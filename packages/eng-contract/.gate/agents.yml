@@ -1,4 +1,4 @@
-template: design/process/templates/AGENTS.template.md
+template: ../../design/process/templates/AGENTS.template.md
 output: AGENTS.md
 values:  # key = the exact text between the double braces in the template
   "package-name": "eng-contract"
@@ -15,5 +15,5 @@ values:  # key = the exact text between the double braces in the template
   "The session's configured model provider; CI reviewer providers; PyPI and other package registries; official\ndocumentation sites listed here; this project's GitHub.": "The session's configured model provider (Anthropic); CI reviewer providers: awaiting owner (bootstrap mode); PyPI (pypi.org, files.pythonhosted.org); this project's GitHub (AbdulkareemSasah/Eng-Agent) and the Sasaah repository, read-only; official documentation: docs.python.org, docs.astral.sh, docs.pydantic.dev, datatracker.ietf.org, docs.github.com."
   "from CODEOWNERS": "as in `.github/CODEOWNERS` at the workspace root (contracts, and engineering content for `src/eng_contract/units*`)"
   "for servers": "not applicable (this package is not a server)"
-  "values": "line 95, branch 90, mutation score 80 for units, quantity, refs and canonical (`pyproject.toml`; process/05 section 2)"
+  "values": "line 95, branch 90, mutation score 80 on all R2 sources under `src/eng_contract/` (`pyproject.toml`; process/05 section 2)"
   "links to acceptance records and spike reports": "none; the package needs no host program, see `docs/local-testing.md`"

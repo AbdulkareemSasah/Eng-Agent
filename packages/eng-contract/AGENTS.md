@@ -101,5 +101,5 @@ The session's configured model provider (Anthropic); CI reviewer providers: awai
 - Tool prefix and toolsets: not applicable (this package is not a server)
 - Fake host and how to run it: not applicable (this package is not a server)
 - Live acceptance scripts: `acceptance/scripts/` (run by the owner only)
-- Coverage thresholds: line 95, branch 90, mutation score 80 for units, quantity, refs and canonical (`pyproject.toml`; process/05 section 2)
+- Coverage thresholds: line 95, branch 90, mutation score 80 on all R2 sources under `src/eng_contract/` (`pyproject.toml`; process/05 section 2)
 - Known host quirks: none; the package needs no host program, see `docs/local-testing.md`
