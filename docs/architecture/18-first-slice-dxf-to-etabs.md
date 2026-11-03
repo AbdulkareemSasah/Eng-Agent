@@ -45,17 +45,17 @@ Steps 1 and 2 run once per run; steps 3 to 15 form one cycle and repeat until th
 
 | # | Step | Kind | Notes |
 |---|---|---|---|
-| 1 | Check server builds | enforced | Stops before any write if a build is older than the declared minimum |
+| 1 | Check server builds and tool lists | enforced | Stops before any write if a build is older than the declared minimum or its tool list differs from the tested one ([11](11-harness-engine.md) §6) |
 | 2 | Open the model; save a working copy in the run folder | tools | The baseline revision |
 | 3 | Read the model state | tools | Identity, revision, and the objects and properties the edit kinds touch |
 | 4 | Compare with the last recorded revision | calc | Differences are engineer changes: shown and recorded, never overwritten |
 | 5 | Validate the change set | enforced | Types, units and bounds; objects and sections exist or are defined in the same set |
-| 6 | Approve the change set, with the differences | approve | On the local approval page ([ADR-0027](../adr/0027-phase-1-interface.md)) |
+| 6 | Approve the change set, with the differences | approve | On the local approval page ([ADR-0027](../adr/0027-phase-1-interface.md)). The approval is bound to this change set and this model state; single edits can be rejected |
 | 7 | Save as the next revision | tool | `model_saved` with revision, fingerprint and file hash |
-| 8 | Apply the edits | tools | Batched, by reference to the change set |
+| 8 | Apply the edits | tools | Batched, by reference to the change set, after a check that the model has not changed since the approval; if it has, the cycle returns to step 3 |
 | 9 | Read back and check | enforced | Every written value matches the change set (P7) |
 | 10 | Save | tool | Before analysis, so no run waits on a save dialog |
-| 11 | Run analysis | tool | A timeout is `TIMEOUT_UNKNOWN_OUTCOME`: reconcile by reading the model state before any retry |
+| 11 | Run analysis | tool | With a timeout suited to analysis, or followed through the status tool ([11](11-harness-engine.md) §9). A timeout is `TIMEOUT_UNKNOWN_OUTCOME`: reconcile by reading the model state and units before any retry |
 | 12 | Run design | tool | Needs a Sasaah build in which design runs work |
 | 13 | Read results | tools | Analysis messages, drifts, design ratios and failing members, by reference |
 | 14 | Summarize | calc | Governing ratios, failing members, changes from the previous revision |

@@ -68,14 +68,16 @@ shape this design:
 |---|---|
 | Script-runner tools (`run_script`, `invoke`) let agents write random code, and tasks took hours | Forbidden by P6 and [ADR-0008](../adr/0008-tool-naming-toolsets-no-escape-hatches.md) |
 | Results returned as text forced agents to re-type numbers | `result_id` store and `$ref` inputs ([ADR-0005](../adr/0005-pass-by-reference.md)) |
-| Unit state in ETABS was not restored after timeouts | Servers never leave host units changed; unit handling is centralized ([06](06-csi-servers.md) §5) |
+| Unit state in ETABS was not restored after timeouts | Servers never leave host units changed; unit handling is centralized ([06](06-csi-servers.md) §5). Until the Sasaah CSI engine does this, the harness checks the model's units after every timeout or reconnect ([11](11-harness-engine.md) §6) |
 | Timeouts were reported as plain failures although the write may have happened | `TIMEOUT_UNKNOWN_OUTCOME` plus idempotency keys ([ADR-0007](../adr/0007-write-safety.md)) |
 | A modal dialog in Revit froze the request queue | Failure preprocessing and dialog suppression in the add-in ([07](07-revit-agent-bridge.md) §6) |
-| Two servers for one host starved each other | Exactly one server per host instance |
+| Two servers for one host starved each other | Exactly one server per host instance, enforced by a lock in the harness ([11](11-harness-engine.md) §6) |
 | Building a desktop host and agent loop consumed the effort while tools stayed thin | The harness reuses libraries for the model loop and owns only the workflow engine ([ADR-0011](../adr/0011-harness-owns-workflow-engine.md)) |
 | Over half the code was never in version control | Every repository is in git from its first commit; CI is mandatory ([process](../../process/README.md)) |
 | Processes at low integrity level could not drive host programs reliably | Servers run at the same integrity level as the host program ([16](16-security-safety-privacy.md) §6) |
-| A server build older than its own fix failed every design run | The harness checks server builds at run start ([ADR-0024](../adr/0024-harness-on-existing-sasaah-servers.md)) |
+| A server build older than its own fix failed every design run | The harness checks server builds and tool lists at run start ([ADR-0024](../adr/0024-harness-on-existing-sasaah-servers.md), [11](11-harness-engine.md) §6) |
 | Save dialogs and analysis timeouts turned into manual steps for the engineer | Save before every analysis; timeouts reconciled, never retried blindly ([11](11-harness-engine.md) §6) |
 | Agents met missing tools mid-project and wrote one-off scripts | Project lane: permanent tools with tests ([ADR-0026](../adr/0026-project-lane-for-tools.md)) |
 | Sasaah Agent ran a free agent loop on Microsoft Agent Framework behind a WPF shell; the effort went there and no real engineering task was finished | The harness never uses Microsoft Agent Framework (its core or its free loop), a WPF interface, or the Sasaah Agent design system (owner's rule, 2026-11-03). It has its own engine ([ADR-0011](../adr/0011-harness-owns-workflow-engine.md)) and no graphical interface in phase 1 ([ADR-0027](../adr/0027-phase-1-interface.md)) |
+| Sasaah Agent spent its phases on design documents and on fakes, and never finished a real engineering task | Every phase has a time box; scope is cut, never the exit criteria ([19](19-roadmap-and-spikes.md) §1) |
+| Engineers edit the model by hand between turns, so it can change after an approval | Approvals are bound to what was shown and to the model, and checked again just before the write ([11](11-harness-engine.md) §3), as in Sasaah Agent's approval token |

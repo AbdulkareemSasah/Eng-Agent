@@ -16,6 +16,9 @@ Status: Proposed (revised by ADR-0024 to ADR-0027)
 In every phase, a capability that is missing during a live project goes through the project lane
 ([ADR-0026](../adr/0026-project-lane-for-tools.md)).
 
+Each phase gets a time box from the owner when it starts (two weeks proposed for phase 0). A phase that has not met
+its exit criteria within its time box cuts scope; its exit criteria are never lowered to close it.
+
 ## 2. Spikes
 
 A spike answers a specific question with throwaway code in the target package's `spikes/` folder, time-boxed to at most
@@ -24,7 +27,7 @@ and ADR updates. Spike code never ships. Spikes run at the start of the phase th
 
 | Id | Phase | Question | Feeds |
 |---|---|---|---|
-| S-12 | 0 | `sasaah-csi-mcp` inventory for the edit cycle: which tools cover each step and edit kind, their units, errors, timeouts and build reporting; which tools run scripts or write tables (kept off the allowlist); gaps | ADR-0024, [18](18-first-slice-dxf-to-etabs.md) |
+| S-12 | 0 | `sasaah-csi-mcp` inventory for the edit cycle: which tools cover each step and edit kind, their units, errors, timeouts and build reporting; which tools run scripts or write tables (kept off the allowlist); gaps. Starts from the tool-manifest exporter of the earlier Sasaah Agent project (`tools/export-manifest`), regenerated for the current catalog of 83 CSI tools | ADR-0024, [18](18-first-slice-dxf-to-etabs.md) |
 | S-02 | 0 | Analysis and design through `sasaah-csi-mcp`: run times, timeout behavior and unknown outcomes, save before run, modal dialogs | [11](11-harness-engine.md) §6 |
 | S-04 | 0 | Reading the model state through `sasaah-csi-mcp`: speed and reliability of a fingerprint and a difference report that catches edits made in the ETABS window; stamping the model identity | [11](11-harness-engine.md) §5, [18](18-first-slice-dxf-to-etabs.md) |
 | S-10 | 0 | Replay-based resumption of async Python blocks with a recorded journal; Job Object termination of child servers | ADR-0014 |
@@ -45,7 +48,7 @@ Imagine it is a year from now and the project failed. The most likely reasons, a
 | R1 | It works, but it is not faster than the engineer | Benchmark B-1 before coding; acceptance A4 gates phase 2; rules-first decisions; batch tools; save before analysis | Phase 1 timings above 50% of baseline |
 | R2 | The decision model is unavailable, changes, or is wrong for engineering states | Provider interface; engineer tier; decision model only from phase 2, in shadow mode with evaluations | S-07 results; evaluation agreement under 95% |
 | R3 | A host API or a Sasaah tool cannot do something a workflow needs | Spikes first (S-12); project lane; gap reports | Gap reports that block a workflow |
-| R4 | Too many packages at once, none finished | Strict phases; packages created only when their phase starts | More than six active packages before phase 1 exit |
+| R4 | Too many packages at once, none finished | Strict phases with time boxes (§1); packages created only when their phase starts | More than six active packages before phase 1 exit; a phase past its time box |
 | R5 | The owner becomes the bottleneck for approvals and reviews | Owner approves only engineering content and contracts; CI reviewers and checks do the rest; daily digest | Pull requests waiting more than a week for the owner |
 | R6 | Coding agents ignore the process and improvise | Machine-checked gates, risk floor, file scope, test-first check, CI reviewers, separate identities, no escape-hatch tools; the project lane as the allowed fast path | Failing `gate-check` runs; seeded-defect audits missed; one-off scripts in session reports |
 | R7 | A code check or calc is wrong | Verification requirements; independent review; approval bound to content hash; program comparison | Disagreement with host design output |
@@ -53,5 +56,5 @@ Imagine it is a year from now and the project failed. The most likely reasons, a
 | R9 | The UI framework cannot support Arabic or live updates | Phase 1 uses plain HTML pages (ADR-0027); spike S-09 before the full UI, with a documented fallback | S-09 outcome |
 | R10 | Host programs misbehave when driven by background processes | Same-integrity rule; S-02; watchdog and wedged state; save before analysis | Spike failures; manual hand-offs in run journals |
 | R11 | A host crash leaves the journal and the model out of step | Save after every write step; host-state check on resume; reconciliation by reading the model | A6 failures |
-| R12 | Sasaah server behavior (stale builds, timeouts, dialogs, partial writes) breaks workflows | Build check at run start; adapters pinned to tested builds, with contract tests; work on a copy; reconciliation before any retry; adoption of [05](05-mcp-server-standard.md) in Sasaah | Build-check failures; reconciliation in more than one run in ten |
+| R12 | Sasaah server behavior (stale builds, timeouts, dialogs, partial writes, unrestored units) breaks workflows | Build and tool-list check at run start; units checked after every timeout; adapters pinned to tested builds, with contract tests; work on a copy; reconciliation before any retry; adoption of [05](05-mcp-server-standard.md) in Sasaah | Build-check failures; reconciliation in more than one run in ten |
 | R13 | Project-lane tools never pass the release lane | Copies only; marked results; open lane branches in the owner digest | Lane branches older than 30 days |
