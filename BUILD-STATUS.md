@@ -43,11 +43,11 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | Id | Task | Author (model, effort) | Reviewer (model, effort) | PR | Status |
 |---|---|---|---|---|---|
 | B-001 | ADR-0028; move the hub into `design/`; update affected documents | lead | — (owner decision record) | direct commit f434a41 | done |
-| B-002 | Workspace root: uv workspace, `.python-version`, README, AGENTS.md, CLAUDE.md, `.gate/`, `.github/` skeleton | sonnet, low | opus, low | — | in progress |
-| B-003 | `eng-contract` spec and plan (draft) | opus, medium | opus, medium (R2) | — | in progress |
-| B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high | opus, low | — | in progress |
-| B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium | opus, low | — | in progress |
-| B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high | opus, low | — | in progress |
+| B-002 | Workspace root: uv workspace, `.python-version`, README, AGENTS.md, CLAUDE.md, `.gate/`, `.github/` skeleton | sonnet, low (second attempt, P-1) | opus, low | — | in progress |
+| B-003 | `eng-contract` spec and plan (draft) | opus, medium; fixes: opus, medium (2 rounds) | opus, medium (R2) | [#3](https://github.com/AbdulkareemSasah/Eng-Agent/pull/3) | in review |
+| B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high; fix: sonnet, high | opus, low | [#4](https://github.com/AbdulkareemSasah/Eng-Agent/pull/4) | in review |
+| B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium; report committed by the lead (P-2) | opus, low | [#5](https://github.com/AbdulkareemSasah/Eng-Agent/pull/5) | in review |
+| B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high; report committed by the lead (P-2) | opus, low | [#6](https://github.com/AbdulkareemSasah/Eng-Agent/pull/6) | in review |
 | B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | — | blocked on B-005 |
 
 ## 4. Decisions by the lead
@@ -68,7 +68,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 
 | Id | Problem | Handling |
 |---|---|---|
-| — | none yet | — |
+| P-1 | The first five worktrees of wave 1 were created from the Sasaah checkout (the lead's shell was there at launch); B-002 stopped, the others cloned Eng-Agent into the scratchpad. Nothing reached Sasaah | Launch every agent from `/home/user/Eng-Agent`; every prompt checks `git remote -v` first |
+| P-2 | Subagents' write tool refuses files it treats as report files (`REPORT.md`) | The lead commits such files from the drafts the subagents return; prompts say not to work around a refusal |
 
 ## 6. Owner queue
 
@@ -87,13 +88,30 @@ option and continued.
 
 | Id | ADR | Recommendation |
 |---|---|---|
-| — | none yet | — |
+| OQ-A1 | Hub ADR "eng-contract 0.1 details": the details the contract spec adds to 04 (marked [added], spec Q1) | To be written as `Proposed` once the spec merges; accept after review |
+| OQ-A2 | ADR amending ADR-0014 (from S-10): replay by step path, block version and code hash, in-flight reconciliation events, durability policy, one engine per run, one Job Object per server with host programs breaking away | To be written as `Proposed` with the engine spec |
+| OQ-A3 | ADR: `model_locked` after analysis versus `HOST_LOCKED`, and an approved unlock step (S-12 gap S12-G3) | To be written as `Proposed` with the CSI adapter spec |
+| OQ-A4 | ADR amending 04 §3.3: a harness-side model identity when the host cannot stamp one (S12-G6) | To be written as `Proposed` with the CSI adapter spec |
+| OQ-A5 | `eng-dev-gate` package ADR-0001: runtime dependencies PyYAML, Pydantic, ruff, mypy, pytest, coverage (gate spec) | Approve |
 
 ### 6.3 Gaps (engineering content left draft or not implemented)
 
 | Id | Gap | Recommendation |
 |---|---|---|
-| — | none yet | — |
+| OQ-G1 | CSI `Ton` unit systems: metric tonne-force or short ton-force? Until confirmed, `eng-contract` refuses them (contract G-1) | Confirm from the CSI API documentation or a local check |
+| OQ-G2 | CSI mass and time units are not mapped in `eng-contract` 0.1 (G-2) | Map when an adapter needs masses |
+| OQ-G3 | Sign and axis convention of `forces.member_end/1` (G-3) | CSI local axes 1-2-3 (`host_local/1`), confirmed at the first local run |
+| OQ-G4 | Exact table and section numbers of the SI Brochure and NIST SP 811 citations for unit factors (G-4) | Confirmed or removed in contract task T4; never guessed |
+| OQ-G5 | No server version or build id in any Sasaah server (S12-G1) | The harness pins the Sasaah commit and hashes the executable; ask Sasaah for `serverInfo.version` and a tool-list hash |
+| OQ-G6 | Analysis and design are synchronous; no start-and-poll (S12-G2) | Per-run larger call timeout sized by S-02, then `TIMEOUT_UNKNOWN_OUTCOME` and reconciliation |
+| OQ-G7 | No batch edit tools (S12-G4) | Bounded per-object calls in the adapter; typed batch tools in Sasaah later |
+| OQ-G8 | No seismic-parameter tool, no load-pattern change or delete, typed slab section not exposed (S12-G5) | Out of the v1 edit-kind list; gap report to Sasaah (its `02_Engines` is frozen outside spec 005, so the build opens no pull request) |
+| OQ-G9 | `csi_db_tables_apply` stays visible under `DisableScript` (S12-G7) | The allowlist and the tool-list fingerprint keep it out; ask Sasaah for a switch that hides it |
+| OQ-G10 | Read-back gaps for area thickness, restraints and distributed frame loads (S12-G8) | Typed reads of pinned table keys through `csi_db_table_read` (read only), confirmed locally |
+| OQ-G11 | `csi_define_*` tools take untyped specs (S12-G10) | Allow with an adapter-pinned list of methods and keys |
+| OQ-G12 | Revit: no save, analytical-model or move tools; timeout code lost; an internal retry may duplicate writes (S12-G11) | Phase 3 adapter works around what it can; the rest are gaps |
+| OQ-G13 | IDEA: stub mode, no check-model, a load unit missing, scripts on by default (S12-G12) | Phase 4 adapter rules; start the server with `--disable-script` |
+| OQ-G14 | `tools/etabs-model/classify-columns.ps1` embeds engineering thresholds (S12-G13) | Not adopted by the harness until the owner reviews it |
 
 ### 6.4 Questions
 
@@ -104,6 +122,20 @@ option and continued.
 | OQ-Q3 | Benchmark B-1 (18 §5) is needed before the first release | Prepare it before the local A4 run |
 | OQ-Q4 | The edit-kind list of the first workflow (18 §2; overview §14 item 13) needs the owner's confirmation | Confirm in the workflow spec review; the build implements the listed kinds that S-12 finds tools for |
 | OQ-Q5 | The tool-manifest exporter of Sasaah Agent (19, S-12) is not available here; the inventory is built from the catalog sources | Regenerate with the exporter during local testing and compare |
+| OQ-Q6 | Contract: refuse a workspace whose location cannot be classified (spec Q2) | Yes; revisit after local tests |
+| OQ-Q7 | Contract: envelopes and records forbid unknown fields (Q3) | Keep while packages upgrade together; decide by ADR before the first public release |
+| OQ-Q8 | Contract: should verdicts recompute `ratio = demand / capacity`? (Q5) | No: it needs a tolerance, which is engineering content |
+| OQ-Q9 | Seismic load parameters: a harness kind `harness.seismic_parameters/1` (contract Q6) | Harness-owned until a second consumer needs it; seismic edits wait for a Sasaah tool (OQ-G8) |
+| OQ-Q10 | Gate: add a `tool` row (95/90/80) to process/05 §2 for `eng-dev-gate` (gate Q2) | Yes, in a process change that lists the `AGENTS.md` files to re-render |
+| OQ-Q11 | Gate: numeric literals in checks, calcs, blocks and rules: only integer indexes and comparisons with `len` are allowed (gate Q5) | Keep only those two exceptions |
+| OQ-Q12 | Gate: the "bandit subset" of process/11 §3 is undefined; the gate uses all `S` rules except `S101` in tests (Q6) | Accept |
+| OQ-Q13 | Gate: how the owner approves a spec or plan in bootstrap mode (Q7) | Commit the status change directly to `build/v1`, or switch bootstrap off first |
+| OQ-Q14 | Gate: import rules for Python products are not defined in 03 §3 (Q9) | Define in the first Python product's spec |
+| OQ-Q15 | Gate: host SDK module names for ETABS, SAFE, SAP2000 and IDEA for the forbidden-import rule (Q10) | Fill in after the first local runs |
+| OQ-Q16 | Engine (S-10): after "not applied", retry with a new `op_id` or the old one? | Reuse the `op_id` where the server deduplicates; otherwise define "not applied" per adapter; decide with S-02 |
+| OQ-Q17 | Engine (S-10): block version bump or recorded code hash for unfinished runs? | Record both: a hash change with the same version warns, a version change stops |
+| OQ-Q18 | Stale section references in the hub: 01 P5 and P9, 05, 10 §3, 11 §12 and 17 §2 cite the wrong 04 sections | Fix in a hub documents change (task queued) |
+| OQ-Q19 | 17 §4 asks for the current and the previous Python minor version; ADR-0028 §5 pins 3.14 only | ADR-0028 applies for v1; amend 17 §4 when the owner accepts it |
 
 ### 6.5 Sasaah pull requests
 

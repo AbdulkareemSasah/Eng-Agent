@@ -1,0 +1,508 @@
+{
+  "inventory": "sasaah-cli-tools",
+  "sasaah_commit": "61da80f61a6562c8e3553168056bc107e3f93013",
+  "provenance": "Built by static reading of the C# catalog sources with extract.py; nothing was run against a host. Compare with the live tools/list of the pinned build (needs local test).",
+  "server": {
+    "executable": "PowerShell wrappers (pwsh -File ...) over published .NET command-line programs in 04_Deployments/Sasaah.Etabs.DxfPrep.Cli and Sasaah.Etabs.ModelFromDxf.Cli",
+    "transport": "process: command-line arguments in, files and console text out, exit code",
+    "version_reporting": "None. The wrappers rebuild the cached CLI when sources are newer than the cached exe (build.ps1 / prepare.ps1), so the behavior follows the working tree, not a pinned build. The adapter must pin the Sasaah commit and hash the cached exe.",
+    "tool_count": 10
+  },
+  "tools": [
+    {
+      "name": "dxf-prep/prepare.ps1",
+      "description": "One-command ETABS DXF preparation: CLI + validator + AutoCAD check + preview.",
+      "description_full": "Prepares one DXF file (or every *.dxf directly inside a folder) for ETABS import. Auto-detection is the default: entities classify by geometry with layer names as hints, so any office style works with no layer options. For each input it runs the cached DxfPrep CLI, validates the output, opens it with AutoCAD accoreconsole, renders a preview PNG, prints one compact summary table, and upserts <OutDir>\\prep-report.md (rows accumulate across runs, keyed by file stem). Exits non-zero when any file fails. Input files are never modified.",
+      "toolset": "dxf-prep",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "Path": {
+            "type": "string"
+          },
+          "OutDir": {
+            "type": "string",
+            "default": ""
+          },
+          "ColumnGrow": {
+            "type": "number",
+            "default": 0.0
+          },
+          "SnapTol": {
+            "type": "number",
+            "default": 0.6
+          },
+          "BeamSpacing": {
+            "type": "number",
+            "default": 0.2
+          },
+          "WallLayer": {
+            "type": "string",
+            "default": "A-WALL"
+          },
+          "ColumnLayer": {
+            "type": "string",
+            "default": "اعمده"
+          },
+          "GridLayers": {
+            "type": "string",
+            "default": ""
+          },
+          "SlabLayer": {
+            "type": "string",
+            "default": ""
+          },
+          "OpeningLayer": {
+            "type": "string",
+            "default": ""
+          },
+          "Profile": {
+            "type": "string",
+            "default": ""
+          },
+          "SaveProfile": {
+            "type": "string",
+            "default": ""
+          },
+          "SlabFromBeams": {
+            "type": "boolean"
+          },
+          "ColumnLayerOnly": {
+            "type": "boolean"
+          },
+          "ColumnSize": {
+            "type": "string",
+            "default": ""
+          },
+          "ClipToColumns": {
+            "type": "boolean"
+          },
+          "ClipMargin": {
+            "type": "number",
+            "default": 0.5
+          },
+          "RequireSupport": {
+            "type": "boolean"
+          },
+          "MaxExtend": {
+            "type": "number",
+            "default": 3.0
+          },
+          "MergeAxes": {
+            "type": "boolean"
+          },
+          "MergeTol": {
+            "type": "number",
+            "default": 0.0
+          },
+          "Origin": {
+            "type": "string",
+            "default": "grid-min",
+            "enum": [
+              "grid-min",
+              "keep"
+            ]
+          },
+          "SkipAutoCad": {
+            "type": "boolean"
+          },
+          "Rebuild": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "Path"
+        ]
+      },
+      "input_schema_note": "Converted from the PowerShell param() block: [string]->string, [double]->number, [switch]->boolean, ValidateSet->enum, Mandatory->required.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "Metres in the output DXF (documented), no host unit setting."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "0 ok; 1 any file failed or no input; CLI: 0/1/2/3",
+      "source": {
+        "file": "tools/dxf-prep/prepare.ps1",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes <OutDir>/<stem>.dxf, <stem>.grids.json, preview PNG and prep-report.md; never modifies the input DXF.",
+        "Calls the cached DxfPrep CLI (dotnet publish on first use or when sources are newer), a Python validator, AutoCAD accoreconsole (path fixed to AutoCAD 2023 in the script) and a Python preview renderer: needs a Windows machine with AutoCAD (needs local test).",
+        "Output geometry is in metres with the lowest-left grid intersection at the origin (docs/dxf-prep/README.md, Origin option).",
+        "Exit code is non-zero on any failure (README); the CLI itself uses 0 ok, 1 usage, 2 unreadable input, 3 failed (Program.cs:34-37)."
+      ]
+    },
+    {
+      "name": "dxf-prep/inspect.ps1",
+      "description": "Fast DXF classification preview: no output DXF, just the verdicts plus a PNG.",
+      "description_full": "Runs the cached DxfPrep CLI in --inspect mode on one DXF file (or every *.dxf directly inside a folder): prints per-layer entity counts with the auto classification and confidence per layer/class, plus warnings for ambiguous items. Writes <stem>.classify.json (the raw verdicts) and <stem>.classify.png, a preview coloured by class. Input files are never modified. Use this first for an unknown office, then prepare with -Profile/-SaveProfile.",
+      "toolset": "dxf-prep",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "Path": {
+            "type": "string"
+          },
+          "OutDir": {
+            "type": "string",
+            "default": ""
+          },
+          "Rebuild": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "Path"
+        ]
+      },
+      "input_schema_note": "Converted from the PowerShell param() block: [string]->string, [double]->number, [switch]->boolean, ValidateSet->enum, Mandatory->required.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "non-zero on failure",
+      "source": {
+        "file": "tools/dxf-prep/inspect.ps1",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Fast classification preview: runs the CLI in --inspect mode, writes <stem>.classify.json and <stem>.classify.png; no output DXF."
+      ]
+    },
+    {
+      "name": "etabs-model/build.ps1",
+      "description": "One-command ETABS model from prepared DXFs: generate e2k, save EDB, analyze, verify.",
+      "description_full": "Reads a model-config.json plus prepared level DXFs, writes <out>.e2k, then (unless -NoEtabs) opens it in a self-launched hidden ETABS 22 instance, saves <out>.EDB, runs the analysis, checks the saved model, exits only that instance, prints a compact summary, and writes model-report.md next to the output. Exits non-zero on any failure. The template is never modified.",
+      "toolset": "etabs-model",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "Config": {
+            "type": "string"
+          },
+          "NoEtabs": {
+            "type": "boolean"
+          },
+          "Rebuild": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "Config"
+        ]
+      },
+      "input_schema_note": "Converted from the PowerShell param() block: [string]->string, [double]->number, [switch]->boolean, ValidateSet->enum, Mandatory->required.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "analysis",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "Uses the template's units (kN, m, C documented) in a hidden instance it launched; the user's ETABS session is never touched."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 300,
+        "source": "04_Deployments/Sasaah.Etabs.ModelFromDxf.Cli/Program.cs:194 (ETABS call timeout inside the CLI); the process itself has no overall timeout",
+        "declared_per_tool": true
+      },
+      "exit_codes": "0 ok; 1 failure; 2 usage",
+      "source": {
+        "file": "tools/etabs-model/build.ps1",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Generates <out>.e2k, launches its own hidden ETABS instance, saves <out>.EDB, RUNS THE ANALYSIS, verifies the saved model, exits only the instance it launched, writes model-report.md (docs/etabs-model/README.md).",
+        "The ETABS session inside the CLI uses CallTimeoutSec 300 (04_Deployments/Sasaah.Etabs.ModelFromDxf.Cli/Program.cs:194) instead of the server default of 120.",
+        "Template .e2k is ETABS 22 text in kN/m/C and is read-only; the model units follow the template (documented).",
+        "Needs ETABS 22 installed: needs local test. -NoEtabs stops after writing the e2k.",
+        "Exit codes of the CLI: 0 ok, 1 failure ('FAIL: ...'), 2 usage (Program.cs:41-65)."
+      ]
+    },
+    {
+      "name": "etabs-model/classify-columns.ps1",
+      "description": "Reaction-based column sizing: joins base reactions (footings.json from the footing-design tool) with old sections (current .e2k) into column-overrides.json.",
+      "description_full": "Reads per-position factored axial loads (1.2D+1.6L, ACI 318 gravity combo as combined by ReactionCombiner) and assigns every base position one of 20x45 / 20x55 / 20x65 by declared thresholds. Orientation is NOT decided here: the builder keeps each column's DXF direction (ANG), the override only changes the long side. The JSON also carries the old-section map and the assumption/threshold text the model CLI pastes into model-report.md.",
+      "toolset": "etabs-model",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "FootingsJson": {
+            "type": "string"
+          },
+          "E2k": {
+            "type": "string"
+          },
+          "Out": {
+            "type": "string"
+          },
+          "T1": {
+            "type": "number",
+            "default": 700.0
+          },
+          "T2": {
+            "type": "number",
+            "default": 870.0
+          }
+        },
+        "required": [
+          "FootingsJson",
+          "E2k",
+          "Out"
+        ]
+      },
+      "input_schema_note": "Converted from the PowerShell param() block: [string]->string, [double]->number, [switch]->boolean, ValidateSet->enum, Mandatory->required.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/etabs-model/classify-columns.ps1",
+        "line": 1
+      },
+      "excluded_from_allowlist": true,
+      "exclusion_reason": "Embeds engineering decision thresholds that are not in the design basis; keep out of the allowlist until the owner reviews them.",
+      "notes": [
+        "Reaction-based column sizing helper: assigns one of three column sizes by declared axial-load thresholds (script header). It embeds engineering thresholds: engineering content, not to be adopted or approved by this build (risk R1); recorded as an owner-queue item.",
+        "Not part of the optional DXF start of 18 section 6."
+      ]
+    },
+    {
+      "name": "dxf-prep/validate_etabs_dxf.py",
+      "description": "Validate a prepared ETABS DXF against its grid sidecar",
+      "description_full": "Validate a prepared ETABS DXF against its grid sidecar. Usage: python tools/dxf-prep/validate_etabs_dxf.py <output.dxf> [<grids.json>] [--expected-columns 34] [--expect-sizes \"0.2x0.45,0.55x0.2,...\"] [--strict-connectivity] Checks (exit non-zero with a message on the first failure): - modelspace holds exactly <expected-columns> closed LWPOLYLINEs on layer اعمده; - every column bbox centre is within 1e-6 of a translated grid intersection; - every column bbox size matches one entry of --expect-sizes (orientation free, within 1e-3) when that option is given; - every LINE on layer beams is longer than zero; - every beam end is either a grid intersection (within 1e-6) or lies on another beam (within 1e-6); - no duplicate beams (same endpoints either direction, within 1e-6); - the minimum grid intersection is at (0, 0) within 1e-6; - $INSUNITS is 6 (metres).",
+      "toolset": "dxf-prep",
+      "input_schema": null,
+      "input_schema_note": "Positional arguments of a Python helper; not converted.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/validate_etabs_dxf.py",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Validates a prepared ETABS DXF against its grids sidecar; called by prepare.ps1.",
+        "Internal helper, not an adapter tool; schema not extracted (positional arguments)."
+      ]
+    },
+    {
+      "name": "dxf-prep/render_preview.py",
+      "description": "Render a side-by-side preview PNG for one prepared ETABS DXF",
+      "description_full": "Render a side-by-side preview PNG for one prepared ETABS DXF. Usage: python tools/dxf-prep/render_preview.py <source.dxf> <output.dxf> <grids.json> <out.png> Left panel: the source file translated by the same origin offset the pipeline applied (read from grids.json ``origin_offset``), all LINE/LWPOLYLINE entities drawn (block references exploded). Right panel: the prepared output with grid lines dashed, column outlines filled, and beam centrelines drawn.",
+      "toolset": "dxf-prep",
+      "input_schema": null,
+      "input_schema_note": "Positional arguments of a Python helper; not converted.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/render_preview.py",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Renders a side-by-side preview PNG; called by prepare.ps1.",
+        "Internal helper, not an adapter tool; schema not extracted (positional arguments)."
+      ]
+    },
+    {
+      "name": "dxf-prep/render_classify.py",
+      "description": "Render a classification preview PNG for one DXF file",
+      "description_full": "Render a classification preview PNG for one DXF file. Usage: python tools/dxf-prep/render_classify.py <source.dxf> <classify.json> <out.png> Colours entities by the classifier verdict (per layer): grids grey, columns filled orange, beams dark blue, slab green, openings red, stairs purple, annotation/ignored light grey. Grid axes from the JSON overlay dashed, stair regions outline purple.",
+      "toolset": "dxf-prep",
+      "input_schema": null,
+      "input_schema_note": "Positional arguments of a Python helper; not converted.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/render_classify.py",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Renders a classification preview PNG; called by inspect.ps1.",
+        "Internal helper, not an adapter tool; schema not extracted (positional arguments)."
+      ]
+    },
+    {
+      "name": "dxf-prep/compare_dxf.py",
+      "description": "Compare two prepared ETABS DXFs (plus grid sidecars) geometrically",
+      "description_full": "Compare two prepared ETABS DXFs (plus grid sidecars) geometrically. Usage: python tools/dxf-prep/compare_dxf.py <a.dxf> <b.dxf> Compares column outlines on اعمده, beam LINEs on beams, slab/opening polygons, and the grids.json sidecars. Prints counts and the max coordinate difference. Exit 0 when identical within 1e-6, 1 otherwise.",
+      "toolset": "dxf-prep",
+      "input_schema": null,
+      "input_schema_note": "Positional arguments of a Python helper; not converted.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/compare_dxf.py",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Compares two prepared DXFs geometrically; development utility, not called by the scripts.",
+        "Internal helper, not an adapter tool; schema not extracted (positional arguments)."
+      ]
+    },
+    {
+      "name": "dxf-prep/make_variants.py",
+      "description": "Generate robustness variants of the <private> test corpus into %TEMP%/dxfprep-variants",
+      "description_full": "Generate robustness variants of the <private> test corpus into %TEMP%/dxfprep-variants. (a) every entity moved to layer 0, blocks exploded; (b) layers renamed to meaningless names (L1, L2, ...); (c) a millimetre version (all coordinates x1000, INSUNITS 4). Inputs (read-only): COLS WITH GRIBS.dxf and GF.dxf from the <private> DXF folder.",
+      "toolset": "dxf-prep",
+      "input_schema": null,
+      "input_schema_note": "Positional arguments of a Python helper; not converted.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/make_variants.py",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Generates robustness test variants of a private test corpus; development utility.",
+        "Internal helper, not an adapter tool; schema not extracted (positional arguments)."
+      ]
+    },
+    {
+      "name": "dxf-prep/check_autocad_open.ps1",
+      "description": "Verifies that AutoCAD 2023 (accoreconsole) can open a DXF without error.",
+      "description_full": "Copies the DXF to a temp dir under an ASCII name, drives accoreconsole.exe with a SAVEAS script, and exits 0 only when the process exits 0, out.dwg is produced, and the console output contains none of the DXF failure markers. Only the accoreconsole process this script starts is ever stopped.",
+      "toolset": "dxf-prep",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "Dxf": {
+            "type": "string"
+          },
+          "AcCore": {
+            "type": "string",
+            "default": "C:\\Program Files\\Autodesk\\AutoCAD 2023\\accoreconsole.exe"
+          }
+        },
+        "required": [
+          "Dxf"
+        ]
+      },
+      "input_schema_note": "Converted from the PowerShell param() block: [string]->string, [double]->number, [switch]->boolean, ValidateSet->enum, Mandatory->required.",
+      "declared_annotations": null,
+      "annotations_note": "Command-line tools declare no MCP annotations.",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "note": "No host unit switching in the script itself."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": null,
+        "declared_per_tool": false,
+        "note": "No timeout is set by the script; the harness must bound the process (Job Object, process/11 and 11 section 9)."
+      },
+      "exit_codes": "not read",
+      "source": {
+        "file": "tools/dxf-prep/check_autocad_open.ps1",
+        "line": 1
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Opens a DXF with AutoCAD accoreconsole to prove AutoCAD can read it; called by prepare.ps1. Needs AutoCAD (needs local test)."
+      ]
+    }
+  ]
+}
