@@ -7,10 +7,9 @@ import json
 from importlib.metadata import version
 
 import pytest
-
 from eng_dev_gate import __version__
 from eng_dev_gate.cli import main
-from eng_dev_gate.results import EnvironmentFault, ExitCode, Status, UsageError, exit_code_for
+from eng_dev_gate.results import EnvironmentFaultError, ExitCode, Status, UsageError, exit_code_for
 
 COMMANDS = [
     "check", "gate-check", "risk-floor", "test-first", "forbidden", "imports", "licenses", "ratchet",
@@ -20,14 +19,14 @@ COMMANDS = [
 
 def test_exit_codes() -> None:
     """AC1: 0 pass or awaiting owner, 1 rule failed, 2 usage or configuration, 3 environment or tool."""
-    assert ExitCode.OK == 0
-    assert ExitCode.FAILED == 1
-    assert ExitCode.USAGE == 2
-    assert ExitCode.ENVIRONMENT == 3
-    assert exit_code_for(Status.PASS) == 0
-    assert exit_code_for(Status.AWAITING_OWNER) == 0
-    assert exit_code_for(Status.SKIPPED) == 0
-    assert exit_code_for(Status.FAIL) == 1
+    assert int(ExitCode.OK) == 0
+    assert int(ExitCode.FAILED) == 1
+    assert int(ExitCode.USAGE) == 2
+    assert int(ExitCode.ENVIRONMENT) == 3
+    assert int(exit_code_for(Status.PASS)) == 0
+    assert int(exit_code_for(Status.AWAITING_OWNER)) == 0
+    assert int(exit_code_for(Status.SKIPPED)) == 0
+    assert int(exit_code_for(Status.FAIL)) == 1
 
     def passing(_args: argparse.Namespace) -> Status:
         return Status.PASS
@@ -42,7 +41,7 @@ def test_exit_codes() -> None:
         raise UsageError("malformed configuration")
 
     def broken_tool(_args: argparse.Namespace) -> Status:
-        raise EnvironmentFault("git is missing")
+        raise EnvironmentFaultError("git is missing")
 
     assert main(["check"], handlers={"check": passing}) == 0
     assert main(["check"], handlers={"check": awaiting}) == 0
@@ -81,3 +80,21 @@ def test_error_in_json_format_goes_to_stderr(capsys: pytest.CaptureFixture[str])
     captured = capsys.readouterr()
     assert captured.out == ""
     assert json.loads(captured.err)["status"] == "error"
+
+
+def test_run_exits_with_main_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    from eng_dev_gate.cli import run
+
+    monkeypatch.setattr("sys.argv", ["eng-gate", "--version"])
+    with pytest.raises(SystemExit) as stop:
+        run()
+    assert stop.value.code == 0
+
+
+def test_python_dash_m_entry_point(monkeypatch: pytest.MonkeyPatch) -> None:
+    import runpy
+
+    monkeypatch.setattr("sys.argv", ["eng-gate", "no-such-command"])
+    with pytest.raises(SystemExit) as stop:
+        runpy.run_module("eng_dev_gate", run_name="__main__")
+    assert stop.value.code == 2
