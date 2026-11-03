@@ -36,3 +36,4 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0027](0027-phase-1-interface.md) | Phase 1 interface: command line, HTML approval page and run report | Accepted |
 | [0028](0028-build-v1-in-this-repository.md) | Build v1 in this repository, code-complete before live testing, in bootstrap mode; Python 3.14 | Accepted (owner, in the build prompt) |
 | [0029](0029-eng-contract-0-1-details.md) | eng-contract 0.1 details recorded in 04 (1024-based sizes, `payload_file`, file sources, `op_id` on errors, `infos`, `Subject.case`, `INTERNAL` for store failures, ASCII unit symbols, `canonical.loads`, local trace references) | Proposed |
+| [0033](0033-desktop-products-in-sasaah.md) | The desktop products stay in Sasaah during v1; nothing is built under `products/` | Proposed |
