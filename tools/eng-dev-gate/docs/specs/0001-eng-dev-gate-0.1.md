@@ -62,8 +62,8 @@ General and modes
 - AC3. Given bootstrap mode off, when the same conditions arise, then the check verifies the condition or fails, and
   never reports `awaiting owner`.
 - AC4. Given any environment variable, command-line option or package configuration, when the mode is read, then none
-  of them can switch it; the mode comes only from `bootstrap.enabled` in the root `.gate/gate.yml` (from the base commit
-  in pull-request context); a missing or invalid file exits 2.
+  of them can switch it; the mode comes only from `bootstrap.enabled` in the root `.gate/gate.yml` (from the gate root, which is the
+  base commit, in pull-request context, §4.16); a missing or invalid file exits 2.
 - AC5. Given `bootstrap.enabled: false` and an empty `identities` block, when any command runs, then it exits 2 with
   CF008.
 
@@ -170,12 +170,12 @@ agents (§4.13)
 - AC58. Given a template, `agents keys` prints a YAML skeleton with every placeholder as a correctly quoted key.
 
 CI (§4.14)
-- AC59. Given `.github/workflows/ci.yml`, then it defines the nine jobs of process/11 §5 as thin steps that call local
-  composite actions, triggers on pull requests into `build/v1` and `main` and on pushes to `build/v1`, and the
+- AC59. Given `.github/workflows/ci.yml`, then it defines the nine jobs of process/11 §5 as thin steps that call
+  composite actions (from the base checkout in pull-request jobs, §4.14), triggers on pull requests into `build/v1` and `main` and on pushes to `build/v1`, and the
   `windows` job runs only on pushes.
 - AC60. Given workflows and actions, then an action not pinned by a 40-character commit SHA (WF001), a missing top-level
   `permissions` (WF002), an attacker-controlled expression inside a `run:` script (WF003) or the trigger
-  `pull_request_target` (WF004) fails.
+  `pull_request_target` (WF004) fails; a `ci.yml` whose shape departs from §4.14 (WF005, AC68) fails.
 - AC61. Given `ci-review`, then the pinned prompts match their recorded hashes; in bootstrap mode the job reports AW04
   and exits 0; in normal mode without configured providers it fails closed.
 - AC62. Given the `security` and `build` jobs, then `security` runs the secret scan and `uv audit`, and `build` runs
@@ -184,6 +184,23 @@ CI (§4.14)
   gives a notice and exit 0.
 - AC64. Given the workspace after the last task, when CI runs on a pull request, then every job is green (verified by the
   CI run itself, not by a unit test).
+
+base-commit gate (§4.16)
+- AC65. Given a pull-request event and a gate root that is a checkout of the event's base commit holding the running
+  package, when a judging command runs, then the policy files (`.gate/gate.yml`, `.gate/forbidden.yml`, the risk maps
+  of the base) and the gate code come from the gate root and the tree under check is the head; a head tree that
+  removes a rule from `.gate/forbidden.yml`, lowers a limit in `.gate/gate.yml` or weakens a check under
+  `tools/eng-dev-gate/` while also introducing the violation changes no finding.
+- AC66. Given `--gate-root` whose `HEAD` is not the event's base commit, or a running package that is not inside the
+  gate root, then CF009 and exit 1; given a push event or no event, then `--gate-root` is not needed and no
+  provenance rule applies.
+- AC67. Given a pull-request event and no `--gate-root` (a head run), when the base commit has no action for the job
+  that runs the command, then AW09 in bootstrap mode and CF009 with bootstrap off; when the base commit has it,
+  then CF009 in both modes.
+- AC68. Given `.github/workflows/ci.yml`, then WF005 unless it has exactly the jobs of §4.14, each pull-request job
+  checks out the head and then the base commit into `.gate-base`, and every `uses:` of a local action in a pull-request
+  job is the base variant (guarded by the presence of that action in the base) or the head variant (guarded by its
+  absence) and nothing else.
 
 ## 4. Design
 
@@ -198,6 +215,7 @@ workspace root.
 src/eng_dev_gate/
   cli.py  results.py  report.py          dispatch, Finding/StepResult, text/JSON/Actions output
   config/                                gate.yml, [tool.eng-gate], floors
+  gate_root.py                           gate root and provenance of the judging gate (§4.16)
   gitio.py  workspace.py  globs.py       Git port, member discovery, glob matching
   event.py  frontmatter.py               GitHub event file, spec/plan models
   checks/                                gate_check, risk_floor, test_first, ratchet, forbidden/, imports,
@@ -229,8 +247,9 @@ requires) and the summary is appended to the file named by `GITHUB_STEP_SUMMARY`
 Everything is in `pyproject.toml` tables and the `.gate/` files (§5). The root `.gate/` files are protected paths
 (process/06 §4). A package can tighten but never relax: thresholds below the floor of process/05 §2 are rejected (AC48),
 risk maps only add, and tool tables are checked against the weakening rules of §4.12. In pull-request context the
-commands read `.gate/gate.yml` and the plan from the base commit (the gate branch), so a pull request cannot relax the
-gate or its own plan for itself; `risk-floor` also reads the risk maps from both commits and unions them.
+commands read `.gate/gate.yml` and the other policy files from the gate root, a checkout of the base commit (§4.16), and
+the plan from the gate branch, so a pull request cannot relax the gate or its own plan for itself; `risk-floor` also
+reads the risk maps from the head tree and unions them with those of the base.
 
 ### 4.4 Bootstrap mode (ADR-0028 §4)
 
@@ -253,6 +272,7 @@ gate or its own plan for itself; `risk-floor` also reads the risk maps from both
 | AW06 | The merge of the gate branch into `main` (the owner merges after local tests) | gate-check |
 | AW07 | The `type/emergency` label set by the owner (honored only with bootstrap off) | gate-check |
 | AW08 | Identity checks: author is the agent identity and not the owner; approvals come from a non-author | gate-check |
+| AW09 | The command ran from the head tree because the base commit has no action for its job (the first pull requests of a job, §4.16); the pull request is judged by the code it changes | every judging command |
 
 Switching it off: the owner changes `bootstrap.enabled` to `false` in `.gate/gate.yml` and fills `identities`
 (`owner_login`, `agent_logins`, `reviewer_app`, all non-empty); otherwise CF008. The file is under `.gate/**`, a
@@ -479,7 +499,7 @@ workstation, the CI job never uses them:
 | 11 | `docs-fresh` | package | Generated documents (`[tool.eng-gate].generated`, GF001, GF002) and `agents drift` for the package |
 | 12 | `licenses` | package | Allowed licenses of the dependency closure (LC001 to LC003) |
 | 13 | `mutation` | package | Mutation tests on changed R1 and R2 modules (MU001, MU002) |
-| 14 | `workflows` | root | §4.14 rules WF001 to WF004 |
+| 14 | `workflows` | root | §4.14 rules WF001 to WF005 |
 
 A failing tool step reports ST001 with the step, tool, exit code and the first lines of its output. Tools run with an
 explicit configuration (`ruff --config pyproject.toml`, `mypy --config-file pyproject.toml`, `pytest -c pyproject.toml`,
@@ -569,34 +589,59 @@ tracked `AGENTS.md` (`git ls-files`), renders every `agents.yml` in memory, and 
 
 ### 4.14 CI
 
-`.github/workflows/ci.yml` (replacing the skeleton) is a thin root workflow; every job is a checkout (`fetch-depth: 0`,
-pull-request jobs at `github.event.pull_request.head.sha`), the local composite action `setup` and one composite action
-per job. Actions live in `tools/eng-dev-gate/actions/<name>/action.yml` and are called with the local path
-`./tools/eng-dev-gate/actions/<name>`.
+`.github/workflows/ci.yml` (replacing the skeleton) is a thin root workflow: triggers, permissions, checkouts and calls,
+no logic. The logic lives in composite actions in `tools/eng-dev-gate/actions/<name>/action.yml` (one `setup` and one per
+job; the action name is the job id), which move with the package when it is split. Every pull-request job judges the
+head tree with the gate of the base commit (§4.16) and has these steps, in this order:
+
+1. checkout of the head (`fetch-depth: 0`, `ref: ${{ github.event.pull_request.head.sha }}`);
+2. checkout of the base commit (`ref: ${{ github.event.pull_request.base.sha }}`, `path: .gate-base`,
+   `persist-credentials: false`);
+3. the action `setup`, then 4. the job's action, each in two variants: the base variant
+   `./.gate-base/tools/eng-dev-gate/actions/<name>` with `with: gate-root: .gate-base`, guarded by
+   `if: hashFiles('.gate-base/tools/eng-dev-gate/actions/<name>/action.yml') != ''`, and the head variant
+   `./tools/eng-dev-gate/actions/<name>` without `gate-root`, guarded by `== ''`. The head variant exists only so that
+   the pull requests that introduce a job can run it; the gate marks such a run AW09.
+
+Push jobs check out the pushed commit and use the head variants only (the commit is already on a protected branch).
+`.gate-base/` is listed in the root `.gitignore`. The actions run `uv sync --all-packages --locked` for the head
+environment and, when `gate-root` is set, also `uv sync --project <gate-root> --package eng-dev-gate --locked` into a
+separate environment, and start every command as
+`uv run --project <gate-root> --package eng-dev-gate eng-gate --root . --gate-root <gate-root> <command>`; without
+`gate-root`, as `uv run eng-gate <command>`. Whether `uv run --project` behaves so is a fact to verify in the first CI run.
 
 | Job | Event | Content |
 |---|---|---|
-| `gate` | PR, push | `uv run eng-gate check --all` (the CI steps never use `--only` or `--skip`) |
-| `gate-check` | PR | `uv run eng-gate gate-check` |
-| `risk-floor` | PR | `uv run eng-gate risk-floor` |
-| `test-first` | PR | `uv run eng-gate test-first` |
-| `ci-review` | PR | `uv run eng-gate review`; AW04 in bootstrap mode; prompts pinned (§4.15) |
-| `agents-drift` | PR, push | `uv run eng-gate agents drift` |
-| `security` | PR, push | `uv run eng-gate secrets` (`--range` on pull requests, `--tree` on pushes) and `uv audit --locked` |
-| `windows` | push to `build/v1` only | `uv run eng-gate windows-tests` on a Windows runner |
+| `gate` | PR, push | `eng-gate check --all` (the CI steps never use `--only` or `--skip`) |
+| `gate-check` | PR | `eng-gate gate-check` |
+| `risk-floor` | PR | `eng-gate risk-floor` |
+| `test-first` | PR | `eng-gate test-first` |
+| `ci-review` | PR | `eng-gate review`; AW04 in bootstrap mode; prompts pinned (§4.15) |
+| `agents-drift` | PR, push | `eng-gate agents drift` |
+| `security` | PR, push | `eng-gate secrets` (`--range` on pull requests, `--tree` on pushes) and `uv audit --locked` |
+| `windows` | push to `build/v1` only | `eng-gate windows-tests` on a Windows runner (head variant) |
 | `build` | PR, push | `uv build --package <name>` for every name printed by `eng-gate packages --names` |
+
+Tools that execute the head's code (`pytest` and `coverage` in the `tests` step, `mypy` through `--python-executable`,
+`mutation`, generated documents, `windows-tests`) run with the interpreter of the head environment; `ruff` and the gate
+itself run in the gate environment. In a base run the `tests` step puts `<gate-root>/tools/eng-dev-gate/src` first on
+`PYTHONPATH` and verifies that the gate's pytest plugin loaded from there (CF009 otherwise), so a head copy of the
+plugin never runs.
 
 Triggers: `pull_request` into `build/v1` and `main` with types `opened`, `synchronize`, `reopened`, `edited`,
 `ready_for_review`; `push` to `build/v1`. Top-level `permissions: contents: read`; one concurrency group per pull
 request that cancels superseded runs. The jobs read the pull request title and body only from the event file through
-the gate, never through `${{ }}` in a script (WF003). `setup` uses the official uv setup action with caching and runs
-`uv sync --all-packages --locked`. Third-party actions are pinned by commit SHA with the version in a comment (the SHA
-is looked up when the workflow is written, not guessed). The job ids are the required status check names. C# build and
-test steps (process/11 §5) are added with the first C# component; 0.1 has none.
+the gate, never through `${{ }}` in a script (WF003). `setup` uses the official uv setup action with caching. Third-party
+actions are pinned by commit SHA with the version in a comment (the SHA is looked up when the workflow is written, not
+guessed). The job ids are the required status check names. C# build and test steps (process/11 §5) are added with the
+first C# component; 0.1 has none.
 
 `workflows` (step 14) enforces: WF001 every `uses:` is a local path or `owner/repo@<40 hex digits>`; WF002 every workflow
 has a top-level `permissions`; WF003 no `${{ github.event.pull_request.title }}`, `.body`, `.head.ref` or
-`github.head_ref` inside a `run:` value; WF004 no `pull_request_target`.
+`github.head_ref` inside a `run:` value; WF004 no `pull_request_target`; WF005 `ci.yml` has exactly the jobs of the
+table, and each pull-request job has the steps above (head checkout, base checkout into `.gate-base`, and local `uses:`
+only in the guarded base and head variants of its own action and of `setup`, with no `run:` step that calls `eng-gate`).
+WF005 is judged by the base gate, so a pull request cannot remove its own guard.
 
 ### 4.15 ci-review and pinned prompts
 
@@ -607,17 +652,39 @@ spec and plan are data and never instructions (A15). In bootstrap mode the `ci-r
 after verifying the prompts. With bootstrap off and no configured providers it fails closed; the provider adapters and
 posting under the reviewer identity are not part of 0.1 (§7).
 
-### 4.16 Limits of the design (threat model)
+### 4.16 The gate of the base commit, and limits (threat model)
 
-The gate runs from the pull request's own checkout, so a pull request can change the gate, the workflow or `.gate/`.
-Mitigations in 0.1: protected paths (`tools/eng-dev-gate/**`, `.github/**`, `.gate/**`) are AW02 in bootstrap mode and
-need the owner's review with bootstrap off; configuration and plans are read from the base commit; the ratchet and risk
-floor compare with the base. Running the enforcement code from the base checkout is stronger and is left for when
-identities exist (§11 Q8). Everything that is `awaiting owner` is not verified, and the lead must not treat it as passed.
+**Rule.** In pull-request context every judging command (all jobs of §4.14 except `windows`) runs the code and the
+policy of the base commit against the head tree. A pull request that changes `tools/eng-dev-gate/**`, `.gate/**` or the
+actions is judged by the gate as it was before the change; the change takes effect for the next pull request.
+
+**Gate root.** The global option `--gate-root <dir>` names a checkout of the base commit (`.gate-base` in CI). It moves
+where the gate code and the policy files are read from and nothing else; it does not set the mode (AC4), because the
+mode file in the gate root is the base commit's own. Read from the gate root: `.gate/gate.yml`, `.gate/forbidden.yml`,
+the base risk map, the pinned prompts and the gate code itself. Read from the head tree, as data under check:
+`.gate/ratchet.json` (compared with the gate root's copy, §4.9), `.gate/agents.yml` and the package files, the head risk
+maps (only added to the base ones, §4.6), the sources, workflows and `CODEOWNERS`. Plans and specs are read from the
+gate branch (§4.5).
+
+**Provenance.** The gate does not trust the workflow to have chosen the base. With `--gate-root` in pull-request context
+it requires that `git -C <gate-root> rev-parse HEAD` equals `pull_request.base.sha` and that the running `eng_dev_gate`
+package lies inside `<gate-root>/tools/eng-dev-gate/src`; otherwise CF009 (exit 1). Without `--gate-root` (a head run)
+it requires that the base commit has no `tools/eng-dev-gate/actions/<job>/action.yml` for the job that runs the
+command; then it reports AW09 in bootstrap mode and CF009 with bootstrap off. This is the whole exception: the first
+pull requests of a job, whose base cannot judge them yet. With bootstrap off a new job is therefore added in two pull
+requests (its action first, the workflow step next). Push events and local runs have no base and no provenance rule.
+
+**Limits that remain.** GitHub loads the workflow file of a pull request from the pull request itself, so the gate
+cannot stop a pull request from editing `ci.yml`. The controls are WF005 (judged by the base gate: an edited `ci.yml`
+that drops the base checkout or a job fails), the required status checks with the job ids as names (a deleted job never
+reports, process/11 §6, once branch protection exists), and the protected paths (`tools/eng-dev-gate/**`, `.github/**`,
+`.gate/**`: AW02 in bootstrap mode, the owner's review otherwise). A change to the actions or the gate that is itself
+faulty is judged by the previous version and found only on the next pull request. Everything that is `awaiting owner`
+is not verified, and the lead must not treat it as passed.
 
 ## 5. Inputs and outputs
 
-Command line: `eng-gate [--root <dir>] [--format text|json] <command> [options]`.
+Command line: `eng-gate [--root <dir>] [--gate-root <dir>] [--format text|json] <command> [options]`.
 
 | Command | Options | Reads | Result |
 |---|---|---|---|
@@ -672,15 +739,15 @@ Diagnostic codes (the contract of this tool; the package `CHANGELOG.md` lists ch
 | Prefix | Meaning | Codes |
 |---|---|---|
 | GC | gate-check | 001 no Plan-Task · 002 malformed or duplicate · 003 work item · 004 plan or spec not on the gate branch · 005 front matter invalid · 006 status not acceptable · 007 task unknown · 008 file outside task · 009 budget · 010 spec or plan pull request mixed · 011 `none` reason · 012 lane · 013 base branch · 014 `approved` set in bootstrap · 015 approval missing · 016 criterion uncovered |
-| AW | awaiting owner (notice) | 01 to 08, §4.4 |
+| AW | awaiting owner (notice) | 01 to 09, §4.4 |
 | RF | risk-floor | 001 below floor · 002 body mismatch · 003 map invalid · 004 no recorded risk |
 | TF | test-first | 001 title · 002 no test commit · 003 test commit not tests only · 004 passes at base · 005 fails at head · 006 refactor changed tests · 007 test pull request changed code · 008 `tests_first` file missing · 009 pytest could not run · 010 no new test · 011 import probe |
-| FB | forbidden | 000 parse error · 001 · 002 · 004 to 009, §4.8 |
+| FB | forbidden | 000 parse error · 001 to 008, §4.8 |
 | RT | ratchet | 001 count rose · 002 issue missing · 003 expiry invalid · 004 expired · 005 file invalid · 006 suppression without issue |
 | IM | imports | 001 to 006, §4.10 |
 | SC | secrets | 001 match · 002 file skipped |
-| CF | configuration | 001 invalid table · 002 below floor · 003 weakening setting · 004 override file · 005 rerun plugin · 006 member without table · 007 `gate.yml` invalid · 008 bootstrap off without identities |
-| CV, ST, LC, GF, MU, AG, WF | coverage, tool step, licenses, generated, mutation, agents, workflows | as named in §4.12 to §4.14 |
+| CF | configuration | 001 invalid table · 002 below floor · 003 weakening setting · 004 override file · 005 rerun plugin · 006 member without table · 007 `gate.yml` invalid · 008 bootstrap off without identities · 009 judging gate is not the gate of the base commit (§4.16) |
+| CV, ST, LC, GF, MU, AG, WF | coverage, tool step, licenses, generated, mutation, agents, workflows | as named in §4.12 to §4.14; WF 001 to 005 |
 
 Exit code 2 covers CF007, CF008, RF003, RT005, AG007 and unreadable inputs; exit code 3 covers TF009, TF011, MU002, GF002 and
 tool or git failures; every other error finding exits 1.
@@ -703,7 +770,7 @@ tool or git failures; every other error finding exits 1.
 | Risk | Class | Mitigation |
 |---|---|---|
 | The gate gives false assurance: `awaiting owner` read as "passed" | r3 | Distinct status, notice and summary text; `BUILD-STATUS.md` owner queue; spec §4.16 |
-| A pull request weakens the gate it runs under | r3 | Protected paths, base-commit configuration, tight tool configuration (AC49), base-checkout option after identities |
+| A pull request weakens the gate it runs under | r3 | The gate of the base commit judges every pull request (§4.16, AC65 to AC68); protected paths; tight tool configuration (AC49) |
 | Expression injection through the pull request title or body | r3 | Event file only, WF003, no shell |
 | A leaked secret or token in logs or in findings | r3 | Fingerprints only (AC46), no token printing, `contents: read` permissions |
 | Runtime dependencies | r3 | Package-local ADR for each; license check; `uv audit` |
@@ -725,8 +792,8 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 | integration | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_budget_counting` |
-| AC12 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_plan_front_matter_rules`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
+| AC6 to AC11, AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
 | AC23, AC24, AC27 | integration | `test_test_first_run.py::test_red_green`, `::test_passes_at_base_and_fails_at_head`, `::test_base_isolation_and_cleanup` |
@@ -734,10 +801,12 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
-| AC47 to AC54 | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table_and_lock` |
-| AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_drift_unmanaged_and_pointer`, `::test_keys_skeleton` |
-| AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_ci_files.py::test_security_and_build_commands`, `test_windows_tests.py::test_declared_paths` |
+| AC47 to AC54 | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001` |
+| AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_keys_skeleton`, `test_agents_drift.py::test_drift_unmanaged_and_pointer` |
+| AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
 | AC64 | CI | the CI run of the last task's pull request |
+| AC65 to AC67 | unit and integration | `test_gate_root.py::test_policy_from_gate_root_not_head`, `::test_provenance_rules`, `::test_head_run_in_both_modes` |
+| AC68 | unit | `test_workflows_lint.py::test_ci_shape_base_first` |
 
 ## 10. Version impact
 
@@ -753,11 +822,11 @@ Every workspace package pins the gate as a workspace member during incubation.
 | Q1. Runtime dependencies: PyYAML (YAML), Pydantic (boundary models, process/04 §5), ruff, mypy, pytest and coverage (pinned by the gate so packages cannot choose weaker versions). Approve through the package-local ADR created in task T1 (process/04 §7) | Owner | Recommend: approve. All five licenses are expected to be on the allowed list; the license check verifies it |
 | Q2. Process/05 §2 has no row for development tools. The gate uses 95 and 90 for itself and 80 for any declared `mutation_min`. Add a `tool` row to process/05 §2? | Owner | Recommend: yes, with these values |
 | Q3. Process changes this spec relies on (not made here, since this change touches two files): risk as a set in plan and spec front matter and templates; `ci`, `release` and spike-only exemptions and the `test:` handling in process/05 §9; the `Plan-Task: none (<reason>)` forms in the pull request template; `pragma: no branch` in the ratchet bucket; composite actions in place of reusable workflows in process/11 §4 and §5; `.gate/gate.yml` and `.gate/forbidden.yml` in process/11 §1. Propose them as a process pull request | Lead, owner | Recommend: one process change after this spec is reviewed; list every repository whose `AGENTS.md` needs re-rendering (rule 7) |
-| Q4. Mutation backend: mutmut or cosmic-ray, and whether either runs on Windows (not verified here). If neither does, mutation runs on Linux CI only and the local step reports `skipped` | Lead (task T19) | Recommend: decide in T19 with a short check, record it in a package ADR |
+| Q4. Mutation backend: mutmut or cosmic-ray, and whether either runs on Windows (not verified here). If neither does, mutation runs on Linux CI only and the local step reports `skipped` | Lead (task T20) | Recommend: decide in T20 with a short check, record it in a package ADR |
 | Q5. FB005 exceptions A2 (integer index) and A3 (integer compared with `len`), and ruling out any exception for `ctx.attempts(n)`, exponents and input bounds. Align the callable name `Cited` with the `eng-contract` spec | Owner | Recommend: keep A2 and A3, no further exceptions; `eng-contract` and `eng-harness` specs add cited callables to `cited.callables` |
 | Q6. The "bandit subset" of process/11 §3 is undefined. The gate selects all S rules and ignores `S101` in tests | Owner | Recommend: accept; refine when the first findings show which S rules are noise |
 | Q7. During bootstrap, how does the owner approve a spec or plan? A pull request that sets `approved` fails (GC014) | Owner | Recommend: the owner commits the status change directly to the gate branch (pushes run `gate`, not `gate-check`), or switches bootstrap off first |
-| Q8. Run the enforcement code of `gate-check`, `risk-floor` and `test-first` from the base checkout instead of the pull request checkout | Owner | Recommend: yes once identities and branch protection exist (process/11 §6); until then protected paths are the control |
+| Q8. The gate of the base commit judges every pull request (lead decision, §4.16). The workflow file itself is still loaded from the pull request. Should the owner add a repository ruleset or branch protection with the job ids as required checks once identities exist (process/11 §6)? | Owner | Recommend: yes; WF005 and protected paths are the controls until then |
 | Q9. Import rules for `product` packages are not defined in 03 §3; only IM002 to IM006 apply to them | Owner | Recommend: define them in the spec of the first Python product |
 | Q10. Host SDK module names beyond the initial list (ETABS, SAFE, SAP2000 and IDEA StatiCa Python-side names) are not known with certainty | Owner | Recommend: add them to `.gate/forbidden.yml` after the first local run shows what the host bridges import. Recorded gap |
 | Q11. In bootstrap mode, should `gate-check` require a non-empty "Review" section in the pull request body as evidence of the subagent review (decision D-6)? | Lead | Recommend: yes after the first merged tasks; one line of configuration, not in 0.1 |

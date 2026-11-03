@@ -107,6 +107,7 @@ tasks:
     title: "CI part 1: setup action and the gate, agents-drift and build jobs"
     files:
       - ".github/workflows/ci.yml"
+      - ".gitignore"
       - "tools/eng-dev-gate/actions/setup/action.yml"
       - "tools/eng-dev-gate/actions/gate/action.yml"
       - "tools/eng-dev-gate/actions/agents-drift/action.yml"
@@ -114,14 +115,15 @@ tasks:
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - "tools/eng-dev-gate/docs/local-testing.md"
       - "tools/eng-dev-gate/tests/**"
-    max_changed_lines: 300
+    max_changed_lines: 380
     max_sessions: 3
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_ci_files.py::test_jobs_triggers_and_local_actions"
       - "tools/eng-dev-gate/tests/unit/test_ci_files.py::test_security_and_build_commands"
       - "tools/eng-dev-gate/tests/unit/test_workspace.py::test_packages_names"
+      - "tools/eng-dev-gate/tests/unit/test_ci_files.py::test_pr_jobs_base_first_steps"
     covers: [AC59, AC62]
-    depends_on: [T4, T5]
+    depends_on: [T4, T5, T26]
   - id: T7
     title: tests step with separate line and branch coverage and the pytest plugin
     files:
@@ -355,17 +357,18 @@ tasks:
     covers: [AC53]
     depends_on: [T7]
   - id: T21
-    title: workflows lint (WF001 to WF004)
+    title: workflows lint (WF001 to WF005)
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/workflows.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - "tools/eng-dev-gate/tests/**"
-    max_changed_lines: 250
+    max_changed_lines: 320
     max_sessions: 2
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_workflows_lint.py::test_pin_permissions_injection_trigger"
-    covers: [AC60]
+      - "tools/eng-dev-gate/tests/unit/test_workflows_lint.py::test_ci_shape_base_first"
+    covers: [AC60, AC68]
     depends_on: [T6]
   - id: T22
     title: reviewer prompts, review command and the ci-review job
@@ -425,7 +428,23 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T15, T17, T18, T19, T20, T21, T22, T23, T24]
+    depends_on: [T7, T8, T9, T11, T12, T14, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26]
+  - id: T26
+    title: Base-commit gate (gate root, provenance, head-run rules); built before T6
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/gate_root.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/config/gate_config.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
+      - "tools/eng-dev-gate/docs/local-testing.md"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 330
+    max_sessions: 2
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_root.py::test_policy_from_gate_root_not_head"
+      - "tools/eng-dev-gate/tests/integration/test_gate_root.py::test_provenance_rules"
+      - "tools/eng-dev-gate/tests/integration/test_gate_root.py::test_head_run_in_both_modes"
+    covers: [AC65, AC66, AC67]
+    depends_on: [T3]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
@@ -443,8 +462,10 @@ tools are used, not rebuilt: ruff, mypy, pytest and coverage.py for the steps; `
 import check, the secret scan, the front matter and body parsing, the byte-exact renderer) is small enough to write
 (spec §2). The Sasaah repository has no equivalent to reuse and no code is copied from it (A12).
 
-**Order.** A useful gate reaches CI at T6, the sixth pull request: T1 to T5 build the package, reporting, configuration,
-the renderer and the `check` orchestrator with the format, lint, type and lock steps; T6 puts `gate`, `agents-drift` and
+**Order.** A useful gate reaches CI at T6, the seventh pull request: T1 to T5 build the package, reporting, configuration,
+the renderer and the `check` orchestrator with the format, lint, type and lock steps; T26 (numbered last because it was
+added last, built before T6) adds the base-commit gate, so that no job is ever wired to the head's own gate by design;
+T6 puts `gate`, `agents-drift` and
 `build` into the root workflow in place of the skeleton. Every later task adds its step to `check` through
 `checks/registry.py` and, when it is a pull-request-context command, its own job, so the gate grows while it already
 protects the workspace. The riskiest parts come early among the checks that guard the process itself: `gate-check`
@@ -456,7 +477,10 @@ the key names of coverage.py's JSON report (T7: `totals` must give lines and bra
 mypy accept an issue reference inside a `noqa` or `type: ignore` comment (T9; if not, the reference moves to the
 line above and AC41 and RT006 are amended by a plan change); that `PYTHONPATH` beats an editable install in the base
 worktree (T17, through the import probe); the exit codes of `uv audit` (T18); the SHA of each third-party action
-(T6, looked up with the GitHub tools when writing the workflow, never guessed); Windows support of the mutation
+(T6, looked up with the GitHub tools when writing the workflow, never guessed); that `uv run --project <gate-root>
+--package eng-dev-gate` runs the base gate in its own environment while the head environment runs the code under test,
+that `hashFiles` in a step `if:` sees `.gate-base`, and that `PYTHONPATH` puts the base plugin ahead of an editable
+install (T6 and T26, local testing list); Windows support of the mutation
 backend (T20, spec §11 Q4).
 
 **Test fixtures.** `tests/support/repo.py` (T2) builds temporary git repositories with fixed dates and a local identity,
@@ -491,8 +515,9 @@ untouched.
 **T5** adds the `check` orchestrator, the step registry and the `lock`, `format`, `lint` and `types` steps with the
 explicit tool configuration of spec §4.12.
 
-**T6** replaces the CI skeleton with the thin root workflow and the local composite actions `setup`, `gate`,
-`agents-drift` and `build`, adds the `packages` command (names and JSON), and records which Actions steps still need a
+**T6** replaces the CI skeleton with the thin root workflow and the composite actions `setup`, `gate`,
+`agents-drift` and `build`, with the base-first steps of spec §4.14 (head checkout, base checkout into `.gate-base`,
+each action in a base variant with `gate-root` and a guarded head variant; `.gate-base/` in `.gitignore`), adds the `packages` command (names and JSON), and records which Actions steps still need a
 real run in `docs/local-testing.md`. This is the first useful gate job.
 
 **T7** adds the `tests` step (coverage run, JSON parse, separate line and branch thresholds) and the pytest plugin
@@ -515,13 +540,22 @@ cleanup and the job.
 
 **T18** adds `secrets` and the `security` job (secret scan plus `uv audit --locked`). **T19** adds `licenses` and the
 generated-document freshness. **T20** adds `mutation` after choosing the backend in a second package-local ADR
-(`docs/adr/0002-mutation-backend.md`). **T21** adds the `workflows` lint.
+(`docs/adr/0002-mutation-backend.md`). **T21** adds the `workflows` lint, including WF005, the shape of `ci.yml` that keeps every pull-request job on the gate
+of the base commit.
 
 **T22** adds the pinned reviewer prompts with their hash manifest, the `review` command, and the `ci-review` job; it
 writes the prompts from the checklist of process/06 §2 and the severities of §3, and treats all pull request content
 as data. **T23** adds `windows-tests` and the `windows` job (push to `build/v1` only). **T24** adds the approvals
 port, a GitHub REST adapter (standard-library HTTP) behind it, and the verification paths that run when bootstrap is off;
 all of it is tested with fakes and none of it can be run for real until identities exist (local testing list).
+
+**T26** adds the gate root (spec §4.16): the global `--gate-root` option, the reader that takes `.gate/gate.yml`,
+`.gate/forbidden.yml`, the base risk map and the prompts from it while the sources stay the head tree, the provenance
+checks (CF009 for a gate root that is not the base commit or does not hold the running package; AW09 or CF009 for a head
+run, by mode and by whether the base has the job's action), and the table from command to job. Every later check reads
+its policy through this reader, never from the working tree directly; the review of each later task checks that. Changes
+to the gate take effect from the next pull request: once T6 has put the jobs into CI, each task is judged by the gate of
+its base commit.
 
 **T25** completes the README (every command, with an example), the CHANGELOG entry for 0.1.0, and the local-testing
 file, and confirms that the whole workspace passes its own gate in CI (AC64). The tag `eng-dev-gate-v0.1.0` is created
