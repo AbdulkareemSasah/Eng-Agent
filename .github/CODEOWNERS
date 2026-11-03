@@ -1,0 +1,46 @@
+# Protected paths of design/process/06-review-and-merge.md section 4.
+# Enforced once branch protection exists (bootstrap mode, ADR-0028); until then it documents the intent.
+
+# Process and enforcement
+/.github/ @AbdulkareemSasah
+/AGENTS.md @AbdulkareemSasah
+**/AGENTS.md @AbdulkareemSasah
+/CLAUDE.md @AbdulkareemSasah
+/.gate/ @AbdulkareemSasah
+**/.gate/ @AbdulkareemSasah
+/pyproject.toml @AbdulkareemSasah
+**/pyproject.toml @AbdulkareemSasah
+/uv.lock @AbdulkareemSasah
+/.python-version @AbdulkareemSasah
+/tools/eng-dev-gate/ @AbdulkareemSasah
+**/conftest.py @AbdulkareemSasah
+**/pytest.ini @AbdulkareemSasah
+**/setup.cfg @AbdulkareemSasah
+**/tox.ini @AbdulkareemSasah
+**/ruff.toml @AbdulkareemSasah
+**/.ruff.toml @AbdulkareemSasah
+**/mypy.ini @AbdulkareemSasah
+**/.coveragerc @AbdulkareemSasah
+**/.pre-commit-config.yaml @AbdulkareemSasah
+
+# Test oracles
+**/acceptance/records/ @AbdulkareemSasah
+**/acceptance/recordings/ @AbdulkareemSasah
+**/tests/data/golden/ @AbdulkareemSasah
+**/evals/ @AbdulkareemSasah
+
+# Engineering content
+**/approvals.yaml @AbdulkareemSasah
+**/checks/ @AbdulkareemSasah
+/packages/eng-harness/src/eng_harness/calcs/ @AbdulkareemSasah
+/packages/eng-harness/src/eng_harness/templates/ @AbdulkareemSasah
+/packages/eng-harness/src/eng_harness/rules/ @AbdulkareemSasah
+/packages/eng-harness/src/eng_harness/policies/ @AbdulkareemSasah
+
+# Contracts
+/packages/eng-contract/ @AbdulkareemSasah
+**/docs/tools/schema.json @AbdulkareemSasah
+**/docs/schema/ @AbdulkareemSasah
+
+# The design hub
+/design/ @AbdulkareemSasah
