@@ -167,6 +167,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_diff.py"
       - "packages/eng-harness/tests/property/test_diff.py"
+      - "packages/eng-harness/tests/workflow/test_calc_step.py"
+      - "packages/eng-harness/tests/contract/test_calc_lock.py"
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/diff-*.json"
     max_changed_lines: 380
     max_sessions: 3
@@ -178,7 +181,9 @@ tasks:
       - "packages/eng-harness/tests/property/test_diff.py::test_identity_and_symmetry"
       - "packages/eng-harness/tests/unit/calcs/test_diff.py::test_basis_tolerances_required"
       - "packages/eng-harness/tests/unit/calcs/test_diff.py::test_not_compared_and_ambiguous"
-    covers: [AC24, AC25, AC26, AC27, AC28, AC29]
+      - "packages/eng-harness/tests/workflow/test_calc_step.py::test_older_revision_inputs"
+      - "packages/eng-harness/tests/contract/test_calc_lock.py::test_stale_ok_fields_match_spec"
+    covers: [AC24, AC25, AC26, AC27, AC28, AC29, AC48, AC49]
     depends_on: [T7]
   - id: T9
     title: Calc 3, read-back check
@@ -190,6 +195,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/readback_check.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_readback.py"
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/readback-*.json"
     max_changed_lines: 260
     max_sessions: 2
@@ -212,6 +218,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/design_summary.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_summary.py"
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/summary-*.json"
     max_changed_lines: 280
     max_sessions: 2
@@ -219,8 +226,9 @@ tasks:
       - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-basic]"
       - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-not-designed]"
       - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-previous]"
+      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-member-worst]"
       - "packages/eng-harness/tests/unit/calcs/test_summary.py::test_empty"
-    covers: [AC35, AC36, AC37, AC38]
+    covers: [AC35, AC36, AC37, AC38, AC50]
     depends_on: [T9]
   - id: T11
     title: Calc 5, section size rounding
@@ -232,13 +240,14 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_rounding.py"
       - "packages/eng-harness/tests/property/test_rounding.py"
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/round-*.json"
     max_changed_lines: 150
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-up]"
       - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-exact]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-within-tolerance]"
+      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-just-above]"
       - "packages/eng-harness/tests/unit/calcs/test_rounding.py::test_edge_cases"
       - "packages/eng-harness/tests/property/test_rounding.py::test_rounding_properties"
     covers: [AC39, AC40, AC41]
@@ -252,6 +261,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/placement_compare.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_placement.py"
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/placement-*.json"
     max_changed_lines: 380
     max_sessions: 3
@@ -332,7 +342,10 @@ verification record template goes in `docs/verification/calcs/README.md`. Almost
 **T7 to T12 The calcs** (spec §4.6 to §4.11). One calc per task, each with its golden files, unit and property tests,
 verification record, lock entry and `REGISTRY` line. T7 adds `_state.py` (section keys and canonical order, spec §4.6
 table). T8 adds `_compare.py` (D3 and D4, exact `Fraction` comparison) and extends `_state.py` with the unnamed-row
-keys of D2. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 add the live items of §4 to
+keys of D2. T8 also adds the older-revision workflow test (spec AC48, a test block that reads, writes and reads
+again through fake tool ports) and the `stale_ok` contract test (spec AC49), which compares each registered calc's
+input schema with `tests/data/calcs/stale_ok.json`, the spec §4.13 table; T9 to T12 add their calc's row to that
+file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 add the live items of §4 to
 `docs/local-testing.md`.
 
 ## 3. Dependencies

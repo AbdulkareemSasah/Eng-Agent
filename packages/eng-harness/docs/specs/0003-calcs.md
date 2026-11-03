@@ -117,6 +117,13 @@ proposed project value.
   `ctx.read`. Test: `tests/workflow/test_calc_step.py::test_calc_step_end_to_end`.
 - AC18. Given a calc that reaches a path marked "not implemented" in §4, then `NotImplementedGap` (code
   `NOT_IMPLEMENTED`, engine §6) names the gap id, and nothing is stored. Test: `test_port.py::test_not_implemented_gap`.
+- AC48. Given the real engine, the real CalcPort and fake tool ports, a model read at revision n, then written (n+1)
+  and read again, when a block calls `ctx.calc("harness.model_diff", before=<refs at n>, after=<refs at n+1>, ...)`,
+  then the calc succeeds. When `after` holds a reference at n while the model is at n+1, then `REF_STALE` and no
+  step result is stored (§4.13). Test: `tests/workflow/test_calc_step.py::test_older_revision_inputs`.
+- AC49. Given every registered calc, then the input fields whose JSON Schema carries `x-eng.stale_ok: true` are
+  exactly those of the §4.13 table for that calc, and no `basis`, `effects`, `after`, `b_*`, `verdicts`, `frames` or
+  `required` field carries it. Test: `tests/contract/test_calc_lock.py::test_stale_ok_fields_match_spec`.
 
 ### 3.4 Model fingerprint (§4.6)
 
@@ -175,26 +182,33 @@ proposed project value.
 ### 3.7 Design results summary (§4.9)
 
 - AC35. Given host verdicts, then the summary lists the governing verdict (highest ratio; ties by subject kind,
-  subject id, check id and case, ascending), every failing member, all `NEEDS_ENGINEER` and `ERROR` verdicts, and a
+  subject id, check id, station and case, ascending, null first, S2), every failing member, all `NEEDS_ENGINEER` and `ERROR` verdicts, and a
   list stated as "top N of M" with N from the basis. Test: `test_calcs_golden.py::test_case[summary-basic]`.
 - AC36. Given frames without any verdict (for example concrete columns, which the CSI design results do not cover,
   S-12 §1 step 13), then they are listed in `not_designed` and the status is not `PASS`. Test:
   `test_calcs_golden.py::test_case[summary-not-designed]`.
-- AC37. Given a previous summary, then members that changed status are listed as `newly_failing` or `newly_passing`
-  with both ratios. Test: `test_calcs_golden.py::test_case[summary-previous]`.
+- AC37. Given a previous summary, then each member (subject kind, subject id, check id) whose member status changed is
+  listed once, in `newly_failing`, `newly_passing` or `other_changes` by the S5 table, with both statuses and both
+  member ratios; members on one side only are in `appeared` or `disappeared`. Test:
+  `test_calcs_golden.py::test_case[summary-previous]`.
+- AC50. Given one member with two verdicts of one check (two stations, or two cases), one `PASS` and one `FAIL`, then
+  the member's status is `FAIL` and its member ratio is the larger ratio (S5), both verdicts are kept in the verdict
+  lists, and the member appears once in `members` and `failing_members`. Test:
+  `test_calcs_golden.py::test_case[summary-member-worst]`.
 - AC38. Given an empty verdict set, then the status is `NEEDS_ENGINEER` with the message "no design results". Test:
   `tests/unit/calcs/test_summary.py::test_empty`.
 
 ### 3.8 Section size rounding (§4.10)
 
 - AC39. Given a required size and a basis increment, then the result is the smallest multiple of the increment not
-  below the required size minus the basis length tolerance. An exact multiple stays the same. Test:
-  `test_calcs_golden.py::test_case[round-up]`, `::test_case[round-exact]`, `::test_case[round-within-tolerance]`.
-- AC40. Given a tolerance not smaller than the increment, a rule other than `up`, or a required size within tolerance
-  of zero, then the result is `NEEDS_ENGINEER` (first case and last case) or `NotImplementedGap` CG-2 (the rule).
-  Never a clamped value. Test: `tests/unit/calcs/test_rounding.py::test_edge_cases`.
-- AC41. Over generated inputs, the result is a multiple of the increment, at least the required size minus the
-  tolerance, and less than that plus the increment. Test: `tests/property/test_rounding.py::test_rounding_properties`.
+  below the required size. An exact multiple stays the same. A required size above a multiple by any amount, however
+  small, gives the next multiple (never a smaller size). Test: `test_calcs_golden.py::test_case[round-up]`,
+  `::test_case[round-exact]`, `::test_case[round-just-above]`.
+- AC40. Given a rule other than `up`, then `NotImplementedGap` CG-2. Given a required size that is not positive, then
+  `OUT_OF_RANGE` (§5 bounds). The calc reads no `compare.*` field. Never a clamped value. Test:
+  `tests/unit/calcs/test_rounding.py::test_edge_cases`.
+- AC41. Over generated inputs (exact fractions), the result is a multiple of the increment, at least the required size,
+  and less than the required size plus the increment. Test: `tests/property/test_rounding.py::test_rounding_properties`.
 
 ### 3.9 Element count and position comparison (§4.11)
 
@@ -290,7 +304,7 @@ required and the engine refuses to start without them (engine invariant 5). Read
 
 | Path | Unit | Bounds | Used by | Source of the value |
 |---|---|---|---|---|
-| `compare.length` | `mm` | ≥ 0 | §4.7, §4.8, §4.10, §4.11 | Template or engineer (13 §3); no default |
+| `compare.length` | `mm` | ≥ 0 | §4.7, §4.8, §4.11 | Template or engineer (13 §3); no default |
 | `compare.angle` | `deg` | ≥ 0 | §4.7, §4.8 | same |
 | `compare.stress` | `MPa` | ≥ 0 | §4.7, §4.8 | same |
 | `compare.unit_weight` | `kN/m3` | ≥ 0 | §4.7, §4.8 | same |
@@ -413,6 +427,7 @@ change the hash (F2 keeps order); (e) properties: permutation invariance, change
 of a write (A1, §4.8).
 
 **Input** `DiffInput`: `before` and `after` (each a `FingerprintInput`-shaped group of references) and `basis`.
+`before` is `stale_ok`; `after` and `basis` are not (§4.13).
 
 **Output kind** `harness.model_diff/1`: `before`, `after` (`model_id`, `model_revision`, `covered`), `tolerances`
 (per quantity kind: `value`, `unit`, `ref`), `changes` (sorted by section and key: `section`, `key` (list of strings),
@@ -463,7 +478,7 @@ turn on `rotation_deg` (changed, D6); a duplicate load-row key (ambiguous); prop
 **Purpose.** 18 step 9 and P7: every written value matches the change set, and nothing else changed (A1).
 
 **Input** `ReadbackInput`: `effects` (reference to `harness.expected_effects/1`), `before` and `after` (read-set
-groups as in §4.7), `basis`. `harness.expected_effects/1` is defined here and produced by spec 0007 from the
+groups as in §4.7; only `before` is `stale_ok`, §4.13), `basis`. `harness.expected_effects/1` is defined here and produced by spec 0007 from the
 change set (Q6). Its fields: `change_set` (`RefString`), `model_id`, `effects` (list of `item_id`, `section` (a
 neutral model kind), `key`, `op` `set` | `add` | `remove`, `pointer` (for `set`), `value` (for `set`: the value; for
 `add`: the whole object), `unit`).
@@ -516,63 +531,84 @@ turn and the run report.
 subject, check id, case, ratio, ratio limit, status), `governing_by_group` (per subject kind and check id),
 `failing` (all `FAIL` verdicts, ratio descending), `failing_members` (distinct subjects), `attention` (all
 `NEEDS_ENGINEER` and `ERROR` verdicts), `top` (`n`, `of_total`, `rows`, `label: "top N of M by ratio"`),
-`not_designed` (frame ids without any verdict), `changes` (`newly_failing`, `newly_passing`, each with both ratios
-and statuses), `complete`.
+`not_designed` (frame ids without any verdict), `members` (every member of S5, sorted by its key: subject kind,
+subject id, check id, `status`, `ratio`), `changes` (`newly_failing`, `newly_passing`, `other_changes`, each row with
+the member key, both statuses and both member ratios; `appeared` and `disappeared`, member rows), `complete`.
 
 **Method.**
 
 - S1. Verdict statuses and ratios are taken as the host reported them. The contract already enforces `PASS` with ratio
   ≤ limit and `FAIL` with ratio > limit (contract §4.9.1). The summary recomputes no ratio and applies no limit of its
   own (contract Q5, owner queue OQ-Q8).
-- S2. Order key: ratio descending, then subject kind, subject id, check id, case ascending (exact comparison). Verdicts
-  without a ratio are ranked after all others and never count as governing.
+- S2. Order key: ratio descending, then subject kind, subject id, check id, `station_mm`, `case` ascending (exact
+  comparison; strings by code point). A null `station_mm` or `case` sorts before every non-null value. Verdicts
+  without a ratio are ranked after all others and never count as governing. Two verdicts equal on the whole key keep
+  no input order: they are compared by their canonical JSON bytes **[added]**.
 - S3. `governing` is the first verdict by S2. `governing_by_group` applies S2 within each group. `failing` and
   `attention` list every verdict: they are never truncated. `top` is the first `report.top_n` verdicts by S2, stated
   as "top N of M" (contract §4.2.5 rule 4).
 - S4. `not_designed`: frames of `frames` with no verdict whose subject is (`frame`, id).
-- S5. `changes`: verdicts matched with `previous` by (subject kind, subject id, check id). A status that moves from
-  something other than `FAIL` to `FAIL` is newly failing, and from `FAIL` to `PASS` is newly passing.
+- S5. Members. A member is the key (subject kind, subject id, check id); stations and cases are not part of it.
+  Member status is the worst of its verdicts in the order `FAIL` > `ERROR` > `NEEDS_ENGINEER` > `PASS` >
+  `NOT_APPLICABLE` **[added]**; the member ratio is the largest non-null ratio of its verdicts, or null. `changes`
+  compares `members` with `previous.members` key by key, so every key is unique on each side:
+
+  | Previous member status | Current member status | Listed in |
+  |---|---|---|
+  | anything but `FAIL` | `FAIL` | `newly_failing` |
+  | `FAIL` | `PASS` | `newly_passing` |
+  | any other pair of different statuses (for example `FAIL` to `NEEDS_ENGINEER`, `PASS` to `ERROR`, `FAIL` to `NOT_APPLICABLE`) | | `other_changes` |
+  | equal statuses | | not listed (a ratio change alone is not a status change) |
+  | absent | present | `appeared` |
+  | present | absent | `disappeared` |
 - S6. Status: `FAIL` if any `FAIL`. Otherwise `NEEDS_ENGINEER` if any `NEEDS_ENGINEER` or `ERROR`, any
   `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`.
 
-**Edge cases.** Several verdicts per member (stations, checks) are all kept. Member status is the worst by S6 order.
-Ties are broken by S2, never by input order. `top_n` larger than M lists all, still labeled "top M of M". The summary
+**Edge cases.** Several verdicts per member (stations, cases) are all kept in `failing`, `attention` and `top`; member
+status and member ratio follow S5. Ties are broken by S2, never by input order. A `previous` without `members` (another
+kind version) is refused with `REF_KIND_MISMATCH` by its `ref_kinds`. `top_n` larger than M lists all, still labeled "top M of M". The summary
 makes no engineering judgment beyond ordering and set membership.
 
 **Verification cases** (method source: this section; golden files `summary-*.json`): three synthetic host verdicts on
 three frames with distinct ratios on both sides of their own `ratio_limit` (governing, failing and top-2 by S2 and S3);
 two equal ratios (tie broken by subject id); frames without verdicts (`not_designed`, S6); a previous summary in which
-one member failed and now passes (S5); an empty set (S6).
+one member failed and now passes, one moves from `FAIL` to `NEEDS_ENGINEER` and one appears (S5); one member with a
+`PASS` and a `FAIL` verdict at two stations (member `FAIL`, S5); an empty set (S6).
 
 ### 4.10 Calc 5: section size rounding `harness.section_round` v1
 
 **Purpose.** 11 §4: a new section size is the output of this calc or an engineer input, never a decision.
 
-**Input** `RoundInput`: `required` (reference to a length quantity in `mm`: a calc output or a
+**Input** `RoundInput`: `required` (reference to a length quantity in `mm`, > 0: a calc output or a
 `basis.engineer_input/1` field; `engineering_quantity`), `basis` (`modeling.section_increment`,
-`modeling.section_rounding`, `compare.length`).
+`modeling.section_rounding`). No comparison tolerance is read: a `compare.*` field compares model states (§4.4) and is
+no rounding allowance.
 
-**Output kind** `harness.section_size/1`: `required`, `increment`, `tolerance` (quantities), `multiple` (integer),
-`size` (`Quantity` in `mm`), `status` (`PASS` when a size was produced, `NEEDS_ENGINEER` otherwise), `message`.
+**Output kind** `harness.section_size/1`: `required`, `increment` (quantities), `multiple` (integer), `size`
+(`Quantity` in `mm`), `status` (`PASS`).
 
-**Method** (rule `up`, the only rule in v1).
+**Method** (rule `up`, the only rule in v1; source: 13 §2 `modeling`, "rounding increment for new section sizes", and
+11 §4).
 
-- N1. With exact fractions `r`, `i`, `t` (required, increment, tolerance): `n = ceil((r − t) / i)`.
-- N2. `size = n × i`, converted to float once. `multiple = n`.
-- N3. If `t >= i`, or `n` is not positive (the required size is within tolerance of zero), the status is
-  `NEEDS_ENGINEER`, with no size and a message naming the condition. The value is never clamped.
+- N1. With exact fractions `r` and `i` (required and increment, each `Fraction(float)`, so the stored binary value is
+  used exactly): `n = ceil(r / i)`, by integer arithmetic on the fractions.
+- N2. `size = n × i`, converted to float once. `multiple = n`. Hence `size >= r` and `size − r < i`: the size is never
+  below the required size.
+- N3. `r > 0` (input bound) gives `n >= 1`. The value is never clamped.
 - N4. A rule other than `up` raises `NotImplementedGap` CG-2.
+
+A required size that carries float noise just above a multiple (for example a computed value one unit in the last
+place above it) rounds to the next multiple. That is conservative. An allowance for such noise would be engineering
+content: it is not applied here and is Q14.
 
 Multiples are counted from zero. The calc does not choose from a catalog, enforce a minimum dimension (13 §2
 `limits`) or apply code limits. Those are separate checks.
 
-**Trace.** `required`, `increment`, `tolerance` as inputs; steps `(r − t) / i`, `n`, `size` with formulas and source
-"N1, N2".
+**Trace.** `required` and `increment` as inputs; steps `r / i`, `n`, `size` with formulas and source "N1, N2".
 
 **Verification cases** (method source: this section; golden files `round-*.json`): a required size between two
-multiples (rounds to the upper); an exact multiple (unchanged); a required size above a multiple by less than the
-synthetic tolerance (that multiple); `t >= i` and a required size within tolerance of zero (`NEEDS_ENGINEER`);
-properties of AC41.
+multiples (rounds to the upper); an exact multiple (unchanged); a required size above a multiple by the smallest
+synthetic amount the fixture states (the next multiple, never the lower one); properties of AC41.
 
 ### 4.11 Calc 6: element count and position comparison `harness.placement_compare` v1
 
@@ -581,7 +617,7 @@ It extends the count check of ب2.
 
 **Input** `PlacementInput`: `a_frames`, `b_frames` (`model.frame_placements/1`), `a_areas`, `b_areas`
 (`model.area_placements/1`; each side needs frames, areas or both, and the same on both sides), `basis`
-(`compare.length`).
+(`compare.length`). `a_*` is the earlier side and is `stale_ok`; `b_*` and `basis` are not (§4.13).
 
 **Output kind** `harness.placement_comparison/1`: `counts` (per element class and type, `frame` × {`column`, `beam`,
 `brace`, `other`} and `area` × {`slab`, `wall`, `deck`, `other`}, and per story with `unassigned` for `null`: `a`,
@@ -622,7 +658,8 @@ coincident frames (`ambiguous`).
 1. `describe` (AC13).
 2. `run(calc_id, args)`: status check (AC11). Then `validate_input(InputCls, args, source=store,
    current_revision=lambda _: None, policy=InputPolicy(require_refs=True))`. The engine already checked staleness
-   (engine invariant 3), so the CalcPort does not repeat it with a partial revision map. Then the record metadata
+   (engine invariant 3) with each parameter's `RefRule`, which carries `stale_ok` (§4.13), so the CalcPort does not
+   repeat it with a partial revision map. Then the record metadata
    (`InputMeta`), the item limit, the pure function, `CalcMeta` (`id`, `version`, `content_sha256`, `status`),
    `draft`, and the trace. The result is stored with `ResultStore.put` (kind, parents, provenance `tool: "harness"`,
    `tool_version` = the package version, `inputs` = references), and the return is `make_success` with a summary of
@@ -631,13 +668,37 @@ coincident frames (`ambiguous`).
    §6). Any other exception is `INTERNAL`.
 
 The kinds of §4.6 to §4.11 and `harness.expected_effects/1` are registered with `KindRegistry.extend` beside the
-engine's harness kinds (engine plan T3, `_kinds.py`).
+engine's harness kinds (engine plan T3, `_kinds.py`). The CalcPort stores calc results with `producer.host` null:
+they are not read from a host model (contract §4.4), so they are never stale by revision (contract §4.6.2 step 6).
+
+### 4.13 Older-revision inputs (`stale_ok`) **[added]**
+
+The difference report, the read-back check and the placement comparison compare a model with an earlier state of the
+same model by design: steps 4 and 9 of 18 §4 and A1, A5 cannot run otherwise. Engine invariant 3 refuses every host
+reference below the model's current revision with `REF_STALE`, unless the parameter declares `stale_ok` (contract
+§4.6.2 step 6, §5). These calcs therefore declare `stale_ok` on exactly the fields that name the earlier state, and on
+no other field:
+
+| Calc | `stale_ok` fields (every reference inside the group) | Never `stale_ok` |
+|---|---|---|
+| `harness.model_fingerprint` | none | all read-set fields |
+| `harness.model_diff` | `before` | `after`, `basis` |
+| `harness.readback_check` | `before` | `after`, `effects`, `basis` |
+| `harness.design_summary` | none (`previous` is a calc result without `host`, never stale) | `verdicts`, `frames`, `basis` |
+| `harness.section_round` | none | `required`, `basis` |
+| `harness.placement_compare` | `a_frames`, `a_areas` | `b_frames`, `b_areas`, `basis` |
+
+Why this is safe: the later side (`after`, `b_*`) must still be at the current revision, so a stale read-back cannot
+pass (ب5). The read-back check's R0 also requires the after revision to be greater than the before revision, so the
+two sides can never be swapped or equal. Why it departs from the architecture: 04 §3.4 says "a calculation never
+mixes revisions of one model", and 11 §6 invariant 3 states no exception. Mixing two revisions is the purpose of
+these three calcs, and each payload records both revisions. This is raised as Q13 for a hub amendment (AC48, AC49).
 
 ## 5. Inputs and outputs
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| Read-set fields (§4.6) | `model.*` payloads | canonical | contract kinds | references only | Read tools, spec 0002 |
+| Read-set fields (§4.6) | `model.*` payloads | canonical | contract kinds | references only; `stale_ok` only as in §4.13 | Read tools, spec 0002 |
 | `basis` | `basis.design_basis/1` | per field (§4.4) | §4.4 | reference only | Spec 0004 |
 | `effects` | `harness.expected_effects/1` | canonical | §4.8 | reference only | Spec 0007 |
 | `verdicts` | `verdicts.set/1` (host) | — | contract §4.9.1 | reference only | Spec 0002 |
@@ -650,7 +711,7 @@ engine's harness kinds (engine plan T3, `_kinds.py`).
 | Condition | Code | Fields |
 |---|---|---|
 | Input shape, literal under `require_refs`, cross-field rule, mixed models, missing or unconfirmed basis field, circular read-back inputs | `INVALID_ARGUMENT` | `field`, `hint` |
-| Reference failures | `REF_NOT_FOUND`, `REF_POINTER_INVALID`, `REF_KIND_MISMATCH`, `REF_UNIT_MISMATCH` | contract §4.6.2 |
+| Reference failures | `REF_NOT_FOUND`, `REF_POINTER_INVALID`, `REF_KIND_MISMATCH`, `REF_UNIT_MISMATCH`; `REF_STALE` (raised by the engine, invariant 3, for a field not `stale_ok`, §4.13) | contract §4.6.2 |
 | Out of bounds | `OUT_OF_RANGE` | `field`, `expected`, `received` |
 | Item limit | `LIMIT_EXCEEDED` | `expected {max}`, `received` |
 | Unknown calc id | `NOT_FOUND` | — |
@@ -677,6 +738,7 @@ engine's harness kinds (engine plan T3, `_kinds.py`).
 | A tolerance invented in code | R1 | No constants; basis fields only; FB005; AC26 |
 | An approval survives a helper change (د8) | R1 | Hash over the static import closure (AC6) |
 | Float noise at a tolerance boundary flips a result between platforms | R1 | Exact `Fraction` comparisons (D3, P2, N1) |
+| A rounded section below the required size | R1 | N1 rounds the exact required value up with no allowance (AC39, AC41); any allowance is an owner decision (Q14) |
 | Kind payloads change and old results no longer read | R2 | Kinds frozen per version (contract §4.10.1) |
 | Large models exceed time or memory | R2 | `max_items`; quadratic step only on unmatched objects |
 
@@ -685,10 +747,10 @@ engine's harness kinds (engine plan T3, `_kinds.py`).
 | Criteria | Layer | Location |
 |---|---|---|
 | AC1, AC4 to AC9, AC11 to AC16, AC18, AC22, AC23, AC26, AC28, AC32, AC33, AC38, AC40 | Unit | `tests/unit/calcs/` |
-| AC2, AC10, AC47 | Contract | `tests/contract/test_calc_lock.py`, `tests/contract/test_calc_kinds.py` |
+| AC2, AC10, AC47, AC49 | Contract | `tests/contract/test_calc_lock.py`, `tests/contract/test_calc_kinds.py` |
 | AC3 | Unit (source rules) | `tests/rules/test_calc_modules.py` |
-| AC17 | Fake-host workflow (real engine and CalcPort, fake tool ports, real store) | `tests/workflow/test_calc_step.py` |
-| AC19 to AC21, AC24, AC25, AC29 to AC31, AC34 to AC37, AC39, AC42 to AC45 | Golden (hand checks, data in `tests/data/golden/calcs/`) | `tests/golden/test_calcs_golden.py` |
+| AC17, AC48 | Fake-host workflow (real engine and CalcPort, fake tool ports, real store) | `tests/workflow/test_calc_step.py` |
+| AC19 to AC21, AC24, AC25, AC29 to AC31, AC34 to AC37, AC39, AC42 to AC45, AC50 | Golden (hand checks, data in `tests/data/golden/calcs/`) | `tests/golden/test_calcs_golden.py` |
 | AC46 | Golden data lint | `tests/golden/test_golden_files.py` |
 | AC19, AC20, AC25, AC27, AC41 | Property (Hypothesis, `derandomize=True`) | `tests/property/` |
 
@@ -706,7 +768,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
 | Q1 | Conflict: contract basis paths are lowercase (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, contract §4.10.2), but unit suffixes such as `_MPa` and `_kN_m` are not, while 13 §2 shows `fc_MPa`. A `/value` reference to such a field cannot pass the suffix unit check | Owner | Amend the contract to allow `[A-Za-z0-9_]` after the first segment (minor version). Until then calcs read the field object (§4.4) |
-| Q2 | The `compare.*`, `report.top_n` and `modeling.section_rounding` basis fields are not in 13 §2 | Owner, spec 0004 | Add a `compare` template section (one tolerance per quantity kind) and `report.top_n`. No shipped default: the owner sets the values |
+| Q2 | The `compare.*`, `report.top_n` and `modeling.section_rounding` basis fields are not in 13 §2 (a rounding allowance is Q14, not a `compare.*` field) | Owner, spec 0004 | Add a `compare` template section (one tolerance per quantity kind) and `report.top_n`. No shipped default: the owner sets the values |
 | Q3 | Fingerprint without rounding (F3) may differ between two reads if the host returns unstable floats | Owner, S-04 | Keep exact. If S-04 shows instability, decide from its data (a basis field for digits, or adapter-side normalization), never a literal |
 | Q4 | 06 §6 includes the file save time and only counts and names. This spec hashes full content (positions, ج9) and leaves out the save time (a save without changes is not a change) | Owner | Accept. Amend 06 §6 by a hub change after S-04 |
 | Q5 | Host object names compared exactly (D2). ETABS may treat names case-insensitively | Owner, local test | Exact for v1 (a case-only rename shows as removed plus added, which is safe). Revisit after the first local run |
@@ -717,6 +779,8 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q10 | All six calcs ship `draft`: `harness.model_fingerprint`, `harness.model_diff`, `harness.readback_check`, `harness.design_summary`, `harness.section_round`, `harness.placement_compare` | Owner | Review the verification records and approve by `approvals.yaml` entries after the local tests |
 | Q11 | Production run class and `CalcRefused` with two harness codes are additions to the engine spec | Owner | Accept. Spec 0006 adds the `--production` option |
 | Q12 | `HostPort.model_state` (spec 0002) needs the fingerprint. In a production run it must be approved | Owner, B-061 | Spec 0002 computes it through the CalcPort, and the command-line preflight includes it |
+| Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
+| Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance`, `mm`, no default) and a new calc version |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |
 | CG-3 | Total weight, modal periods and reactions comparison (ب2) | Owner | A later calc with its own basis tolerances, after phase 1 |
