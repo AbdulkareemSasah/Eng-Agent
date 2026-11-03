@@ -1,0 +1,5 @@
+# Package floor: contracts (design/process/01-lifecycle.md section 6). The unit factors in
+# src/eng_contract/units* are also engineering content (r1); the root map covers them.
+- paths:
+    - "**"
+  risk: r2
