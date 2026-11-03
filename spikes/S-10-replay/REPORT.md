@@ -145,7 +145,7 @@ runs.** Until it passes, nothing here may be quoted as measured.
 | **The race.** A process becomes a member of the job at assignment. Processes it created *before* that moment are not members and are not killed. A plain `Popen` followed by `AssignProcessToJobObject` leaves a window in which the new process can start grandchildren that then escape. Case `late` makes the window two seconds long on purpose and asserts that the two grandchildren escape (documenting the rule); the loop `race_loop` counts how often a child's first act (starting a grandchild) beats the assignment, and requires zero escapes for the suspended start. The count for the plain start is printed as INFO only: with a slow Python start-up it may be zero, which would not prove safety | documentation; to be measured by `windows_check.py` |
 | **Closing the race.** Three ways exist: (a) create the process suspended (`CREATE_SUSPENDED`), assign it, resume it: no instruction of the new process runs before assignment; (b) the engine assigns *itself* to the job first, and all later children inherit membership (no window, but the job is then shared by all servers and by the engine); (c) a small launcher that is itself in the job before it starts the server. (c) only moves the race: the launcher must be started suspended or be in the job already, so it needs (a) or (b) anyway | `jobobject.popen_in_job` implements (a); case `self_assign` tests (b) |
 | **Nested jobs.** From Windows 8 on, a process may be in a chain of nested jobs; earlier versions allow one job per process. An engine started from a terminal, a CI runner or a scheduler that already uses a job is therefore not a problem on supported Windows versions. Case `nested` puts the engine in an outer job and each server in its own inner job: `TerminateJobObject` on one inner job ends exactly that server's tree and leaves the other, and the engine ending ends the rest | documentation; `windows_check.py` case `nested`. The check prints whether the check process is already in a job |
-| Breakaway: a job member can leave the job only if the job allows breakaway (`JOB_OBJECT_LIMIT_BREAKAWAY_OK` or `SILENT_BREAKAWAY_OK`) and the creator asks for it. The spike sets neither, so a server cannot escape by its own choice | documentation |
+| Breakaway: with `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, a child leaves the job only if its creator passes `CREATE_BREAKAWAY_FROM_JOB`; with `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`, every process a job member creates leaves the job automatically. The spike sets neither, so in the spike nothing escapes. The engine needs a choice here (see open risks): silent breakaway lets host programs survive but also lets every helper process a server starts outlive it; `BREAKAWAY_OK` keeps helpers in the job but needs the server to start host programs with the breakaway flag, which is a Sasaah change | documentation |
 | A Python virtual-environment launcher (`python.exe` in `.venv\Scripts`) can start the real interpreter as a child process. In a job both stay members, but a test that tracks "the server's PID" would track the wrong process. `windows_check.py` therefore uses the base interpreter, and adapters must track the whole job rather than a PID | note in `windows_check.py` |
 | Resuming a suspended process: `subprocess.Popen` does not hand back the primary thread handle, so `resume_process` enumerates threads with `CreateToolhelp32Snapshot` and resumes those of the new PID. This works for a process that has just been created, but it is more machinery than needed and it works by PID | `jobobject.py` |
 | PID use (review note). `popen_in_job` opens the child by PID with `OpenProcess` to assign it, instead of using the handle `Popen` already holds. A PID can in principle be reused if a child dies in between; for a suspended child that has run no code this is not a practical risk. The engine should not depend on it: it should call `CreateProcessW` itself, keep `PROCESS_INFORMATION.hProcess` and `.hThread`, assign with the process handle and resume with the thread handle. No PID lookup is then needed | design recommendation, not tested |
@@ -155,9 +155,12 @@ runs.** Until it passes, nothing here may be quoted as measured.
 **One job per server, created by the engine, with the server process created suspended, assigned to its job, then
 resumed.** Each job has `KILL_ON_JOB_CLOSE` and its handle is held by the engine only (not inheritable).
 
-- Engine exit or crash closes all handles, so all servers and everything they started end: this is the ADR-0014 requirement.
-- Restarting one crashed server terminates its job, which also removes any host program it left behind, without touching
-  the other servers.
+- Engine exit or crash closes all handles, so every server process ends: this is the ADR-0014 requirement. Host
+  programs a server starts must not end with it (open risk "Host programs inside a server's job"): they leave the job,
+  and the engine closes only host instances it started, by an explicit decision, never as a side effect of a job ending
+  ([11](../../design/docs/architecture/11-harness-engine.md) §6 item 10).
+- Restarting one crashed server terminates its job (the server and the helper processes that stayed in it), without
+  touching the other servers or any host program.
 - No code of the server runs before it is in the job, so the race is closed, whatever the server does at start.
 - If the engine is itself inside a job (CI, terminal, scheduler), nested jobs keep this working on Windows 8 and later.
 - A launcher is not needed: it would have to be started the same way. The engine should do the creation itself with
@@ -201,7 +204,8 @@ These are proposals. The hub documents and the ADR are not changed by this spike
    `NEEDS_RECONCILIATION` for the engineer. A read in flight is run again."
 3. Replace "Servers run in a Job Object that terminates them with the engine" with: "Each server runs in its own Job
    Object with kill-on-close, created suspended, assigned, then resumed, with the job handle held by the engine, so no
-   orphan keeps a host locked and no process of a server escapes". Add under Consequences: "The Windows behavior is
+   orphan server keeps a host locked; host programs a server starts leave the job (the breakaway choice of the open
+   risks), and the engine closes only host instances it started, by an explicit decision". Add under Consequences: "The Windows behavior is
    validated by the Windows CI job; until it has passed, this decision is not validated" and change "validated in spike
    S-10 before the engine is built" to name this report.
 4. Add under Decision: "One engine works on a run at a time (an OS file lock on the run directory)."
@@ -267,4 +271,7 @@ process and thread handles, that adapters address a server as a job, and that re
   §6 item 10 require host programs to stay outside the job and to be closed only by an explicit decision about
   instances the engine started. The engine spec must decide it; the likely answer is
   `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK` together with `KILL_ON_JOB_CLOSE`, which keeps the servers in the job and
-  lets the processes they create break away. Not tested here; `windows_check.py` should gain this case.
+  lets the processes they create break away. Not tested here; `windows_check.py` should gain this case. The trade-off: silent
+  breakaway also lets every helper process a server starts outlive it (an orphan helper can hold a pipe or a lock), so
+  the engine must still track and close what it started; `JOB_OBJECT_LIMIT_BREAKAWAY_OK` avoids that but needs the server
+  to pass `CREATE_BREAKAWAY_FROM_JOB` when it starts a host program, which the Sasaah servers do not do today.
