@@ -23,13 +23,13 @@ After a restart or a context compaction, read this file and `git log origin/buil
 | Phase | Package or item | Status |
 |---|---|---|
 | 0 | ADR-0028, hub moved to `design/` | done (f434a41) |
-| 0 | Workspace root (`pyproject.toml`, AGENTS.md, CI skeleton, `.gate/`) | in progress |
+| 0 | Workspace root (`pyproject.toml`, AGENTS.md, CI skeleton, `.gate/`) | done (B-002, B-009 in review) |
 | 0 | `eng-contract` 0.1 | spec in progress |
 | 0 | `tools/eng-dev-gate` 0.1 | spec in progress |
 | 0 | CI workflows (all jobs of process/11 §5) | not started |
-| 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | in progress |
-| 0 | Spike S-10 (replay; Job Object termination) | in progress |
-| 0 | Spikes S-02 and S-04 (scripts for local runs) | not started (needs S-12) |
+| 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | report written; merging |
+| 0 | Spike S-10 (replay; Job Object termination) | report written; merging; Windows result pending the Windows CI job |
+| 0 | Spikes S-02 and S-04 (scripts for local runs) | queued (B-007) |
 | 1 | `eng-harness` (engine, journal, replay, ctx, CSI adapter, calcs, templates, basis, decisions, CLI, progress, approval page, run report, edit-cycle workflow) | not started |
 | 2 | `structural-codes` (core, `aci318-14`, `sbc304-2018` draft), SAFE via CSI adapter, providers (Jev shadow, PydanticAI), `design_isolated_footing` | not started |
 | 3 | `sasaah-revit-mcp` adapter, SAP2000 via CSI adapter, column checks, column workflow | not started |
@@ -43,12 +43,23 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | Id | Task | Author (model, effort) | Reviewer (model, effort) | PR | Status |
 |---|---|---|---|---|---|
 | B-001 | ADR-0028; move the hub into `design/`; update affected documents | lead | — (owner decision record) | direct commit f434a41 | done |
-| B-002 | Workspace root: uv workspace, `.python-version`, README, AGENTS.md, CLAUDE.md, `.gate/`, `.github/` skeleton | sonnet, low (second attempt, P-1) | opus, low | — | in progress |
+| B-002 | Workspace root: uv workspace, `.python-version`, README, AGENTS.md, CLAUDE.md, `.gate/`, `.github/` skeleton | sonnet, low (second attempt, P-1) | opus, low | [#7](https://github.com/AbdulkareemSasah/Eng-Agent/pull/7) | done (ea33ff9) |
 | B-003 | `eng-contract` spec and plan (draft) | opus, medium; fixes: opus, medium (2 rounds) | opus, medium (R2) | [#3](https://github.com/AbdulkareemSasah/Eng-Agent/pull/3) | in review |
 | B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high; fix: sonnet, high | opus, low | [#4](https://github.com/AbdulkareemSasah/Eng-Agent/pull/4) | in review |
 | B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium; report committed by the lead (P-2) | opus, low | [#5](https://github.com/AbdulkareemSasah/Eng-Agent/pull/5) | in review |
 | B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high; report committed by the lead (P-2) | opus, low | [#6](https://github.com/AbdulkareemSasah/Eng-Agent/pull/6) | in review |
-| B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | — | blocked on B-005 |
+| B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | — | queued (wave 2) |
+| B-008 | Hub: stale 04 section references; ADR-0029 (Proposed) eng-contract 0.1 details | sonnet, medium | opus, low | — | queued (wave 2) |
+| B-009 | Root workspace members listed explicitly (D-10) | lead | opus, low | [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) | in review |
+| B-010 to B-025 | `eng-contract` 0.1, plan tasks T1 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | queued (wave 2) |
+| B-030 to B-055 | `eng-dev-gate` 0.1, plan tasks T1 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | queued (wave 2) |
+| B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
+| B-061 | `eng-harness` spec and plan 0002 servers and adapters; ADR-0031, ADR-0032 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
+| B-062 | `eng-harness` spec and plan 0003 calcs | opus, medium | opus, medium | — | queued (wave 2) |
+| B-063 | `eng-harness` spec and plan 0004 templates and design basis | sonnet, medium | opus, medium | — | queued (wave 2) |
+| B-064 | `eng-harness` spec and plan 0005 decision layer | sonnet, medium | opus, low | — | queued (wave 2) |
+| B-065 | `eng-harness` spec and plan 0006 command line, progress, approval page, run report | sonnet, high | opus, medium (security) | — | queued (wave 2) |
+| B-066 | Model edit cycle: workflow spec, block spec and plan 0007 | opus, medium | opus, medium | — | queued (wave 2) |
 
 ## 4. Decisions by the lead
 
@@ -63,6 +74,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | D-7 | A spec and its plan may share one documents-only pull request, reviewed together | process/01 §4 forbids mixing specs or plans with other changes; reviewing both together keeps them consistent |
 | D-8 | B-002 (workspace root) is built from ADR-0028 §1 and process/11 directly, without a plan file | No gate tooling exists yet to verify a plan; the review still applies |
 | D-9 | A phase's specs may start once the specs of the packages it depends on are merged; its code starts when the previous phase's packages are done | Keeps the phase order (19, R4) without idling while the last tasks of a phase finish |
+| D-10 | The root uv workspace lists its members explicitly; each package's skeleton task adds its folder (B-009) | A package folder holds its spec and plan before its `pyproject.toml` exists, and uv refuses a glob that matches such a folder |
+| D-11 | Tasks run as workflow chains: writer, independent review with up to two fix rounds, then a mechanical merge step that waits for CI and squash-merges only on an approving review and green CI; at most five writers at once | Serialized chains (the 16 `eng-contract` tasks) do not stall between tasks; the merge rule stays the lead's |
 
 ## 5. Problems
 
@@ -70,6 +83,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 |---|---|---|
 | P-1 | The first five worktrees of wave 1 were created from the Sasaah checkout (the lead's shell was there at launch); B-002 stopped, the others cloned Eng-Agent into the scratchpad. Nothing reached Sasaah | Launch every agent from `/home/user/Eng-Agent`; every prompt checks `git remote -v` first |
 | P-2 | Subagents' write tool refuses files it treats as report files (`REPORT.md`) | The lead commits such files from the drafts the subagents return; prompts say not to work around a refusal |
+| P-3 | Worktrees are created from the lead's current folder when each agent starts, not when its workflow starts; two reviews failed while the lead's shell was outside the repository | The lead's shell stays in `/home/user/Eng-Agent` while workflows run (other folders only in subshells) |
+| P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
 
 ## 6. Owner queue
 
