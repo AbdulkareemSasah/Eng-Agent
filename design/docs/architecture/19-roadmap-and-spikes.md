@@ -16,6 +16,10 @@ Status: Proposed (revised by ADR-0024 to ADR-0027)
 In every phase, a capability that is missing during a live project goes through the project lane
 ([ADR-0026](../adr/0026-project-lane-for-tools.md)).
 
+For v1, all phases are built code-complete before live testing; the spikes that need host programs, acceptance A1 to
+A7 and the A4 time gate run at the owner's local test stage and must pass before any release
+([ADR-0028](../adr/0028-build-v1-in-this-repository.md)).
+
 Each phase gets a time box from the owner when it starts (two weeks proposed for phase 0). A phase that has not met
 its exit criteria within its time box cuts scope; its exit criteria are never lowered to close it.
 
@@ -23,7 +27,8 @@ its exit criteria within its time box cuts scope; its exit criteria are never lo
 
 A spike answers a specific question with throwaway code in the target package's `spikes/` folder, time-boxed to at most
 two days, and ends with a written report ([process/templates/spike-report.md](../../process/templates/spike-report.md))
-and ADR updates. Spike code never ships. Spikes run at the start of the phase that needs them.
+and ADR updates. Spike code never ships. Spikes run at the start of the phase that needs them; for v1, the parts that need host
+programs run at the local test stage (ADR-0028).
 
 | Id | Phase | Question | Feeds |
 |---|---|---|---|
@@ -45,7 +50,7 @@ Imagine it is a year from now and the project failed. The most likely reasons, a
 
 | Id | Failure story | Prevention | Early warning |
 |---|---|---|---|
-| R1 | It works, but it is not faster than the engineer | Benchmark B-1 before coding; acceptance A4 gates phase 2; rules-first decisions; batch tools; save before analysis | Phase 1 timings above 50% of baseline |
+| R1 | It works, but it is not faster than the engineer | Benchmark B-1 and acceptance A4 before any release (ADR-0028); rules-first decisions; batch tools; save before analysis | Phase 1 timings above 50% of baseline |
 | R2 | The decision model is unavailable, changes, or is wrong for engineering states | Provider interface; engineer tier; decision model only from phase 2, in shadow mode with evaluations | S-07 results; evaluation agreement under 95% |
 | R3 | A host API or a Sasaah tool cannot do something a workflow needs | Spikes first (S-12); project lane; gap reports | Gap reports that block a workflow |
 | R4 | Too many packages at once, none finished | Strict phases with time boxes (§1); packages created only when their phase starts | More than six active packages before phase 1 exit; a phase past its time box |

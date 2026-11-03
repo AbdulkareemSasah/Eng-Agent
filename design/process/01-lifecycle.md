@@ -64,6 +64,9 @@ Gates are files and pull-request approvals on `main`, never labels or comments, 
   verifies that the plan and its spec are approved on `main`, the task exists, every changed file matches the task's
   globs, and the diff stays within `max_changed_lines`.
 - Labels (`status/`, `size/`, `risk/`) are informational and for search; no gate depends on them.
+- Bootstrap mode ([ADR-0028](../docs/adr/0028-build-v1-in-this-repository.md)): gates are verified on `build/v1`
+  instead of `main`; a spec or plan with `status: draft` that a subagent other than its author reviewed stands in for
+  G1 and G2; a check that needs the owner or another identity reports `awaiting owner` instead of failing.
 
 ## 5. Who approves
 

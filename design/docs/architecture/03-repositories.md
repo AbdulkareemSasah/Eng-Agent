@@ -6,7 +6,8 @@ Status: Proposed (catalog revised by ADR-0024) · Names are *working names* unti
 
 Every tool is an independent package from its first commit. While private, the agent-stack packages live together in
 one private uv workspace repository, `eng-platform`; each is split into its own public repository when it goes open
-source ([ADR-0001](../adr/0001-independent-repositories-private-first.md)).
+source ([ADR-0001](../adr/0001-independent-repositories-private-first.md)). `eng-platform` is the repository that holds
+this hub as `design/` ([ADR-0028](../adr/0028-build-v1-in-this-repository.md)).
 
 ```
 eng-platform/                      private workspace repository (incubation)
@@ -17,6 +18,7 @@ eng-platform/                      private workspace repository (incubation)
     ...
   tools/
     eng-dev-gate/                  the shared process gate (process/11 §4)
+  products/                        desktop products of 15, while v1 is built here (ADR-0028)
   .github/                         CI, CODEOWNERS, templates (repository level)
 ```
 

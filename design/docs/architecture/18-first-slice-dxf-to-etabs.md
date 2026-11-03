@@ -65,7 +65,8 @@ Steps 1 and 2 run once per run; steps 3 to 15 form one cycle and repeat until th
 
 ## 5. Acceptance criteria and benchmark
 
-Before any phase 1 code is written, the owner prepares benchmark B-1: three past projects, each with its ETABS model,
+Before the first release, the owner prepares benchmark B-1 (v1 is built before live testing,
+[ADR-0028](../adr/0028-build-v1-in-this-repository.md)): three past projects, each with its ETABS model,
 five to ten typical change requests taken from the real work, and the time those changes took by hand and, where
 recorded, in agent chats (the session baseline of ADR-0024).
 
@@ -79,7 +80,7 @@ recorded, in agent chats (the session baseline of ADR-0024).
 | A6 | A run interrupted at any step (process killed, or ETABS killed) resumes after the host-state check and ends with the same model as an uninterrupted run |
 | A7 | Besides the change-set approval and the engineer turn, at most one engineer prompt per cycle, where one batched screen counts as one prompt |
 
-If A4 is not met, phase 2 does not start until the cause is found and fixed, because time savings are the reason this
+If A4 is not met, no release is made until the cause is found and fixed, because time savings are the reason this
 system exists.
 
 ## 6. Optional start from DXF

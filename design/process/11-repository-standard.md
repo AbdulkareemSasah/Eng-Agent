@@ -20,7 +20,7 @@ Every repository is created from this standard on the day its phase starts.
 | `.github/workflows/` | Thin callers of the reusable workflows in `eng-dev-gate` (§5) |
 | `.github/dependabot.yml` | Dependency updates ([12](12-operations.md) §6) |
 | `.gate/risk-map.yml`, `.gate/ratchet.json`, `.gate/agents.yml` | Risk floor, suppression ratchet, `AGENTS.md` inputs |
-| `pyproject.toml`, `uv.lock`, `.python-version` | Project, locked dependencies, pinned Python |
+| `pyproject.toml`, `uv.lock`, `.python-version` | Project, locked dependencies, pinned Python (one version for the whole workspace, [ADR-0028](../docs/adr/0028-build-v1-in-this-repository.md)) |
 
 ## 2. Layout (Python repository)
 
@@ -99,7 +99,8 @@ Consequences: pull requests are authored by the agent identity, so the owner can
 can be mistaken for the owner; an agent cannot change protection or merge with admin rights.
 
 Branch protection, required reviews and `CODEOWNERS` enforcement on private repositories need a paid GitHub plan
-(Pro for a personal account, or Team for an organization). This is a phase 0 setup item.
+(Pro for a personal account, or Team for an organization). This is a phase 0 setup item. Until it is done, the
+workspace runs in bootstrap mode ([ADR-0028](../docs/adr/0028-build-v1-in-this-repository.md)).
 
 ## 7. GitHub settings at creation
 

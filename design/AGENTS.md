@@ -1,7 +1,9 @@
 # AGENTS.md: Eng-Agent Design Hub
 
-This repository holds architecture, decisions and process. It contains no product code. Read
-[README.md](README.md), then the documents relevant to your task.
+This folder (`design/`) holds architecture, decisions and process. It contains no product code; the packages live
+outside it, in the workspace root, which has its own `AGENTS.md`
+([ADR-0028](docs/adr/0028-build-v1-in-this-repository.md)). Read [README.md](README.md), then the documents relevant
+to your task.
 
 ## Rules for working here
 

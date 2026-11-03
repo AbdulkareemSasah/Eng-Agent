@@ -9,7 +9,9 @@ check a rule, a machine checks it ([ADR-0021](../docs/adr/0021-agent-agnostic-ci
 
 During incubation ([ADR-0001](../docs/adr/0001-independent-repositories-private-first.md)), "repository" in these
 documents means a package directory of the `eng-platform` workspace; repository-level files (CI, branch protection,
-`CODEOWNERS`) exist once at its root.
+`CODEOWNERS`) exist once at its root. Until the owner sets up the identities and branch protection of
+[11](11-repository-standard.md) §6, the workspace runs in bootstrap mode
+([ADR-0028](../docs/adr/0028-build-v1-in-this-repository.md)).
 
 ## The ten golden rules
 

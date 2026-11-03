@@ -7,7 +7,7 @@ An accepted ADR is never edited except to change its status; a new decision supe
 
 | ADR | Decision | Status |
 |---|---|---|
-| [0001](0001-independent-repositories-private-first.md) | Independent packages, incubated privately in one workspace, split into public repositories | Proposed |
+| [0001](0001-independent-repositories-private-first.md) | Independent packages, incubated privately in one workspace, split into public repositories | Proposed; amended by ADR-0028 |
 | [0002](0002-python-uv-default-csharp-at-host-boundary.md) | Python with uv by default; C# only where a host API forces it; every MCP front end in Python | Proposed; amended by ADR-0024 |
 | [0003](0003-mcp-servers-are-pure-adapters.md) | MCP servers are pure host adapters; blocks, workflows and code verdicts live elsewhere | Proposed; amended by ADR-0024 |
 | [0004](0004-shared-tool-contract.md) | One shared tool contract package, `eng-contract` | Proposed; amended by ADR-0024 |
@@ -27,10 +27,11 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0018](0018-permission-modes.md) | Three permission modes, user-selectable, default work on a copy | Proposed |
 | [0019](0019-host-version-support-policy.md) | Host version support: tested versions only, design for multi-version | Proposed |
 | [0020](0020-dxf-reading-as-mcp-server.md) | DXF reading as its own MCP server | Superseded by ADR-0024 |
-| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026 |
+| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026 and ADR-0028 |
 | [0022](0022-repository-names.md) | Repository and package names | Proposed; amended by ADR-0024 |
 | [0023](0023-license-apache-2.md) | License: Apache-2.0 | Proposed |
 | [0024](0024-harness-on-existing-sasaah-servers.md) | The harness runs on the existing Sasaah MCP servers and tools; no new host servers are built | Accepted |
 | [0025](0025-first-workflow-edit-cycle.md) | The first workflow is the model edit cycle | Accepted |
 | [0026](0026-project-lane-for-tools.md) | A project lane builds tools during live projects; the release lane runs before reuse | Accepted |
 | [0027](0027-phase-1-interface.md) | Phase 1 interface: command line, HTML approval page and run report | Accepted |
+| [0028](0028-build-v1-in-this-repository.md) | Build v1 in this repository, code-complete before live testing, in bootstrap mode; Python 3.14 | Accepted (owner, in the build prompt) |

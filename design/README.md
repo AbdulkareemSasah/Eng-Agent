@@ -4,9 +4,10 @@ This folder is the single source of truth for the architecture and the developme
 independent, open-source engineering tools: MCP servers for Revit, ETABS, SAFE, SAP2000 and IDEA StatiCa,
 structural code packs, and an engineering harness that runs engineer-defined workflows on top of them.
 
-No product code lives here. Each tool is an independent package; while private, the packages incubate together in
-one workspace repository (`eng-platform`, which will also hold this hub as `design/`), and each becomes its own public
-repository when it goes open source ([ADR-0001](docs/adr/0001-independent-repositories-private-first.md)). This hub holds:
+No product code lives in this folder. Each tool is an independent package; while private, the packages incubate
+together in one workspace repository, `eng-platform`, and each becomes its own public repository when it goes open
+source ([ADR-0001](docs/adr/0001-independent-repositories-private-first.md)). `eng-platform` is the repository that
+holds this hub as its `design/` folder ([ADR-0028](docs/adr/0028-build-v1-in-this-repository.md)). This hub holds:
 
 | Folder | What it holds | Normative? |
 |---|---|---|
@@ -29,7 +30,9 @@ repository when it goes open source ([ADR-0001](docs/adr/0001-independent-reposi
 
 ## Status
 
-Phase: **architecture review**. Nothing is built. No repository is created until the owner approves this design.
+Phase: **build v1** ([ADR-0028](docs/adr/0028-build-v1-in-this-repository.md)). The owner decided on 2026-11-03 to
+build v1 code-complete in this repository before live testing, on the branch `build/v1` in bootstrap mode; `main` keeps
+the approved design until the owner merges after the local tests.
 On 2026-11-03 the design was revised from evidence in real sessions (ADR-0024 to ADR-0027, accepted by the owner):
 the harness runs on the existing Sasaah MCP servers and tools, the first workflow is the model edit cycle, a project
 lane allows building tools during live projects, and the full UI is deferred.
