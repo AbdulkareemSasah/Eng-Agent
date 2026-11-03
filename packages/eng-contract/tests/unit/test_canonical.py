@@ -55,13 +55,13 @@ def test_number_layout_boundaries() -> None:
 
 
 def test_key_order_and_escaping() -> None:
-    value = {"b": 1, "a": 2, "é": 3, "\U0001f600": 4, "דּ": 5}
+    value = {"b": 1, "a": 2, "\u00e9": 3, "\U0001f600": 4, "\ufb33": 5}
     # UTF-16 code unit order: a, b, e-acute (U+00E9), the emoji (D83D DE00), then U+FB33.
-    expected = '{"a":2,"b":1,"é":3,"\U0001f600":4,"דּ":5}'.encode()
+    expected = '{"a":2,"b":1,"\u00e9":3,"\U0001f600":4,"\ufb33":5}'.encode()
     assert canonical_json(value) == expected
-    text = '\x00\x08\t\n\x0c\r\x1f\x7f  "\\/'
+    text = '\x00\x08\t\n\x0c\r\x1f\x7f\u2028\u2029"\\/'
     assert canonical_json(text) == b'"\\u0000\\b\\t\\n\\f\\r\\u001f\x7f\xe2\x80\xa8\xe2\x80\xa9\\"\\\\/"'
-    assert canonical_json("é") == '"é"'.encode()  # no normalization
+    assert canonical_json("e\u0301") == '"e\u0301"'.encode()  # no normalization
     assert canonical_json([True, False, None, [], {}, {"k": [1, {"z": None}]}]) == (
         b'[true,false,null,[],{},{"k":[1,{"z":null}]}]'
     )
@@ -84,7 +84,7 @@ def test_rejects_non_json_values() -> None:
         Decimal("1.5"),
         Fraction(1, 3),
         b"bytes",
-        datetime(2026, 1, 1),  # noqa: DTZ001
+        datetime(2026, 1, 1),
         (1, 2),
         {1, 2},
         object(),
@@ -152,7 +152,7 @@ def test_loads_values_and_integer_rule() -> None:
         b"{",
         b"\xff",
         b"\xef\xbb\xbf1",
-        b"[" * 5000,
+        b"[" * 1_000_000 + b"]" * 1_000_000,
     ],
 )
 def test_loads_rejects(text: bytes) -> None:
