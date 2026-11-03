@@ -92,11 +92,14 @@ tasks:
       - "packages/structural-codes/core/src/structural_codes/check.py"
       - "packages/structural-codes/core/src/structural_codes/pack.py"
       - "packages/structural-codes/core/tests/unit/test_registry.py"
+      - "packages/structural-codes/core/tests/unit/test_check.py"
       - "packages/structural-codes/core/tests/fixtures/synthbase/**"
     max_changed_lines: 300
     max_sessions: 2
-    tests_first: ["packages/structural-codes/core/tests/unit/test_registry.py::test_discovery_and_lookup"]
-    covers: [AC16]
+    tests_first:
+      - "packages/structural-codes/core/tests/unit/test_registry.py::test_discovery_and_lookup"
+      - "packages/structural-codes/core/tests/unit/test_check.py::test_applicability_declared"
+    covers: [AC5b, AC16]
     depends_on: [T5]
   - id: T7
     title: Content hash over sources, imported helpers, metadata and inputs
@@ -110,7 +113,8 @@ tasks:
     tests_first:
       - "packages/structural-codes/core/tests/unit/test_content_hash.py::test_hash_inputs"
       - "packages/structural-codes/core/tests/unit/test_content_hash.py::test_dynamic_import_rejected"
-    covers: [AC21, AC22]
+      - "packages/structural-codes/core/tests/unit/test_content_hash.py::test_closure_within_check_modules"
+    covers: [AC21, AC22, AC22a]
     depends_on: [T6]
   - id: T8
     title: Runner, evaluate and evaluate_batch
@@ -126,13 +130,14 @@ tasks:
     max_sessions: 3
     tests_first:
       - "packages/structural-codes/core/tests/unit/test_applicability.py::test_outcomes_and_order"
+      - "packages/structural-codes/core/tests/unit/test_applicability.py::test_member_scope_first"
       - "packages/structural-codes/core/tests/unit/test_runner.py::test_not_implemented_gap"
       - "packages/structural-codes/core/tests/unit/test_runner.py::test_references"
       - "packages/structural-codes/core/tests/unit/test_runner.py::test_batch"
       - "packages/structural-codes/core/tests/unit/test_runner.py::test_no_verdict"
       - "packages/structural-codes/core/tests/contract/test_verdict_set.py::test_evaluate_payload"
       - "packages/structural-codes/core/tests/replay/test_determinism.py::test_identical_across_runs_and_hash_seeds"
-    covers: [AC5, AC6, AC7, AC26, AC27, AC28, AC29]
+    covers: [AC5, AC5a, AC6, AC7, AC26, AC27, AC28, AC29]
     depends_on: [T7]
   - id: T9
     title: Verification case files, tolerance and verification runner
@@ -181,7 +186,8 @@ tasks:
       - "packages/structural-codes/core/tests/unit/test_lifecycle.py::test_approvals_file"
       - "packages/structural-codes/core/tests/unit/test_lifecycle.py::test_state_resolution"
       - "packages/structural-codes/core/tests/unit/test_lifecycle.py::test_mode_usability"
-    covers: [AC23, AC24, AC25]
+      - "packages/structural-codes/core/tests/unit/test_lifecycle.py::test_installed_layout"
+    covers: [AC23, AC24, AC24a, AC25]
     depends_on: [T9, T10]
   - id: T12
     title: Command line (verify and hash)
@@ -277,14 +283,17 @@ hash is passed in as a value (T7 computes it), so the recorder has no dependency
 reviewed with the source-check lens. Exact boundary tests at `ratio == limit` and the next float above.
 
 **T6 Checks and registry.** `@check`, `Check`, `Pack`, `Registry.discover()` (entry points, sorted) and `Registry.of()`.
-The `synthbase` fixture pack starts here.
+`@check` enforces the applicability declaration (non-empty preconditions or `unconditional`, spec §4.4). The
+`synthbase` fixture pack starts here.
 
 **T7 Content hash.** The static import closure (`_closure.py`, AST only, no import side effects) and the hash document
-of spec §4.7. Fixtures are copied into a temporary folder so tests can change single bytes.
+of spec §4.7 (closure over the pack, `structural_codes` and `eng_contract`), and `lint_scope_violations` (spec §4.5).
+Fixtures are copied into a temporary folder so tests can change single bytes.
 
-**T8 Runner.** `evaluate`, `evaluate_batch`, validation through `validate_input`, preconditions, gaps, error isolation
-per item, governing, the `verdicts.set/1` payload. Until T11, the runner treats every check as `draft` in `trial` mode and
-refuses `production` (the safe default). The replay test runs two subprocesses through `sys.executable`.
+**T8 Runner.** `evaluate`, `evaluate_batch`, validation through `validate_input`, the member-scope step, preconditions,
+gaps, error isolation per item, governing, the `verdicts.set/1` payload. Until T11, the runner treats every check as
+`draft` in `trial` mode and refuses `production` (the safe default). The replay test runs two subprocesses through
+`sys.executable`.
 
 **T9 Verification.** Case-file models, `compare`, `verify_check` and `verify_pack`, the report and the requirement list
 of spec §4.9.4. YAML loading uses `yaml.safe_load` only (`_yaml.py`), with duplicate keys rejected.
@@ -292,11 +301,14 @@ of spec §4.9.4. YAML loading uses `yaml.safe_load` only (`_yaml.py`), with dupl
 **T10 Overlays.** `Overlay` and its entries, completeness, clause-map rules, derived inherited checks and their hash
 (adds the `base` member to the hash document). Can run in parallel with T9 (disjoint files) once T8 is merged.
 
-**T11 Lifecycle.** `approvals.yaml` model, `resolve_state`, mode usability wired into the runner (replacing T8's
-default). Tests use temporary approvals files; no shipped `approvals.yaml` has entries.
+**T11 Lifecycle.** `approvals.yaml` model, the runtime `resolve_state` (approvals and hash only, no case files; spec
+§4.8), mode usability wired into the runner (replacing T8's default). Tests use temporary approvals files and an
+installed-layout copy of `synthbase` (its `src/` package and `approvals.yaml` only); no shipped `approvals.yaml` has
+entries.
 
-**T12 Command line.** `python -m structural_codes verify --pack P` and `hash --pack P`; exit codes 0, 1, 2; output to
-an injected stream (no `print`, FB007).
+**T12 Command line.** `python -m structural_codes verify --pack P` and `hash --pack P`; exit codes 0, 1, 2; `verify`
+also reads the pack's `check_modules` with `tomllib` and exits 2 on a lint-scope violation; output to an injected stream
+(no `print`, FB007).
 
 **T13 Notes.** `render_html` and the label table; golden file committed under `tests/data/golden/notes/` (a protected
 test oracle; the owner reviews it). Can run in parallel with T9 to T12 once T8 is merged.

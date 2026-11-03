@@ -72,6 +72,15 @@ engineering meaning"`.
   verdict `NOT_APPLICABLE` with `demand`, `capacity` and `ratio` null, the body is not run, and the trace messages name
   `P1` and its clause; when only P2 fails, then `NEEDS_ENGINEER` likewise; when both fail, P1 wins (declared order).
   Test: `tests/unit/test_applicability.py::test_outcomes_and_order`.
+- AC5a. Given a check whose `members` is `{footing}`, when it is evaluated with a subject of kind `frame` (also with
+  `preconditions=()` and with preconditions that would pass), then one verdict `NOT_APPLICABLE` with `demand`,
+  `capacity` and `ratio` null, neither preconditions nor body run, and a trace message names the subject kind, the
+  member scope and the first clause; with a `footing` subject the preconditions run. Test:
+  `tests/unit/test_applicability.py::test_member_scope_first`.
+- AC5b. Given a check with `preconditions=()` and no `CheckMeta.unconditional`, when it is defined, then
+  `CheckDefinitionError`; given `preconditions=()` and `unconditional` naming a clause-spec section, or a non-empty
+  tuple, then it is defined; given both a non-empty tuple and `unconditional`, then `CheckDefinitionError`. Test:
+  `tests/unit/test_check.py::test_applicability_declared`.
 - AC6. Given a body that raises `NotImplementedGap("G-3", clause="22.6.5.2", reason=...)` with `G-3` declared in the
   metadata's `gaps`, when evaluated, then one verdict `NEEDS_ENGINEER` whose trace messages contain `G-3`, the clause and
   the reason; an undeclared gap id raises `CheckDefinitionError`. Test: `tests/unit/test_runner.py::test_not_implemented_gap`.
@@ -87,8 +96,10 @@ engineering meaning"`.
   `tests/unit/test_trace.py::test_recording_rules`.
 - AC9. Given an evaluation, when its trace is built, then every input field is a `TraceInput` with the unit of its
   field metadata and the `ref` of its provenance (null for literals), `calc_id` is the `check_id`, `calc_version` is
-  the pack version, `content_sha256` is the check's content hash (§4.7), and the trace validates as the contract's
-  `Trace`. Test: `tests/unit/test_trace.py::test_inputs_and_contract_shape`.
+  the pack version, `content_sha256` is the check's content hash (§4.7), `subject` is the evaluated subject,
+  `outputs` lists `demand`, `capacity` and `ratio` names of each verdict in order (only those recorded), `status` is
+  the governing verdict's status or else the first verdict's, and the trace validates as the contract's `Trace`.
+  Test: `tests/unit/test_trace.py::test_inputs_and_contract_shape`.
 - AC10. Given a step whose name ends in a known unit suffix (EC §4.7.2) and whose unit differs from that suffix's
   canonical unit, or a unit not in `UNITS`, when recorded, then `CheckDefinitionError`. Test:
   `tests/unit/test_trace.py::test_step_units`.
@@ -135,22 +146,28 @@ engineering meaning"`.
 ### 3.5 Content hash and lifecycle
 
 - AC21. Given a check, when its content hash is computed twice, then equal; after changing one byte of its module, of a
-  pack module it imports (directly or transitively), of a core module, of its metadata or of its input model, then
+  pack module it imports (directly or transitively), of a core module, of an eng-contract module in its closure, of its metadata or of its input model, then
   different; with CRLF line endings in place of LF, or after changing a pack module it does not import, then unchanged.
   Test: `tests/unit/test_content_hash.py::test_hash_inputs`.
 - AC22. Given a check module (or a module in its closure) that imports `importlib` or calls `__import__`, when hashed,
   then `CheckDefinitionError`. Test: `tests/unit/test_content_hash.py::test_dynamic_import_rejected`.
+- AC22a. Given a pack whose check imports a pack helper module, when `lint_scope_violations(check, check_modules)` runs
+  with globs that do not match the helper's path, then it returns the helper's dotted name; with
+  `["src/<pack>/**/*.py"]`, then it returns nothing. Test: `tests/unit/test_content_hash.py::test_closure_within_check_modules`.
 - AC23. Given `approvals.yaml` files, when loaded, then an empty file (`approvals: []`, `withdrawn: []`) is valid; a
   missing field, an unknown key, a malformed hash or date, a `kind: approved` entry for an inherited check, or a
   `kind: inherited-confirmed` entry for a non-inherited check raises `ApprovalsFileError`. Test:
   `tests/unit/test_lifecycle.py::test_approvals_file`.
-- AC24. Given combinations of withdrawal, approvals entries, verification review blocks and case results, when the
-  state is resolved, then `withdrawn` wins; `approved` requires an entry with the current content hash and the
-  `verified` conditions; `verified` requires the §4.9.4 conditions; otherwise `draft`; an inherited check is `approved`
-  only when its base check is also `approved`; a hash change turns `approved` into `verified` or `draft`. Test:
-  `tests/unit/test_lifecycle.py::test_state_resolution`.
+- AC24. Given combinations of withdrawal and approvals entries, when the runtime state is resolved, then `withdrawn`
+  wins; `approved` requires an entry with the current content hash (and, for an inherited check, `kind:
+  inherited-confirmed` and an `approved` base check); otherwise `draft`; `resolve_state` never returns `verified` and
+  reads no case file; a hash change turns `approved` into `draft`. Test: `tests/unit/test_lifecycle.py::test_state_resolution`.
+- AC24a. Given a synthetic pack copied to a temporary folder as installed (its `src/` package and `approvals.yaml`
+  only, no `tests/` folder) with an approvals entry for the current hash, when evaluated in `production`, then it runs
+  and the payload has `draft: false`; with the entry's hash changed, then `CheckNotUsable`. Test:
+  `tests/unit/test_lifecycle.py::test_installed_layout`.
 - AC25. Given mode `production`, when a check that is not `approved` is evaluated, then `CheckNotUsable`
-  (`INVALID_ARGUMENT`, `field: "check_id"`, interim code, §11 Q1); given mode `trial`, `draft` and `verified` checks run
+  (`INVALID_ARGUMENT`, `field: "check_id"`, interim code, §11 Q1); given mode `trial`, `draft` and `approved` checks run
   and the payload has `draft: true`; a `withdrawn` check is refused in both modes. Test:
   `tests/unit/test_lifecycle.py::test_mode_usability`.
 
@@ -181,10 +198,11 @@ engineering meaning"`.
   `tests/unit/test_verification.py::test_tolerance`, `tests/property/test_tolerance_props.py::test_symmetric_and_monotone`.
 - AC32. Given a check's cases, when the verification runner runs, then each case is `pass`, `fail` or `pending`
   (program comparisons marked `needs_local_test`); hand checks are reported but never satisfy the worked-example
-  requirement; the report lists every unmet requirement of §4.9.4. Test:
+  requirement; the report lists every unmet requirement of §4.9.4 and `verified` is true only when none is unmet. Test:
   `tests/unit/test_verification.py::test_report_and_requirements`.
 - AC33. Given a pack, when `python -m structural_codes verify --pack P` runs, then it exits 0 if no case fails
-  (pending is not a failure), 1 if any case fails, 2 on a data or definition error, and prints the report. Test:
+  (pending is not a failure), 1 if any case fails, 2 on a data or definition error (including a non-empty
+  `lint_scope_violations` against the pack's `[tool.eng-gate] check_modules`), and prints the report. Test:
   `tests/unit/test_cli.py::test_verify_exit_codes`.
 
 ### 3.8 Calculation notes
@@ -232,7 +250,7 @@ verification records under `docs/verification/<pack>/<check_id>.md`); the packag
 | `structural_codes.pack` | `Pack`, `Registry`, `ENTRY_POINT_GROUP` |
 | `structural_codes.overlay` | `Overlay`, `Inherited`, `Overridden`, `Added`, `Removed` |
 | `structural_codes.lifecycle` | `State`, `ApprovalsFile`, `resolve_state` |
-| `structural_codes.content_hash` | `content_hash` |
+| `structural_codes.content_hash` | `content_hash`, `lint_scope_violations` |
 | `structural_codes.verification` | `CaseFile`, `Case`, `compare`, `verify_check`, `verify_pack`, `VerificationReport` |
 | `structural_codes.notes` | `render_html` |
 
@@ -245,7 +263,9 @@ R1 modules (mutation ≥ 80%): `trace`, `check` (verdict builder in `_verdict`),
 `"ACI 318-14"`, 1 to 100); `edition` (1 to 20); `clauses` (non-empty tuple of clause numbers as printed in the code,
 each 1 to 40); `title` and optional `title_ar` (our own words, 1 to 200; no clause text, 10 §8); `members` (non-empty
 set of `SubjectKind`); `spec` (relative path of the clause spec under `docs/clause-specs/`); `gaps` (tuple of
-`GapDecl{id: ^G-[0-9]+$, clause, reason}`); `assumptions` (tuple of `str`, each max 500).
+`GapDecl{id: ^G-[0-9]+$, clause, reason}`); `assumptions` (tuple of `str`, each max 500); `unconditional` (`str`
+1 to 500, or null: the clause-spec section stating that the clause has no applicability limit beyond `members`, §4.4)
+**[added]**.
 
 `clause_token(clause)`: lower-case, each run of characters outside `[0-9a-z]` replaced by `_`, leading and trailing
 `_` removed **[added: 10 §3 shows only the dotted case]**. `check_id` must equal
@@ -267,6 +287,15 @@ Reserved field on `CheckInputs`: `ratio_limit: float | None` (ref-capable, from 
 `<= ` the contract default (04 §5.1) **[added]**.
 
 ### 4.4 Applicability (10 §3)
+
+Every evaluation passes two framework-owned applicability steps before the body; neither can be skipped by a check:
+
+1. **Member scope** (runs first): if `subject.kind` is not in `meta.members`, one `NOT_APPLICABLE` verdict with
+   `demand`, `capacity` and `ratio` null and the trace message `"member scope (<clauses[0]>): <kind> not in
+   <sorted members>"`; preconditions and body do not run (AC5a).
+2. **Declared preconditions**, below. A check must declare a non-empty `preconditions` tuple, or an empty one together
+   with `meta.unconditional`; anything else (empty without `unconditional`, or both) is a `CheckDefinitionError` at
+   definition (AC5b). So the framework cannot produce a `PASS` or `FAIL` without a reviewed applicability decision.
 
 `Precondition(id: ^[A-Z][A-Z0-9_]*$, outcome: Outcome, clause: str, description: str, test: Callable[[I,
 TraceRecorder], bool])`; `Outcome` = `NOT_APPLICABLE` or `NEEDS_ENGINEER`. The check's preconditions are evaluated in
@@ -292,6 +321,12 @@ messages (AC6).
 Rules: names are unique and match the contract's name pattern; a unit suffix in a name fixes the unit (AC10); NaN or
 infinity raises `TraceValueError` (AC8).
 
+Contract fields set by the runner (EC §4.9.3, AC9): `subject` = the evaluated subject; `outputs` = for each verdict in
+order, its `demand`, `capacity` and `ratio` names that were recorded; `status` = the governing verdict's status, else
+the first verdict's. The recorder can check `uses` against recorded names but cannot see Python intermediates that a
+body computes without recording them; complete tracing of every intermediate value is a review item of the clause spec
+and the source-check lens (process/10), not a framework guarantee.
+
 Verdict builder: demand and capacity are recorded names of the same dimension. It records step `ratio` (`ratio_2`,
 `ratio_3`, ... for later verdicts of the same evaluation, so names stay unique), then status
 `PASS` iff `ratio <= ratio_limit` (exact float64, AC11). Capacity `<= 0` or demand `< 0` gives `ERROR` with a message
@@ -300,7 +335,14 @@ Verdict builder: demand and capacity are recorded names of the same dimension. I
 assumptions plus verdict assumptions go into `assumptions`.
 
 The body signature is `def body(inp: I, t: TraceRecorder) -> None`; pure, float64, no I/O, globals, time or randomness
-(10 §3). The gate's FB005 rejects bare literals in pack check modules; purity of imports is §11 Q3.
+(10 §3). The gate's FB005 rejects bare literals in files matching a pack's `check_modules`; purity of imports is §11 Q3.
+
+Lint scope **[added]**: every pack module in any check's import closure (§4.7) must match the pack's `check_modules`,
+so a helper module cannot carry an uncited literal into a verdict. Pack specs set `check_modules` to the whole pack
+source (`src/<import name>/**/*.py`). `lint_scope_violations(check, check_modules) -> tuple[str, ...]` returns the
+closure modules of the check's pack whose source path (relative to the pack project root, matched with
+`PurePosixPath.full_match`) matches no glob (AC22a); the `verify` command reads `check_modules` from the pack's
+`pyproject.toml` with `tomllib` and exits 2 on any violation (AC33), and each pack's tests call it.
 
 ### 4.6 Checks, packs and registry
 
@@ -321,19 +363,26 @@ under `[project.entry-points."structural_codes.packs"]`. `Registry.discover()` l
 ```
 
 `modules` is the static import closure of the check's module restricted to modules whose top-level package is the
-check's pack or `structural_codes` (AST of each source, relative imports resolved). An `importlib` import or an
+check's pack, `structural_codes` or `eng_contract` (AST of each source, relative imports resolved). An `importlib` import or an
 `__import__` call in the closure is a `CheckDefinitionError` (AC22). Sources are read with `importlib.util.find_spec`;
-wheels ship them. The core sources are in the closure, so a core change resets approvals (§11 Q2).
+wheels ship them. The core and contract sources used by evaluation are in the closure, so a change to either resets
+approvals even within one `0.1.0.devN` version (§11 Q2).
 
 ### 4.8 Lifecycle and approvals (10 §4, process/10 §6 and §7)
 
-`State` = `draft`, `verified`, `approved`, `withdrawn`. The state is **computed**, never declared in code:
+`State` = `draft`, `verified`, `approved`, `withdrawn`. The state is **computed**, never declared in code, on two
+separate paths **[added]**:
 
-1. `withdrawn` if the pack's `approvals.yaml` lists the check under `withdrawn`;
-2. `approved` if an `approvals` entry has the current content hash, the `verified` conditions hold, and for an
-   inherited check its entry is `inherited-confirmed` and its base check is `approved`;
-3. `verified` if the conditions of §4.9.4 hold for the current content hash;
-4. `draft` otherwise.
+- **Runtime** (`resolve_state`, used by `evaluate` on every call): reads only the shipped `approvals.yaml` and the
+  content hash, never case files (they are test data and are not installed). `withdrawn` if listed under `withdrawn`;
+  else `approved` if an `approvals` entry has the current content hash and, for an inherited check, `kind:
+  inherited-confirmed` and an `approved` base check; else `draft`. It never returns `verified` (AC24, AC24a).
+- **Verification** (`verify_check` and the `verify` command, from a source tree): `verified` when the §4.9.4
+  conditions hold for the current hash. This is the evidence the owner records as the entry's `verification_record`
+  before adding an approval; the runtime trusts the owner-reviewed entry and does not re-run verification.
+
+A check that is `verified` but not approved therefore resolves to `draft` at runtime: both are trial-only (10 §4); the
+only difference is the `DRAFT` watermark, which stays on (the safe side, §11 Q14).
 
 `approvals.yaml` (one per pack, shipped as package data; a protected path):
 
@@ -347,7 +396,7 @@ withdrawn: []      # {check_id, reason, issue, date}
 Only the owner adds entries (CODEOWNERS); the core validates shape and kind (AC23), not identity. In this build every
 file is empty and every check is `draft`.
 
-`Mode` = `trial` (draft, verified, approved run; payload `draft` is true unless approved) or `production` (approved
+`Mode` = `trial` (draft and approved run; payload `draft` is true unless approved) or `production` (approved
 only). `withdrawn` is refused in both (AC25).
 
 ### 4.9 Verification runner (10 §6, process/10 §3)
@@ -388,8 +437,8 @@ quantity in the case (10 §6). Units must match exactly (no conversion).
 #### 4.9.3 Runner
 
 `verify_check(check, cases) -> VerificationReport` evaluates each case in `trial` mode and reports `pass`, `fail` or
-`pending` per case; `verify_pack(pack)` does all checks; `python -m structural_codes verify --pack P` prints the
-report (AC33). `python -m structural_codes hash --pack P` prints each check's content hash (for approvals).
+`pending` per case, the unmet §4.9.4 requirements and `verified: bool`; `verify_pack(pack)` does all checks;
+`python -m structural_codes verify --pack P` prints the report (AC33). `python -m structural_codes hash --pack P` prints each check's content hash (for approvals).
 
 #### 4.9.4 Conditions for `verified` (10 §6)
 
@@ -443,7 +492,7 @@ evaluate_batch(check_id, items: Sequence[BatchItem], *, mode="trial", registry=N
 `inputs` is a mapping (raw JSON form, may hold `Ref` objects) or an instance of the input model. `BatchItem(subject,
 inputs)`. `registry=None` uses `Registry.discover()`. Order: look up the check (NOT_FOUND) → resolve the state and
 refuse by mode (AC25) → validate every item with `validate_input` (EC §5; references need `source`, AC27) → per item:
-preconditions, body, verdicts, trace → governing (AC14) → payload. `Evaluation`: `payload` (`verdicts.set/1` model),
+member scope (AC5a), preconditions, body, verdicts, trace → governing (AC14) → payload. `Evaluation`: `payload` (`verdicts.set/1` model),
 `state`, `content_sha256`, `inputs_provenance` (per item, for the caller's envelope). The core stores nothing; the
 harness stores the payload as a result (spec B-062).
 
@@ -478,8 +527,11 @@ payload (EC §4.10.2) and HTML notes. Inputs of each check are defined in its cl
 | Risk | Class | Mitigation |
 |---|---|---|
 | A framework bug changes every verdict (status, ratio, governing) | R1 | Exact boundary tests (AC11 to AC14), property tests, mutation ≥ 80% on R1 modules, golden notes |
-| An approval survives a change to the implementation | R1 | Hash over sources, imported helpers, core, metadata, input schema (AC21); dynamic imports rejected (AC22) |
+| An approval survives a change to the implementation | R1 | Hash over sources, imported helpers, core and contract modules, metadata, input schema (AC21); dynamic imports rejected (AC22) |
 | An inherited SBC check is used as if confirmed | R1 | Completeness (AC17); `inherited-confirmed` plus base approval (AC24) |
+| Installed packs cannot resolve their state | R1 | Runtime state from `approvals.yaml` and the hash only; installed-layout test (AC24a) |
+| A verdict is produced outside the check's scope | R1 | Framework-owned member-scope step and mandatory applicability declaration (AC5a, AC5b) |
+| A pack helper carries an uncited literal into a verdict | R1 | Closure modules must match `check_modules` (AC22a, AC33) |
 | A gap is silently computed | R1 | `NotImplementedGap` must be declared and yields `NEEDS_ENGINEER` (AC6) |
 | Verdict shape drifts from the contract | R2 | Contract tests against eng-contract models (AC15, AC26) |
 | Notes leak markup or show values not in the trace | R2, R3 | Escaping and values-only-from-payload test (AC35) |
@@ -489,7 +541,7 @@ payload (EC §4.10.2) and HTML notes. Inputs of each check are defined in its cl
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC6, AC8 to AC14, AC16 to AC25, AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
+| AC1 to AC6 (with AC5a, AC5b), AC8 to AC14, AC16 to AC25 (with AC22a, AC24a), AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
 | AC15, AC26 | Contract (against eng-contract models) | `tests/contract/` |
 | AC7 | Replay (determinism across runs and processes) | `tests/replay/` |
 | AC34 | Golden | `tests/golden/`, `tests/data/golden/notes/` |
@@ -508,7 +560,7 @@ content-hash format is a major change of the core and resets every approval (17 
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
 | Q1 | The contract has no `Precondition` for "check not approved or withdrawn"; the core uses `INVALID_ARGUMENT` | Owner | Add `check_approved` to `Precondition` in an eng-contract minor (ADR), then switch to `PRECONDITION_FAILED` |
-| Q2 | Core sources are in every check's hash, so any core change resets all approvals | Owner | Keep (safe); revisit if re-approvals become a burden |
+| Q2 | Core and eng-contract sources are in every check's hash, so any change to them resets all approvals | Owner | Keep (safe); revisit if re-approvals become a burden |
 | Q3 | The gate's FB004 (I/O imports) covers block and rule modules, not check modules | Owner | Extend FB004 to `check_modules` in eng-dev-gate |
 | Q4 | The gate assumes `<package>/docs/plans/` and `<package>/.gate/` per workspace member; `packages/structural-codes/` is a group folder, not a member | Owner, gate author | Let the gate treat a folder holding `.gate/agents.yml` as a repository root whose plans govern its members |
 | Q5 | process/03 places clause specs at `structural-codes/packages/<pack>/specs/<check_id>.md`; this workspace uses `packages/structural-codes/docs/clause-specs/<pack>/` | Owner | Amend process/03 to the shared `docs/` folder |
@@ -520,4 +572,6 @@ content-hash format is a major change of the core and resets every approval (17 
 | Q11 | Governing rule (largest ratio among `PASS`/`FAIL` per subject, first on a tie) | Owner | Accept |
 | Q12 | PyYAML as a runtime dependency (package ADR-0001, Proposed) | Owner | Approve (MIT, `safe_load` only) |
 | Q13 | 10 §6 default tolerance 0.5% comes from a `Proposed` document | Owner | Accept with 10; until then it is the documented default |
+| Q14 | At runtime a `verified`, unapproved check resolves to `draft` (watermarked), because case files are not installed | Owner | Keep; 10 §4 makes both trial-only. Shipping case files as package data would only remove the watermark |
+| Q15 | `CheckMeta.unconditional` lets a check declare no precondition beyond member scope | Owner | Accept; the clause-spec reviewer confirms the stated section |
 | G-1 | No worked examples from books or code examples exist here for any check; every case in this build is a labeled hand check | Owner | Owner supplies book, edition, page and example per check (pack specs list them) |
