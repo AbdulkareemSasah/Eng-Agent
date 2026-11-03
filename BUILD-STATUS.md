@@ -48,19 +48,26 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high; fix: sonnet, high | opus, low | [#4](https://github.com/AbdulkareemSasah/Eng-Agent/pull/4) | done (0bf48f4) |
 | B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium; report committed by the lead (P-2) | opus, low | [#5](https://github.com/AbdulkareemSasah/Eng-Agent/pull/5) | done (fbbfbec) |
 | B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high; report committed by the lead (P-2) | opus, low | [#6](https://github.com/AbdulkareemSasah/Eng-Agent/pull/6) | done (fe93351) |
-| B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | — | queued (wave 2) |
-| B-008 | Hub: stale 04 section references; ADR-0029 (Proposed) eng-contract 0.1 details | sonnet, medium | opus, low | — | queued (wave 2) |
+| B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) | done (6fdc739) |
+| B-008 | Hub: stale 04 section references; ADR-0029 (Proposed) eng-contract 0.1 details | sonnet, medium | opus, low | [#13](https://github.com/AbdulkareemSasah/Eng-Agent/pull/13) | done (f93732b) |
 | B-009 | Root workspace members listed explicitly (D-10) | lead | opus, low | [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) | done (fe5fea2) |
-| B-010 to B-025 | `eng-contract` 0.1, plan tasks T1 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | queued (wave 2) |
-| B-030 to B-055 | `eng-dev-gate` 0.1, plan tasks T1 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | queued (wave 2) |
-| B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
+| B-010 | `eng-contract` T1: package skeleton | sonnet, low | opus, medium | [#9](https://github.com/AbdulkareemSasah/Eng-Agent/pull/9) | conflict resolution (wave 2b) |
+| B-011 to B-025 | `eng-contract` T2 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | queued (wave 2b) |
+| B-030 | `eng-dev-gate` T1: package skeleton, dependency ADR, CLI shell | sonnet, low | opus, low | [#10](https://github.com/AbdulkareemSasah/Eng-Agent/pull/10) | done (365f3b9) |
+| B-056 | `eng-dev-gate` plan amendment: split T2 into T2a and T2b (D-12) | sonnet, low | opus, low | — | queued (wave 2b) |
+| B-031, B-057 | `eng-dev-gate` T2a, T2b (foundations), from the B-031 branch | sonnet, medium | opus, low | — | queued (wave 2b) |
+| B-032 to B-055 | `eng-dev-gate` T3 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | queued (wave 2b) |
+| B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium | opus, medium | [#12](https://github.com/AbdulkareemSasah/Eng-Agent/pull/12) | fourth fix round (wave 2b) |
 | B-061 | `eng-harness` spec and plan 0002 servers and adapters; ADR-0031, ADR-0032 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
 | B-062 | `eng-harness` spec and plan 0003 calcs | opus, medium | opus, medium | — | queued (wave 2) |
 | B-063 | `eng-harness` spec and plan 0004 templates and design basis | sonnet, medium | opus, medium | — | queued (wave 2) |
 | B-064 | `eng-harness` spec and plan 0005 decision layer | sonnet, medium | opus, low | — | queued (wave 2) |
 | B-065 | `eng-harness` spec and plan 0006 command line, progress, approval page, run report | sonnet, high | opus, medium (security) | — | queued (wave 2) |
 | B-066 | Model edit cycle: workflow spec, block spec and plan 0007 | opus, medium | opus, medium | — | queued (wave 2) |
-| B-067 | S-10 report: record the Windows CI results | haiku | opus, low | — | queued (after wave 2) |
+| B-067 | S-10 report: record the Windows CI results | haiku | opus, low | — | queued |
+| B-070 to B-075 | Phase 2 specs: structural-codes core, ACI 318-14 footing clauses, SBC 304-2018 overlay, SAFE adapter, providers, footing block and workflow | opus or sonnet per task | opus, medium (low for none) | — | queued (wave 2b, after their dependencies) |
+| B-080 to B-083 | Phase 3 specs: Revit adapter, SAP2000, ACI 318-14 column clauses, column workflow | opus or sonnet per task | opus, medium or low | — | queued (wave 2b) |
+| B-090, B-091 | Phase 4 specs: IDEA adapter; desktop products overlap with Sasaah and ADR-0033 | sonnet | opus, medium or low | — | queued (wave 2b) |
 
 ## 4. Decisions by the lead
 
@@ -76,6 +83,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | D-8 | B-002 (workspace root) is built from ADR-0028 §1 and process/11 directly, without a plan file | No gate tooling exists yet to verify a plan; the review still applies |
 | D-9 | A phase's specs may start once the specs of the packages it depends on are merged; its code starts when the previous phase's packages are done | Keeps the phase order (19, R4) without idling while the last tasks of a phase finish |
 | D-10 | The root uv workspace lists its members explicitly; each package's skeleton task adds its folder (B-009) | A package folder holds its spec and plan before its `pyproject.toml` exists, and uv refuses a glob that matches such a folder |
+| D-12 | A task over its line budget is split by a plan amendment in its own reviewed pull request, not given a budget above the ~400-line cap of process/04 §4 | B-031 measured 573 lines; splitting keeps reviews small |
 | D-11 | Tasks run as workflow chains: writer, independent review with up to two fix rounds, then a mechanical merge step that waits for CI and squash-merges only on an approving review and green CI; at most five writers at once | Serialized chains (the 16 `eng-contract` tasks) do not stall between tasks; the merge rule stays the lead's |
 
 ## 5. Problems
@@ -87,6 +95,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | P-3 | Worktrees are created from the lead's current folder when each agent starts, not when its workflow starts; two reviews failed while the lead's shell was outside the repository | The lead's shell stays in `/home/user/Eng-Agent` while workflows run (other folders only in subshells) |
 | P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
 | P-5 | The harness flagged the merge of B-009 as possible self-approval: the lead wrote that 3-line fix, an independent subagent reviewed it, and the merge step merged it. In bootstrap mode every pull request is opened and merged under the owner's GitHub account (no separate identities yet, OQ-2) | Lead-written changes are kept to integration fixes; the owner may re-review [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) |
+| P-7 | The harness flagged the merge of B-007 as "merge without review": the subagent review (APPROVE, recorded in the PR body) is not a GitHub review, because every account action is the owner's in bootstrap mode | Reviews stay recorded in the PR body (D-6); the owner can audit [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) |
+| P-8 | Wave 2 stopped early on three blockers: B-010 CI (the skeleton ran mypy on an empty folder; B-030 fixed it first, leaving B-010 in conflict), B-031 over budget (573 of 380 lines), B-060 one open MEDIUM after three rounds | Relaunched as wave 2b: conflict resolution for B-010, the T2 split (D-12), a fourth fix round for B-060 |
 | P-6 | The merge step merged B-005 after only the Dependabot check had reported, before the CI job appeared; the content was validated by the next push run on `build/v1` (green) | The merge step now requires a pull-request workflow run for the exact head commit to succeed |
 
 ## 6. Owner queue
@@ -110,7 +120,8 @@ option and continued.
 | OQ-A2 | ADR amending ADR-0014 (from S-10): replay by step path, block version and code hash, in-flight reconciliation events, durability policy, one engine per run, one Job Object per server with host programs breaking away | To be written as `Proposed` with the engine spec |
 | OQ-A3 | ADR: `model_locked` after analysis versus `HOST_LOCKED`, and an approved unlock step (S-12 gap S12-G3) | To be written as `Proposed` with the CSI adapter spec |
 | OQ-A4 | ADR amending 04 §3.3: a harness-side model identity when the host cannot stamp one (S12-G6) | To be written as `Proposed` with the CSI adapter spec |
-| OQ-A5 | `eng-dev-gate` package ADR-0001: runtime dependencies PyYAML, Pydantic, ruff, mypy, pytest, coverage (gate spec) | Approve |
+| OQ-A5 | `eng-dev-gate` package ADR-0001: runtime dependencies PyYAML, Pydantic, ruff, mypy, pytest, coverage (gate spec; licenses to be confirmed by the gate's license check) | Approve |
+| OQ-A6 | ADR-0029 (Proposed): eng-contract 0.1 details recorded in 04 (B-008) | Accept: all items are additive |
 
 ### 6.3 Gaps (engineering content left draft or not implemented)
 
@@ -154,6 +165,11 @@ option and continued.
 | OQ-Q17 | Engine (S-10): block version bump or recorded code hash for unfinished runs? | Record both: a hash change with the same version warns, a version change stops |
 | OQ-Q18 | Stale section references in the hub: 01 P5 and P9, 05, 10 §3, 11 §12 and 17 §2 cite the wrong 04 sections | Fix in a hub documents change (task queued) |
 | OQ-Q19 | 17 §4 asks for the current and the previous Python minor version; ADR-0028 §5 pins 3.14 only | ADR-0028 applies for v1; amend 17 §4 when the owner accepts it |
+| OQ-Q20 | Spikes: may a spike's first commit mix tests and code, since spikes have no plan task? (B-007) | Yes; say so in process/05 §9 |
+| OQ-Q21 | S-02 needs a call timeout shorter than an analysis, but the timeout is a server start option, so the scripts start a second server (B-007) | The harness adapter does the same: a dedicated server instance for long runs |
+| OQ-Q22 | Engine spec (B-060) questions Q1 to Q11: attempt limits from the basis, block version plus code hash, restore only when no later model was written, autonomous mode resolving info and change-set approvals, the durability set, a new `op_id` after not-applied, harness codes for engine-only conditions, explicit `args` mappings, `for` loops over finite collections, a single-writer journal with an answer inbox, saving after every write step | Accept each as recommended in the spec; measure saving cost with S-02 |
+| OQ-Q23 | Engine gap E-G1: promotion by replaying journaled write steps (11 §7) is not built; it raises NOT_IMPLEMENTED and a test expects it | Build when a Revit or workshared-model workflow needs it |
+| OQ-Q24 | `[tool.eng-gate]` key names differ between the eng-contract plan and the gate spec (mutation module list, `may_import`) | Align in the gate's configuration task (T3); until then the gate spec's names apply |
 
 ### 6.5 Sasaah pull requests
 
