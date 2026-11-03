@@ -217,21 +217,24 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
+      - "packages/eng-harness/src/eng_harness/engine/_steps.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/unit/test_steps.py"
       - "packages/eng-harness/tests/workflow/test_invariants.py"
       - "packages/eng-harness/tests/property/test_check_after_write.py"
       - "packages/eng-harness/tests/replay/test_divergence.py"
       - "packages/eng-harness/tests/workflows/**"
-    max_changed_lines: 350
+    max_changed_lines: 380
     max_sessions: 3
     tests_first:
+      - "packages/eng-harness/tests/unit/test_steps.py::test_sibling_model_conflict"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_check_after_write"
       - "packages/eng-harness/tests/property/test_check_after_write.py::test_no_unchecked_use_after_write"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_engineering_literal_rejected"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_stale_ref"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_save_before_analysis"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_inserted_steps_are_replayed"
-    covers: [AC37, AC38, AC39, AC43, AC47]
+    covers: [AC5, AC37, AC38, AC39, AC43, AC47]
     depends_on: [T10]
   - id: T13
     title: Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases)
@@ -242,8 +245,10 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/workflow/test_invariants.py"
       - "packages/eng-harness/tests/workflow/test_honest_outcomes.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
       - "packages/eng-harness/tests/workflows/**"
-    max_changed_lines: 350
+    max_changed_lines: 400
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_basis_incomplete_refused"
@@ -252,7 +257,9 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_server_check"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_units_after_reconnect"
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_host_lease_and_close"
-    covers: [AC33, AC41, AC42, AC44, AC45, AC46]
+      - "packages/eng-harness/tests/replay/test_resume.py::test_close_started_after_resume"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation"
+    covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62]
     depends_on: [T11, T12]
   - id: T14
     title: ctx.decide, ctx.decide_many and ctx.ask (invariant 4)
@@ -267,8 +274,8 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
-    covers: [AC40]
-    depends_on: [T12]
+    covers: [AC40, AC61]
+    depends_on: [T13]
   - id: T15
     title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
     files:
@@ -309,6 +316,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_modes.py::test_always_ask_in_every_mode"
       - "packages/eng-harness/tests/unit/test_promote.py::test_file_copy_promotion"
       - "packages/eng-harness/tests/unit/test_promote.py::test_replay_promotion_is_a_gap"
+      - "packages/eng-harness/tests/unit/test_promote.py::test_promotion_rechecks_approval"
     covers: [AC48, AC49, AC50, AC51, AC52, AC53]
     depends_on: [T15]
   - id: T17
@@ -323,10 +331,11 @@ tasks:
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_guard.py::test_guard_blocks_io_in_block_code"
+      - "packages/eng-harness/tests/unit/test_guard.py::test_guard_covers_parallel_children_and_child_blocks"
       - "packages/eng-harness/tests/rules/test_block_modules.py::test_rules_detect_violations"
       - "packages/eng-harness/tests/rules/test_block_modules.py::test_package_block_modules_pass"
     covers: [AC18, AC19]
-    depends_on: [T10]
+    depends_on: [T16]
   - id: T18
     title: Resource limits, progress sink and the overhead benchmark
     files:
@@ -345,7 +354,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_progress.py::test_sink_order_and_failure"
       - "packages/eng-harness/tests/perf/test_overhead.py::test_engine_overhead_p95"
     covers: [AC58, AC59, AC60]
-    depends_on: [T13]
+    depends_on: [T14, T17]
   - id: T19
     title: Crash-matrix replay suite with a worker process
     files:
@@ -372,7 +381,9 @@ the ctx types and codec, step paths, then the run loop with replay and divergenc
 reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3), path identity (T8) and replay (T9) are the core S-10 proved, so a
-defect there shows before the invariants are built on them.
+defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
+by `depends_on` (T10, T12, T13, T14, T15, T16, T17, T18 in that order), so no two of them run in parallel; T11 runs
+beside T12 and edits only `_runner.py` of the shared files, which T13 then extends.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -430,7 +441,8 @@ containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to 
 **T2 Errors** (spec §6). `HarnessCode`, `EngineStop` (a `BaseException`) and its subclasses, `StepError` and its
 subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
 
-**T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers, the 19 event payload models, the writer with the
+**T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
+the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models, the writer with the
 hash chain, per-event durability, the inline limit and `harness.journal_blob/1`, and the harness kinds module
 (`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`, `harness.approval_preview/1`,
 `harness.journal_blob/1`, registered with `KindRegistry.extend`). AC22 is tested by wrapping the connection and
@@ -469,26 +481,31 @@ is wired here so the divergence tests can run; T10 completes it.
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
 `restore`.
 
-**T12 Invariants 1, 2, 3, 7** (spec §4.6). The model tracker, inserted `check_model` and `save` steps, the
+**T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
+dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
 engineering-parameter check, the staleness check with `resolve_ref`, the property test over generated step programs,
 and the test that inserted steps are replayed.
 
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
-reconciliation pending, server checks at start and resume, unit reads after epoch changes, host leases and
-`close_started`.
+reconciliation pending, server checks at start and resume, unit reads (first contact, every resume, after epoch
+changes and observed timeouts), host leases, `host_started` journaling and `close_started` from the journal at run
+end, and the resume order of spec §4.5.1 (preflight, leases and units before T11's reconciliation, AC62).
 
 **T14 Decisions and inputs** (spec §4.3.2, §4.6 item 4). `decide`, `decide_many` and `ask` over the ports; option and
-answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stored as `basis.engineer_input/1`.
+answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stored as `basis.engineer_input/1`
+(AC61).
 
 **T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
 re-check before the first write under an approval, revision continuity, expiry, items, `signed_off`, pause and the
 `except Exception` test.
 
 **T16 Modes and promotion** (spec §4.7). Working copies, approval per write, mode-resolved approvals, the always-ask
-list, file-copy promotion over the internal `FileOps` port with its fake, and the `REPLAY_WRITES` gap.
+list, file-copy promotion over the internal `FileOps` port with its fake (including the re-check of the `PROMOTION`
+approval's binding before copying), and the `REPLAY_WRITES` gap.
 
 **T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
-call, and the AST rules test over fixture modules and over the package's block and rule globs (empty until later
+call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
+attempts bodies, and the AST rules test over fixture modules and over the package's block and rule globs (empty until later
 specs add blocks).
 
 **T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the

@@ -51,11 +51,14 @@ queued (B-067). The breakaway case below was not part of it.
    the step again as the next attempt with a new `op_id`; `partial`, an unclear outcome, a missing reconciler, or an
    exception, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` inside a write stops the run with `NEEDS_RECONCILIATION` for
    the engineer. A write is never run again until its outcome is known. A read, calc or non-engineer decision in
-   flight is run again and journaled as `step_rerun`. The event list of 11 §5 gains `step_reconciled` and
-   `step_rerun`.
+   flight is run again and journaled as `step_rerun`. The event list of 11 §5 gains `step_reconciled`,
+   `step_rerun` and `host_started` (decision 8). At resume, reconciliation runs only after the server check
+   (11 §6 item 8), the host lease (item 10) and a units read on every model the run addressed (item 9, always at a
+   resume, because the server is a new process); a failure of any of them stops the run and leaves the write in
+   flight.
 5. **Durability.** WAL mode. `synchronous=FULL` for `run_started`, `run_completed`, `run_failed`, the `step_started`
-   of a write, `step_reconciled`, `approval_requested`, `approval_resolved`, `input_provided`, `model_saved` and
-   `signed_off`; `NORMAL` for the rest. A lost `NORMAL` event after a power failure is repaired by reconciliation or a
+   of a write, `step_reconciled`, `approval_requested`, `approval_resolved`, `input_provided`, `model_saved`,
+   `host_started` and `signed_off`; `NORMAL` for the rest. A lost `NORMAL` event after a power failure is repaired by reconciliation or a
    rerun. Large values go to the result store and are referenced from the journal.
 6. **One engine per run.** The engine holds an exclusive OS file lock on the run folder while it works on a run; the
    operating system releases it when the process ends. The engine is the journal's only writer; answers from the
@@ -65,8 +68,9 @@ queued (B-067). The breakaway case below was not part of it.
    it; only the engine holds the job handle. Engine exit or crash ends every server; restarting one server terminates
    its job only. Adapters address a server as its whole job, never as one process id.
 8. **Host programs stay outside the server jobs.** The jobs also set `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`, so a host
-   program a server launches is not killed with the server or the engine. The engine records every host instance a run
-   started (process id and start time) and closes only those, by an explicit decision (11 §6 item 10). Trade-off:
+   program a server launches is not killed with the server or the engine. The engine journals every host instance a run
+   started (process id and start time) as a `host_started` event and closes only those, read from the journal, when
+   the run completes or fails (never at a pause), by an explicit decision (11 §6 item 10). Trade-off:
    silent breakaway also lets helper processes of a server outlive it; the engine tracks what it started and the server
    spec lists the helpers to check. `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, which keeps helpers inside the job, needs the
    server to pass `CREATE_BREAKAWAY_FROM_JOB` when it starts a host program; it becomes the target once Sasaah does so.

@@ -76,8 +76,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 
 - AC5. Given a block with sequential steps, a child block, `ctx.parallel` of three children and a `ctx.attempts`
   loop, when it runs twice with fake ports that complete the parallel children in opposite orders, then both runs
-  record identical step paths (§4.3.1) and results, and `ctx.parallel` returns results in argument order. Test:
-  `tests/unit/test_steps.py::test_paths_independent_of_completion_order`.
+  record identical step paths (§4.3.1), including the inserted check steps, and results, and `ctx.parallel` returns
+  results in argument order; and given two sibling children of one `ctx.parallel` of which one writes a model and the
+  other reads or writes the same model, then `BlockRuleViolation` is raised before the second one's port call, in
+  either completion order. Tests: `tests/unit/test_steps.py::test_paths_independent_of_completion_order`,
+  `::test_sibling_model_conflict`.
 - AC6. Given a run id, a path and an attempt, then `op_id` is `"op_"` followed by the first 32 hex digits of
   `sha256(run_id + "\n" + path + "\n" + str(attempt))`, differs for every attempt, and is passed to every write call.
   Test: `tests/unit/test_steps.py::test_op_id`.
@@ -110,6 +113,13 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC15. Given `ctx.block(child, input)`, then `step_started` records the child's name, version and code hash, the
   child's steps are under the block step's path, and the child's input and output are validated against its models.
   Test: `tests/unit/test_ctx_block.py::test_child_block`.
+- AC61. Given `ctx.ask(fields, title=...)` with a Pydantic model `fields`, when no answer is stored, then
+  `input_requested` (kind `block`) is journaled, the run pauses (`run_paused`, reason `awaiting_input`) and the process
+  returns `PAUSED`; when it is resumed with an answer that validates against `fields`, then the answer is stored as a
+  `basis.engineer_input/1` result, `input_provided` records its `answer_ref` and `by`, the block receives
+  `Answered[M]` whose `value` is the validated model and whose `field_ref(name)` is a reference into that result, and a
+  further resume replays it without asking again; an answer that fails `fields` is refused and the request presented
+  again. Test: `tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input`.
 - AC16. Given a run input that fails the workflow's input model, then `start` raises `ContractError`
   (`INVALID_ARGUMENT`) and creates no run folder; given a block that returns a value that is not an instance of its
   output model, then `BlockRuleViolation`. Test: `tests/unit/test_runner.py::test_input_and_output_validation`.
@@ -117,8 +127,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   (`res_<id>#/fields/<path>/value`), `ctx.basis.quantity(path)` is a `Quantity`, and a path the workflow did not
   declare in `required_basis` raises `BlockRuleViolation`. Test: `tests/unit/test_ctx_basis.py::test_basis_view`.
 - AC18. Given block code that opens a file, starts a process, opens a socket or connects to SQLite while the block
-  runs, then the runtime guard raises `BlockRuleViolation` and the operation does not happen; the engine's own I/O in
-  the same process is unaffected. Test: `tests/unit/test_guard.py::test_guard_blocks_io_in_block_code`.
+  runs, directly, inside a child of `ctx.parallel`, inside a child block run by `ctx.block`, or inside the body of a
+  `ctx.attempts` loop, then the runtime guard raises `BlockRuleViolation` and the operation does not happen; the
+  engine's own I/O in the same process, including during those calls, is unaffected. Tests:
+  `tests/unit/test_guard.py::test_guard_blocks_io_in_block_code`, `::test_guard_covers_parallel_children_and_child_blocks`.
 - AC19. Given fixture block and rule modules with an import outside the allowlist of §4.1.2, a read of an attribute
   named `value`, an arithmetic operator, a `while` loop, a bare `except` or `except BaseException`, then the
   block-module rules test reports each; and every module matching `block_modules` or `rule_modules` in this package
@@ -127,8 +139,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 
 ### 3.3 Journal
 
-- AC20. Given a new journal, then it is in WAL mode, `UPDATE` and `DELETE` on `events` and `meta` abort, and an event
-  type outside §4.4.2 is refused by a `CHECK` constraint. Test: `tests/unit/test_journal.py::test_append_only`.
+- AC20. Given a new journal, then it is in WAL mode; `UPDATE` and `DELETE` on `events` and `meta` abort;
+  `INSERT OR REPLACE`, `REPLACE` and `INSERT OR IGNORE` of an existing `events.seq` or `meta.key` abort; an event whose
+  `seq` is not the last `seq` + 1 (a gap, a `NULL` or an earlier value) aborts; and an event type outside §4.4.2 is
+  refused by a `CHECK` constraint. Test: `tests/unit/test_journal.py::test_append_only`.
 - AC21. Given a journal whose stored payload or chain hash was altered outside the engine, when it is opened, then
   `JournalIntegrityError` (`JOURNAL_INTEGRITY`) names the first bad `seq`. Test:
   `tests/unit/test_journal.py::test_hash_chain_detects_tampering`.
@@ -178,8 +192,15 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   from the last `model_saved`, then the run stops with the three choices of 11 §5; `accept` saves and records a new
   baseline and continues; `restore` restores the saved copy and replays from the step after its `model_saved` (§4.5.4);
   `abandon` records `run_failed`. Test: `tests/replay/test_host_state.py::test_three_choices`.
-- AC35. Given a completed run, when it is resumed, then it returns the recorded output without any port call. Test:
+- AC35. Given a completed run, when it is resumed, then it returns the recorded output with no ToolPort, CalcPort,
+  DecisionPort, ApprovalPort or InputPort call; the only HostPort call is `close_started` for its journaled host
+  instances (invariant 10). Test:
   `tests/replay/test_resume.py::test_completed_run`.
+- AC62. Given a run with a write in flight, when it is resumed with (a) a failing server preflight, (b) a refused host
+  lease, or (c) units that differ, then neither `ToolPort.reconcile` nor `HostPort.model_state` is called, the step
+  stays in flight in the journal, and a later resume with all three passing reconciles it; and given all three pass,
+  then the port calls occur in the order `preflight`, `acquire`, `read_units`, `reconcile`, `model_state`, then the
+  first block call (§4.5.1). Test: `tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation`.
 - AC36. Given a pending approval or input at resume, then it is presented again with the same request id and a stored
   answer to it is consumed once. Test: `tests/replay/test_resume.py::test_pending_requests_represented`.
 
@@ -210,14 +231,21 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC44. Invariant 8: given a server check that fails (build below the workflow's minimum, or tool-list fingerprint
   mismatch), then the run stops with `RunRefused` (`SERVER_CHECK_FAILED`) before any write, at start and at resume.
   Test: `tests/workflow/test_invariants.py::test_server_check`.
-- AC45. Invariant 9: given a host session epoch change (timeout, reconnect, server restart) and present units that
-  differ from the expected ones, then before the next step on that host the run stops with `ContractError`
-  `PRECONDITION_FAILED` (`units_verified`). Test: `tests/workflow/test_invariants.py::test_units_after_reconnect`.
+- AC45. Invariant 9: given present units that differ from the expected ones, when (a) a model is first addressed in a
+  run, (b) a run resumes (always, in the new engine process, with no epoch change reported), or (c) the host's session
+  epoch changed or the engine observed a timeout on that host, then before the next step on that host the run stops
+  with `ContractError` `PRECONDITION_FAILED` (`units_verified`). Test:
+  `tests/workflow/test_invariants.py::test_units_after_reconnect`.
 - AC46. Invariant 10: given a host, then the engine acquires its lease before the first step on it and a refused
-  lease raises `HOST_LOCKED`; at run end the engine asks HostPort to close only instances the run started. Test:
-  `tests/workflow/test_invariants.py::test_host_lease_and_close`.
-- AC47. Given a resumed run, then the inserted check, save and unit steps of invariants 1, 7 and 9 are replayed from
-  the journal like any other step, and a journal in which one was removed diverges. Test:
+  lease raises `HOST_LOCKED`; every instance HostPort reports as started is journaled as `host_started`; at run end
+  (`run_completed` or `run_failed` only) the engine passes exactly the journaled instances to `close_started`; given a
+  run that paused or crashed after starting an instance, then nothing is closed at the pause, and when a new engine
+  process resumes it to completion, it closes that instance from the journal. Tests:
+  `tests/workflow/test_invariants.py::test_host_lease_and_close`,
+  `tests/replay/test_resume.py::test_close_started_after_resume`.
+- AC47. Given a resumed run, then the inserted check, save and first-contact unit steps of invariants 1, 7 and 9
+  (`~pre`, `~post`, `~end`) are replayed from the journal like any other step, a journal in which one was removed
+  diverges, and recorded `~host` unit steps are skipped without divergence. Test:
   `tests/replay/test_divergence.py::test_inserted_steps_are_replayed`.
 
 ### 3.6 Permission modes (11 §7)
@@ -235,7 +263,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `tests/workflow/test_modes.py::test_always_ask_in_every_mode`.
 - AC52. Given an approved file-copy promotion, then the original is backed up into the run folder and the accepted
   revision's files are copied to the target; given that the original's file hash changed since the working copy was
-  taken, then `ContractError` `CONFLICT` and nothing is copied. Test: `tests/unit/test_promote.py::test_file_copy_promotion`.
+  taken, then `ContractError` `CONFLICT` and nothing is copied; given that the working copy's revision, fingerprint or
+  file hash differs from the binding of the `PROMOTION` approval, then `ApprovalVoid` and nothing is copied; given an
+  approval that is not of kind `PROMOTION`, not approved, bound to another model or already used, then
+  `BlockRuleViolation` and nothing is copied. Tests: `tests/unit/test_promote.py::test_file_copy_promotion`,
+  `::test_promotion_rechecks_approval`.
 - AC53. Given `ctx.promote(model, Promotion.REPLAY_WRITES)`, then `NotImplementedGap` (`NOT_IMPLEMENTED`, gap E-G1).
   Test: `tests/unit/test_promote.py::test_replay_promotion_is_a_gap`.
 
@@ -343,13 +375,22 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   call order only (S-10 "parallel determinism").
 - Engine-inserted steps (§4.6) take the path of the step that triggered them plus a suffix: `p~pre.<kind>.<key>`
   (before step `p`), `p~post.<kind>.<key>` (after it), `p~end.<kind>.<key>` (before the block at `p` returns; the root
-  block uses `~end...`). They are part of the replayed sequence (AC47).
+  block uses `~end...`). They are decided only from the block's own steps, so they are part of the replayed sequence
+  (AC47). Steps triggered by a host event (a session epoch change or an observed timeout, invariant 9) take
+  `p~host.<kind>.<key>`; they are journaled but not part of the replayed sequence (§4.5.2 rule 5).
 - Housekeeping steps of a resume (host-state reads, server checks) take paths `@resume<n>.<kind>.<key>` and are not
   replayed: each resume runs them again.
-- Grammar: `index = "0" | [1-9][0-9]*`; `path = index ("/" index)* [ "~" ("pre"|"post"|"end") "." kind ["." key] ]`,
+- Grammar: `index = "0" | [1-9][0-9]*`; `path = index ("/" index)* [ "~" ("pre"|"post"|"end"|"host") "." kind ["." key] ]`,
   or `"@resume" index "." kind "." key`; `key` matches `^[A-Za-z0-9_.:-]{1,200}$`; at most 1024 characters.
 - `op_id = "op_" + sha256(run_id + "\n" + path + "\n" + str(attempt)).hexdigest()[:32]` (11 §3, AC6). The attempt
   starts at 1 and increases only after a reconciled `not_applied` or a retry of §4.3.3.
+- **Models in parallel children.** Each child of `ctx.parallel` keeps its own dirty flags (invariant 1), so the check
+  steps inserted in a child depend only on that child's own steps. Before each port call in a child, the engine
+  compares the step's model (`ToolInfo.model_param`) with the models its siblings in the same `ctx.parallel` have
+  touched so far: a step that reads or writes a model a sibling wrote, or writes a model a sibling read, is
+  `BlockRuleViolation` (a race the block must not contain). When the parallel ends, the models any child left dirty
+  get `p~post.check_model.<model_key>` steps in model-key order. Which of two conflicting siblings reaches the check
+  first may vary, but the outcome (a stop with `BlockRuleViolation` before the conflicting call) does not (AC5).
 - A scope allows one step in progress at a time. A second overlapping step in the same scope is `BlockRuleViolation`
   (S-10 "rules"); concurrency exists only through `ctx.parallel`.
 
@@ -409,7 +450,7 @@ The gate's lint (FB004, FB005) and the block-module rules test (AC19) check the 
 
 | Rule (11 §3) | Runtime enforcement |
 |---|---|
-| 1 No direct I/O | Runtime guard: one `sys.addaudithook` hook per process, installed by the first `Engine`. A context variable is true while control is in block or rule code and false inside every ctx call; while true, the audit events `open`, `os.*` file and process events (`os.remove`, `os.rename`, `os.mkdir`, `os.listdir`, `os.scandir`, `os.system`, `os.exec`, `os.posix_spawn`, `os.spawn`, `os.startfile`), `subprocess.Popen`, `socket.*`, `sqlite3.connect`, `ctypes.*` and `import` raise `BlockRuleViolation` (AC18). The decision layer (0005) evaluates rules inside the same guard |
+| 1 No direct I/O | Runtime guard: one `sys.addaudithook` hook per process, installed by the first `Engine`. A context variable (`in_block_code`) is false only while the engine executes its own step work (port calls, journal and store writes, codec, invariant checks) and true whenever control is in block or rule code, including the children of `ctx.parallel`, the function of a child block run by `ctx.block`, and the body of an `async for` over `ctx.attempts`: each ctx call sets it false on entry and restores true before it awaits or returns into block-supplied code (a child coroutine, a child block's function, the next loop iteration). While true, the audit events `open`, `os.*` file and process events (`os.remove`, `os.rename`, `os.mkdir`, `os.listdir`, `os.scandir`, `os.system`, `os.exec`, `os.posix_spawn`, `os.spawn`, `os.startfile`), `subprocess.Popen`, `socket.*`, `sqlite3.connect`, `ctypes.*` and `import` raise `BlockRuleViolation` (AC18). The decision layer (0005) evaluates rules inside the same guard |
 | 2 No engineering arithmetic | `Quantity` has no arithmetic (contract §4.8); values reach blocks only as `Quantity`; arguments that are numbers or `Quantity` objects for `engineering_quantity` parameters are refused (invariant 2) |
 | 3 No literal thresholds | Source lint only (FB005); at runtime, `ctx.attempts` accepts only a `BasisCount` |
 | 4 Deterministic | Replay divergence (§4.5.2); overlap detection (§4.3.1); the replay test of every workflow (process/05 §2) |
@@ -431,8 +472,8 @@ folder also holds `run.lock` (§4.4.4), `copies/` (working copies, spec 0002), `
 ```sql
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;  -- schema_version, run_id, created_at
 CREATE TABLE events (
-  seq            INTEGER PRIMARY KEY,          -- 1, 2, 3, ... assigned by the writer, no gaps
-  type           TEXT NOT NULL CHECK (type IN (<the 19 types of 4.4.2>)),
+  seq            INTEGER PRIMARY KEY,          -- 1, 2, 3, ... assigned by the writer, no gaps (trigger)
+  type           TEXT NOT NULL CHECK (type IN (<the 20 types of 4.4.2>)),
   path           TEXT,                         -- step path; NULL for run-level events
   attempt        INTEGER CHECK (attempt IS NULL OR attempt >= 1),
   at             TEXT NOT NULL,                -- contract Timestamp, from the injected Clock
@@ -442,8 +483,19 @@ CREATE TABLE events (
 ) STRICT;
 CREATE TRIGGER events_no_update BEFORE UPDATE ON events BEGIN SELECT RAISE(ABORT, 'journal is append-only'); END;
 CREATE TRIGGER events_no_delete BEFORE DELETE ON events BEGIN SELECT RAISE(ABORT, 'journal is append-only'); END;
--- the same two triggers on meta
+CREATE TRIGGER events_next_seq BEFORE INSERT ON events
+  WHEN NEW.seq IS NOT (SELECT COALESCE(MAX(seq), 0) + 1 FROM events)
+  BEGIN SELECT RAISE(ABORT, 'journal seq must be the next integer'); END;
+-- the same no_update and no_delete triggers on meta, and:
+CREATE TRIGGER meta_insert_once BEFORE INSERT ON meta
+  WHEN EXISTS (SELECT 1 FROM meta WHERE key = NEW.key)
+  BEGIN SELECT RAISE(ABORT, 'journal meta is write-once'); END;
 ```
+
+The `BEFORE INSERT` triggers close the `REPLACE` conflict path, on which SQLite deletes the old row without firing
+`BEFORE DELETE` triggers unless `recursive_triggers` is on: they fire before conflict resolution, so a replace of an
+existing `seq` or `key` aborts (checked with SQLite while writing this spec; AC20). The hash chain additionally detects
+an alteration made outside SQLite's triggers (AC21).
 
 The first `chain_sha256` uses 64 zeros as the previous value. On open, the engine and the reader verify the chain
 (AC21). One event is one `BEGIN IMMEDIATE` ... `COMMIT` transaction. The engine is the only writer (one engine per run,
@@ -461,7 +513,7 @@ result and referenced (AC24). The engine stores run input and output as `harness
 
 #### 4.4.2 Events
 
-The events of 11 §5 plus `step_reconciled` and `step_rerun` (ADR-0030). Every payload is a Pydantic model with
+The events of 11 §5 plus `step_reconciled`, `step_rerun` and `host_started` (ADR-0030). Every payload is a Pydantic model with
 `extra="forbid"`, validated on append and on read (AC26).
 
 | Event | Payload | Durability |
@@ -477,6 +529,7 @@ The events of 11 §5 plus `step_reconciled` and `step_rerun` (ADR-0030). Every p
 | `input_provided` | `request_id`, `answer_ref` (`basis.engineer_input/1`), `by` | FULL |
 | `approval_requested` | `request_id`, `kind`, `title`, `preview_ref`, `shown_sha256`, `binding` (§4.9), `items` (ids) | FULL |
 | `approval_resolved` | `request_id`, `shown_sha256`, `decision` (`approve`, `reject`), `rejected_items`, `reason`, `by` (`engineer:<name>` or `mode:<mode>`) | FULL |
+| `host_started` | `host_key`, `instance_id` (opaque, from HostPort), `pid`, `process_started_at` (contract Timestamp), `program` (host kind) | FULL |
 | `check_enforced` | `invariant` (1 to 10), `model_key` or `host_key`, `outcome` (`pass`, `fail`), `ref` | NORMAL |
 | `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` (working copies) | FULL |
 | `run_paused` | `reason` (`awaiting_approval`, `awaiting_input`, `stop_requested`), `request_ids` | NORMAL |
@@ -495,8 +548,9 @@ The events of 11 §5 plus `step_reconciled` and `step_rerun` (ADR-0030). Every p
 WAL mode; `synchronous=FULL` for the commit of every event marked FULL above, `NORMAL` for the rest (set per
 transaction on the writer's connection). The FULL set is S-10's (`run_started`, `run_completed`, the `step_started` of a
 write, `step_reconciled`, `approval_requested`, `approval_resolved`) **plus** `model_saved`, `input_provided`,
-`run_failed` and `signed_off` **[added]**: losing one of these after a power failure would make the host-state check
-compare with an older baseline, re-ask an answered question, or lose a terminal or sign-off record. A lost NORMAL event
+`run_failed`, `signed_off` and `host_started` **[added]**: losing one of these after a power failure would make the
+host-state check compare with an older baseline, re-ask an answered question, lose a terminal or sign-off record, or
+leave a host instance the run started unknown to the engine that must close it. A lost NORMAL event
 is repaired by reconciliation or a rerun (S-10 reasoning). Power loss is not tested (S-10 open risk); the Windows
 numbers come from the Windows CI job and the owner's machine (local testing).
 
@@ -529,10 +583,26 @@ The terminal progress, the approval page and the run report use only this API (1
 #### 4.5.1 Start and resume
 
 `start(request)`: validate the input (AC16); load the basis and check invariant 5; run the server checks (invariant 8);
-create the run folder, take the lock, store the input, append `run_started`; call the root block. `resume(run_id)`: take
-the lock; open and verify the journal; refuse a run whose last run-level event is terminal (return the recorded outcome,
-AC35); compare the header with the registry (§4.2 version rule); append `run_resumed`; reconcile every in-flight write
-(§4.5.3) before anything else; then call the root block from the start with the replay index.
+create the run folder, take the lock, store the input, append `run_started`; call the root block.
+
+`resume(run_id)` runs in this order, and no step of it may be moved (AC62):
+
+1. Take the run lock (§4.4.4).
+2. Open and verify the journal (AC21). A run whose last run-level event is terminal returns its recorded outcome
+   (AC35), after `close_started` for its journaled host instances (invariant 10).
+3. Compare the header with the registry (§4.2 version rule); append `run_resumed`.
+4. Server preflight (invariant 8): `HostPort.preflight`; a failed check is `RunRefused` (`SERVER_CHECK_FAILED`).
+5. Host leases (invariant 10): `HostPort.acquire` for every host key that has an in-flight write or a model the run
+   wrote; a refused lease is `HOST_LOCKED` and the run stops.
+6. Units (invariant 9): for every model key the journal addressed on those hosts, `HostPort.read_units` as housekeeping
+   step `@resume<n>.units.<model_key>`, always (the server is a new process and its own units restore may have been
+   skipped, 11 §6 item 9); a mismatch stops the run (`units_mismatch`).
+7. In-flight reconciliation (§4.5.3) of every write in flight, then the rerun marking of reads in flight.
+8. Host-state check (§4.5.4) for every model the run wrote.
+9. Call the root block from the start with the replay index.
+
+Reconciliation therefore never runs without the preflight, a lease and verified units on its host; a stop at steps 4
+to 6 leaves the in-flight write in flight for the next resume.
 
 #### 4.5.2 Replay index and divergence
 
@@ -542,8 +612,9 @@ The index maps each path to its events. When the block makes a call at path `p`:
    name and version; for `parallel`, the number of children). A difference is `ReplayDivergence`.
 2. Recorded and completed (or reconciled `applied`): return the recorded result through the codec, with no port call.
 3. Recorded and failed: §4.3.3.
-4. Not recorded: the run goes live. Before the first live step of a start or resume, the host-state check of §4.5.4
-   runs once (other parallel children wait for it).
+4. Not recorded: the run goes live (at a resume, the host-state check of §4.5.4 has already run, §4.5.1 step 8).
+5. Recorded `~host` steps (§4.6 invariant 9) are skipped: they are audit records of host events, not compared and not
+   required.
 
 When the root block returns, any recorded path not visited is `ReplayDivergence` (S-10 "block ending before the
 journal does"). Divergence is raised before any live call because recorded steps precede live ones; it is journaled as
@@ -571,7 +642,8 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 For every model the run wrote to, the engine reads `HostPort.model_state(model_key)` (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
-last `model_saved`. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
+last `model_saved`, or, when a write on it was reconciled `applied` after that save (§4.5.1 step 7), with the revision
+and fingerprint of the reconciled result's `provenance.host`. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
 request (`engine.host_state`) offering three choices (11 §5):
 
 - `accept`: the differences are engineer changes. The engine saves the model (`model_saved`, role `baseline`) and
@@ -601,9 +673,9 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 | 5 Never assume inputs (P8) | `_hostsafety`, in `start`: `DesignBasis.missing(workflow.required_basis)` (contract §4.10.2) must be empty | `RunRefused` (`BASIS_INCOMPLETE`, fields listed); no run folder | AC41 |
 | 6 Honest outcomes (P9) | `_hostsafety`: `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` sets "reconciliation pending" on the host; every later step on that host waits until §4.5.3 has run; other hosts continue | `NeedsReconciliation` when unresolved | AC33, AC42 |
 | 7 Save before analysis | `_invariants`: before a tool with `ToolInfo.action` `analysis` or `design`, the step `p~pre.save.<model>` calls `HostPort.save` and journals `model_saved` (role `pre_analysis`) | `StepError` of the save | AC43, AC47 |
-| 8 Server builds | `_hostsafety`, in `start` and at each resume: `HostPort.preflight(workflow.min_server_builds)`; any `ServerCheck.ok` false stops the run before any write | `RunRefused` (`SERVER_CHECK_FAILED`) | AC44 |
-| 9 Host units | `_hostsafety`: when `HostPort.session_epoch(host)` changed since the last step on that host, the step `p~pre.units.<host>` calls `HostPort.read_units`; a mismatch stops the run until restored and the in-flight step reconciled | `ContractError` `PRECONDITION_FAILED` (`units_verified`), run escalated `units_mismatch` | AC45, AC47 |
-| 10 One driver per host instance | `_hostsafety`: `HostPort.acquire(host_key)` before the first step on a host; at run end `HostPort.close_started(host_key)`, which closes only instances this run started (identified by process id and start time, spec 0002) | `ContractError` `HOST_LOCKED` | AC46 |
+| 8 Server builds | `_hostsafety`, in `start` before `run_started`, and at each resume as step 4 of §4.5.1 (before any lease, reconciliation or host-state read): `HostPort.preflight(workflow.min_server_builds)`; any `ServerCheck.ok` false stops the run before any write | `RunRefused` (`SERVER_CHECK_FAILED`) | AC44 |
+| 9 Host units | `_hostsafety`, `HostPort.read_units(model_key)`: (a) before the first step of the run addressed to a model, as `p~pre.units.<model_key>` (replayed); (b) at each resume, for every model key the journal addressed, as `@resume<n>.units.<model_key>`, before reconciliation (§4.5.1 step 6); (c) before the next step on a host when, within this engine process, `HostPort.session_epoch(host)` changed or the engine observed a timeout, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` on that host, as `p~host.units.<model_key>`. The epoch is compared only within one engine process, so it needs no journal baseline; a new process always reads units by (b). A mismatch stops the run before any reconciliation, until the units are restored | `ContractError` `PRECONDITION_FAILED` (`units_verified`), run escalated `units_mismatch` | AC45, AC47 |
+| 10 One driver per host instance | `_hostsafety`: `HostPort.acquire(host_key)` before the first step on a host, and at each resume before reconciliation (§4.5.1 step 5). After every live step on a host, `HostPort.started_instances(host_key)` lists the instances this engine's servers started; each one not journaled yet is appended as `host_started` (FULL) before the next step. Run end is only after `run_completed` or `run_failed` is appended (never a pause, an escalation, a divergence or a refusal); then `HostPort.close_started(host_key, instances)` receives the instances read from the journal's `host_started` events, so a resumed engine closes what an earlier process started; spec 0002 closes an instance only if its process id and start time still match. A resume of a terminal run repeats `close_started` (idempotent) | `ContractError` `HOST_LOCKED` | AC46 |
 
 ### 4.7 Permission modes (11 §7, ADR-0018)
 
@@ -621,6 +693,12 @@ turns an invariant off (AC37); in every case the block's call raises before any 
   save whose target is an original (`ToolInfo.overwrites_original(args)`); and tools in `WorkflowDef.always_ask`. The
   engine inserts an approval before such a step unless the block passed `under=` an approval of the same request.
 - **Promotion** (`ctx.promote`, always an approval of kind `PROMOTION`):
+  - Before anything else, `_promote` checks the `approval` argument: it must be of kind `PROMOTION`, approved, bound
+    to this model, and unused by an earlier promotion; and the working copy's current `HostPort.model_state` (revision,
+    fingerprint, file hash) must equal the binding taken when the approval was shown (§4.9). Otherwise `ApprovalVoid`
+    (a mismatch, for example an engineer edit to the copy while the run waited at the approval page) or
+    `BlockRuleViolation` (wrong kind, not approved, other model, reused), and nothing is copied. The binding of a
+    `PROMOTION` approval also records `file_sha256` of every model in the preview.
   - `Promotion.FILE_COPY` (the edit cycle and new models): `_promote` checks that the original's current file hash
     equals the working copy's `origin_sha256` (else `ContractError` `CONFLICT`, nothing copied); copies the original's
     files to `runs/<run_id>/backups/` and verifies their hashes; copies the accepted revision's files
@@ -638,7 +716,7 @@ lead decision D-5) and a shared conformance test (AC57). All results from host t
 | Port | Methods | Implemented by |
 |---|---|---|
 | `ToolPort` | `describe(tool) -> ToolInfo` (refuses a tool outside the allowlist with `INVALID_ARGUMENT`); `call(tool, args, *, op_id, model) -> Envelope`; `supports_reconcile(tool) -> bool`; `reconcile(tool, args, op_id) -> Reconciliation`; `read_back(tool, args) -> Envelope \| None`; `preview(tool, args) -> Preview` | Spec 0002 (adapters) |
-| `HostPort` | `preflight(min_builds) -> list[ServerCheck]`; `acquire(host_key) -> HostLease`; `release(lease)`; `session_epoch(host_key) -> int`; `model_state(model_key) -> HostModelState`; `check_model(model_key) -> Envelope` (`issues.model_check/1`); `save(model_key, role) -> SavedModel`; `read_units(model_key) -> UnitsState`; `working_copy(model_key, folder) -> ModelKey`; `restore(model_key, saved) -> None`; `model_files(model_key) -> tuple[Path, ...]`; `close_started(host_key) -> None` | Spec 0002 (server processes, Job Objects, host-instance locks, process start times) |
+| `HostPort` | `preflight(min_builds) -> list[ServerCheck]`; `acquire(host_key) -> HostLease`; `release(lease)`; `session_epoch(host_key) -> int`; `model_state(model_key) -> HostModelState`; `check_model(model_key) -> Envelope` (`issues.model_check/1`); `save(model_key, role) -> SavedModel`; `read_units(model_key) -> UnitsState`; `working_copy(model_key, folder) -> ModelKey`; `restore(model_key, saved) -> None`; `model_files(model_key) -> tuple[Path, ...]`; `started_instances(host_key) -> list[HostInstance]`; `close_started(host_key, instances: Sequence[HostInstance]) -> None` | Spec 0002 (server processes, Job Objects, host-instance locks, process start times) |
 | `CalcPort` | `describe(calc_id) -> CalcInfo` (`id`, `version`, `content_sha256`, `status`, `engineering_params`); `run(calc_id, args) -> Envelope` | Spec 0003 and code packs |
 | `BasisPort` | `load(basis_ref) -> LoadedBasis` (`result_id`, `basis`: the `basis.design_basis/1` payload model) | Spec 0004 |
 | `DecisionPort` | `decide(request) -> DecisionAnswer \| PendingAnswer`; `decide_many(requests) -> list[DecisionAnswer \| PendingAnswer]` | Spec 0005 |
@@ -654,7 +732,7 @@ subclass); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unk
 `missing: list[str]`; `evidence: list[Ref]`); `ServerCheck` (`server`, `build`, `min_build`, `fingerprint`,
 `expected_fingerprint`, `ok`, `reason`); `HostModelState` (`model_id`, `revision`, `fingerprint`, `file_sha256`);
 `SavedModel` (`model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name`); `UnitsState` (`ok`, `present`,
-`expected`); `HostLease`; `ApprovalRequest`, `ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9).
+`expected`); `HostLease`; `HostInstance` (`instance_id`, `pid`, `process_started_at`, `program`); `ApprovalRequest`, `ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9).
 
 `EnginePorts` bundles the ports; `Engine(workspace, registry, ports, store, settings, clock, ids)` takes everything
 explicitly (contract `ResultStore`, `Clock`, `IdSource`).
@@ -664,7 +742,7 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 - `ctx.approve(title, preview, kind)`: `request_id = "apr_" + sha256(run_id + "\n" + path).hexdigest()[:32]`, stable
   across replay. `Preview` (`items: list[PreviewItem]` with unique `id`, `label`, `refs`; `diff_ref: Ref | None`;
   `models: list[ModelHandle]`) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
-  `binding` is `[{model_key, model_id, revision, fingerprint}]` of every model in `preview.models`, read from HostPort
+  `binding` is `[{model_key, model_id, revision, fingerprint, file_sha256}]` of every model in `preview.models`, read from HostPort
   when the request is made (after invariant 1 has checked them).
 - An answer is accepted only if its `request_id` names an open approval request of this run, its `shown_sha256` equals
   the request's, and the request has no `approval_resolved` yet (used once). Otherwise it is refused and the request is
@@ -762,11 +840,11 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59 | Unit | `tests/unit/` |
+| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
 | AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
-| AC27 to AC32, AC34 to AC36, AC47 | Replay (process/05 §1) | `tests/replay/` |
+| AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 | Replay (process/05 §1) | `tests/replay/` |
 | AC37 (generated programs) | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC60 | Performance | `tests/perf/` |
 | AC23 (Windows lock) | Unit, marker `windows` | `tests/windows/` |
@@ -797,3 +875,6 @@ event payload is a new schema version that the reader must still read (its chang
 | Q9 | 11 §3 rule 5 "loops only through `ctx.attempts`": `for` over a finite typed collection | Owner | Allow (one call per object is needed on the Sasaah CSI server, S12-G4); forbid `while` |
 | Q10 | The single-writer journal with an answer inbox replaces S-10's page-writes-journal | Owner | Accept (§4.4.1) |
 | Q11 | Saving the working copy after every write step (11 §5) may cost seconds per step on ETABS | Owner | Keep for safety; measure in the local test (S-02) and revisit with data |
+| Q12 | A `host_started` event (not in 11 §5) journals the host instances a run started, so a resumed engine can close them (invariant 10) | Owner | Accept with ADR-0030 (decision 8) |
+| Q13 | Resume order (§4.5.1): preflight, leases and units before reconciliation; units always read at resume in a new engine process | Owner | Accept with ADR-0030 (decision 4); amend 11 §5 when it is accepted |
+| Q14 | Sibling `ctx.parallel` children that touch the same model with a write are refused (`BlockRuleViolation`) | Owner | Accept; such a block has a race whatever the engine does |
