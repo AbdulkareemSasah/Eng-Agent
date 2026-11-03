@@ -201,6 +201,12 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   stays in flight in the journal, and a later resume with all three passing reconciles it; and given all three pass,
   then the port calls occur in the order `preflight`, `acquire`, `read_units`, `reconcile`, `model_state`, then the
   first block call (§4.5.1). Test: `tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation`.
+- AC63. Given a run with a write in flight on a model, when the host crashed (the fake host reports the model not
+  loaded) and the run resumes, then `ToolPort.reconcile` is not called for that write, the host-state check stops the
+  run with reason `model_not_loaded` offering `restore` and `abandon` (not `accept`); on `restore`, `HostPort.restore`
+  is called, then `read_units` on the restored model, and only then the first live step; the in-flight write gets
+  `step_rerun` (reason `restored`) and runs as a new attempt with a new `op_id`. Test:
+  `tests/replay/test_host_state.py::test_host_crash_with_write_in_flight`.
 - AC36. Given a pending approval or input at resume, then it is presented again with the same request id and a stored
   answer to it is consumed once. Test: `tests/replay/test_resume.py::test_pending_requests_represented`.
 
@@ -596,13 +602,17 @@ create the run folder, take the lock, store the input, append `run_started`; cal
    wrote; a refused lease is `HOST_LOCKED` and the run stops.
 6. Units (invariant 9): for every model key the journal addressed on those hosts, `HostPort.read_units` as housekeeping
    step `@resume<n>.units.<model_key>`, always (the server is a new process and its own units restore may have been
-   skipped, 11 §6 item 9); a mismatch stops the run (`units_mismatch`).
-7. In-flight reconciliation (§4.5.3) of every write in flight, then the rerun marking of reads in flight.
-8. Host-state check (§4.5.4) for every model the run wrote.
+   skipped, 11 §6 item 9); a mismatch stops the run (`units_mismatch`). A model the host does not have loaded
+   (`UnitsState.loaded` false, §4.8: the host crashed, or the instance is not the one that held it) is not a units
+   mismatch: the step records `loaded: false` and the model is marked **lost** for steps 7 and 8.
+7. In-flight reconciliation (§4.5.3) of every write in flight on a model that is not lost, then the rerun marking of
+   reads in flight. A write in flight on a lost model is not reconciled (a reconciler reading an empty or new instance
+   could report `not_applied` for an edit that is only gone from memory); step 8 resolves it.
+8. Host-state check (§4.5.4) for every model the run wrote; a lost model is a mismatch.
 9. Call the root block from the start with the replay index.
 
-Reconciliation therefore never runs without the preflight, a lease and verified units on its host; a stop at steps 4
-to 6 leaves the in-flight write in flight for the next resume.
+Reconciliation therefore never runs without the preflight, a lease, a loaded model and verified units on its host; a
+stop at steps 4 to 6 leaves the in-flight write in flight for the next resume.
 
 #### 4.5.2 Replay index and divergence
 
@@ -643,16 +653,25 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 For every model the run wrote to, the engine reads `HostPort.model_state(model_key)` (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
 last `model_saved`, or, when a write on it was reconciled `applied` after that save (§4.5.1 step 7), with the revision
-and fingerprint of the reconciled result's `provenance.host`. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
+and fingerprint of the reconciled result's `provenance.host`. A model with `HostModelState.loaded` false (a lost model,
+§4.5.1 step 6) is a mismatch with reason `model_not_loaded`. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
 request (`engine.host_state`) offering three choices (11 §5):
 
 - `accept`: the differences are engineer changes. The engine saves the model (`model_saved`, role `baseline`) and
-  continues; the workflow shows and records the differences itself (18 step 4).
+  continues; the workflow shows and records the differences itself (18 step 4). Not offered for a lost model: there is
+  no state to accept **[added]**.
 - `restore`: `HostPort.restore(model_key, saved)` reopens the last saved working copy; `run_resumed` records
   `restored_to_seq` (the `seq` of that `model_saved`), and the replay index ignores every step event after it, so those
   steps run live again as new attempts (`step_rerun`, reason `restored`) with new `op_id`s. Offered only when no other
-  model was written after that `seq` **[added: otherwise a restore would repeat writes on the other model]**.
+  model was written after that `seq` **[added: otherwise a restore would repeat writes on the other model]**. After the
+  restore and before any live step on that model, the engine reads units again (`@resume<n>.units_restored.<model_key>`,
+  invariant 9); a mismatch or `loaded` false stops the run (`units_mismatch`). A write in flight on the model started
+  after the restored `model_saved` (no save follows an in-flight write), so the cut covers it: it gets `step_rerun`
+  (reason `restored`) and runs as a new attempt; it is never reconciled against the restored model.
 - `abandon`: `run_failed` (reason `abandoned`).
+
+For a lost model on which `restore` is not offered, only `abandon` is offered; the run stays escalated, and an engineer
+who reopens the model in the host and resumes gets the normal check of §4.5.1 (Q15).
 
 In `work_on_copy` the working copy is saved after every write step (`p~post.save.<model_key>`, 11 §5), so a host
 crash loses at most one step.
@@ -674,7 +693,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 | 6 Honest outcomes (P9) | `_hostsafety`: `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` sets "reconciliation pending" on the host; every later step on that host waits until §4.5.3 has run; other hosts continue | `NeedsReconciliation` when unresolved | AC33, AC42 |
 | 7 Save before analysis | `_invariants`: before a tool with `ToolInfo.action` `analysis` or `design`, the step `p~pre.save.<model>` calls `HostPort.save` and journals `model_saved` (role `pre_analysis`) | `StepError` of the save | AC43, AC47 |
 | 8 Server builds | `_hostsafety`, in `start` before `run_started`, and at each resume as step 4 of §4.5.1 (before any lease, reconciliation or host-state read): `HostPort.preflight(workflow.min_server_builds)`; any `ServerCheck.ok` false stops the run before any write | `RunRefused` (`SERVER_CHECK_FAILED`) | AC44 |
-| 9 Host units | `_hostsafety`, `HostPort.read_units(model_key)`: (a) before the first step of the run addressed to a model, as `p~pre.units.<model_key>` (replayed); (b) at each resume, for every model key the journal addressed, as `@resume<n>.units.<model_key>`, before reconciliation (§4.5.1 step 6); (c) before the next step on a host when, within this engine process, `HostPort.session_epoch(host)` changed or the engine observed a timeout, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` on that host, as `p~host.units.<model_key>`. The epoch is compared only within one engine process, so it needs no journal baseline; a new process always reads units by (b). A mismatch stops the run before any reconciliation, until the units are restored | `ContractError` `PRECONDITION_FAILED` (`units_verified`), run escalated `units_mismatch` | AC45, AC47 |
+| 9 Host units | `_hostsafety`, `HostPort.read_units(model_key)`: (a) before the first step of the run addressed to a model, as `p~pre.units.<model_key>` (replayed); (b) at each resume, for every model key the journal addressed, as `@resume<n>.units.<model_key>`, before reconciliation (§4.5.1 step 6), where a model not loaded is not a mismatch but goes to the host-state check (§4.5.4) and units are read again after a `restore`; (c) before the next step on a host when, within this engine process, `HostPort.session_epoch(host)` changed or the engine observed a timeout, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` on that host, as `p~host.units.<model_key>`. The epoch is compared only within one engine process, so it needs no journal baseline; a new process always reads units by (b). A mismatch stops the run before any reconciliation, until the units are restored | `ContractError` `PRECONDITION_FAILED` (`units_verified`), run escalated `units_mismatch` | AC45, AC47 |
 | 10 One driver per host instance | `_hostsafety`: `HostPort.acquire(host_key)` before the first step on a host, and at each resume before reconciliation (§4.5.1 step 5). After every live step on a host, `HostPort.started_instances(host_key)` lists the instances this engine's servers started; each one not journaled yet is appended as `host_started` (FULL) before the next step. Run end is only after `run_completed` or `run_failed` is appended (never a pause, an escalation, a divergence or a refusal); then `HostPort.close_started(host_key, instances)` receives the instances read from the journal's `host_started` events, so a resumed engine closes what an earlier process started; spec 0002 closes an instance only if its process id and start time still match. A resume of a terminal run repeats `close_started` (idempotent) | `ContractError` `HOST_LOCKED` | AC46 |
 
 ### 4.7 Permission modes (11 §7, ADR-0018)
@@ -730,9 +749,15 @@ Port data types (frozen models): `ToolInfo` (`name`, `effect` read or write, `ac
 `engineering_params` (field paths), `overwrites_original(args) -> bool` is a method on the adapter's `ToolInfo`
 subclass); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unknown`; `result: Envelope | None`;
 `missing: list[str]`; `evidence: list[Ref]`); `ServerCheck` (`server`, `build`, `min_build`, `fingerprint`,
-`expected_fingerprint`, `ok`, `reason`); `HostModelState` (`model_id`, `revision`, `fingerprint`, `file_sha256`);
-`SavedModel` (`model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name`); `UnitsState` (`ok`, `present`,
-`expected`); `HostLease`; `HostInstance` (`instance_id`, `pid`, `process_started_at`, `program`); `ApprovalRequest`, `ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9).
+`expected_fingerprint`, `ok`, `reason`); `HostModelState` (`loaded`, `model_id`, `revision`, `fingerprint`,
+`file_sha256`; the last four `None` when `loaded` is false);
+`SavedModel` (`model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name`); `UnitsState` (`loaded`, `ok`, `present`,
+`expected`; `ok` true and `present` `None` when `loaded` is false); `HostLease`; `HostInstance` (`instance_id`, `pid`, `process_started_at`, `program`); `ApprovalRequest`, `ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9).
+
+`HostPort.read_units` and `HostPort.model_state` never raise for a model the connected host instance does not have
+open, or that is open in an instance other than the one the journal recorded for it (`host_started`, or the instance of
+its last `model_saved`): they return `loaded: false`. A host program that is not running is the same case (spec 0002
+starts no host program to answer them). A server that cannot be reached fails the preflight (invariant 8).
 
 `EnginePorts` bundles the ports; `Engine(workspace, registry, ports, store, settings, clock, ids)` takes everything
 explicitly (contract `ResultStore`, `Clock`, `IdSource`).
@@ -844,7 +869,7 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
 | AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
-| AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 | Replay (process/05 §1) | `tests/replay/` |
+| AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62, AC63 | Replay (process/05 §1) | `tests/replay/` |
 | AC37 (generated programs) | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC60 | Performance | `tests/perf/` |
 | AC23 (Windows lock) | Unit, marker `windows` | `tests/windows/` |
@@ -878,3 +903,4 @@ event payload is a new schema version that the reader must still read (its chang
 | Q12 | A `host_started` event (not in 11 §5) journals the host instances a run started, so a resumed engine can close them (invariant 10) | Owner | Accept with ADR-0030 (decision 8) |
 | Q13 | Resume order (§4.5.1): preflight, leases and units before reconciliation; units always read at resume in a new engine process | Owner | Accept with ADR-0030 (decision 4); amend 11 §5 when it is accepted |
 | Q14 | Sibling `ctx.parallel` children that touch the same model with a write are refused (`BlockRuleViolation`) | Owner | Accept; such a block has a race whatever the engine does |
+| Q15 | After a host crash the model is not loaded; the in-flight write on it cannot be reconciled by reading the host | Owner | Treat it as a host-state mismatch (`model_not_loaded`): offer `restore` (re-runs the steps after the save, including the in-flight write) or `abandon`, never `accept`; never reconcile against an empty or new instance (§4.5.1, §4.5.4) |

@@ -210,7 +210,8 @@ tasks:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_read_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
-    covers: [AC31, AC32, AC34]
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
+    covers: [AC31, AC32, AC34, AC63]
     depends_on: [T10]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
@@ -235,7 +236,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_save_before_analysis"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_inserted_steps_are_replayed"
     covers: [AC5, AC37, AC38, AC39, AC43, AC47]
-    depends_on: [T10]
+    depends_on: [T10, T11]
   - id: T13
     title: Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases)
     files:
@@ -382,8 +383,11 @@ reconciliation and the host-state check, the invariants, decisions and inputs, a
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3), path identity (T8) and replay (T9) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
-by `depends_on` (T10, T12, T13, T14, T15, T16, T17, T18 in that order), so no two of them run in parallel; T11 runs
-beside T12 and edits only `_runner.py` of the shared files, which T13 then extends.
+by `depends_on` (T10, T12, T13, T14, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11 shares
+`CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11 and T13 on both: the
+tasks from T10 to T18 run one after another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
+to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T6 and T7; T19 beside T17 and T18) share those two
+files only: their lines are merged in pull-request order, and they share no other file.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -457,7 +461,7 @@ blocks in `tests/data/blocks/` and on the real (empty) registry.
 
 **T6 Ports** (spec §4.8). The nine protocols and their data types; fakes in `tests/fakes/`: a fake host with a ledger
 of every call and `op_id` (S-10's reconciler stand-in), scripted outcomes per call (success, failure envelope,
-`TIMEOUT_UNKNOWN_OUTCOME`, `HOST_WEDGED`, raise), model state with revision and fingerprint, units, session epochs,
+`TIMEOUT_UNKNOWN_OUTCOME`, `HOST_WEDGED`, raise), model state with revision and fingerprint, units, a host crash (models reported not loaded), session epochs,
 leases; fake CalcPort, BasisPort, DecisionPort, ApprovalPort and InputPort with scripted answers; a recording
 ProgressSink; a RunControlPort. The fakes count as tests for the budget.
 
@@ -479,7 +483,8 @@ is wired here so the divergence tests can run; T10 completes it.
 
 **T11 In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
-`restore`.
+`restore`, and lost models after a host crash (no reconciliation, `model_not_loaded`, units read after the restore,
+AC63).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the

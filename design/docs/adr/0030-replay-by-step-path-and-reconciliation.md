@@ -55,7 +55,9 @@ queued (B-067). The breakaway case below was not part of it.
    `step_rerun` and `host_started` (decision 8). At resume, reconciliation runs only after the server check
    (11 §6 item 8), the host lease (item 10) and a units read on every model the run addressed (item 9, always at a
    resume, because the server is a new process); a failure of any of them stops the run and leaves the write in
-   flight.
+   flight. A write in flight on a model the host no longer has loaded (a host crash) is never reconciled against the
+   empty or new instance: the host-state check treats the missing model as a mismatch and offers `restore` (the write
+   runs again as a new attempt after the restored save, units read first) or `abandon`.
 5. **Durability.** WAL mode. `synchronous=FULL` for `run_started`, `run_completed`, `run_failed`, the `step_started`
    of a write, `step_reconciled`, `approval_requested`, `approval_resolved`, `input_provided`, `model_saved`,
    `host_started` and `signed_off`; `NORMAL` for the rest. A lost `NORMAL` event after a power failure is repaired by reconciliation or a
