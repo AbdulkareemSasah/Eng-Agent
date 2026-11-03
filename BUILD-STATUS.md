@@ -28,7 +28,7 @@ After a restart or a context compaction, read this file and `git log origin/buil
 | 0 | `tools/eng-dev-gate` 0.1 | spec and plan merged (B-004); implementation queued (B-030 to B-055) |
 | 0 | CI workflows (all jobs of process/11 §5) | not started |
 | 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | done (B-005); live comparison with `tools/list` needs local test |
-| 0 | Spike S-10 (replay; Job Object termination) | done (B-006); Windows check runs in the first Windows CI job |
+| 0 | Spike S-10 (replay; Job Object termination) | done (B-006). Windows evidence from CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/runs/41729982994) (windows-latest, Python 3.14.10): all Job Object cases pass (kill on close at engine exit and kill, nested jobs, suspended start 0 of 40 escaped, late assignment escapes as expected); replay scenarios pass; write-step overhead p95 7.0 ms (target 20 ms). Report update queued (B-067) |
 | 0 | Spikes S-02 and S-04 (scripts for local runs) | queued (B-007) |
 | 1 | `eng-harness` (engine, journal, replay, ctx, CSI adapter, calcs, templates, basis, decisions, CLI, progress, approval page, run report, edit-cycle workflow) | not started |
 | 2 | `structural-codes` (core, `aci318-14`, `sbc304-2018` draft), SAFE via CSI adapter, providers (Jev shadow, PydanticAI), `design_isolated_footing` | not started |
@@ -60,6 +60,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-064 | `eng-harness` spec and plan 0005 decision layer | sonnet, medium | opus, low | — | queued (wave 2) |
 | B-065 | `eng-harness` spec and plan 0006 command line, progress, approval page, run report | sonnet, high | opus, medium (security) | — | queued (wave 2) |
 | B-066 | Model edit cycle: workflow spec, block spec and plan 0007 | opus, medium | opus, medium | — | queued (wave 2) |
+| B-067 | S-10 report: record the Windows CI results | haiku | opus, low | — | queued (after wave 2) |
 
 ## 4. Decisions by the lead
 
