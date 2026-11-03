@@ -52,15 +52,19 @@ queued (B-067). The breakaway case below was not part of it.
    exception, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` inside a write stops the run with `NEEDS_RECONCILIATION` for
    the engineer. A write is never run again until its outcome is known. A read, calc or non-engineer decision in
    flight is run again and journaled as `step_rerun`. The event list of 11 §5 gains `step_reconciled`,
-   `step_rerun` and `host_started` (decision 8). At resume, reconciliation runs only after the server check
+   `step_rerun`, `host_started` (decision 8) and `model_bound`. At resume, reconciliation runs only after the server check
    (11 §6 item 8), the host lease (item 10) and a units read on every model the run addressed (item 9, always at a
    resume, because the server is a new process); a failure of any of them stops the run and leaves the write in
    flight. A write in flight on a model the host no longer has loaded (a host crash) is never reconciled against the
    empty or new instance: the host-state check treats the missing model as a mismatch and offers `restore` (the write
-   runs again as a new attempt after the restored save, units read first) or `abandon`.
+   runs again as a new attempt after the restored save, units read first) or `abandon`. Each model is bound to one
+   host instance by a `model_bound` event (at its first use, whether or not the engine started that instance; after a
+   restore; and at a resume that finds the model reopened in another instance); units and model state are read against
+   the bound instance. A reopened model is not reconciled either: it continues only if no write on it follows its last
+   save, otherwise it is a mismatch offering `restore` or `abandon`.
 5. **Durability.** WAL mode. `synchronous=FULL` for `run_started`, `run_completed`, `run_failed`, the `step_started`
    of a write, `step_reconciled`, `approval_requested`, `approval_resolved`, `input_provided`, `model_saved`,
-   `host_started` and `signed_off`; `NORMAL` for the rest. A lost `NORMAL` event after a power failure is repaired by reconciliation or a
+   `host_started`, `model_bound` and `signed_off`; `NORMAL` for the rest. A lost `NORMAL` event after a power failure is repaired by reconciliation or a
    rerun. Large values go to the result store and are referenced from the journal.
 6. **One engine per run.** The engine holds an exclusive OS file lock on the run folder while it works on a run; the
    operating system releases it when the process ends. The engine is the journal's only writer; answers from the

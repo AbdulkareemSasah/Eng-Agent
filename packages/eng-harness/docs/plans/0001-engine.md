@@ -211,7 +211,8 @@ tasks:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_read_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
-    covers: [AC31, AC32, AC34, AC63]
+      - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
+    covers: [AC31, AC32, AC34, AC63, AC64]
     depends_on: [T10]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
@@ -483,8 +484,9 @@ is wired here so the divergence tests can run; T10 completes it.
 
 **T11 In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
-`restore`, and lost models after a host crash (no reconciliation, `model_not_loaded`, units read after the restore,
-AC63).
+`restore`, the instance binding (`model_bound` at first use, after a restore and for a reopened model), and lost or
+reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding, AC63,
+AC64).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
