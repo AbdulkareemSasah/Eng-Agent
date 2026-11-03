@@ -150,13 +150,16 @@ def test_code_specific_fields() -> None:
                 _detail(code, retryable, incident_id="inc_1")
         if code not in HOST_FIELD_CODES:
             for name in ("host_code", "host_method"):
-                with pytest.raises(ValidationError):
-                    _detail(code, retryable, **{name: "X"})
+                for value in ("X", ""):
+                    with pytest.raises(ValidationError):
+                        _detail(code, retryable, **{name: value})
     for code in HOST_FIELD_CODES:
         d = _detail(code, True, host_code="MODAL_DIALOG", host_method="Save")
         assert (d.host_code, d.host_method) == ("MODAL_DIALOG", "Save")
         with pytest.raises(ValidationError):
             _detail(code, True, host_code="x" * 201)
+        with pytest.raises(ValidationError):
+            _detail(code, True, host_method="x" * 201)
 
 
 def test_field_limits() -> None:
@@ -168,6 +171,8 @@ def test_field_limits() -> None:
         {"field": "a..b"},
         {"field": "x" * 513},
         {"unknown": 1},
+        {"expected": [1]},
+        {"expected": "x"},
     ]
     for bad in bad_values:
         with pytest.raises(ValidationError):
@@ -175,7 +180,7 @@ def test_field_limits() -> None:
     ok = _detail("INVALID_ARGUMENT", False, message="x" * 2000, field="a.b[0].c", op_id="x" * 200)
     assert ok.field == "a.b[0].c"
     with pytest.raises(ValidationError):
-        ok.message = "other"  # type: ignore[misc]
+        ok.message = "other"
 
 
 def test_contract_warning() -> None:

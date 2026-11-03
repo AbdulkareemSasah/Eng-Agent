@@ -121,7 +121,7 @@ class ErrorDetail(BaseModel):
             raise ValueError("precondition is required for, and only allowed on, PRECONDITION_FAILED")
         if (self.incident_id is not None) is not (self.code is ErrorCode.INTERNAL):
             raise ValueError("incident_id is required for, and only allowed on, INTERNAL")
-        if self.code not in _HOST_FIELD_CODES and (self.host_code or self.host_method):
+        if self.code not in _HOST_FIELD_CODES and (self.host_code is not None or self.host_method is not None):
             raise ValueError("host_code and host_method are only allowed on HOST_ERROR and HOST_BUSY")
         return self
 
