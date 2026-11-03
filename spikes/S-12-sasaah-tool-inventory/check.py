@@ -125,6 +125,22 @@ def check_file(path: Path, inventory: str, errors: list[str]) -> None:
         err(f"server.tool_count {stated} differs from {len(tools)} tools")
 
 
+REPORT_SECTIONS = ["## Question", "## Method", "## Findings", "## Answer", "## Consequences for the design", "## Open risks"]
+
+
+def check_report(path: Path, errors: list[str]) -> None:
+    """The spike report must exist and keep the sections of design/process/templates/spike-report.md."""
+    if not path.exists():
+        errors.append("REPORT.md: missing")
+        return
+    text = path.read_text(encoding="utf-8")
+    for heading in REPORT_SECTIONS:
+        if heading not in text:
+            errors.append(f"REPORT.md: section {heading!r} missing")
+    if PINNED_COMMIT not in text:
+        errors.append("REPORT.md: the pinned Sasaah commit is not recorded")
+
+
 def main() -> int:
     base = Path(__file__).resolve().parent / "inventory"
     errors: list[str] = []
@@ -134,6 +150,7 @@ def main() -> int:
             errors.append(f"{fname}: missing")
             continue
         check_file(p, inv, errors)
+    check_report(Path(__file__).resolve().parent / "REPORT.md", errors)
     if errors:
         print("S-12 inventory check FAILED:")
         for e in errors:
