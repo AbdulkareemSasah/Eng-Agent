@@ -33,7 +33,7 @@ Blocks talk to the world only through `ctx`.
 | `ctx.decide(question, options, state, rules, policy)` | Make a typed decision through the cascade ([12](12-decision-layer.md)). Returns the chosen option and who decided |
 | `ctx.decide_many(...)` | Several decisions in one batched request, and one batched engineer screen when the engineer is needed |
 | `ctx.ask(fields)` | Ask the engineer for inputs; the run pauses durably until answered. Answers become `basis` results |
-| `ctx.approve(title, preview)` | Request approval; behavior depends on the permission mode (§7). In phase 1 the engineer answers on the local approval page |
+| `ctx.approve(title, preview)` | Request approval; behavior depends on the permission mode (§7). In phase 1 the engineer answers on the local approval page. An approval is bound to the hash of what was shown and to the model state, is used once, and is checked again just before the write; a mismatch voids it. The engineer may reject single items of a change set |
 | `ctx.block(other, input)` | Run a child block as a sub-step |
 | `ctx.parallel(*steps)` | Run independent steps concurrently, within resource limits (§8) |
 | `ctx.attempts(max)` | The only way to loop. Exceeding `max` raises an escalation |
@@ -108,8 +108,16 @@ The engine enforces these regardless of what block code does:
    as `TIMEOUT_UNKNOWN_OUTCOME`.
 7. **Save before analysis.** The engine saves the model before every analysis or design run, so no run waits on a
    save dialog.
-8. **Server builds.** At run start every server's build must be at least the minimum the workflow declares; otherwise
-   the run stops before any write ([ADR-0024](../adr/0024-harness-on-existing-sasaah-servers.md)).
+8. **Server builds.** At run start every server's build must be at least the minimum the workflow declares, and the
+   fingerprint of its tool list (names and input schemas) must match the one its adapter was tested with; otherwise the
+   run stops before any write ([ADR-0024](../adr/0024-harness-on-existing-sasaah-servers.md)).
+9. **Host units.** After any timeout, reconnect or server restart, the adapter reads the model's present units before
+   the next step. If they differ from the units it expects, the run stops with `PRECONDITION_FAILED` until they are
+   restored and the step is reconciled. The Sasaah CSI engine does not check that it restored units after a call and
+   skips the restore when a call times out.
+10. **One driver per host instance.** The engine takes a lock per host instance before attaching, so two servers or two
+    runs never drive the same instance; the Sasaah servers do not guard this themselves. The engine closes only host
+    instances it started, identified by process id and start time, and never ends an instance it did not start.
 
 ## 7. Permission modes
 
@@ -140,11 +148,17 @@ stops if the original's file hash changed since the working copy was taken.
 - Servers are declared in `harness.toml` with their command, toolsets, options and the minimum build the workflows
   need. In phase 1 they are the Sasaah servers, each with its adapter. Sasaah command-line tools are declared the same
   way and wrapped by an adapter, so blocks call them with `ctx.tool`.
+- Each adapter's allowlist leaves out every tool that runs scripts or writes database tables directly (on the Sasaah
+  CSI server today: `csi_run_script` and `csi_db_tables_apply`), and the CSI server is started with its `DisableScript`
+  option.
+- Analysis and design runs get a call timeout suited to them, or are started and then followed through the server's
+  status tool (`csi_analysis_status`); they are never a single call bounded by the server's default timeout of
+  120 seconds.
 - The engine starts every server inside a Windows Job Object configured to terminate its processes when the engine
   exits, so no orphaned server keeps a host locked.
 - Servers that follow [05](05-mcp-server-standard.md) get `ENG_WORKSPACE` (the project workspace) and
   `ENG_REQUIRE_REFS=1`; for the Sasaah servers the adapters provide both behaviors. The engine checks each server's
-  build at start, restarts a crashed server, and reconciles any write that was in flight. `HOST_LOCKED` (`model_locked`
+  build and tool list at start (§6), restarts a crashed server, and reconciles any write that was in flight. `HOST_LOCKED` (`model_locked`
   from the Sasaah CSI server) is shown to the engineer, never retried.
 - Workflows are tested without host programs against recorded server replies (the adapters' contract tests) and, on
   servers that offer one, a fake host (`--host-mode fake --fake-model <fixture>`).
