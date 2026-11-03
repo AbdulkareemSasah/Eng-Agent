@@ -89,7 +89,7 @@ def test_invalid_table_is_cf001(overrides: dict[str, Any]) -> None:
 def test_optional_fields_and_generated() -> None:
     """Optional lists default to empty; generated entries carry path, module and args."""
     config = parse_package_config(_table(generated=[{"path": "docs/x.json", "module": "pkg.gen", "args": ["--x"]}]))
-    assert config.r1_modules == [] and config.windows_tests == [] and config.public_modules == []
+    assert (config.r1_modules, config.windows_tests, config.public_modules) == ([], [], [])
     assert config.generated[0].args == ["--x"]
 
 
@@ -106,6 +106,10 @@ def test_load_package_config(tmp_path: Path) -> None:
     with pytest.raises(ConfigError) as missing:
         load_package_config(path)
     assert missing.value.code == "CF006"
+    path.write_text('[tool]\n"eng-gate" = 5\n', encoding="utf-8")
+    with pytest.raises(ConfigError) as scalar:
+        load_package_config(path)
+    assert scalar.value.code == "CF001"
     path.write_text("[tool.eng-gate\n", encoding="utf-8")
     with pytest.raises(ConfigError) as broken:
         load_package_config(path)
