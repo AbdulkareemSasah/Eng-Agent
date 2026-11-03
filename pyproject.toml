@@ -11,7 +11,7 @@ package = false
 [tool.uv.workspace]
 # Explicit list: a package folder can hold its spec and plan before its pyproject.toml exists,
 # and uv refuses a glob that matches a folder without one. Each package's skeleton task adds it here.
-members = ["tools/eng-dev-gate"]
+members = ["packages/eng-contract", "tools/eng-dev-gate"]
 
 [dependency-groups]
 dev = ["ruff>=0.17.3", "mypy>=2.4.1", "pytest>=9.2.0", "pytest-cov>=7.1.0", "hypothesis>=6.170.14"]
