@@ -54,11 +54,17 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC2. Given an object with keys `"b"`, `"a"`, `"é"`, `"\U0001F600"` and `"דּ"`, when serialized, then keys
   are ordered by UTF-16 code units, there is no whitespace, non-ASCII is written as UTF-8, and only `"`, `\` and
   U+0000 to U+001F are escaped. Test: `test_canonical.py::test_key_order_and_escaping`.
-- AC3. Given NaN, an infinity, an integer outside ±(2^53 − 1), a lone surrogate, a non-string key, or a value that is
-  not a JSON type (for example `Decimal`, `bytes`, `datetime`), when serialized, then `CanonicalJsonError` is raised.
-  Test: `test_canonical.py::test_rejects_non_json_values`.
-- AC4. Given any JSON value built by Hypothesis, when serialized, parsed with `json.loads` and serialized again, then
-  the bytes are identical, and `payload_sha256` is the SHA-256 of those bytes in lowercase hex. Test:
+- AC3. Given NaN, an infinity, a Python `int` outside ±(2^53 − 1) (including 2^53 and 10^16), a lone surrogate, a
+  non-string key, or a value that is not a JSON type (for example `Decimal`, `bytes`, `datetime`), when serialized,
+  then `CanonicalJsonError` is raised. Given the floats `2.0**53`, `1e16`, `1e20` and `1e21`, then they serialize as
+  `9007199254740992`, `10000000000000000`, `100000000000000000000` and `1e+21`, and `canonical.loads` reads each back
+  as that `float`. Given text with `NaN`, a duplicate key, or an integer literal outside ±(2^53 − 1) that does not
+  convert exactly to a finite float64 (for example `9007199254740993`), when parsed with `canonical.loads`, then
+  `CanonicalJsonError`. Test: `test_canonical.py::test_rejects_non_json_values`,
+  `test_canonical.py::test_large_integral_floats`.
+- AC4. Given any JSON value built by Hypothesis (floats drawn to include integral values at and above 2^53), when
+  serialized, parsed with `canonical.loads` and serialized again, then the bytes are identical, and `payload_sha256`
+  is the SHA-256 of those bytes in lowercase hex. Test:
   `tests/property/test_canonical_props.py::test_round_trip_is_stable`.
 - AC5. Given a `SeededIdSource(seed=b"t", clock=FixedClock(...))`, when it generates three ids, then they equal the
   recorded fixture values, each matches `^res_[0-7][0-9A-HJKMNP-TV-Z]{25}$`, and they sort in generation order. Test:
@@ -96,9 +102,15 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC14. Given a location probe (fake) that classifies the workspace as `network`, `cloud_synced` or `unknown`, when
   the store opens, then `PRECONDITION_FAILED` (`local_workspace`) with a hint naming the classification. Test:
   `test_workspace.py::test_refuses_non_local`.
-- AC15. Given the Windows probe on a Windows runner, when it classifies a local temporary folder, a UNC path and a
-  folder under the `OneDrive` environment folder, then it returns `local`, `network` and `cloud_synced`. Test (marked
-  `windows`, runs in the Windows CI job): `tests/windows/test_windows_probe.py::test_classifications`.
+- AC15. Given the Windows probe on a Windows runner, when it classifies a local temporary folder (which exercises the
+  real "not under a sync root" result of the Cloud Files API), a UNC path and a folder under the `OneDrive`
+  environment folder, then it returns `local`, `network` and `cloud_synced`. Test (marked `windows`, runs in the
+  Windows CI job): `tests/windows/test_windows_probe.py::test_classifications`.
+- AC15a. Given the Windows probe rules over a fake Windows API (any OS), when the sync-root query returns success or
+  `ERROR_MORE_DATA`, then `cloud_synced`; when it returns `ERROR_CLOUD_FILE_NOT_UNDER_SYNC_ROOT`, or `cldapi.dll` or
+  its entry point is missing, then the remaining rules decide (`local` for a fixed drive without markers); when it
+  returns any other code, or `GetDriveTypeW` or `GetFileAttributesW` fails, then `unknown`. Test:
+  `tests/unit/test_windows_probe_rules.py::test_result_code_mapping`.
 - AC16. Given a payload, when `ResultStore.put` returns, then
   `<workspace>/.eng/results/<yyyy>/<mm>/<dd>/<result_id>.json` exists (date from the ULID, UTC), its bytes are the
   canonical JSON of the record, no temporary file remains, and `get` returns an equal record. Test:
@@ -117,6 +129,10 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC21. Given a payload that does not validate against its kind's schema, or a kind that is not in the store's kind
   registry, when `put` runs, then `INVALID_ARGUMENT` and nothing is written. Test:
   `test_store.py::test_payload_validated_against_kind`.
+- AC21a. Given a `verdicts.set/1` payload whose code-pack verdict has `trace_ref: "#/traces/0"`, when it is stored with
+  `put`, the verdict's reference is rebased onto the returned `result_id` with `rebase_local_ref`, and the result is
+  resolved through `resolve_ref`, then the value equals the stored trace and the hash of the payload does not depend
+  on the `result_id`. Test: `test_store.py::test_verdict_trace_ref_end_to_end`.
 - AC22. Given a model state at revision 3, when `ModelStateStore.increment(model_id, expected_revision=3)` runs, then
   the state is revision 4; with `expected_revision=2`, then `CONFLICT` and the state is unchanged. Test:
   `tests/unit/test_model_state.py::test_increment_compare_and_set`.
@@ -159,9 +175,16 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
   `test_units_props.py::test_single_rounding`.
 - AC34. Given `Quantity(450, "mm")`, when any arithmetic operator, `float()`, `int()`, `round()`, `abs()` or unary
   minus is applied, then `TypeError`. Test: `tests/unit/test_quantity.py::test_no_arithmetic`.
-- AC35. Given `Quantity(1, "in")` and `Quantity(25.4, "mm")`, when compared, then they are equal and `<` is false both
-  ways; given `Quantity(1, "kN")` and `Quantity(1, "mm")`, then `==`, `<`, `<=`, `>`, `>=` raise `TypeError`; a
-  `Quantity` compared with a plain number raises `TypeError`. Test: `test_quantity.py::test_comparisons`.
+- AC35. Given `Quantity(1, "in")` and `Quantity(25.4, "mm")`, when compared, then they are equal, have equal hashes,
+  and `<` is false both ways; given `Quantity(1, "kN")` and `Quantity(1, "mm")`, then `<`, `<=`, `>`, `>=` raise
+  `TypeError` and `==` is `False`; a `Quantity` ordered against a plain number or `None` raises `TypeError`, and `==`
+  against them is `False`; `bool(Quantity(...))` raises `TypeError`. Given `Quantity(180, "deg")` and
+  `Quantity(math.pi, "rad")`, when they compare equal, then their hashes are equal. Test:
+  `test_quantity.py::test_comparisons`, `test_quantity.py::test_hash_consistent_with_eq`.
+- AC35a. Given two `Verdict`s that differ only in that one has `demand: null` and the other a `Quantity`, or whose
+  demands have different dimensions, when compared with `==`, then the result is `False` and nothing is raised; two
+  verdicts that differ only in holding `1 in` and `25.4 mm` compare equal. Test:
+  `tests/unit/test_verdicts.py::test_model_equality`.
 - AC36. Given random quantity pairs of one dimension (Hypothesis), when compared, then the ordering is total and
   consistent with exact conversion to the canonical unit. Test:
   `tests/property/test_quantity_props.py::test_order_consistent`.
@@ -194,7 +217,9 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 
 - AC44. Given a verdict with `status: PASS` and `ratio > ratio_limit`, or `FAIL` and `ratio <= ratio_limit`, or
   `demand` and `capacity` of different dimensions, or `source: code_pack` without `trace_ref`, when validated, then
-  validation fails. Test: `tests/unit/test_verdicts.py::test_consistency_rules`.
+  validation fails; given a `verdicts.set/1` payload with a full `res_…` trace reference, or a local reference whose
+  index is not less than the number of traces, then validation fails. Test:
+  `tests/unit/test_verdicts.py::test_consistency_rules`, `tests/contract/test_kinds.py::test_verdict_set_trace_refs`.
 - AC45. Given a `check_model` summary with `errors: 0` and `clean: false`, or an `issues.model_check/1` payload whose
   counts differ from its issues, when validated, then validation fails. Test: `tests/unit/test_issues.py::test_summary`.
 - AC46. Given each neutral kind of §4.10, when a valid fixture and each invalid fixture of that kind (one per rule) are
@@ -212,6 +237,10 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC49. Given a success and a failure envelope, when mapped to a tool result, then `structuredContent` equals the
   envelope's JSON form, `isError` is `not ok`, and `content` is one text block holding the canonical JSON; mapping back
   returns an equal envelope. Test: `tests/unit/test_mcp.py::test_round_trip`.
+- AC49a. Given `output_schema()`, when inspected, then its top level has `"type": "object"`, and the success and
+  failure envelope examples of 04 §1 (their abbreviated ids such as `mdl_01JB6...` replaced by full 26-character
+  ids, recorded in `tests/data/envelopes/`) validate against it with a Draft 2020-12 validator (test-only dependency
+  `jsonschema`); an object with `"ok": "yes"` does not. Test: `test_mcp.py::test_output_schema_is_object`.
 - AC50. Given a tool result without `structuredContent` (a server that does not speak the contract), when
   `extract_raw_reply` runs, then it returns `is_error`, the text blocks and any JSON parsed from them, and
   `tool_result_to_envelope` raises `NotAnEnvelope`. Test: `test_mcp.py::test_raw_reply`.
@@ -239,13 +268,13 @@ nothing outside this package imports it (03 §3 rule 2). The public list is also
 | Module | Public names |
 |---|---|
 | `eng_contract` | `CONTRACT_VERSION = "eng-contract/1"`, `UNITS_VERSION = "canonical/1"`, `__version__` |
-| `eng_contract.canonical` | `canonical_json(value) -> bytes`, `payload_sha256(value) -> str`, `CanonicalJsonError` |
+| `eng_contract.canonical` | `canonical_json(value) -> bytes`, `loads(data) -> JsonValue`, `payload_sha256(value) -> str`, `CanonicalJsonError` |
 | `eng_contract.ids` | `ResultId`, `ModelId` (annotated `str` types), `IdSource` (protocol), `SystemIdSource`, `SeededIdSource`, `Clock` (protocol), `SystemClock`, `FixedClock`, `new_result_id`, `new_model_id`, `ulid_timestamp_ms`, `IdOverflowError`, `Timestamp` |
 | `eng_contract.errors` | `ErrorCode`, `WarningCode`, `Precondition`, `ErrorDetail`, `ContractWarning`, `ContractError`, `RETRY_RULES` |
 | `eng_contract.envelope` | `Provenance`, `HostInfo`, `FileSource`, `RefInput`, `LiteralInput`, `SuccessEnvelope`, `FailureEnvelope`, `Envelope`, `make_success`, `make_failure`, `SUMMARY_LIMIT_BYTES`, `INLINE_DATA_LIMIT_BYTES` |
 | `eng_contract.records` | `ResultRecord`, `PAYLOAD_SPLIT_BYTES` |
 | `eng_contract.store` | `Workspace`, `resolve_workspace`, `LocationClass`, `LocationProbe` (protocol), `FakeLocationProbe`, `default_location_probe`, `ResultStore`, `ModelStateStore`, `ModelState`, `StoreWriteError`, `StoreIntegrityError` |
-| `eng_contract.refs` | `Ref`, `RefString`, `parse_ref`, `JsonPointer`, `RefRule`, `RecordSource` (protocol), `resolve_ref`, `ResolvedRef` |
+| `eng_contract.refs` | `Ref`, `RefString`, `LocalTraceRef`, `rebase_local_ref`, `parse_ref`, `JsonPointer`, `RefRule`, `RecordSource` (protocol), `resolve_ref`, `ResolvedRef` |
 | `eng_contract.units` | `Dimension`, `Unit`, `QuantityKind`, `UNITS`, `QUANTITY_KINDS`, `unit`, `convert`, `convert_exact`, `kind_for_field`, `CsiUnitSystem`, `csi_unit_system`, `UnitError`, `UnitGapError` |
 | `eng_contract.quantity` | `Quantity`, `LabeledQuantity` |
 | `eng_contract.cited` | `Cited` |
@@ -276,6 +305,10 @@ No module holds global mutable state; registries are immutable mappings built at
 | `KindName` | `str`, pattern `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+/[1-9][0-9]{0,3}$` (§4.10.1) |
 | `FieldPath` | `str` naming an input field: `name ( "." name | "[" index "]" )*`, `name` = `[A-Za-z_][A-Za-z0-9_]*`, `index` = `0` or `[1-9][0-9]*`; max 512 |
 | `Sha256Hex` | `str`, pattern `^[0-9a-f]{64}$` |
+
+Homes: `ResultId`, `ModelId` and `Timestamp` in `ids`; `FieldPath`, `Sha256Hex` and `KindName` in the internal
+`_types` module (built with `errors`, plan T2, because envelopes need `KindName` before the kinds task); `kinds`
+re-exports `KindName` as its public name.
 
 #### 4.2.2 Provenance
 
@@ -325,6 +358,20 @@ records carry no personal paths), `sha256` (`Sha256Hex`), `size_bytes` (`int`, �
 `ContractError(Exception)` carries one `ErrorDetail` (`.detail`); its constructor takes the code and fields and fills
 `retryable` from `RETRY_RULES` unless the rule is `depends`, where the caller must pass it. Library functions raise
 `ContractError` (or a subclass listed in this spec, each with a fixed code); they never return `None` on failure.
+Because every module raises these, `errors` is the first module built after the skeleton (plan T2) and imports no
+other module of this package. The subclasses and their fixed codes:
+
+| Exception | Module | Code |
+|---|---|---|
+| `CanonicalJsonError` | `canonical` | `INVALID_ARGUMENT` (the value is not in the JSON data model of §4.3.1) |
+| `IdOverflowError` | `ids` | `LIMIT_EXCEEDED` (the overflow case of the ULID monotonic rule, ulid/spec; not transient within the same millisecond) |
+| `UnitError`, and its subclass `UnitGapError` | `units` | `UNIT_MISMATCH` |
+| `StoreWriteError`, `StoreIntegrityError` | `store` | `INTERNAL` (§4.5.3; `incident_id` is passed by the raiser, a fresh ULID from its `IdSource`) |
+| `NotAnEnvelope` | `mcp` | `INVALID_ARGUMENT` |
+| `KindNotRegistered` | `kinds` | `INVALID_ARGUMENT` |
+
+`ContractDefinitionError` (§5) is not a `ContractError`: it reports a programming error at class definition, never a
+tool failure.
 
 #### 4.2.4 Warnings
 
@@ -382,6 +429,16 @@ Rules (validators):
 Models are serialized with `model.model_dump(mode="json", by_alias=True, exclude_none=False)` and then
 `canonical_json`. `payload_sha256(payload)` is `hashlib.sha256(canonical_json(payload)).hexdigest()`.
 
+`canonical.loads(data: bytes) -> JsonValue` is the only parser used on canonical bytes (the store, references and
+tests use it; never `json.loads` directly or Pydantic's `model_validate_json`) **[added]**. It is `json.loads` over
+UTF-8 with these hooks: `parse_constant` rejects `NaN`, `Infinity` and `-Infinity`; `object_pairs_hook` rejects a
+duplicate key; `parse_int` returns an `int` when the literal is within ±(2^53 − 1), and otherwise a `float` when
+`float(n) == n` exactly (rule 4 writes an integral float of 2^53 or more in this form), else raises
+`CanonicalJsonError`. `parse_float` is left as `float` (shortest round-trip digits read back exactly). So for every
+value `v` that `canonical_json` accepts, `canonical_json(loads(canonical_json(v))) == canonical_json(v)` (AC4), and a
+record read from disk re-hashes to the stored `payload_sha256`. A Python `int` of 2^53 or more passed to
+`canonical_json` is still rejected (rule 4): producers that hold such a number as an integer have a bug.
+
 #### 4.3.2 ULIDs
 
 The ULID text form (ulid/spec, github.com/ulid/spec): 26 Crockford base32 characters (alphabet
@@ -436,23 +493,40 @@ the harness, not by this package).
 `default_location_probe()` returns the Windows probe on Windows and the POSIX probe elsewhere. `FakeLocationProbe`
 (public, for consumers' tests) returns a configured class per path prefix.
 
-Windows probe (`_probe_windows`, standard library `ctypes` only):
+Windows probe (`_probe_windows`, standard library `ctypes` only). The rules are a pure function over a small
+internal `WinApi` port (`drive_type(root)`, `file_attributes(path)`, `sync_root_status(path)`); the real port calls
+`ctypes`, and a fake port lets AC15a test every rule on any OS. Rules, in order, first match wins:
 
 1. A UNC path (`\\server\share`, including `\\?\UNC\`) is `NETWORK`.
 2. `GetDriveTypeW` of the path's root: `DRIVE_REMOTE` is `NETWORK`; `DRIVE_FIXED` and `DRIVE_RAMDISK` continue;
-   anything else (removable, CD-ROM, unknown, no root) is `UNKNOWN`.
-3. `CLOUD_SYNCED` if the path is inside a folder named by the environment variables `OneDrive`, `OneDriveCommercial`
-   or `OneDriveConsumer`, or if `CfGetSyncRootInfoByPath` (Windows Cloud Files API, `cldapi.dll`) succeeds for the
-   path (a sync root of any cloud-files provider), or if the folder's attributes include
+   anything else (removable, CD-ROM, `DRIVE_UNKNOWN`, `DRIVE_NO_ROOT_DIR`) is `UNKNOWN`.
+3. The path is inside a folder named by the environment variable `OneDrive`, `OneDriveCommercial` or
+   `OneDriveConsumer`: `CLOUD_SYNCED`.
+4. `GetFileAttributesW` of the folder: `INVALID_FILE_ATTRIBUTES` (the call failed) is `UNKNOWN`; any of
    `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`, `FILE_ATTRIBUTE_RECALL_ON_OPEN`, `FILE_ATTRIBUTE_PINNED` or
-   `FILE_ATTRIBUTE_UNPINNED`. The numeric values of these constants are taken from the Microsoft Win32 documentation
-   ("File Attribute Constants", "GetDriveTypeW") and cited next to their definitions in code; they are not engineering
-   values.
-4. Otherwise `LOCAL`. A failing API call gives `UNKNOWN` (refused), never `LOCAL`.
+   `FILE_ATTRIBUTE_UNPINNED` set is `CLOUD_SYNCED`.
+5. Sync-root query: `CfGetSyncRootInfoByPath` (Windows Cloud Files API, `cldapi.dll`) for the folder, with
+   `CF_SYNC_ROOT_INFO_BASIC` and a buffer of `sizeof(CF_SYNC_ROOT_BASIC_INFO)`. The result maps as follows:
+   - `S_OK`, or `HRESULT_FROM_WIN32(ERROR_MORE_DATA)` (the buffer is too small, which still means the folder is under a
+     sync root): `CLOUD_SYNCED`.
+   - `HRESULT_FROM_WIN32(ERROR_CLOUD_FILE_NOT_UNDER_SYNC_ROOT)`: not a sync root; continue to rule 6.
+   - `cldapi.dll` cannot be loaded, or it has no `CfGetSyncRootInfoByPath` export: the Cloud Files API is absent, so
+     no Cloud Files sync root can exist on the machine; continue to rule 6 (rules 3 and 4 still caught OneDrive).
+   - Any other `HRESULT`: `UNKNOWN`.
+6. Otherwise `LOCAL`. No other failure ever yields `LOCAL`.
+
+The numeric values of these constants (drive types, file attributes, `S_OK`, the two Win32 error codes and the
+`HRESULT_FROM_WIN32` mapping) are taken from the Windows SDK headers (`winbase.h`, `winnt.h`, `winerror.h`) and the
+Microsoft Win32 documentation pages "GetDriveTypeW", "File Attribute Constants", "CfGetSyncRootInfoByPath" and "System
+Error Codes", cited next to each definition in code; they are software constants, not engineering values. This spec
+deliberately does not state them: the T13 author copies them from the headers, and AC15 on a real Windows runner
+proves the "not under a sync root" code (a wrong value classifies the local temporary folder as `UNKNOWN` and fails
+the test).
 
 POSIX probe (`_probe_posix`, for development and Linux CI): reads `/proc/self/mountinfo` when present and classifies
 mounts of type `nfs`, `nfs4`, `cifs`, `smb3`, `smbfs`, `afs`, `fuse.sshfs`, `9p` as `NETWORK`; otherwise `LOCAL`; if
-the file cannot be read, `LOCAL` (POSIX is not a production platform, 17 §3).
+the file cannot be read, `LOCAL` (POSIX is used for development and CI only; the platform is tested on the owner's
+Windows machine, ADR-0028).
 
 #### 4.5.3 ResultStore API
 
@@ -462,7 +536,7 @@ sleep: Callable[[float], None] = time.sleep)`.
 | Method | Behavior |
 |---|---|
 | `put(kind, payload, producer, parents=(), complete=True) -> ResultRecord` | Validates `payload` against `kinds[kind]` (else `INVALID_ARGUMENT`; unregistered kind: `INVALID_ARGUMENT`); checks every parent exists (else `REF_NOT_FOUND`); assigns `result_id` and `created_at`; computes the hash; writes per §4.5.4 |
-| `get(result_id) -> ResultRecord` | Reads, validates the record model, loads the gzip payload if split, verifies `payload_sha256` (else `StoreIntegrityError`); `REF_NOT_FOUND` if missing |
+| `get(result_id) -> ResultRecord` | Reads the bytes, parses them with `canonical.loads` (§4.3.1), validates the record model, loads the gzip payload if split (also with `canonical.loads`), verifies `payload_sha256` by re-serializing the parsed payload (else `StoreIntegrityError`); `REF_NOT_FOUND` if missing |
 | `exists(result_id) -> bool` | |
 | `payload(result_id) -> dict` | `get(...).payload` with the split payload loaded |
 
@@ -532,7 +606,7 @@ failure is `REF_POINTER_INVALID` with `field` and the failing token in `received
 `resolve_ref(ref, rule: RefRule, source: RecordSource, current_revision: Callable[[ModelId], int | None]) ->
 ResolvedRef`.
 
-`RefRule` (built from the parameter's metadata, §4.8): `kinds` (set of accepted `KindName`, may be empty = any),
+`RefRule` (built from the parameter's metadata, §5): `kinds` (set of accepted `KindName`, may be empty = any),
 `unit` (the parameter's canonical unit symbol, or null), `stale_ok` (`bool`).
 
 Steps, first failure wins:
@@ -558,6 +632,17 @@ Steps, first failure wins:
 
 `ResolvedRef`: `ref` (`RefString`), `value` (`JsonValue`), `record_kind`, `result_id`, `model_id` and
 `model_revision` (or null). Provenance records `ref`, never `value`.
+
+#### 4.6.3 Local trace references **[added]**
+
+A payload cannot contain its own `result_id`: `ResultStore.put` assigns the id after the payload is validated and
+hashed (§4.5.3). A reference from inside a payload to another part of the same payload is therefore written as a
+`LocalTraceRef`: `str`, pattern `^#/traces/(0|[1-9][0-9]*)$`, an RFC 6901 pointer (JSON string form, §4.6.1) into
+the containing payload. `rebase_local_ref(result_id, local) -> RefString` returns `f"{result_id}{local}"`, which
+`resolve_ref` then handles like any reference. `resolve_ref` itself never accepts a `LocalTraceRef` (it is not a
+`RefString`): a consumer reading a verdict out of record `R` rebases its `trace_ref` onto `R` first. Producers that
+surface a verdict in an envelope summary rebase it the same way, so callers only ever see the 04 §5.1 form. This keeps
+`payload_sha256` independent of the `result_id`, and `put` needs no pre-allocated id.
 
 ### 4.7 Units (`canonical/1`, 04 §4)
 
@@ -599,11 +684,11 @@ wins over `_kN`); `_ratio` and names without a known suffix return `dimensionles
 Each `Unit` has a symbol, a dimension, an exact factor to the coherent SI unit of its dimension (m, kg, s, rad; K
 intervals for temperature) as a `Fraction`, a power of π (0 except for `rad`-based factors), and an offset (temperature
 only). Base entries are defined from the cited documents; every other entry is a product of base entries with integer
-exponents, computed exactly at import (no hand-typed derived factors). The implementer of T3 checks each citation
+exponents, computed exactly at import (no hand-typed derived factors). The implementer of T5 checks each citation
 against the document and records edition and page in `docs/verification/units.md`; an entry whose definition cannot be
 confirmed in the cited document is removed and reported as a gap, never guessed. The defining values below are the
 well-known exact definitions; the table and section numbers were written from the documents' structure, not checked
-line by line, and are confirmed in T3 (gap G-4).
+line by line, and are confirmed in T5 (gap G-4).
 
 | Entry | Definition | Source |
 |---|---|---|
@@ -662,13 +747,25 @@ Rules (11 §3 rule 2):
    `__rtruediv__`, `__floordiv__`, `__mod__`, `__pow__`, `__neg__`, `__pos__`, `__abs__`, `__round__` raise
    `TypeError`; `__float__`, `__int__`, `__index__` and `__bool__` are not usable (raise `TypeError`), so a quantity
    cannot silently become a number. The value is reachable only as `.value`, which code-pack and calc code use
-   explicitly.
-2. Comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`) only with another `Quantity` of the same dimension; otherwise
-   `TypeError` (never `False` or `NotImplemented`, so a mistake cannot pass silently). Both sides are converted
-   exactly to the coherent SI value (`Fraction(value) × factor`, plus offset) and compared as fractions; when the π
-   powers differ, both are converted to float64 first.
-3. `__hash__` is consistent with `==` (hash of the exact SI value and the dimension).
-4. `Quantity.to(symbol) -> Quantity` converts through `units.convert`; `Quantity.canonical(kind)` converts to the
+   explicitly. Validators test an optional quantity with `is not None`, never by truth value.
+2. Ordering (`<`, `<=`, `>`, `>=`) only with another `Quantity` of the same dimension; against anything else
+   (a number, `None`, a `Quantity` of another dimension) `TypeError`, never `False` or `NotImplemented`, so a threshold
+   mistake cannot pass silently (11 §3 rule 2).
+3. Equality (`==`, `!=`) is physical between two `Quantity` objects of the same dimension. A `Quantity` of another
+   dimension is unequal (`False`, no exception), and any other object (a number, `None`) returns `NotImplemented`, so
+   Python's fallback gives `False`. Reason: Pydantic model equality compares field values with `==`, so two `Verdict`
+   or kind payloads holding `None` against a `Quantity`, or a force against a moment, must compare unequal rather
+   than raise (AC35a). Comparing a quantity with a bare number in block or calc code is still a defect: the
+   `eng-dev-gate` lint rejects it (owner queue item, not this package's code).
+4. Comparison key: each side is converted to its coherent SI value `r = Fraction(value) × factor + offset` with its π
+   power `p`. When both π powers are equal, the keys `r` are compared as fractions (exact). When they differ (only
+   `deg` against `rad` today), both are compared as `sifloat = float(r) * math.pi ** p`, the single float64 step of
+   §4.7.4.
+5. `__hash__` is `hash((dimension, sifloat))` for every unit, π power 0 included. It is consistent with rule 3:
+   exactly equal fractions with equal π powers give the same `sifloat`, and the cross-π case compares `sifloat`
+   itself. Equality across π powers is not transitive at the last float64 bit; this is documented on the class, and
+   canonical stored data never mixes `deg` and `rad` (angles are canonical `deg`).
+6. `Quantity.to(symbol) -> Quantity` converts through `units.convert`; `Quantity.canonical(kind)` converts to the
    canonical unit of a quantity kind.
 
 `Cited` (frozen model): `value` (finite `float` or `int`), `unit` (`str` in `UNITS`; `"1"` for dimensionless),
@@ -699,7 +796,7 @@ for a data type, and a separate library would need an ADR for one model. The lin
 | `ratio_limit` | `float`, > 0, default 1.0 | 04 §5.1 (1.0 unless the design basis sets a stricter limit) |
 | `status` | `VerdictStatus` = `PASS`, `FAIL`, `NOT_APPLICABLE`, `NEEDS_ENGINEER`, `ERROR` | |
 | `governing` | `bool`, default `false` | |
-| `trace_ref` | `RefString` or null | Required for `code_pack` |
+| `trace_ref` | `RefString`, `LocalTraceRef` or null | Required for `code_pack`. Inside a `verdicts.set/1` payload it must be a `LocalTraceRef` (§4.10.2); a verdict carried outside a stored payload (for example in an envelope summary) uses the full `RefString` form of 04 §5.1 |
 | `assumptions` | list of `str` (each max 500), default `[]` | |
 
 Consistency: `PASS` requires `ratio` set and `ratio <= ratio_limit`; `FAIL` requires `ratio` set and
@@ -771,7 +868,7 @@ them).
 | `forces.story_drifts/1` | `rows`: list of `{story, case: CaseRef, direction: "X" or "Y", drift_ratio (≥ 0), point: str or null, x_mm, y_mm, z_mm: float or null}` |
 | `basis.design_basis/1` | `template`: `{name, version, sha256}` or null; `fields`: `dict[str, BasisField]` keyed by dotted path (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, for example `limits.drift_ratio`). `BasisField`: `value` (`JsonValue`), `unit` (`str` in `UNITS` or null; must match the suffix of the last path segment when it has one), `source` (13 §3: `template:<name>@<version>`, `engineer:<name>@<Timestamp>` or `model:<RefString>`), `confirmed` (`bool`), `citation` (`str` or null; required when `source` is `template:*`, 13 §2) |
 | `basis.engineer_input/1` | `step`: `str` (the step path that asked); `fields`: `dict[str, {value, unit, entered_by: str, entered_at: Timestamp}]` |
-| `verdicts.set/1` | `verdicts`: list of `Verdict`; `traces`: list of `Trace` (a verdict's `trace_ref` points into this list, as `res_…#/traces/<n>`, 04 §5.1); `counts`: per `VerdictStatus` (must match); `draft: bool` (outputs of draft checks are watermarked, 10 §4) |
+| `verdicts.set/1` | `verdicts`: list of `Verdict`; `traces`: list of `Trace`; every non-null `trace_ref` is a `LocalTraceRef` `#/traces/<n>` with `n` less than the number of traces (§4.6.3; a full `res_…` reference is rejected, so the set is self-contained); `counts`: per `VerdictStatus` (must match); `draft: bool` (outputs of draft checks are watermarked, 10 §4) |
 | `issues.model_check/1` | `summary`: `CheckModelSummary`; `issues`: list of `ModelIssue`; counts must match |
 
 The design-basis pointer rule: `ctx.basis.ref("limits.drift_ratio")` is `res_<basis id>#/fields/limits.drift_ratio/value`
@@ -796,7 +893,12 @@ Plain dicts only; no import of the MCP SDK.
   `structured` (`dict` or null), `texts` (list of the `text` of every `type: text` block), `json_texts` (each text that
   parses as JSON, parsed; others skipped). Non-text blocks are counted in `other_blocks`. Adapters build envelopes from
   it; this package never interprets server-specific content.
-- `output_schema() -> dict`: the JSON Schema of `Envelope`, for tools' `outputSchema`.
+- `output_schema() -> dict`: for tools' `outputSchema`, which MCP requires to be an object schema. The result is
+  `{"type": "object", "required": ["contract", "ok"], "properties": {"contract": {"const": "eng-contract/1"}, "ok":
+  {"type": "boolean"}}, "oneOf": [{"$ref": "#/$defs/SuccessEnvelope"}, {"$ref": "#/$defs/FailureEnvelope"}],
+  "$defs": {...}}`, where `$defs` holds Pydantic's schemas of both envelopes and everything they reference (each
+  envelope schema has `"type": "object"` and its `ok` `const`), and the `$schema` keyword is
+  `https://json-schema.org/draft/2020-12/schema`. AC49a validates both 04 §1 examples against it.
 
 Annotations and timeout classes (04 §10) are the publishing server's concern; not in 0.1.
 
@@ -874,7 +976,7 @@ Validation never changes a value: no clamping, rounding or unit conversion.
   here (ADR-0024); helpers come with the first server that needs them.
 - Store cleanup command, archive, retention (04 §3.1 last bullet): a later minor version.
 - The op ledger and reconciliation (ADR-0007): server or harness concern.
-- `geom.*` kinds (a later minor version), seismic load parameters in `model.load_set` (a later kind version), grid
+- `geom.*` kinds (a later minor version), seismic load parameters in `model.load_set` (open question Q6), grid
   types other than Cartesian, non-uniform member loads, section property modifiers.
 - Temperature differences (intervals) as a quantity kind; mass and time units of CSI unit systems (G-2).
 - Any engineering logic: no calcs, checks, rounding of sizes, combinations generation.
@@ -889,7 +991,7 @@ Validation never changes a value: no clamping, rounding or unit conversion.
 | Canonical JSON differs between producers, so hashes mismatch | R2 | RFC 8785 test vectors (AC1); one implementation for every package |
 | A stale reference is accepted because the caller does not track the model | R2 | `current_revision` returning `None` is explicit at the call site; the engine passes every model it attached (11 §6 item 3); open question Q4 |
 | Workspace on OneDrive or a share corrupts records | R2, R3 | Refusal with `local_workspace` (AC14, AC15); unknown classification refused |
-| Path handling from `ENG_WORKSPACE` (file paths from input) | R3 | Absolute path required; no expansion; records hold base names only; security-reviewer lens on T8 and T10 |
+| Path handling from `ENG_WORKSPACE` (file paths from input) | R3 | Absolute path required; no expansion; records hold base names only; security-reviewer lens on T13 and T14 |
 | Pydantic behavior changes the JSON Schema between versions | R2 | Snapshot test (AC51); `uv.lock` pins Pydantic |
 | Additive fields marked **[added]** diverge from 04 | R2 | Listed in §11 for the owner; recommendation to record them in the hub by ADR |
 
@@ -897,7 +999,7 @@ Validation never changes a value: no clamping, rounding or unit conversion.
 
 | Criteria | Test layer | Location |
 |---|---|---|
-| AC1 to AC3, AC5 to AC28, AC30 to AC32, AC34, AC35, AC37 to AC45, AC49, AC50 | Unit | `tests/unit/` |
+| AC1 to AC3, AC5 to AC28 (with AC15a and AC21a), AC30 to AC32, AC34, AC35, AC35a, AC37 to AC45, AC49, AC49a, AC50 | Unit | `tests/unit/` |
 | AC4, AC29, AC33, AC36 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC46 to AC48, AC51 | Contract | `tests/contract/`, fixtures `tests/data/kinds/` |
 | AC15 | Unit, marker `windows` (runs only in the Windows CI job) | `tests/windows/` |
@@ -921,9 +1023,10 @@ New package, version 0.1.0, contract `eng-contract/1`, units `canonical/1`. Ever
 | G-1 | Meaning of `Ton` in the CSI `eUnits` names (`Ton_mm_C`, `Ton_m_C`, `Ton_cm_C`): metric tonne-force (1000 kgf) or the 2000 lbf short ton-force | Owner (from CSI documentation or a live check) | Treat as metric tonne-force only after confirmation from the CSI API documentation or a local test; until then the four systems raise `UnitGapError` and the CSI adapter refuses a model in those units |
 | G-2 | CSI mass and time units per unit system (mass as force·s²/length) | Owner, CSI adapter work | Map when the adapter reads masses; not needed by the edit cycle |
 | G-3 | Sign and axis convention of `forces.member_end/1` (host local axes 1-2-3, sign of `P`) | Owner | Record `host_local/1` = the CSI local-axis convention as documented by CSI, confirmed during S-12 and the first local run; consumers must check `sign_convention` |
-| G-4 | The table and section numbers cited in §4.7.3 (SI Brochure 9th edition Tables 2, 4, 7, 8 and §2.3.1; NIST SP 811 (2008) Appendix B.8 and §4.2.1.1) were not checked against the documents in this spec | Owner, T3 author and reviewer | T3 records page and entry for every row in `docs/verification/units.md`; a row that cannot be confirmed is removed and reported, never kept on memory |
-| Q1 | The **[added]** details (1024-byte KB, `payload_file`, `files` provenance, `op_id` on errors, `infos` count, `Subject.case`, `INTERNAL` for store failures, `INVALID_ARGUMENT` for literals under `require_refs`, ASCII unit symbols) are not in 04 | Owner | Record them in 04 through a hub ADR ("eng-contract 0.1 details"), so 04 stays the single source |
+| G-4 | The table and section numbers cited in §4.7.3 (SI Brochure 9th edition Tables 2, 4, 7, 8 and §2.3.1; NIST SP 811 (2008) Appendix B.8 and §4.2.1.1) were not checked against the documents in this spec | Owner, T5 author and reviewer | T5 records page and entry for every row in `docs/verification/units.md`; a row that cannot be confirmed is removed and reported, never kept on memory |
+| Q1 | The **[added]** details (1024-byte KB, `payload_file`, `files` provenance, `op_id` on errors, `infos` count, `Subject.case`, `INTERNAL` for store failures, `INVALID_ARGUMENT` for literals under `require_refs`, ASCII unit symbols, `canonical.loads` and its integer rule, local trace references in `verdicts.set/1`) are not in 04 | Owner | Record them in 04 through a hub ADR ("eng-contract 0.1 details"), so 04 stays the single source |
 | Q2 | `UNKNOWN` location classification is refused; this can block a valid local workspace whose drive type cannot be read | Owner | Keep refusing (safe); the hint names `ENG_WORKSPACE`; revisit after the local tests |
 | Q3 | Envelope and record models forbid unknown fields, so an older reader rejects a newer minor version's additive field | Owner | Acceptable while all packages are in one workspace and upgrade together; before the first public release, decide by ADR whether readers ignore unknown fields |
 | Q4 | `current_revision` returning `None` accepts a host reference from an untracked model | Owner | Keep, and require the engine to pass a function that knows every attached model (engine spec); untracked models are then only those never attached in the run |
 | Q5 | Should verdicts recompute `ratio = demand / capacity` as a consistency check | Owner | No: the check needs a tolerance, which is engineering content; code-pack tests own it |
+| Q6 | The phase 1 edit cycle changes seismic load parameters through a dedicated tool (18 §2), but `model.load_set/1` carries none | Owner | Define them as a harness kind (`harness.seismic_parameters/1`, owned by `eng-harness`) before phase 1's seismic step: the parameters are code- and host-specific (the host's automatic seismic load per code edition), so a neutral kind would freeze one code's fields into the contract. Promote to a neutral `model.load_set/2` or `model.seismic_*` kind only when a second host or code needs the same shape |
