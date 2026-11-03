@@ -360,8 +360,15 @@ types and the ctx API only, never I/O. Enforced by the block-module rules test (
 @block(name="apply_change_set", version=1)
 async def apply_change_set(ctx: Ctx, inp: ChangeSetInput) -> ChangeSetOutput: ...
 
-@workflow(name="model_edit_cycle", version=1, description="...", required_basis=("limits.drift_ratio",),
-          min_server_builds={"sasaah-csi-mcp": "<pinned build>"}, always_ask=("csi_unlock_model",))
+
+@workflow(
+    name="model_edit_cycle",
+    version=1,
+    description="...",
+    required_basis=("limits.drift_ratio",),
+    min_server_builds={"sasaah-csi-mcp": "<pinned build>"},
+    always_ask=("csi_unlock_model",),
+)
 async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ...
 ```
 
