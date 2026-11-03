@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 
+import pytest
 from eng_dev_gate.report import (
     CommandResult,
     Finding,
@@ -15,7 +16,7 @@ from eng_dev_gate.report import (
     escape_property,
     render,
 )
-from eng_dev_gate.results import Status
+from eng_dev_gate.results import Status, UsageError
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -79,7 +80,7 @@ def test_text_output_prints_mode_first() -> None:
 
 
 def test_awaiting_owner_notice_and_summary(tmp_path: Path) -> None:
-    """AC2: bootstrap awaiting owner prints a ::notice titled awaiting owner, appends it to the summary, status passes."""
+    """AC2: awaiting owner prints a ::notice titled awaiting owner, appends it to the summary, exits 0."""
     summary = tmp_path / "summary.md"
     finding = Finding(code="AW02", severity=Severity.AWAITING, path=".gate/gate.yml", line=None, message="needs owner")
     result = CommandResult(
@@ -120,3 +121,30 @@ def test_escaped_data_has_no_raw_specials(text: str) -> None:
     assert escaped.replace("%25", "").replace("%0D", "").replace("%0A", "").count("%") == 0
     assert escape_property(text).count(",") == 0
     assert escape_property(text).count(":") == 0
+
+
+def test_error_without_path_summary_errors_and_clean_run(tmp_path: Path) -> None:
+    """Errors without a path omit file=; no awaiting finding writes no summary; an unwritable summary is exit 2."""
+    bare = Finding(code="CF007", severity=Severity.ERROR, message="bad")
+    result = CommandResult(command="c", mode="normal", steps=[StepResult(name="s", findings=[bare])])
+    out = io.StringIO()
+    render(result, "text", out, env={"GITHUB_ACTIONS": "true", "GITHUB_STEP_SUMMARY": str(tmp_path / "s.md")})
+    assert "::error title=CF007::bad" in out.getvalue().splitlines()
+    assert not (tmp_path / "s.md").exists()
+    wait = Finding(code="AW01", severity=Severity.AWAITING, message="x")
+    waiting = CommandResult(command="c", mode="bootstrap", steps=[StepResult(name="s", findings=[wait])])
+    with pytest.raises(UsageError):
+        render(waiting, "text", io.StringIO(), env={"GITHUB_ACTIONS": "true", "GITHUB_STEP_SUMMARY": str(tmp_path)})
+
+
+def test_text_shows_location_and_skip_reason() -> None:
+    """Text lines carry path:line and the skip reason."""
+    result = CommandResult(
+        command="c",
+        mode="normal",
+        steps=[StepResult(name="a", findings=[_finding(Severity.ERROR)]), StepResult(name="b", skipped_reason="n/a")],
+    )
+    out = io.StringIO()
+    render(result, "text", out, env={})
+    assert "a/b.py:3: GC008 msg" in out.getvalue()
+    assert "b: skipped (n/a)" in out.getvalue()

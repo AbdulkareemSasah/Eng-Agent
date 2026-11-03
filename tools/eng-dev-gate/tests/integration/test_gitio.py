@@ -88,3 +88,23 @@ def test_failures_are_typed_environment_errors(repo: Repo, tmp_path: Path) -> No
         SubprocessGit(tmp_path / "not-a-repo").rev_parse("HEAD")
     with pytest.raises(GitError):
         SubprocessGit(repo.root, executable="git-does-not-exist").rev_parse("HEAD")
+
+
+@pytest.mark.parametrize(
+    ("method", "output"),
+    [
+        ("name_status", "R100\0only-one-path\0"),
+        ("name_status", "M\0"),
+        ("numstat", "1\t2"),
+        ("numstat", "1\t2\t\0old\0"),
+        ("numstat", "x\ty\tfile\0"),
+    ],
+)
+def test_malformed_git_output_is_git_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, method: str, output: str
+) -> None:
+    """Output that does not follow the documented NUL format is a GitError, never a guess."""
+    git = SubprocessGit(tmp_path)
+    monkeypatch.setattr(git, "_run", lambda *_args: output)
+    with pytest.raises(GitError):
+        getattr(git, method)("a", "b")

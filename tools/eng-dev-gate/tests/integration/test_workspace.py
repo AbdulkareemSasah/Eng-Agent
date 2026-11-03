@@ -66,3 +66,10 @@ def test_malformed_toml_is_usage_error(repo: Repo) -> None:
     repo.write({"pyproject.toml": "[tool.uv.workspace\n"})
     with pytest.raises(UsageError):
         discover_members(repo.root)
+
+
+def test_members_must_be_a_list_of_strings(repo: Repo) -> None:
+    """A malformed members value is a configuration error."""
+    repo.write({"pyproject.toml": "[tool.uv.workspace]\nmembers = 3\n"})
+    with pytest.raises(UsageError):
+        discover_members(repo.root)
