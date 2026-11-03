@@ -57,7 +57,7 @@ Tools are grouped into toolsets so a client loads only what a task needs.
 
 | Toolset | Contents | Enabled by default |
 |---|---|---|
-| `core` | Standard tools ([04](04-tool-contract.md) §8) | Always |
+| `core` | Standard tools ([04](04-tool-contract.md) §9) | Always |
 | `read` | `list_*`, `get_*`, `find_*` on model objects and definitions | Yes |
 | `file` | `open_model`, `save_model`, `save_model_as`, `create_model`, `close_model` | No |
 | `define` | Materials, sections, load patterns, combinations, stories, grids | No |
@@ -169,7 +169,7 @@ fails if the committed file differs from the generated one. Hand-written docs ex
 ## 14. Release checklist for a server
 
 - [ ] Every tool follows §3 naming and vocabulary, and belongs to a toolset within the size limits.
-- [ ] Every parameter has type, unit, bounds, and ref-capability declared ([04](04-tool-contract.md) §6).
+- [ ] Every parameter has type, unit, bounds, and ref-capability declared ([04](04-tool-contract.md) §7).
 - [ ] Every write tool supports `dry_run`, `op_id`, the op ledger, deterministic naming, change sets, dirty marking,
       and `reconcile_operation` (including `partial`).
 - [ ] Host lock, wedged state and modal-dialog watchdog are implemented and tested with the fake host.
