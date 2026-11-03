@@ -61,6 +61,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | D-5 | Fakes of the Sasaah servers are test doubles inside `tests/` (synthetic MCP servers built from the tool schemas), never shipped or installed | "Build no MCP server for a host program" applies to product code; the fakes are what the owner asked tests to run against |
 | D-6 | Subagent reviews are recorded in the pull request description (section "Review"), not as comments | Durable evidence without notifications |
 | D-7 | A spec and its plan may share one documents-only pull request, reviewed together | process/01 §4 forbids mixing specs or plans with other changes; reviewing both together keeps them consistent |
+| D-8 | B-002 (workspace root) is built from ADR-0028 §1 and process/11 directly, without a plan file | No gate tooling exists yet to verify a plan; the review still applies |
+| D-9 | A phase's specs may start once the specs of the packages it depends on are merged; its code starts when the previous phase's packages are done | Keeps the phase order (19, R4) without idling while the last tasks of a phase finish |
 
 ## 5. Problems
 
