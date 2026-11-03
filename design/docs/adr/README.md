@@ -35,3 +35,4 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0026](0026-project-lane-for-tools.md) | A project lane builds tools during live projects; the release lane runs before reuse | Accepted |
 | [0027](0027-phase-1-interface.md) | Phase 1 interface: command line, HTML approval page and run report | Accepted |
 | [0028](0028-build-v1-in-this-repository.md) | Build v1 in this repository, code-complete before live testing, in bootstrap mode; Python 3.14 | Accepted (owner, in the build prompt) |
+| [0030](0030-replay-by-step-path-and-reconciliation.md) | Replay by step path, in-flight reconciliation, durability policy, one engine per run, one Job Object per server with host programs outside it (amends ADR-0014) | Proposed |
