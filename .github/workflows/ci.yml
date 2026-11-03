@@ -1,0 +1,102 @@
+# CI skeleton (B-002). The eng-dev-gate task replaces it with the full gate.
+name: ci
+
+on:
+  pull_request:
+    branches: [main, build/v1]
+  push:
+    branches: [build/v1]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the Python version
+        id: py
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < .python-version)" >> "$GITHUB_OUTPUT"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          python-version: ${{ steps.py.outputs.version }}
+      - name: Sync
+        run: uv sync --locked --all-packages
+      - name: Format
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Types and tests
+        shell: bash
+        run: |
+          if [ -n "$(find packages tools -name '*.py' -not -path '*/.venv/*' 2>/dev/null | head -n 1)" ]; then
+            uv run mypy packages tools
+            status=0
+            uv run pytest || status=$?
+            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then exit "$status"; fi
+          else
+            echo "No Python sources under packages/ or tools/ yet; skipping mypy and pytest."
+          fi
+      - name: Spike checks
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(spikes/*/check.py)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No spikes/*/check.py found; nothing to run."
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            uv run --script "$f"
+            echo "::endgroup::"
+          done
+
+  windows:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the Python version
+        id: py
+        shell: bash
+        run: echo "version=$(tr -d '[:space:]' < .python-version)" >> "$GITHUB_OUTPUT"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          python-version: ${{ steps.py.outputs.version }}
+      - name: Sync
+        run: uv sync --locked --all-packages
+      - name: Windows tests
+        shell: bash
+        run: |
+          if [ -n "$(find packages tools -name 'test_*.py' -not -path '*/.venv/*' 2>/dev/null | head -n 1)" ]; then
+            status=0
+            uv run pytest -m windows || status=$?
+            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then exit "$status"; fi
+          else
+            echo "No tests yet; skipping."
+          fi
+      - name: Windows spike checks
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(spikes/*/windows_check.py)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No spikes/*/windows_check.py found; nothing to run."
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            uv run --script "$f"
+            echo "::endgroup::"
+          done
