@@ -30,7 +30,7 @@ Each check is one Python function plus metadata, written from the clause specifi
 |---|---|
 | `check_id` | Stable: `<pack>.<clause with underscores>.<short_name>`, for example `aci318_14.22_6_5_2.punching_stress_concrete` |
 | Metadata | Code, edition, clause numbers, a title in our own words, member types in scope |
-| Inputs | Pydantic model in canonical units; every field has physical bounds ([04](04-tool-contract.md) §6); inputs normally arrive as references |
+| Inputs | Pydantic model in canonical units; every field has physical bounds ([04](04-tool-contract.md) §7); inputs normally arrive as references |
 | Applicability | Explicit preconditions. Not applicable gives `NOT_APPLICABLE`; outside the clause's validity (for example a material strength above a clause limit) gives `NEEDS_ENGINEER`, never a silent clamp |
 | Body | Pure, deterministic, float64. No I/O, no globals, no time, no random |
 | Constants | Every numeric constant is a `Cited` value carrying its source (`Cited(0.75, "ACI 318-14 Table 21.2.1(b)")`). A CI lint rejects bare float literals in check modules |

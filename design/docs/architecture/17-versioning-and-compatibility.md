@@ -15,7 +15,7 @@ Status: Proposed · Applies to: every repository
 
 ## 2. Contract versions
 
-- `eng-contract/<major>` appears in every envelope and record ([04](04-tool-contract.md) §10).
+- `eng-contract/<major>` appears in every envelope and record ([04](04-tool-contract.md) §11).
 - Each result kind is versioned separately. Consumers declare the kind versions they accept.
 
 ## 3. Host program support

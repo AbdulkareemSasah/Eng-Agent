@@ -52,7 +52,10 @@ Success:
 | `data` | The full payload inline, only when its serialized size is at most 16 KB; otherwise `null` |
 | `complete` | `false` when the host returned partial data (P9). Consumers must not treat partial data as complete |
 | `warnings` | Non-fatal conditions, each with a warning code (§8.2) |
-| `provenance` | Tool, versions, host model identity and revision, every input as `ref` or `literal`, timing |
+| `provenance` | Tool, versions, host model identity and revision, every input as `ref` or `literal`, input files (`files`: base name, SHA-256 and size of each file a file-based result was read from, never a directory path), timing |
+
+Size limits: "KB" means 1024 bytes and "MB" means 1 048 576 bytes everywhere in this contract (summary limit 4096 bytes,
+inline `data` limit 16 384 bytes, payload split 8 388 608 bytes).
 
 Failure:
 
@@ -94,7 +97,15 @@ The store holds immutable result records. A record is written once and never mod
 - `result_id` is `res_` followed by a ULID: unique, sortable by time, safe in file names and JSON Pointers.
 - `parents` lists every result the producer read, giving a lineage graph from any verdict back to host data and the
   engineer's inputs.
-- `payload_sha256` is computed over the canonical JSON form of the payload; it is verified on read.
+- `payload` is the inline payload. A payload above the split size (§3.1) is not inline: `payload` is absent and
+  `payload_file` names the compressed file next to the record (`<result_id>.payload.json.gz`). Exactly one of the two is
+  set.
+- `payload_sha256` is computed over the canonical JSON form of the payload (in both cases); it is verified on read.
+- Canonical JSON: object keys sorted by UTF-16 code units, no whitespace, UTF-8, no `NaN` or infinity, no duplicate
+  keys, and no integer of 2^53 or more (a producer holding such a number as an integer has a bug). Bytes in the store
+  and in references are read only with `canonical.loads`, which rejects `NaN`, infinities, duplicate keys and overflow
+  (`1e400`), reads an integer literal within ±(2^53 − 1) as an integer and a larger one only if it converts exactly to
+  a finite float64, and otherwise fails. So re-serializing what was read gives the same bytes and the same hash.
 - Engineer inputs, template values and the design basis are results too (kind `basis.*`, producer `engineer`,
   `template` or `harness`), so they are referenced exactly like host data.
 
@@ -106,12 +117,15 @@ The store holds immutable result records. A record is written once and never mod
   `%LOCALAPPDATA%\eng\workspaces\default` (never the process's working directory, which MCP clients set unpredictably).
 - Runs of the harness are subfolders of the project workspace (`runs/<run_id>/`); results are shared across runs of
   the same project.
-- Results: `<workspace>/.eng/results/<yyyy>/<mm>/<dd>/<result_id>.json` (date from the ULID). Payloads above 8 MB go to
-  `<result_id>.payload.json.gz`.
+- Results: `<workspace>/.eng/results/<yyyy>/<mm>/<dd>/<result_id>.json` (date from the ULID). Payloads above 8 MB (8 388 608 bytes of canonical JSON) go
+  to `<result_id>.payload.json.gz`.
 - Writes: write to a temporary file in the same folder, flush to disk, then rename with exclusive create; renames are
   retried with backoff (antivirus scanners briefly lock new files on Windows).
 - A workspace on a cloud-synchronized folder (OneDrive and similar) or a network share is refused with
   `PRECONDITION_FAILED` (`precondition: local_workspace`): synchronization corrupts SQLite journals and races renames.
+- A failure to write a record after the retries, an id collision, or a record that is unreadable, fails its hash check
+  or shows a revision regression is a bug or a damaged store, not bad input: it is reported as `INTERNAL`
+  (never `INVALID_ARGUMENT`), with an `incident_id`.
 - Records are never deleted during a run. Cleanup is an explicit command that keeps every result referenced by a
   journal that is not archived.
 
@@ -157,7 +171,8 @@ Any input parameter declared *ref-capable* accepts either a literal or a referen
 ### 3.5 Literals and policy
 
 General MCP clients may send literals; the server records them as `literal` in provenance. A server started with
-`ENG_REQUIRE_REFS=1` rejects literals for every parameter marked `engineering_quantity`. Inside the harness this rule
+`ENG_REQUIRE_REFS=1` rejects literals for every parameter marked `engineering_quantity` with `INVALID_ARGUMENT` (the
+field is named). Inside the harness this rule
 always applies, enforced by the engine ([11](11-harness-engine.md) §6).
 
 ## 4. Canonical units (`canonical/1`)
@@ -189,6 +204,8 @@ Rules:
 2. Inside generic tables and summaries, a unit-bearing value is a quantity object `{"value": 450.0, "unit": "mm"}`.
 3. Servers never leave a host program in different units than they found it ([06](06-csi-servers.md) §5).
 4. Conversions are implemented once in `eng-contract.units` with exact factors and tests.
+5. Unit symbols on the wire are ASCII: the moment unit written `kN·m` in the table is `kN.m` in a quantity object and in
+   schema metadata (the field suffix `_kNm` is unchanged).
 
 ## 5. Verdicts and model issues
 
@@ -206,7 +223,7 @@ Verdicts have two possible sources, always labeled and never mixed silently:
   "check_id": "aci318_14.22_5_5_1.one_way_shear_concrete",
   "code": "ACI 318-14",
   "clause": "22.5.5.1",
-  "subject": {"kind": "frame", "id": "B204", "station_mm": 350},
+  "subject": {"kind": "frame", "id": "B204", "station_mm": 350, "case": "ULS-1"},
   "demand":   {"value": 412.0, "unit": "kN"},
   "capacity": {"value": 368.0, "unit": "kN"},
   "ratio": 1.12,
@@ -218,11 +235,16 @@ Verdicts have two possible sources, always labeled and never mixed silently:
 }
 ```
 
+- `subject.case` (optional text, at most 200 characters) names the governing load case or combination of a
+  force-based check.
 - `ratio` is always `demand / capacity`, computed by the code pack or the host.
 - `ratio_limit` is 1.0 unless the design basis sets a stricter project limit (for example 0.95).
 - `status` is one of `PASS`, `FAIL`, `NOT_APPLICABLE`, `NEEDS_ENGINEER` (outside the clause's scope or its assumptions
   are not met), `ERROR` (inputs could not be evaluated; details in the trace).
-- `trace_ref` points to the calculation trace. Calculation notes and reports are generated from traces and journals
+- `trace_ref` points to the calculation trace. Inside a stored `verdicts.set/1` payload, which cannot contain its own
+  `result_id`, it is a local reference `#/traces/<n>` (a JSON Pointer to the n-th trace of the same payload; a full
+  `res_...` reference is rejected there). A consumer rebases it onto the record it read (`<result_id>#/traces/<n>`);
+  every verdict that reaches an envelope summary carries the full form shown above. Calculation notes and reports are generated from traces and journals
   only; no model writes report text that contains engineering values.
 
 ### 5.2 Model issue (produced by `check_model`)
@@ -232,8 +254,8 @@ Verdicts have two possible sources, always labeled and never mixed silently:
   "message": "Joint J118 has no support and no connected frame or area." }
 ```
 
-Severity is `error`, `warning` or `info`. `check_model` returns a summary `{ "errors": 0, "warnings": 3, "clean": true }`,
-where `clean` means zero errors. Host servers report the state of the model; they never judge code compliance
+Severity is `error`, `warning` or `info`. `check_model` returns a summary `{ "errors": 0, "warnings": 3, "infos": 1, "clean": true }`,
+where `clean` means zero errors and `infos` counts the issues of severity `info`. Host servers report the state of the model; they never judge code compliance
 ([ADR-0003](../adr/0003-mcp-servers-are-pure-adapters.md)).
 
 ## 6. Neutral kinds
@@ -280,7 +302,7 @@ failure is returned; validation never "fixes" an input.
 
 | Code | Meaning | Retryable |
 |---|---|---|
-| `INVALID_ARGUMENT` | Input does not match the schema | No |
+| `INVALID_ARGUMENT` | Input does not match the schema, or is a literal for an `engineering_quantity` parameter under `ENG_REQUIRE_REFS` (§3.5) | No |
 | `OUT_OF_RANGE` | A value is outside its declared bounds | No |
 | `UNIT_MISMATCH` | A quantity has an unexpected unit | No |
 | `REF_NOT_FOUND` | The referenced result does not exist in this workspace | No |
@@ -301,7 +323,10 @@ failure is returned; validation never "fixes" an input.
 | `TIMEOUT_NO_EFFECT` | A read timed out, or a write timed out before it was sent to the host; nothing changed | Yes |
 | `TIMEOUT_UNKNOWN_OUTCOME` | A write timed out after it was sent; it may be applied fully, partly or not at all. Reconcile with the same `op_id` before anything else | Only through reconciliation |
 | `NOT_SUPPORTED_BY_VERSION` | The connected host version does not support this operation | No |
-| `INTERNAL` | A bug in the server; `incident_id` points to the log entry | No |
+| `INTERNAL` | A bug in the server, or a failed or damaged result store (§3.1); `incident_id` points to the log entry | No |
+
+`op_id` (text, at most 200 characters) is carried on `TIMEOUT_UNKNOWN_OUTCOME` and `CONFLICT` errors of write
+operations, so the caller can reconcile.
 
 A released tool never advertises an option it does not implement. "Not implemented" is not an error code.
 
