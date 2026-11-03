@@ -255,7 +255,9 @@ tasks:
       - "packages/eng-contract/tests/unit/test_store.py::test_exclusive_create"
       - "packages/eng-contract/tests/unit/test_store.py::test_large_payload_split"
       - "packages/eng-contract/tests/unit/test_store.py::test_hash_verified_on_read"
+      - "packages/eng-contract/tests/unit/test_store.py::test_corrupt_record_is_integrity_error"
       - "packages/eng-contract/tests/unit/test_store.py::test_payload_validated_against_kind"
+      - "packages/eng-contract/tests/unit/test_store.py::test_payload_stored_normalized"
       - "packages/eng-contract/tests/unit/test_store.py::test_verdict_trace_ref_end_to_end"
       - "packages/eng-contract/tests/unit/test_model_state.py::test_increment_compare_and_set"
     covers: [AC16, AC17, AC18, AC19, AC20, AC21, AC21a, AC22]
@@ -358,12 +360,13 @@ handles, because the map holds one floor per path), an empty `.gate/ratchet.json
 T1 starts after B-002 (workspace root) is merged.
 
 **T2 Errors** (spec §4.2.3, §4.2.4). Enums, `RETRY_RULES`, `ErrorDetail` validators, `ContractError`, and the
-internal `_types` module (`FieldPath`, `Sha256Hex`). It imports no other module of the package, so every later task
-can raise `ContractError` subclasses with their fixed codes (spec §4.2.3).
+internal `_types` module (`FieldPath`, `Sha256Hex`, `KindName`). `errors` imports only `_types`, and `_types` imports
+nothing from the package, so every later task can raise `ContractError` subclasses with their fixed codes (spec
+§4.2.3).
 
-**T3 Canonical JSON** (spec §4.3.1). The serializer, the number formatter, `loads` with its integer rule, and the
-hash, with the RFC 8785 sample numbers and strings as data files citing the RFC section. `CanonicalJsonError` is a
-T2 `ContractError`.
+**T3 Canonical JSON** (spec §4.3.1). The serializer, the number formatter, `loads` with its integer rule and its
+non-finite float rejection, and the hash, with the RFC 8785 sample numbers and strings as data files citing the RFC
+section. `CanonicalJsonError` is a T2 `ContractError`.
 
 **T4 Identifiers** (spec §4.3.2). ULID encoding and decoding, `SystemIdSource`, `SeededIdSource`, `FixedClock`,
 timestamps, `IdOverflowError`. Serialized after T3 like every task; it uses no T3 code.
@@ -401,7 +404,8 @@ marker and run in the Windows CI job. `docs/local-testing.md` lists what the own
 workspace on a OneDrive folder (including a Files On-Demand sync root) and on a mapped network drive is refused.
 
 **T14 Store** (spec §4.5.3 to §4.5.5). The file-system port and its fake, the atomic write protocol, retries, payload
-split, hash verification with `canonical.loads`, `ModelStateStore`, and the end-to-end trace-reference test (AC21a).
+split, payload normalization (spec §4.4), hash verification with `canonical.loads` and the wrapping of read errors
+as `StoreIntegrityError`, `ModelStateStore`, and the end-to-end trace-reference test (AC21a).
 
 **T15 MCP mapping** (spec §4.11), with `output_schema()` as an object schema (AC49a).
 

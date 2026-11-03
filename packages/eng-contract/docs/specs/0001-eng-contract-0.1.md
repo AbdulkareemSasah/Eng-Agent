@@ -58,10 +58,10 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
   non-string key, or a value that is not a JSON type (for example `Decimal`, `bytes`, `datetime`), when serialized,
   then `CanonicalJsonError` is raised. Given the floats `2.0**53`, `1e16`, `1e20` and `1e21`, then they serialize as
   `9007199254740992`, `10000000000000000`, `100000000000000000000` and `1e+21`, and `canonical.loads` reads each back
-  as that `float`. Given text with `NaN`, a duplicate key, or an integer literal outside ±(2^53 − 1) that does not
-  convert exactly to a finite float64 (for example `9007199254740993`), when parsed with `canonical.loads`, then
-  `CanonicalJsonError`. Test: `test_canonical.py::test_rejects_non_json_values`,
-  `test_canonical.py::test_large_integral_floats`.
+  as that `float`. Given text with `NaN`, a duplicate key, a number literal that overflows float64 (for example
+  `1e400` or `-1e400`), or an integer literal outside ±(2^53 − 1) that does not convert exactly to a finite float64
+  (for example `9007199254740993`), when parsed with `canonical.loads`, then `CanonicalJsonError`. Test:
+  `test_canonical.py::test_rejects_non_json_values`, `test_canonical.py::test_large_integral_floats`.
 - AC4. Given any JSON value built by Hypothesis (floats drawn to include integral values at and above 2^53), when
   serialized, parsed with `canonical.loads` and serialized again, then the bytes are identical, and `payload_sha256`
   is the SHA-256 of those bytes in lowercase hex. Test:
@@ -124,11 +124,16 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC19. Given a payload whose canonical form exceeds 8 388 608 bytes, when stored, then the record has
   `payload_file` and the gzip file holds the canonical payload; `get` returns the payload with the same hash. Test:
   `test_store.py::test_large_payload_split`.
-- AC20. Given a stored record whose payload (inline or gzip) was altered on disk, when read, then `StoreIntegrityError`
-  (mapped to `INTERNAL`) is raised. Test: `test_store.py::test_hash_verified_on_read`.
+- AC20. Given a stored record whose payload (inline or gzip) was altered on disk, or a record file rewritten on disk
+  to hold a duplicate key, a `NaN` literal, or JSON that does not validate as a `ResultRecord`, when read, then
+  `StoreIntegrityError` (mapped to `INTERNAL`, never `INVALID_ARGUMENT`) is raised. Test:
+  `test_store.py::test_hash_verified_on_read`, `test_store.py::test_corrupt_record_is_integrity_error`.
 - AC21. Given a payload that does not validate against its kind's schema, or a kind that is not in the store's kind
-  registry, when `put` runs, then `INVALID_ARGUMENT` and nothing is written. Test:
-  `test_store.py::test_payload_validated_against_kind`.
+  registry, when `put` runs, then `INVALID_ARGUMENT` and nothing is written. Given a valid payload that omits fields
+  with defaults (for example a `verdicts.set/1` verdict without `ratio_limit`), when `put` runs, then the stored and
+  returned payload has every default written out (the normalized form of §4.4), and the same payload with the defaults
+  written explicitly gives the same `payload_sha256`. Test: `test_store.py::test_payload_validated_against_kind`,
+  `test_store.py::test_payload_stored_normalized`.
 - AC21a. Given a `verdicts.set/1` payload whose code-pack verdict has `trace_ref: "#/traces/0"`, when it is stored with
   `put`, the verdict's reference is rebased onto the returned `result_id` with `rebase_local_ref`, and the result is
   resolved through `resolve_ref`, then the value equals the stored trace and the hash of the payload does not depend
@@ -358,8 +363,9 @@ records carry no personal paths), `sha256` (`Sha256Hex`), `size_bytes` (`int`, �
 `ContractError(Exception)` carries one `ErrorDetail` (`.detail`); its constructor takes the code and fields and fills
 `retryable` from `RETRY_RULES` unless the rule is `depends`, where the caller must pass it. Library functions raise
 `ContractError` (or a subclass listed in this spec, each with a fixed code); they never return `None` on failure.
-Because every module raises these, `errors` is the first module built after the skeleton (plan T2) and imports no
-other module of this package. The subclasses and their fixed codes:
+Because every module raises these, `errors` is the first module built after the skeleton (plan T2) and imports only
+the internal `_types` module of this package (for `FieldPath`); `_types` imports nothing from the package. The
+subclasses and their fixed codes:
 
 | Exception | Module | Code |
 |---|---|---|
@@ -434,7 +440,8 @@ tests use it; never `json.loads` directly or Pydantic's `model_validate_json`) *
 UTF-8 with these hooks: `parse_constant` rejects `NaN`, `Infinity` and `-Infinity`; `object_pairs_hook` rejects a
 duplicate key; `parse_int` returns an `int` when the literal is within ±(2^53 − 1), and otherwise a `float` when
 `float(n) == n` exactly (rule 4 writes an integral float of 2^53 or more in this form), else raises
-`CanonicalJsonError`. `parse_float` is left as `float` (shortest round-trip digits read back exactly). So for every
+`CanonicalJsonError`; `parse_float` converts with `float` (shortest round-trip digits read back exactly) and raises
+`CanonicalJsonError` when the result is not finite (a literal such as `1e400` overflows to an infinity). So for every
 value `v` that `canonical_json` accepts, `canonical_json(loads(canonical_json(v))) == canonical_json(v)` (AC4), and a
 record read from disk re-hashes to the stored `payload_sha256`. A Python `int` of 2^53 or more passed to
 `canonical_json` is still rejected (rule 4): producers that hold such a number as an integer have a bug.
@@ -464,7 +471,11 @@ random part. `res_` or `mdl_` is prefixed.
 
 Rules: exactly one of `payload` and `payload_file` is set; `payload_file`, when set, equals
 `<result_id>.payload.json.gz`; `payload_sha256` is over the canonical payload in both cases. The record file on disk
-is the canonical JSON of the record.
+is the canonical JSON of the record. The stored payload is the normalized form
+`kinds[kind].model_validate(payload).model_dump(mode="json", by_alias=True, exclude_none=False)`: every default is
+written out and every lax-coerced value is replaced by its validated value, so the record always validates against its
+kind, `payload_sha256` is the same for one semantic payload with or without its defaults, and JSON Pointers (§4.6) to
+defaulted fields resolve.
 
 ### 4.5 Result store (04 §3.1)
 
@@ -535,8 +546,8 @@ sleep: Callable[[float], None] = time.sleep)`.
 
 | Method | Behavior |
 |---|---|
-| `put(kind, payload, producer, parents=(), complete=True) -> ResultRecord` | Validates `payload` against `kinds[kind]` (else `INVALID_ARGUMENT`; unregistered kind: `INVALID_ARGUMENT`); checks every parent exists (else `REF_NOT_FOUND`); assigns `result_id` and `created_at`; computes the hash; writes per §4.5.4 |
-| `get(result_id) -> ResultRecord` | Reads the bytes, parses them with `canonical.loads` (§4.3.1), validates the record model, loads the gzip payload if split (also with `canonical.loads`), verifies `payload_sha256` by re-serializing the parsed payload (else `StoreIntegrityError`); `REF_NOT_FOUND` if missing |
+| `put(kind, payload, producer, parents=(), complete=True) -> ResultRecord` | Validates `payload` against `kinds[kind]` (else `INVALID_ARGUMENT`; unregistered kind: `INVALID_ARGUMENT`); replaces it with the normalized form of §4.4 (`kinds[kind].model_validate(payload).model_dump(mode="json", by_alias=True, exclude_none=False)`), which is what is hashed, stored and returned; checks every parent exists (else `REF_NOT_FOUND`); assigns `result_id` and `created_at`; computes the hash; writes per §4.5.4 |
+| `get(result_id) -> ResultRecord` | Reads the bytes, parses them with `canonical.loads` (§4.3.1), validates the record model, loads the gzip payload if split (also with `canonical.loads`), verifies `payload_sha256` by re-serializing the parsed payload (else `StoreIntegrityError`); a `CanonicalJsonError`, a gzip error or a record validation error raised on stored bytes is wrapped as `StoreIntegrityError` (`INTERNAL`), never surfaced as `INVALID_ARGUMENT`; `REF_NOT_FOUND` if missing |
 | `exists(result_id) -> bool` | |
 | `payload(result_id) -> dict` | `get(...).payload` with the split payload loaded |
 
