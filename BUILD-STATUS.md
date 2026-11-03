@@ -24,11 +24,11 @@ After a restart or a context compaction, read this file and `git log origin/buil
 |---|---|---|
 | 0 | ADR-0028, hub moved to `design/` | done (f434a41) |
 | 0 | Workspace root (`pyproject.toml`, AGENTS.md, CI skeleton, `.gate/`) | done (B-002, B-009 in review) |
-| 0 | `eng-contract` 0.1 | spec in progress |
-| 0 | `tools/eng-dev-gate` 0.1 | spec in progress |
+| 0 | `eng-contract` 0.1 | spec and plan merged (B-003); implementation queued (B-010 to B-025) |
+| 0 | `tools/eng-dev-gate` 0.1 | spec and plan merged (B-004); implementation queued (B-030 to B-055) |
 | 0 | CI workflows (all jobs of process/11 §5) | not started |
-| 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | report written; merging |
-| 0 | Spike S-10 (replay; Job Object termination) | report written; merging; Windows result pending the Windows CI job |
+| 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | done (B-005); live comparison with `tools/list` needs local test |
+| 0 | Spike S-10 (replay; Job Object termination) | done (B-006); Windows check runs in the first Windows CI job |
 | 0 | Spikes S-02 and S-04 (scripts for local runs) | queued (B-007) |
 | 1 | `eng-harness` (engine, journal, replay, ctx, CSI adapter, calcs, templates, basis, decisions, CLI, progress, approval page, run report, edit-cycle workflow) | not started |
 | 2 | `structural-codes` (core, `aci318-14`, `sbc304-2018` draft), SAFE via CSI adapter, providers (Jev shadow, PydanticAI), `design_isolated_footing` | not started |
@@ -44,13 +44,13 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 |---|---|---|---|---|---|
 | B-001 | ADR-0028; move the hub into `design/`; update affected documents | lead | — (owner decision record) | direct commit f434a41 | done |
 | B-002 | Workspace root: uv workspace, `.python-version`, README, AGENTS.md, CLAUDE.md, `.gate/`, `.github/` skeleton | sonnet, low (second attempt, P-1) | opus, low | [#7](https://github.com/AbdulkareemSasah/Eng-Agent/pull/7) | done (ea33ff9) |
-| B-003 | `eng-contract` spec and plan (draft) | opus, medium; fixes: opus, medium (2 rounds) | opus, medium (R2) | [#3](https://github.com/AbdulkareemSasah/Eng-Agent/pull/3) | in review |
-| B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high; fix: sonnet, high | opus, low | [#4](https://github.com/AbdulkareemSasah/Eng-Agent/pull/4) | in review |
-| B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium; report committed by the lead (P-2) | opus, low | [#5](https://github.com/AbdulkareemSasah/Eng-Agent/pull/5) | in review |
-| B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high; report committed by the lead (P-2) | opus, low | [#6](https://github.com/AbdulkareemSasah/Eng-Agent/pull/6) | in review |
+| B-003 | `eng-contract` spec and plan (draft) | opus, medium; fixes: opus, medium (2 rounds) | opus, medium (R2) | [#3](https://github.com/AbdulkareemSasah/Eng-Agent/pull/3) | done (e13d3c0) |
+| B-004 | `eng-dev-gate` spec and plan (draft) | sonnet, high; fix: sonnet, high | opus, low | [#4](https://github.com/AbdulkareemSasah/Eng-Agent/pull/4) | done (0bf48f4) |
+| B-005 | Spike S-12: Sasaah tool inventory from the catalog sources | sonnet, medium; report committed by the lead (P-2) | opus, low | [#5](https://github.com/AbdulkareemSasah/Eng-Agent/pull/5) | done (fbbfbec) |
+| B-006 | Spike S-10: replay of async blocks; Job Object termination | sonnet, high; report committed by the lead (P-2) | opus, low | [#6](https://github.com/AbdulkareemSasah/Eng-Agent/pull/6) | done (fe93351) |
 | B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | — | queued (wave 2) |
 | B-008 | Hub: stale 04 section references; ADR-0029 (Proposed) eng-contract 0.1 details | sonnet, medium | opus, low | — | queued (wave 2) |
-| B-009 | Root workspace members listed explicitly (D-10) | lead | opus, low | [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) | in review |
+| B-009 | Root workspace members listed explicitly (D-10) | lead | opus, low | [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) | done (fe5fea2) |
 | B-010 to B-025 | `eng-contract` 0.1, plan tasks T1 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | queued (wave 2) |
 | B-030 to B-055 | `eng-dev-gate` 0.1, plan tasks T1 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | queued (wave 2) |
 | B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
@@ -85,6 +85,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | P-2 | Subagents' write tool refuses files it treats as report files (`REPORT.md`) | The lead commits such files from the drafts the subagents return; prompts say not to work around a refusal |
 | P-3 | Worktrees are created from the lead's current folder when each agent starts, not when its workflow starts; two reviews failed while the lead's shell was outside the repository | The lead's shell stays in `/home/user/Eng-Agent` while workflows run (other folders only in subshells) |
 | P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
+| P-5 | The harness flagged the merge of B-009 as possible self-approval: the lead wrote that 3-line fix, an independent subagent reviewed it, and the merge step merged it. In bootstrap mode every pull request is opened and merged under the owner's GitHub account (no separate identities yet, OQ-2) | Lead-written changes are kept to integration fixes; the owner may re-review [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) |
+| P-6 | The merge step merged B-005 after only the Dependabot check had reported, before the CI job appeared; the content was validated by the next push run on `build/v1` (green) | The merge step now requires a pull-request workflow run for the exact head commit to succeed |
 
 ## 6. Owner queue
 
