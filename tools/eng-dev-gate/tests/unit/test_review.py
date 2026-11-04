@@ -56,6 +56,7 @@ def test_prompt_hashes_and_modes(tmp_path: Path, capsys: pytest.CaptureFixture[s
     assert _codes(capsys) == ["AW04"]
     normal = _tree(tmp_path / "n", bootstrap=False)
     assert _run(normal, "--check-prompts") == 0
+    assert _codes(capsys) == []
     assert _run(normal) == 1
     assert _codes(capsys) == ["RV002"]
 
