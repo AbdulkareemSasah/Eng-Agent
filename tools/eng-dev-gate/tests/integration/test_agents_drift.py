@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 import yaml
 from eng_dev_gate.agents import render_unit, template_version, units_of
 from support.repo import Repo
@@ -104,8 +103,7 @@ def test_drift_reports_render_errors(repo: Repo) -> None:
 def test_committed_agents_files_equal_their_rendering() -> None:
     """The AGENTS.md files of the workspace root and of this package equal what the renderer produces."""
     root = Path(__file__).resolve().parents[4]
-    if not (root / "design/process/templates/AGENTS.template.md").is_file():
-        pytest.skip("not inside the workspace")
+    assert (root / "design/process/templates/AGENTS.template.md").is_file(), "runs inside the workspace only"
     units = units_of(root)
     assert {u.output for u in units} >= {"AGENTS.md", "tools/eng-dev-gate/AGENTS.md"}
     for unit in units:
