@@ -6,10 +6,21 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "eng_harness"
 _DIRECTIVE = re.compile(r"%[aAbBcpPxX]")
+_N_FIELD = re.compile(r"\{[^{}]*:[^{}]*n\}")
 
 
 def _modules() -> list[Path]:
     return sorted(SRC.rglob("*.py"))
+
+
+def _n_spec(node: ast.AST) -> bool:
+    """True for an f-string field `{x:n}` or a string constant holding a `{:n}` replacement field."""
+    if isinstance(node, ast.Constant):
+        return isinstance(node.value, str) and _N_FIELD.search(node.value) is not None
+    if isinstance(node, ast.FormattedValue) and isinstance(node.format_spec, ast.JoinedStr):
+        tail = node.format_spec.values[-1:]
+        return any(isinstance(v, ast.Constant) and str(v.value).endswith("n") for v in tail)
+    return False
 
 
 def _violations(path: Path) -> list[str]:
@@ -33,7 +44,7 @@ def _violations(path: Path) -> list[str]:
             and len(node.args) == 2
             and isinstance(node.args[1], ast.Constant)
             and str(node.args[1].value).endswith("n")
-        ):
+        ) or _n_spec(node):
             found.append(f"{path.name}:{node.lineno} uses the n format type")
     return found
 
@@ -46,5 +57,8 @@ def test_no_locale_calls() -> None:
 
 def test_rule_detects_violations(tmp_path: Path) -> None:
     bad = tmp_path / "bad.py"
-    bad.write_text("import locale\nx = now.strftime('%A')\ny = format(1.0, 'n')\n", encoding="utf-8")
-    assert len(_violations(bad)) == 4
+    bad.write_text(
+        "import locale\nx = now.strftime('%A')\ny = format(1.0, 'n')\nz = f'{x:n}'\nw = '{:n}'.format(x)\n",
+        encoding="utf-8",
+    )
+    assert len(_violations(bad)) == 6

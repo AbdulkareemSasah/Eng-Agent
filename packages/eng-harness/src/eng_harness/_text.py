@@ -15,26 +15,20 @@ _LINE_SEPARATORS = frozenset((chr(0x2028), chr(0x2029)))
 
 
 def format_duration_ms(milliseconds: int) -> str:
-    """Format a duration given in milliseconds, by integer arithmetic.
+    """Format a duration given in milliseconds, by integer arithmetic (spec 0006 section 4.4).
 
-    Under one second the form is `850 ms`; otherwise whole seconds (the fraction is dropped) as `7 s`,
-    `2 min 05 s` or `1 h 02 min 03 s`.
+    The form is `MM:SS` below one hour and `H:MM:SS` from one hour; the sub-second fraction is dropped.
 
     Raises:
         ValueError: the duration is negative.
     """
     if milliseconds < 0:
         raise ValueError("duration is negative")
-    if milliseconds < 1000:
-        return f"{milliseconds} ms"
-    seconds = milliseconds // 1000
-    minutes, seconds = divmod(seconds, 60)
+    minutes, seconds = divmod(milliseconds // 1000, 60)
     hours, minutes = divmod(minutes, 60)
     if hours:
-        return f"{hours} h {minutes:02d} min {seconds:02d} s"
-    if minutes:
-        return f"{minutes} min {seconds:02d} s"
-    return f"{seconds} s"
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 def format_timestamp(timestamp: str) -> str:
