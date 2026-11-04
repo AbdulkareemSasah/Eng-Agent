@@ -1,4 +1,4 @@
-"""Tests of check inputs, the bounded and unbounded helpers and preconditions (plan 0001 T3; spec 0001 AC3, AC4, AC4a)."""
+"""Tests of check inputs, the bounded and unbounded helpers and preconditions (plan 0001 T3; AC3, AC4, AC4a)."""
 
 from enum import StrEnum
 from typing import Any, Literal, NoReturn
@@ -16,6 +16,7 @@ from structural_codes.inputs import CheckInputs, bounded, check_inputs_definitio
 # Structural fixtures only: the numbers are labels for the bounds machinery, not engineering data.
 _LOW = Cited(value=0, unit="mm", source="10-structural-codes synthetic lower bound")
 _HIGH = Cited(value=100, unit="mm", source="10-structural-codes synthetic upper bound")
+_ONE = Cited(value=0, unit="1", source="10-structural-codes synthetic dimensionless bound")
 
 
 class _Mode(StrEnum):
@@ -32,17 +33,15 @@ class _NoSource:
 
 
 def _validate(model: type[CheckInputs], raw: dict[str, Any]) -> dict[str, Any]:
-    validated = validate_input(
-        model, raw, source=_NoSource(), current_revision=lambda _id: None, policy=InputPolicy()
-    )
+    validated = validate_input(model, raw, source=_NoSource(), current_revision=lambda _id: None, policy=InputPolicy())
     return validated.model.model_dump()
 
 
 def test_definition_rules() -> None:
     class Good(CheckInputs):
         width_mm: float = bounded(ge=_LOW, le=_HIGH, unit="mm")
-        force_kN: float = unbounded(reason="signed reaction; no physical bound", unit="kN")
-        count: int = bounded(gt=_LOW, unit="1")
+        drift_ratio: float = unbounded(reason="signed reaction; no physical bound", unit="1")
+        count: int = bounded(gt=_ONE, unit="1")
         flag: bool = False
         mode: _Mode = _Mode.A
         kind: Literal["x", "y"] = "x"
@@ -50,10 +49,9 @@ def test_definition_rules() -> None:
     check_inputs_definition(Good)
     assert Good.model_fields["ratio_limit"].default is None
 
-    with pytest.raises(CheckDefinitionError):
-        check_inputs_definition(ParamModel)  # type: ignore[arg-type]  # B-257: the point of the test
-    with pytest.raises(CheckDefinitionError):
-        check_inputs_definition(dict)  # type: ignore[arg-type]  # B-257: the point of the test
+    for wrong in (ParamModel, dict):
+        with pytest.raises(CheckDefinitionError):
+            check_inputs_definition(wrong)
 
     with pytest.raises(CheckDefinitionError, match="width_mm"):
 
@@ -63,14 +61,14 @@ def test_definition_rules() -> None:
     with pytest.raises(CheckDefinitionError, match="names"):
 
         class NotScalar(CheckInputs):
-            names: list[float] = []
+            names: tuple[float, ...] = ()
 
     with pytest.raises(CheckDefinitionError, match="text"):
 
         class AString(CheckInputs):
             text: str = "a"
 
-    with pytest.raises(CheckDefinitionError, match="width_mm"):
+    with pytest.raises(CheckDefinitionError, match="unit"):
 
         class BadUnit(CheckInputs):
             width_mm: float = bounded(ge=_LOW, le=_HIGH, unit="m")
@@ -95,15 +93,15 @@ def test_bounded_helper_and_out_of_range() -> None:
     for bad in (100.0001, -0.0001):
         with pytest.raises(ContractError) as info:
             _validate(Section, {"width_mm": bad})
-        assert info.value.code is ErrorCode.OUT_OF_RANGE
-        assert info.value.field == "width_mm"
+        assert info.value.detail.code is ErrorCode.OUT_OF_RANGE
+        assert info.value.detail.field == "width_mm"
 
     class Exclusive(CheckInputs):
         width_mm: float = bounded(gt=_LOW, lt=_HIGH, unit="mm")
 
     with pytest.raises(ContractError) as info:
         _validate(Exclusive, {"width_mm": 0})
-    assert info.value.code is ErrorCode.OUT_OF_RANGE
+    assert info.value.detail.code is ErrorCode.OUT_OF_RANGE
 
 
 def test_ratio_limit_bounds() -> None:
@@ -111,7 +109,7 @@ def test_ratio_limit_bounds() -> None:
         pass
 
     prop = Plain.model_json_schema()["properties"]["ratio_limit"]
-    literal = next(c for c in prop["anyOf"] if c.get("type") == "number")
+    literal = prop["anyOf"][0]
     assert literal["exclusiveMinimum"] == 0
     assert literal["maximum"] == 1.0
     assert _validate(Plain, {})["ratio_limit"] is None
@@ -119,36 +117,39 @@ def test_ratio_limit_bounds() -> None:
     for bad in (0, -1, 1.01):
         with pytest.raises(ContractError) as info:
             _validate(Plain, {"ratio_limit": bad})
-        assert info.value.code is ErrorCode.OUT_OF_RANGE
+        assert info.value.detail.code is ErrorCode.OUT_OF_RANGE
 
 
 def test_unbounded_helper() -> None:
     class Load(CheckInputs):
-        force_kN: float = unbounded(reason="signed reaction; no physical bound", unit="kN")
+        drift_ratio: float = unbounded(reason="signed reaction; no physical bound", unit="1")
 
-    prop = Load.model_json_schema()["properties"]["force_kN"]
+    prop = Load.model_json_schema()["properties"]["drift_ratio"]
     assert prop["x-unbounded-reason"] == "signed reaction; no physical bound"
     assert not {"minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"} & prop.keys()
     assert prop["x-eng"]["bounds_source"] is None
-    assert _validate(Load, {"force_kN": -1e9})["force_kN"] == -1e9
+    assert _validate(Load, {"drift_ratio": -1e9})["drift_ratio"] == -1e9
 
     for blank in ("", "   ", "\n\t"):
         with pytest.raises(CheckDefinitionError):
-            unbounded(reason=blank, unit="kN")
+            unbounded(reason=blank, unit="1")
 
 
 def _always(inputs: Any, trace: Any) -> bool:
     return True
 
 
+_GOOD_PRE: dict[str, Any] = {
+    "id": "P1",
+    "outcome": Outcome.NOT_APPLICABLE,
+    "clause": "22.6.5.2",
+    "description": "d",
+    "test": _always,
+}
+
+
 def test_precondition_rules() -> None:
-    good: dict[str, Any] = {
-        "id": "P1",
-        "outcome": Outcome.NOT_APPLICABLE,
-        "clause": "22.6.5.2",
-        "description": "d",
-        "test": _always,
-    }
+    good = _GOOD_PRE
     pre = Precondition(**good)
     assert pre.outcome.value == "NOT_APPLICABLE"
     assert Outcome.NEEDS_ENGINEER.value == "NEEDS_ENGINEER"
@@ -156,3 +157,14 @@ def test_precondition_rules() -> None:
     for bad in ({"id": "p1"}, {"id": "1P"}, {"id": ""}, {"clause": ""}, {"clause": "c" * 41}, {"description": " "}):
         with pytest.raises(CheckDefinitionError):
             Precondition(**{**good, **bad})
+
+
+def test_outcome_and_union_rules() -> None:
+    with pytest.raises(CheckDefinitionError):
+        Precondition(**{**_GOOD_PRE, "outcome": "NOT_APPLICABLE"})
+    with pytest.raises(CheckDefinitionError):
+        bounded()
+    with pytest.raises(CheckDefinitionError, match="either"):
+
+        class Either(CheckInputs):
+            either: int | float = 1
