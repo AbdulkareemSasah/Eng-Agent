@@ -4,6 +4,7 @@ Expected values come from RFC 6901 (pointer syntax and evaluation, sections 3, 4
 rules of spec 4.6, not from the implementation.
 """
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -198,6 +199,20 @@ def test_ref_model() -> None:
             adapter.validate_python(bad_text)
 
 
+def test_ref_pattern_is_portable_to_ecmascript() -> None:
+    # JSON Schema patterns follow ECMA-262: no inline modifier groups such as (?s:...).
+    pattern = TypeAdapter(RefString).json_schema()["pattern"]
+    assert "(?" not in pattern.replace("(?:", "")
+    assert re.search(pattern, RID + "#/a\nb") is not None
+
+
+def test_ref_rule_unit_is_a_known_symbol() -> None:
+    assert RefRule(unit="kN/m").unit == "kN/m"
+    for bad in ("mmm", "", "x" * 33):
+        with pytest.raises(ValidationError):
+            RefRule(unit=bad)
+
+
 def test_local_trace_ref() -> None:
     adapter = TypeAdapter(LocalTraceRef)
     assert adapter.validate_python("#/traces/0") == "#/traces/0"
@@ -384,6 +399,7 @@ def test_staleness_rule() -> None:
     assert detail.retryable is False
     assert detail.field == "b_mm"
     assert detail.received == {"model_id": MID, "record_revision": 4, "current_revision": 5}
+    assert detail.expected == {"model_revision": 5}
     with pytest.raises(ContractError) as err:
         resolve(RID, strict, source, lambda _m: 5)
     assert code_of(err) is ErrorCode.REF_STALE
@@ -414,6 +430,7 @@ def test_revision_below_the_record_is_an_integrity_failure() -> None:
         detail = err.value.detail
         assert detail.code is ErrorCode.INTERNAL
         assert detail.incident_id is not None
+        assert detail.received == RID  # spec section 6: the result id
         assert detail.retryable is False
 
 
