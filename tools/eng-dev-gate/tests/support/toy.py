@@ -48,7 +48,7 @@ def root_pyproject(members: list[str]) -> str:
 def member_pyproject(name: str, *, gate_table: bool = True) -> str:
     """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name).
 
-    ``gate_table=False`` leaves out ``[tool.eng-gate]`` for tests that write their own.
+    ``gate_table`` appends a default ``[tool.eng-gate]`` table; pass False when the caller appends its own.
     """
     head = f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
     if not gate_table:
