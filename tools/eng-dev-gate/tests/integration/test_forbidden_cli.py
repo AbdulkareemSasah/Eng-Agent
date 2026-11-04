@@ -83,3 +83,15 @@ def test_policy_comes_from_the_gate_root(repo: Repo, tmp_path: Path) -> None:
     strict = repo.run(["--gate-root", str(gate), "--format", "json", "forbidden", "--all"])
     assert strict.code == 1
     assert [f["code"] for f in _findings(strict)] == ["FB001"]
+
+
+def test_part_2_rules_run_through_the_command_and_the_step(repo: Repo) -> None:
+    """FB006 (a rationale that does not forbid digits) is registered in the step, not only in the rule tuple."""
+    make_workspace(repo, ["a"], module="class Reason:\n    rationale: str = ''\n")
+    expected = [("FB006", "pkgs/a/src/a/mod.py", 2)]
+    command = repo.run(["--format", "json", "forbidden", "--package", "a"])
+    assert command.code == 1
+    assert [(f["code"], f["path"], f["line"]) for f in _findings(command)] == expected
+    step = repo.run(["--format", "json", "check", "--only", "forbidden"], {"check": make_handler()})
+    assert step.code == 1
+    assert [(f["code"], f["path"], f["line"]) for f in _findings(step)] == expected
