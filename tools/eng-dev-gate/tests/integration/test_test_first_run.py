@@ -206,8 +206,11 @@ class Editable:
         return self._real.run(argv, cwd, installed, timeout_seconds)
 
 
-def _new_package(repo: Repo) -> tuple[str, Path]:
-    """A pull request that adds the package ``pkg2`` (import name ``newpkg``) and then a test that imports it."""
+def _new_package(repo: Repo, conftest: str | None = None) -> tuple[str, Path]:
+    """A pull request that adds the package ``pkg2`` (import name ``newpkg``) and then a test that imports it.
+
+    ``conftest`` is the text of a ``pkg2/tests/conftest.py`` that the test commit adds as well.
+    """
     base = tf_repo(repo)
     workspace = (repo.root / "pyproject.toml").read_text(encoding="utf-8").replace('"pkg"', '"pkg", "pkg2"')
     config = (repo.root / "pkg/pyproject.toml").read_text(encoding="utf-8").replace("fixpkg", "newpkg")
@@ -216,13 +219,23 @@ def _new_package(repo: Repo) -> tuple[str, Path]:
         "feat: add package",
     )
     test = "from newpkg import VALUE\n\n\ndef test_n() -> None:\n    assert VALUE == 5\n"
-    repo.commit({"pkg2/tests/test_n.py": test}, "test: red")
+    files = {"pkg2/tests/test_n.py": test}
+    if conftest is not None:
+        files["pkg2/tests/conftest.py"] = conftest
+    repo.commit(files, "test: red")
     return base, repo.root / "pkg2" / "src"
 
 
 def test_new_package_hidden_at_base(repo: Repo) -> None:
     """AC27a: with the head's package importable (an editable install), a new package is still red at the base."""
     base, source = _new_package(repo)
+    result, status, errors = tf_run(repo, base, "feat: x", runner=Editable(source))
+    assert (result.code, status, errors) == (0, "pass", {})
+
+
+def test_new_package_hidden_from_conftest_at_base(repo: Repo) -> None:
+    """AC27a: a conftest.py of the test commit that imports the new package does not make the base run green."""
+    base, source = _new_package(repo, conftest="import newpkg\n")
     result, status, errors = tf_run(repo, base, "feat: x", runner=Editable(source))
     assert (result.code, status, errors) == (0, "pass", {})
 
