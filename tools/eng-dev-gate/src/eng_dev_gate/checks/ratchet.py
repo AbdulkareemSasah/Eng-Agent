@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from eng_dev_gate.agents import tracked_files
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding, load_gate_config
 from eng_dev_gate.gate_root import GateContext
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult, render
@@ -195,19 +196,23 @@ def load_recorded(path: Path) -> dict[str, dict[str, int]]:
         raise RatchetFileError(f"{path}: {error}") from error
 
 
-def _files(member: Member) -> Iterator[Path]:
-    for folder in ("src", "tests"):
-        yield from sorted((member.directory / folder).rglob("*.py"))
-    if (member.directory / "conftest.py").is_file():
-        yield member.directory / "conftest.py"
+def _files(root: Path, member: Member, tracked: list[str]) -> Iterator[Path]:
+    """Yield the tracked Python files of ``src``, ``tests`` and ``conftest.py`` of one member (spec 4.9)."""
+    base = member.directory.relative_to(root).as_posix()
+    prefix = "" if base == "." else base + "/"
+    wanted = (prefix + "src/", prefix + "tests/")
+    for path in sorted(tracked):
+        if path.endswith(".py") and (path.startswith(wanted) or path == prefix + "conftest.py"):
+            yield root / path
 
 
 def _scan(root: Path, members: list[Member], today: date) -> tuple[dict[str, dict[str, int]], list[Finding]]:
     actual: dict[str, dict[str, int]] = {}
     findings: list[Finding] = []
+    tracked = tracked_files(root)
     for member in members:
         counts = dict.fromkeys(BUCKETS, 0)
-        for file in _files(member):
+        for file in _files(root, member, tracked):
             try:
                 source = file.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError) as error:

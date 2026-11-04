@@ -91,3 +91,11 @@ def test_step_runs_in_check(repo: Repo) -> None:
     (step,) = json.loads(result.out)["steps"]
     assert step["name"] == "ratchet"
     assert [f["code"] for f in step["findings"]] == ["RT006"]
+
+
+def test_untracked_files_are_not_counted(repo: Repo) -> None:
+    """Spec 4.9: only the tracked files of a package are counted; an untracked file is ignored."""
+    make_workspace(repo, ["a"], module=SUPPRESSED)
+    repo.commit(_file(2))
+    (repo.root / "pkgs" / "a" / "src" / "untracked_module.py").write_text("z = 3  # noqa: E501 B-3\n", encoding="utf-8")
+    assert _codes(_ratchet(repo)) == []
