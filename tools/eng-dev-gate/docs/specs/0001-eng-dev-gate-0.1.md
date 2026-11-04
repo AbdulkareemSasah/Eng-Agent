@@ -570,10 +570,18 @@ The gate's pytest plugin (`-p eng_dev_gate.pytest_plugin`) loads the Hypothesis 
 when Hypothesis is installed (process/11 §3) and fails the session if any test is deselected (CV003).
 
 License check: the closure is the package's runtime dependencies and dependency groups, resolved through
-`importlib.metadata` of the active environment. Allowed (process/04 §7): MIT, BSD (2 and 3 clause), Apache-2.0, ISC, PSF,
+`importlib.metadata`. Allowed (process/04 §7): MIT, BSD (2 and 3 clause), Apache-2.0, ISC, PSF,
 MPL-2.0, taken from `License-Expression`, the `License` field or trove classifiers. `OR` needs one allowed alternative;
 `AND` needs all. Missing metadata is LC002. An exception is an entry `{distribution, license, adr}` in `.gate/gate.yml`
 whose `adr` file exists (LC003 otherwise). Workspace members are not checked.
+In pull-request context (a gate root other than the judged tree, §4.16) the closure is read from the judged
+environment, like the tests of the `tests` step: `judged_metadata.py`, a file of the base commit's package that imports
+nothing from `eng_dev_gate`, runs as `uv run --project <judged tree> --locked --all-packages --group dev python -I
+judged_metadata.py <output file>` and writes name, `License-Expression`, `License`, license classifiers and
+`Requires-Dist` of every installed distribution as JSON; the gate validates it and evaluates the policy itself. A stale
+`uv.lock` is ST001 of the step, a missing `uv` or unusable output an environment fault; the residual risk is that of
+the `tests` step (the judged lock file chooses what is installed and what its metadata says). Head runs read the
+interpreter of the gate.
 
 Generated documents: each `[[tool.eng-gate.generated]]` entry names `path`, `module` and `args`; the gate runs
 `sys.executable -m <module> <args>` in the package directory (no shell; the module must belong to a workspace
