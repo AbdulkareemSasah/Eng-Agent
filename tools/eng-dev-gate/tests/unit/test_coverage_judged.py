@@ -70,7 +70,17 @@ def test_judged_tree_report_is_made_in_the_judged_environment(repo: Repo, gate_r
     runner = Recorder()
     _judge(repo, gate_root, runner)
     json_argv, json_cwd = runner.calls[1]
-    assert json_argv[:9] == ["uv", "run", "--project", str(repo.root), "--locked", "--all-packages", "--group", "dev", "python"]
+    assert json_argv[:9] == [
+        "uv",
+        "run",
+        "--project",
+        str(repo.root),
+        "--locked",
+        "--all-packages",
+        "--group",
+        "dev",
+        "python",
+    ]
     assert json_argv[9:12] == ["-m", "coverage", "json"]
     assert not json_cwd.is_relative_to(repo.root)  # nothing of the judged tree is on the import path
 

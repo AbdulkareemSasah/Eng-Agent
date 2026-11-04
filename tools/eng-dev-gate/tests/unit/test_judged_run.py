@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import runpy
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 import pytest
@@ -12,10 +12,11 @@ from eng_dev_gate import judged_run, pytest_plugin
 
 
 @pytest.fixture(autouse=True)
-def _restore_import_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    """``main`` edits ``sys.path`` and ``sys.modules``; leave them as the session had them."""
+def _restore_import_state(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """``main`` edits ``sys.path`` and registers a module; leave both as the session had them."""
     monkeypatch.setattr(sys, "path", list(sys.path))
-    monkeypatch.setattr(sys, "modules", dict(sys.modules))
+    yield
+    sys.modules.pop(judged_run.BASE_PLUGIN, None)
 
 
 def test_base_plugin_is_loaded_from_the_base_file_under_its_own_name(tmp_path: Path) -> None:
@@ -68,7 +69,9 @@ def test_main_puts_the_working_directory_first_in_place_of_the_script_folder(
     assert script_dir not in sys.path
 
 
-def test_main_reports_a_missing_tool_as_exit_2(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_reports_a_missing_tool_as_exit_2(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setitem(sys.modules, "coverage", None)  # makes ``import coverage`` raise ImportError
     monkeypatch.setitem(sys.modules, "coverage.cmdline", None)
     assert judged_run.main(["run"]) == 2
