@@ -77,6 +77,7 @@ gate-check (§4.5)
   bootstrap mode and fails with GC006 otherwise.
 - AC9. Given a task id that the plan does not define, then GC007.
 - AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each.
+- AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
@@ -320,7 +321,10 @@ Checks, in order (all run; findings accumulate):
 5. **Task.** The task id must exist (GC007).
 6. **Scope.** Changed files come from `git diff --name-status -z -M <merge-base> <head sha>`; a rename or copy
    contributes both paths. Each path must match a glob of the task (`PurePosixPath.full_match` semantics: `*` does not
-   cross `/`, `**` matches any number of directories, matching is case-sensitive). Else GC008.
+   cross `/`, `**` matches any number of directories, matching is case-sensitive), or be the `<dir>/CHANGELOG.md` or
+   `<dir>/docs/local-testing.md` of a directory `<dir>` that is a workspace member or holds the plan
+   (`<dir>/docs/plans/`) when another changed file under `<dir>` matches a task glob: process/04 asks every task for a
+   changelog entry and process/05 for its local-testing items (amendment B-096). Else GC008.
 7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
@@ -817,7 +821,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11, AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC6 to AC11 (with AC10a), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
