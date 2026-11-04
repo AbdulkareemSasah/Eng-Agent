@@ -3,3 +3,4 @@
 ## Unreleased
 
 - Package skeleton: `pyproject.toml` with the gate configuration, workspace member, `__version__`, `py.typed`, README, rendered `AGENTS.md` and risk map (B-100).
+- Text, date and number formatting and sanitizing: `eng_harness._text` and its culture-invariance rule test (B-175).

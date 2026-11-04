@@ -16,10 +16,12 @@ def _violations(path: Path) -> list[str]:
     found: list[str] = []
     tree = ast.parse(path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
-        if isinstance(node, ast.Import) and any(a.name.split(".")[0] == "locale" for a in node.names):
-            found.append(f"{path.name}:{node.lineno} imports locale")
-        elif isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] == "locale":
-            found.append(f"{path.name}:{node.lineno} imports locale")
+        if isinstance(node, ast.Import):
+            if any(a.name.split(".")[0] == "locale" for a in node.names):
+                found.append(f"{path.name}:{node.lineno} imports locale")
+        elif isinstance(node, ast.ImportFrom):
+            if (node.module or "").split(".")[0] == "locale":
+                found.append(f"{path.name}:{node.lineno} imports locale")
         elif isinstance(node, ast.Attribute) and node.attr == "strftime":
             found.append(f"{path.name}:{node.lineno} calls strftime")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and _DIRECTIVE.search(node.value):

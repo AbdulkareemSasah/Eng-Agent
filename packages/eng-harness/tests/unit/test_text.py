@@ -37,7 +37,15 @@ def test_format_timestamp_slices_contract_timestamp() -> None:
     assert format_timestamp("2026-03-04T05:06:07.089Z") == "2026-03-04 05:06:07 UTC"
 
 
-@pytest.mark.parametrize("bad", ["2026-03-04", "2026-03-04T05:06:07Z", "", "٢٠٢٦-٠٣-٠٤T٠٥:٠٦:٠٧.٠٨٩Z"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "2026-03-04",
+        "2026-03-04T05:06:07Z",
+        "",
+        "".join(chr(0x0660 + int(d)) if d.isdigit() else d for d in "2026-03-04T05:06:07.089Z"),
+    ],
+)
 def test_format_timestamp_rejects_malformed(bad: str) -> None:
     with pytest.raises(ValueError, match="timestamp"):
         format_timestamp(bad)
