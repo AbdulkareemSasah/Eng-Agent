@@ -508,7 +508,7 @@ workstation, the CI job never uses them:
 | 10 | `tests` | package | `python -m coverage run --branch` with `-m pytest` on `tests/` and the gate's pytest plugin; coverage JSON; line and branch compared separately with the package's thresholds (CV001, CV002) |
 | 11 | `docs-fresh` | package | Generated documents (`[tool.eng-gate].generated`, GF001, GF002) and `agents drift` for the package |
 | 12 | `licenses` | package | Allowed licenses of the dependency closure (LC001 to LC003) |
-| 13 | `mutation` | package | Mutation tests on changed R1 and R2 modules (MU001, MU002) |
+| 13 | `mutation` | package | Mutation tests on changed R1 and R2 modules (MU001, MU002, MU003) |
 | 14 | `workflows` | root | §4.14 rules WF001 to WF005 |
 
 A failing tool step reports ST001 with the step, tool, exit code and the first lines of its output. Tools run with an
@@ -593,11 +593,13 @@ package) and compares its standard output with the committed file after normaliz
 Mutation: for each file changed against the merge base that matches a package `r1_modules` or `r2_modules` glob, the
 backend mutates that file and runs the package tests; the score is killed (timeouts included) over total mutants and
 must be at least `mutation_min`. The backend is chosen in the mutation task (§11 Q4); on a platform it does not support,
-the step is reported `skipped` with the reason locally and fails in CI if skipped there.
+the step is reported `skipped` with the reason locally and fails in CI if skipped there. Only changed files that hold at
+least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
+reaches); when none remain the step passes with the notice MU003 (amendment B-026).
 
 ### 4.13 agents render, keys, drift
 
-`.gate/agents.yml` exists at the workspace root and in each package (`<package>/.gate/agents.yml`):
+`.gate/agents.yml` exists at the workspace root, in each package and in any other folder that holds one: every tracked `.gate/agents.yml` of the repository is a unit, so a shared package folder that is not itself a workspace member is managed too (amendment B-026):
 
 ```yaml
 template: ../../design/process/templates/AGENTS.template.md   # relative to the directory that holds .gate/
@@ -790,7 +792,8 @@ Diagnostic codes (the contract of this tool; the package `CHANGELOG.md` lists ch
 | IM | imports | 001 to 006, §4.10 |
 | SC | secrets | 001 match · 002 file skipped |
 | CF | configuration | 001 invalid table · 002 below floor · 003 weakening setting · 004 override file · 005 rerun plugin · 006 member without table · 007 `gate.yml` invalid · 008 bootstrap off without identities · 009 judging gate is not the gate of the base commit (§4.16) |
-| CV, ST, LC, GF, MU, AG, WF | coverage, tool step, licenses, generated, mutation, agents, workflows | as named in §4.12 to §4.14; WF 001 to 005 |
+| MU | mutation | 001 score below `mutation_min` · 002 backend failed or cannot run · 003 notice: nothing to mutate, no changed file holds a function body |
+| CV, ST, LC, GF, AG, WF | coverage, tool step, licenses, generated, agents, workflows | as named in §4.12 to §4.14; WF 001 to 005 |
 
 Exit code 2 covers CF007, CF008, RF003, RT005, AG007 and unreadable inputs; exit code 3 covers TF009, TF011, MU002, GF002 and
 tool or git failures; every other error finding exits 1.

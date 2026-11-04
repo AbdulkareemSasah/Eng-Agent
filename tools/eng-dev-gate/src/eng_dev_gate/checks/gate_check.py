@@ -26,6 +26,7 @@ from eng_dev_gate.checks.gate_check_docs import (
     protected_findings,
     spec_plan_findings,
 )
+from eng_dev_gate.checks.ratchet import RATCHET_FILE, RatchetFile
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest, event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, parse_spec, safe_relative_path
@@ -139,14 +140,48 @@ def _status(doc: Spec, path: str, config: GateConfig) -> list[Finding]:
     return [_error("GC006", f"status {doc.status!r} is not acceptable; it must be approved", path)]
 
 
-def _scope(changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str]) -> list[Finding]:
+def _ratchet_counts(text: str) -> dict[str, dict[str, int]]:
+    """Counts per package directory of a baseline file; ValueError when it does not validate."""
+    return {p: {str(b): n for b, n in c.items()} for p, c in RatchetFile.model_validate_json(text).counts.items()}
+
+
+def _ratchet_in_scope(git: Git, base: str, head: str, anchors: set[str]) -> bool:
+    """True when the baseline changes only counts of packages that have a changed file in ``anchors`` (AC10b).
+
+    A package key added or removed without a count change, a reformat, another file version, a baseline that does
+    not parse, or a count of another package (a lowering included) is not in scope. The workspace root (``.``) has no
+    path ``./...`` among the anchors, so it never anchors a change.
+    """
+    try:
+        old = _ratchet_counts(git.show(base, RATCHET_FILE))
+    except PathNotFoundError:
+        old = {}  # a missing baseline records nothing
+    try:
+        new = _ratchet_counts(git.show(head, RATCHET_FILE))
+    except PathNotFoundError, ValueError:  # pydantic's ValidationError is a ValueError
+        return False
+    changed = [p for p in old.keys() | new.keys() if old.get(p) != new.get(p)]
+
+    def nonzero(counts: dict[str, dict[str, int]], package: str) -> dict[str, int]:
+        return {b: n for b, n in counts.get(package, {}).items() if n}  # a zero is the same as absent
+
+    return bool(changed) and all(
+        nonzero(old, p) != nonzero(new, p) and any(a.startswith(f"{p}/") for a in anchors) for p in changed
+    )
+
+
+def _scope(
+    changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
+) -> list[Finding]:
     """GC008 for each changed path (a rename counts both) outside the task's globs.
 
     The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
-    scope when another changed file under that directory matches a glob of the task (AC10a).
+    scope when another changed file under that directory matches a glob of the task (AC10a); so is the ratchet
+    baseline when it changes only counts of packages with such a file (AC10b).
     """
     paths = dict.fromkeys(p for change in changes for p in change.paths)
     inside = {p for p in paths if matches_any(p, task.files)}
+    anchors = set(inside)
     plan = PurePosixPath(plan_path)
     holders = [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
     for directory in holders:
@@ -156,6 +191,8 @@ def _scope(changes: list[Change], task: Task, plan_path: str, member_dirs: Seque
             for f in (prefix + n for n in _NOTES_FILES)
             if f in paths and any(q != f and q.startswith(prefix) and q in inside for q in paths)
         }
+    if RATCHET_FILE in paths and _ratchet_in_scope(git, base, head, anchors):
+        inside.add(RATCHET_FILE)
     return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
 
 
@@ -217,7 +254,7 @@ def _judge(
         return [*findings, _error("GC007", f"plan {plan_path} defines no task {task_id}", plan_path)]
     return [
         *findings,
-        *_scope(changes, task, plan_path, member_dirs),
+        *_scope(changes, task, plan_path, member_dirs, git, base, pr.head_sha),
         *_budget(entries, task, config),
     ]
 
