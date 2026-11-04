@@ -130,7 +130,7 @@ def test_verdict_definition_errors() -> None:
         t.verdict(demand="missing_kN", capacity="capacity_kN")
     with pytest.raises(CheckDefinitionError, match="missing_kN"):
         t.verdict(demand="demand_kN", capacity="missing_kN")
-    assert t.verdicts == ()
+    assert list(t.verdicts) == []
     # A refused verdict records no ratio step and leaves the name free.
     assert "ratio" not in {s.name for s in t.to_trace(outputs=[], status=None).steps}
     t.verdict(demand="demand_kN", capacity="capacity_kN")
