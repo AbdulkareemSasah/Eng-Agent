@@ -14,8 +14,9 @@ from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, field_validator
 
+from eng_dev_gate.config import ConfigError, load_package_config
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.results import UsageError
@@ -55,11 +56,40 @@ class HostSdk(_Model):
     modules: list[Name]
 
 
+class Cited(_Model):
+    """FB005 form A1 policy: names of the callables that carry a cited value."""
+
+    callables: list[Name]
+
+
+class RationalePolicy(_Model):
+    """FB006 policy: names of the types that already forbid digits."""
+
+    types: list[Name]
+
+
 class ForbiddenConfig(_Model):
-    """The whole ``.gate/forbidden.yml``; unknown keys are rejected."""
+    """The whole ``.gate/forbidden.yml``; unknown keys are rejected and no list may be left out."""
 
     escape_hatch: EscapeHatch
     host_sdk: HostSdk
+    io_modules: list[Name]
+    cited: Cited
+    rationale_policy: RationalePolicy = Field(alias="rationale")  # not named `rationale`: FB006 would flag it
+
+
+@dataclass(frozen=True)
+class ModuleGlobs:
+    """The module globs of ``[tool.eng-gate]`` (relative to the package) that select where FB004 and FB005 apply."""
+
+    check: tuple[str, ...] = ()
+    calc: tuple[str, ...] = ()
+    block: tuple[str, ...] = ()
+    rule: tuple[str, ...] = ()
+
+    def covers(self, local: str, *kinds: Literal["check", "calc", "block", "rule"]) -> bool:
+        """Return whether ``local`` (relative to its package) matches a glob of one of the module ``kinds``."""
+        return any(matches_any(local, getattr(self, kind)) for kind in kinds)
 
 
 def parse_config(text: str, source: str) -> ForbiddenConfig:
@@ -74,6 +104,9 @@ def parse_config(text: str, source: str) -> ForbiddenConfig:
         raise UsageError(f"cannot read {source}: {error}") from error
     except ValidationError as error:
         raise UsageError(f"invalid {source}: {error}") from error
+
+
+NO_MODULES = ModuleGlobs()  # a package without module globs
 
 
 def _resolve(aliases: dict[str, str], node: ast.expr) -> str | None:
@@ -113,6 +146,7 @@ class Unit:
     local: str
     tree: ast.Module
     aliases: dict[str, str]
+    modules: ModuleGlobs = NO_MODULES
 
     @property
     def in_host(self) -> bool:
@@ -139,8 +173,15 @@ class Rule:
     check: Callable[[Unit, ForbiddenConfig], list[Finding]]
 
 
-def scan_file(path: str, local: str, data: bytes, config: ForbiddenConfig, rules: Sequence[Rule]) -> list[Finding]:
-    """Parse ``data`` and run ``rules`` on it; findings are ordered by line.
+def scan_file(
+    path: str,
+    local: str,
+    data: bytes,
+    config: ForbiddenConfig,
+    rules: Sequence[Rule],
+    modules: ModuleGlobs = NO_MODULES,
+) -> list[Finding]:
+    """Parse ``data`` and run ``rules`` on it, given the ``modules`` globs of its package; findings are ordered by line.
 
     A file that does not parse gives one FB000 finding and no other.
     """
@@ -151,8 +192,20 @@ def scan_file(path: str, local: str, data: bytes, config: ForbiddenConfig, rules
         return [
             Finding(code="FB000", severity=Severity.ERROR, path=path, line=line, message=f"does not parse: {error}")
         ]
-    unit = Unit(path, local, tree, _aliases(tree))
+    unit = Unit(path, local, tree, _aliases(tree), modules)
     return sorted((f for rule in rules for f in rule.check(unit, config)), key=lambda f: (f.line or 0, f.code))
+
+
+def _module_globs(pyproject: Path) -> ModuleGlobs:
+    try:
+        table = load_package_config(pyproject)
+    except ConfigError as error:
+        if error.code == "CF006":
+            return NO_MODULES
+        raise
+    return ModuleGlobs(
+        tuple(table.check_modules), tuple(table.calc_modules), tuple(table.block_modules), tuple(table.rule_modules)
+    )
 
 
 def _python_files(directory: Path, pattern: str, base: Path) -> list[Path]:
@@ -166,8 +219,11 @@ def scan_member(
 
     Raises:
         UsageError: a file cannot be read.
+        ConfigError: the ``[tool.eng-gate]`` table of the member is invalid (CF001); a missing table is CF006 of
+            the ``config`` step and gives no module globs here.
     """
     base = member.directory
+    modules = _module_globs(base / "pyproject.toml")
     scoped = {
         "src": _python_files(base / "src", "*.py", base),
         "tests": [*_python_files(base / "tests", "*.py", base), *_python_files(base, "conftest.py", base)],
@@ -185,5 +241,5 @@ def scan_member(
             data = path.read_bytes()
         except OSError as error:
             raise UsageError(f"cannot read {path}: {error}") from error
-        findings.extend(scan_file(shown, path.relative_to(base).as_posix(), data, config, wanted[path]))
+        findings.extend(scan_file(shown, path.relative_to(base).as_posix(), data, config, wanted[path], modules))
     return findings
