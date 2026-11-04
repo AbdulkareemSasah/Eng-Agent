@@ -34,7 +34,7 @@ def test_ruff_mypy_on_toy_package(repo: Repo) -> None:
     repo.commit({"pkgs/a/src/a/mod.py": BAD_MODULE})
     bad = _check(repo, "--skip", "lock")
     assert bad.code == 1
-    assert _statuses(bad) == {"format": "fail", "lint": "fail", "types": "fail"}
+    assert _statuses(bad) == {"format": "fail", "lint": "fail", "types": "fail", "forbidden": "pass"}
     codes = {f["code"] for s in json.loads(bad.out)["steps"] for f in s["findings"]}
     assert codes == {"ST001"}
 

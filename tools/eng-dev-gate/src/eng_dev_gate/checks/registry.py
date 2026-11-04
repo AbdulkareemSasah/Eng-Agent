@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from eng_dev_gate.checks import secrets, tests_step, tool_steps
+from eng_dev_gate.checks import forbidden, secrets, tests_step, tool_steps
 from eng_dev_gate.report import Finding
 from eng_dev_gate.toolrun import ToolRunner
 from eng_dev_gate.workspace import Member
@@ -43,6 +43,7 @@ STEPS: tuple[Step, ...] = (
     Step("format", "package", tool_steps.format_),
     Step("lint", "package", tool_steps.lint),
     Step("types", "package", tool_steps.types),
+    Step("forbidden", "package", forbidden.run_step),
     Step("secrets", "root", secrets.step),
     Step("tests", "package", tests_step.tests),
 )
