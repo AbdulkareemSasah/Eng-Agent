@@ -71,6 +71,13 @@ def test_builder_refuses_bad_steps() -> None:
         trace.output("missing")
 
 
+def test_step_keeps_uses_given_as_a_one_shot_iterator() -> None:
+    trace = TraceBuilder()
+    trace.input("a", 1)
+    trace.step("s", 1, formula="a", source="rule", uses=(n for n in ["a"]))
+    assert list(trace._steps[0].uses) == ["a"]
+
+
 def test_builder_records_cited_constants(fixtures: ModuleType) -> None:
     trace = TraceBuilder()
     cited = Cited(value=2, unit="1", source="Test double source")
