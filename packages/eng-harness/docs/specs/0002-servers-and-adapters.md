@@ -220,6 +220,15 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   pin, each live tool-list fingerprint, installed host programs, the integrity level (warning when not medium), and
   the workspace class, as a table and as JSON with base names only, exit code 0 without failures and 1 with any.
   Tests: `tests/unit/test_doctor.py::test_checks_and_output`, `tests/windows/test_doctor.py::test_integrity_level`.
+- AC38. Given an allowlist or `[cli_tools.*]` entry with `release = "unreleased"` and a `release_record`, then
+  `ToolPort.unreleased_tools()` returns it with its record; an `unreleased` entry without a record, or a record on a
+  `released` entry, is refused at load; with no such entry the mapping is empty. Test:
+  `tests/unit/adapters/test_allowlist.py::test_release_marks`.
+- AC39. Given `doctor.run(..., extra_checks=[provider])` where the provider returns checks (as spec 0006 does for the
+  page binding, browser opening, console encoding, locale and calendar, its Q13), then those checks appear in the
+  table and the JSON after the checks of §4.9, a `fail` among them gives exit 1, and a provider that raises gives one
+  `fail` check naming it; and given unreleased tools (AC38), then a `warn` check lists them with their records. Test:
+  `tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools`.
 
 ## 4. Design
 
@@ -231,7 +240,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 |---|---|---|
 | `eng_harness.servers` | `ServersConfig`, `ServerConfig`, `RoleConfig`, `CliToolConfig`, `ConfigError`, `load_servers_config`, `ServerManager`, `ServerCheck` (re-export of the port type), `RecordMode` | engine wiring (0006), doctor, tests |
 | `eng_harness.adapters` | `build_ports(config, workspace, store, run_dir, clock, ids) -> AdapterPorts` (`tool_port`, `host_port`), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
-| `eng_harness.doctor` | `run(config_path, *, json_output, show_paths) -> int`, `DoctorReport`, `Check` | CLI (0006) |
+| `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=()) -> int`, `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
 
 Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
 `servers/_procinfo.py`, `servers/_transport.py`, `servers/_session.py`, `servers/_buildcheck.py`,
@@ -459,6 +468,12 @@ until a recording replaces it, then `recording`), and one `[[tool]]` entry per t
 | `confirm` | `never`, `approved` (the adapter sets `confirm: true` only for a step under an approval or an engine-inserted always-ask approval), `owned` (also needs a server-launched instance) |
 | `readback` | the read-back helper name, required for every `write` |
 | `products` | products the entry applies to (`ETABS` in v1; SAFE and SAP2000 later) |
+| `release` | `released` (default) or `unreleased` (a project-lane tool not yet through the release lane, ADR-0026 §3) **[added: spec 0006 Q5]** |
+| `release_record` | repository path of the tool's gap report or session record; required when `release` is `unreleased`, refused otherwise |
+
+`ToolPort.unreleased_tools()` (engine §4.8) returns `{name: release_record}` for every allowlisted entry and every
+`[cli_tools.*]` entry (which takes the same two keys) marked `unreleased`; the engine records it in `run_started`
+(engine §4.4.2, AC68), so a later change of the allowlist or of `harness.toml` cannot unmark a journaled run.
 
 `ToolInfo.engineering_params` are the `args_model` fields declared `engineering_quantity`; references are required
 for them (11 §6 item 2). **Escape hatches never**: the loader refuses a name in the deny list (`csi_run_script`,
@@ -773,6 +788,12 @@ Logic in `eng_harness.doctor`, registered as a subcommand by spec 0006. Checks, 
 | Workspace | `eng_contract.store.resolve_workspace` with the default location probe: `fail` unless `LOCAL` |
 | Timeouts | `warn` for a `single` topology; prints configured values beside the Sasaah default |
 | Lock directory | writable; lists lock files whose host instance no longer runs (information only) |
+| Unreleased tools | `warn` listing each `unreleased` tool and its `release_record` (§4.5.1); `ok` when none |
+
+**Extension point** **[added: spec 0006 Q13]**. `extra_checks` is a sequence of `CheckProvider`s (a `Protocol`:
+`name: str`, `checks() -> Sequence[Check]`). Spec 0006 passes its own (page binding to `127.0.0.1`, browser opening,
+console encoding, locale and calendar); their logic belongs to spec 0006. The doctor runs them after its own checks,
+in order; a provider that raises becomes one `fail` check with its name and the exception type (AC39).
 
 Output: a table, or JSON with `--json`; paths shown as base names unless `--show-paths`. Exit 0 when no check is
 `fail`, 1 otherwise.
@@ -833,7 +854,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 | Unit | `tests/unit/` |
+| AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC39 | Unit | `tests/unit/` |
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35 | Contract (inventory, recordings; markers `synthetic`, `recorded`) | `tests/contract/` |
@@ -872,6 +893,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
+| A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
 | C1 | Conflict: 11 §9 says analysis may be "started and then followed through `csi_analysis_status`"; S-12 §5 shows the call is synchronous | Owner | This spec follows S-12; amend 11 §9 and 18 step 11 (S-12 "Consequences") |
 | C2 | Conflict: 11 §9 and ADR-0008 name two excluded CSI tools; S-12 §8 finds seven, and `DisableScript` does not hide `csi_db_tables_apply` | Owner | This spec excludes all seven; amend 11 §9 and ADR-0008 |
 | C3 | The SDK's `stdio_client` on Windows assigns its job after the spawn and allows no breakaway | Owner | Not used (§2); recorded here so a later SDK upgrade is checked against it |

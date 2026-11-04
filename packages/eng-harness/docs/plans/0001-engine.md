@@ -166,7 +166,9 @@ tasks:
       - "packages/eng-harness/tests/replay/test_resume.py::test_completed_run"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_divergence_variants"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_hash_change_warns"
-    covers: [AC16, AC23, AC28, AC29, AC35]
+      - "packages/eng-harness/tests/unit/test_runner.py::test_run_class_recorded_and_checked"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_unreleased_tools_recorded"
+    covers: [AC16, AC23, AC28, AC29, AC35, AC65, AC68]
     depends_on: [T4, T5, T8]
   - id: T10
     title: ctx implementation of tool, read, calc, block, parallel, attempts, escalate
@@ -271,12 +273,14 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py"
-    max_changed_lines: 280
+    max_changed_lines: 380
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
-    covers: [AC40, AC61]
+      - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_input_request_markers"
+    covers: [AC40, AC61, AC66, AC67]
     depends_on: [T13]
   - id: T15
     title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
@@ -325,15 +329,17 @@ tasks:
     title: Runtime guard for block and rule code, and the block-module rules test
     files:
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/__init__.py"
       - "packages/eng-harness/src/eng_harness/engine/_guard.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_guard.py"
       - "packages/eng-harness/tests/rules/**"
-    max_changed_lines: 220
+    max_changed_lines: 250
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_guard.py::test_guard_blocks_io_in_block_code"
       - "packages/eng-harness/tests/unit/test_guard.py::test_guard_covers_parallel_children_and_child_blocks"
+      - "packages/eng-harness/tests/unit/test_guard.py::test_rule_guard_factory"
       - "packages/eng-harness/tests/rules/test_block_modules.py::test_rules_detect_violations"
       - "packages/eng-harness/tests/rules/test_block_modules.py::test_package_block_modules_pass"
     covers: [AC18, AC19]
@@ -447,7 +453,8 @@ containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to 
 subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
 
 **T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
-the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models, the writer with the
+the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models (with the B-068 fields `run_class`,
+`unreleased_tools`, `item_reasons` and the kind `engine.decision`), the writer with the
 hash chain, per-event durability, the inline limit and `harness.journal_blob/1`, and the harness kinds module
 (`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`, `harness.approval_preview/1`,
 `harness.journal_blob/1`, registered with `KindRegistry.extend`). AC22 is tested by wrapping the connection and
@@ -460,7 +467,9 @@ recording the `synchronous` value of each commit.
 `--write-lock` entry point and an empty `blocks.lock.json` (no blocks exist yet). AC4's contract test runs on fixture
 blocks in `tests/data/blocks/` and on the real (empty) registry.
 
-**T6 Ports** (spec §4.8). The nine protocols and their data types; fakes in `tests/fakes/`: a fake host with a ledger
+**T6 Ports** (spec §4.8). The nine protocols and their data types (including `RunClass`, `CalcPort.run_class`,
+`CalcInfo.basis_fields` and `ref_rules`, `ToolPort.unreleased_tools`, `DecisionCall` and the input request and answer
+models of spec §4.9.1); fakes in `tests/fakes/`: a fake host with a ledger
 of every call and `op_id` (S-10's reconciler stand-in), scripted outcomes per call (success, failure envelope,
 `TIMEOUT_UNKNOWN_OUTCOME`, `HOST_WEDGED`, raise), model state with revision and fingerprint, units, a host crash (models reported not loaded), session epochs,
 leases; fake CalcPort, BasisPort, DecisionPort, ApprovalPort and InputPort with scripted answers; a recording
@@ -476,11 +485,12 @@ iterator. Tested with a stub step executor, before the runner exists.
 
 **T9 Runner and replay** (spec §4.5.1, §4.5.2, §4.4.4). `Engine.start` and `Engine.resume`, input and output
 validation, holding the run lock of `_runlock.py` (with the Windows test under the `windows` marker), the run header and
-the version rule, the replay index, divergence (all S-10 variants) and the completed-run return. A minimal `ctx.tool`
+the version rule, the run-class check at start and resume and the `unreleased_tools` record (AC65, AC68), the replay index, divergence (all S-10 variants) and the completed-run return. A minimal `ctx.tool`
 is wired here so the divergence tests can run; T10 completes it.
 
 **T10 ctx calls** (spec §4.3.2, §4.3.3). `tool` (with retries), `read`, `calc`, `block`, `parallel`, `attempts`,
-`escalate`, and pause and resume through a test approval stub (the full approval rules come in T15).
+`escalate`, and pause and resume through a test approval stub (the full approval rules come in T15); `CalcRefused`
+from the CalcPort becomes a failed step (AC13).
 
 **T11 In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
@@ -490,7 +500,8 @@ AC64).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
-engineering-parameter check, the staleness check with `resolve_ref`, the property test over generated step programs,
+engineering-parameter check, the staleness check with `resolve_ref` and each calc argument's `RefRule` from
+`CalcInfo.ref_rules` (default `stale_ok` false), the property test over generated step programs,
 and the test that inserted steps are replayed.
 
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
@@ -500,10 +511,13 @@ end, and the resume order of spec §4.5.1 (preflight, leases and units before T1
 
 **T14 Decisions and inputs** (spec §4.3.2, §4.6 item 4). `decide`, `decide_many` and `ask` over the ports; option and
 answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stored as `basis.engineer_input/1`
-(AC61).
+(AC61); the `DecisionCall` with `sensitive_values`, the `engine.decision` request through `InputPort` and the
+`EngineerChoice` round trip against a fake DecisionPort (AC66); the `x-eng-input` marker and the choice convention
+(AC67). The budget rose from 280 to 380 lines with these (B-068). `Rule` and `DecisionPolicy` are annotations only
+(`TYPE_CHECKING`), so this task does not wait for the decision plan.
 
 **T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
-re-check before the first write under an approval, revision continuity, expiry, items, `signed_off`, pause and the
+re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`, `signed_off`, pause and the
 `except Exception` test.
 
 **T16 Modes and promotion** (spec §4.7). Working copies, approval per write, mode-resolved approvals, the always-ask
@@ -512,7 +526,8 @@ approval's binding before copying), and the `REPLAY_WRITES` gap.
 
 **T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
 call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
-attempts bodies, and the AST rules test over fixture modules and over the package's block and rule globs (empty until later
+attempts bodies, the public `rule_guard()` factory for the decision layer (exported from `engine/__init__.py`;
+budget 250 lines with it, B-068), and the AST rules test over fixture modules and over the package's block and rule globs (empty until later
 specs add blocks).
 
 **T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the

@@ -121,10 +121,11 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_each_mismatch"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_entries_complete"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_escape_hatches_refused"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_release_marks"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_against_inventory"
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
-    covers: [AC9, AC10, AC16]
+    covers: [AC9, AC10, AC16, AC38]
     depends_on: [T5]
   - id: T7
     title: Machine-level host-instance lock and process guard
@@ -334,7 +335,8 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_checks_and_output"
       - "packages/eng-harness/tests/windows/test_doctor.py::test_integrity_level"
-    covers: [AC37]
+      - "packages/eng-harness/tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools"
+    covers: [AC37, AC39]
     depends_on: [T7]
   - id: T19
     title: Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes
@@ -406,7 +408,7 @@ timeouts, crash detection, restart with re-attach, shutdown. Uses the synthetic 
 
 **T6 Allowlist and build check** (§4.3.4, §4.5.1). Descriptors, the TOML allowlist with the deny list and pattern
 refusal, the CSI allowlist header pinned to the S-12 commit and the fingerprint computed from the inventory, the build
-check and `ServerCheck`; the workflow test stops a run through the engine's preflight.
+check and `ServerCheck`; the workflow test stops a run through the engine's preflight. The `release` and `release_record` keys and the mapping that `ToolPort.unreleased_tools()` returns once the ToolPort is built (AC38, B-068).
 
 **T7 Lock and guard** (§4.4). OS locks in the machine-level lock folder, holder records, stale handling; launched
 instance identification by snapshot diff; launch ownership per role session counter; `close_started` rules with
@@ -451,7 +453,7 @@ fake, the contract and fidelity tests (skipped with a reason until the owner com
 script and its README.
 
 **T18 Doctor** (§4.9). The checks behind interfaces (installed programs, integrity level, location probe), table and
-JSON output, exit codes.
+JSON output, exit codes; the unreleased-tools check and the `extra_checks` extension point for spec 0006 (AC39, B-068).
 
 **T19 End to end.** `build_ports` wiring; a test block that runs the cycle's steps through the real engine and real
 fake-server processes; the crash matrix that kills the engine at each write step and resumes. Completes
