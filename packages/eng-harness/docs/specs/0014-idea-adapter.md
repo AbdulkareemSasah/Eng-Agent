@@ -83,7 +83,8 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
   `SASAAH_IDEA_*`, `SASAH_IDEA_*` or `IDEA_*` key in `env` gives a load error naming the field. Tests:
   `tests/unit/servers/test_config.py::test_idea_server_section`, `::test_idea_forbidden_options`,
   `::test_idea_service_url_loopback_only`, `::test_idea_env_keys_refused`,
-  `tests/unit/servers/test_launch_args.py::test_idea_argv_has_no_audit_log` (no `--audit-log` is built for this server).
+  `tests/unit/servers/test_launch_args.py::test_idea_argv_has_no_audit_log` (no `--audit-log` is built for this server),
+  `tests/workflow/servers/test_session.py::test_idea_launcher_receives_no_audit_log` (the argv the launcher actually receives).
 - AC2. Given the allowlist data, when loaded, then exactly the 9 tools marked `serve` in §4.4 are served, each with the
   fields of 0002 AC16 plus `routes`; the 20 `gap` tools, the 28 `not served` tools and `idea_run_script` are refused with
   `INVALID_ARGUMENT` (`field: tool`) and nothing is sent; any name containing `script`, `invoke`, `eval` or
