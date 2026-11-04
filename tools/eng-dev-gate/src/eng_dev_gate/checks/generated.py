@@ -71,7 +71,7 @@ def generated(ctx: StepContext) -> list[Finding]:
         EnvironmentFaultError: GF002, a generator is not a workspace module or does not run (exit 3).
         UsageError: an entry is invalid, or an AGENTS.md configuration is (exit 2).
     """
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    assert ctx.member is not None  # noqa: S101  # B-048: package steps always have a member
     member = ctx.member
     try:
         entries = _ENTRIES.validate_python(_table(member.directory).get("generated", []))
