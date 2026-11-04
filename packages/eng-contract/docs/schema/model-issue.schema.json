@@ -1,0 +1,109 @@
+{
+  "$defs": {
+    "Severity": {
+      "description": "Issue severity.",
+      "enum": [
+        "error",
+        "warning",
+        "info"
+      ],
+      "title": "Severity",
+      "type": "string"
+    },
+    "Subject": {
+      "additionalProperties": false,
+      "description": "The object a verdict or issue is about; `station_mm` is the position along it, `case` the governing case.",
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "station_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Mm"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "SubjectKind": {
+      "description": "Kind of the checked object; new values are additive.",
+      "enum": [
+        "joint",
+        "frame",
+        "area",
+        "link",
+        "story",
+        "grid_line",
+        "section",
+        "material",
+        "load_pattern",
+        "load_combination",
+        "footing",
+        "model"
+      ],
+      "title": "SubjectKind",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One finding; `code` is defined by the producer and listed in its documentation.",
+  "properties": {
+    "code": {
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+      "title": "Code",
+      "type": "string"
+    },
+    "message": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "severity": {
+      "$ref": "#/$defs/Severity"
+    },
+    "subject": {
+      "$ref": "#/$defs/Subject"
+    }
+  },
+  "required": [
+    "severity",
+    "code",
+    "subject",
+    "message"
+  ],
+  "title": "ModelIssue",
+  "type": "object"
+}
