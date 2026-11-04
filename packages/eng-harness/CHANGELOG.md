@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc content hash over the static import closure (`_calc/_hash.py`: `ast` and file lookup, no import run; LF-normalized sources, metadata, both schemas, contract version), refusal of unhashable calcs, the `calcs.lock.json` lock with its writer (`uv run python -m eng_harness._calc._hash --write-lock`) and `removed` ids in `CalcRegistry`; `_calc/**` added to the R1 modules (plan 0003 T2, B-141).
 - Calc framework: `eng_harness.calc` (decorator, registry with the AC1 registration rules, input metadata, trace builder, statuses) and the empty `eng_harness.calcs.REGISTRY`; `calcs/**` added to the R1 modules (plan 0003 T1, B-140).
 - Harness codes and the EngineStop, StepError, RunRefused, RunLocked and JournalIntegrityError families (B-101).
 - Package skeleton: `pyproject.toml` with the gate configuration, workspace member, `__version__`, `py.typed`, README, rendered `AGENTS.md` and risk map (B-100).

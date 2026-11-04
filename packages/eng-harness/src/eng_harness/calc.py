@@ -9,7 +9,7 @@ a calc itself raises `ContractError` or `NotImplementedGap`.
 
 import inspect
 import re
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Collection, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
@@ -21,6 +21,8 @@ from eng_contract.params import ParamModel
 from eng_contract.trace import Trace, TraceConstant, TraceInput, TraceStep
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from eng_harness._calc import CalcRegistryError
+from eng_harness._calc._hash import content_hash
 from eng_harness.errors import NotImplementedGap
 
 __all__ = [
@@ -48,15 +50,6 @@ class CalcStatus(StrEnum):
     VERIFIED = "verified"
     APPROVED = "approved"
     WITHDRAWN = "withdrawn"
-
-
-class CalcRegistryError(ValueError):
-    """A registration rule is broken; `rule` names it (`id`, `version`, `input_type`, ...)."""
-
-    def __init__(self, rule: str, calc_id: str, why: str) -> None:
-        """Keep `rule` for callers and tests."""
-        super().__init__(f"{calc_id}: {rule}: {why}")
-        self.rule = rule
 
 
 class TraceError(ValueError):
@@ -194,10 +187,6 @@ def calc(
     return wrap
 
 
-def _unhashed(definition: CalcDef) -> str:
-    raise NotImplementedError("the content hash arrives with plan 0003 T2 (spec 0003 4.5)")
-
-
 def _check(definition: CalcDef, kinds: KindRegistry) -> None:
     """Raise `CalcRegistryError` for the first broken registration rule (AC1)."""
     d = definition
@@ -231,13 +220,17 @@ class CalcRegistry(Mapping[str, CalcDef]):
         kinds: KindRegistry,
         calcs: Iterable[CalcDef] = (),
         *,
-        hasher: Callable[[CalcDef], str] = _unhashed,
+        hasher: Callable[[CalcDef], str] | None = None,
+        removed: Collection[str] = (),
     ) -> None:
-        """Check and hold `calcs`; `hasher` gives the content hash (the real one arrives with T2)."""
+        """Check and hold `calcs`; `hasher` defaults to the spec 4.5 hash; ids in `removed` (lock file) are refused."""
+        hasher = hasher or (lambda definition: content_hash(definition, kinds))
         entries: dict[str, CalcDef] = {}
         hashes: dict[str, str] = {}
         for definition in calcs:
             _check(definition, kinds)
+            if definition.id in removed:
+                raise CalcRegistryError("removed", definition.id, "the id was removed and cannot be registered again")
             if definition.id in entries:
                 raise CalcRegistryError("duplicate", definition.id, "the id is already registered")
             entries[definition.id] = definition

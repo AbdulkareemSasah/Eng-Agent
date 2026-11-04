@@ -12,7 +12,7 @@ import eng_contract
 import pytest
 from eng_contract.kinds import NEUTRAL_KINDS, KindRegistry
 from eng_contract.params import eng_param
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, create_model
 
 import eng_harness
 from eng_harness._calc import _hash
@@ -87,8 +87,7 @@ def test_hash_covers_helpers_and_metadata(
         helper.write_bytes(original.replace(b"\n", line_ending))
         assert _hash.content_hash(definition, kinds, root=root) == base
 
-    class WiderInput(fixtures.FixtureIn):  # type: ignore[name-defined]  # B-141: fixture module is loaded by path
-        extra_mm: float = eng_param(unit="mm")
+    wider_input = create_model("WiderInput", __base__=fixtures.FixtureIn, extra_mm=(float, eng_param(unit="mm")))
 
     class OtherOut(BaseModel):
         model_config = ConfigDict(frozen=True, extra="forbid")
@@ -106,7 +105,7 @@ def test_hash_covers_helpers_and_metadata(
         "title": _hash.content_hash(replace(definition, title="Other"), kinds),
         "method_source": _hash.content_hash(replace(definition, method_source="Other"), kinds),
         "verification": _hash.content_hash(replace(definition, verification="verified"), kinds),
-        "input schema": _hash.content_hash(replace(definition, input_type=WiderInput), kinds),
+        "input schema": _hash.content_hash(replace(definition, input_type=wider_input), kinds),
         "output schema": _hash.content_hash(definition, other_kinds),
         "contract version": contract_version,
     }
