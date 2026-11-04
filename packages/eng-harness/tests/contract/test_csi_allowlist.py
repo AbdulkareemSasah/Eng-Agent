@@ -28,7 +28,9 @@ def _inventory() -> dict[str, Any]:
     missing inventory fails (B-369).
     """
     if not INVENTORY.is_file() and "MUTANT_UNDER_TEST" in os.environ:
-        pytest.skip("the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31")
+        pytest.skip(
+            "the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31"
+        )
     return _load(INVENTORY)
 
 
