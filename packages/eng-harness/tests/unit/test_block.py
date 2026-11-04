@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 from pydantic import BaseModel

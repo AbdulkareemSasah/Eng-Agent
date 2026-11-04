@@ -6,18 +6,19 @@ Units: none.
 Errors: `RegistryError` (a registration or lock rule is broken; its message names the rule or lock code).
 """
 
+import annotationlib
 import argparse
 import hashlib
 import inspect
 import json
-import linecache
 import re
 import sys
-from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from importlib.machinery import SourceFileLoader
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, cast, get_type_hints
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -80,30 +81,51 @@ class LockFinding:
 
 
 def _code_hash(fn: Callable[..., object]) -> str:
-    """Return the SHA-256 of the module source of `fn` with LF line endings; `RegistryError` without source."""
+    """Return the SHA-256 of the module source of `fn` (loader `get_source`, LF endings); `RegistryError` without it."""
     module = sys.modules.get(fn.__module__)
-    lines = linecache.getlines(fn.__code__.co_filename, getattr(module, "__dict__", None))
-    if not lines:
+    loader = getattr(module, "__loader__", None)
+    if not callable(getattr(loader, "get_source", None)):
+        # Import hooks without get_source (for example a test assertion rewriter): read through the file loader.
+        origin = getattr(module, "__file__", None)
+        loader = SourceFileLoader(fn.__module__, origin) if origin else None
+    try:
+        source = loader.get_source(fn.__module__) if loader is not None else None
+    except (ImportError, OSError) as exc:
+        raise RegistryError(f"source of module {fn.__module__} is not available") from exc
+    if source is None:
         raise RegistryError(f"source of module {fn.__module__} is not available")
-    return hashlib.sha256("".join(lines).replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")).hexdigest()
+    return hashlib.sha256(source.replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")).hexdigest()
+
+
+def _annotation(name: str, fn: Callable[..., object], key: str) -> object:
+    """Return the annotation `key` of `fn`, resolved; `RegistryError` when it names an unresolvable type."""
+    value = annotationlib.get_annotations(fn, format=annotationlib.Format.FORWARDREF).get(key)
+    if isinstance(value, str):
+        value = annotationlib.ForwardRef(value, owner=fn)
+    if isinstance(value, annotationlib.ForwardRef):
+        try:
+            return cast("object", value.evaluate(globals=getattr(fn, "__globals__", None)))
+        except NameError as exc:
+            role = "output" if key == "return" else "input"
+            raise RegistryError(f"{name}: the {role} annotation {value.__forward_arg__!r} cannot be resolved") from exc
+    return value
 
 
 def _checked[I: BaseModel, O: BaseModel](name: str, version: int, fn: _Fn[I, O]) -> tuple[type[I], type[O], str]:
     """Apply the registration rules of AC2; return the input model, output model and code hash."""
     if not inspect.iscoroutinefunction(fn):
         raise RegistryError(f"{name}: the block function must be async def")
-    hints = get_type_hints(fn)
     params = list(inspect.signature(fn).parameters)
     if len(params) != 2:
         raise RegistryError(f"{name}: the block function takes (ctx, inp)")
-    input_model, output_model = hints.get(params[1]), hints.get("return")
+    input_model, output_model = _annotation(name, fn, params[1]), _annotation(name, fn, "return")
     if not (isinstance(input_model, type) and issubclass(input_model, BaseModel)):
         raise RegistryError(f"{name}: the input type must be a Pydantic BaseModel subclass")
     if not (isinstance(output_model, type) and issubclass(output_model, BaseModel)):
         raise RegistryError(f"{name}: the output type must be a Pydantic BaseModel subclass")
     if not _NAME.fullmatch(name):
         raise RegistryError(f"block name {name!r} must match {_NAME.pattern}")
-    if isinstance(version, bool) or not _VERSION.fullmatch(str(version)):
+    if type(version) is not int or not _VERSION.fullmatch(str(version)):
         raise RegistryError(f"{name}: version {version!r} must match {_VERSION.pattern}")
     return cast("type[I]", input_model), cast("type[O]", output_model), _code_hash(fn)
 
@@ -152,16 +174,19 @@ def workflow[I: BaseModel, O: BaseModel](
     return decorate
 
 
+@dataclass(frozen=True, slots=True)
 class Registry:
     """An immutable set of block definitions, unique by name and held sorted by name."""
 
-    def __init__(self, blocks: Iterable[BlockDef[Any, Any]]) -> None:
-        """Reject a second block with the same name (`RegistryError`)."""
-        found = sorted(blocks, key=lambda b: b.name)
+    blocks: Sequence[BlockDef[Any, Any]]
+
+    def __post_init__(self) -> None:
+        """Sort by name and reject a second block with the same name (`RegistryError`)."""
+        found = tuple(sorted(self.blocks, key=lambda b: b.name))
         for first, second in pairwise(found):
             if first.name == second.name:
                 raise RegistryError(f"duplicate block name {first.name!r}")
-        self.blocks: tuple[BlockDef[Any, Any], ...] = tuple(found)
+        object.__setattr__(self, "blocks", found)
 
     def with_(self, *more: BlockDef[Any, Any]) -> Registry:
         """Return a new registry that also holds `more`."""
