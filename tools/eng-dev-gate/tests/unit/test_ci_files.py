@@ -18,7 +18,7 @@ ACTIONS = "tools/eng-dev-gate/actions"
 NINE_JOBS = {
     "gate", "gate-check", "risk-floor", "test-first", "ci-review", "agents-drift", "security", "windows", "build",
 }  # fmt: skip
-PR_JOBS = ("gate", "agents-drift", "build")  # the jobs of T6 that run on pull requests and pushes
+PR_JOBS = ("gate", "gate-check", "agents-drift", "build")  # the jobs of T6 and T14 that run on pull requests
 GATE_ROOT_RUN = 'uv run --project "$GATE_ROOT" --package eng-dev-gate eng-gate --root . --gate-root "$GATE_ROOT"'
 
 
@@ -102,7 +102,8 @@ def test_security_and_build_commands() -> None:
     assert "check --all" in gate
     assert not re.search(r"--(only|skip)\b", gate)  # the CI steps never use --only or --skip
     assert "agents drift" in _runs(_action("agents-drift"))
-    for name in ("gate", "agents-drift", "build"):
+    assert "gate-check" in _runs(_action("gate-check"))
+    for name in ("gate", "gate-check", "agents-drift", "build"):
         scripts = _runs(_action(name))
         assert GATE_ROOT_RUN in scripts, name  # the base variant
         assert "uv run eng-gate" in scripts, name  # the head variant
@@ -122,7 +123,7 @@ def test_ignored_base_checkout_and_spikes() -> None:
     assert "spikes/*/windows_check.py" in "\n".join(s.get("run", "") for s in jobs["windows"]["steps"])
 
 
-@pytest.mark.parametrize("name", ["setup", "gate", "agents-drift", "build"])
+@pytest.mark.parametrize("name", ["setup", "gate", "gate-check", "agents-drift", "build"])
 def test_actions_are_composite(name: str) -> None:
     """Each action is composite, has the optional gate-root input and names the shell of every run step."""
     action = _action(name)
