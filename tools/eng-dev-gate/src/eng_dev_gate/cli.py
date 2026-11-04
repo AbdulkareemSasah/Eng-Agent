@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 
 from eng_dev_gate import __version__, agents, gate_root
+from eng_dev_gate.checks import imports
 from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.report import AWAITING_TITLE, escape_data
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
@@ -40,6 +41,9 @@ def _parser() -> argparse.ArgumentParser:
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
+        if name == "imports":
+            child.add_argument("--package", default=None, help="report only this workspace member")
+            child.add_argument("--all", action="store_true", help="every member (the default)")
         if name == "check":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
@@ -94,7 +98,9 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = {"agents": agents.handle, "packages": _packages, **(handlers or {})}.get(args.command)
+    handler = {"agents": agents.handle, "packages": _packages, "imports": imports.handle, **(handlers or {})}.get(
+        args.command
+    )
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")

@@ -137,7 +137,8 @@ def test_cycle(repo: Repo) -> None:
     )  # fmt: skip
     findings = [f for f in check_workspace(root) if f.code == "IM005"]
     assert len(findings) == 1
-    assert all(name in findings[0].message for name in ("p-a", "p-b", "p-c")) and "p-d" not in findings[0].message
+    assert all(name in findings[0].message for name in ("p-a", "p-b", "p-c"))
+    assert "p-d" not in findings[0].message
 
 
 def test_command_reports_and_selects_packages(repo: Repo) -> None:
