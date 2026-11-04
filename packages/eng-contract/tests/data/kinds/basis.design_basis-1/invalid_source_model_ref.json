@@ -14,9 +14,9 @@
         "confirmed": true,
         "citation": "ASCE 7-16 Table 12.12-1"
       },
-      "materials.fc_MPa": {
-        "value": 28,
-        "unit": "MPa",
+      "materials.cover_mm": {
+        "value": 40,
+        "unit": "mm",
         "source": "engineer:A. Engineer@2026-01-15T10:30:00.000Z",
         "confirmed": false,
         "citation": null

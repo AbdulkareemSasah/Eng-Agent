@@ -202,7 +202,7 @@ def test_basis_sources() -> None:
     payload = _valid("basis.design_basis/1")
     payload["fields"]["site.name"]["unit"] = "mm"
     assert Basis.model_validate(payload).fields["site.name"].unit == "mm"
-    payload["fields"]["materials.fc_MPa"]["unit"] = None
+    payload["fields"]["materials.cover_mm"]["unit"] = None
     with pytest.raises(ValidationError, match="does not match the unit suffix"):
         Basis.model_validate(payload)
 
@@ -211,11 +211,11 @@ def test_basis_missing_lists_absent_and_unconfirmed() -> None:
     basis = Basis.model_validate(_valid("basis.design_basis/1"))
     assert basis.missing([]) == []
     assert basis.missing(["limits.drift_ratio", "site.name"]) == []
-    assert basis.missing(["materials.fc_MPa", "limits.drift_ratio", "loads.live_kPa"]) == [
-        "materials.fc_MPa",
+    assert basis.missing(["materials.cover_mm", "limits.drift_ratio", "loads.live_kPa"]) == [
+        "materials.cover_mm",
         "loads.live_kPa",
     ]
-    assert basis.missing(iter(["materials.fc_MPa"])) == ["materials.fc_MPa"]
+    assert basis.missing(iter(["materials.cover_mm"])) == ["materials.cover_mm"]
 
 
 def _set_with_ref(ref: str | None, traces: int = 1) -> dict[str, Any]:
