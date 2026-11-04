@@ -11,7 +11,7 @@ import json
 import sys
 from collections.abc import Callable, Mapping, Sequence
 
-from eng_dev_gate import __version__, agents
+from eng_dev_gate import __version__, agents, gate_root
 from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 
@@ -73,6 +73,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")
+        args.gate_context = gate_root.resolve_for(args)  # None for a command that does not judge (spec 4.16)
         return int(exit_code_for(handler(args)))
     except GateError as error:
         _report_error(str(error), output_format)

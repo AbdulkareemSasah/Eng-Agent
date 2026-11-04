@@ -43,11 +43,12 @@ def test_exit_codes() -> None:
     def broken_tool(_args: argparse.Namespace) -> Status:
         raise EnvironmentFaultError("git is missing")
 
-    assert main(["check"], handlers={"check": passing}) == 0
-    assert main(["check"], handlers={"check": awaiting}) == 0
-    assert main(["check"], handlers={"check": failing}) == 1
-    assert main(["check"], handlers={"check": bad_config}) == 2
-    assert main(["check"], handlers={"check": broken_tool}) == 3
+    # windows-tests does not judge a pull request, so no gate.yml is read before the handler (spec 4.16)
+    assert main(["windows-tests"], handlers={"windows-tests": passing}) == 0
+    assert main(["windows-tests"], handlers={"windows-tests": awaiting}) == 0
+    assert main(["windows-tests"], handlers={"windows-tests": failing}) == 1
+    assert main(["windows-tests"], handlers={"windows-tests": bad_config}) == 2
+    assert main(["windows-tests"], handlers={"windows-tests": broken_tool}) == 3
 
 
 def test_usage_errors_exit_2() -> None:
