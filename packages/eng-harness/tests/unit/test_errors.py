@@ -55,7 +55,7 @@ def test_engine_stop_is_not_exception() -> None:
     def swallow() -> None:
         try:
             raise Pause("awaiting approval")
-        except Exception:  # noqa: BLE001  # B-101: the test shows this handler cannot catch a pause
+        except Exception:  # B-101: the test shows this handler cannot catch a pause
             return
 
     with pytest.raises(Pause):
@@ -68,9 +68,9 @@ def test_step_errors_are_exceptions_not_stops() -> None:
         assert issubclass(cls, StepError)
         assert issubclass(cls, Exception)
         assert not issubclass(cls, EngineStop)
-    for cls in (RunRefused, RunLocked, JournalIntegrityError):
-        assert issubclass(cls, Exception)
-        assert not issubclass(cls, (EngineStop, StepError))
+    for other in (RunRefused, RunLocked, JournalIntegrityError):
+        assert issubclass(other, Exception)
+        assert not issubclass(other, (EngineStop, StepError))
 
 
 def test_codes_per_exception() -> None:
