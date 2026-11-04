@@ -7,6 +7,7 @@ replace the probe or the pytest call to reach the exit-3 findings (TF009, TF011)
 
 from __future__ import annotations
 
+import os
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -188,3 +189,46 @@ def test_head_unchanged_after_run(repo: Repo) -> None:
     tf_run(repo, base, "feat: x")
     assert repo.git("rev-parse", "HEAD").strip() == head_of(repo)
     assert repo.git("status", "--porcelain") == ""
+
+
+class Editable:
+    """A runner that makes the head's source folder importable in every run, as an editable install does (B-355)."""
+
+    def __init__(self, source: Path, probe: str | None = None) -> None:
+        self._real: Runner = SubprocessRunner()
+        self._source = source
+        self._probe = probe
+
+    def run(self, argv: Sequence[str], cwd: Path, env: Mapping[str, str], timeout_seconds: float) -> ToolResult:
+        if self._probe is not None and ("-c" in argv or "probe" in argv):
+            return ToolResult(exit_code=0, output=self._probe)
+        installed = {**env, "PYTHONPATH": os.pathsep.join([env.get("PYTHONPATH", ""), str(self._source)])}
+        return self._real.run(argv, cwd, installed, timeout_seconds)
+
+
+def _new_package(repo: Repo) -> tuple[str, Path]:
+    """A pull request that adds the package ``pkg2`` (import name ``newpkg``) and then a test that imports it."""
+    base = tf_repo(repo)
+    workspace = (repo.root / "pyproject.toml").read_text(encoding="utf-8").replace('"pkg"', '"pkg", "pkg2"')
+    config = (repo.root / "pkg/pyproject.toml").read_text(encoding="utf-8").replace("fixpkg", "newpkg")
+    repo.commit(
+        {"pkg2/pyproject.toml": config, "pkg2/src/newpkg/__init__.py": "VALUE = 5\n", "pyproject.toml": workspace},
+        "feat: add package",
+    )
+    test = "from newpkg import VALUE\n\n\ndef test_n() -> None:\n    assert VALUE == 5\n"
+    repo.commit({"pkg2/tests/test_n.py": test}, "test: red")
+    return base, repo.root / "pkg2" / "src"
+
+
+def test_new_package_hidden_at_base(repo: Repo) -> None:
+    """AC27a: with the head's package importable (an editable install), a new package is still red at the base."""
+    base, source = _new_package(repo)
+    result, status, errors = tf_run(repo, base, "feat: x", runner=Editable(source))
+    assert (result.code, status, errors) == (0, "pass", {})
+
+
+def test_new_package_still_resolving_is_tf011(repo: Repo) -> None:
+    """AC27a: a name of a new package that the probe still resolves in the base run is TF011 (exit 3)."""
+    base, source = _new_package(repo)
+    result, _, _ = tf_run(repo, base, "feat: x", runner=Editable(source, probe="newpkg\t/elsewhere/newpkg.py\n"))
+    assert (result.code, "TF011" in result.err) == (3, True)
