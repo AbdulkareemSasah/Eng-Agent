@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc framework: `eng_harness.calc` (decorator, registry with the AC1 registration rules, input metadata, trace builder, statuses) and the empty `eng_harness.calcs.REGISTRY`; `calcs/**` added to the R1 modules (plan 0003 T1, B-140).
 - Harness codes and the EngineStop, StepError, RunRefused, RunLocked and JournalIntegrityError families (B-101).
 - Package skeleton: `pyproject.toml` with the gate configuration, workspace member, `__version__`, `py.typed`, README, rendered `AGENTS.md` and risk map (B-100).
 - Servers configuration: `eng_harness.servers` loads and validates the `[servers.*]`, `[cli_tools.*]` and `[host_programs.*]` sections of `harness.toml` (required timeouts, forbidden options); `mcp>=2.3,<3` runtime dependency with ADR-0001 (Proposed) (B-120).
