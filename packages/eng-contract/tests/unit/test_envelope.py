@@ -62,7 +62,8 @@ def failure() -> dict[str, Any]:
     }
 
 
-def record(payload: Any = None, **over: Any) -> ResultRecord:
+def record(**over: Any) -> ResultRecord:
+    """Record with payload `{"k": 1}` unless overridden."""
     base: dict[str, Any] = {
         "contract": "eng-contract/1",
         "result_id": RID,
@@ -73,7 +74,7 @@ def record(payload: Any = None, **over: Any) -> ResultRecord:
         "producer": prov(),
         "parents": [],
         "payload_sha256": SHA,
-        "payload": {"k": 1} if payload is None else payload,
+        "payload": {"k": 1},
         "payload_file": None,
     }
     return ResultRecord.model_validate(base | over)
@@ -97,15 +98,20 @@ def test_size_limits() -> None:
 
 def test_make_success_inlines_small_payloads() -> None:
     small = {"s": "x" * (16384 - 8)}
-    env = make_success(record(small), {"n": 1})
+    env = make_success(record(payload=small), {"n": 1})
     assert env.data == small
     assert (env.result_id, env.kind, env.complete) == (RID, "model.info/1", True)
     assert env.provenance == record().producer
 
     big = {"s": "x" * (16384 - 7)}
-    assert make_success(record(big), {"n": 1}).data is None
+    assert make_success(record(payload=big), {"n": 1}).data is None
     split = record(payload=None, payload_file=RID + ".payload.json.gz")
     assert make_success(split, {}).data is None
+
+
+def test_summary_outside_json_model_is_invalid() -> None:
+    with pytest.raises(ValidationError):
+        SuccessEnvelope.model_validate(success(summary={"n": 2**60}))
 
 
 def test_make_success_warnings_follow_completeness() -> None:
