@@ -38,12 +38,36 @@ def test_commands_exact_and_no_approve() -> None:
 
 def test_options_of_the_commands() -> None:
     for argv in (
-        ["run", "wf", "--input", "i.json", "--basis", "b.yaml", "--template", "t@1", "--mode", "work_on_copy",
-         "--run-class", "trial", "--answers", "a.json", "--no-wait", "--wait-timeout", "5", "--no-browser",
-         "--progress", "json", "--json", "--no-report"],
+        [
+            "run",
+            "wf",
+            "--input",
+            "i.json",
+            "--basis",
+            "b.yaml",
+            "--template",
+            "t@1",
+            "--mode",
+            "work_on_copy",
+            "--run-class",
+            "trial",
+            "--answers",
+            "a.json",
+            "--no-wait",
+            "--wait-timeout",
+            "5",
+            "--no-browser",
+            "--progress",
+            "json",
+            "--json",
+            "--no-report",
+        ],
         ["resume", "01RUN", "--answers", "a.json", "--no-wait", "--json"],
-        ["status"], ["status", "01RUN", "--json"], ["stop", "01RUN", "--wait", "3"],
-        ["report", "01RUN", "--out", "r.html", "--force"], ["doctor", "--json", "--show-paths"],
+        ["status"],
+        ["status", "01RUN", "--json"],
+        ["stop", "01RUN", "--wait", "3"],
+        ["report", "01RUN", "--out", "r.html", "--force"],
+        ["doctor", "--json", "--show-paths"],
     ):
         _, _, err = _call(argv)
         assert "usage:" not in err, (argv, err)
@@ -70,7 +94,7 @@ def test_entry_point_and_root_form() -> None:
     assert "eng-harness" not in root.get("project", {}).get("scripts", {})
     assert "eng_harness.cli" in package["tool"]["eng-gate"]["public_modules"]
     _, expected, _ = _call(["--help"])
-    done = subprocess.run(  # noqa: S603  # B-177: fixed interpreter and module, no external input
+    done = subprocess.run(  # B-177: fixed interpreter and module, no external input
         [sys.executable, "-m", "eng_harness", "--help"], capture_output=True, check=False, timeout=60
     )
     assert done.returncode == 0

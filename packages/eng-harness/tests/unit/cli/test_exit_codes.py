@@ -8,8 +8,17 @@ from eng_harness.cli._exit import Outcome, exit_code_for, exit_code_for_error
 
 def test_table_values() -> None:
     assert {c.name: int(c) for c in ExitCode} == {
-        "OK": 0, "RUN_FAILED": 1, "USAGE": 2, "REFUSED": 3, "RUN_LOCKED": 4, "JOURNAL_INTEGRITY": 5,
-        "NOT_FOUND": 6, "AWAITING_ENGINEER": 10, "NEEDS_ENGINEER": 11, "STOPPED": 12, "INTERNAL": 70,
+        "OK": 0,
+        "RUN_FAILED": 1,
+        "USAGE": 2,
+        "REFUSED": 3,
+        "RUN_LOCKED": 4,
+        "JOURNAL_INTEGRITY": 5,
+        "NOT_FOUND": 6,
+        "AWAITING_ENGINEER": 10,
+        "NEEDS_ENGINEER": 11,
+        "STOPPED": 12,
+        "INTERNAL": 70,
         "INTERRUPTED": 130,
     }
 

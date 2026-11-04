@@ -24,13 +24,13 @@ class _Spawn:
 
 def test_browser_variable_ignored() -> None:
     spawn = _Spawn()
-    environ = {"BROWSER": "/tmp/capture", "PATH": "/usr/bin", "HOME": "/h"}
+    environ = {"BROWSER": "capture-program", "PATH": "/usr/bin", "HOME": "/h"}
     assert open_address(ADDRESS, platform="linux", environ=environ, spawn=spawn, startfile=None) is True
     [(command, env)] = spawn.calls
     assert command == ["xdg-open", ADDRESS]
     assert "BROWSER" not in env
     assert env == {"PATH": "/usr/bin", "HOME": "/h"}
-    assert environ["BROWSER"] == "/tmp/capture"
+    assert environ["BROWSER"] == "capture-program"
 
 
 def test_platform_commands() -> None:
