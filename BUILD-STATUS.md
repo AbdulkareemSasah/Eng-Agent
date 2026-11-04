@@ -102,10 +102,11 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-032 | T3 | Configuration models, floors and bootstrap mode (root gate.yml) | sonnet, medium | opus, low | [#24](https://github.com/AbdulkareemSasah/Eng-Agent/pull/24) | done |
 | B-033 | T4 | agents render, keys and drift (and re-render of drifting AGENTS.md files) | sonnet, medium | opus, low | [#26](https://github.com/AbdulkareemSasah/Eng-Agent/pull/26) | done |
 | B-034 | T5 | check orchestrator with the lock, format, lint and types steps | sonnet, medium | opus, low | [#27](https://github.com/AbdulkareemSasah/Eng-Agent/pull/27) | done |
-| B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | [#37](https://github.com/AbdulkareemSasah/Eng-Agent/pull/37) | open |
-| B-036 | T7 | tests step with separate line and branch coverage and the pytest plugin | sonnet, medium | opus, low | — | not started or in writing |
-| B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | — | not started or in writing |
+| B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | [#37](https://github.com/AbdulkareemSasah/Eng-Agent/pull/37) | done |
+| B-036 | T7 | tests step with separate line and branch coverage and the pytest plugin | sonnet, medium | opus, low | [#41](https://github.com/AbdulkareemSasah/Eng-Agent/pull/41) | done |
+| B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | [#40](https://github.com/AbdulkareemSasah/Eng-Agent/pull/40) | open |
 | B-038 | T9 | ratchet command and step | sonnet, medium | opus, low | — | not started or in writing |
+| B-038a | docs | plan amendment: T9 also writes the root .gate/ratchet.json baseline | haiku, low | opus, low | [#44](https://github.com/AbdulkareemSasah/Eng-Agent/pull/44) | done |
 | B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | [#39](https://github.com/AbdulkareemSasah/Eng-Agent/pull/39) | open |
 | B-040 | T11 | forbidden part 2: FB004, FB005, FB006, FB008 | sonnet, high | opus, low | — | not started or in writing |
 | B-041 | T12 | imports command and step | sonnet, medium | opus, low | — | not started or in writing |
@@ -131,16 +132,17 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-063 | docs | write the eng-harness templates and design-basis specification and plan | sonnet, medium | opus, medium | [#23](https://github.com/AbdulkareemSasah/Eng-Agent/pull/23) | done |
 | B-064 | docs | write the eng-harness decision-layer specification and plan | sonnet, medium | opus, low | [#30](https://github.com/AbdulkareemSasah/Eng-Agent/pull/30) | done |
 | B-065 | docs | write the eng-harness command-line, progress, approval-page and run-report specification and plan | sonnet, high | opus, medium | [#32](https://github.com/AbdulkareemSasah/Eng-Agent/pull/32) | done |
-| B-066 | docs | write the model edit cycle workflow spec, block specification and plan | opus, medium | opus, medium | — | not started or in writing |
-| B-068 | docs | amend the engine spec as specs 0003 (Q11), 0005 (Q1) and 0006 (§11) require | opus, medium | opus, medium | — | not started or in writing |
+| B-066 | docs | write the model edit cycle workflow spec, block specification and plan | opus, medium | opus, medium | [#43](https://github.com/AbdulkareemSasah/Eng-Agent/pull/43) | done |
+| B-068 | docs | amend the engine spec as specs 0003 (Q11), 0005 (Q1) and 0006 (§11) require | opus, medium | opus, medium | [#42](https://github.com/AbdulkareemSasah/Eng-Agent/pull/42) | done |
+| B-069 | docs | amend the eng-contract spec: the Quantity comparison key uses the shortest round-trip decimal | sonnet, low | opus, medium | [#49](https://github.com/AbdulkareemSasah/Eng-Agent/pull/49) | open |
 | B-070 | docs | write the structural-codes core framework specification and plan | opus, medium | opus, medium | [#16](https://github.com/AbdulkareemSasah/Eng-Agent/pull/16) | done |
-| B-071 | docs | write the ACI 318-14 isolated-footing clause specifications and plan (draft) | opus, medium | opus, medium | [#34](https://github.com/AbdulkareemSasah/Eng-Agent/pull/34) | open |
+| B-071 | docs | write the ACI 318-14 isolated-footing clause specifications and plan (draft) | opus, medium | opus, medium | [#34](https://github.com/AbdulkareemSasah/Eng-Agent/pull/34) | done |
 | B-072 | docs | write the SBC 304-2018 overlay specification and plan for the footing checks (draft, with explicit gaps) | opus, medium | opus, medium | — | not started or in writing |
-| B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | [#36](https://github.com/AbdulkareemSasah/Eng-Agent/pull/36) | open |
-| B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | — | not started or in writing |
+| B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | [#36](https://github.com/AbdulkareemSasah/Eng-Agent/pull/36) | done |
+| B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | [#46](https://github.com/AbdulkareemSasah/Eng-Agent/pull/46) | open |
 | B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | — | not started or in writing |
-| B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
-| B-081 | docs | write the SAP2000 coverage check and the specification and plan for SAP2000 through the CSI adapter | sonnet, medium | opus, low | — | not started or in writing |
+| B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | [#47](https://github.com/AbdulkareemSasah/Eng-Agent/pull/47) | open |
+| B-081 | docs | write the SAP2000 coverage check and the specification and plan for SAP2000 through the CSI adapter | sonnet, medium | opus, low | [#48](https://github.com/AbdulkareemSasah/Eng-Agent/pull/48) | open |
 | B-082 | docs | write the ACI 318-14 column check clause specifications and plan (draft) | opus, medium | opus, medium | — | not started or in writing |
 | B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | — | not started or in writing |
 | B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
@@ -231,6 +233,18 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-189 | I.T15 | Basis confirmation screen, setup log and its place in run | sonnet, medium | opus, low | — | not started or in writing |
 | B-190 | I.T16 | Commands status, stop, report and doctor | sonnet, medium | opus, low | — | not started or in writing |
 | B-191 | I.T17 | End-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule | sonnet, medium | opus, medium | — | not started or in writing |
+| B-195 | W.T1 | Edit-cycle kinds and the change-set model | sonnet, medium | opus, medium | — | not started or in writing |
+| B-196 | W.T2 | Calc harness.change_set_check (resolve, validate, conflicts, refused kinds) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-197 | W.T3 | Calc harness.expected_effects (projection of a resolved change set) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-198 | W.T4 | Calcs harness.host_design_verdicts and harness.analysis_summary | sonnet, medium | opus, medium | — | not started or in writing |
+| B-199 | W.T5 | CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-200 | W.T6 | Engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-201 | W.T7 | Decision points and rules of the edit cycle | sonnet, medium | opus, medium | — | not started or in writing |
+| B-202 | W.T8 | Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-203 | W.T9 | Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop | sonnet, medium | opus, medium | — | not started or in writing |
+| B-204 | W.T10 | Report renderers, value-source audit, prompt counter and B-1 cycle timings | sonnet, medium | opus, medium | — | not started or in writing |
+| B-205 | W.T11 | Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list | sonnet, medium | opus, medium | — | not started or in writing |
+| B-206 | W.T12 | Replay test and crash matrix of the workflow (A6) | sonnet, medium | opus, medium | — | not started or in writing |
 
 ## 4. Decisions by the lead
 
@@ -246,6 +260,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | D-8 | B-002 (workspace root) is built from ADR-0028 §1 and process/11 directly, without a plan file | No gate tooling exists yet to verify a plan; the review still applies |
 | D-9 | A phase's specs may start once the specs of the packages it depends on are merged; its code starts when the previous phase's packages are done | Keeps the phase order (19, R4) without idling while the last tasks of a phase finish |
 | D-10 | The root uv workspace lists its members explicitly; each package's skeleton task adds its folder (B-009) | A package folder holds its spec and plan before its `pyproject.toml` exists, and uv refuses a glob that matches such a folder |
+| D-14 | Reviewers mark each finding's action: `author` (fix in this pull request) or `lead` (the code is right; only a spec, plan or design document must change). Lead actions do not block a merge or trigger fix rounds; the lead amends the document in its own pull request | B-015's correct code looped through three fix rounds over a spec contradiction only a spec change could resolve (P-12) |
 | D-13 | When the base-commit gate itself is defective so that every pull request fails on the defect, the lead may merge the fix with its gate job red only if: an independent reviewer approved; the only failing step is the defect being fixed (job log); the fixed gate, run the way CI runs it against the repository, passes; and the exception is recorded here and in the owner queue. Used once: B-058 ([#45](https://github.com/AbdulkareemSasah/Eng-Agent/pull/45)) | The emergency path of process/12 §1 needs an owner approval and green CI, neither available in bootstrap mode; every route through the gate deadlocks otherwise |
 | D-12 | A task over its line budget is split by a plan amendment in its own reviewed pull request, not given a budget above the ~400-line cap of process/04 §4 | B-031 measured 573 lines; splitting keeps reviews small |
 | D-11 | Tasks run as workflow chains: writer, independent review with up to two fix rounds, then a mechanical merge step that waits for CI and squash-merges only on an approving review and green CI; at most five writers at once | Serialized chains (the 16 `eng-contract` tasks) do not stall between tasks; the merge rule stays the lead's |
@@ -260,6 +275,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
 | P-5 | The harness flagged the merge of B-009 as possible self-approval: the lead wrote that 3-line fix, an independent subagent reviewed it, and the merge step merged it. In bootstrap mode every pull request is opened and merged under the owner's GitHub account (no separate identities yet, OQ-2) | Lead-written changes are kept to integration fixes; the owner may re-review [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) |
 | P-7 | The harness flagged the merge of B-007 as "merge without review": the subagent review (APPROVE, recorded in the PR body) is not a GitHub review, because every account action is the owner's in bootstrap mode | Reviews stay recorded in the PR body (D-6); the owner can audit [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) |
+| P-12 | The contract chain stopped at B-015: four reviews approved its code but repeated one MEDIUM, a contradiction inside the spec (rule 4 against AC35) that only a spec change could resolve, and the chain treated it as author work | Spec amended by B-069 (#49); D-14; the contract chain runs as its own workflow from B-069 |
 | P-11 | After gate T6 (B-035) merged, the base-commit gate ran ruff with the base checkout as working directory, so `per-file-ignores` never matched the judged tree and every pull request failed lint (S101 in tests); wave 2c stalled on it | Wave 2c stopped; fixed by B-058 and merged under D-13; also closed a cache-planting hole the review found |
 | P-10 | The container restarted at about 02:00 UTC and stopped wave 2b; agents in flight were lost (six open PRs, two pushed branches without PRs, writers without pushes) | Relaunched as wave 2c from the state on GitHub: merged tasks marked done, open PRs resume at review, pushed branches resume in open-PR mode, the rest restart; stale worktrees removed |
 | P-9 | The merge step of B-091 declined to merge because GitHub showed no GitHub review | The lead merged after CI passed on the conflict-resolved head; merge prompts now say a missing GitHub review is expected in bootstrap mode |
