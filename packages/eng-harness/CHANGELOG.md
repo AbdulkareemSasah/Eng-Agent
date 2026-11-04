@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Journal schema with append-only and gap-free `seq` triggers, the hash-chained append-only writer with per-event durability, and large step arguments stored by reference as `harness.journal_blob/1`: `eng_harness.journal` `JournalWriter` (plan 0001 T3b, B-367; spec 0001 AC20 to AC22, AC24, AC26).
 - Calc-module rules test (imports, purity, module state, FB005 forms), golden data loader and file lint, and the verification record template (plan 0003 T6, B-145; spec 0003 AC3, AC46).
 - Journal event payload models: `eng_harness.journal` (the 21 event types and `PAYLOAD_MODELS`) and the harness result kinds in `eng_harness._kinds` (plan 0001 T3, B-102).
 - Calc framework: `eng_harness.calc` (decorator, registry with the AC1 registration rules, input metadata, trace builder, statuses) and the empty `eng_harness.calcs.REGISTRY`; `calcs/**` added to the R1 modules (plan 0003 T1, B-140).
