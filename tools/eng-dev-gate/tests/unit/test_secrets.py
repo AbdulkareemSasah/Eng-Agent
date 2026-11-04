@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,37 @@ def test_only_added_lines_of_the_range_are_scanned(repo: Repo) -> None:
     repo.commit({"a.txt": f"{GITHUB_TOKEN}\nkeep\nmore\n"})
     assert repo.run(["secrets", "--range", f"{base}..HEAD"]).code == 0
     assert repo.run(["secrets", "--tree"]).code == 1
+
+
+def _merge_with_resolution(repo: Repo, resolved: str) -> str:
+    """Merge two branches that edit the same line; resolve the conflict with ``resolved``; return the base SHA."""
+    base = repo.commit({".gate/gate.yml": _gate_yml(), "conf.txt": "a\nvalue\nz\n"})
+    repo.branch("side")
+    repo.commit({"conf.txt": "a\nside\nz\n"}, "feat: side")
+    repo.git("checkout", "-q", "main")
+    repo.commit({"conf.txt": "a\nmain\nz\n"}, "feat: main")
+    merge = subprocess.run(  # noqa: S603  # B-047: no shell; fixed arguments
+        ["git", "merge", "--no-edit", "side"],  # noqa: S607  # B-047: git from PATH
+        cwd=repo.root, env=repo._env, capture_output=True, check=False,  # noqa: SLF001  # B-047: fixture environment
+    )
+    assert merge.returncode == 1  # a conflict
+    repo.commit({"conf.txt": f"a\n{resolved}\nz\n"}, "merge: resolve")
+    return base
+
+
+def test_range_scan_covers_a_merge_resolution(repo: Repo) -> None:
+    """Spec 4.11: a secret added only by a merge commit's conflict resolution is reported."""
+    base = _merge_with_resolution(repo, f"key = {GITHUB_TOKEN}")
+    result = repo.run(["--format", "json", "secrets", "--range", f"{base}..HEAD"])
+    assert result.code == 1
+    (finding,) = _findings(result)
+    assert (finding["code"], finding["path"], finding["line"]) == ("SC001", "conf.txt", 2)
+    assert GITHUB_TOKEN not in result.out + result.err
+
+
+def test_range_scan_passes_a_clean_merge_resolution(repo: Repo) -> None:
+    base = _merge_with_resolution(repo, "both")
+    assert repo.run(["secrets", "--range", f"{base}..HEAD"]).code == 0
 
 
 def test_hunk_lines_that_look_like_headers(repo: Repo) -> None:
