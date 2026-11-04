@@ -233,21 +233,27 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools`.
 - AC40. **[added: B-085]** Given a server section without `audit_log`, when its roles start, then `audit_log` is true
   and each role's argv is the one of §4.3.2 with `--audit-log` (the CSI argv is unchanged); given `audit_log = false`,
-  then no `--audit-log` argument is built and reconciliation reads no audit log; a value that is not a boolean is a
-  `ConfigError`. Tests: `tests/unit/servers/test_config.py::test_audit_log_flag`,
+  then no `--audit-log` argument is built; a value that is not a boolean is a `ConfigError`. Tests: `tests/unit/servers/test_config.py::test_audit_log_flag`,
   `tests/unit/servers/test_launch_args.py::test_audit_log_default_and_off`.
 - AC41. **[added: B-085]** Given an allowlist whose header declares `routes`, when it is loaded, then every entry
   carries a non-empty `routes` list drawn from them (else a load error), and loading it for a server section's `route`
   gives exactly the entries whose `routes` include that route, so a tool of another route is refused as in AC17; a
   `route` the header does not declare, or a missing `route` for such an adapter, is a load error. Given an allowlist
   without `routes` in its header (CSI), then an entry with `routes` or a server section with `route` is a load error.
-  The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. Tests:
+  The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. `build_ports`
+  loads each adapter's allowlist for its server section's `route`. Tests:
   `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter`,
-  `tests/unit/servers/test_config.py::test_route_key`.
+  `tests/unit/servers/test_config.py::test_route_key`,
+  `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data).
 - AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
-  loaded, then each is exposed on the tool's descriptor; `unit_status` is `declared`, `missing` or `confirmed`, and an
-  unknown status, a `unit` with status `missing`, a status other than `missing` without a `unit`, or a `tool` that is
-  not an allowlisted entry is a load error. Test: `tests/unit/adapters/test_allowlist.py::test_unit_header_entries`.
+  loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
+  descriptor; `unit_status` is `declared`, `missing` or `confirmed`. An entry with status `missing` may name a tool the
+  allowlist does not serve (it records why the tool stays unserved, as `idea_set_loads` in spec 0014 AC16); it then
+  serves nothing and appears on no descriptor. An unknown status, a `unit` with status `missing`, a status other than
+  `missing` without a `unit`, a `declared` or `confirmed` entry whose `tool` is not an allowlisted entry, or a `tool`
+  in the escape-hatch deny list (§4.5.1) is a load error; each adapter's contract test checks every `[[unit]]` tool
+  against its pinned inventory. Tests: `tests/unit/adapters/test_allowlist.py::test_unit_header_entries`,
+  `::test_unit_header_missing_on_unserved_tool`.
 
 ## 4. Design
 
@@ -512,8 +518,10 @@ all entries, whatever the route, because one build serves them all.
 **Unit header [added: B-085].** `[[unit]]` entries record what is known of a unit the server does not switch: `tool`,
 `field` (the argument or reply field), `unit` (a contract unit token, or absent), and `unit_status`: `declared` (from
 the tool's description or schema, not confirmed by a live run), `missing` (no unit is declared; the adapter's spec
-then serves no quantity of that field) or `confirmed` (a recorded local test confirms it). A change of status is a
-reviewed data change, not code. Spec 0014 §4.6 and AC16 are the first user (AC42).
+then serves no quantity of that field) or `confirmed` (a recorded local test confirms it). A `declared` or `confirmed`
+entry names an allowlisted entry; a `missing` entry may also name a tool the allowlist does not serve, where it records
+why that tool stays unserved (spec 0014: `idea_set_loads`, gap IG-1). A change of status is a reviewed data change, not
+code. Spec 0014 §4.6 and AC16 are the first user (AC42).
 
 `ToolPort.unreleased_tools()` (engine §4.8) returns `{name: release_record}` for every allowlisted entry and every
 `[cli_tools.*]` entry (which takes the same two keys) marked `unreleased`; the engine records it in `run_started`
@@ -911,7 +919,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35 | Contract (inventory, recordings; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route) | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 

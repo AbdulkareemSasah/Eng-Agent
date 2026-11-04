@@ -350,12 +350,14 @@ tasks:
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
+      - "packages/eng-harness/tests/workflow/test_build_ports.py"
     max_changed_lines: 200
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
-    covers: [AC36]
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
+    covers: [AC36, AC41]
     depends_on: [T17, T18, T20]
   - id: T20
     title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
@@ -378,6 +380,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_routes_declared"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_route_filter"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_unit_header_entries"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_unit_header_missing_on_unserved_tool"
     covers: [AC40, AC41, AC42]
     depends_on: [T7]
 ---
@@ -491,13 +494,15 @@ JSON output, exit codes; the unreleased-tools check and the `extra_checks` exten
 
 **T19 End to end.** `build_ports` wiring; a test block that runs the cycle's steps through the real engine and real
 fake-server processes; the crash matrix that kills the engine at each write step and resumes. Completes
-`docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20).
+`docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20); the route-bearing
+case is tested in `test_build_ports.py` with a synthetic routed allowlist (test data, product-neutral), since the CSI
+cycle has no route (AC41).
 
 **T20 Framework additions for the IDEA adapter** (AC40 to AC42, spec §11 A3, B-085). `audit_log` on the server
 section (default true) and the argv builder `servers/_launch_args.py`, wired into `_session.py`, so the CSI argv stays
 as it is and a section with `audit_log = false` gets no `--audit-log`; the `route` key and the allowlist header
 `routes` with the entries' `routes` and loading for one route; the header `[[unit]]` entries with `unit_status` on the
-descriptors. Product-neutral: no module names IDEA. The IDEA server section, its options and its allowlist are plan
+descriptors and `Allowlist.units`, where a `missing` entry may name an unserved tool. Product-neutral: no module names IDEA. The IDEA server section, its options and its allowlist are plan
 0014 T1 and T3, which start after this task; the issue codes, host codes and harness kinds of A3 are implemented where
 they are used (plan 0014 T5, T7, T8).
 
