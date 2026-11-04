@@ -225,15 +225,20 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
+      - "packages/eng-harness/src/eng_harness/report/__main__.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py"
-    max_changed_lines: 80
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py"
+    # Amendment B-354: the read-only entry point for A3 and A7 on real journals (spec AC35), about 70 lines; 80 -> 150.
+    max_changed_lines: 150
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_unclassified_messages_use_the_prompt"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced"
-    covers: [AC25, AC26]
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_entry_is_read_only_and_exit_codes"
+    covers: [AC25, AC26, AC35]
     depends_on: [T9, T10]
   - id: T12
     title: Replay test and crash matrix of the workflow (A6)
@@ -327,6 +332,10 @@ AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8 and T9 (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
+Amendment B-354 (spec AC35, Q11): `python -m eng_harness.report` with `audit-sources RUN_DIR` and
+`count-prompts RUN_DIR`, a read-only wrapper over the T10 functions so that the owner can run A3 and A7 on the
+journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-testing.md` names the command form
+`uv run --package eng-harness python -m eng_harness.report ...` (spec 0006 §4.1).
 
 **T12 Replay and crash matrix** (spec AC27, AC28). A two-cycle run killed at every step in a worker process (plan 0001
 T19's harness) and resumed with the same scripted answers; the replay test over a journal recorded by the

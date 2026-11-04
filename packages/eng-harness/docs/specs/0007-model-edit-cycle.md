@@ -182,6 +182,19 @@ defines its method; values are synthetic and say so.
   `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
   `tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt`,
   `::test_unclassified_messages_use_the_prompt`.
+- AC35 (A3, A7 on real journals; B-354). Given the module entry point `python -m eng_harness.report` (run from the
+  workspace root as `uv run --package eng-harness python -m eng_harness.report ...`, spec 0006 §4.1) with the
+  subcommand `audit-sources RUN_DIR` or `count-prompts RUN_DIR` (and `--json`), then it opens the run folder read-only
+  through `JournalReader` and the run's result store, calls `audit_value_sources` or `count_prompts` on it and prints
+  the result (one line per finding with the step path, tool and argument; one line per cycle with its count and the
+  counted requests by kind and title; `--json` one JSON object), data-derived text sanitized as in spec 0006 AC21; the
+  exit code is 0 (`audit-sources` with no finding; `count-prompts` always, because the A7 bound depends on the path,
+  §4.9), 1 (`audit-sources` with a finding), 2 (usage, not a run folder, or a run of another workflow), 5 (altered
+  journal, naming the first bad `seq`) or 6 (no such folder), the numbers of spec 0006 §4.2.3; a run held by a live
+  engine is read up to its last committed event and the output says "run in progress as of seq N"; the journal, store
+  and folder bytes and modification times are unchanged; and `eng-harness --help` still lists exactly the six commands
+  of spec 0006 AC1. Tests: `tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder`,
+  `::test_entry_is_read_only_and_exit_codes`.
 - AC27 (A6). Given a two-cycle run in a worker process, when the engine is killed at every step and resumed with the
   same scripted answers, then each run ends with the same fake model, revision chain and outputs as the uninterrupted
   run, and no write is sent twice. Test: `tests/replay/edit_cycle/test_crash_matrix.py::test_every_step`.
@@ -220,6 +233,7 @@ defines its method; values are synthetic and say so.
 | `src/eng_harness/adapters/csi/_read_state_tool.py` | `csi_read_model_state` and `csi_read_analysis_messages` (§4.10) | R1 |
 | `src/eng_harness/adapters/csi/_revisions.py` | `csi_open_revision` and `as_new_revision` (§4.10, §4.5.1) | R1 |
 | `src/eng_harness/report/_edit_cycle.py` | renderers, `audit_value_sources`, `count_prompts`, `edit_cycle_timings` | report |
+| `src/eng_harness/report/__main__.py` | the read-only entry point `python -m eng_harness.report` with `audit-sources` and `count-prompts` (AC35, B-354) | report |
 
 ### 4.2 Workflow definition, input, output, kinds
 
@@ -243,7 +257,8 @@ defines its method; values are synthetic and say so.
 #### 4.3.1 Shape
 
 The change set is the answer to one `ctx.ask(ChangeSetRequest, title=...)` per cycle (a data request,
-`x-eng-input: data`, answered with `resume --answers FILE`, spec 0006 §4.2.1). `ChangeSetRequest` has one field
+`x-eng-input: data`, answered with `run --answers FILE` for the first change set of the run and with
+`resume --answers FILE` after a pause, spec 0006 §4.2.1, AC64). `ChangeSetRequest` has one field
 `change_set: ChangeSetDraft`; the answer is stored as `basis.engineer_input/1` (engine AC61), so its literal values are
 engineer inputs with `entered_by` and `entered_at`, and the change-set approval is where the engineer confirms them
 (spec 0006 Q3).
@@ -553,7 +568,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3, AC6, AC18, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
+| AC1, AC3, AC6, AC18, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2 | Unit (source rules) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
 | AC4, AC5, AC7, AC8, AC30 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
@@ -579,7 +594,8 @@ start at version 1 with lock entries.
 | Q4 | Restoring an earlier revision inside a cycle (D-2) has no engine or adapter operation | Owner | `csi_open_revision` on this cycle's step 7 snapshot (§4.5.1, §4.10), which keeps the engineer's changes; it never overwrites a file and refuses a changed snapshot |
 | Q5 | Conflict: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval would satisfy it (engine §4.7) | Owner | Engine amendment: an approval resolved by `mode:*` never satisfies an always-ask step |
 | Q6 | Two read-back tolerances: spec 0002 `checks.readback_relative_tolerance` and spec 0003 `compare.*` | Owner | Keep both in v1 (both required); converge on `compare.*` in the next spec 0002 revision |
-| Q7 | The first change set arrives only by `resume --answers` after `run` pauses at the request | Owner | Let `run --answers FILE` pre-answer the first data request (spec 0006 amendment); until then `run --no-wait` then `resume --answers` |
+| Q7 | The first change set arrives only by `resume --answers` after `run` pauses at the request | Owner | Decided by amendment B-354 in spec 0006 (§4.2.1, §4.4.7, AC47, AC64, Q17): `run --answers FILE` pre-answers the first change-set request; the engineer starts `run` without `--no-wait`, confirms the basis on the page and approves the change set there. The interim `run --no-wait` route is withdrawn: a `--no-wait` run cannot confirm the basis, so it cannot start this workflow |
+| Q11 | The A3 audit and the A7 prompt count (AC25, AC26) are functions, and spec 0006 AC1 allows six commands only (`LOCAL-TESTING.md` open point 7) | Owner | Decided by amendment B-354: the read-only module entry point `python -m eng_harness.report` with `audit-sources` and `count-prompts` (AC35), as spec 0009 exposes `python -m eng_harness.providers` (its Q6); no seventh command |
 | Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `am.clean` (an unknown message must not pass silently) |

@@ -49,7 +49,7 @@ end to end, engineer time included (baseline ب1).
 |---|---|---|
 | ETABS model file | Engineer, command-line `--input` | Never opened in the engineer's own ETABS: a hidden or visible instance that the run launches opens a copy (S-12 §1 step 2, baseline ج2) |
 | Template and design basis | Engineer: template plus values file, confirmed on the page | Fields of spec 0007 §4.8: comparison tolerances, change-set bounds, ratio and drift limits, design kinds, attempt limits. No value is shipped (spec 0004 §4.8) |
-| Change set | Engineer, or a coding agent from the engineer's words, as a JSON answers file (`resume --answers`) | One per cycle; edit kinds of §4.1 below; each value from the design basis or entered as an engineer input for this cycle |
+| Change set | Engineer, or a coding agent from the engineer's words, as a JSON answers file (`run --answers` for the first change set of a run, `resume --answers` after a pause; spec 0006 AC64) | One per cycle; edit kinds of §4.1 below; each value from the design basis or entered as an engineer input for this cycle |
 | Permission mode | Command-line `--mode` | `work_on_copy` by default; §6 |
 | `sasaah-csi-mcp` build | Pinned by the adapter (spec 0002 §4.3.4) | Checked before any write (§4, step 1) |
 
