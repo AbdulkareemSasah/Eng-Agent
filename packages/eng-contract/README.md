@@ -7,5 +7,6 @@ Plan: [docs/plans/0001-eng-contract-0.1.md](docs/plans/0001-eng-contract-0.1.md)
 Install from the workspace root with `uv sync`. Import name: `eng_contract`; other packages may import only the
 modules listed in `public_modules` of `pyproject.toml`.
 
-Limits: this skeleton holds only the version constants; the modules arrive task by task (T2 onward). Nothing here
-talks to a host program.
+JSON Schema snapshots of every public model and kind are in `docs/schema/`; regenerate them with
+`uv run python -m eng_contract._schema_export docs/schema` (a test fails when they are stale). Nothing here talks to a
+host program.

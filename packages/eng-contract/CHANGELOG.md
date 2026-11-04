@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- JSON Schema snapshots in `docs/schema/` and the exporter `_schema_export` (`uv run python -m eng_contract._schema_export docs/schema`), spec 4.12, with the freshness test AC51 (B-025, plan task T16). Owner queue: the `source` of each `units.json` entry points to `docs/verification/units.md` because the unit table keeps citations in comments only (gap G-4); the version bump to `0.1.0` is outside the T16 file globs (`pyproject.toml`, `__init__.py`, `test_package.py`) and needs a plan amendment or the release task; AC52 and AC53 are proven by the gate in CI.
+
 - MCP mapping helpers: `envelope_to_tool_result`, `tool_result_to_envelope`, `extract_raw_reply`, `output_schema`, `NotAnEnvelope` (`mcp`), spec 4.11 (B-024).
 - Package skeleton: `pyproject.toml`, gate configuration, version constants `CONTRACT_VERSION`, `UNITS_VERSION`,
   `__version__` (B-010).
