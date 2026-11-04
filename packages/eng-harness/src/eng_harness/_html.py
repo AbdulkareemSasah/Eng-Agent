@@ -49,7 +49,9 @@ class Href:
 
     __slots__ = ("value",)
 
-    def __init__(self, value: str) -> None:
+    def __init__(self, value: str, _mint: object = None) -> None:
+        if _mint is not _MINT:
+            raise HtmlError("Href is created only by href()")
         self.value = value
 
 
@@ -58,7 +60,7 @@ def href(*segments: SafeToken) -> Href:
     for segment in segments:
         if not isinstance(segment, SafeToken) or segment in {".", ".."}:
             raise HtmlError("a URL segment must be a SafeToken other than . and ..")
-    return Href("/" + "/".join(segments))
+    return Href("/" + "/".join(segments), _MINT)
 
 
 class Node:
@@ -173,8 +175,8 @@ class Element(Node):
     def __init__(self, tag: Tag, children: Sequence[Node], attrs: dict[str, object]) -> None:
         if not isinstance(tag, Tag):
             raise HtmlError("tag not allowed")
-        if any(not isinstance(child, Node) for child in children):
-            raise HtmlError("a child must be a Node (Text, Trusted or Element)")
+        if any(type(child) not in _NODES for child in children):
+            raise HtmlError("a child must be a Text, Trusted or Element of this module")
         if tag in _VOID and children:
             raise HtmlError("a void element has no children")
         self._tag, self._children = tag, tuple(children)
@@ -238,7 +240,7 @@ def stylesheet(css: LiteralString) -> Stylesheet:
 
 def document(title: Node, body: Sequence[Node], style: Stylesheet) -> str:
     """Return a complete English page with one style element and the policy that allows only it (no script)."""
-    if not isinstance(style, Stylesheet) or not isinstance(title, Node):
+    if not isinstance(style, Stylesheet) or type(title) not in _NODES:
         raise HtmlError("document takes a Node title and a Stylesheet")
     policy = f"default-src 'none'; style-src {style.csp_source}"
     head = f'<meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="{policy}">'
@@ -246,3 +248,6 @@ def document(title: Node, body: Sequence[Node], style: Stylesheet) -> str:
         f'<!doctype html><html lang="en" dir="ltr"><head>{head}<title>{title.render()}</title>{style.render()}</head>'
         f"{el(Tag.BODY, *body).render()}</html>"
     )
+
+
+_NODES: frozenset[type[Node]] = frozenset({Text, Trusted, Element, Stylesheet})  # closed: no foreign subclass

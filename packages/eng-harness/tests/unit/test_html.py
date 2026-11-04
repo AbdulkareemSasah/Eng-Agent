@@ -156,8 +156,8 @@ def test_field_labels_and_wraps_untrusted_value() -> None:
         '<span class="field"><span class="label">Drawing</span> '
         '<bdi dir="auto">&lt;img src=x onerror=&quot;y&quot;&gt;</bdi></span>'
     )
-    mixed = field(trusted("Name"), "عمود C12 ٣٠\u00d7٤٠")
-    assert '<bdi dir="auto">عمود C12 ٣٠\u00d7٤٠</bdi>' in mixed.render()
+    mixed = field(trusted("Name"), "عمود C12 \u0663\u0660\u00d7\u0664\u0660")
+    assert '<bdi dir="auto">عمود C12 \u0663\u0660\u00d7\u0664\u0660</bdi>' in mixed.render()
     assert "&lt;U+202E&gt;" in field(trusted("Name"), "a\u202eb").render()
     assert "&lt;U+0000&gt;" in field(trusted("Name"), "a\x00b").render()
 
