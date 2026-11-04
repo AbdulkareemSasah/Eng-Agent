@@ -164,7 +164,7 @@ def test_windows_job_only_on_push() -> None:
 
 
 def test_gate_action_runs_only_check() -> None:
-    """AC59: the gate action runs ``eng-gate check`` only; the tests step runs each member's tests, not a workspace run."""
+    """AC59: the gate action runs ``eng-gate check`` only; the tests step runs each member's tests."""
     action = _action("gate")
     steps = action["runs"]["steps"]
     assert len(steps) == 1
