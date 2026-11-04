@@ -67,3 +67,21 @@ def test_reader_imports_nothing_from_the_gate_package() -> None:
             assert node.level == 0, "a relative import reaches the package of the judged tree"
             imported.add(node.module or "")
     assert not {name for name in imported if name.split(".")[0] == "eng_dev_gate"}
+
+
+def test_script_writes_the_interpreter_and_the_distribution_map(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AC54a: the file also holds ``sys.executable`` and ``packages_distributions()`` of the judged environment."""
+    site = tmp_path / "site"
+    add_dist(site, "Some-Dist")
+    (site / "Some_Dist-1.0.dist-info" / "top_level.txt").write_text("somemod\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(site))
+    out = tmp_path / "metadata.json"
+    monkeypatch.setattr(sys, "argv", ["judged_metadata.py", str(out)])
+    with pytest.raises(SystemExit):
+        runpy.run_path(str(Path(judged_metadata.__file__)), run_name="__main__")
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert written["executable"] == sys.executable
+    assert written["packages"]["somemod"] == ["Some-Dist"]
+    assert "Some-Dist" in {entry["name"] for entry in written["distributions"]}

@@ -6,11 +6,12 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
-from eng_dev_gate.checks import tool_steps
+from eng_dev_gate.checks import tests_step, tool_steps
 from eng_dev_gate.checks.registry import StepContext
-from eng_dev_gate.results import UsageError
+from eng_dev_gate.results import EnvironmentFaultError, UsageError
 from eng_dev_gate.toolrun import ToolResult
 from eng_dev_gate.workspace import Member
+from support.scripted import EnvironmentRunner, environment_payload
 
 
 class Recorder:
@@ -179,3 +180,39 @@ def test_mypy_keeps_its_cache_outside_the_judged_tree(tmp_path: Path) -> None:
         assert not cache.is_relative_to(ctx.root)
         assert not cache.is_relative_to(ctx.gate_root)
         assert not cache.exists()  # removed after the run
+
+
+def _judged_types(tmp_path: Path, runner: EnvironmentRunner) -> StepContext:
+    ctx, _ = _context(tmp_path, "[tool.mypy]\nstrict = true\n")
+    assert ctx.member is not None
+    (ctx.member.directory / "src").mkdir()
+    return StepContext(ctx.root, ctx.gate_root, ctx.member, runner)
+
+
+def test_mypy_runs_with_the_interpreter_of_the_judged_environment(tmp_path: Path) -> None:
+    """AC54a: the gate's own mypy, told where the judged environment's packages and stubs are."""
+    runner = EnvironmentRunner(environment_payload(executable="/judged/bin/python"))
+    ctx = _judged_types(tmp_path, runner)
+    assert tool_steps.types(ctx) == []
+    argv, cwd = runner.calls[-1]
+    assert argv[1:3] == ["-m", "mypy"]  # the gate's mypy, not the judged environment's
+    assert argv[argv.index("--python-executable") + 1] == "/judged/bin/python"
+    assert cwd == ctx.root
+    assert [a[:2] for a, _ in runner.calls[:2]] == [["uv", "lock"], ["uv", "run"]]
+
+
+def test_mypy_with_a_stale_lock_is_st001_and_does_not_run(tmp_path: Path) -> None:
+    runner = EnvironmentRunner(lock=2)
+    ctx = _judged_types(tmp_path, runner)
+    (finding,) = tool_steps.types(ctx)
+    assert (finding.code, finding.path) == ("ST001", "pkgs/a")
+    assert finding.message.startswith("types: uv.lock of the judged tree is not up to date")
+    assert len(runner.calls) == 1
+
+
+def test_mypy_without_uv_is_an_environment_fault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tests_step, "_uv_available", lambda: False)
+    runner = EnvironmentRunner()
+    with pytest.raises(EnvironmentFaultError, match="types: uv is not available"):
+        tool_steps.types(_judged_types(tmp_path, runner))
+    assert runner.calls == []
