@@ -46,10 +46,10 @@ def _parse(line: bytes) -> SessionMessage | Exception:
 class ProcessTransport(AbstractAsyncContextManager[TransportStreams]):
     """The SDK's `Transport` over the pipes of `launched`; it also stops the process when it is left.
 
-    Two worker threads (through `anyio.to_thread`) read standard output and write standard input. End-of-file or a
-    broken pipe closes the read stream, which the session sees as the connection ending. Leaving the context closes
-    standard input (a server ends on end-of-file), waits `grace_s` seconds for the process, then ends its job; host
-    programs the server started in their own session or job are not touched.
+    Worker threads (through `anyio.to_thread`) read standard output and write standard input. End-of-file or a broken
+    pipe closes the read stream, which the session sees as the connection ending. Leaving the context closes standard
+    input (a server ends on end-of-file), waits `grace_s` seconds, then ends the job; host programs the server started
+    in their own session or job are not touched.
     """
 
     def __init__(self, launched: LaunchedProcess, *, grace_s: float) -> None:
