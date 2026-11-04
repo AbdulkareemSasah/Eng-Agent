@@ -12,14 +12,25 @@ import time
 
 
 def _sleeper(new_session: bool) -> int:
-    """Fork a process that closes its standard streams and sleeps; return its pid."""
+    """Fork a process that closes its standard streams and sleeps; return its pid once it is set up.
+
+    The child reports through a pipe after `setsid`, so a host stand-in has left the server's process group before its
+    pid is announced; without the handshake a reader of the group could still count it as a member (B-368).
+    """
+    ready_read, ready_write = os.pipe()
     pid = os.fork()
     if pid == 0:
+        os.close(ready_read)
         if new_session:
             os.setsid()
+        os.write(ready_write, b"1")
+        os.close(ready_write)
         os.closerange(0, 3)
         time.sleep(120)
         os._exit(0)
+    os.close(ready_write)
+    os.read(ready_read, 1)
+    os.close(ready_read)
     return pid
 
 
