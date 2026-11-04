@@ -28,7 +28,7 @@ class HashInputs(CheckInputs):
         edition="1",
         clauses=("1.1",),
         title="Synthetic hash check",
-        members=frozenset({SubjectKind.SECTION, SubjectKind.MEMBER}),
+        members=frozenset({SubjectKind.SECTION, SubjectKind.FRAME}),
         spec="hashpack/demo.md",
         unconditional="synthetic clause spec section 1",
     ),

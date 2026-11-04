@@ -106,7 +106,9 @@ def test_hash_inputs(hashpack: Fixture, monkeypatch: pytest.MonkeyPatch) -> None
 
     class OtherInputs(CheckInputs):
         width_mm: float = bounded(
-            ge=Cited(value=1, unit="mm", source="s"), le=Cited(value=2, unit="mm", source="s"), unit="mm"
+            ge=Cited(value=1, unit="mm", source="synthetic bound"),
+            le=Cited(value=2, unit="mm", source="synthetic bound"),
+            unit="mm",
         )
 
     assert content_hash(replace(check, inputs=OtherInputs)) != first
@@ -131,13 +133,14 @@ def test_document_fields(hashpack: Fixture) -> None:
     assert doc["eng_contract"] == eng_contract.__version__
     assert doc["base"] is None
     assert doc["preconditions"] == []
-    assert doc["meta"]["members"] == ["MEMBER", "SECTION"]
+    assert doc["meta"]["members"] == ["frame", "section"]
     assert doc["inputs_schema"]["properties"]["width_mm"]["maximum"] == 100.0
     modules = doc["modules"]
     assert all(re.fullmatch(r"[0-9a-f]{64}", digest) for digest in modules.values())
     assert {n for n in modules if n.startswith(_PACK)} == set(_PACK_CLOSURE)
     assert {n.partition(".")[0] for n in modules} == {_PACK, "structural_codes", "eng_contract"}
-    assert "structural_codes.meta" in modules and "eng_contract.cited" in modules
+    assert "structural_codes.meta" in modules
+    assert "eng_contract.cited" in modules
 
 
 def test_base_hash(hashpack: Fixture) -> None:
