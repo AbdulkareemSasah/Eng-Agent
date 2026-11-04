@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses
+from eng_dev_gate.checks import licenses, ratchet
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
@@ -56,6 +56,8 @@ def _parser() -> argparse.ArgumentParser:
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
+        if name == "ratchet":
+            child.add_argument("--update", action="store_true", help="lower the recorded counts; never raises one")
         if name == "licenses":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
@@ -167,4 +169,9 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:], {"check": make_handler(), "licenses": licenses.make_handler()}))
+    raise SystemExit(
+        main(
+            sys.argv[1:],
+            {"check": make_handler(), "licenses": licenses.make_handler(), "ratchet": ratchet.make_handler()},
+        )
+    )
