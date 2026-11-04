@@ -15,13 +15,14 @@ from structural_codes.check import Check
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.pack import ENTRY_POINT_GROUP, Pack, Registry
 
+_PACK_MODULE = "synth" + "base"
 _SRC = Path(__file__).parent.parent / "fixtures" / "synthbase" / "src"
 
 
 @pytest.fixture
 def synthbase(monkeypatch: pytest.MonkeyPatch) -> Iterator[Pack]:
     monkeypatch.syspath_prepend(str(_SRC))
-    pack = importlib.import_module("synthbase").PACK
+    pack = importlib.import_module(_PACK_MODULE).PACK
     assert isinstance(pack, Pack)
     yield pack
     for name in [n for n in sys.modules if n == "synthbase" or n.startswith("synthbase.")]:

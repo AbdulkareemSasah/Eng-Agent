@@ -2,6 +2,7 @@
 
 from eng_contract.cited import Cited
 from eng_contract.verdicts import SubjectKind
+
 from structural_codes.applicability import Outcome, Precondition
 from structural_codes.check import Check, check
 from structural_codes.inputs import CheckInputs, bounded

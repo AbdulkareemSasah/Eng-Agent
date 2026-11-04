@@ -7,3 +7,4 @@
 - Check inputs, `bounded` and `unbounded` helpers, `ratio_limit` and preconditions: `structural_codes.inputs`, `structural_codes.applicability` (B-257).
 - Trace recorder: `structural_codes.trace.TraceRecorder` (B-258).
 - Verdict builder `TraceRecorder.verdict` and governing selection `structural_codes._verdict` (B-259).
+- Check decorator, packs and registry: `structural_codes.check`, `structural_codes.pack`, `synthbase` test fixture pack (B-260).

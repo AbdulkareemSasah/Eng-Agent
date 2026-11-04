@@ -2,7 +2,7 @@
 
 from structural_codes.pack import Pack
 
-from synthbase.checks import SYNTH_CHECKS
+from .checks import SYNTH_CHECKS
 
 PACK = Pack(
     name="synthbase",
