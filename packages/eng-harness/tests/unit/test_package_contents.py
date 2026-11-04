@@ -1,9 +1,12 @@
 """The built wheel holds no test code (plan 0002 T4; spec 0002 AC35)."""
 
 import asyncio
+import os
 import shutil
 import zipfile
 from pathlib import Path
+
+import pytest
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 
@@ -23,6 +26,11 @@ async def _build_wheel(uv: str, out_dir: Path) -> int:
 
 
 def test_fakes_not_shipped(tmp_path: Path) -> None:
+    if not (PACKAGE_ROOT / "README.md").is_file() and "MUTANT_UNDER_TEST" in os.environ:
+        # The mutation step runs the tests in a copy without README.md, which the build needs; any other run fails.
+        pytest.skip(
+            "the package copy of the mutation step lacks README.md, so it cannot be built (B-369); expires 2026-12-31"
+        )
     fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_csi"
     assert (fake / "server.py").is_file()
     assert (fake / "schemas.json").is_file()
