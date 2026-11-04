@@ -5,3 +5,17 @@ No host program is involved. These checks need the owner's machine (plan 0001 se
 2. The run lock is released after killing the engine from Task Manager.
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
+
+Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
+1. `csi_launch` on the owner's machine: which process is the ETABS parent, the pid the reply names, and that the instance survives the server job's closure.
+2. A second server (`long` role) attaching by pid to a server-launched instance.
+3. The live `tools/list` fingerprint against the allowlist's.
+4. The `serverInfo` the Sasaah server reports.
+5. Every table key and reply field of spec 0002 sections 4.6.2 and 4.6.4, and the reply fields of every mapped list tool.
+6. A server `timeout` during a write and during an analysis, the units afterwards, each reconciliation rule, `locked` after a completed analysis, and a proof-of-end mechanism for an abandoned analysis call; after a `timeout` on a role, re-attachment with `launched: false`, `csi_exit` refused, and what `csi_status` reports.
+7. Fingerprint stability and the blind spots of the read set.
+8. `close_started` closing a hidden launched instance and leaving a visible one.
+9. The host-instance lock across two engine processes.
+10. `dxf-prep/prepare` and `etabs-model/build` through the adapter, including the configuration rewrite and the build-artifact hash.
+11. `eng-harness doctor` on the owner's machine, including the integrity level and installed products.
+12. Record mode on a copy, and the owner's review of the recordings before commit.

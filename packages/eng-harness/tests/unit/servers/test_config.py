@@ -166,9 +166,9 @@ def test_invalid_values_name_the_key(tmp_path: Path, old: str, new: str, key: st
 
 
 def test_unreadable_and_malformed_files(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="harness.toml"):
+    with pytest.raises(ConfigError, match=r"harness\.toml"):
         load_servers_config(tmp_path / "harness.toml")
-    with pytest.raises(ConfigError, match="harness.toml"):
+    with pytest.raises(ConfigError, match=r"harness\.toml"):
         load_servers_config(_write(tmp_path, "[servers\n"))
 
 
