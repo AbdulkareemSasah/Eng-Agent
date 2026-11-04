@@ -1,0 +1,10 @@
+# Policy of the forbidden check (spec 4.8). Protected path (.gate/**); read from the gate root.
+escape_hatch:  # FB001: exact names, and regexes that must fully match a function or class name (case-insensitive)
+  names: [csi_run_script, csi_db_tables_apply]
+  patterns:
+    - '(?i)(?:\w+_)?(?:run|exec|execute|eval|evaluate)_?(?:script|code|expr|expression|macro)s?(?:_\w+)?'
+    - '(?i)(?:\w+_)?(?:apply|write)_?(?:db|database)_?tables?(?:_\w+)?'
+    - '(?i)(?:\w+_)?(?:forward|proxy|passthrough)_?(?:arbitrary_|any_)?(?:api_)?(?:call|request)s?(?:_\w+)?'
+    - '(?i)(?:\w+_)?arbitrary_?(?:api_?)?(?:call|request)s?(?:_\w+)?'
+host_sdk:  # FB003: top-level modules of host program SDKs (ETABS, SAFE, SAP2000, IDEA StatiCa names are a gap, Q10)
+  modules: [win32com, pythoncom, pywintypes, comtypes, clr, System, Autodesk]
