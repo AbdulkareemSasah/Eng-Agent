@@ -28,6 +28,14 @@ def _with_entry(key: str, entry: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _leaf(template: Template, group: str, key: str) -> Entry:
+    node = template.materials[group]
+    assert isinstance(node, dict)
+    leaf = node[key]
+    assert isinstance(leaf, Entry)
+    return leaf
+
+
 def _refused(data: object, file_name: str | None = FILE_NAME) -> TemplateInvalid:
     with pytest.raises(TemplateInvalid) as caught:
         Template.from_data(data, file_name=file_name)
@@ -57,8 +65,7 @@ def test_valid_template_loads() -> None:
         template.drawing,
     ):
         assert section
-    leaf = template.materials["alpha"]["strength_MPa"]
-    assert isinstance(leaf, Entry)
+    leaf = _leaf(template, "alpha", "strength_MPa")
     assert (leaf.value, leaf.unit, leaf.citation) == (1, "MPa", CITE)
     unitless = template.analysis["method"]
     assert isinstance(unitless, Entry)
@@ -111,8 +118,7 @@ def test_extra_keys_forbidden() -> None:
 
 def test_string_value_is_never_evaluated() -> None:
     template = Template.from_data(_with_entry("note", _entry("1+1", None)), file_name=FILE_NAME)
-    leaf = template.materials["alpha"]["note"]
-    assert isinstance(leaf, Entry)
+    leaf = _leaf(template, "alpha", "note")
     assert leaf.value == "1+1"
 
 
@@ -141,7 +147,8 @@ def test_canonical_unit_accepted(key: str, unit: str) -> None:
 
 
 def test_values_and_bounds() -> None:
-    for bad in (math.nan, math.inf, -math.inf, True, "1", None, [math.nan]):
+    bad_values: list[object] = [math.nan, math.inf, -math.inf, True, "1", None, [math.nan]]
+    for bad in bad_values:
         assert _refused(_with_entry("strength_MPa", _entry(bad))).reason == "value_invalid"
 
     bounds = {"min": _bound(1), "max": _bound(3)}
@@ -248,3 +255,14 @@ def test_ask_item_rules(item: dict[str, Any]) -> None:
     data = _data()
     data["ask_each_run"] = [item]
     assert _refused(data).reason == "value_invalid"
+
+
+def test_ask_each_run_must_be_a_list() -> None:
+    data = _data()
+    data["ask_each_run"] = {"path": "a.b"}
+    assert _refused(data).reason == "value_invalid"
+
+
+def test_bound_with_unknown_unit_is_invalid() -> None:
+    bound = {"min": {"value": 1, "unit": "furlong", "source": "Synthetic placeholder bound"}}
+    assert _refused(_with_entry("strength_MPa", _entry(2, bounds=bound))).reason == "bounds_invalid"
