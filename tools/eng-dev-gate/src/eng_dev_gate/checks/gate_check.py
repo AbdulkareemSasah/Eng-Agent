@@ -26,6 +26,7 @@ from eng_dev_gate.results import Status, UsageError
 
 LARGEST_FILES_SHOWN = 3  # files named in a GC009 message (presentation only)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_FENCE_CLOSE = re.compile(r" {0,3}(`{3,}|~{3,})[ \t]*")
 _PLAN_TASK = re.compile(r"(\S+)#(T\d+[a-z]*)")
 _NONE = re.compile(r"none \(.+\)")
 _BOOTSTRAP_ITEM = re.compile(r"B-\d+")
@@ -60,9 +61,9 @@ def parse_body(body: str) -> BodyFields:
     fields: dict[str, list[tuple[int, str]]] = {"plan_task": [], "work_item": [], "closes": []}
     fence, in_comment = "", False
     for number, raw in enumerate(body.splitlines(), 1):
-        stripped = raw.strip()
         if fence:
-            if stripped and set(stripped) == {fence[0]} and len(stripped) >= len(fence):
+            closer = _FENCE_CLOSE.fullmatch(raw)
+            if closer and closer[1][0] == fence[0] and len(closer[1]) >= len(fence):
                 fence = ""
             continue
         if not in_comment and (opener := _FENCE.match(raw)):
