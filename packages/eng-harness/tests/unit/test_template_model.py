@@ -279,6 +279,7 @@ def test_models_refuse_invalid_entries_without_from_data() -> None:
     with pytest.raises(TemplateInvalid):
         Entry(value=1, unit="MPa", citation="short")
     data = _with_entry("strength_MPa", {"value": 1, "unit": "kPa", "citation": CITE})
+    del data["schema"]
     with pytest.raises(TemplateInvalid) as caught:
         Template.model_validate(data)
     assert (caught.value.reason, caught.value.path) == ("unit_mismatch", "materials.alpha.strength_MPa")

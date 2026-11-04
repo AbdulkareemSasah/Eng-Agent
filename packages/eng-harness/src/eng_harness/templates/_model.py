@@ -10,12 +10,21 @@ Errors: `TemplateInvalid` (contract code INVALID_ARGUMENT) with a `reason` key, 
 import math
 import re
 from collections.abc import Mapping
-from typing import Annotated, Final, Literal, Self, cast
+from typing import Annotated, Final, Literal, Self
 
 from eng_contract.cited import Cited
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.units import UnitError, kind_for_field
-from pydantic import BaseModel, ConfigDict, JsonValue, StrictBool, StringConstraints, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    JsonValue,
+    ModelWrapValidatorHandler,
+    StrictBool,
+    StringConstraints,
+    ValidationError,
+    model_validator,
+)
 
 Reason = Literal[
     "yaml_invalid",
@@ -41,7 +50,6 @@ _SEMVER = (  # Semantic Versioning 2.0.0, section 2 of semver.org
     r"(?:-(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*)?"
     r"(?:\+[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*)?"
 )
-_FILE = re.compile(rf"^({_NAME[1:-1]})-({_SEMVER})\.template\.yaml$")
 _MODEL = ConfigDict(frozen=True, extra="forbid")
 
 
@@ -63,15 +71,65 @@ class Bounds(BaseModel):
     min: Cited | None = None
     max: Cited | None = None
 
+    @model_validator(mode="wrap")
+    @classmethod
+    def _unit_known(cls, data: object, handler: ModelWrapValidatorHandler[Self]) -> Self:
+        try:
+            return handler(data)
+        except UnitError as error:
+            raise TemplateInvalid("bounds_invalid", "") from error
+
+
+def _limits_ok(bounds: Bounds, unit: str | None) -> None:
+    """Raise `bounds_invalid` unless a limit exists, each limit is in `unit` (or '1') and min <= max."""
+    limits = [limit for limit in (bounds.min, bounds.max) if limit is not None]
+    if not limits or any(limit.unit != (unit or "1") for limit in limits):
+        raise TemplateInvalid("bounds_invalid", "")
+    if bounds.min and bounds.max and bounds.min.value > bounds.max.value:
+        raise TemplateInvalid("bounds_invalid", "")
+
+
+def _json_ok(value: object) -> bool:
+    """True for a finite number, integer, string or bool, or a list or mapping of those (never null)."""
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_json_ok(item) for item in value)
+    if isinstance(value, dict):
+        return all(isinstance(k, str) and _json_ok(v) for k, v in value.items())
+    return isinstance(value, bool | int | str)
+
 
 class Entry(BaseModel):
-    """A leaf: JSON `value` (never null), canonical `unit` or null, `citation` (8 to 500 characters), `bounds`."""
+    """A leaf: JSON `value` (finite, never null), canonical `unit` or null, `citation` (8 to 500), `bounds`.
+
+    The model refuses to be built without a valid citation, value and bounds (`TemplateInvalid`, path empty);
+    `Template` checks the unit against the key suffix.
+    """
 
     model_config = _MODEL
-    value: JsonValue
-    unit: str | None
-    citation: str
+    value: JsonValue = None
+    unit: str | None = None
+    citation: str | None = None
     bounds: Bounds | None = None
+
+    @model_validator(mode="after")
+    def _checked(self) -> Self:
+        text = self.citation
+        if text is None or not 8 <= len(text) <= 500 or not text.strip():
+            raise TemplateInvalid("citation_missing", "")
+        if not _json_ok(self.value):
+            raise TemplateInvalid("value_invalid", "")
+        if self.bounds is not None:
+            _limits_ok(self.bounds, self.unit)
+            number = self.value
+            if isinstance(number, bool) or not isinstance(number, int | float):
+                raise TemplateInvalid("bounds_invalid", "")
+            if (self.bounds.min and number < self.bounds.min.value) or (
+                self.bounds.max and number > self.bounds.max.value
+            ):
+                raise TemplateInvalid("out_of_bounds", "")
+        return self
 
 
 class CodePack(BaseModel):
@@ -106,7 +164,7 @@ class AskItem(BaseModel):
     """A value the engineer is asked for at each run; carries no value (rules as `FieldSpec`, spec 4.5)."""
 
     model_config = _MODEL
-    path: Annotated[str, StringConstraints(strict=True, pattern=r"^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$")]
+    path: Annotated[str, StringConstraints(strict=True, pattern=rf"^{_SEGMENT.pattern}(\.{_SEGMENT.pattern})*$")]
     label: Annotated[str, StringConstraints(strict=True, min_length=1, max_length=120)]
     kind: Literal["quantity", "count", "choice", "text"]
     unit: str | None = None
@@ -119,6 +177,10 @@ class AskItem(BaseModel):
             raise ValueError("only a quantity has a unit")
         if (self.kind == "choice") is (self.choices is None) or (self.choices is not None and len(self.choices) < 2):
             raise ValueError("a choice has two or more choices and no other kind has any")
+        if self.bounds is not None:
+            if self.kind not in ("quantity", "count"):
+                raise TemplateInvalid("bounds_invalid", "")
+            _limits_ok(self.bounds, self.unit)
         return self
 
 
@@ -140,6 +202,12 @@ class Template(BaseModel):
     modeling: Section = {}
     drawing: Section = {}
     ask_each_run: list[AskItem] = []
+
+    @model_validator(mode="after")
+    def _keys_match_units(self) -> Self:
+        for name in SECTIONS:
+            _walk(getattr(self, name), name)
+        return self
 
     @property
     def is_draft(self) -> bool:
@@ -187,10 +255,14 @@ def _build[M: BaseModel](model: type[M], data: object, path: str, reason: Reason
     """Validate `data` into `model`; an extra key gives `unknown_key`, any other failure gives `reason`."""
     try:
         return model.model_validate(data)
+    except TemplateInvalid as error:
+        raise TemplateInvalid(error.reason, path) from error
     except ValidationError as error:
         for found in error.errors():
             if found["type"] == "extra_forbidden":
                 raise TemplateInvalid("unknown_key", ".".join([path, *map(str, found["loc"])])) from error
+        if any(found["loc"][:1] == ("bounds",) for found in error.errors()):
+            raise TemplateInvalid("bounds_invalid", path) from error
         raise TemplateInvalid(reason, path) from error
     except UnitError as error:
         raise TemplateInvalid(reason, path) from error
@@ -219,44 +291,25 @@ def _tree(node: object, path: str) -> Section:
             raise TemplateInvalid("unknown_key", here)
         if not isinstance(child, Mapping):
             raise TemplateInvalid("value_invalid", here)
-        out[key] = _entry(child, key, here) if "citation" in child or "value" in child else _tree(child, here)
+        out[key] = (
+            _build(Entry, child, here, "value_invalid")
+            if "citation" in child or "value" in child
+            else _tree(child, here)
+        )
     return out
 
 
-def _json_ok(value: object) -> bool:
-    if isinstance(value, float):
-        return math.isfinite(value)
-    if isinstance(value, list):
-        return all(item is None or _json_ok(item) for item in value)
-    if isinstance(value, dict):
-        return all(isinstance(k, str) and (v is None or _json_ok(v)) for k, v in value.items())
-    return isinstance(value, bool | int | str)
-
-
-def _entry(raw: Mapping[str, object], key: str, path: str) -> Entry:
-    for name in raw:
-        if name not in ("value", "unit", "citation", "bounds"):
-            raise TemplateInvalid("unknown_key", _join(path, name))
-    citation, unit, value = raw.get("citation"), raw.get("unit"), raw.get("value")
-    if not isinstance(citation, str) or not 8 <= len(citation) <= 500 or not citation.strip():
-        raise TemplateInvalid("citation_missing", path)
-    if unit != _canonical_unit(key):
-        raise TemplateInvalid("unit_mismatch", path)
-    number = value if isinstance(value, int | float) and not isinstance(value, bool) else None
-    if value is None or not _json_ok(value) or (kind_for_field(key) is not None and number is None):
-        raise TemplateInvalid("value_invalid", path)
-    bounds = None if "bounds" not in raw else _bounds(raw["bounds"], unit, number, path)
-    return Entry(value=cast(JsonValue, value), unit=unit, citation=citation, bounds=bounds)
-
-
-def _bounds(raw: object, unit: str | None, value: float | None, path: str) -> Bounds:
-    """Validate the bounds of an entry: each limit `Cited` in the entry's unit, min <= max, value inside."""
-    bounds = _build(Bounds, raw, path, "bounds_invalid")
-    limits = [limit for limit in (bounds.min, bounds.max) if limit is not None]
-    if value is None or not limits or any(limit.unit != (unit or "1") for limit in limits):
-        raise TemplateInvalid("bounds_invalid", path)
-    if bounds.min and bounds.max and bounds.min.value > bounds.max.value:
-        raise TemplateInvalid("bounds_invalid", path)
-    if (bounds.min and value < bounds.min.value) or (bounds.max and value > bounds.max.value):
-        raise TemplateInvalid("out_of_bounds", path)
-    return bounds
+def _walk(node: Section, path: str) -> None:
+    """Check each leaf's key shape, its unit against the key suffix, and a number under a quantity key."""
+    for key, child in node.items():
+        here = _join(path, key)
+        if not _SEGMENT.fullmatch(key):
+            raise TemplateInvalid("unknown_key", here)
+        if not isinstance(child, Entry):
+            _walk(child, here)
+        elif child.unit != _canonical_unit(key):
+            raise TemplateInvalid("unit_mismatch", here)
+        elif kind_for_field(key) is not None and (
+            isinstance(child.value, bool) or not isinstance(child.value, int | float)
+        ):
+            raise TemplateInvalid("value_invalid", here)
