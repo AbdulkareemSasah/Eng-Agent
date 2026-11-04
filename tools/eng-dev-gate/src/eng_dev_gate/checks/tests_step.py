@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import tempfile
 from pathlib import Path
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
 
 __all__ = ["DESELECTED_EXIT_CODE", "tests"]
 
-OUTPUT_LINES = 20  # first lines of pytest output quoted in ST001; presentation only
+OUTPUT_LINES = 20  # last lines of pytest output quoted in ST001; presentation only
 TEST_FAILURE_EXITS = (1, 5)  # pytest: 1 tests failed, 5 no tests collected; other codes are tool faults
 
 
@@ -29,6 +30,11 @@ def _totals(report: Path) -> dict[str, int]:
         return {k: int(totals[k]) for k in ("num_statements", "covered_lines", "num_branches", "covered_branches")}
     except (OSError, ValueError, KeyError, TypeError) as error:
         raise EnvironmentFaultError(f"tests: unusable coverage report {report}: {error!r}") from error
+
+
+def _pytest_cov_installed() -> bool:
+    """True when pytest-cov, a dev dependency only, can be imported; ``--no-cov`` is unknown to pytest without it."""
+    return importlib.util.find_spec("pytest_cov") is not None
 
 
 def _below(covered: int, total: int, minimum: int) -> bool:
@@ -54,7 +60,8 @@ def _run_coverage(runner: ToolRunner, member_dir: Path, work: Path) -> tuple[int
         "pyproject.toml",
         "-p",
         "eng_dev_gate.pytest_plugin",
-        "--no-cov",  # a member's own pytest-cov addopts would otherwise take over measurement from this run
+        # a member's own pytest-cov addopts would otherwise take over measurement from this run
+        *(["--no-cov"] if _pytest_cov_installed() else []),
         "tests",
     )
     outcome = runner.run(run, member_dir)

@@ -92,7 +92,7 @@ def test_command_lines(repo: Repo) -> None:
 
 
 def test_no_cov_only_when_pytest_cov_is_installed(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
-    """pytest rejects ``--no-cov`` without pytest-cov, which is a dev dependency only; the step must not pass it then."""
+    """pytest rejects ``--no-cov`` without pytest-cov (a dev dependency); the step must not pass it then."""
     import eng_dev_gate.checks.tests_step as step_module
 
     for installed, expected in ((True, True), (False, False)):
