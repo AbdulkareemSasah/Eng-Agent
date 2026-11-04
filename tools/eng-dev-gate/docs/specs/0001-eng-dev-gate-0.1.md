@@ -78,7 +78,7 @@ gate-check (§4.5)
 - AC9. Given a task id that the plan does not define, then GC007.
 - AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each.
 - AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
-- AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008.
+- AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008. Each of these gives GC008 as well: a changed `version` field; a package key added, removed or renamed without a count change of an in-scope package; a lowering (`ratchet --update`) of another package's count; a change anchored only by the workspace root (`.`).
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
@@ -327,7 +327,10 @@ Checks, in order (all run; findings accumulate):
    (`<dir>/docs/plans/`) when another changed file under `<dir>` matches a task glob: process/04 asks every task for a
    changelog entry and process/05 for its local-testing items (amendment B-096). `.gate/ratchet.json` is also in scope
    when every count it changes belongs to a package that has another changed file matching a task glob: a task that
-   adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Else GC008.
+   adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Any other
+   change to that file is GC008: the `version` field, a package key added, removed or renamed without a count change of
+   an in-scope package, and counts of other packages, lowerings by `ratchet --update` included (they go in a pull
+   request of their own); the workspace root (`.`) never anchors a change (amendment B-089). Else GC008.
 7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
@@ -505,7 +508,7 @@ workstation, the CI job never uses them:
 | 10 | `tests` | package | `python -m coverage run --branch` with `-m pytest` on `tests/` and the gate's pytest plugin; coverage JSON; line and branch compared separately with the package's thresholds (CV001, CV002) |
 | 11 | `docs-fresh` | package | Generated documents (`[tool.eng-gate].generated`, GF001, GF002) and `agents drift` for the package |
 | 12 | `licenses` | package | Allowed licenses of the dependency closure (LC001 to LC003) |
-| 13 | `mutation` | package | Mutation tests on changed R1 and R2 modules (MU001, MU002) |
+| 13 | `mutation` | package | Mutation tests on changed R1 and R2 modules (MU001, MU002, MU003) |
 | 14 | `workflows` | root | §4.14 rules WF001 to WF005 |
 
 A failing tool step reports ST001 with the step, tool, exit code and the first lines of its output. Tools run with an
@@ -590,11 +593,13 @@ package) and compares its standard output with the committed file after normaliz
 Mutation: for each file changed against the merge base that matches a package `r1_modules` or `r2_modules` glob, the
 backend mutates that file and runs the package tests; the score is killed (timeouts included) over total mutants and
 must be at least `mutation_min`. The backend is chosen in the mutation task (§11 Q4); on a platform it does not support,
-the step is reported `skipped` with the reason locally and fails in CI if skipped there.
+the step is reported `skipped` with the reason locally and fails in CI if skipped there. Only changed files that hold at
+least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
+reaches); when none remain the step passes with the notice MU003 (amendment B-026).
 
 ### 4.13 agents render, keys, drift
 
-`.gate/agents.yml` exists at the workspace root and in each package (`<package>/.gate/agents.yml`):
+`.gate/agents.yml` exists at the workspace root, in each package and in any other folder that holds one: every tracked `.gate/agents.yml` of the repository is a unit, so a shared package folder that is not itself a workspace member is managed too (amendment B-026):
 
 ```yaml
 template: ../../design/process/templates/AGENTS.template.md   # relative to the directory that holds .gate/
@@ -787,7 +792,8 @@ Diagnostic codes (the contract of this tool; the package `CHANGELOG.md` lists ch
 | IM | imports | 001 to 006, §4.10 |
 | SC | secrets | 001 match · 002 file skipped |
 | CF | configuration | 001 invalid table · 002 below floor · 003 weakening setting · 004 override file · 005 rerun plugin · 006 member without table · 007 `gate.yml` invalid · 008 bootstrap off without identities · 009 judging gate is not the gate of the base commit (§4.16) |
-| CV, ST, LC, GF, MU, AG, WF | coverage, tool step, licenses, generated, mutation, agents, workflows | as named in §4.12 to §4.14; WF 001 to 005 |
+| MU | mutation | 001 score below `mutation_min` · 002 backend failed or cannot run · 003 notice: nothing to mutate, no changed file holds a function body |
+| CV, ST, LC, GF, AG, WF | coverage, tool step, licenses, generated, agents, workflows | as named in §4.12 to §4.14; WF 001 to 005 |
 
 Exit code 2 covers CF007, CF008, RF003, RT005, AG007 and unreadable inputs; exit code 3 covers TF009, TF011, MU002, GF002 and
 tool or git failures; every other error finding exits 1.
@@ -832,7 +838,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |

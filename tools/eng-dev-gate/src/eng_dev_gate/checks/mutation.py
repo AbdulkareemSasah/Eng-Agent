@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import shutil
@@ -50,8 +51,20 @@ def changed_modules(config: PackageConfig, member_path: str, changes: list[Chang
     return sorted(path for path in found if matches_any(path, globs))
 
 
-def _notice(path: str, reason: str) -> list[Finding]:
-    return [Finding(code="MU002", severity=Severity.NOTICE, path=path, message=f"mutation not run: {reason}")]
+def _has_code(directory: Path, module: str) -> bool:
+    """True if ``module`` holds a function, method or lambda body (constants-only files have no mutant a test reaches).
+
+    A file that cannot be read or parsed counts as code, so that mutmut reports the fault.
+    """
+    try:
+        tree = ast.parse((directory / module).read_text(encoding="utf-8"))
+    except OSError, SyntaxError, ValueError:
+        return True
+    return any(isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda) for node in ast.walk(tree))
+
+
+def _notice(path: str, reason: str, code: str = "MU002") -> list[Finding]:
+    return [Finding(code=code, severity=Severity.NOTICE, path=path, message=f"mutation not run: {reason}")]
 
 
 def _event_base() -> str | None:
@@ -108,6 +121,8 @@ def run_step(ctx: StepContext) -> list[Finding]:
     modules = changed_modules(config, member.path, git.name_status(git.merge_base(base, "HEAD"), "HEAD"))
     if not modules:
         return []
+    if not (modules := [module for module in modules if _has_code(member.directory, module)]):
+        return _notice(member.path, "nothing to mutate: the changed files hold no function body", "MU003")
     if sys.platform == "win32":
         if os.environ.get("CI"):
             raise EnvironmentFaultError("MU002 mutation: mutmut has no native Windows support (ADR-0002)")
