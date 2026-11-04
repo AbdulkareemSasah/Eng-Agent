@@ -3,6 +3,8 @@
 from eng_contract.kinds import NEUTRAL_KINDS
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from eng_harness.kinds.calcs import CALC_KINDS
+
 
 class Value(BaseModel):
     """A JSON value stored by reference: journal blobs, run input and run output."""
@@ -25,5 +27,5 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.run_output/1": Value,
         "harness.approval_preview/1": ApprovalPreview,
     }
-)
-"""The neutral kinds plus the four harness kinds."""
+).extend(CALC_KINDS)
+"""The neutral kinds, the four harness kinds and the calc kinds (spec 0003 4.6 to 4.11)."""
