@@ -167,8 +167,10 @@ the real ports of this adapter against the synthetic fake.
 - AC18. Given a write, then it is sent on the `write` role in the `attended` class; given the engineer declines the
   dialog in the fake (fault `dialog_declined`), then the result is `CONFIRMATION_REQUIRED`, certain not applied, never
   retried; given the dialog is left open past the timeout (fault `dialog_unanswered`), then the result is `HOST_BUSY`
-  (`MODAL_DIALOG`) with no model change. Tests: `tests/workflow/adapters/test_revit_dialog.py::test_declined_not_applied`,
-  `::test_unanswered_is_busy`.
+  (`MODAL_DIALOG`) with no model change, provided the `write` role's `call_timeout_s` exceeds the add-in deadline (§4.2
+  rule 1; with a shorter one the fault yields `TIMEOUT_UNKNOWN_OUTCOME`, and the test for that case is
+  `::test_short_timeout_is_unknown`). Tests: `tests/workflow/adapters/test_revit_dialog.py::test_declined_not_applied`,
+  `::test_unanswered_is_busy`, `::test_short_timeout_is_unknown`.
 - AC19. Given a write whose reply says success but whose state is unchanged (fault `commit_unchecked`), or whose state
   differs from the request, then `check_model` gives `READBACK_MISMATCH` (error); given a read-back that cannot be read,
   `READBACK_UNAVAILABLE`; given an element missing after `change_element_type` (fault `element_replaced`), an error
@@ -234,7 +236,8 @@ the real ports of this adapter against the synthetic fake.
   `tests/contract/test_revit_recordings.py::test_adapter_on_recordings`.
 - AC32. Given `eng-harness doctor` with a `[servers.revit]` section, then it reports the configured pipe and whether the
   bridge answers, the executable and add-in hashes against the pin, the destructive toolset, the Revit version and
-  the open document's base name; a `fail` gives exit 1. Test: `tests/unit/test_doctor.py::test_revit_checks`.
+  the open document's base name, and a `warn` when the `write` role's `call_timeout_s` is not greater than the add-in
+  queue deadline (60 s, §4.2 rule 1); a `fail` gives exit 1. Test: `tests/unit/test_doctor.py::test_revit_checks`.
 - AC33. Given each Revit kind of §4.5 and §4.11, a valid fixture and one invalid fixture per rule (an unknown field,
   a unit-bearing field without its suffix, counts that do not match rows, an unsorted list) are validated and the invalid
   ones fail; given the role map of §4.8, a role without a name or status, an unknown status, or two roles with one GUID
@@ -275,8 +278,13 @@ call_timeout_s = <required>
 
 Rules (in addition to 0002 §4.2): (1) no timeout has a default; the doctor prints the Sasaah values for comparison
 (client 120 s; the add-in's own queue deadline appears to be a fixed 60 s, `E/Runtime/MainThreadRequestQueue.cs:25`,
-`A/RevitThreadHandlerDecorator.cs:31-36`, which makes the `attended` timeout longer than 60 s useless unless L3 shows
-otherwise). (2) **Required start options**, passed by the adapter: `--pipe-name`, `--bridge-timeout-ms`,
+`A/RevitThreadHandlerDecorator.cs:31-36`, to be confirmed by L3). **The `write` role's `call_timeout_s` must exceed that
+queue deadline by a margin the engineer chooses**, so that the add-in's own timeout text (the "already executing ...
+`prepare_destructive`" row of §4.7) reaches the client before the client gives up. A shorter client timeout ends an
+unanswered dialog in a client-side `TimeoutException`, which carries no code and maps to `TIMEOUT_UNKNOWN_OUTCOME` on a
+write (§4.7): every unanswered dialog would then need a reconciliation that itself waits behind the dialog. The doctor
+(AC32) warns when the `write` role's `call_timeout_s` is not greater than the deadline it prints; the margin has no
+default. (2) **Required start options**, passed by the adapter: `--pipe-name`, `--bridge-timeout-ms`,
 `--disable-send-code`, `--disable-adaptive-bake`, `--no-cache-send-code-bodies`, and `--read-only` on the `read` role only.
 The explicit negative options exist because `S/ServerConfig.cs:23-39` also reads `%LOCALAPPDATA%/Sasaah/mcp-server.config.json`
 and `SASAAH_MCP_*` variables, which a command-line flag overrides only when given. (3) **Forbidden**: `--enable-send-code`,
@@ -360,7 +368,7 @@ record them. Kinds (all `harness.*` kinds are **[added]**, registered with `Kind
 | `harness.revit_levels/1` | `levels`: `{element_id, name, elevation_mm}` sorted by elevation | `list_levels` (mm, 3 decimals) |
 | `harness.revit_grids/1` | `grids`: `{element_id, name, start, end: Point3 or null, length_mm}` | `list_grids` (no `visible`, so no `model.grid_system/1`) |
 | `harness.revit_structure/1` | `elements`: `{unique_id, element_id, category: column or framing, family, type_id, type_name, level_id, level_name, location_kind: point or curve, i, j: Point3 or null, rotation_deg or null, parameters: {role: value with unit}}`; `types`: `{type_id, family, name, instance_ids, parameters}` | lists, details, parameter reads |
-| `model.frame_placements/1` | the elements of `harness.revit_structure/1` with every field known (`id` is the `unique_id`, `section` is `<family>: <type>`, `story` the level name) | derived (AC11) |
+| `model.frame_placements/1` | the elements of `harness.revit_structure/1` with every field known (`id` is the `unique_id`, `section` is `<family>: <type>`, `story` the level name). `kind`: category column gives `column`; category framing gives `other`, because beam versus brace needs an engineering threshold or a structural-usage parameter that no allowlisted read returns (gap R-G16 in §11: add the usage parameter as a role if L2 shows it; the ETABS mapping of §4.11 selects frames by id and does not use `kind`). `i_joint` and `j_joint` are null (Revit has no joints). `rotation_deg` comes from the `rotation` role (L6). An element with a null `i`, `j` or `rotation_deg` is left out of this kind and counted in the step summary | derived (AC11) |
 | `model.sections/1` | `frame_sections` `rectangular {b_mm, h_mm}` or `circular {D_mm}` for the types whose roles are all mapped | derived (AC11) |
 | `harness.revit_write_result/1` | `tool`, `op_id`, `targets`: `{unique_id or null, element_id or type_id}`, `reply_summary` | write replies |
 | `issues.model_check/1` | read-back and integrity issues (§4.8) | `check_model` |
@@ -413,11 +421,13 @@ produce proves nothing about the first: it is "certain" only when it cannot foll
 | `internal_error`, other | read: `INTERNAL` with an `incident_id`; write: `TIMEOUT_UNKNOWN_OUTCOME` | |
 | `compile_error`, `runtime_exception` | `INTERNAL` | an allowlist bug |
 | `RESPONSE_TOO_LARGE: ...` (no code) | `LIMIT_EXCEEDED` | narrow and retry (§4.5) |
-| "The server encountered an unexpected error..." (no code) | read: `HOST_NOT_CONNECTED` when `revit_ping` fails, else `INTERNAL`; write: `TIMEOUT_UNKNOWN_OUTCOME` | covers a client-side `TimeoutException`, a missing token file and an unavailable bridge alike (S-12 §6) |
+| "The server encountered an unexpected error..." (no code) | read: `HOST_NOT_CONNECTED` when `revit_ping` fails, else `INTERNAL`; write: `TIMEOUT_UNKNOWN_OUTCOME` | covers a client-side `TimeoutException`, a missing token file and an unavailable bridge alike (S-12 §6). A `write` role timeout shorter than the add-in deadline turns an unanswered dialog into this row (§4.2 rule 1) |
 
 **Attended timeouts.** The bridge call carries one timeout (client side, `--bridge-timeout-ms`), and the add-in appears
-to apply a fixed 60 s deadline to every request on the Revit thread; the gate's dialog probably runs on that thread (L3). A person
-who does not answer in time yields the `HOST_BUSY` row, and the dialog may still be open: later calls time out as
+to apply a fixed 60 s deadline to every request on the Revit thread; the gate's dialog probably runs on that thread (L3).
+A person who does not answer within the add-in deadline yields the `HOST_BUSY` row **only if the client timeout is longer
+than that deadline** (§4.2 rule 1); with a shorter client timeout the same situation arrives as the code-less
+"unexpected error" row and is `TIMEOUT_UNKNOWN_OUTCOME` on a write. In both cases the dialog may still be open: later calls time out as
 "NOT executed" until it is closed, and the answer to a stale dialog mints a token nobody uses. Whether reads that bypass the
 queue (spec 009 FR-002: `list_grids`, `list_levels`, `list_elements`, `get_model_metadata`) answer while a dialog is open
 is a local test (L3). After any timeout the host is wedged as in 0002 §4.5.6.
@@ -489,7 +499,7 @@ dialog "declined by the user" answer, before any write was sent), never retries 
 
 | Tool | `applied` | `not_applied` | `partial` / `unknown` |
 |---|---|---|---|
-| `set_type_parameter_values`, `set_element_parameter_values`, `set_parameter_value_by_guid` (setters) | every target equals the requested value | every target equals the pre-image | some of each: `partial` (`missing` lists the targets); anything else: `unknown`. A double application is `applied` (same value) |
+| `set_type_parameter_values`, `set_element_parameter_values`, `set_parameter_value_by_guid` (setters) | every target equals the requested value (checked first, so it wins when the requested value equals the pre-image: a no-op write is `applied`, and the model is the same either way) | every target equals the pre-image and the requested value differs from it | some of each: `partial` (`missing` lists the targets); anything else: `unknown`. A double application is `applied` (same value) |
 | `change_element_type` | every element (by `unique_id`) has the requested type | every element has its pre-image type | mixed: `partial`; an element not found by `unique_id`: `unknown` (Revit may replace it, L8) |
 | `duplicate_family_type` | a type of the requested name exists in the family and was absent in the pre-image; its id is returned from the read | absent and absent before | present with other values, or `invalid_request` "already exists" for a name absent in the pre-image and no read to confirm: `unknown`. **A second type is never created by the adapter** |
 | `revit_open_model` | `get_model_metadata` path equals the file | the path is another document | otherwise `unknown` |
@@ -658,11 +668,12 @@ engine spec 0001; plan T1 carries them.
 | R-G8 | Parameters by display name (language-dependent, first match); only the GUID tool is language-independent | Owner | Name taken from the prior read; Sasaah: built-in id or GUID on every tool (07 §2) |
 | R-G9 | Workshared models: opening a copy of a workshared file creates a local of the **original central** (`A/Meta/OpenModelHandler.cs:157-202`), so the copy approach is unsafe | Owner | v1 refuses (AC23); engine gap E-G1 (replayed writes) is what a workshared Revit workflow needs, OQ-Q23 |
 | R-G10 | The add-in journal (`get_change_records`, records failed and timed-out writes) is shadowed by the local tool of the same name; the local store records only calls that returned | Owner | Sasaah: rename the local tool or expose the bridge journal; then add it to reconciliation as evidence |
-| R-G11 | The server resends a write once after an `IOException`, with no idempotency key; a client `TimeoutException` loses its code (S12-G11) | Owner | Reconciliation by reading (§4.10); Sasaah: no resend after the request is written, or an `op_id` |
+| R-G11 | The server resends a write once after an `IOException`, with no idempotency key; a client `TimeoutException` loses its code (S12-G11) | Owner | Reconciliation by reading (§4.10); the `write` role's timeout must exceed the add-in deadline (§4.2 rule 1), the doctor warns; Sasaah: no resend after the request is written, or an `op_id` |
 | R-G12 | List tools return no `uniqueId`; `list_elements` caps at 1000 without an offset and reports the base level only | Owner | Details reads and per-level reads (§4.5); Sasaah: add `uniqueId` to the summary |
 | R-G13 | No Revit or add-in build id (S12-G1); `catalog_version` covers the whole catalog | Owner | Add-in hashes and pinned commit (§4.3); Sasaah: version in `ping` |
 | R-G14 | Model identity cannot be stamped (S12-G6) | Owner | ADR-0032 store (§4.9) |
 | R-G15 | Column rotation, base and top: no field in the details reply | Owner | Candidate parameter and bounding box, confirmed locally (L6); rows without them are left out of the neutral kind |
+| R-G16 | Structural framing cannot be classified as beam or brace from allowlisted reads, so its neutral `kind` is `other` (§4.5) | Owner | Keep `other`; if L2 shows a structural-usage parameter in the details reply, add it as a role in §4.8 and map it (no slope threshold in the adapter) |
 | C1 | **Correction to S-12 §10 and the inventory notes** ("the token is not a human confirmation"): the add-in shows a Yes/No dialog for every `destructive` call (§1) | Owner | Amend S-12 §10 and the notes in `inventory/sasaah-revit-mcp.json` in a spikes change; this spec follows the source |
 | C2 | Conflict: 07 §5 and §6 describe a bounded queue, a journal of `op_id`s, dialog handling by the add-in, dry runs; Sasaah has none of them | Owner | ADR-0024 already makes 07 a target; this spec follows Sasaah |
 | A1 | **[added]** descriptor class `attended`, `confirm = "host_dialog"`, `ToolInfo.attended`, deny-list names `revit_shutdown_bridge`, `revit_authenticate`, `revit_prepare_destructive`, `revit_switch_target` (exact MCP names), `HostInstance.pid` optional, `harness.toml` `addin_sha256` and `addin_paths`, harness kinds of §4.5, calc `harness.frame_element_map`, codes `ELEMENT_MISSING`, `TYPE_UNDEFINED`, `REVIT_WARNINGS_INCREASED`, `MODEL_UNSAVED`, `PARAMETER_UNIT_UNMAPPED`, `ROTATION_UNAVAILABLE`, `SECTION_ROLES_UNMAPPED` | Owner | Accept with this spec |

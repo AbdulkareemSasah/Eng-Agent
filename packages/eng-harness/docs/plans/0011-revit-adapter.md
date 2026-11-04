@@ -25,7 +25,7 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_config.py::test_revit_forbidden_options"
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_addin_hashes"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_attended_class_and_deny_names"
-    covers: [AC1]
+    covers: [AC1, AC2, AC3]   # AC2 and AC3 in part: T1 holds the framework tests (deny-list names and class, add-in hashes); T3 and T4 complete them
     depends_on: []
   - id: T2
     title: Synthetic Revit fake server (test-only), its faults and its schema check
@@ -169,6 +169,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_revit_dialog.py::test_declined_not_applied"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_dialog.py::test_unanswered_is_busy"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_dialog.py::test_short_timeout_is_unknown"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_readback.py::test_commit_unchecked_detected"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_readback.py::test_mismatch"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_readback.py::test_check_model_issues"
@@ -324,8 +325,8 @@ code-toolset names `revit_compile_and_run`, `revit_batch_execute` and the others
 check in the build check. The tests of plan 0002 that read these structures change only in how they construct them,
 never in what they expect.
 
-**T2 Fake** (spec §4.13). Test code only. A stdio MCP server built from the inventory schemas of the allowlisted
-tools, with levels, grids, columns, framing, types and parameters (raw feet values, `specId`, `builtInParameter`), one
+**T2 Fake** (spec §4.13). Test code only. A stdio MCP server built from the inventory schemas of a fixed list of the 21
+allowlisted tool names (the allowlist itself arrives in T3, whose contract test checks that list against it), with levels, grids, columns, framing, types and parameters (raw feet values, `specId`, `builtInParameter`), one
 document with a path, `open_model`, transactions that validate then apply, and the faults `dialog_declined`,
 `dialog_unanswered`, `commit_unchecked`, `retry_duplicate`, `retry_token_consumed`, `timeout_not_started`, `timeout_executing`,
 `response_too_large`, `element_replaced`, `other_document_active`, `workshared_open`, `lost_pipe`,
@@ -358,7 +359,8 @@ characters of the dialog summary, the `unique_id` check and the active-document 
 shared-type rule, `duplicate_family_type` without overrides, parameter resolution from the prior read.
 
 **T9 Attended writes and checks** (spec §4.7, §4.8). Dialog outcomes at the tool layer (declined, unanswered), the
-read-back helpers per tool, and `check_model` with the Revit issue codes.
+read-back helpers per tool, and `check_model` with the Revit issue codes. The unanswered dialog is tested twice: with a
+`write` timeout above the add-in deadline (`HOST_BUSY`) and below it (`TIMEOUT_UNKNOWN_OUTCOME`).
 
 **T10 Reconciliation** (spec §4.10). The per-tool rules, including the retried `duplicate_family_type` and the
 element-not-found case of `change_element_type`, with the evidence stored.
@@ -376,7 +378,8 @@ sanitizer test, the recorded-reply contract tests (skipped with a reason until t
 record script for the owner's local run.
 
 **T14 Doctor** (AC32). The Revit checks as a `CheckProvider`: pipe and bridge, hashes, destructive toolset, Revit
-version, open document base name.
+version, open document base name, and the warning when the `write` role's `call_timeout_s` is not above the add-in
+queue deadline (spec §4.2 rule 1).
 
 **T15 Wiring and documents** (AC22, AC29). Port wiring for the Revit adapter, the crash matrix against real fake
 processes, the stale-map test, and the Revit section of `docs/local-testing.md` (spec §12, L1 to L15).
