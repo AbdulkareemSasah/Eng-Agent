@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33, T34]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -554,6 +554,10 @@ tasks:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/imports.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/licenses.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/judged_metadata.py"
+      # Amendment (B-355): the imports step is wired in checks/registry.py, and the judged environment helper lives in
+      # checks/tests_step.py; both are needed to give the step its context (B-347 report).
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/tests_step.py"
       - "tools/eng-dev-gate/tests/**"
     max_changed_lines: 160
     max_sessions: 2
@@ -576,6 +580,21 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_risk_floor.py::test_in_scope_ratchet_change_does_not_raise_floor"
     covers: [AC21b]
     depends_on: [T14b, T15, T27]
+  - id: T34
+    title: "test-first: a package new in the pull request is not importable in the base run"
+    # Amendment (B-355, documents only): the structural-codes skeleton (B-255, PR 88) failed TF004 because the base run
+    # imported the head's editable install of the new package (_probe returns early when the base has no pyproject.toml).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/test_first_run.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/pytest_plugin.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/judged_run.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 90
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_test_first_run.py::test_new_package_hidden_at_base"
+    covers: [AC27a]
+    depends_on: [T17]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
