@@ -188,7 +188,7 @@ tasks:
       - "packages/eng-contract/src/eng_contract/kinds/model.py"
       - "packages/eng-contract/tests/contract/test_kinds.py"
       - "packages/eng-contract/tests/data/kinds/model.*/**"
-    max_changed_lines: 380
+    max_changed_lines: 560
     max_sessions: 3
     tests_first:
       - "packages/eng-contract/tests/contract/test_kinds.py::test_kind_names_and_registry"
@@ -394,6 +394,10 @@ six-step pipeline with error mapping.
 
 **T11 Kinds I** (spec §4.10.1, the `model.*` rows of §4.10.2). Registry, kind names, common sub-models and the eight
 `model.*` kinds with one valid and several invalid fixtures each.
+Budget amendment (B-020): `max_changed_lines` raised from 380 to 560, because the writer measured 543 changed lines in the
+code files alone (`model.py` 382, `_registry.py` 74, `_common.py` 61, `__init__.py` 26): the spec §4.10.2 rows need about
+35 small Pydantic classes, each with a docstring, and merging them would drop required behavior (frozen, extra-forbid
+models, discriminated shapes, enum validation). Recorded by work item B-020 through the plan amendment pull request.
 
 **T12 Kinds II** (the remaining rows of §4.10.2). `forces.*`, `basis.*` with `DesignBasis.missing`, `verdicts.set/1`,
 `issues.model_check/1`, with the local trace-reference rule of `verdicts.set/1` (spec §4.6.3).
