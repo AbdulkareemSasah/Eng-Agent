@@ -175,9 +175,13 @@ defines its method; values are synthetic and say so.
 - AC26 (A7). Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests of §4.9 (a
   repeated step 6 approval, a re-asked change set and every engine request count; the first step 6 approval, the
   first change-set request, the engineer turn and the run-level steps 16 and 17 do not); every normal-path scenario of
-  §4.9 (AC9 to AC12, AC14, AC15, AC19, AC21, AC22) in `work_on_copy` has at most one per cycle, and the failure and
-  escalation scenarios (AC13, AC16, AC17, AC20, AC24, AC34) are counted and reported but not bounded. Tests: `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
-  `tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt`.
+  §4.9 (AC9 to AC12, AC15, AC19, AC21, AC22, with the fake returning no analysis messages) in `work_on_copy` has at
+  most one per cycle; given the fake returning analysis messages (all `unclassified`, EC-G3), then D-3 reaches the
+  engineer and is that cycle's one prompt; and the interruption, failure and escalation scenarios (AC13, AC14, AC16,
+  AC17, AC20, AC24, AC34) are counted and reported but not bounded. Tests:
+  `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
+  `tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt`,
+  `::test_unclassified_messages_use_the_prompt`.
 - AC27 (A6). Given a two-cycle run in a worker process, when the engine is killed at every step and resumed with the
   same scripted answers, then each run ends with the same fake model, revision chain and outputs as the uninterrupted
   run, and no write is sent twice. Test: `tests/replay/edit_cycle/test_crash_matrix.py::test_every_step`.
@@ -206,13 +210,15 @@ defines its method; values are synthetic and say so.
 | Module | Content | Risk floor |
 |---|---|---|
 | `src/eng_harness/workflows/model_edit_cycle/__init__.py` | `model_edit_cycle` (`WorkflowDef`), `basis_fields`, input and output models | block code |
-| `src/eng_harness/workflows/model_edit_cycle/_cycle.py` | child blocks `edit_cycle_once`, `read_state`, `apply_change_set`, `run_and_summarize` | block code |
+| `src/eng_harness/workflows/model_edit_cycle/_cycle.py` | child blocks `edit_cycle_once`, `read_state`, `obtain_change_set`, `apply_change_set`, `run_and_summarize` | block code |
+| `src/eng_harness/workflows/model_edit_cycle/_finish.py` | steps 16 and 17: promotion and sign-off (§4.5) | block code |
 | `src/eng_harness/workflows/model_edit_cycle/_change_set.py` | `ChangeSetDraft` and the item models (§4.3) | block code |
 | `src/eng_harness/workflows/model_edit_cycle/_points.py` | decision points and their state models (§4.6) | block code |
 | `src/eng_harness/rules/edit_cycle.py` | the rules of §4.6 | R1 |
 | `src/eng_harness/calcs/edit_cycle/` | the four calcs of §4.4 | R1 |
 | `src/eng_harness/kinds/edit_cycle.py` | the kinds of §4.2 | R2 |
-| `src/eng_harness/adapters/csi/_read_state_tool.py` | the read tool of §4.10 | R1 |
+| `src/eng_harness/adapters/csi/_read_state_tool.py` | `csi_read_model_state` and `csi_read_analysis_messages` (§4.10) | R1 |
+| `src/eng_harness/adapters/csi/_revisions.py` | `csi_open_revision` and `as_new_revision` (§4.10, §4.5.1) | R1 |
 | `src/eng_harness/report/_edit_cycle.py` | renderers, `audit_value_sources`, `count_prompts`, `edit_cycle_timings` | report |
 
 ### 4.2 Workflow definition, input, output, kinds
@@ -397,7 +403,9 @@ statuses, booleans and labels only; no rule holds a number (thresholds are in th
 
 D-2 and D-3 are never open at the same time: D-2 is asked before analysis and an open D-2 means analysis does not
 run (AC17), so no batching is needed. D-2 reaches the engineer only on a read-back failure, a failure path of §4.9;
-on a normal path at most D-3 reaches the engineer, so A7 holds. D-1 (WS §5) is the attempts loop of step 5 and D-5 the loop of §4.5; neither is a decision point. D-4 is
+on a normal path at most D-3 reaches the engineer, so A7 holds there. Until EC-G3 is resolved every analysis
+message is `unclassified`, so `am.clean` sends D-3 to the engineer whenever the host reports any message, as real
+analyses usually do; D-3 is then the cycle's one prompt and any further request in that cycle exceeds A7 (Q10). D-1 (WS §5) is the attempts loop of step 5 and D-5 the loop of §4.5; neither is a decision point. D-4 is
 the engine's in-flight request (engine §4.5.3), not a workflow point. `stop_cycle` skips to the engineer turn of the
 same cycle with the summaries available so far; `restore_previous` runs `ctx.tool("csi_open_revision", {"model": m,
 "revision": P[k]})` (§4.5.1, §4.10, Q4) and starts the next approval-void iteration (a new step 3 read, a step 4
@@ -468,10 +476,13 @@ except the first step 6 approval of the cycle, the first change-set request of t
 repeated step 6 approval (after `ApprovalVoid` or `restore_previous`), a re-asked change set, an engine request
 (`engine.in_flight`, `engine.host_state`, `engine.escalation`), a separately asked always-ask approval and a D-2 or D-3
 screen each count; one batched screen counts once. Steps 16 and 17 are once per run, outside the cycle, and are not
-counted. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC14, AC15, AC19, AC21 and
-AC22. Failure and escalation paths (approval void, read-back failure and restore, timeout, change-set re-asks and
-exhaustion, cycle limit: AC13, AC16, AC17, AC20, AC24, AC34) are counted and shown in the report but not bounded; the
-B-1 journals show how often they occur.
+counted. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC15, AC19, AC21 and AC22.
+In those fake-host scenarios the fake returns no analysis messages, so D-3 resolves by `am.clean` and no request is
+counted; one added scenario has the fake return messages, which are `unclassified` (EC-G3), and shows D-3 as that
+cycle's one prompt. Interruption, failure and escalation paths (resume after a stop with its `engine.host_state`
+request, approval void, read-back failure and restore, timeout, change-set re-asks and exhaustion, cycle limit: AC13,
+AC14, AC16, AC17, AC20, AC24, AC34) are counted and shown in the report but not bounded; the B-1 journals show how
+often they occur. AC14 is not a normal path: its host-state request is the engine's answer to a stop, and it counts.
 
 ### 4.10 Adapter additions (spec 0002 amendment, Q1 **[added]**)
 
@@ -551,7 +562,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC27, AC28 | Replay | `tests/replay/edit_cycle/` |
 
 No host program and no network. Coverage floors 85% line and 75% branch; mutation score at least 80% on the R1
-modules (`rules/edit_cycle.py`, `calcs/edit_cycle/`, `adapters/csi/_read_state_tool.py`).
+modules (`rules/edit_cycle.py`, `calcs/edit_cycle/`, `adapters/csi/_read_state_tool.py`, `adapters/csi/_revisions.py`).
 
 ## 10. Version impact
 
@@ -571,6 +582,7 @@ start at version 1 with lock entries.
 | Q7 | The first change set arrives only by `resume --answers` after `run` pauses at the request | Owner | Let `run --answers FILE` pre-answer the first data request (spec 0006 amendment); until then `run --no-wait` then `resume --answers` |
 | Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
+| Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `am.clean` (an unknown message must not pass silently) |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |

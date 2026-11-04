@@ -85,7 +85,7 @@ Steps 1 and 2 run once per run; steps 3 to 15 form one cycle and repeat until th
 | 4 | Compare with the last recorded revision | Harness calc (difference report) | — | Differences are engineer changes: shown and recorded, never overwritten |
 | 5 | Ask for and validate the change set | Engineer answers file; harness calc | Types, units, bounds from the basis; objects and sections exist; kinds are supported; conflicts with engineer changes are marked | An invalid set is refused with its reasons and asked again (bounded by the basis) |
 | 6 | Approve the change set, with the differences | Approval page | The approval is bound to this change set and this model state; single items can be rejected | Rejected: nothing is written; the engineer turn follows |
-| 7 | Save as the next revision | ETABS save, then a copy of the saved file as this cycle's revision snapshot (covered by the change-set approval) | File hash and fingerprint recorded; the model still equals the approved state | Stop; the previous revision file is intact |
+| 7 | Save as the next revision | ETABS save, then a copy of the saved file as this cycle's revision snapshot (covered by the change-set approval or, after "I edited by hand", without approval: nothing is written but the snapshot) | File hash and fingerprint recorded; the model still equals the approved state | Stop; the previous revision file is intact |
 | 8 | Apply the edits (unlock first when the model is locked after analysis) | ETABS writes, one call per object | Before the first write, the model equals the approved state | If the model changed since the approval, the cycle goes back to step 3 |
 | 9 | Read back and check | ETABS reads; harness calc (read-back check) | Every written value matches the change set and nothing else changed | Mismatch: the engineer chooses (§5, D-2) |
 | 10 | Save | ETABS save | File hash recorded | Stop with the reason |
@@ -155,7 +155,7 @@ has a source, and every result shown was read from the saved model after the wri
 | A4 | Median request-to-accepted-revision time, engineer included, at most 50% of the B-1 time | **Local only**: B-1 with the journal timings |
 | A5 | A hand edit between cycles always appears in the next differences and is never written over | CI: fake hand edits between cycles, during an approval wait, and while the run is stopped. Local: a hand edit in every B-1 project |
 | A6 | A run killed at any step resumes and ends with the same model as an uninterrupted run | CI: engine kill at every step against the fake. Local: process kill and ETABS kill |
-| A7 | At most one extra engineer prompt per cycle on the normal path | CI: prompt count from the test journals (failure paths counted and reported). Local: the B-1 journals |
+| A7 | At most one extra engineer prompt per cycle on the normal path | CI: prompt count from the test journals (failure paths counted and reported; the normal-path fake returns no analysis messages). Local: the B-1 journals; until analysis message severity is known, every message asks the engineer (spec 0007 Q10) |
 
 ## 9. Out of scope / خارج النطاق
 

@@ -231,6 +231,7 @@ tasks:
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_unclassified_messages_use_the_prompt"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced"
     covers: [AC25, AC26]
     depends_on: [T9, T10]
