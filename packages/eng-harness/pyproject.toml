@@ -4,7 +4,11 @@ version = "0.1.0.dev0"
 description = "Harness of the Eng-Agent platform: run engine, journal, ports and workflows (layer 4)."
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
-dependencies = ["eng-contract", "pydantic>=2.14,<3"]
+dependencies = [
+    "eng-contract",
+    "mcp>=2.3,<3",
+    "pydantic>=2.14,<3",
+]
 
 # Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the
 # workspace root's dev group.
@@ -44,7 +48,7 @@ markers = [
 profile = "harness"
 layer = 4
 import_names = ["eng_harness"]
-public_modules = ["eng_harness"]          # each later task adds the public modules it creates
+public_modules = ["eng_harness", "eng_harness.servers", "eng_harness.pages"]          # each later task adds the public modules it creates
 coverage_line = 85                        # process/05 section 2
 coverage_branch = 75
 r1_modules = [

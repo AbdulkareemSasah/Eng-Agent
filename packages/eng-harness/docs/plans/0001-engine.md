@@ -37,7 +37,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/errors.py"
       - "packages/eng-harness/tests/unit/test_errors.py"
-    max_changed_lines: 150
+    max_changed_lines: 240
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/test_errors.py::test_engine_stop_is_not_exception"
@@ -69,6 +69,7 @@ tasks:
   - id: T4
     title: Journal reader API and views
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.journal (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/journal/__init__.py"
       - "packages/eng-harness/src/eng_harness/journal/_reader.py"
@@ -133,6 +134,7 @@ tasks:
   - id: T8
     title: Step paths, scopes, op_id, overlap detection, parallel and attempts scopes
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_steps.py"
       - "packages/eng-harness/tests/unit/test_steps.py"
@@ -174,6 +176,7 @@ tasks:
   - id: T10
     title: ctx implementation of tool, read, calc, block, parallel, attempts, escalate
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
@@ -203,6 +206,7 @@ tasks:
     # lead decision D-12: split. T11 keeps the input-request builders of B-068 (`_inputs.py`, AC67); T11b keeps the
     # in-flight reconciliation and the host-state check, which present their requests through T11.
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_inputs.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
@@ -216,6 +220,7 @@ tasks:
   - id: T11b
     title: In-flight reconciliation and the host-state check before live execution
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
       - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
@@ -236,6 +241,7 @@ tasks:
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
       - "packages/eng-harness/src/eng_harness/engine/_steps.py"
@@ -260,6 +266,7 @@ tasks:
   - id: T13
     title: Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
@@ -288,6 +295,7 @@ tasks:
     # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
     # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.ports (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/ports.py"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
@@ -306,6 +314,7 @@ tasks:
   - id: T14b
     title: ctx.ask and the decision runtime record (run header and reader view)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.journal, eng_harness.ports (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/ports.py"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
@@ -330,6 +339,7 @@ tasks:
   - id: T15
     title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
@@ -350,6 +360,7 @@ tasks:
   - id: T16
     title: Permission modes, always-ask list, working copies and file-copy promotion
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_modes.py"
       - "packages/eng-harness/src/eng_harness/engine/_promote.py"
@@ -373,6 +384,7 @@ tasks:
   - id: T17
     title: Runtime guard for block and rule code, and the block-module rules test
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/__init__.py"
       - "packages/eng-harness/src/eng_harness/engine/_guard.py"
@@ -497,6 +509,7 @@ containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to 
 
 **T2 Errors** (spec §6). `HarnessCode`, `EngineStop` (a `BaseException`) and its subclasses, `StepError` and its
 subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
+Budget amendment (B-101-amend): `max_changed_lines` raised from 150 to 240 because the 19 exception classes and the 18-member `HarnessCode` enum with their docstrings measured 221 changed non-test lines in the B-101 writer's run (`errors.py` 218, `pyproject.toml` 2, `CHANGELOG.md` 1), which rounds up to 240.
 
 **T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
 the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models (with the B-068 fields `run_class`,

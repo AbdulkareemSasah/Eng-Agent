@@ -1,0 +1,22 @@
+{
+  "contract": "eng-contract/1",
+  "ok": true,
+  "result_id": "res_01JB7Z3K9V4X2N8Q5W6E7R8T9Y",
+  "kind": "forces.member_end/1",
+  "summary": {
+    "members": 1240,
+    "combos": ["ULS-1", "ULS-2"],
+    "max_abs_P": {"value": 4120.5, "unit": "kN", "member": "C12", "combo": "ULS-1", "end": "i"}
+  },
+  "data": null,
+  "complete": true,
+  "warnings": [],
+  "provenance": {
+    "tool": "sasaah-csi-mcp/csi_results_frame_forces",
+    "tool_version": "0.3.1",
+    "host": {"program": "ETABS", "version": "22.1.0", "model_id": "mdl_01JB6Z3K9V4X2N8Q5W6E7R8T9Y", "model_revision": 12},
+    "inputs": {"combos": {"ref": "res_01JB7YX0000000000000000000#/combinations/ultimate"}},
+    "started_at": "2026-10-24T10:15:02.114Z",
+    "duration_ms": 412
+  }
+}

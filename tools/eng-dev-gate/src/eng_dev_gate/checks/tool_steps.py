@@ -9,6 +9,7 @@ import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from eng_dev_gate.checks.tests_step import _judged_environment, read_judged_environment
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.results import EnvironmentFaultError, UsageError
 from eng_dev_gate.toolrun import python_module
@@ -117,11 +118,20 @@ def types(ctx: StepContext) -> list[Finding]:
     the base configuration is given by absolute path and the tool runs in the judged tree (spec 4.16). The incremental
     cache lives in a fresh directory outside every checkout and is removed afterwards: a ``.mypy_cache`` committed to
     the pull request could otherwise mark a badly typed module as clean.
+
+    With a gate root other than the judged tree, ``--python-executable`` names the interpreter of the judged
+    environment, where the pull request's packages and stubs are installed (AC54a).
     """
     assert ctx.member is not None  # noqa: S101  # B-034: package steps always have a member
     folders = [str(ctx.member.directory / d) for d in ("src", "tests") if (ctx.member.directory / d).is_dir()]
     own = _has_own_table(ctx, "mypy")
     config, cwd = ("pyproject.toml", ctx.member.directory) if own else (str(ctx.gate_root / "pyproject.toml"), ctx.root)
+    judged: list[str] = []
+    if _judged_environment(ctx):
+        environment = read_judged_environment(ctx, "types")
+        if isinstance(environment, Finding):
+            return [environment]
+        judged = ["--python-executable", environment.executable]
     with tempfile.TemporaryDirectory(prefix="eng-gate-mypy-") as cache:
-        argv = python_module("mypy", "--strict", "--cache-dir", cache, "--config-file", config, *folders)
+        argv = python_module("mypy", "--strict", "--cache-dir", cache, "--config-file", config, *judged, *folders)
         return _fail_or_fault(ctx, "types", "mypy", argv, cwd)

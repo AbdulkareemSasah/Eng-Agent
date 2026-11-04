@@ -35,6 +35,7 @@ tasks:
   - id: T2
     title: Credential store, backend allow-list, key management entry point
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"
       - "packages/eng-harness/src/eng_harness/providers/_credentials.py"
@@ -53,6 +54,7 @@ tasks:
   - id: T3
     title: Shared HTTP client, error mapping, outgoing guard
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/_http.py"
       - "packages/eng-harness/src/eng_harness/providers/_outgoing.py"
@@ -78,6 +80,7 @@ tasks:
   - id: T4
     title: Jev adapter over a format boundary; formats not implemented until S-07
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/_jev.py"
       - "packages/eng-harness/src/eng_harness/providers/_jev_format.py"
@@ -98,6 +101,7 @@ tasks:
   - id: T5
     title: Strict output type and prompt for the language-model tier
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/_llm_types.py"
       - "packages/eng-harness/src/eng_harness/providers/_prompts.py"
@@ -115,6 +119,7 @@ tasks:
   - id: T6
     title: PydanticAI adapter (the only importer), conformance of both adapters
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/_llm.py"
       - "packages/eng-harness/tests/unit/providers/test_llm.py"
@@ -134,6 +139,7 @@ tasks:
   - id: T7
     title: Provider factory, local_only, run summary
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"
       - "packages/eng-harness/src/eng_harness/providers/_factory.py"
@@ -151,6 +157,7 @@ tasks:
   - id: T8
     title: Evaluation core (thresholds, metrics, eligibility)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.decisions.evaluation (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/evaluation.py"
       - "packages/eng-harness/tests/unit/decisions/test_evaluation.py"
@@ -168,6 +175,7 @@ tasks:
   - id: T9
     title: Evaluation store, release verification, evaluate command
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.decisions.evaluation (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/evaluation.py"
       - "packages/eng-harness/src/eng_harness/decisions/_evalstore.py"
@@ -185,6 +193,7 @@ tasks:
   - id: T10
     title: Runtime assembly, shadow-mode workflow, replay and isolation tests, local-testing notes
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"

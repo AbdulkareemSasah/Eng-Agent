@@ -34,6 +34,13 @@ calendar, cp1256, Arabic paths).
 and that the run header record the runtime's summary. Both are made here (§4.2.2, §4.2.4, AC4, AC62, AC63) and listed in
 §11 (Q15, Q16); the header field itself is engine AC69.
 
+**Amendment B-354.** Four points the specs left open (root `LOCAL-TESTING.md`, open points 5, 6, 7 and 13) are
+decided here and in [spec 0007](0007-model-edit-cycle.md): `run --answers FILE` pre-answers the first data request
+(§4.2.1, AC64; spec 0007 Q7); a workflow that needs basis confirmation is started without `--no-wait`, and the
+`run --no-wait` route of spec 0007 Q7 is withdrawn (§4.4.7, AC47); the one supported command form from the workspace
+root is `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the A3 audit and the A7 prompt count are a
+module entry point of spec 0007 (its AC35), not a seventh command (AC1 unchanged). Listed in §11 as Q17 and Q18.
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -134,6 +141,21 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `model_version`), then `run_resumed.decision_runtime` holds the new object; and no journal byte, standard-output or
   standard-error line holds a `base_url`, a `key_ref` or a key. Test:
   `tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime`.
+- AC64. Given `run --answers FILE` (B-354), then the file is read and checked to be one JSON object in step 2 of
+  §4.2.2, and a file that is missing, not valid JSON or not an object is a usage error (exit 2) with no run folder;
+  given a workflow whose first data request (kind `block`, marker `x-eng-input: data`) opens, then that request, and
+  only that one, is answered from the file through `pages.accept_answers_file` (no page is served for it) and the
+  journal holds `input_provided` for it with the same `by` as `resume --answers`; an answer that fails the request's
+  model is refused by the engine and the request is presented again on the page (or exit 10 with `--no-wait`), and a
+  later data request (a re-asked change set) is never answered from the file; approvals, choices and `engine.*`
+  requests are never answered from it; given a run that opens no data request, the run outcome is unchanged and one
+  warning on standard error says the file was not used. Test:
+  `tests/workflow/test_cli_answers.py::test_run_answers_first_data_request`.
+- AC65. Given the package `pyproject.toml`, then `[project.scripts]` declares exactly
+  `eng-harness = "eng_harness.cli:main"`, `python -m eng_harness --help` prints the usage that `main(["--help"])`
+  prints with the program name `eng-harness`, and the workspace root `pyproject.toml` declares no script named
+  `eng-harness` (the supported root form is `uv run --package eng-harness eng-harness <command>`, §4.1). Test:
+  `tests/unit/cli/test_parser.py::test_entry_point_and_root_form`.
 
 ### 3.2 Terminal progress
 
@@ -283,8 +305,11 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   starts the run; an answer whose `draft_sha256` is not that of the draft currently shown is refused (409) before
   `freeze`; rejecting with a reason ends with exit 3, no run folder and no stored basis. The answer and the
   setup log `<workspace>/setups/<setup_id>.json` hold `by`, `at`, `draft_sha256` and the section names, never a value.
+  Given `run --no-wait` for a workflow with required basis fields (B-354), then no page is served, the process exits
+  10 saying that the basis is confirmed only by a `run` started without `--no-wait`, and no run folder, journal, setup
+  log or stored basis exists.
     Tests: `tests/workflow/test_cli_basis.py::test_basis_confirmation_flow`, `::test_reject_leaves_no_run`,
-  `::test_stale_draft_hash_refused`.
+  `::test_stale_draft_hash_refused`, `::test_no_wait_basis_exits_10_nothing_stored`.
 
 ### 3.6 Untrusted text
 
@@ -368,6 +393,16 @@ takes its collaborators in `CliDeps` (registry, port factories, clock, ids, stre
 assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
 runs without a host, a browser or the real clock.
 
+**Invocation from the workspace root (B-354).** The one supported form is
+`uv run --package eng-harness eng-harness <command> [options]`, run in the workspace root. The root project
+`eng-platform` is not installed (`[tool.uv] package = false`) and does not depend on its members, so a plain
+`uv sync` there installs the root's dependencies and `dev` group only and, being an exact sync, removes members an
+earlier command installed; `uv run eng-harness` then fails with "Failed to spawn". `--package eng-harness` makes
+`uv run` sync and run in the `eng-harness` member, which installs it with its entry point whatever was synced before
+(checked with uv 0.11 on this workspace's `eng-gate`, which behaves the same way; Q18). `uv run --package eng-harness
+python -m eng_harness` is the equivalent module form. No change to the root `pyproject.toml` is needed (AC65); the
+package's `[project.scripts]` entry is plan T3's.
+
 ### 4.2 Command line
 
 #### 4.2.1 Commands
@@ -376,7 +411,7 @@ Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract
 
 | Command | Purpose and options |
 |---|---|
-| `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), generated `--<field>` options (AC14), and the shared options below |
+| `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), `--answers FILE` (B-354, AC64: the bare JSON object of one answer, given to the first `ctx.ask` data request the run opens; the keyed form of `resume` is not taken, because request ids depend on the run id), generated `--<field>` options (AC14), and the shared options below |
 | `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers pending `ctx.ask` data requests only (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one data request is pending; and the shared options |
 | `status [<run_id>]` | Without an id: the 20 most recent runs. With an id: AC11. `--json`. Read-only |
 | `stop <run_id>` | Ask a live run to pause at the next safe point (`--wait SECONDS` waits for it to end) |
@@ -392,15 +427,18 @@ controlling terminal only, §4.4.4), `--progress {auto,tty,plain,json,off}` (def
 per-item rejection and sign-off exist only on the page (ADR-0027 §2). An agent that runs a workflow can start, resume,
 stop and inspect it, and read the report; it cannot give the answer (AC1, AC2). Input values for `ctx.ask` data requests and the
 basis values arrive as files, because they are data; their confirmation by the engineer happens at the change-set
-approval and on the basis screen (Q3). **`--answers` cannot decide anything.** `resume` turns the file into an
-`InputAnswer` only through `pages.accept_answers_file(request, payload, by)`, which accepts a request only if it is of
+approval and on the basis screen (Q3). **`--answers` cannot decide anything.** `run` and `resume` turn the file into
+an `InputAnswer` only through `pages.accept_answers_file(request, payload, by)`, which accepts a request only if it is of
 kind `block`, its id does not start with `engine.`, and its schema carries the marker `x-eng-input: data` (the marker
 `ctx.ask` sets and the choice helpers never set, §4.4.6). The engineer turn, batched decisions and the engine's own
 requests are choices and can only be answered on the page; any other request is refused with exit 2 and nothing is
-journaled (AC46).
+journaled (AC46). For `run`, the CLI holds the file's object and wraps the page `InputPort`: the first `present` of a
+data request is answered from it once through `pages.accept_answers_file`; every other request, a later data request
+included, goes to the page port unchanged (AC64).
 
 Rule for coding agents, recorded in the package `AGENTS.md` (plan T17): run `run` and `resume` in the background and
-follow them with `status`, or use `--no-wait` and tell the engineer to resume; never read or relay the launch address
+follow them with `status`, or use `--no-wait` and tell the engineer to resume (a `run` that needs basis confirmation is
+started by the engineer without `--no-wait`, §4.4.7); never read or relay the launch address
 or open the page; the approval is the engineer's. The rule is generated into the package
 `AGENTS.md` from `packages/eng-harness/.gate/agents.yml`.
 
@@ -408,7 +446,9 @@ or open the page; the approval is the engineer's. The rule is generated into the
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
    §4.2, AC62); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
-2. Validate the input file against the workflow's input model, without creating anything (engine AC16).
+2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
+   `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
+   the request opens.
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
    `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
@@ -646,7 +686,12 @@ The screen is rendered from one draft and the form carries its `draft_sha256`; t
 hash is not that of the current draft, before `freeze` (AC47, §4.4.2). The answer holds `setup_id`, `draft_sha256`, the confirmed section names, `by` and `at` (from the injected clock), or
 the rejection; the page appends a record to `<workspace>/setups/<setup_id>.json` (spec 0004 Q5). In-process only: a
 `--no-wait` run does not serve it (exit 10, nothing stored), and an interrupted setup starts again with the same
-command (a new draft hash if the files changed).
+command (a new draft hash if the files changed). **There is no deferred basis confirmation (B-354).** No run exists
+before the basis is frozen, so there is nothing to resume: a workflow with required basis fields is started by the
+engineer with `run` without `--no-wait`, in a terminal, and the basis is confirmed on this screen in that process;
+`--no-wait` there exits 10 with a message saying so (AC47). For the first change set of spec 0007, `run --answers
+FILE` (AC64) replaces the interim `run --no-wait` route that spec 0007 Q7 had proposed: one `run` confirms the basis,
+takes the change set from the file and waits at the change-set approval on the page.
 
 ### 4.5 HTML, escaping and the templating choice
 
@@ -789,12 +834,12 @@ heartbeat task runs on the engine loop.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62 | Unit | `tests/unit/cli/` |
+| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62, AC65 | Unit | `tests/unit/cli/` |
 | AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
 | AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
-| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
+| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
 | AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
@@ -815,7 +860,8 @@ Adds the commands, the four public modules and the file formats of §5 to `eng-h
 change to the journal schema that the reader must read with and without. The marker `x-eng-input` on input requests (Q6) is a second engine amendment; a request without it is read as a choice. The JSON result of §4.2.1 and the exit codes
 are public interface: a change is minor or major with a changelog entry. Amendment B-098: `harness.toml` passes
 `[providers.*]` to spec 0009, `CliDeps` gains the decision-runtime assembler, and the run header gains
-`decision_runtime` (engine AC69), all additive.
+`decision_runtime` (engine AC69), all additive. Amendment B-354: `run` gains `--answers FILE` (additive) and the
+basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract change.
 
 ## 11. Open questions, gaps and additions
 
@@ -837,4 +883,6 @@ are public interface: a change is minor or major with a changelog entry. Amendme
 | Q14 | Engine §4.9 lists `ApprovalKind` `CHANGE_SET`, `PROMOTION`, `SIGN_OFF`, `INFO`, while 18 step 15 calls the engineer turn "approve" | Owner | The engineer turn is a choice request (§4.4.6), not an approval kind: it binds no model state and writes nothing. Spec 0007 states its options |
 | Q15 | Spec 0005 §4.3 and spec 0009 §4.2 say this spec reads `DecisionSettings` (`local_only`, `sensitive_values`, `export_enabled`, `shadow_released.<point>` and the limits) from `harness.toml`, but no document names its section or its keys' types and bounds, and §4.2.4 had no entry for it | Owner | Name the section `[decisions]` (keys the fields of spec 0005 §4.3, `shadow_released.<point>` as a sub-table) in an amendment of spec 0005 §4.3, which owns the type; this spec then passes it through like `[providers.*]`. Until then T14 builds `DecisionSettings` with its defaults (`local_only` false, no release), which is the phase 1 behavior |
 | Q16 | Amendment B-098 (spec 0009 Q7). (a) Spec 0009 names `assemble_decision_runtime` and its result (providers, verified releases, summary) but not its arguments; §4.2.2 step 5 reads them as the `ProvidersConfig`, the `DecisionSettings`, the workspace and the point policies of `verify_releases` **[added]**. (b) Release findings (spec 0009 §4.10: "findings go to the run report as warnings") reach standard error only, because the report reads the journal and the store only (§4.6.1) and the summary of spec 0009 AC29 does not hold them. (c) The report's Status section does not yet show `decision_runtime` | Owner | (a) Fix the signature in plan 0009 T10 to these inputs. (b) Add the dropped releases (`point`, `reason`) to the summary in an amendment of spec 0009 AC29, so they are journaled with it. (c) Show the providers and released points of `RunHeader.decision_runtime` in the Status section at the next amendment of §4.6.1 (report plan T13) |
+| Q17 | Amendment B-354 (spec 0007 Q7; `LOCAL-TESTING.md` open points 5 and 13). The first change set could reach a run only by `resume --answers`, and the interim route `run --no-wait` could not start a workflow that needs basis confirmation, because a `--no-wait` run does not serve the basis page and no run exists to resume | Owner | Decided **[added]**: `run --answers FILE` pre-answers the first data request only, through `accept_answers_file` (AC64); a workflow with required basis fields starts only with a waiting `run` (§4.4.7, AC47); the `run --no-wait` route is withdrawn. No answer path is widened: the file still answers data requests only, and the change set is still approved on the page |
+| Q18 | Amendment B-354 (`LOCAL-TESTING.md` open point 6). How the owner invokes the command from the workspace root. The decision rests on uv's documented command-line options (`uv run --package`, `uv sync` being exact) and a check on this workspace with uv 0.11; the uv workspace documentation page was not reachable from the authoring session | Owner | Decided: `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the owner may confirm it against docs.astral.sh. `LOCAL-TESTING.md` should use this form for every `eng-harness` command |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

@@ -4,11 +4,12 @@ issue: "B-090"
 spec: packages/eng-harness/docs/specs/0014-idea-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1]               # binding for every pull request of this plan
+risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: The IDEA server section on the framework additions of plan 0002 T20 (routes, audit_log flag)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_launch_args.py"
@@ -43,6 +44,7 @@ tasks:
   - id: T3
     title: IDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_allowlist.toml"
@@ -75,6 +77,7 @@ tasks:
   - id: T4
     title: Error mapping, timeouts and licensing outcomes
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_errors.py"
       - "packages/eng-harness/tests/unit/adapters/test_idea_errors.py"
@@ -92,6 +95,7 @@ tasks:
   - id: T5
     title: Replies, stub guard, harness kinds and the host-verdict mapping
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_replies.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_stub.py"
@@ -118,6 +122,7 @@ tasks:
   - id: T6
     title: Working copy, route preconditions, HostPort methods and gap entries
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_gaps.py"
@@ -140,6 +145,7 @@ tasks:
   - id: T7
     title: Load map (unset), load plan, structure-preserving loading builder, set_loads, read-back and check_model
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_load_map.toml"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_loads.py"
@@ -174,6 +180,7 @@ tasks:
   - id: T8
     title: Calculation on both routes, host-verdict reads, reconciliation and the stub-refusal workflows
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_calculate.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_reconcile.py"
@@ -196,6 +203,7 @@ tasks:
   - id: T9
     title: End-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.doctor (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/doctor/_idea.py"
       - "packages/eng-harness/docs/local-testing.md"
