@@ -49,7 +49,9 @@ def _locate(name: str, root: Path, calc_id: str) -> Path | None:
 def _imports(node: ast.AST, package: str, calc_id: str, nested: bool = False) -> Iterator[tuple[str, list[str]]]:
     """Yield `(module, names)` for each import statement under `node`; refuse dynamic and nested imports."""
     for child in ast.iter_child_nodes(node):
-        if isinstance(child, ast.If) and ast.unparse(child.test) == "__name__ == '__main__'":  # not run on import
+        if isinstance(child, ast.If) and ast.unparse(child.test) == "__name__ == '__main__'":  # body: not run on import
+            for orelse in child.orelse:  # the else branch does run
+                yield from _imports(ast.Module([orelse], []), package, calc_id, nested)
             continue
         if isinstance(child, ast.Name | ast.Attribute) and "__import__" in (
             getattr(child, "id", ""),
