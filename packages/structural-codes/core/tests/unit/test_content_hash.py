@@ -225,6 +225,10 @@ def test_unresolvable_and_unreadable_modules(hashpack: Fixture, monkeypatch: pyt
     with pytest.raises(CheckDefinitionError, match="missing"):
         content_hash(check)
 
+    hashpack.path("helpers.py").write_bytes(original + f"\nimport {_PACK}.missing.deeper\n".encode())
+    with pytest.raises(CheckDefinitionError, match="deeper"):
+        content_hash(check)
+
     hashpack.path("helpers.py").write_bytes(original + f"\nimport {_PACK}.ext\n".encode())
     extension = types.ModuleType(f"{_PACK}.ext")
     extension.__spec__ = ModuleSpec(f"{_PACK}.ext", None, origin="ext.so")

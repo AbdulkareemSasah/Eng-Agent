@@ -8,3 +8,4 @@
 - Trace recorder: `structural_codes.trace.TraceRecorder` (B-258).
 - Verdict builder `TraceRecorder.verdict` and governing selection `structural_codes._verdict` (B-259).
 - Check decorator, packs and registry: `structural_codes.check`, `structural_codes.pack`, `synthbase` test fixture pack (B-260).
+- Content hash over the static import closure (pack, `structural_codes`, `eng_contract`), dynamic-import rejection and `lint_scope_violations`: `structural_codes.content_hash`, `structural_codes._closure`, `hashpack` test fixture pack (B-261).
