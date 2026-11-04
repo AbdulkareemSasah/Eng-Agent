@@ -222,15 +222,14 @@ def test_plan_task_resolution(repo: Repo) -> None:
     assert isinstance(resolve("pkg/docs/plans/0003-bad.md#T1"), Finding)
 
 
-def test_selected_pull_request_waits_for_the_run_phase(repo: Repo) -> None:
-    """Until plan task T17 adds the runs, a pull request that passes selection is not judged: exit 2, never 0."""
+def test_selected_pull_request_is_judged_by_the_runs(repo: Repo) -> None:
+    """A pull request that passes selection is judged by the runs (T17): a test that is green at the base is TF004."""
     base = tf_repo(repo)
-    repo.commit({BASE_TEST_PATH: BASE_TEST + "\n" + NEW_TEST}, "test: red")
-    result, _, errors = tf_run(repo, base, "feat: x")
-    assert (result.code, errors) == (2, {})
-    assert "T17" in result.err
+    repo.commit({BASE_TEST_PATH: BASE_TEST + "\n" + NEW_TEST}, "test: not red")
+    result, status, errors = tf_run(repo, base, "feat: x")
+    assert (result.code, status, list(errors)) == (1, "fail", ["TF004"])
     event = write_event(repo, base, TASK_BODY.format("none (trivial)"))
-    assert repo.run(["test-first", "--event", str(event)]).code == 2
+    assert repo.run(["test-first", "--event", str(event)]).code == 1
 
 
 def test_inputs(repo: Repo, tmp_path: Path) -> None:

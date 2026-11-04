@@ -45,7 +45,7 @@ def root_pyproject(members: list[str]) -> str:
     )
 
 
-def member_pyproject(name: str, gate_table: bool = True) -> str:
+def member_pyproject(name: str, *, gate_table: bool = True) -> str:
     """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name).
 
     ``gate_table`` appends a default ``[tool.eng-gate]`` table; pass False when the caller appends its own.

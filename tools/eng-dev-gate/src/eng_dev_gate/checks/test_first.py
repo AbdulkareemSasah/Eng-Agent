@@ -1,8 +1,7 @@
-"""``test-first`` part 1 (spec 4.7 up to step 4.2): title, exemptions, commit selection, new or changed tests.
+"""``test-first`` (spec 4.7): title, exemptions, commit selection, new or changed tests, then the runs.
 
-The temporary base worktree, the pytest runs, the classification (TF004, TF005, TF009, TF011) and the CI job are plan
-task T17. A pull request that passes the selection is therefore a usage error here, never a pass. The title and the
-body are data: they are parsed, never executed or interpolated.
+The base worktree, the pytest runs and the classification (TF004, TF005, TF009, TF011) are in ``test_first_run``. The
+title and the body are data: they are parsed, never executed or interpolated.
 """
 
 from __future__ import annotations
@@ -17,6 +16,7 @@ from typing import Protocol
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_dev_gate.checks.gate_check import parse_body
+from eng_dev_gate.checks.test_first_run import Runner, SubprocessRunner, WorktreeGit, interpreter, judge
 from eng_dev_gate.config import GateConfig
 from eng_dev_gate.event import event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, Task, parse_plan, safe_relative_path
@@ -85,7 +85,7 @@ class Selection(BaseModel):
 
 
 class Outcome(BaseModel):
-    """Result of :func:`evaluate`; ``selection`` is set only when there is no error and tests must run (T17)."""
+    """Result of :func:`evaluate`; ``selection`` is set only when there is no error and tests must run."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -229,11 +229,16 @@ def resolve_task(body: str, config: GateConfig, git: Git, gate_ref: str) -> Task
     return _finding("TF008", f"tests_first is not checked: {reason}", Severity.NOTICE)
 
 
-def handle(args: argparse.Namespace) -> Status:
+def handle(args: argparse.Namespace, runner: Runner | None = None) -> Status:
     """The ``test-first`` command: ``--base --head --title`` or an event file; print the result.
 
+    Args:
+        args: the parsed options, with the gate context.
+        runner: runs the probe and pytest; the subprocess runner when omitted.
+
     Raises:
-        UsageError: bad options, no event, a fork, or a pull request that passes the selection (runs: plan task T17).
+        UsageError: bad options, no event, or a fork.
+        RunFaultError: TF009 or TF011 (exit 3).
         GitError: git failed.
     """
     context: GateContext = args.gate_context
@@ -243,12 +248,14 @@ def handle(args: argparse.Namespace) -> Status:
     if any(v is not None for v in given):
         if None in given:
             raise UsageError("--base, --head and --title go together")
-        outcome = evaluate(args.title, args.base, args.head, config, git, None)
+        base, head = args.base, args.head
+        outcome = evaluate(args.title, base, head, config, git, None)
     else:
         path = event_path(args.event, os.environ)
         if path is None:
             raise UsageError("no event file: pass --event or set GITHUB_EVENT_PATH, or give --base --head --title")
         pr = read_event(path).pull_request
+        base, head = (pr.base_sha, pr.head_sha) if pr is not None else ("", "")
         if pr is None:
             outcome = Outcome(skipped_reason="push event")
         elif pr.from_fork:
@@ -256,11 +263,14 @@ def handle(args: argparse.Namespace) -> Status:
         else:
             task = resolve_task(pr.body, config, git, args.gate_ref or f"origin/{config.gate_branch}")
             findings = [task] if isinstance(task, Finding) else []
-            outcome = evaluate(
-                pr.title, pr.base_sha, pr.head_sha, config, git, task if isinstance(task, Task) else None
-            )
+            outcome = evaluate(pr.title, base, head, config, git, task if isinstance(task, Task) else None)
     if outcome.selection is not None:
-        raise UsageError("the test runs (TF004, TF005) are not implemented yet (plan task T17)")
+        judged = context.policy_root.resolve() != context.root.resolve()
+        python = interpreter(context.root, judged)
+        findings += judge(
+            context.root, WorktreeGit(context.root), git.merge_base(base, head), outcome.selection,
+            runner or SubprocessRunner(), python, config.limits.test_run_seconds,
+        )  # fmt: skip
     step = StepResult(name="test-first", findings=[*findings, *outcome.findings], skipped_reason=outcome.skipped_reason)
     result = context.with_findings(CommandResult(command="test-first", mode=config.mode.value, steps=[step]))
     render(result, args.format, sys.stdout, os.environ)
