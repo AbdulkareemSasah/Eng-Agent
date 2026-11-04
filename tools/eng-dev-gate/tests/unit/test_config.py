@@ -140,6 +140,13 @@ def test_root_gate_yml_initial_values() -> None:
     assert "uv.lock" in config.generated_globs
 
 
+def test_root_gate_yml_schema_snapshots_are_generated() -> None:
+    """AC12c: the committed root gate.yml treats JSON Schema snapshots under docs/schema as generated files."""
+    config = load_gate_config(ROOT)
+    assert matches_any("packages/eng-contract/docs/schema/units.json", config.generated_globs)
+    assert matches_any("packages/eng-contract/docs/schema/kinds/beam.json", config.generated_globs)
+
+
 def test_root_gate_yml_workflow_specs_are_specs() -> None:
     """The committed root gate.yml treats workflow documents as specs (AC12a, spec 4.5 step 8)."""
     config = load_gate_config(ROOT)
