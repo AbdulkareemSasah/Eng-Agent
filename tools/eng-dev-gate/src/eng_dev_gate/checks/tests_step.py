@@ -78,7 +78,7 @@ def _stale_lock(ctx: StepContext) -> Finding | None:
     The ``lock`` step reports the same fact for the workspace; this check keeps the tests step from turning it into an
     environment fault (``uv run --locked`` exits 2) that would hide every other finding of the run.
     """
-    assert ctx.member is not None  # noqa: S101
+    assert ctx.member is not None  # noqa: S101  # B-059: package steps always have a member
     checked = ctx.runner.run(["uv", "lock", "--check", "--project", str(ctx.root)], ctx.root)
     if checked.exit_code == 0:
         return None
@@ -155,7 +155,7 @@ def tests(ctx: StepContext) -> list[Finding]:
         ConfigError: the package table is invalid (exit 2).
         EnvironmentFaultError: pytest or coverage crashed, or the report is unusable (exit 3).
     """
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    assert ctx.member is not None  # noqa: S101  # B-036: package steps always have a member
     member = ctx.member
     config = load_package_config(member.directory / "pyproject.toml")
     if _judged_environment(ctx):

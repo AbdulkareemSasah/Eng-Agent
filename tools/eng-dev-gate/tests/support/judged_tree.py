@@ -54,7 +54,7 @@ def make_judged_tree(
     }
     files.update({f"pkgs/a/{name}": text for name, text in (extra_files or {}).items()})
     tree.commit(files)
-    subprocess.run(["uv", "lock"], cwd=root, check=True, capture_output=True)  # noqa: S607
+    subprocess.run(["uv", "lock"], cwd=root, check=True, capture_output=True)  # noqa: S607  # B-059: uv from PATH
     tree.commit({}, "chore: lock")
     return tree
 
