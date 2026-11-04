@@ -19,6 +19,7 @@ from eng_dev_gate.config import (
     load_package_config,
     parse_package_config,
 )
+from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.toolrun import ToolResult
 from eng_dev_gate.workspace import Member
@@ -137,6 +138,17 @@ def test_root_gate_yml_initial_values() -> None:
     assert config.limits.max_task_lines == 400
     assert config.agents.unmanaged_ok == ["design/**"]
     assert "uv.lock" in config.generated_globs
+
+
+def test_root_gate_yml_workflow_specs_are_specs() -> None:
+    """The committed root gate.yml treats workflow documents as specs (AC12a, spec 4.5 step 8)."""
+    config = load_gate_config(ROOT)
+    workflows = sorted(path.relative_to(ROOT).as_posix() for path in ROOT.glob("*/*/docs/workflows/*.md"))
+    assert "packages/eng-harness/docs/workflows/model-edit-cycle.md" in workflows
+    assert matches_any("packages/eng-harness/docs/workflows/model-edit-cycle.md", config.spec_globs)
+    for path in workflows:
+        assert matches_any(path, config.spec_globs), path
+    assert matches_any("tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md", config.spec_globs)
 
 
 # ---- config step: weakening rules (spec 4.12 table; AC49, AC54) ----
