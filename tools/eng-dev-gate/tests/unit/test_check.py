@@ -47,7 +47,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
-    assert [s.name for s in STEPS] == ["lock", "format", "lint", "types", "tests"]
+    assert [s.name for s in STEPS] == ["lock", "format", "lint", "types", "secrets", "tests"]
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
     assert len(STEP_ORDER) == 14
