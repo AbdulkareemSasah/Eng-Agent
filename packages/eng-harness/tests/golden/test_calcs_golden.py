@@ -25,7 +25,7 @@ def test_case(stem: str) -> None:
     input_type = definition.input_type
     assert isinstance(input_type, type)
     assert issubclass(input_type, CalcInput)
-    inp = input_type.model_validate(case.inputs["input"])
-    meta = InputMeta.model_validate(case.inputs["meta"])
+    inp = input_type.model_validate(case.inputs.input)
+    meta = InputMeta.model_validate(case.inputs.meta)
     result = definition(inp, meta, TraceBuilder())
     assert result.model_dump(mode="json") == case.expected

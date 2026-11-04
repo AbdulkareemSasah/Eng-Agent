@@ -39,7 +39,7 @@ ALLOWED_NAMES = {
     "eng_contract.refs": {"RefString", "JsonPointer"},
     "eng_contract.errors": {"ContractError", "ErrorCode"},
 }
-FORBIDDEN_CALLS = {"open", "input", "eval", "exec", "compile", "__import__"}
+FORBIDDEN_CALLS = {"open", "input", "eval", "exec", "compile", "__import__", "globals", "vars", "setattr", "breakpoint"}
 MUTABLE_CALLS = {"list", "dict", "set", "bytearray", "defaultdict", "deque", "Counter"}
 
 
@@ -60,8 +60,10 @@ def _allowed_literals(tree: ast.Module) -> set[int]:
     ok: set[int] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "Cited":
-            if len(node.args) > 1 and (c := _numeric(node.args[0])):
-                source = node.args[1]
+            keywords = {k.arg: k.value for k in node.keywords}
+            value = node.args[0] if node.args else keywords.get("value")
+            source = node.args[1] if len(node.args) > 1 else keywords.get("source")
+            if value is not None and (c := _numeric(value)):
                 if isinstance(source, ast.Constant) and source.value:
                     ok.add(id(c))
         elif isinstance(node, ast.Subscript):
@@ -97,6 +99,22 @@ def _mutable(value: ast.expr | None) -> bool:
     return isinstance(value, ast.Call) and getattr(value.func, "id", "") in MUTABLE_CALLS
 
 
+def _state_statements(body: list[ast.stmt]) -> list[ast.Assign | ast.AnnAssign]:
+    """Assignments at module level, including those nested in module-level blocks and class bodies."""
+    found: list[ast.Assign | ast.AnnAssign] = []
+    for stmt in body:
+        if isinstance(stmt, ast.Assign | ast.AnnAssign):
+            found.append(stmt)
+        elif isinstance(stmt, ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        else:
+            for field in ("body", "orelse", "finalbody"):
+                found += _state_statements(getattr(stmt, field, []))
+            for handler in getattr(stmt, "handlers", []):
+                found += _state_statements(handler.body)
+    return found
+
+
 def _is_all(stmt: ast.Assign | ast.AnnAssign) -> bool:
     """`__all__` is a list of names, not state."""
     targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
@@ -106,7 +124,11 @@ def _is_all(stmt: ast.Assign | ast.AnnAssign) -> bool:
 def _import_problems(node: ast.Import | ast.ImportFrom, top: set[int]) -> list[str]:
     found = [] if id(node) in top else [f"{node.lineno}: import inside a function or block"]
     if isinstance(node, ast.Import):
-        return found + [f"{node.lineno}: import of {a.name}" for a in node.names if not _module_ok(a.name)]
+        return found + [
+            f"{node.lineno}: import of {a.name} (only the from form with allowed names is accepted)"
+            for a in node.names
+            if not _module_ok(a.name) or a.name in ALLOWED_NAMES
+        ]
     mod = node.module or ""
     if node.level or not _module_ok(mod):
         found.append(f"{node.lineno}: import of {'.' * node.level}{mod} is not allowed")
@@ -127,8 +149,8 @@ def check_source(source: str) -> list[str]:
             found.append(f"{node.lineno}: global statement")
         elif isinstance(node, ast.Call) and (name := getattr(node.func, "id", "")) in FORBIDDEN_CALLS:
             found.append(f"{node.lineno}: call of {name} (open, clock, environment and random reads are refused)")
-    for stmt in tree.body:
-        if isinstance(stmt, ast.Assign | ast.AnnAssign) and _mutable(stmt.value) and not _is_all(stmt):
+    for stmt in _state_statements(tree.body):
+        if _mutable(stmt.value) and not _is_all(stmt):
             found.append(f"{stmt.lineno}: mutable module-level state")
     skip = _annotation_nodes(tree) | _allowed_literals(tree)
     found += [
@@ -147,6 +169,11 @@ VIOLATIONS = {
     "def f():\n    import math\n": "inside",
     "def f():\n    return open('x')\n": "open",
     "def f():\n    global X\n": "global",
+    "import eng_contract.units": "import",
+    "import eng_contract.errors as e": "import",
+    "if True:\n    Y = {}": "mutable",
+    "class A:\n    items = []": "mutable",
+    "def f():\n    return globals()": "globals",
     "CACHE = {}": "mutable",
     "ITEMS: list[int] = []": "mutable",
     "X = 0.5": "FB005",
@@ -159,6 +186,7 @@ ALLOWED = [
     "from eng_contract.kinds.neutral import X",
     "from eng_harness.calcs import _state\nfrom eng_harness.calc import calc",
     "from eng_contract.cited import Cited\nX = Cited(3, 'spec')\nY = X[0]",
+    "from eng_contract.cited import Cited\nX = Cited(value=3, source='spec')",
     "def f(a: list[int]) -> bool:\n    return len(a) == 2 and a[-1] > a[0]",
     "REGISTRY = Registry(kinds)",
 ]

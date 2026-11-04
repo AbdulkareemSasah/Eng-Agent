@@ -12,7 +12,7 @@ GOOD = {
     "method_ref": "§4.7 D3",
     "synthetic": True,
     "derivation": "worked by hand",
-    "inputs": {},
+    "inputs": {"input": {}, "meta": {}},
     "expected": {},
 }
 BAD = {
@@ -22,6 +22,8 @@ BAD = {
     "not synthetic": {**GOOD, "synthetic": False},
     "synthetic missing": {k: v for k, v in GOOD.items() if k != "synthetic"},
     "extra field": {**GOOD, "note": "x"},
+    "inputs missing meta": {**GOOD, "inputs": {"input": {}}},
+    "inputs extra key": {**GOOD, "inputs": {"input": {}, "meta": {}, "x": 1}},
     "no derivation": {**GOOD, "derivation": ""},
 }
 

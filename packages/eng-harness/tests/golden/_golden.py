@@ -11,6 +11,15 @@ METHOD_REF = r"^§4\.(?:[6-9]|1[01])\s+\S"
 """A rule of spec 0003 sections 4.6 to 4.11, such as "§4.7 D3"."""
 
 
+class GoldenInputs(BaseModel):
+    """The calc input and its metadata; no other key is allowed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    input: dict[str, Any]
+    meta: dict[str, Any]
+
+
 class GoldenCase(BaseModel):
     """One hand-derived golden case; no field outside this schema is allowed."""
 
@@ -20,7 +29,7 @@ class GoldenCase(BaseModel):
     method_ref: str = Field(pattern=METHOD_REF)
     synthetic: Literal[True]
     derivation: str = Field(min_length=1, pattern=r"\S")
-    inputs: dict[str, Any]
+    inputs: GoldenInputs
     expected: dict[str, Any]
 
 
