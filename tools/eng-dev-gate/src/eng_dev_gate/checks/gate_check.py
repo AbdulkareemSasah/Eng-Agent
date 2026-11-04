@@ -14,6 +14,7 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
+from eng_dev_gate.approvals import Approvals, source_from_env
 from eng_dev_gate.checks.codeowners import load_patterns
 from eng_dev_gate.checks.gate_check_docs import (
     NONE_LINE,
@@ -225,7 +226,7 @@ def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list
 
 def _judge(
     pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str], base: str,
-    changes: list[Change],
+    changes: list[Change], approvals: Approvals | None, risks: set[str],
 ) -> list[Finding]:  # fmt: skip
     """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and budget (steps 3 to 8)."""
     fields = parse_body(pr.body)
@@ -236,7 +237,7 @@ def _judge(
         if target != "spec and plan":
             needed = "a spec and plan pull request needs `Plan-Task: none (spec and plan)`"
             findings.append(target if isinstance(target, Finding) else _error("GC011", needed))
-        return [*findings, *spec_plan_findings(git, config, changes, pr.head_sha, base)]
+        return [*findings, *spec_plan_findings(git, config, changes, pr.head_sha, base, approvals, risks)]
     if isinstance(target, Finding):
         return [*findings, target]
     if isinstance(target, str):
@@ -246,6 +247,7 @@ def _judge(
     plan = _read(git, gate_ref, plan_path, lambda text: parse_plan(text, config.limits.max_task_lines))
     if isinstance(plan, Finding):
         return [*findings, plan]
+    risks.update(plan.risk)
     findings += _status(plan, plan_path, config)
     spec = _read(git, gate_ref, plan.spec, parse_spec)
     findings += [spec] if isinstance(spec, Finding) else _status(spec, plan.spec, config)
@@ -260,7 +262,12 @@ def _judge(
 
 
 def check_pull_request(
-    pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str] = ()
+    pr: PullRequest,
+    config: GateConfig,
+    git: Git,
+    gate_ref: str,
+    member_dirs: Sequence[str] = (),
+    approvals: Approvals | None = None,
 ) -> list[Finding]:
     """Run the checks of spec 4.5 and the body rules; findings accumulate.
 
@@ -269,6 +276,7 @@ def check_pull_request(
         config: the gate configuration (read from the gate root).
         git: the git port; ``gate_ref`` is the ref the plan and spec are read from.
         member_dirs: POSIX paths of the workspace members (for the changelog exception of the scope check).
+        approvals: the approvals of the pull request, set with bootstrap off; None means bootstrap mode (AW codes).
 
     Returns:
         The findings (GC001 to GC016, AW02, AW03, AW06, AW08).
@@ -286,11 +294,12 @@ def check_pull_request(
     changes = git.name_status(base, pr.head_sha)
     paths = [p for c in changes for p in c.paths]
     patterns = load_patterns(git, (pr.base_sha, pr.head_sha))
+    risks: set[str] = set()  # risk classes of the plan or documents; they set the G3 approvals
     return [
         *findings,
-        *_judge(pr, config, git, gate_ref, member_dirs, base, changes),
-        *protected_findings(paths, patterns, config),
-        *identity_findings(config),
+        *_judge(pr, config, git, gate_ref, member_dirs, base, changes, approvals, risks),
+        *protected_findings(paths, patterns, config, approvals),
+        *identity_findings(config, approvals, risks),
     ]
 
 
@@ -312,7 +321,12 @@ def handle_gate_check(args: argparse.Namespace) -> Status:
     else:
         gate_ref = args.gate_ref or f"origin/{config.gate_branch}"
         members = [m.path for m in discover_members(root)] if (root / "pyproject.toml").is_file() else []
-        findings = check_pull_request(pr, config, SubprocessGit(root), gate_ref, members)
+        approvals = None
+        if config.mode is Mode.NORMAL:
+            approvals = Approvals(
+                source_from_env(os.environ), config, number=pr.number, author=pr.user_login, head_sha=pr.head_sha
+            )
+        findings = check_pull_request(pr, config, SubprocessGit(root), gate_ref, members, approvals)
         step = StepResult(name="gate-check", findings=findings)
     judged = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
     result: CommandResult = args.gate_context.with_findings(judged)

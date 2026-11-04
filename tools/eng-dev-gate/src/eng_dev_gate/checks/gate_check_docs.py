@@ -1,4 +1,4 @@
-"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8 to 10); the approvals port is T24, so bootstrap off fails closed."""
+"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8 to 10); with bootstrap off the approvals port decides."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable, Sequence
 from pathlib import PurePosixPath
 
+from eng_dev_gate.approvals import Approvals, approval_findings, required_approvers
 from eng_dev_gate.checks.codeowners import protected_paths
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest
@@ -20,7 +21,6 @@ _LANE = re.compile(r"lane/[0-9]+-[a-z0-9-]+")
 _TRIVIAL_EXCLUDED_DIRS = frozenset({"src", "tests", ".gate", ".github"})
 _CONFIG_SUFFIXES = frozenset({".toml", ".yml", ".yaml", ".json", ".ini", ".cfg"})  # with names holding `schema`
 _RELEASE_FILES = frozenset({"pyproject.toml", "CHANGELOG.md", "uv.lock"})
-_NOT_VERIFIED = "verification through the approvals port is not implemented (plan task T24)"
 
 
 def _error(code: str, message: str, path: str | None = None) -> Finding:
@@ -96,7 +96,9 @@ def is_document(path: str, config: GateConfig) -> bool:
     return matches_any(path, [*config.spec_globs, *config.plan_globs])
 
 
-def _check_document(git: Git, config: GateConfig, path: str, head: str, base: str) -> list[Finding]:
+def _check_document(
+    git: Git, config: GateConfig, path: str, head: str, base: str, approvals: Approvals | None, risks: set[str]
+) -> list[Finding]:
     """GC005, GC004, GC016 and GC014 or GC015 for one changed spec or plan, read at the head commit."""
     plan = matches_any(path, config.plan_globs)
     parse: Callable[[str], Spec] = (lambda t: parse_plan(t, config.limits.max_task_lines)) if plan else parse_spec
@@ -109,13 +111,18 @@ def _check_document(git: Git, config: GateConfig, path: str, head: str, base: st
     except PathNotFoundError, FrontMatterError:
         was = None
     findings: list[Finding] = []
+    risks.update(doc.risk)
     if doc.status == "approved" and was != "approved":
-        if config.mode is Mode.BOOTSTRAP:
+        if approvals is None:
             findings.append(
                 _error("GC014", "`status: approved` is the owner's act and cannot be set by a pull request", path)
             )
         else:
-            findings.append(_error("GC015", f"approvals of process/01 section 5 are required; {_NOT_VERIFIED}", path))
+            gate = "G2" if isinstance(doc, Plan) else "G1"
+            roles = required_approvers(gate, doc.risk, large=doc.size == "large")
+            findings += approval_findings(
+                approvals, roles, f"approving a {'plan' if gate == 'G2' else 'spec'} ({gate})", path
+            )
     if isinstance(doc, Plan):
         try:
             missing = uncovered_criteria(doc, git.show(head, doc.spec))
@@ -126,7 +133,15 @@ def _check_document(git: Git, config: GateConfig, path: str, head: str, base: st
     return findings
 
 
-def spec_plan_findings(git: Git, config: GateConfig, changes: Sequence[Change], head: str, base: str) -> list[Finding]:
+def spec_plan_findings(
+    git: Git,
+    config: GateConfig,
+    changes: Sequence[Change],
+    head: str,
+    base: str,
+    approvals: Approvals | None,
+    risks: set[str],
+) -> list[Finding]:
     """Step 8: GC010 for any other file, then the front matter, coverage and status of each changed document."""
     paths = list(dict.fromkeys(p for c in changes for p in c.paths))
     findings = [
@@ -136,26 +151,34 @@ def spec_plan_findings(git: Git, config: GateConfig, changes: Sequence[Change], 
     ]
     for change in changes:
         if change.status != "D" and is_document(change.path, config):
-            findings += _check_document(git, config, change.path, head, base)
+            findings += _check_document(git, config, change.path, head, base, approvals, risks)
     return findings
 
 
-def protected_findings(paths: Sequence[str], patterns: Sequence[str], config: GateConfig) -> list[Finding]:
-    """Step 9: AW02 in bootstrap mode, else GC015, when a changed path is covered by CODEOWNERS."""
+def protected_findings(
+    paths: Sequence[str], patterns: Sequence[str], config: GateConfig, approvals: Approvals | None
+) -> list[Finding]:
+    """Step 9: AW02 in bootstrap mode, else GC015 unless the owner approved, when CODEOWNERS covers a changed path."""
     covered = protected_paths(paths, patterns)
     if not covered:
         return []
     listed = f"{len(covered)} protected path(s): {', '.join(covered)}"
-    if config.mode is Mode.BOOTSTRAP:
+    if approvals is None:
         return [awaiting_finding(config, "AW02", f"CODEOWNERS review is required for {listed}")]
-    return [_error("GC015", f"the owner's approving review is required for {listed}; {_NOT_VERIFIED}")]
+    if approvals.owner_approved():
+        return []
+    return [_error("GC015", f"owner approval (an approving review of the head commit) is required for {listed}")]
 
 
-def identity_findings(config: GateConfig) -> list[Finding]:
-    """Step 10: AW08 and AW03 in bootstrap mode, else GC015, because the identity and G3 checks are not verified."""
-    if config.mode is Mode.BOOTSTRAP:
+def identity_findings(config: GateConfig, approvals: Approvals | None, risks: set[str]) -> list[Finding]:
+    """Step 10: AW08 and AW03 in bootstrap mode; else the author must be an agent and the G3 approvals must exist."""
+    if approvals is None:
         return [
             awaiting_finding(config, "AW08", "the identity checks (author and approver logins) are the owner's"),
             awaiting_finding(config, "AW03", "the G3 approvals of process/01 section 5 are the owner's"),
         ]
-    return [_error("GC015", f"the identity checks and the G3 approvals are required; {_NOT_VERIFIED}")]
+    who = config.identities
+    findings = []
+    if approvals.author == who.owner_login or approvals.author not in who.agent_logins:
+        findings.append(_error("GC015", f"identity check: author {approvals.author!r} is not an agent login"))
+    return [*findings, *approval_findings(approvals, required_approvers("G3", risks), "merging (G3)")]
