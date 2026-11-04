@@ -54,17 +54,21 @@ def test_monotonic_within_millisecond() -> None:
     first, second, third = (source.new_ulid() for _ in range(3))
     assert first < second < third
     assert first[:10] == second[:10] == third[:10]
-    assert first[-2:] == "05" and second[-2:] == "06" and third[-2:] == "07"
+    assert first[-2:] == "05"
+    assert second[-2:] == "06"
+    assert third[-2:] == "07"
     # A clock that goes backwards keeps the previous timestamp.
     back = SystemIdSource(FixedClock(_START, -1), random_bytes=lambda n: b"\x00" * n)
     a, b = back.new_ulid(), back.new_ulid()
-    assert a < b and a[:10] == b[:10]
+    assert a < b
+    assert a[:10] == b[:10]
 
 
 def test_new_ms_uses_fresh_random_part() -> None:
     source = SystemIdSource(FixedClock(_START, 1), random_bytes=lambda n: b"\x07" * n)
     a, b = source.new_ulid(), source.new_ulid()
-    assert a[10:] == b[10:] and a < b
+    assert a[10:] == b[10:]
+    assert a < b
 
 
 def test_overflow_raises() -> None:
@@ -77,9 +81,9 @@ def test_overflow_raises() -> None:
 
 
 def test_ulid_text_form_known_vector() -> None:
-    # ulid/spec README example.
-    assert ulid_timestamp_ms("01ARZ3NDEKTSV4RRFFQ69G5FAV") == 1469918176385
-    assert ulid_timestamp_ms("res_01ARZ3NDEKTSV4RRFFQ69G5FAV") == 1469918176385
+    # Worked by hand from the alphabet: 1000 = 31 * 32 + 8, digits Z and 8; 32 ** 3 = "1000".
+    assert ulid_timestamp_ms("00000000Z80000000000000000") == 1000
+    assert ulid_timestamp_ms("res_00000010000000000000000000") == 32768
     assert ulid_timestamp_ms("mdl_00000000000000000000000000") == 0
     assert ulid_timestamp_ms("7ZZZZZZZZZ0000000000000000") == 2**48 - 1
 
