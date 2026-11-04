@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 
 from eng_dev_gate import __version__
+from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 
 Handler = Callable[[argparse.Namespace], Status]
@@ -30,7 +31,13 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--format", choices=("text", "json"), default="text")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in COMMANDS:
-        sub.add_parser(name, help=f"{name} command")
+        command = sub.add_parser(name, help=f"{name} command")
+        if name == "check":
+            command.add_argument("--package", default=None, help="check this workspace member")
+            command.add_argument("--all", action="store_true", help="check every member")
+            command.add_argument("--only", action="append", default=[], help="run only these steps (comma list)")
+            command.add_argument("--skip", action="append", default=[], help="skip these steps (comma list)")
+            command.add_argument("--fail-fast", action="store_true", help="stop after the first failing step")
     return parser
 
 
@@ -72,4 +79,4 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main(sys.argv[1:], {"check": make_handler()}))

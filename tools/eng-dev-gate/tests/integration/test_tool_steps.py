@@ -22,7 +22,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 
 
 def _uv_lock(repo: Repo) -> None:
-    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S603, S607
+    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S607
 
 
 def test_ruff_mypy_on_toy_package(repo: Repo) -> None:

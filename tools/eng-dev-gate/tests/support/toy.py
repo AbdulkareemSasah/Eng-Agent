@@ -20,7 +20,12 @@ limits:
   max_file_bytes: 1048576
 """
 
-CLEAN_MODULE = '"""A clean module."""\n\n\ndef double(value: int) -> int:\n    """Return twice ``value``."""\n    return value * 2\n'
+CLEAN_MODULE = (
+    '"""A clean module."""\n\n\n'
+    "def double(value: int) -> int:\n"
+    '    """Return twice ``value``."""\n'
+    "    return value * 2\n"
+)
 
 
 def root_pyproject(members: list[str]) -> str:
