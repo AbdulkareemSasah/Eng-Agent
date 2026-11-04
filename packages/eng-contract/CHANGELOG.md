@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- MCP mapping helpers: `envelope_to_tool_result`, `tool_result_to_envelope`, `extract_raw_reply`, `output_schema`, `NotAnEnvelope` (`mcp`), spec 4.11 (B-024).
 - Package skeleton: `pyproject.toml`, gate configuration, version constants `CONTRACT_VERSION`, `UNITS_VERSION`,
   `__version__` (B-010).
 - Error codes, retry rules, warnings and `ContractError` (`errors`, internal `_types`), spec 4.2.3 and 4.2.4 (B-011).
