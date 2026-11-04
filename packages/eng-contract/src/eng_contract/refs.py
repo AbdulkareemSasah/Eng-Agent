@@ -10,13 +10,13 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Annotated, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, field_validator
 
 from eng_contract._pointer import JsonPointer
 from eng_contract._types import FieldPath, KindName
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import IdSource, ModelId, ResultId, SystemClock, SystemIdSource
-from eng_contract.units import kind_for_field
+from eng_contract.units import UNITS, kind_for_field
 
 if TYPE_CHECKING:
     from eng_contract.records import ResultRecord
@@ -27,7 +27,7 @@ _REF = re.compile(rf"({_ID})(?:#(.*))?", re.DOTALL)
 _LOCAL = re.compile(r"#/traces/(0|[1-9][0-9]*)")
 _MODEL = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False, strict=False)
 
-RefString = Annotated[str, StringConstraints(max_length=_MAX_REF, pattern=rf"^{_ID}(#(?s:.*))?$")]
+RefString = Annotated[str, StringConstraints(max_length=_MAX_REF, pattern=rf"^{_ID}(#[\s\S]*)?$")]
 """A result id, optionally followed by `#` and an RFC 6901 pointer (JSON string form)."""
 LocalTraceRef = Annotated[str, StringConstraints(pattern=r"^#/traces/(0|[1-9][0-9]*)$")]
 """Pointer from inside a payload to one of its own traces (spec 4.6.3); rebased before resolution."""
@@ -60,9 +60,16 @@ class RefRule(BaseModel):
     model_config = _MODEL
 
     kinds: frozenset[KindName] = frozenset()
-    unit: str | None = None
+    unit: Annotated[str, StringConstraints(max_length=32)] | None = None
     stale_ok: bool = False
     field: FieldPath | None = None
+
+    @field_validator("unit")
+    @classmethod
+    def _known_unit(cls, value: str | None) -> str | None:
+        if value is not None and value not in UNITS:
+            raise ValueError(f"unknown unit symbol {value!r}")
+        return value
 
 
 class ResolvedRef(BaseModel):
@@ -160,13 +167,19 @@ def _check_revision(
         source = ids or SystemIdSource(SystemClock())
         raise ContractError(
             ErrorCode.INTERNAL,
-            "the model revision is older than the record's",
+            f"the model revision {current} is older than the record's {host.model_revision}",
             field=rule.field,
-            received=seen,
+            received=record.result_id,
             incident_id=source.new_ulid(),
         )
     if not rule.stale_ok:
-        raise ContractError(ErrorCode.REF_STALE, "the model changed after the result", field=rule.field, received=seen)
+        raise ContractError(
+            ErrorCode.REF_STALE,
+            "the model changed after the result",
+            field=rule.field,
+            expected={"model_revision": current},
+            received=seen,
+        )
 
 
 def resolve_ref(
