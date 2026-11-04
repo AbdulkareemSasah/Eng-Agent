@@ -12,16 +12,18 @@ from pydantic import BaseModel, ConfigDict, JsonValue, TypeAdapter, ValidationEr
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import canonical_json
 from eng_contract.envelope import Envelope, FailureEnvelope, SuccessEnvelope
+from eng_contract.errors import ContractError, ErrorCode
 
 _ADAPTER: TypeAdapter[SuccessEnvelope | FailureEnvelope] = TypeAdapter(Envelope)
+_JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
-class NotAnEnvelope(Exception):  # noqa: N818  # B-024: name fixed by spec 4.11
-    """A tool result is not a valid contract envelope; `errors` holds the validation errors, if any."""
+class NotAnEnvelope(ContractError):  # noqa: N818  # B-024: name fixed by spec 4.11
+    """A tool result is not a valid contract envelope; code `INVALID_ARGUMENT`; `errors` holds the validation errors."""
 
     def __init__(self, message: str, errors: list[Any] | None = None) -> None:
         """Keep the message and the validation `errors`."""
-        super().__init__(message)
+        super().__init__(ErrorCode.INVALID_ARGUMENT, message)
         self.errors = errors or []
 
 
@@ -76,7 +78,7 @@ def extract_raw_reply(result: Mapping[str, Any]) -> RawToolReply:
     parsed: list[JsonValue] = []
     for text in texts:
         try:
-            parsed.append(TypeAdapter(JsonValue).validate_json(text))
+            parsed.append(_JSON.validate_json(text))
         except ValidationError:
             continue
     structured = result.get("structuredContent")
