@@ -58,6 +58,7 @@ def test_jobs_triggers_and_local_actions() -> None:
     assert triggers["push"]["branches"] == ["build/v1"]
     assert workflow["permissions"] == {"contents": "read"}
     assert workflow["concurrency"]["cancel-in-progress"] is True
+    assert workflow["jobs"]["gate-check"]["if"] == "github.event_name == 'pull_request'"  # spec 4.14: PR events only
     windows_if = workflow["jobs"]["windows"]["if"]
     assert "github.event_name == 'push'" in windows_if
     assert "github.ref == 'refs/heads/build/v1'" in windows_if

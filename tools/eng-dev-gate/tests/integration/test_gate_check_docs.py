@@ -88,8 +88,7 @@ def test_lane_branch(repo: Repo) -> None:
     repo.commit({"pkg/elsewhere.py": "z = 1\n"}, "feat: lane tool")  # outside every task, no Plan-Task line
     draft = gate_check(repo, write_event(repo, base, "no plan task\n", head_ref="lane/12-wall-check", draft=True))[0]
     assert draft.code == 0
-    assert json.loads(draft.out)["status"] == "pass"
-    assert _findings(draft) == [("GC012", "notice", None)]
+    assert _findings(draft) == [("GC012", "notice", None)]  # no AW08 or AW03: the lane skips the remaining steps
     bad = [("lane/12-wall-check", False), ("lane/x-foo", True), ("lane/12", True), ("lane/12-Foo", True)]
     bad += [("lane/12-", True), ("lane/-foo", True), ("lane/1_2-foo", True)]
     for name, is_draft in bad:
@@ -175,13 +174,13 @@ def test_protected_paths_awaiting_owner(repo: Repo) -> None:
     plan = plan_text(files=("pkg/src/**", ".github/**"))
     base = make_gate_repo(repo, plan=plan, base_files={CODEOWNERS: OWNERS, "pkg/src/protected/a.py": "a = 1\n"})
     ok = _commit_and_check(repo, base, {"pkg/src/free.py": "f = 1\n"}, BODY)
-    assert (ok.code, _findings(ok)) == (0, [])
+    assert (ok.code, _findings(ok)) == (0, [("AW08", "awaiting", None), ("AW03", "awaiting", None)])
     result = _commit_and_check(repo, base, {"pkg/src/protected/a.py": "a = 2\n"}, BODY, name="p.json")
     assert result.code == 0
     data = json.loads(result.out)
     assert data["status"] == "awaiting-owner"
     awaiting = [f for f in data["steps"][0]["findings"] if f["severity"] == "awaiting"]
-    assert [f["code"] for f in awaiting] == ["AW02"]
+    assert [f["code"] for f in awaiting] == ["AW02", "AW08", "AW03"]
     assert "pkg/src/protected/a.py" in awaiting[0]["message"]
     assert "pkg/src/free.py" not in awaiting[0]["message"]
     repo.commit({CODEOWNERS: "/nothing/ @owner\n"}, "ci: drop protection")  # removed by the pull request itself
@@ -233,9 +232,9 @@ def test_gate_branch_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.Monk
     normal.commit({"pkg/src/new.py": "y\n"}, "feat: change")
     gate = base_checkout(normal, base, tmp_path / "gate-base", monkeypatch)
     wrong = write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="build/v1")
-    assert set(gate_check(normal, wrong, gate=gate)[1]) == {"GC013"}
+    assert set(gate_check(normal, wrong, gate=gate)[1]) == {"GC013", "GC015"}
     merge_like = write_event(normal, base, "Closes #1\n", base_ref="main", head_ref="build/v1", name="n.json")
-    assert set(gate_check(normal, merge_like, gate=gate)[1]) == {"GC001"}
+    assert set(gate_check(normal, merge_like, gate=gate)[1]) == {"GC001", "GC015"}
 
 
 def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
@@ -245,9 +244,42 @@ def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
     quiet = Repo(tmp_path / "quiet")  # a draft spec of risk r3 and a draft plan that is not large wait for no owner
     base = make_gate_repo(quiet, plan=plan_text(status="draft"), base_files={SPEC_PATH: r3_spec})
     result = _commit_and_check(quiet, base, {"pkg/src/new.py": "y = 2\n"}, BODY)
-    assert (result.code, _findings(result), json.loads(result.out)["status"]) == (0, [], "pass")
+    waiting = [("AW08", "awaiting", None), ("AW03", "awaiting", None)]  # step 10 only; no AW01
+    assert (result.code, _findings(result)) == (0, waiting)
     loud = Repo(tmp_path / "loud")
     base = make_gate_repo(loud, plan=large, base_files={SPEC_PATH: spec_text("draft")})
     result = _commit_and_check(loud, base, {"pkg/src/new.py": "y = 2\n"}, BODY)
     assert result.code == 0
-    assert sorted(_findings(result)) == [("AW01", "awaiting", PLAN_PATH), ("AW01", "awaiting", SPEC_PATH)]
+    assert sorted(_findings(result)) == [
+        ("AW01", "awaiting", PLAN_PATH),
+        ("AW01", "awaiting", SPEC_PATH),
+        ("AW03", "awaiting", None),
+        ("AW08", "awaiting", None),
+    ]
+
+
+def test_identity_and_g3_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC2 (spec 4.5 step 10): AW08 and AW03 in bootstrap mode, also on a spec and plan pull request; GC015 otherwise."""
+    boot = Repo(tmp_path / "boot")
+    base = make_gate_repo(boot)
+    docs = _commit_and_check(boot, base, {PLAN_PATH: plan_text() + MORE}, DOCS)
+    assert (docs.code, _findings(docs)) == (0, [("AW08", "awaiting", None), ("AW03", "awaiting", None)])
+    assert json.loads(docs.out)["status"] == "awaiting-owner"
+    normal = Repo(tmp_path / "normal")
+    base = make_gate_repo(normal, bootstrap=False)
+    normal.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    gate = base_checkout(normal, base, tmp_path / "gate-base", monkeypatch)
+    event = write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main")
+    result, errors = gate_check(normal, event, gate=gate)
+    assert (result.code, set(errors)) == (1, {"GC015"})
+    assert "identity" in errors["GC015"]
+    assert "not implemented" in errors["GC015"]
+
+
+def test_head_run_reports_aw09(repo: Repo) -> None:
+    """AC67: a head run (no --gate-root) of gate-check prints the AW09 notice, as every other judging command does."""
+    base = make_gate_repo(repo)
+    repo.commit({"pkg/src/new.py": "y = 2\n"}, "feat: change")
+    result = gate_check(repo, write_event(repo, base, BODY))[0]
+    steps = {step["name"]: [f["code"] for f in step["findings"]] for step in json.loads(result.out)["steps"]}
+    assert steps["gate-root"] == ["AW09"]
