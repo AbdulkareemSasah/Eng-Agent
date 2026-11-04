@@ -38,7 +38,7 @@ class FakeRunner:
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
     # the tests step has its own tests (test_coverage.py); the fake runner here writes no coverage report
     return repo.run(
-        ["--format", "json", "check", "--skip", "tests,docs-fresh,licenses", *argv], {"check": make_handler(runner)}
+        ["--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation", *argv], {"check": make_handler(runner)}
     )
 
 
@@ -50,7 +50,7 @@ def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
     assert [s.name for s in STEPS] == [
-        "lock", "format", "lint", "types", "forbidden", "tests", "docs-fresh", "licenses"
+        "lock", "format", "lint", "types", "forbidden", "tests", "docs-fresh", "licenses", "mutation"
     ]  # fmt: skip
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
@@ -148,12 +148,12 @@ def test_workspace_selection(repo: Repo) -> None:
     one = _statuses(_run(repo, FakeRunner(), "--package", "b"))
     assert list(one) == ["lock", "format", "lint", "types", "forbidden"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
-    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check", "--skip", "tests,docs-fresh,licenses"]
+    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation"]
     inside = repo.run(argv, {"check": make_handler(FakeRunner())})
     assert json.loads(inside.out)["steps"][1]["name"] == "format"
 
 
 def test_text_output_starts_with_mode(repo: Repo) -> None:
     make_workspace(repo, ["a"])
-    result = repo.run(["check", "--skip", "tests,docs-fresh,licenses"], {"check": make_handler(FakeRunner())})
+    result = repo.run(["check", "--skip", "tests,docs-fresh,licenses,mutation"], {"check": make_handler(FakeRunner())})
     assert result.out.splitlines()[0] == "mode: bootstrap"

@@ -17,7 +17,8 @@ from support.repo import Repo
 from support.toy import GATE_YML, root_pyproject
 
 TABLE = (
-    '[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["a"]\ncoverage_line = 95\ncoverage_branch = 90\n'
+    '[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["a"]\n'
+    "coverage_line = 95\ncoverage_branch = 90\n"
     'r1_modules = ["src/a/core.py"]\nr2_modules = ["src/a/rules/*.py"]\nmutation_min = {minimum}\n'
 )
 HEAD = '[project]\nname = "a"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
@@ -126,7 +127,7 @@ def test_default_minimum_is_the_floor(repo: Repo) -> None:
 def test_mutation_settings_of_the_package_are_refused(repo: Repo) -> None:
     base, member = _setup(repo, table=TABLE.format(minimum=80) + "[tool.mutmut]\ndo_not_mutate = ['*']\n")
     _change(repo)
-    with pytest.raises(UsageError, match="tool.mutmut"):
+    with pytest.raises(UsageError, match=r"tool\.mutmut"):
         mutation.run_step(_context(repo, member, FakeMutmut(["killed"]), base))
 
 
@@ -157,5 +158,7 @@ def test_no_base_commit_is_a_notice(repo: Repo) -> None:
 
 
 def test_parse_results() -> None:
-    text = "warning: noise\n    a.x_f__mutmut_1: killed\n    a.x_f__mutmut_2: no tests\n\n    a.x_g__mutmut_1: timeout\n"
+    text = (
+        "warning: noise\n    a.x_f__mutmut_1: killed\n    a.x_f__mutmut_2: no tests\n\n    a.x_g__mutmut_1: timeout\n"
+    )
     assert mutation.parse_results(text) == {"killed": 1, "no tests": 1, "timeout": 1}

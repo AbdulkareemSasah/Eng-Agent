@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from eng_dev_gate.checks import forbidden, generated, licenses, tests_step, tool_steps
+from eng_dev_gate.checks import forbidden, generated, licenses, mutation, tests_step, tool_steps
 from eng_dev_gate.report import Finding
 from eng_dev_gate.toolrun import ToolRunner
 from eng_dev_gate.workspace import Member
@@ -21,12 +21,16 @@ STEP_ORDER: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class StepContext:
-    """What a step sees: workspace ``root``, ``gate_root`` (policy files), the ``member`` for package steps."""
+    """What a step sees: workspace ``root``, ``gate_root`` (policy files), the ``member`` for package steps.
+
+    ``base`` is the commit that changes are compared with (``mutation``); ``None`` takes it from the event file.
+    """
 
     root: Path
     gate_root: Path
     member: Member | None
     runner: ToolRunner
+    base: str | None = None
 
 
 @dataclass(frozen=True)
@@ -47,4 +51,5 @@ STEPS: tuple[Step, ...] = (
     Step("tests", "package", tests_step.tests),
     Step("docs-fresh", "package", generated.generated),
     Step("licenses", "package", licenses.licenses),
+    Step("mutation", "package", mutation.run_step),
 )
