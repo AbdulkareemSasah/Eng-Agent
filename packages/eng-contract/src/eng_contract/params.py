@@ -13,7 +13,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from pydantic.fields import FieldInfo
-from pydantic_core import PydanticUndefined
 
 from eng_contract._types import KindName
 from eng_contract._validation import invalid_from, run_pipeline
@@ -81,7 +80,7 @@ class ParamSpec:
 
 
 def eng_param(
-    default: Any = PydanticUndefined,
+    default: Any = ...,  # pydantic's required-field marker; pydantic turns it into PydanticUndefined
     *,
     unit: str | None = None,
     ge: float | None = None,
