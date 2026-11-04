@@ -168,3 +168,39 @@ def test_uncovered_criteria() -> None:
 def test_safe_relative_path(path: str, ok: bool) -> None:
     """Plan and spec paths are workspace-relative POSIX paths without `..`, absolute or backslash forms."""
     assert safe_relative_path(path) is ok
+
+
+CLAUSES = "a/docs/clauses/pk/"
+BP_CLAUSE = "---\nx: 1\n---\n- BP-AC1. Given a\n- BP-AC2. Given b\n- BP-AC3a. Given c\n"
+OV_CLAUSE = "---\nx: 1\n---\n- OV-AC1. Given d\n"
+
+
+def _clause_plan(covers: str) -> str:
+    return _plan(_task("T1", covers=covers), spec=CLAUSES)
+
+
+def test_clause_spec_directory_plan() -> None:
+    """AC13a: a spec path ending in `/` and prefixed `covers` ids parse; GC016 counts the covered prefixes' criteria."""
+    plan = parse_plan(_clause_plan("[BP-AC1, AC4, PK-AC1]"), CAP)
+    assert plan.spec == CLAUSES
+    assert plan.tasks[0].covers == ["BP-AC1", "AC4", "PK-AC1"]
+    for bad in ("[bp-AC1]", "[B-AC1]", "[ABCD-AC1]", "[BP-AC]", "[BP-ac1]", "[BP_AC1]"):
+        with pytest.raises(FrontMatterError, match="covers"):
+            parse_plan(_clause_plan(bad), CAP)
+    for bad_spec in ("a//", "/a/", "a/../", "a\\b/", "/", "a/./"):
+        with pytest.raises(FrontMatterError, match="spec"):
+            parse_plan(_plan(_task("T1"), spec=f'"{bad_spec}"'), CAP)
+    clauses = [BP_CLAUSE, OV_CLAUSE]
+    own = "\n# Plan\n\n- PK-AC1. Given the package, then it imports.\nPK-AC2. bare line\nPK-AC3 no dot\n"
+    # only the prefix BP is covered: OV-AC1 of the other clause spec is not demanded; the plan's own PK criteria are
+    part = parse_plan(_clause_plan("[BP-AC1, BP-AC3a]"), CAP)
+    assert uncovered_criteria(part, clauses, own) == ["BP-AC2", "PK-AC1", "PK-AC2"]
+    full = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, PK-AC1, PK-AC2]"), CAP)
+    assert uncovered_criteria(full, clauses, own) == []
+    both = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, OV-AC1, PK-AC1, PK-AC2]"), CAP)
+    assert uncovered_criteria(both, clauses, own) == []
+    none = parse_plan(_clause_plan("[PK-AC1, PK-AC2]"), CAP)  # no clause prefix covered: no clause criterion demanded
+    assert uncovered_criteria(none, clauses, own) == []
+    # a plan whose spec is a file ignores prefixed lines of the spec and the plan's own text
+    single = parse_plan(_plan(_task("T1", covers="[AC1]")), CAP)
+    assert uncovered_criteria(single, "- AC1. a\n- BP-AC1. b\n", own) == []

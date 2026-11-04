@@ -151,6 +151,17 @@ def test_root_gate_yml_workflow_specs_are_specs() -> None:
     assert matches_any("tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md", config.spec_globs)
 
 
+def test_root_gate_yml_clause_specs_are_specs() -> None:
+    """The committed root gate.yml treats clause specs as specs (AC12b, spec 4.5 step 8)."""
+    config = load_gate_config(ROOT)
+    clauses = sorted(path.relative_to(ROOT).as_posix() for path in ROOT.glob("*/*/docs/clauses/**/*.md"))
+    clause = "packages/structural-codes/docs/clauses/aci318_14/aci318_14.8_6_1_1.min_flexural_reinforcement.md"
+    assert clause in clauses
+    for path in clauses:
+        assert matches_any(path, config.spec_globs), path
+        assert not matches_any(path, config.plan_globs), path
+
+
 # ---- config step: weakening rules (spec 4.12 table; AC49, AC54) ----
 
 BASE = (
