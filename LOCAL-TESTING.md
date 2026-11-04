@@ -785,6 +785,22 @@ item in this list that is wrong or missing, tell the agent.
 Marker: **[H]** needs a host program, **[N]** needs the network or a key only, **[M]** needs your machine only (disk,
 antivirus, browser, language settings).
 
+### 7.0 The two CI steps the build container could not run
+
+GitHub Actions did not run for this repository from 2026-11-04 (billing: [BUILD-STATUS.md](BUILD-STATUS.md) OQ-A13), so
+the build ran CI inside its container instead (BUILD-STATUS.md D-23). Each pull request shows that result in its "Local
+CI" section. Two steps cannot run there. Run them on your machine before `build/v1` goes to `main`:
+
+- [N] The dependency audit. From the repository folder, run `uv audit --locked`. What you should see: no known
+  vulnerability reported. It needs the network: it asks the OSV vulnerability database (osv.dev), which the build
+  container may not contact. If it reports a vulnerability, send its output to the agent.
+- [M] The windows job. From the repository folder, run `uv sync --all-packages`, then `uv run eng-gate windows-tests`.
+  What you should see: the command ends without a failed test (exit code 0). It runs the Windows-only tests of every
+  package, the ones marked `windows`. If a test fails, report it as section 6 describes.
+
+If GitHub Actions works again, you can instead re-run CI on the final `build/v1` on GitHub: the `windows` job runs on
+pushes to `build/v1`.
+
 ### 7.1 eng-contract
 
 Source: [packages/eng-contract/docs/local-testing.md](packages/eng-contract/docs/local-testing.md) (exists now).
