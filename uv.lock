@@ -6,6 +6,7 @@ requires-python = "==3.14.*"
 members = [
     "eng-contract",
     "eng-dev-gate",
+    "eng-harness",
     "eng-platform",
 ]
 
@@ -202,6 +203,33 @@ dev = [
     { name = "hypothesis", specifier = ">=6.170.14" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "types-pyyaml", specifier = ">=6.0.12" },
+]
+
+[[package]]
+name = "eng-harness"
+version = "0.1.0.dev0"
+source = { editable = "packages/eng-harness" }
+dependencies = [
+    { name = "eng-contract" },
+    { name = "pydantic" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eng-contract", editable = "packages/eng-contract" },
+    { name = "pydantic", specifier = ">=2.14,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.170.14" },
+    { name = "pytest", specifier = ">=9.2.0" },
 ]
 
 [[package]]
