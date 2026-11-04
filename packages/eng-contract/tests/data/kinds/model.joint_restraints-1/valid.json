@@ -1,0 +1,22 @@
+{
+  "joints": [
+    {
+      "joint": "J1",
+      "ux": true,
+      "uy": true,
+      "uz": true,
+      "rx": false,
+      "ry": false,
+      "rz": false
+    },
+    {
+      "joint": "J2",
+      "ux": true,
+      "uy": true,
+      "uz": true,
+      "rx": true,
+      "ry": false,
+      "rz": false
+    }
+  ]
+}

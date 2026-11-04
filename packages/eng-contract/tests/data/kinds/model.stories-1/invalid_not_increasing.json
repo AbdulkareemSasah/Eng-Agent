@@ -1,0 +1,22 @@
+{
+  "rule": "strictly increasing",
+  "payload": {
+    "base_elevation_mm": 0,
+    "stories": [
+      {
+        "name": "S1",
+        "elevation_mm": 3000,
+        "height_mm": 3000,
+        "master_story": true,
+        "similar_to": null
+      },
+      {
+        "name": "S2",
+        "elevation_mm": 3000,
+        "height_mm": 3000,
+        "master_story": false,
+        "similar_to": "S1"
+      }
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "rule": "at least 3",
+  "payload": {
+    "areas": [
+      {
+        "id": "A1",
+        "kind": "slab",
+        "section": "S200",
+        "points": [
+          {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          {
+            "x_mm": 1,
+            "y_mm": 0,
+            "z_mm": 0
+          }
+        ],
+        "joints": null,
+        "story": "S1"
+      }
+    ]
+  }
+}
