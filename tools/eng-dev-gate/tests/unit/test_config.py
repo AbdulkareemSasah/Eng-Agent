@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.metadata
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_dev_gate.checks import config_step
+from eng_dev_gate.checks.registry import StepContext
 from eng_dev_gate.config import (
     FLOORS,
     ConfigError,
@@ -15,7 +19,9 @@ from eng_dev_gate.config import (
     load_package_config,
     parse_package_config,
 )
-from eng_dev_gate.report import Severity
+from eng_dev_gate.report import Finding, Severity
+from eng_dev_gate.toolrun import ToolResult
+from eng_dev_gate.workspace import Member
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -131,3 +137,143 @@ def test_root_gate_yml_initial_values() -> None:
     assert config.limits.max_task_lines == 400
     assert config.agents.unmanaged_ok == ["design/**"]
     assert "uv.lock" in config.generated_globs
+
+
+# ---- config step: weakening rules (spec 4.12 table; AC49, AC54) ----
+
+BASE = (
+    '[project]\nname = "pkg"\nversion = "0.1.0"\n[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\n'
+    'import_names = ["pkg"]\ncoverage_line = 95\ncoverage_branch = 90\n'
+)
+RULES = '["E", "W", "F", "I", "B", "UP", "SIM", "N", "S"]'
+CLEAN_TABLES = (
+    '[tool.ruff]\nline-length = 120\nsrc = ["src"]\nexclude = ["spikes"]\n'
+    '[tool.ruff.lint]\nselect = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "RUF"]\n'
+    '[tool.ruff.lint.per-file-ignores]\n"tests/**" = ["S101"]\n'
+    '[tool.mypy]\nstrict = true\npython_version = "3.14"\nfiles = ["src"]\n'
+    '[[tool.mypy.overrides]]\nmodule = ["yaml.*"]\nignore_missing_imports = true\n'
+    '[tool.pytest.ini_options]\ntestpaths = ["tests"]\nminversion = "9"\n'
+    'addopts = "-ra -q --strict-markers --strict-config --import-mode=importlib"\n'
+    'filterwarnings = ["error", "default::DeprecationWarning"]\n'
+)
+
+
+class _NoRunner:
+    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+        raise AssertionError("the config step runs no tool")
+
+
+def _config_step(tmp_path: Path, pyproject: str, files: dict[str, str] | None = None) -> list[Finding]:
+    directory = tmp_path / "pkgs" / "pkg"
+    directory.mkdir(parents=True)
+    (directory / "pyproject.toml").write_text(pyproject, encoding="utf-8")
+    for name, text in (files or {}).items():
+        (directory / name).write_text(text, encoding="utf-8")
+    member = Member(name="pkg", path="pkgs/pkg", directory=directory)
+    return config_step.config(StepContext(tmp_path, tmp_path, member, _NoRunner()))
+
+
+def _step_codes(tmp_path: Path, pyproject: str) -> list[str]:
+    return sorted(f.code for f in _config_step(tmp_path, pyproject))
+
+
+def test_clean_tables_pass(tmp_path: Path) -> None:
+    """The closed allowed set of the table in spec 4.12 raises no finding."""
+    assert _config_step(tmp_path, BASE + CLEAN_TABLES) == []
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        f"[tool.ruff.lint]\nselect = {RULES}\nignore = ['E501']\n",
+        f"[tool.ruff.lint]\nselect = {RULES}\nextend-ignore = ['E501']\n",
+        '[tool.ruff.lint]\nselect = ["E", "W", "F", "I", "B", "UP", "SIM", "N"]\n',
+        "[tool.ruff]\nline-length = 100\n",
+        f'[tool.ruff.lint]\nselect = {RULES}\n[tool.ruff.lint.per-file-ignores]\n"src/**" = ["S101"]\n',
+        f'[tool.ruff.lint]\nselect = {RULES}\n[tool.ruff.lint.per-file-ignores]\n"tests/**" = ["S101", "E501"]\n',
+        f'[tool.ruff]\nexclude = ["src"]\n[tool.ruff.lint]\nselect = {RULES}\n',
+        f'[tool.ruff]\nextend = "../../pyproject.toml"\n[tool.ruff.lint]\nselect = {RULES}\n',
+        "[tool.mypy]\nstrict = false\n",
+        "[tool.mypy]\npython_version = '3.14'\n",
+        "[tool.mypy]\nstrict = true\nignore_errors = true\n",
+        "[tool.mypy]\nstrict = true\nwarn_unreachable = true\n",
+        '[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\nmodule = "pkg.*"\nignore_missing_imports = true\n',
+        '[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\nmodule = ["yaml"]\ndisallow_untyped_defs = false\n',
+        '[tool.pytest.ini_options]\naddopts = "-ra --deselect tests/a.py::t"\n',
+        '[tool.pytest.ini_options]\naddopts = "-ra -k fast"\n',
+        '[tool.pytest.ini_options]\naddopts = "-m slow"\n',
+        '[tool.pytest.ini_options]\naddopts = "--ignore=tests/a.py"\n',
+        '[tool.pytest.ini_options]\naddopts = "-p no:cacheprovider"\n',
+        '[tool.pytest.ini_options]\nfilterwarnings = ["ignore::UserWarning"]\n',
+        "[tool.pytest.ini_options]\nxfail_strict = false\n",
+        "[tool.coverage.run]\nomit = ['src/x.py']\n",
+        "[tool.coverage.report]\nfail_under = 1\n",
+        '[tool.pytest]\naddopts = ["-k", "nothing"]\n',
+        '[tool.pytest]\nfilterwarnings = ["ignore"]\n',
+        '[tool.pytest]\nini_options = {}\naddopts = ["-p", "no:cacheprovider"]\n',
+        '[tool.ruff]\nlint = ["E"]\n',
+        f'[tool.ruff.lint]\nselect = {RULES}\nper-file-ignores = "x"\n',
+        '[tool.ruff.lint]\nselect = "E"\n',
+        "[tool.mypy]\nstrict = true\noverrides = [5]\n",
+        "[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\nmodule = 5\nignore_missing_imports = true\n",
+        "[tool.pytest.ini_options]\naddopts = 5\n",
+        "[tool.pytest.ini_options]\nfilterwarnings = [5]\n",
+        "[tool.pytest]\nini_options = 5\n",
+        "[tool.coverage]\nrun = 5\n",
+    ],
+)
+def test_weakening_rules(tmp_path: Path, extra: str) -> None:
+    """AC49: each setting outside the allowed set is CF003."""
+    assert "CF003" in _step_codes(tmp_path, BASE + extra)
+
+
+@pytest.mark.parametrize("table", ["", "[tool.eng-gate]\nprofile = 5\n"])
+def test_own_namespace_override_rejected_without_valid_table(tmp_path: Path, table: str) -> None:
+    """The package's own namespace (from [project]) is protected even when [tool.eng-gate] is missing or invalid."""
+    pyproject = '[project]\nname = "my-pkg"\n' + table
+    pyproject += "[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\n"
+    pyproject += 'module = ["my_pkg.x"]\nignore_missing_imports = true\n'
+    findings = _config_step(tmp_path, pyproject)
+    assert any(f.code == "CF003" and "own namespace" in f.message for f in findings)
+
+
+def test_wildcard_override_has_its_own_message(tmp_path: Path) -> None:
+    """A wildcard module pattern is CF003 with a message about wildcards, not about the package namespace."""
+    pyproject = BASE + '[[tool.mypy.overrides]]\nmodule = ["*.foo"]\nignore_missing_imports = true\n'
+    messages = [f.message for f in _config_step(tmp_path, pyproject) if f.code == "CF003"]
+    assert any("wildcard" in m for m in messages)
+    assert not any("own namespace" in m for m in messages)
+
+
+@pytest.mark.parametrize(
+    "name", ["pytest.ini", "tox.ini", "setup.cfg", "ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini", ".coveragerc"]
+)
+def test_override_files_are_cf004(tmp_path: Path, name: str) -> None:
+    """AC49: a configuration file beside the package's pyproject.toml is CF004."""
+    findings = _config_step(tmp_path, BASE, {name: "\n"})
+    assert [(f.code, f.severity) for f in findings] == [("CF004", Severity.ERROR)]
+    assert name in findings[0].message
+
+
+def test_rerun_plugins_are_cf005(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC49: pytest-rerunfailures, flaky and pytest-retry (process/05 section 3) are CF005, names normalised."""
+
+    class _Dist:
+        def __init__(self, name: str) -> None:
+            self.metadata = {"Name": name}
+
+    monkeypatch.setattr(
+        importlib.metadata,
+        "distributions",
+        lambda: [_Dist("pytest"), _Dist("pytest_rerunfailures"), _Dist("Flaky"), _Dist("pytest-retry")],
+    )
+    assert [f.code for f in _config_step(tmp_path, BASE)] == ["CF005"] * 3
+
+
+def test_invalid_table_and_floor_are_reported_not_raised(tmp_path: Path) -> None:
+    """CF001 (invalid table, unreadable file), CF002 (below the floor) and CF006 (no table) are findings."""
+    assert _step_codes(tmp_path, BASE.replace("coverage_line = 95", "coverage_line = 80")) == ["CF002"]
+    assert _step_codes(tmp_path / "a", BASE.replace('layer = "tool"', "layer = 3")) == ["CF001"]
+    assert _step_codes(tmp_path / "b", '[project]\nname = "pkg"\n') == ["CF006"]
+    assert _step_codes(tmp_path / "c", "[tool.eng-gate\n") == ["CF001"]
+    assert _step_codes(tmp_path / "d", '[tool]\n"eng-gate" = 5\n') == ["CF001"]
