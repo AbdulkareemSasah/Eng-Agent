@@ -16,6 +16,7 @@ from pathlib import Path
 from eng_dev_gate import __version__, agents, gate_root
 from eng_dev_gate.checks import licenses
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
+from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
 from eng_dev_gate.report import AWAITING_TITLE, CommandResult, escape_data, render
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
@@ -41,6 +42,9 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "gate-check":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
@@ -121,6 +125,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
     handler = {
         "agents": agents.handle,
         "forbidden": _forbidden,
+        "gate-check": handle_gate_check,
         "packages": _packages,
         **(handlers or {}),
     }.get(args.command)
