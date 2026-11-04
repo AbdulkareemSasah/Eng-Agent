@@ -14,7 +14,16 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses, mutation, ratchet, review, secrets, test_first, windows_tests
+from eng_dev_gate.checks import (
+    imports,
+    licenses,
+    mutation,
+    ratchet,
+    review,
+    secrets,
+    test_first,
+    windows_tests,
+)
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS, StepContext
@@ -64,6 +73,9 @@ def _parser() -> argparse.ArgumentParser:
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
+        if name == "imports":
+            child.add_argument("--package", default=None, help="report only this workspace member")
+            child.add_argument("--all", action="store_true", help="every member (the default)")
         if name == "review":
             child.add_argument("--check-prompts", action="store_true", help="only verify the pinned prompts")
         if name == "ratchet":
@@ -182,6 +194,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
     handler = {
         "agents": agents.handle,
         "forbidden": _forbidden,
+        "imports": imports.handle,
         "gate-check": handle_gate_check,
         "mutation": _mutation,
         "packages": _packages,
