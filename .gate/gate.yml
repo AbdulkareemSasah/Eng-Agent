@@ -12,7 +12,7 @@ identities:  # all three must be set before bootstrap.enabled can be false (CF00
 spec_globs: ["**/docs/specs/*.md", "**/docs/workflows/*.md", "**/docs/clauses/**/*.md"]
 plan_globs: ["**/docs/plans/*.md"]
 test_globs: ["**/tests/**", "**/test_*.py", "**/conftest.py"]
-generated_globs: ["uv.lock", "**/AGENTS.md"]
+generated_globs: ["uv.lock", "**/AGENTS.md", "**/docs/schema/**"]  # B-360: JSON Schema snapshots are generated (AC12c)
 spike_globs: ["spikes/**"]
 agents:
   unmanaged_ok: ["design/**"]
