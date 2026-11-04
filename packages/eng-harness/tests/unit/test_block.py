@@ -120,8 +120,9 @@ def test_missing_source_is_refused() -> None:
         "async def f(ctx, inp: In) -> Out:\n    return Out(value=1)\n", namespace
     )
     fn = namespace["f"]
-    with pytest.raises(RegistryError, match="source"):
+    with pytest.raises(RegistryError, match="source") as info:
         block(name="nosrc", version=1)(cast_any(fn))
+    assert str(info.value) == f"source of module {fn.__module__} is not available"
 
 
 def test_code_hash_is_stable(tmp_path: Path) -> None:
@@ -269,16 +270,6 @@ def test_definition_fields() -> None:
     with pytest.raises(RegistryError) as info:
         workflow(name="wf", version=1, description="")(fn)
     assert str(info.value) == "wf: description must be 1 to 500 characters"
-
-
-def test_missing_source_message() -> None:
-    namespace: dict[str, Any] = {"In": In, "Out": Out}
-    exec(  # noqa: S102  # B-104: builds a function whose module has no readable source
-        "async def f(ctx, inp: In) -> Out:\n    return Out(value=1)\n", namespace
-    )
-    with pytest.raises(RegistryError) as info:
-        block(name="nosrc", version=1)(namespace["f"])
-    assert str(info.value) == f"source of module {namespace['f'].__module__} is not available"
 
 
 def test_lock_file_round_trip(tmp_path: Path) -> None:
