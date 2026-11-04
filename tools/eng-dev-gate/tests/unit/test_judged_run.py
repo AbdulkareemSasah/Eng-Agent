@@ -108,15 +108,20 @@ def test_probe_mode_prints_the_origin_of_each_name_and_nothing_for_a_blocked_one
 ) -> None:
     """B-355: ``probe`` blocks the names of the environment first; a blocked name has an empty origin."""
     monkeypatch.setattr(sys, "meta_path", list(sys.meta_path))
-    monkeypatch.setenv(pytest_plugin.BLOCKED_ENV, "json")
-    assert judged_run.main(["probe", "json", "os", "no_such_module_b355"]) == 0
+    monkeypatch.setenv(pytest_plugin.BLOCKED_ENV, "this")
+    assert judged_run.main(["probe", "this", "colorsys", "no_such_module_b355"]) == 0
     lines = dict(line.split("\t") for line in capsys.readouterr().out.splitlines())
-    assert (lines["json"], lines["no_such_module_b355"]) == ("", "")
-    assert lines["os"].endswith("os.py")
+    assert (lines["this"], lines["no_such_module_b355"]) == ("", "")
+    assert lines["colorsys"].endswith("colorsys.py")
 
 
 def test_pytest_mode_runs_pytest_with_the_remaining_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[list[str]] = []
-    monkeypatch.setattr(pytest, "main", lambda args: seen.append(list(args)) or 1)
+
+    def fake(args: list[str]) -> int:
+        seen.append(list(args))
+        return 1
+
+    monkeypatch.setattr(pytest, "main", fake)
     assert judged_run.main(["pytest", "-p", judged_run.BASE_PLUGIN, "tests"]) == 1
     assert seen == [["-p", judged_run.BASE_PLUGIN, "tests"]]

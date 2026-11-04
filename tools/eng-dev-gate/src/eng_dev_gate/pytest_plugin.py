@@ -6,11 +6,15 @@ any test is deselected (CV003, process/05 section 3), whatever way the deselecti
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import importlib.abc
+import os
+import sys
+from collections.abc import Generator, Iterable
 from typing import Any
 
 import pytest
 
+BLOCKED_ENV = "ENG_GATE_BLOCKED_IMPORTS"  # comma-separated import names that the base run hides (TF011, AC27a)
 DESELECTED_EXIT_CODE = 10  # pytest uses 0 to 5 itself; the tests step maps this value to CV003
 _DESELECTED = pytest.StashKey[int]()
 
@@ -19,9 +23,32 @@ def _count(config: pytest.Config) -> int:
     return config.stash.get(_DESELECTED, 0)
 
 
+class _Blocker(importlib.abc.MetaPathFinder):
+    """Raises ``ModuleNotFoundError`` for the blocked top-level names and their submodules."""
+
+    def __init__(self, names: Iterable[str]) -> None:
+        self._names = frozenset(names)
+
+    def find_spec(self, fullname: str, path: Any = None, target: Any = None) -> None:  # Any: the finder protocol
+        """Raise for a blocked name; any other name is left to the next finder (returns ``None``)."""
+        if fullname.partition(".")[0] in self._names:
+            raise ModuleNotFoundError(f"TF011: {fullname} is hidden in the base run", name=fullname)
+
+
+def block_imports(names: Iterable[str]) -> None:
+    """Make ``names`` (top-level import names) unimportable for the rest of the process.
+
+    Raises:
+        ModuleNotFoundError: later, on each import of a blocked name.
+    """
+    sys.meta_path.insert(0, _Blocker(names))
+
+
 def pytest_configure(config: pytest.Config) -> None:
-    """Load the Hypothesis ``ci`` profile when Hypothesis is installed (it is optional for a package)."""
+    """Block the names of ``BLOCKED_ENV``; load the Hypothesis ``ci`` profile when Hypothesis is installed."""
     config.stash[_DESELECTED] = 0
+    if names := [n for n in os.environ.get(BLOCKED_ENV, "").split(",") if n]:
+        block_imports(names)
     try:
         from hypothesis import settings
     except ImportError:  # Hypothesis is a development dependency of some packages only

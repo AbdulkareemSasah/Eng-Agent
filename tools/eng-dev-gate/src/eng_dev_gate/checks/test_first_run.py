@@ -17,9 +17,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from eng_dev_gate import judged_run
 from eng_dev_gate.checks.tests_step import _judged_command
 from eng_dev_gate.config.package_config import load_package_config
 from eng_dev_gate.gitio import SubprocessGit
+from eng_dev_gate.pytest_plugin import BLOCKED_ENV
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.results import EnvironmentFaultError
 from eng_dev_gate.toolrun import ToolResult
@@ -32,6 +34,9 @@ _PROBE = (
     "import importlib.util, sys\nfor n in sys.argv[1:]:\n    s = importlib.util.find_spec(n)\n"
     "    print(n, (s.origin or '') if s else '', sep='\\t')\n"
 )  # prints ``<import name> TAB <file that the name resolves to>``
+
+
+_SCRIPT = str(Path(judged_run.__file__).resolve())  # the gate's stdlib-only entry point for the base run
 
 
 class RunFaultError(EnvironmentFaultError):
@@ -141,11 +146,16 @@ def _environment(tree: Path, members: Sequence[Member]) -> dict[str, str]:
 
 
 def _probe(
-    runner: Runner, python: Sequence[str], tree: Path, member: Member, env: Mapping[str, str], limit: int
-) -> None:
+    runner: Runner, python: Sequence[str], tree: Path, member: Member, env: Mapping[str, str], limit: int,
+    hidden: Sequence[str] = (),
+) -> None:  # fmt: skip
     """TF011 unless every import name of the package that exists in ``tree`` resolves to a file inside ``tree``."""
     folder = tree / member.path
-    if not (folder / "pyproject.toml").is_file():  # the package is new in the pull request: nothing to resolve
+    if hidden:  # the package is new in the pull request: its names are blocked, none may resolve (AC27a)
+        done = runner.run([*python, _SCRIPT, "probe", *hidden], folder, env, limit)
+        where = dict(line.partition("\t")[::2] for line in done.output.splitlines())
+        if done.exit_code != 0 or any(where.get(n) for n in hidden):
+            raise RunFaultError("TF011", f"a name of the new package {member.path} resolves in the base run: {where}")
         return
     names = [
         n for n in load_package_config(folder / "pyproject.toml").import_names
@@ -165,10 +175,14 @@ def _probe(
 
 def _run(
     runner: Runner, python: Sequence[str], folder: Path, env: Mapping[str, str], files: Sequence[str], report: Path,
-    limit: int,
+    limit: int, hidden: Sequence[str] = (),
 ) -> None:  # fmt: skip
-    """Run pytest on ``files`` in ``folder``, writing ``report``; exit codes 0 and 1 are verdicts, others TF009."""
-    argv = [*python, "-m", "pytest", "-p", "no:cacheprovider", "--continue-on-collection-errors",
+    """Run pytest on ``files`` in ``folder``, writing ``report``; exit codes 0 and 1 are verdicts, others TF009.
+
+    With ``hidden`` names (set in ``env``) pytest runs through the base plugin, which blocks them.
+    """
+    start = [_SCRIPT, "pytest", "-p", judged_run.BASE_PLUGIN] if hidden else ["-m", "pytest"]
+    argv = [*python, *start, "-p", "no:cacheprovider", "--continue-on-collection-errors",
             "--rootdir", str(folder), "--junitxml", str(report), *files]  # fmt: skip
     done = runner.run(argv, folder, env, limit)
     if done.exit_code not in (0, 1):
@@ -212,12 +226,17 @@ def judge(
         for number, (member, ids) in enumerate(groups.items()):
             local = [t.removeprefix(f"{member.path}/") for t in ids]
             files = sorted({t.partition("::")[0] for t in local})
+            new = not (base / member.path / "pyproject.toml").is_file()
+            hidden = load_package_config(root / member.path / "pyproject.toml").import_names if new else []
             for tree, wanted in ((base, "failed"), (root, "passed")):
                 env = _environment(tree, members)
+                blocked = hidden if tree is base else []
+                if blocked:
+                    env[BLOCKED_ENV] = ",".join(blocked)
                 if tree is base:
-                    _probe(runner, python, base, member, env, limit)
+                    _probe(runner, python, base, member, env, limit, blocked)
                 report = base.parent / f"{number}-{wanted}.xml"
-                _run(runner, python, tree / member.path, env, files, report, limit)
+                _run(runner, python, tree / member.path, env, files, report, limit, blocked)
                 found = outcomes(report, local)
                 for test, local_id in zip(ids, local, strict=True):
                     kinds = found[local_id]

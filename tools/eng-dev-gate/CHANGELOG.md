@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `test-first`: for a package that the pull request adds, the base run blocks the package's import names (read from the head's `[tool.eng-gate] import_names`) with a meta-path finder of the base pytest plugin, so an editable install of the head cannot make a first-commit test pass at the base (TF004); a name that still resolves is TF011. `judged_run.py` gains the modes `pytest` and `probe` (B-357, plan task T34, AC27a).
 - `risk-floor`: a `.gate/ratchet.json` change that gate-check accepts in the task's scope no longer raises the floor (the rise is AW05); any other change of it still does (B-348, plan task T33, AC21b).
 - `gate-check`: a plan whose `spec:` is a directory (path ending in `/`) of clause specs loads every `*.md` directly in it from the gate ref with `git ls-tree` (GC005 for each that does not parse, GC004 when there is none); `covers` ids may carry a prefix (`BP-AC1`); GC016 lists the uncovered criteria of the clause specs whose prefix the plan covers and of the plan's own text; `.gate/gate.yml` `spec_globs` gains `**/docs/clauses/**/*.md`. New `Git.list_files` (B-344, plan task T31, AC12b, AC13a).
 - Fix: a `mutation` run in which mutmut produced no mutant (a module-level lambda, decorated methods only) passes with the notice MU003 instead of MU002; mutants that no test covers count as survivors in the MU001 score, also when mutmut stops on them; MU002 stays reserved for a backend fault (B-339, AC53a, plan task T29).
