@@ -131,14 +131,15 @@ class TraceBuilder:
         unit: str | None = None,
     ) -> None:
         """Record one step; `source` names its method rule and every `uses` name must already be recorded."""
-        later = [u for u in uses if u not in self._names]
+        used = tuple(uses)
+        later = [u for u in used if u not in self._names]
         if later:
             raise TraceError(f"step {name!r} uses names that are not earlier: {later}")
         if not source.strip():
             raise TraceError(f"step {name!r} has a blank source")
         self._claim(name)
         self._steps.append(
-            TraceStep(name=name, value=value, unit=unit, formula=formula, source=source, uses=list(uses))
+            TraceStep(name=name, value=value, unit=unit, formula=formula, source=source, uses=list(used))
         )
 
     def output(self, *names: str) -> None:
