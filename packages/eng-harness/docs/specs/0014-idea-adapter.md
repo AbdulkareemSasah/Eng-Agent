@@ -154,16 +154,18 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
   `::test_live_create_fallback_offline_refused`.
 - AC12. Given route `native`, when `idea_native_calculate` runs with `save` false and no `out_path`, then each result row
   becomes verdicts; a non-empty `errors` list gives one verdict `idea:connection` with status `ERROR` and the host text
-  (cut to 500 characters) in `assumptions`; a reply of an unexpected shape, or with a stub marker, is `HOST_ERROR`
-  (`host_code: UNEXPECTED_REPLY`). Tests: `tests/workflow/adapters/test_idea_calculate.py::test_native_checks_to_verdicts`,
+  (cut to 500 characters) in `assumptions`; a reply of an unexpected shape is `HOST_ERROR`
+  (`host_code: UNEXPECTED_REPLY`) and a reply with a stub marker is `HOST_ERROR` (`host_code: OFFLINE_STUB`, AC11), on either route. Tests: `tests/workflow/adapters/test_idea_calculate.py::test_native_checks_to_verdicts`,
   `::test_native_errors_are_error_verdicts`, `::test_unexpected_shape_host_error`.
 - AC13. Given a check row, when mapped (§4.5), then `source` is `host`, `ratio = check_value / 100`, `status` follows
   `check_status`, `skipped` gives `NOT_APPLICABLE`, and any disagreement between `check_status` and `ratio` against
-  `ratio_limit` (1.0), a negative or non-finite value, or an unread design code gives `NEEDS_ENGINEER` (non-finite: `ERROR`);
+  `ratio_limit` (1.0), a negative value, a `check_value` of exactly 0 with `check_status` true (Sasaah fills a missing
+  field with 0, so a missing value cannot be told from a real zero, §4.5), or an unread design code gives
+  `NEEDS_ENGINEER`; a non-finite value gives `ERROR`;
   the adapter never recomputes a status and never changes a host `FAIL` to `PASS`. Hand-derived cases: 87.5 and true gives
-  `PASS` (0.875); 103 and true, 80 and false give `NEEDS_ENGINEER`; 112 and false gives `FAIL`; skipped gives
+  `PASS` (0.875); 103 and true, 80 and false, 0 and true give `NEEDS_ENGINEER`; 112 and false gives `FAIL`; skipped gives
   `NOT_APPLICABLE`. Tests: `tests/golden/test_idea_verdicts.py::test_mapping_cases`,
-  `tests/property/test_idea_verdicts_props.py::test_no_status_upgrade`.
+  `tests/property/test_idea_verdicts_props.py::test_no_status_upgrade`, `tests/workflow/adapters/test_idea_calculate.py::test_zero_utilization_true_needs_engineer` (fake fault `zero_utilization_true`).
 - AC14. Given the verdicts of one call, then they form one `verdicts.set/1` whose verdicts are all `source: host`, with
   `counts` matching, `draft: true` while the load map is unconfirmed (and for route `rest` always, §4.5), `governing` on the
   largest-ratio non-skipped verdict per connection (ties all), `trace_ref` null, the raw reply in a parent
@@ -191,7 +193,7 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
 ### 3.6 Errors, timeouts, licensing
 
 - AC17. Given each Sasaah code of §4.8, then the contract code, `retryable`, `host_code`, `host_method` and precondition are as
-  tabled; a text with no code is `INTERNAL` with an `incident_id`. Test:
+  tabled; a reply with no code is `INTERNAL` with an `incident_id` on a read and `TIMEOUT_UNKNOWN_OUTCOME` on a write or analysis call. Test:
   `tests/unit/adapters/test_idea_errors.py::test_mapping_table` (parametrized over the table).
 - AC18. Given a `timeout` on a read, then `TIMEOUT_NO_EFFECT`; on `idea_calculate` or `idea_native_set_loads`, then
   `TIMEOUT_UNKNOWN_OUTCOME` with the `op_id`, the host is wedged and the epoch increases; reconciling
@@ -353,8 +355,16 @@ Message texts are cut to 500 characters; absolute paths are reduced to base name
 - `ratio = check_value / 100` (the tool describes `check_value` as a utilization percentage; status `declared`, L6).
 - `status`: `skipped` gives `NOT_APPLICABLE`; otherwise the host's `check_status` gives `PASS` (true) or `FAIL` (false)
   **only if** it is consistent with the contract rule (`PASS` needs `ratio <= ratio_limit`, `FAIL` needs `ratio >
-  ratio_limit`); otherwise `NEEDS_ENGINEER` with the disagreement in `assumptions`. A negative `check_value`, a missing
-  one, or an unread design code gives `NEEDS_ENGINEER`; a non-finite one gives `ERROR`.
+  ratio_limit`); otherwise `NEEDS_ENGINEER` with the disagreement in `assumptions`. A negative `check_value` or an unread
+  design code gives `NEEDS_ENGINEER`; a non-finite one gives `ERROR`.
+- **Missing fields are not visible to the adapter.** Sasaah replaces a missing `check_value` by 0, a missing `check_status`
+  by false and a missing `skipped` by false before the reply is built (REST route `E/IdeaRestClient.cs:258-260`, native
+  route `E/IdeaHiddenCalcClient.cs:1341-1343`), so the adapter cannot detect a missing value and must not claim to. The
+  rule it can apply: `check_value` exactly 0 with `check_status` true gives `NEEDS_ENGINEER` with "utilization is exactly
+  zero; the value may be missing in the host reply" in `assumptions` (a real zero utilization is also reported this way and
+  the engineer decides; Q12). A missing `check_status` arrives as false and, with a `check_value` of at most 100, is the
+  disagreement already mapped to `NEEDS_ENGINEER`; a missing `skipped` arrives as false and is read as a calculated check.
+  Absence of a verdict is never read as a pass (§4.9).
 - `assumptions` always carry: "host-native check of IDEA StatiCa; not merged with code-pack verdicts"; on route `rest`
   also "design code declared in the design basis, not read from the host" and "loads as stored in the opened file".
 - `draft = true` while `_load_map.toml` is unconfirmed and always on route `rest` until IG-5 is closed **[added]**: the
@@ -460,7 +470,7 @@ numbers), `idea_native_get_loads`/`_set_loads` through a temp file and move, nat
 with a deterministic rule that is **not** engineering (documented in the fake), and the stub reply of the real server when
 the service is "stopped". Faults, selected by the test: `service_stopped` (stub reply), `live_create_fallback`,
 `license_refused`, `license_hang`, `timeout_calculate`, `timeout_set_loads` (file written or not, reply lost),
-`unexpected_shape`, `errors_in_reply`, `all_zero_loads`, `passed_disagrees`, `script_enabled`, `read_only_listed_wrong`,
+`unexpected_shape`, `errors_in_reply`, `all_zero_loads`, `passed_disagrees`, `zero_utilization_true` (a check with `check_value` 0 and `check_status` true), `script_enabled`, `read_only_listed_wrong`,
 `zero_connections_calculated`. Record mode (0002 §4.8.1) gets an IDEA scenario that drops paths and names.
 
 ## 5. Inputs and outputs
@@ -509,6 +519,7 @@ the service is "stopped". Faults, selected by the test: `service_stopped` (stub 
 | Loads sent in the wrong unit, axis or sign, or to the wrong segment | R1 | Declared unit with status in the report (AC16); map unconfirmed means gap (AC7); exact segment match, structure-preserving build, read-back (AC9, AC10); L2, L9 |
 | Edits believed applied but not part of the calculation | R1 | In-memory edit tools not served (AC6); loads only through a file the calculator reads; L4 |
 | Verdict relabelled or recomputed by the adapter | R1 | Host status wins; disagreement is `NEEDS_ENGINEER`; property test of no upgrade (AC13) |
+| A missing host utilization (filled with 0 by Sasaah) read as a pass | R1 | Zero with `check_status` true is `NEEDS_ENGINEER` (AC13, §4.5); L6 |
 | Design code wrong or defaulted | R1 | Taken from the basis only (AC15); server default never used |
 | A hang on a missing license seat blocks the run | R2 | Backstop and server timeout (AC18, AC19); doctor warning; L7 |
 | Scripts left enabled | R1 | Required `--disable-script`, status check, fingerprint (AC1, AC3) |
@@ -534,14 +545,14 @@ draft for the owner and are not run on real projects until confirmed.
 
 Part of `eng-harness` 0.1.0. New harness kinds and the IDEA allowlist (with its pinned Sasaah commit and fingerprint) are
 versioned with the package; a new Sasaah build is a new allowlist header and new recordings in a minor release. Changes to
-0002 (A1 in §11: `routes` on allowlist entries, `audit_log` on the server section, a `single` role serving `long`) need an
-amendment of 0002; plan T1 carries them.
+0002 (A1 in §11: `routes` on allowlist entries, `audit_log` on the server section) need an amendment of 0002: plan T1
+implements the code, and the lead amends the text of 0002 in a separate documents-only pull request.
 
 ## 11. Open questions, gaps and additions
 
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
-| Q1 | Route for loads: the file route (native, hidden calculator, tools described as 21.x) is the only one where loads provably reach the calculation; the REST route can only check a project as it is | Owner | Accept the two routes as specified; ask Sasaah (project lane, ADR-0026) for a typed tool that sends loads to the REST service, then serve it on route `rest` (plan T9, blocked) |
+| Q1 | Route for loads: the file route (native, hidden calculator, tools described as 21.x) is the only one where loads provably reach the calculation; the REST route can only check a project as it is | Owner | Accept the two routes as specified; ask Sasaah (project lane, ADR-0026) for a typed tool that sends loads to the REST service, then serve it on route `rest` (plan T10, blocked) |
 | Q2 | One server role (the process holds the project) instead of `main` and `long` | Owner | Accept; the doctor warns about the shared timeout |
 | Q3 | Host status wins; a disagreement with `ratio` against 1.0 is `NEEDS_ENGINEER` | Owner | Accept: never recompute, never relabel |
 | Q4 | `check_value` read as percent | Owner | Accept as `declared`; confirm at L6 |
@@ -551,6 +562,7 @@ amendment of 0002; plan T1 carries them.
 | Q8 | A license hang is `TIMEOUT_UNKNOWN_OUTCOME`, not `HOST_NOT_CONNECTED` | Owner | Accept: a hang cannot be told from a long calculation; revisit after L7 |
 | Q9 | "Create a connection project" means: copy an engineer-prepared `.ideaCon` (working copy); creation through the server is IG-4 | Owner | Accept; a template `.ideaCon` is the engineer's input |
 | Q10 | The engineer starts the REST service and IDEA; the harness does not (08 §1 said the server would) | Owner | Accept (A9, 16 §5); the doctor reports the state |
+| Q12 | Sasaah fills a missing `check_value` with 0 and `check_status` with false, so the adapter cannot see missing data; a genuine 0 utilization with `check_status` true is also sent to the engineer | Owner | Accept; ask Sasaah (project lane, ADR-0026) to report absent fields as null, then replace the zero rule with a missing-value rule; L6 |
 | Q11 | The load map (signs per component and member end) and its confirming case are engineering content | Owner | Owner commits the confirmed map after L9; the build ships it unset |
 | IG-1 | `idea_set_loads` forces have no unit (S12-G12) | Owner | Not served; ask Sasaah for a unit field; L2 |
 | IG-2 | ETABS to IDEA axis, sign and member-end mapping unconfirmed (contract G-3) | Owner | `_load_map.toml` unset, `NotImplementedGap`; Q11 |
@@ -563,7 +575,7 @@ amendment of 0002; plan T1 carries them.
 | IG-9 | The meaning of `position` and `beamSegmentId` in the loading JSON | Owner | Opaque keys matched exactly; L3 and the workflow's map decide |
 | C1 | **Addition to S-12 §11:** `idea_set_loads` is present but its result never reaches a real calculation; an opened REST project holds defaults; creation leaves content in memory | Owner | Amend S-12 §11 and the inventory notes in a spikes change; this spec follows the source |
 | C2 | Conflict: 08 §1 and §2 describe a Python server with typed tools, `check_model` and a service it starts | Owner | ADR-0024 makes 08 a target; this spec follows Sasaah |
-| A1 | **[added]** `routes` field on allowlist entries; `audit_log` on the server section (false for IDEA, so no `--audit-log` argument); a `single` role serving `session`, `call` and `long`; allowlist header `unit_status` entries; harness kinds of §4.5; issue codes `LOADS_UNCONFIRMED_MAP`, `LOAD_EFFECT_ZERO_DROPPED`; host codes `OFFLINE_STUB`, `UNEXPECTED_REPLY` | Owner | Accept with this spec |
+| A1 | **[added]** `routes` field on allowlist entries; `audit_log` on the server section (false for IDEA, so no `--audit-log` argument; a single `main` role serving all classes is already allowed by 0002 §4.2 rule 2); allowlist header `unit_status` entries; harness kinds of §4.5; issue codes `LOADS_UNCONFIRMED_MAP`, `LOAD_EFFECT_ZERO_DROPPED`; host codes `OFFLINE_STUB`, `UNEXPECTED_REPLY` | Owner | Accept with this spec |
 
 ## 12. Needs local test
 
@@ -579,7 +591,7 @@ effect in IDEA's own interface and with `idea_set_loads` plus an IOM export (evi
 fields, `forcesPercentageOnSegments`, the meaning of `position` and `beamSegmentId`; L4 whether in-memory edits reach a
 calculation on either route (set a load, calculate, compare with the file route; IG-3); L5 timeouts: a calculation longer
 than `call_timeout_s` (does the service keep running, what the next call sees, process cleanup of the hidden calculator),
-a timed-out `idea_native_set_loads` (file written or not); L6 `check_value` scale against `check_status`, `skipped`,
+a timed-out `idea_native_set_loads` (file written or not); L6 `check_value` scale against `check_status`, `skipped`, whether a host row can carry a zero or absent `check_value` with `check_status` true (Q12),
 multi-case results, limits other than 100 percent; L7 licensing: no seat for the REST service and for the hidden
 calculator, the error text, the time to fail, any hang; L8 the stub: service stopped, failed live creation, the exact
 markers; L9 the load map: the owner's reference connection with a hand-verifiable load, to confirm the component, sign

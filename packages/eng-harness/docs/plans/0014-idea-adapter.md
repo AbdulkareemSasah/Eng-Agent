@@ -7,14 +7,16 @@ size: large
 risk: [r1]               # binding for every pull request of this plan
 tasks:
   - id: T1
-    title: Framework extensions (routes on allowlist entries, audit_log flag, single role serving all classes) and the IDEA server section
+    title: Framework extensions (routes on allowlist entries, audit_log flag) and the IDEA server section
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_launch_args.py"
+      - "packages/eng-harness/src/eng_harness/servers/_session.py"
       - "packages/eng-harness/src/eng_harness/adapters/_descriptors.py"
       - "packages/eng-harness/tests/unit/servers/test_config.py"
       - "packages/eng-harness/tests/unit/servers/test_launch_args.py"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
@@ -23,8 +25,9 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_config.py::test_idea_service_url_loopback_only"
       - "packages/eng-harness/tests/unit/servers/test_config.py::test_idea_env_keys_refused"
       - "packages/eng-harness/tests/unit/servers/test_launch_args.py::test_idea_argv_has_no_audit_log"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_idea_launcher_receives_no_audit_log"
     covers: [AC1]
-    depends_on: []
+    depends_on: []   # after the `_session.py` tasks of plan 0002 (T5 to T7), see section 3
   - id: T2
     title: Synthetic IDEA fake server (test-only), its faults and its schema check
     files:
@@ -186,9 +189,10 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_idea_calculate.py::test_native_checks_to_verdicts"
       - "packages/eng-harness/tests/workflow/adapters/test_idea_calculate.py::test_native_errors_are_error_verdicts"
       - "packages/eng-harness/tests/workflow/adapters/test_idea_calculate.py::test_unexpected_shape_host_error"
+      - "packages/eng-harness/tests/workflow/adapters/test_idea_calculate.py::test_zero_utilization_true_needs_engineer"
       - "packages/eng-harness/tests/workflow/adapters/test_idea_reconcile.py::test_set_loads_outcomes"
       - "packages/eng-harness/tests/workflow/adapters/test_idea_reconcile.py::test_calculate_unknown_no_rerun"
-    covers: [AC11, AC12, AC18]
+    covers: [AC11, AC12, AC13, AC18]   # AC13 in part: the fake-fault workflow; the mapping is T5
     depends_on: [T5, T7]
   - id: T9
     title: End-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps
@@ -232,7 +236,8 @@ the local-test steps of spike S-08.
 ## 2. Tasks
 
 **T1 Framework and server section** (AC1). `routes` on allowlist entries, `audit_log` on the server section (false for
-IDEA: no `--audit-log` argument is built), a single role serving `session`, `call` and `long`, and the `[servers.idea]`
+IDEA: no `--audit-log` argument is built; `_launch_args.py` is wired into `_session.py`, and a workflow test checks the argv
+the launcher actually receives, because Sasaah ignores unknown arguments with only a warning), and the `[servers.idea]`
 rules of spec §4.2 (required `--disable-script`, forbidden `--read-only`, `--default-project`, other arguments and
 `SASAAH_IDEA_*`, `SASAH_IDEA_*`, `IDEA_*` variables, loopback-only `service_url`). The amendment of the text of spec 0002
 (item A1 of spec 0014) is made by the lead in its own documents-only pull request, not here.
@@ -250,7 +255,7 @@ escape hatches, so the security lens reviews it.
 licensing outcomes of §4.9 bounded by the backstop. Reconciliation of the two write-like tools is T8.
 
 **T5 Replies, stub guard, kinds, verdicts** (AC11 in part, AC13 to AC15). The reply parser with path reduction, the stub
-markers, the harness kinds, and the pure verdict mapping with its golden and property tests (no upgrade of a host status).
+markers, the harness kinds, and the pure verdict mapping with its golden and property tests (no upgrade of a host status; zero utilization with a true status goes to the engineer because Sasaah fills missing values with 0).
 `_verdicts.py` is engineering content: it stays draft and the owner reviews it.
 
 **T6 Session, ports, gaps** (AC4 to AC6). Working copy and hashes, the route preconditions, `acquire`, `locate`,
@@ -261,7 +266,7 @@ plan and builder (exact segment match, structure preserved, `forcesPercentageOnS
 file, the read-back, the `harness.idea_loads/1` kind and `check_model` for the adapter. The synthetic map lives in
 `tests/fixtures/idea/` and says so in its header.
 
-**T8 Calculation** (AC11, AC12, AC18). `idea_native_calculate` and `idea_calculate` / `idea_get_check_results` with the
+**T8 Calculation** (AC11, AC12, AC13 in part, AC18). `idea_native_calculate` and `idea_calculate` / `idea_get_check_results` with the
 pre-flight and the stub refusal, host verdicts out, reconciliation of `idea_native_set_loads` by file and read-back, and
 `unknown` without re-run for `idea_calculate`.
 
