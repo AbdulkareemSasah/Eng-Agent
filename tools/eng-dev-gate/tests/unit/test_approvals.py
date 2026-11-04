@@ -5,7 +5,7 @@ from __future__ import annotations
 import http.client
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 from eng_dev_gate import approvals as module
@@ -159,7 +159,7 @@ def test_github_adapter_stops_at_the_page_limit() -> None:
 class _Connection:
     """Stands in for ``http.client.HTTPSConnection`` and records the request."""
 
-    sent: list[tuple[str, str, dict[str, str]]] = []
+    sent: ClassVar[list[tuple[str, str, dict[str, str]]]] = []
 
     def __init__(self, host: str, timeout: float) -> None:
         self.host = host
