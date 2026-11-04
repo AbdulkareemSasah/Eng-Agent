@@ -194,5 +194,7 @@ def test_failed_identity_closes_pipes_and_reaps(tmp_path: Path, monkeypatch: pyt
         PosixLauncher(_NoIdentity()).start(_spec(tmp_path, JobPolicy.SERVER, "--children"))
     (popen,) = created
     assert popen.returncode is not None  # killed and reaped
-    assert popen.stdin is not None and popen.stdin.closed
-    assert popen.stdout is not None and popen.stdout.closed
+    assert popen.stdin is not None
+    assert popen.stdin.closed
+    assert popen.stdout is not None
+    assert popen.stdout.closed

@@ -5,6 +5,7 @@ and `terminate_job` is `killpg`. POSIX has no kill-on-close job: when the engine
 its standard input reaches end-of-file. The Windows job with kill-on-close arrives with plan task T3.
 """
 
+import contextlib
 import os
 import signal
 import subprocess
@@ -12,7 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import IO, Protocol
+from typing import IO, Protocol, cast
 
 from eng_harness.servers._procinfo import PosixProcessInspector, ProcessIdentity
 
@@ -64,19 +65,15 @@ class LaunchedProcess(Protocol):
 
     def wait(self, timeout: float | None) -> int | None:
         """Return the exit code, or None when the process still runs after `timeout` seconds."""
-        ...
 
     def terminate_job(self) -> None:
         """End every process of the job; idempotent."""
-        ...
 
     def job_members(self) -> list[ProcessIdentity]:
         """Return the running processes of the job."""
-        ...
 
     def close(self) -> None:
         """Release the pipes and handles; does not end the job (call `terminate_job`); idempotent."""
-        ...
 
 
 class ProcessLauncher(Protocol):
@@ -84,7 +81,6 @@ class ProcessLauncher(Protocol):
 
     def start(self, spec: LaunchSpec) -> LaunchedProcess:
         """Start `spec`; raises `LaunchError` when it cannot be started."""
-        ...
 
 
 class _PosixProcess:
@@ -99,6 +95,7 @@ class _PosixProcess:
         self.started_at = started_at
         self.stdin, self.stdout, self._stderr = pipes
         self._popen, self._inspector = popen, inspector
+        self._ended = False
 
     def wait(self, timeout: float | None) -> int | None:
         try:
@@ -110,13 +107,19 @@ class _PosixProcess:
         return self._inspector.group_members(self.pid)
 
     def terminate_job(self) -> None:
-        # The group id stays reserved while the leader is unreaped; once nothing runs in the group, do not signal
-        # it, because the number could belong to an unrelated group by now.
-        if self.job_members():
-            try:
+        # While the leader is unreaped its pid, and so the group id, stays reserved: signal the group. After that the
+        # number may belong to an unrelated group, so members end one by one by identity, and never again once the
+        # group has been seen empty.
+        if self._ended:
+            return
+        if self._popen.returncode is None:
+            with contextlib.suppress(ProcessLookupError):
                 os.killpg(self.pid, signal.SIGKILL)
-            except ProcessLookupError:  # the last member ended between the listing and the signal
-                return
+            return
+        members = self.job_members()
+        for member in members:
+            self._inspector.terminate(member)
+        self._ended = not members
 
     def close(self) -> None:
         for stream in (self.stdin, self.stdout, self._stderr):
@@ -152,8 +155,9 @@ class PosixLauncher:
         if identity is None:
             popen.kill()
             popen.wait()
-            stderr.close()
+            for stream in (popen.stdin, popen.stdout, stderr):
+                if stream is not None:
+                    stream.close()
             raise LaunchError(f"no start time readable for pid {popen.pid} of {spec.argv[0]}")
-        if popen.stdin is None or popen.stdout is None:  # not reachable with PIPE; narrows the types
-            raise LaunchError(f"no pipes for {spec.argv[0]}")
-        return _PosixProcess(popen, (popen.stdin, popen.stdout, stderr), identity.started_at, self._inspector)
+        pipes = (cast("IO[bytes]", popen.stdin), cast("IO[bytes]", popen.stdout), stderr)  # PIPE: never None
+        return _PosixProcess(popen, pipes, identity.started_at, self._inspector)

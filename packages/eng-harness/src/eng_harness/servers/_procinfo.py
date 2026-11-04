@@ -36,23 +36,18 @@ class ProcessInspector(Protocol):
 
     def identity(self, pid: int) -> ProcessIdentity | None:
         """Return the identity of `pid`, or None when no such process exists."""
-        ...
 
     def alive(self, identity: ProcessIdentity) -> bool:
         """Return True when the process with this pid and start time still runs."""
-        ...
 
     def children(self, pid: int) -> list[ProcessIdentity]:
         """Return the direct children of `pid`."""
-        ...
 
     def snapshot(self, exe_names: list[str]) -> list[ProcessIdentity]:
         """Return every running process whose `exe_name` is in `exe_names`."""
-        ...
 
     def terminate(self, identity: ProcessIdentity) -> bool:
         """End the process only if pid and start time match; return True when it was signalled."""
-        ...
 
 
 class PosixProcessInspector:
