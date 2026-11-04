@@ -9,6 +9,7 @@ tasks:
   - id: T1
     title: Footing kinds and their registration
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.footing (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/footing.py"
       - "packages/eng-harness/src/eng_harness/_kinds.py"
@@ -42,6 +43,7 @@ tasks:
   - id: T3
     title: Calc harness.footing_subjects and the footing calc package
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.subjects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
@@ -63,6 +65,7 @@ tasks:
   - id: T4
     title: Calcs harness.footing_plan_size and harness.footing_resize
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.plan_size and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/plan_size.py"
@@ -87,6 +90,7 @@ tasks:
   - id: T5
     title: Calc harness.footing_layout
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.layout (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/layout.py"
@@ -106,6 +110,7 @@ tasks:
   - id: T6
     title: Calcs harness.footing_status and harness.footing_schedule (with clearance)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.schedule and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/status.py"
@@ -128,6 +133,7 @@ tasks:
   - id: T7
     title: Decision points footing_fix_strategy and footing_review, and the footing rules
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.footing, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/_points.py"
@@ -147,6 +153,7 @@ tasks:
   - id: T8
     title: Block design_isolated_footing (rounds, batched checks, decisions, engineer dimensions, resize)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/_block.py"
@@ -176,6 +183,7 @@ tasks:
   - id: T9
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/__init__.py"
@@ -204,6 +212,7 @@ tasks:
   - id: T10
     title: Calcs harness.reactions_to_joint_loads and harness.safe_equilibrium
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.reactions_to_loads and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/reactions_to_loads.py"
@@ -226,6 +235,7 @@ tasks:
   - id: T11
     title: Block footing_safe_cross_check and the allowlist contract test
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/_safe.py"
@@ -248,6 +258,7 @@ tasks:
   - id: T12
     title: Report sections (schedule, calculation notes), acceptance audits and the local-testing list
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_footing.py"
       - "packages/eng-harness/src/eng_harness/report/__init__.py"

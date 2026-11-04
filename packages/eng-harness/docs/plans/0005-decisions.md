@@ -27,6 +27,7 @@ tasks:
   - id: T2
     title: Decision points, state field rules, point registry and lock
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.decisions.types (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/__init__.py"
       - "packages/eng-harness/src/eng_harness/decisions/types.py"
@@ -48,6 +49,7 @@ tasks:
   - id: T3
     title: Redaction check (by construction and at runtime)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/_redaction.py"
       - "packages/eng-harness/src/eng_harness/decisions/_points.py"
@@ -63,6 +65,7 @@ tasks:
   - id: T4
     title: Rule definitions, restricted basis view, registry, lock and review table
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.decisions.types (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/__init__.py"
       - "packages/eng-harness/src/eng_harness/decisions/types.py"
@@ -88,6 +91,7 @@ tasks:
   - id: T5
     title: Provider interfaces, suggestion and port models, fake providers
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.decisions.interfaces (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/interfaces.py"
       - "packages/eng-harness/src/eng_harness/decisions/_record.py"
@@ -102,6 +106,7 @@ tasks:
   - id: T6
     title: Label store, pending store, override and opt-in export
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/__init__.py"
       - "packages/eng-harness/src/eng_harness/decisions/_labels.py"
@@ -119,6 +124,7 @@ tasks:
   - id: T7
     title: Cascade core (validation, tier 1, engineer tier, pending, record)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/__init__.py"
       - "packages/eng-harness/src/eng_harness/decisions/_cascade.py"
@@ -139,6 +145,7 @@ tasks:
   - id: T8
     title: Tiers 2 and 3, shadow mode, timeouts, policy switches, local_only
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/_cascade.py"
       - "packages/eng-harness/tests/unit/decisions/test_cascade.py"
@@ -159,6 +166,7 @@ tasks:
   - id: T9
     title: decide_many batching and one batched screen
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/decisions/_batch.py"
       - "packages/eng-harness/src/eng_harness/decisions/_cascade.py"
@@ -174,6 +182,7 @@ tasks:
   - id: T10
     title: Engine wiring, workflow, replay, conformance and performance tests, local-testing notes
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
