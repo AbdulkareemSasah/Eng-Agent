@@ -98,7 +98,7 @@ def test_tool_crash_is_an_environment_error(repo: Repo) -> None:
 
 
 def test_explicit_tool_configuration(repo: Repo) -> None:
-    """Tools get an explicit config file and strict mode, so stray files cannot change them."""
+    """Tools get the explicit policy of the gate root (ruff: isolated options, mypy: file) and strict mode."""
     make_workspace(repo, ["a"])
     runner = FakeRunner()
     _run(repo, runner)
@@ -107,12 +107,14 @@ def test_explicit_tool_configuration(repo: Repo) -> None:
     assert by_key["lock"][1] == repo.root
     for key in ("format", "lint"):
         argv, cwd = by_key[key]
-        assert argv[argv.index("--config") + 1] == "pyproject.toml"
+        assert "--isolated" in argv  # no configuration file is discovered, so stray files cannot change the tool
+        assert "line-length = 120" in argv  # the policy of the gate root's [tool.ruff], as options
         assert cwd == repo.root
         assert argv[-1] == str(repo.root / "pkgs" / "a")
     assert "--check" in by_key["format"][0]
     argv = by_key["types"][0]
-    assert argv[argv.index("--config-file") + 1] == "pyproject.toml"
+    assert argv[argv.index("--config-file") + 1] == str(repo.root / "pyproject.toml")
+    assert by_key["types"][1] == repo.root
     assert "--strict" in argv
     assert str(repo.root / "pkgs" / "a" / "src") in argv
 
