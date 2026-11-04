@@ -14,6 +14,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict
+
 from eng_dev_gate.config import GateConfig, Mode, load_gate_config
 from eng_dev_gate.event import PullRequest, event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, parse_spec, safe_relative_path
@@ -21,7 +23,6 @@ from eng_dev_gate.gitio import Change, Git, NumstatEntry, PathNotFoundError, Sub
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult, render
 from eng_dev_gate.results import Status, UsageError
-from pydantic import BaseModel, ConfigDict
 
 LARGEST_FILES_SHOWN = 3  # files named in a GC009 message (presentation only)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
