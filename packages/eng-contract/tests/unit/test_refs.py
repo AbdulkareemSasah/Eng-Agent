@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pydantic import TypeAdapter, ValidationError
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
@@ -48,7 +48,13 @@ PAYLOAD: dict[str, Any] = {
 def record(
     *, rid: str = RID, kind: str = "model.sections/1", payload: dict[str, Any] | None = PAYLOAD, host: int | None = None
 ) -> ResultRecord:
-    producer: dict[str, Any] = {"tool": "harness", "tool_version": "1", "inputs": {}, "started_at": TS, "duration_ms": 0}
+    producer: dict[str, Any] = {
+        "tool": "harness",
+        "tool_version": "1",
+        "inputs": {},
+        "started_at": TS,
+        "duration_ms": 0,
+    }
     if host is not None:
         producer["host"] = {"program": "ETABS", "version": "1", "model_id": MID, "model_revision": host}
     return ResultRecord.model_validate(
@@ -90,7 +96,7 @@ def untracked(_: str) -> int | None:
 
 
 def resolve(
-    text: str,
+    text: str | Ref,
     rule: RefRule | None = None,
     source: MemorySource | None = None,
     revision: Callable[[str], int | None] = untracked,
@@ -146,7 +152,7 @@ def test_json_pointer_format_and_rfc_examples() -> None:
     assert JsonPointer.parse("") == ()
     assert JsonPointer.parse("/a~1b/m~0n") == ("a/b", "m~n")
     # RFC 6901 section 5 document and its evaluations.
-    doc = {
+    doc: dict[str, JsonValue] = {
         "foo": ["bar", "baz"],
         "": 0,
         "a/b": 1,
@@ -196,7 +202,15 @@ def test_local_trace_ref() -> None:
     adapter = TypeAdapter(LocalTraceRef)
     assert adapter.validate_python("#/traces/0") == "#/traces/0"
     assert adapter.validate_python("#/traces/12") == "#/traces/12"
-    for bad in ("#/traces/01", "#/traces/", "#/traces/-1", "#/trace/0", "/traces/0", "#/traces/0/x", RID + "#/traces/0"):
+    for bad in (
+        "#/traces/01",
+        "#/traces/",
+        "#/traces/-1",
+        "#/trace/0",
+        "/traces/0",
+        "#/traces/0/x",
+        RID + "#/traces/0",
+    ):
         with pytest.raises(ValidationError):
             adapter.validate_python(bad)
     rebased = rebase_local_ref(RID, "#/traces/3")
@@ -235,7 +249,7 @@ def test_pointer_failures() -> None:
         "#/a~1b/-": "-",  # the element after the last
         "#/a~1b/x": "x",  # not an index
         "#/a~1b/+1": "+1",
-        "#/a~1b/١": "١",  # Arabic-Indic digit one is not an RFC 6901 digit
+        f"#/a~1b/{chr(0x661)}": chr(0x661),  # Arabic-Indic digit one is not an RFC 6901 digit
         "#/b_mm/x": "x",  # token applied to a number
         "#/name/0": "0",  # token applied to a string
         "#/flag/x": "x",
@@ -381,12 +395,15 @@ def test_staleness_rule() -> None:
     assert resolve(RID + "#/b_mm", strict, source, lambda _m: None).value == 300
     # A result without a host is never stale by revision, and the function is not consulted.
     called: list[str] = []
-    hostless = MemorySource(record())
-    assert resolve(RID, strict, hostless, lambda m: called.append(m) or 99).value == PAYLOAD
+
+    def tracked(model_id: str) -> int | None:
+        called.append(model_id)
+        return 4
+
+    assert resolve(RID, strict, MemorySource(record()), tracked).value == PAYLOAD
     assert called == []
-    seen: list[str] = []
-    resolve(RID, strict, source, lambda m: seen.append(m) or 4)
-    assert seen == [MID]
+    resolve(RID, strict, source, tracked)
+    assert called == [MID]
 
 
 def test_revision_below_the_record_is_an_integrity_failure() -> None:
