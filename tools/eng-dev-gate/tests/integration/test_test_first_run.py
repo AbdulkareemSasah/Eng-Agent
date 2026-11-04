@@ -13,7 +13,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
-from eng_dev_gate.checks.test_first_run import Runner, SubprocessRunner
+from eng_dev_gate.checks.test_first_run import RunFaultError, Runner, SubprocessRunner
 from eng_dev_gate.toolrun import ToolResult
 from support.pullrequest import BODY, write_event
 from support.repo import Repo
@@ -163,9 +163,9 @@ def test_new_package_has_no_probe(repo: Repo) -> None:
 
 def test_subprocess_runner_times_out() -> None:
     """A run over its time limit is TF009 (exit 3), never a pass."""
-    with pytest.raises(Exception, match="TF009") as raised:
+    with pytest.raises(RunFaultError, match="TF009") as raised:
         SubprocessRunner().run([sys.executable, "-c", "import time; time.sleep(30)"], Path.cwd(), {}, 0.2)
-    assert raised.value.exit_code == 3  # type: ignore[attr-defined]  # B-046: GateError carries the exit code
+    assert raised.value.exit_code == 3
 
 
 def test_head_unchanged_after_run(repo: Repo) -> None:
