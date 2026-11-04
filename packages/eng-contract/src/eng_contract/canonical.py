@@ -133,13 +133,14 @@ def loads(data: bytes) -> JsonValue:
 
     UTF-8 only. Integers beyond +-(2**53 - 1) become `float` when they are an exact float64 or the text that
     `canonical_json` writes for one, so `canonical_json(loads(canonical_json(v))) == canonical_json(v)` (AC4).
+    The result is always accepted by `canonical_json`.
 
     Raises:
         CanonicalJsonError: invalid UTF-8 or JSON, NaN or an infinity, a duplicate key, a number that overflows
-            float64, or an integer literal that is not an exact float64.
+            float64, an integer literal that is not an exact float64, or a lone surrogate (escaped).
     """
     try:
-        return json.loads(  # type: ignore[no-any-return]
+        value: JsonValue = json.loads(
             data.decode("utf-8"),
             parse_int=_parse_int,
             parse_float=_parse_float,
@@ -150,3 +151,5 @@ def loads(data: bytes) -> JsonValue:
         raise CanonicalJsonError("text is nested too deeply") from exc
     except ValueError as exc:  # invalid UTF-8 (UnicodeDecodeError) or invalid JSON (JSONDecodeError)
         raise CanonicalJsonError(f"invalid JSON text: {exc}") from exc
+    canonical_json(value)  # rule 3: an escaped lone surrogate parses but no canonical writer can produce it
+    return value
