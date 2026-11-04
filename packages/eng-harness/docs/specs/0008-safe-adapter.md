@@ -160,12 +160,16 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   after the engine's save; the model is `locked` afterwards and an edit before `csi_unlock_model` is refused as in 0002
   AC29. Test: `tests/workflow/adapters/test_safe_analysis.py::test_long_role_save_first_and_locked`.
 - AC22. Given the tables of §4.6 and a case list, when soil pressures are read, then `harness.safe_soil_pressures/1` holds
-  the rows (`area`, `element` and `joint` each when the table has the column and `null` otherwise, case, pressure in `kPa`
-  converted from the present units), `field_map_status` is `candidate` until L5 promotes the entry (§4.5),
+  the rows (`area`, `element` and `joint` each when the table has the column and `null` otherwise, `case`, `step_type`
+  and `case_type` each when the table has the column and `null` otherwise, pressure in `kPa` converted from the present
+  units), `field_map_status` is `candidate` until L5 promotes the entry (§4.5),
   `sign_convention` is `host_unconfirmed/1`, no absolute value is taken, `group` is passed when requested, and a
-  `truncated` reply gives `LIMIT_EXCEEDED` (gap SG-6) with the `group` hint. Tests:
+  `truncated` reply gives `LIMIT_EXCEEDED` (gap SG-6) with the `group` hint. Given an envelope combination or a
+  multi-step case, which the table reports as several rows (Max and Min) told apart only by the step-type column, then
+  every row carries its `step_type` and none is dropped or merged; given a reply in which (`area`, `element`, `joint`,
+  `case`, `step_type`) is not unique, then `INTERNAL` with the columns seen, never a silent ambiguity. Tests:
   `tests/workflow/adapters/test_safe_results.py::test_soil_pressure_rows`, `::test_soil_pressure_truncated`,
-  `::test_soil_pressure_group`.
+  `::test_soil_pressure_group`, `::test_soil_pressure_step_type_and_unique_key`.
 - AC23. Given `csi_results_base_reactions` and `csi_results_joint_reactions`, then the replies become
   `harness.base_reactions/1` and `forces.joint_reactions/1` in canonical units; the moment reference of the base
   reactions is `host_unconfirmed/1`. `csi_analysis_status` becomes `harness.csi_analysis_status/1` (0002 §4.6.1 step 11). Reading the table
@@ -294,7 +298,7 @@ and maps columns to logical names through the data file `products/_safe_tables.t
 | Status | Meaning | Tables |
 |---|---|---|
 | `reference` | field keys from the Sasaah SAFE 22 table reference (importable tables); confirmed by `csi_db_table_fields` at the first local run | `Slab Property Definitions` (`Name`, `PropType`, `Material`, `Thickness`), `Material Properties - General` (`Material`, `Type`), `- Basic Mechanical Properties` (`Material`, `UnitWeight`, `E1`, `U12`), `- Concrete Data` (`Material`, `Fc`), `Spring Property Definitions - Area Springs` (`Name`, `StiffOpt`, `StiffU1`, `StiffU2`, `StiffU3`, `NonlinOpt3`), `Area Assignments - Area Springs` (`UniqueName`, `SpringProp`), `Joint Loads Assignments - Force` (`UniqueName`, `LoadPattern`, `FX`..`MZ`, `XDim`, `YDim`), `Load Pattern Definitions`, `Load Combination Definitions` |
-| `candidate` | each logical column has a fixed list of accepted names, taken from the names the Sasaah footing tool reads in `Soil Pressures` (`SafePhase.cs:529-531` and `550-551`; `uniquename` is the area part of its (area, element, joint) key, line 573) and compared by **exact equality** of the normalized name (lower case, letters and digits only): `case` = `outputcase`, `loadcase`, `case`; `pressure` = `pressure`, `soilpressure`; `joint` = `joint`; `area` = `uniquename`; `element` = `shellelm`, `element`. `case` and `pressure` are required; `area`, `element` and `joint` are optional and `null` in the row when absent. Exactly one column of the reply may match a logical column: none for a required one, or more than one for any, is `INTERNAL` with the columns seen (AC13), never a first match. Sasaah's own `FindColumn` (`CsiHelpers.cs:188-200`) matches by substring and takes the first hit, and falls back to column 0 for a missing `uniquename`; the adapter does neither | `Soil Pressures` |
+| `candidate` | each logical column has a fixed list of accepted names, taken from the names the Sasaah footing tool reads in `Soil Pressures` (`SafePhase.cs:529-531` and `550-551`; `uniquename` is the area part of its (area, element, joint) key, line 573) and compared by **exact equality** of the normalized name (lower case, letters and digits only): `case` = `outputcase`, `loadcase`, `case`; `pressure` = `pressure`, `soilpressure`; `joint` = `joint`; `area` = `uniquename`; `element` = `shellelm`, `element`; `step_type` = `steptype`; `case_type` = `casetype` (the result tables of the host report envelope and multi-step output as Max and Min rows told apart by this column, and the Sasaah ETABS sessions read it so). `case` and `pressure` are required; `area`, `element`, `joint`, `step_type` and `case_type` are optional and `null` in the row when absent. Exactly one column of the reply may match a logical column: none for a required one, or more than one for any, is `INTERNAL` with the columns seen (AC13), never a first match. Sasaah's own `FindColumn` (`CsiHelpers.cs:188-200`) matches by substring and takes the first hit, and falls back to column 0 for a missing `uniquename`; the adapter does neither | `Soil Pressures` |
 | `unknown` | the SAFE 22 reference lists the table with no fields and no Sasaah code reads it; the reader is a gap until a recording gives the keys | `Soil Pressures Summary`, `Soil Pressures Enveloping Summary`, `Base Reactions`, `Analysis Messages`, `Concrete Slab Design - Punching Shear Data`, `Concrete Slab Design - Flexure and Shear Data` |
 
 A `candidate` table may be read before any recording, because a wrong or ambiguous column raises instead of being picked
@@ -306,7 +310,7 @@ SAFE change is absorbed.
 ### 4.6 Results
 
 - **Soil pressures** (`harness.safe_soil_pressures/1` **[added]**): `source_table`; `sign_convention:
-  "host_unconfirmed/1"`; `field_map_status` (`candidate` or `reference`); `rows`: `{area|null, element|null, joint|null, case: CaseRef, pressure_kPa}`; `summary` with the row
+  "host_unconfirmed/1"`; `field_map_status` (`candidate` or `reference`); `rows`: `{area|null, element|null, joint|null, case: CaseRef, step_type|null, case_type|null, pressure_kPa}`; (`area`, `element`, `joint`, `case`, `step_type`) must be unique in a reply, otherwise `INTERNAL` with the columns seen, so that Max and Min rows of an envelope are never confused; `summary` with the row
   count and the raw minimum and maximum (no absolute values, no envelope computed by the adapter; the Sasaah tool takes
   `abs` and superposes service patterns itself, which is a calc, not a read). The case list is an argument, the `group`
   filter optional. **Limit (SG-6):** the tool returns at most 2000 rows and has no case or area filter; a realistic
@@ -430,7 +434,7 @@ package, changelog entries). `eng-contract` is unchanged; Q2 and Q3 ask for addi
 | SG-1 to SG-9 | §4.8 | Owner | As tabled |
 | A1 | **[added]** `ProductProfile`; `[servers.<name>].product`; allowlist `[fingerprint]` per product; harness kinds `harness.joint_loads/1`, `harness.model_points/1`, `harness.safe_soil_supports/1`, `harness.safe_soil_pressures/1`, `harness.base_reactions/1`; warnings `ZERO_LOAD_SKIPPED`; issue codes `SECTION_TYPE_NOT_MAPPED`, `JOINT_LOAD_ON_MISSING_JOINT`, `AREA_WITHOUT_SOIL_SUPPORT` | Owner | Accept with this spec |
 | C1 | Conflict: 06 §8 lists soil supports, punching output and strip results as SAFE tools; `sasaah-csi-mcp` has none of them (ADR-0024 made 06 a target) | Owner | This spec follows the server; amend 06 §8 with the gap table when the owner accepts it |
-| C2 | Conflict: S-12 §2 and 0002 assume `csi_new_model` for new models; on SAFE it is `unsupported_by_version` in the same Sasaah source that the footing tool contradicts | Owner | Settle by L3 |
+| C2 | Conflict: S-12 §2 and 0002 assume `csi_new_model` for new models; on SAFE it is `unsupported_by_version` in the same Sasaah source that the footing tool contradicts | Owner | Settle by L3. The same `_model.File` object serves `csi_open_model` (`File.OpenFile`, `CsiModel.cs:1758`) and `csi_save_model` (`File.Save`, `CsiModel.cs:1730`), which steps 2 and 6 of §4.2 depend on; the footing command-line tool opens and saves `.FDB` live through them (`SafePhase.cs:88`, `111`), which is the evidence that they work on SAFE, to be confirmed by L2 |
 | C3 | Conflict: ADR-0025 and 10 §9 scope ACI 318-14; the Sasaah footing tool implements ACI 318-19 | Owner | Not an adapter issue; recorded so that no host design result is compared with a code-pack result before the design code of the SAFE model is known |
 
 ## 12. Needs local test
@@ -439,14 +443,17 @@ Listed in `docs/local-testing.md` by the plan (no host program runs in CI), on a
 
 - L1. `csi_launch(product="SAFE", visible=false)`: the pid the reply names, the SAFE parent process, survival after the
   server job closes (silent breakaway, 0002 §12 item 1), and `csi_exit` of a launched hidden instance.
-- L2. `csi_open_model` on a `.FDB`; the files a SAFE model keeps next to it; copy hash equality; what `companion_globs` must
-  list.
+- L2. `csi_open_model` and `csi_save_model` on a `.FDB` (both use the same `File` object as `csi_new_model`, C2): the
+  `saved_to` path, the hash change after a save, the files a SAFE model keeps next to it; copy hash equality; what
+  `companion_globs` must list.
 - L3. `csi_new_blank_model` and `csi_new_model` on SAFE (SG-1, C2).
 - L4. The live `tools/list` fingerprint of the SAFE entry set, `csi_status` installed products, `serverInfo`.
-- L5. `csi_db_table_fields` and `csi_db_table_read` of every table in §4.5, with the real columns, units (also when the
+- L5. `csi_db_table_fields` and `csi_db_table_read` of every table in §4.5, with the real columns (for `Soil Pressures`, whether a `StepType` and a `CaseType` column exist and how an envelope
+  combination reports Max and Min), units (also when the
   present units are millimetres), and `truncated` behavior; the SAFE tables with `unknown` status are recorded for the
   owner's review.
-- L6. Whether `Soil Pressures` needs an output selection before it has rows, its row count for a model of about 30
+- L6. Whether `Soil Pressures` needs an output selection before it has rows, the `StepType` values it reports for an
+  envelope combination and a multi-step case (key uniqueness of AC22), its row count for a model of about 30
   footings, and whether groups of one footing each read within 2000 rows (SG-6).
 - L7. Sign convention of soil pressure; moment reference and sign of base reactions (Q6).
 - L8. `csi_set_point_load` on SAFE: replace semantics, rejection of an all-zero row, effect on `XDim` and `YDim`, units

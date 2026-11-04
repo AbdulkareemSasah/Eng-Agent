@@ -158,6 +158,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_rows"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_truncated"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_group"
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_step_type_and_unique_key"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_base_and_joint_reactions"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_analysis_status"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_analysis_messages_unknown_is_gap"
@@ -265,7 +266,7 @@ the fingerprint; `locate` and `model_state` for SAFE through the profile; `LIMIT
 dimension comparison, SAFE integrity issues, reconciliation of a point load from the table, pattern and combination
 mapping including `SuperDead`.
 
-**T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group`, the
+**T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group` (rows carry `step_type` and `case_type`; a non-unique key is `INTERNAL`), the
 base-reaction and joint-reaction readers, analysis status, the `Analysis Messages` read as a `NotImplementedGap` until recorded, and the explicit gaps for
 slab design.
 
@@ -287,7 +288,7 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   `csi_unlock_model` SAFE entry; T17 (record mode) before T8 of this plan. Engine plan 0001 as for plan 0002.
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
   kinds and gaps defined here.
-- Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented).
+- Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented). Q8 (whether a candidate-mapped soil-pressure result may feed a verdict) is for the footing-workflow spec and does not affect T1 to T9.
 
 ## 4. Verification
 
