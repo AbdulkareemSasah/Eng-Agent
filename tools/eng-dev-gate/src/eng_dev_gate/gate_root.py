@@ -145,10 +145,18 @@ def resolve(root: Path, gate_root: Path | None, job: str, event_file: Path | Non
     return GateContext(root, gate_root, load_gate_config(gate_root))
 
 
+def _tree_root(start: Path) -> Path:
+    """Return ``start`` or its nearest ancestor that holds ``.gate/gate.yml``; ``start`` if none does."""
+    resolved = start.resolve()
+    return next((d for d in (resolved, *resolved.parents) if (d / GATE_YML).is_file()), start)
+
+
 def resolve_for(args: argparse.Namespace, env: Mapping[str, str] | None = None) -> GateContext | None:
     """Resolve the context of the command in ``args``; None when the command does not judge a pull request."""
     job = job_for(args)
     if job is None:
         return None
     chosen = Path(args.gate_root) if args.gate_root else None
-    return resolve(Path(args.root), chosen, job, event_path(getattr(args, "event", None), env or os.environ))
+    return resolve(
+        _tree_root(Path(args.root)), chosen, job, event_path(getattr(args, "event", None), env or os.environ)
+    )
