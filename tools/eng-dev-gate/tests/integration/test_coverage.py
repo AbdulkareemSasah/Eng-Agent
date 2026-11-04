@@ -48,3 +48,10 @@ def test_deselection_fails(repo: Repo) -> None:
 def test_failing_test_is_st001(repo: Repo) -> None:
     make_toy(repo, "def test_bad() -> None:\n    assert False\n")
     assert _run(repo)[1] == ["ST001"]
+
+
+def test_member_own_cov_addopts_do_not_hide_measurement(repo: Repo) -> None:
+    """A member that configures pytest-cov in addopts is still measured by the step (not 0 of N)."""
+    make_toy(repo, addopts="--cov=a --cov-branch --cov-fail-under=95")
+    result, codes, status = _run(repo)
+    assert (result.code, codes, status) == (0, [], "pass")
