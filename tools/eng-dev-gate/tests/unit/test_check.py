@@ -36,7 +36,8 @@ class FakeRunner:
 
 
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
-    return repo.run(["--format", "json", "check", *argv], {"check": make_handler(runner)})
+    # the tests step has its own tests (test_coverage.py); the fake runner here writes no coverage report
+    return repo.run(["--format", "json", "check", "--skip", "tests", *argv], {"check": make_handler(runner)})
 
 
 def _statuses(result: RunResult) -> dict[str, str]:
@@ -46,7 +47,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
-    assert [s.name for s in STEPS] == ["lock", "config", "format", "lint", "types"]
+    assert [s.name for s in STEPS] == ["lock", "config", "format", "lint", "types", "tests"]
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
     assert len(STEP_ORDER) == 14
@@ -142,12 +143,12 @@ def test_workspace_selection(repo: Repo) -> None:
     ]  # fmt: skip
     assert list(_statuses(_run(repo, FakeRunner(), "--package", "b"))) == ["lock", "config", "format", "lint", "types"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
-    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check"]
+    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check", "--skip", "tests"]
     inside = repo.run(argv, {"check": make_handler(FakeRunner())})
     assert json.loads(inside.out)["steps"][1]["name"] == "config"
 
 
 def test_text_output_starts_with_mode(repo: Repo) -> None:
     make_workspace(repo, ["a"])
-    result = repo.run(["check"], {"check": make_handler(FakeRunner())})
+    result = repo.run(["check", "--skip", "tests"], {"check": make_handler(FakeRunner())})
     assert result.out.splitlines()[0] == "mode: bootstrap"
