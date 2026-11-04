@@ -4,6 +4,7 @@ Expected strings are written out here or come from RFC 8785 (data file), indepen
 """
 
 import hashlib
+import json
 import struct
 from datetime import datetime
 from decimal import Decimal
@@ -15,7 +16,8 @@ import pytest
 from eng_contract.canonical import CanonicalJsonError, canonical_json, loads, payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 
-_DATA = Path(__file__).resolve().parent.parent / "data" / "jcs" / "numbers.csv"
+_DIR = Path(__file__).resolve().parent.parent / "data" / "jcs"
+_DATA = _DIR / "numbers.csv"
 
 
 def _samples() -> list[tuple[str, str]]:
@@ -67,6 +69,13 @@ def test_key_order_and_escaping() -> None:
     )
     assert canonical_json(True) == b"true"
     assert not canonical_json({"a": 1}).startswith(b"\xef\xbb\xbf")
+
+
+def test_rfc8785_key_sorting_example() -> None:
+    sample = json.loads((_DIR / "keys.json").read_text(encoding="utf-8"))
+    out = canonical_json(sample["input"])
+    assert list(json.loads(out)) == sample["sorted_names"]
+    assert out.startswith(b'{"\\r":"Carriage Return","1":"One","\xc2\x80":"Control",')
 
 
 def test_rejects_non_json_values() -> None:
@@ -151,6 +160,8 @@ def test_loads_values_and_integer_rule() -> None:
         b"",
         b"{",
         b"\xff",
+        b'"\\ud800"',  # a lone surrogate, which spec rule 3 forbids in canonical text
+        b'{"\\udc00":1}',
         b"\xef\xbb\xbf1",
         b"[" * 1_000_000 + b"]" * 1_000_000,
     ],
