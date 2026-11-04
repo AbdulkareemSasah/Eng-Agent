@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from support.approvals import FakeApprovals
 from support.pullrequest import (
     BODY,
     PLAN_PATH,
@@ -18,7 +19,6 @@ from support.pullrequest import (
     spec_text,
     write_event,
 )
-from support.approvals import FakeApprovals
 from support.repo import Repo, RunResult
 
 DOCS = "Work-Item: B-001\nPlan-Task: none (spec and plan)\n"
@@ -319,7 +319,7 @@ def test_identity_and_g3_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     event = write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main")
     result, errors = gate_check(normal, event, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC015"})
-    assert "identity" in errors["GC015"]
+    assert "(G3)" in errors["GC015"]
     assert "approval" in errors["GC015"]
 
 
