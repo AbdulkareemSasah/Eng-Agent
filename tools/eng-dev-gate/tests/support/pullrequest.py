@@ -29,7 +29,7 @@ def gate_yml(*, bootstrap: bool = True) -> str:
     return (
         f"bootstrap:\n  enabled: {str(bootstrap).lower()}\n  gate_branch: build/v1\nmain_branch: main\n"
         + ("" if bootstrap else OWNER_IDENTITIES)
-        + "spec_globs: ['**/docs/specs/*.md']\nplan_globs: ['**/docs/plans/*.md']\n"
+        + "spec_globs: ['**/docs/specs/*.md', '**/docs/clauses/**/*.md']\nplan_globs: ['**/docs/plans/*.md']\n"
         "test_globs: ['**/tests/**', '**/test_*.py']\ngenerated_globs: ['uv.lock', '**/AGENTS.md']\n"
         "spike_globs: ['spikes/**']\n"
         "limits:\n  diff_lines: 200\n  max_task_lines: 400\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
@@ -57,6 +57,19 @@ def plan_text(
 def spec_text(status: str = "approved") -> str:
     """A spec with one acceptance criterion."""
     return f"---\nid: spec-1\nissue: B-001\nstatus: {status}\nsize: small\nrisk: r1\n---\n\n- AC1. Given x, then y.\n"
+
+
+CLAUSE_DIR = "pkg/docs/clauses/pk/"
+
+
+def clause_spec(*criteria: str, status: str = "approved") -> str:
+    """A clause spec whose acceptance criteria are ``- <id>. Given x, then y.`` lines."""
+    return spec_text(status).split("\n- AC1.")[0] + "\n" + "".join(f"- {c}. Given x, then y.\n" for c in criteria)
+
+
+def clause_plan(*covers: str, extra: str = "") -> str:
+    """A plan whose spec is the directory ``CLAUSE_DIR``; both tasks cover ``covers``; ``extra`` ends its text."""
+    return plan_text(spec=CLAUSE_DIR).replace("covers: [AC1]", f"covers: [{', '.join(covers)}]") + extra
 
 
 def make_gate_repo(

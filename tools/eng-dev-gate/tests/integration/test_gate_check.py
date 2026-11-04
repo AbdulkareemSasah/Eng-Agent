@@ -8,10 +8,13 @@ from pathlib import Path
 import pytest
 from support.pullrequest import (
     BODY,
+    CLAUSE_DIR,
     PLAN_PATH,
     PLAN_TASK,
     SPEC_PATH,
     base_checkout,
+    clause_plan,
+    clause_spec,
     gate_check,
     make_gate_repo,
     plan_text,
@@ -372,3 +375,32 @@ def test_ratchet_baseline_created_in_scope(repo: Repo) -> None:
     files = {"pkg/src/new.py": "y = 2\n", ".gate/ratchet.json": _ratchet(pkg=_ONE)}
     result, errors = gate_check(repo, _change(repo, base, files=files))
     assert (result.code, errors) == (0, {})
+
+
+def test_plan_with_clause_spec_directory(repo: Repo) -> None:
+    """AC13a: every `*.md` directly in the spec directory is a spec (GC005), none at all is GC004."""
+    clauses = {f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1"), f"{CLAUSE_DIR}ov.md": clause_spec("OV-AC1")}
+    junk = {f"{CLAUSE_DIR}notes.txt": "not a spec\n", f"{CLAUSE_DIR}sub/deep.md": "no front matter\n"}
+    base = make_gate_repo(repo, plan=clause_plan("BP-AC1"), base_files={**clauses, **junk})
+    result, errors = gate_check(repo, _change(repo, base))
+    assert (result.code, errors) == (0, {})
+    # a clause spec without valid front matter
+    bad = Repo(repo.root.parent / "bad")
+    base_bad = make_gate_repo(
+        bad, plan=clause_plan("BP-AC1"), base_files={**clauses, f"{CLAUSE_DIR}raw.md": "no front matter\n"}
+    )
+    result, errors = gate_check(bad, _change(bad, base_bad))
+    assert (result.code, set(errors)) == (1, {"GC005"})
+    assert f"{CLAUSE_DIR}raw.md" in errors["GC005"]
+    # a directory without a Markdown file, and a directory that is absent
+    for name, files in (("empty", junk), ("absent", {})):
+        other = Repo(repo.root.parent / name)
+        base_other = make_gate_repo(other, plan=clause_plan("BP-AC1"), base_files=files)
+        result, errors = gate_check(other, _change(other, base_other))
+        assert (result.code, set(errors)) == (1, {"GC004"}), name
+        assert CLAUSE_DIR in errors["GC004"]
+    # a clause spec that is a draft does not fail in bootstrap mode (as a single spec)
+    draft = Repo(repo.root.parent / "draft")
+    drafts = {f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1", status="draft")}
+    base_draft = make_gate_repo(draft, plan=clause_plan("BP-AC1"), base_files=drafts)
+    assert gate_check(draft, _change(draft, base_draft))[0].code == 0
