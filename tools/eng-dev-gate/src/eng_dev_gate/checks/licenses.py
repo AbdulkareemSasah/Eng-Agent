@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import tempfile
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from eng_dev_gate import judged_metadata
-from eng_dev_gate.checks.tests_step import _judged_command, _judged_environment, _uv_available
+from eng_dev_gate.checks.tests_step import _judged_environment, read_judged_environment
 from eng_dev_gate.config import load_gate_config
 from eng_dev_gate.config.gate_config import LicenseException
 from eng_dev_gate.report import Finding, Severity
@@ -182,33 +181,19 @@ def _judge(
     return None
 
 
-def _stale_lock(ctx: StepContext, path: str) -> Finding | None:
-    """ST001 at ``path`` when the judged tree's ``uv.lock`` is stale or missing (``uv run --locked`` would fail)."""
-    checked = ctx.runner.run(["uv", "lock", "--check", "--project", str(ctx.root)], ctx.root)
-    if checked.exit_code == 0:
-        return None
-    head = " | ".join(checked.output.splitlines()[-OUTPUT_LINES:])
-    message = f"licenses: uv.lock of the judged tree is not up to date, so its environment cannot be built: {head}"
-    return _finding("ST001", path, message)
-
-
-def _judged_installed(ctx: StepContext) -> list[Installed]:
-    """Read the installed distributions inside the judged tree's environment with the base commit's reader.
+def _judged_installed(ctx: StepContext) -> list[Installed] | Finding:
+    """Read the installed distributions inside the judged tree's environment, or ST001 for a stale ``uv.lock``.
 
     Raises:
         EnvironmentFaultError: the run failed or wrote unusable output (tool output is validated, never trusted).
     """
-    with tempfile.TemporaryDirectory(prefix="eng-gate-lic-") as folder:
-        out = Path(folder) / "metadata.json"
-        command = _judged_command(ctx.root, "-I", str(Path(judged_metadata.__file__).resolve()), str(out))
-        ran = ctx.runner.run(command, Path(folder))  # nothing of the judged tree is on the import path
-        if ran.exit_code != 0:
-            head = " | ".join(ran.output.splitlines()[-OUTPUT_LINES:])
-            raise EnvironmentFaultError(f"licenses: reading the judged environment exited {ran.exit_code}: {head}")
-        try:
-            return _INSTALLED.validate_json(out.read_text(encoding="utf-8"))
-        except (OSError, ValidationError) as error:
-            raise EnvironmentFaultError(f"licenses: unusable metadata of the judged environment: {error!r}") from error
+    environment = read_judged_environment(ctx, "licenses")
+    if isinstance(environment, Finding):
+        return environment
+    try:
+        return _INSTALLED.validate_python(environment.distributions)
+    except ValidationError as error:
+        raise EnvironmentFaultError(f"licenses: unusable metadata of the judged environment: {error!r}") from error
 
 
 def licenses(ctx: StepContext) -> list[Finding]:
@@ -227,13 +212,10 @@ def licenses(ctx: StepContext) -> list[Finding]:
     exceptions = {_normalize(e.distribution): e for e in load_gate_config(ctx.gate_root).license_exceptions}
     members = {_normalize(m.name) for m in discover_members(ctx.root)}
     if _judged_environment(ctx):
-        if not _uv_available():
-            raise EnvironmentFaultError(
-                "licenses: uv is not available; the judged tree's closure needs its environment"
-            )
-        if (stale := _stale_lock(ctx, ctx.member.path)) is not None:
-            return [stale]
-        installed = _judged_installed(ctx)
+        judged = _judged_installed(ctx)
+        if isinstance(judged, Finding):
+            return [judged]
+        installed = judged
     else:
         installed = _INSTALLED.validate_python(judged_metadata.collect(SEARCH_PATH))
     by_name = {_normalize(d.name): d for d in installed}
