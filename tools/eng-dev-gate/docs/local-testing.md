@@ -4,3 +4,4 @@ Nothing in the skeleton (plan task T1) needs a host program. Items below are add
 
 - Real GitHub Actions runs of the composite actions (task T6) and the Windows CI job: needs a CI run.
 - The `check` command runs real `uv`, ruff and mypy; only its integration tests (toy workspace in a temporary directory, no network, no host program) cover that, so nothing here needs a host program (task T5).
+- The `tests` step runs real coverage.py and pytest on a toy member in a temporary directory (no network, no host program), so nothing here needs a host program (task T7).

@@ -15,7 +15,9 @@ MODULE = (
     "        return 1\n"
     "    return 0\n"
 )
-FULL_TESTS = "from a.mod import sign\n\n\ndef test_sign() -> None:\n    assert (sign(-2), sign(0), sign(3)) == (-1, 0, 1)\n"
+FULL_TESTS = (
+    "from a.mod import sign\n\n\ndef test_sign() -> None:\n    assert (sign(-2), sign(0), sign(3)) == (-1, 0, 1)\n"
+)
 PARTIAL_TESTS = "from a.mod import sign\n\n\ndef test_sign() -> None:\n    assert sign(3) == 1\n"
 
 

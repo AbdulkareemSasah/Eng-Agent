@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 from eng_dev_gate.checks.registry import STEP_ORDER, STEPS, StepContext
-from eng_dev_gate.checks.tests_step import DESELECTED_EXIT_CODE, tests
+from eng_dev_gate.checks.tests_step import DESELECTED_EXIT_CODE
+from eng_dev_gate.checks.tests_step import tests as run_step
 from eng_dev_gate.report import Finding
 from eng_dev_gate.results import EnvironmentFaultError
 from eng_dev_gate.toolrun import ToolResult
@@ -47,9 +48,10 @@ class FakeCoverage:
 
 
 def _step(repo: Repo, runner: FakeCoverage, line: int = 95, branch: int = 90) -> list[Finding]:
-    make_toy(repo, line=line, branch=branch)
+    if not (repo.root / "pyproject.toml").exists():
+        make_toy(repo, line=line, branch=branch)
     (member,) = discover_members(repo.root)
-    return tests(StepContext(repo.root, repo.root, member, runner))
+    return run_step(StepContext(repo.root, repo.root, member, runner))
 
 
 def _codes(findings: list[Finding]) -> list[str]:
@@ -80,10 +82,13 @@ def test_command_lines(repo: Repo) -> None:
     runner = FakeCoverage(_totals(1, 1, 0, 0))
     _step(repo, runner)
     run_argv, json_argv = (c[0] for c in runner.calls)
-    assert run_argv[1:3] == ["-m", "coverage"] and "--branch" in run_argv
+    assert run_argv[1:3] == ["-m", "coverage"]
+    assert "--branch" in run_argv
     assert run_argv[run_argv.index("-m", 3) + 1] == "pytest"
-    assert "eng_dev_gate.pytest_plugin" in run_argv and "-c" in run_argv
-    assert "--rcfile" in run_argv and "--rcfile" in json_argv
+    assert "eng_dev_gate.pytest_plugin" in run_argv
+    assert "-c" in run_argv
+    assert "--rcfile" in run_argv
+    assert "--rcfile" in json_argv
 
 
 def test_pytest_exit_codes(repo: Repo) -> None:

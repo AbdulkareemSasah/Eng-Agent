@@ -135,12 +135,12 @@ def test_workspace_selection(repo: Repo) -> None:
     assert list(both) == ["lock", "format:a", "format:b", "lint:a", "lint:b", "types:a", "types:b"]
     assert list(_statuses(_run(repo, FakeRunner(), "--package", "b"))) == ["lock", "format", "lint", "types"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
-    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check"]
+    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check", "--skip", "tests"]
     inside = repo.run(argv, {"check": make_handler(FakeRunner())})
     assert json.loads(inside.out)["steps"][1]["name"] == "format"
 
 
 def test_text_output_starts_with_mode(repo: Repo) -> None:
     make_workspace(repo, ["a"])
-    result = repo.run(["check"], {"check": make_handler(FakeRunner())})
+    result = repo.run(["check", "--skip", "tests"], {"check": make_handler(FakeRunner())})
     assert result.out.splitlines()[0] == "mode: bootstrap"

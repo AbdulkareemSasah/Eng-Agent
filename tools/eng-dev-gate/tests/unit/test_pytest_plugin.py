@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+from typing import cast
+
 import pytest
+from eng_dev_gate import pytest_plugin
 from eng_dev_gate.checks.tests_step import DESELECTED_EXIT_CODE
 
 pytest_plugins = ["pytester"]
@@ -41,3 +46,10 @@ def test_hypothesis_profile_ci_is_derandomized(pytester: pytest.Pytester) -> Non
     )
     result = pytester.runpytest_inprocess("-p", "eng_dev_gate.pytest_plugin")
     assert result.ret == 0
+
+
+def test_configure_without_hypothesis_is_quiet(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "hypothesis", None)  # makes ``import hypothesis`` raise ImportError
+    config = cast("pytest.Config", SimpleNamespace(stash={}))
+    pytest_plugin.pytest_configure(config)
+    assert pytest_plugin._count(config) == 0

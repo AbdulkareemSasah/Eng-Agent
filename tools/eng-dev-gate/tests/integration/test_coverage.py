@@ -20,7 +20,8 @@ def test_full_coverage_passes_and_leaves_no_files(repo: Repo) -> None:
     make_toy(repo)
     result, codes, status = _run(repo)
     assert (result.code, codes, status) == (0, [], "pass")
-    assert repo.git("status", "--porcelain").strip() == ""
+    left = [line for line in repo.git("status", "--porcelain").splitlines() if "__pycache__" not in line]
+    assert left == []  # no .coverage data, rc file or report in the tree
 
 
 def test_partial_coverage_reports_both_codes(repo: Repo) -> None:
