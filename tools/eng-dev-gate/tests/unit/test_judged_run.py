@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import runpy
 import sys
 from collections.abc import Iterator, Sequence
@@ -86,3 +87,17 @@ def test_script_entry_point_exits_with_the_status(monkeypatch: pytest.MonkeyPatc
     with pytest.raises(SystemExit) as stopped:
         runpy.run_path(str(Path(judged_run.__file__)), run_name="__main__")
     assert stopped.value.code == 3
+
+
+def test_base_plugin_imports_nothing_from_the_gate_package() -> None:
+    """It runs in the judged environment, where ``eng_dev_gate`` may be the pull request's copy: any import of the
+    gate package from the plugin would resolve to that copy and let a pull request replace part of the plugin."""
+    tree = ast.parse(Path(pytest_plugin.__file__ or "").read_text(encoding="utf-8"))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            assert node.level == 0, "a relative import reaches the package of the judged tree"
+            imported.add(node.module or "")
+    assert not {name for name in imported if name.split(".")[0] == "eng_dev_gate"}

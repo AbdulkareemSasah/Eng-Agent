@@ -92,3 +92,27 @@ def test_judged_run_leaves_the_judged_tree_without_coverage_files(tmp_path: Path
     status = head.git("status", "--porcelain", "--untracked-files=all").splitlines()
     left = [line for line in status if "__pycache__" not in line and ".venv" not in line]
     assert left == []
+
+
+def test_stale_lock_file_is_a_finding_not_an_environment_fault(tmp_path: Path) -> None:
+    """A member gained a dependency without relocking: ST001 from ``lock`` and from ``tests``, exit 1, not exit 3."""
+    gate, head = make_gate_root(tmp_path / "base"), make_judged_tree(tmp_path / "head")
+    member = head.root / "pkgs" / "a" / "pyproject.toml"
+    member.write_text(member.read_text().replace("dependencies = []", 'dependencies = ["packaging"]'), encoding="utf-8")
+    argv = ["--gate-root", str(gate.root), "--format", "json", "check", "--only", "lock,tests"]
+    result = head.run(argv, {"check": make_handler(SubprocessToolRunner())})
+    assert result.out, f"no report (exit {result.code}): {result.err[:600]}"
+    steps = {step["name"]: step for step in json.loads(result.out)["steps"]}
+    assert result.code == 1, result.out + result.err
+    assert [f["code"] for f in steps["lock"]["findings"]] == ["ST001"]
+    assert [f["code"] for f in steps["tests"]["findings"]] == ["ST001"]
+
+
+def test_inherited_virtual_environment_does_not_break_the_judged_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The gate usually runs inside another environment; uv's warning about it is not a result."""
+    monkeypatch.setenv("VIRTUAL_ENV", str(tmp_path / "some-other-venv"))
+    gate, head = make_gate_root(tmp_path / "base"), make_judged_tree(tmp_path / "head", FAILING_TEST)
+    result, codes, _ = _judge(gate, head)
+    assert (result.code, codes) == (1, ["ST001"]), result.out + result.err
