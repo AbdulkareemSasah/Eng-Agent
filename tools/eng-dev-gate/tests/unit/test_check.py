@@ -76,7 +76,12 @@ def test_fail_fast_stops_after_first_failure(repo: Repo) -> None:
 def test_only_and_skip(repo: Repo) -> None:
     make_workspace(repo, ["a"])
     assert list(_statuses(_run(repo, FakeRunner(), "--only", "lint", "--only", "types"))) == ["lint", "types"]
-    assert list(_statuses(_run(repo, FakeRunner(), "--skip", "lock,types"))) == ["format", "lint", "forbidden", "imports"]
+    assert list(_statuses(_run(repo, FakeRunner(), "--skip", "lock,types"))) == [
+        "format",
+        "lint",
+        "forbidden",
+        "imports",
+    ]
     assert _run(repo, FakeRunner(), "--only", "nonsense").code == 2
 
 

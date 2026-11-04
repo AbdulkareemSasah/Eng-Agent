@@ -125,9 +125,6 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "packages": _packages,
         **(handlers or {}),
     }.get(args.command)
-    handler = {"agents": agents.handle, "packages": _packages, "imports": imports.handle, **(handlers or {})}.get(
-        args.command
-    )
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")
