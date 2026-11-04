@@ -281,7 +281,7 @@ the fake-host workflow tests with the real engine and cascade (one screen, batch
 the import-isolation test (not vacuous: it requires the modules), recordings, and the items of spec §9 in
 `docs/local-testing.md`. Waits for the engine's `_decide` wiring (plan 0005 T10). Amendment B-098: the summary is a
 JSON object recorded in the run header (AC48, through spec 0005 AC43 and engine AC69, which plan 0005 T10 and engine
-plan T14 build); this task tests the path end to end and fixes the arguments of `assemble_decision_runtime` (spec 0006
+plan T14b build); this task tests the path end to end and fixes the arguments of `assemble_decision_runtime` (spec 0006
 Q16).
 
 ## 3. Dependencies
@@ -298,8 +298,8 @@ Q16).
   `httpx2.MockTransport` ship with the runtime dependencies).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9
   (`decide_many`) and T10 (engine wiring) merged before the tasks that need them (T1 needs T5 for `interfaces.py`; T8
-  needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14 for the header field of AC48; spec 0006
-  reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7), built by plan 0006 T14,
+  needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14b for the header field of AC48; spec 0006
+  reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7), built by plan 0006 T14b,
   which in turn needs this plan's T1 and T10. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
