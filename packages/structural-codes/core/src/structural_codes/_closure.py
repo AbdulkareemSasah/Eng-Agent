@@ -76,9 +76,14 @@ def _imports(name: str, text: str, is_package: bool, checked: bool) -> tuple[lis
             base = _absolute(name, is_package, node)
             required.append(base)
             optional.extend(f"{base}.{alias.name}" for alias in node.names)
-        elif checked and isinstance(node, ast.Call) and "__import__" in (
-            getattr(node.func, "id", None),
-            getattr(node.func, "attr", None),
+        elif (
+            checked
+            and isinstance(node, ast.Call)
+            and "__import__"
+            in (
+                getattr(node.func, "id", None),
+                getattr(node.func, "attr", None),
+            )
         ):
             raise CheckDefinitionError(f"module {name!r} calls __import__")
     for target in required if checked else ():

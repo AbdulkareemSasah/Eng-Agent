@@ -3,8 +3,8 @@
 Purpose: one SHA-256 over everything that decides a verdict: the sources of the static import closure (the check's
 pack, `structural_codes`, `eng_contract`), the metadata, the input schema and the preconditions. An approval is bound
 to this hash, so changing any of them withdraws the approval. Units: none.
-Errors: `CheckDefinitionError` for a dynamic import in a module of the check's pack (AC22), an unresolvable or unreadable import, or a
-malformed `base`; `CanonicalJsonError` if a document value is not canonical JSON.
+Errors: `CheckDefinitionError` for a dynamic import in a module of the check's pack (AC22), an unresolvable or
+unreadable import, or a malformed `base`; `CanonicalJsonError` if a document value is not canonical JSON.
 """
 
 import hashlib
