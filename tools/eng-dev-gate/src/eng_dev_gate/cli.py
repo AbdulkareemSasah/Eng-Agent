@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 
 from eng_dev_gate import __version__, agents
+from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 
@@ -37,6 +38,12 @@ def _parser() -> argparse.ArgumentParser:
         elif name == "gate-check":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+        elif name == "check":
+            child.add_argument("--package", default=None, help="check this workspace member")
+            child.add_argument("--all", action="store_true", help="check every member")
+            child.add_argument("--only", action="append", default=[], help="run only these steps (comma list)")
+            child.add_argument("--skip", action="append", default=[], help="skip these steps (comma list)")
+            child.add_argument("--fail-fast", action="store_true", help="stop after the first failing step")
     return parser
 
 
@@ -78,4 +85,4 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(main(sys.argv[1:], {"check": make_handler()}))

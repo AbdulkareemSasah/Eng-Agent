@@ -1,0 +1,1307 @@
+{
+ "comment": "Expected exact factors to the coherent SI unit (m, kg, s, rad; kelvin), derived independently by decimal definitions: in = 0.0254 m, ft = 0.3048 m, lb = 0.45359237 kg, g_n = 9.80665 m/s2, lbf = lb x g_n, kip = 1000 lbf, kgf = g_n kg, tonf = 1000 kg x g_n, t = 1000 kg, deg = pi/180 rad, degC: T/K = t + 273.15, degF: t/degC = (t/degF - 32)/1.8. Sources: units.md.",
+ "units": [
+  {
+   "symbol": "mm",
+   "dimension": [
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "length mm"
+  },
+  {
+   "symbol": "mm2",
+   "dimension": [
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(mm)^2"
+  },
+  {
+   "symbol": "mm3",
+   "dimension": [
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(mm)^3"
+  },
+  {
+   "symbol": "mm4",
+   "dimension": [
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(mm)^4"
+  },
+  {
+   "symbol": "cm",
+   "dimension": [
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/100",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "length cm"
+  },
+  {
+   "symbol": "cm2",
+   "dimension": [
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/10000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(cm)^2"
+  },
+  {
+   "symbol": "cm3",
+   "dimension": [
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(cm)^3"
+  },
+  {
+   "symbol": "cm4",
+   "dimension": [
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/100000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(cm)^4"
+  },
+  {
+   "symbol": "m",
+   "dimension": [
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "length m"
+  },
+  {
+   "symbol": "m2",
+   "dimension": [
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(m)^2"
+  },
+  {
+   "symbol": "m3",
+   "dimension": [
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(m)^3"
+  },
+  {
+   "symbol": "m4",
+   "dimension": [
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(m)^4"
+  },
+  {
+   "symbol": "in",
+   "dimension": [
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "127/5000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "length in"
+  },
+  {
+   "symbol": "in2",
+   "dimension": [
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "16129/25000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(in)^2"
+  },
+  {
+   "symbol": "in3",
+   "dimension": [
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "2048383/125000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(in)^3"
+  },
+  {
+   "symbol": "in4",
+   "dimension": [
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "260144641/625000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(in)^4"
+  },
+  {
+   "symbol": "ft",
+   "dimension": [
+    1,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "381/1250",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "length ft"
+  },
+  {
+   "symbol": "ft2",
+   "dimension": [
+    2,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "145161/1562500",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(ft)^2"
+  },
+  {
+   "symbol": "ft3",
+   "dimension": [
+    3,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "55306341/1953125000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(ft)^3"
+  },
+  {
+   "symbol": "ft4",
+   "dimension": [
+    4,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "21071715921/2441406250000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "(ft)^4"
+  },
+  {
+   "symbol": "N",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force N in N"
+  },
+  {
+   "symbol": "kN",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force kN in N"
+  },
+  {
+   "symbol": "MN",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force MN in N"
+  },
+  {
+   "symbol": "kgf",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force kgf in N"
+  },
+  {
+   "symbol": "tonf",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force tonf in N"
+  },
+  {
+   "symbol": "lbf",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force lbf in N"
+  },
+  {
+   "symbol": "kip",
+   "dimension": [
+    1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "force kip in N"
+  },
+  {
+   "symbol": "kN.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN x m"
+  },
+  {
+   "symbol": "kN.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN x mm"
+  },
+  {
+   "symbol": "kN.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "127/5",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN x in"
+  },
+  {
+   "symbol": "kN.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1524/5",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN x ft"
+  },
+  {
+   "symbol": "kgf.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf x m"
+  },
+  {
+   "symbol": "kgf.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf x mm"
+  },
+  {
+   "symbol": "kgf.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "24908891/100000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf x in"
+  },
+  {
+   "symbol": "kgf.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "74726673/25000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf x ft"
+  },
+  {
+   "symbol": "tonf.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf x m"
+  },
+  {
+   "symbol": "tonf.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf x mm"
+  },
+  {
+   "symbol": "tonf.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "24908891/100000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf x in"
+  },
+  {
+   "symbol": "tonf.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "74726673/25000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf x ft"
+  },
+  {
+   "symbol": "lbf.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf x m"
+  },
+  {
+   "symbol": "lbf.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf x mm"
+  },
+  {
+   "symbol": "lbf.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1129848290276167/10000000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf x in"
+  },
+  {
+   "symbol": "lbf.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "3389544870828501/2500000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf x ft"
+  },
+  {
+   "symbol": "kip.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip x m"
+  },
+  {
+   "symbol": "kip.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/2000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip x mm"
+  },
+  {
+   "symbol": "kip.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1129848290276167/10000000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip x in"
+  },
+  {
+   "symbol": "kip.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "3389544870828501/2500000000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip x ft"
+  },
+  {
+   "symbol": "N.m",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N x m"
+  },
+  {
+   "symbol": "N.mm",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N x mm"
+  },
+  {
+   "symbol": "N.in",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "127/5000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N x in"
+  },
+  {
+   "symbol": "N.ft",
+   "dimension": [
+    2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "381/1250",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N x ft"
+  },
+  {
+   "symbol": "kN/m",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN / m"
+  },
+  {
+   "symbol": "N/mm",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N / mm"
+  },
+  {
+   "symbol": "kgf/m",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf / m"
+  },
+  {
+   "symbol": "tonf/m",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf / m"
+  },
+  {
+   "symbol": "lbf/ft",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/609600000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf / ft"
+  },
+  {
+   "symbol": "kip/ft",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/609600000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / ft"
+  },
+  {
+   "symbol": "kip/in",
+   "dimension": [
+    0,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/50800000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / in"
+  },
+  {
+   "symbol": "kN/m3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN / m^3"
+  },
+  {
+   "symbol": "N/mm3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000000000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N / mm^3"
+  },
+  {
+   "symbol": "kgf/m3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf / m^3"
+  },
+  {
+   "symbol": "tonf/m3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/20",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "tonf / m^3"
+  },
+  {
+   "symbol": "kip/ft3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1112055403815125/7079211648",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / ft^3"
+  },
+  {
+   "symbol": "kip/in3",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1112055403815125/4096766",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / in^3"
+  },
+  {
+   "symbol": "N/mm2",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "N / mm^2"
+  },
+  {
+   "symbol": "kN/m2",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kN / m^2"
+  },
+  {
+   "symbol": "kgf/cm2",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "196133/2",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kgf / cm^2"
+  },
+  {
+   "symbol": "lbf/in2",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/1290320000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf / in^2"
+  },
+  {
+   "symbol": "Pa",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "Pa in Pa"
+  },
+  {
+   "symbol": "kPa",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kPa in Pa"
+  },
+  {
+   "symbol": "MPa",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "MPa in Pa"
+  },
+  {
+   "symbol": "GPa",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1000000000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "GPa in Pa"
+  },
+  {
+   "symbol": "psi",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/1290320000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf / in^2"
+  },
+  {
+   "symbol": "ksi",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/1290320",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / in^2"
+  },
+  {
+   "symbol": "psf",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/185806080000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf / ft^2"
+  },
+  {
+   "symbol": "ksf",
+   "dimension": [
+    -1,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/185806080",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kip / ft^2"
+  },
+  {
+   "symbol": "pcf",
+   "dimension": [
+    -2,
+    1,
+    -2,
+    0,
+    0
+   ],
+   "factor": "8896443230521/56633693184",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "lbf / ft^3"
+  },
+  {
+   "symbol": "kg",
+   "dimension": [
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kg"
+  },
+  {
+   "symbol": "t",
+   "dimension": [
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "factor": "1000/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "1 t = 1000 kg"
+  },
+  {
+   "symbol": "lb",
+   "dimension": [
+    0,
+    1,
+    0,
+    0,
+    0
+   ],
+   "factor": "45359237/100000000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "1 lb = 0.45359237 kg"
+  },
+  {
+   "symbol": "s",
+   "dimension": [
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "s"
+  },
+  {
+   "symbol": "min",
+   "dimension": [
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "factor": "60/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "60 s"
+  },
+  {
+   "symbol": "h",
+   "dimension": [
+    0,
+    0,
+    1,
+    0,
+    0
+   ],
+   "factor": "3600/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "3600 s"
+  },
+  {
+   "symbol": "rad",
+   "dimension": [
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "rad"
+  },
+  {
+   "symbol": "deg",
+   "dimension": [
+    0,
+    0,
+    0,
+    0,
+    1
+   ],
+   "factor": "1/180",
+   "pi_power": 1,
+   "offset": "0/1",
+   "derivation": "pi/180 rad"
+  },
+  {
+   "symbol": "K",
+   "dimension": [
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "kelvin"
+  },
+  {
+   "symbol": "degC",
+   "dimension": [
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "5463/20",
+   "derivation": "T/K = t/degC + 273.15"
+  },
+  {
+   "symbol": "degF",
+   "dimension": [
+    0,
+    0,
+    0,
+    1,
+    0
+   ],
+   "factor": "5/9",
+   "pi_power": 0,
+   "offset": "45967/180",
+   "derivation": "t/degC = (t/degF - 32)/1.8, T/K = t/degC + 273.15"
+  },
+  {
+   "symbol": "m/s2",
+   "dimension": [
+    1,
+    0,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "m/s^2"
+  },
+  {
+   "symbol": "mm/s2",
+   "dimension": [
+    1,
+    0,
+    -2,
+    0,
+    0
+   ],
+   "factor": "1/1000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "mm/s^2"
+  },
+  {
+   "symbol": "ft/s2",
+   "dimension": [
+    1,
+    0,
+    -2,
+    0,
+    0
+   ],
+   "factor": "381/1250",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "ft/s^2"
+  },
+  {
+   "symbol": "in/s2",
+   "dimension": [
+    1,
+    0,
+    -2,
+    0,
+    0
+   ],
+   "factor": "127/5000",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "in/s^2"
+  },
+  {
+   "symbol": "1",
+   "dimension": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "factor": "1/1",
+   "pi_power": 0,
+   "offset": "0/1",
+   "derivation": "dimensionless"
+  }
+ ]
+}
