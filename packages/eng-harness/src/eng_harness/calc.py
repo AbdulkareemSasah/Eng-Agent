@@ -194,10 +194,6 @@ def calc(
     return wrap
 
 
-def _unhashed(definition: CalcDef) -> str:
-    raise NotImplementedError("the content hash arrives with plan 0003 T2 (spec 0003 4.5)")
-
-
 def _check(definition: CalcDef, kinds: KindRegistry) -> None:
     """Raise `CalcRegistryError` for the first broken registration rule (AC1)."""
     d = definition
@@ -223,7 +219,8 @@ class CalcRegistry(Mapping[str, CalcDef]):
     """Immutable id to `CalcDef` mapping with the content hash of each; there is no global registration.
 
     Raises:
-        CalcRegistryError: a calc breaks a registration rule or its id is already registered.
+        CalcRegistryError: a calc breaks a registration rule, its id is already registered or was removed (the lock
+            file keeps removed ids), or it cannot be hashed (spec 0003 AC7).
     """
 
     def __init__(
@@ -231,15 +228,25 @@ class CalcRegistry(Mapping[str, CalcDef]):
         kinds: KindRegistry,
         calcs: Iterable[CalcDef] = (),
         *,
-        hasher: Callable[[CalcDef], str] = _unhashed,
+        hasher: Callable[[CalcDef], str] | None = None,
+        removed_ids: Iterable[str] = (),
     ) -> None:
-        """Check and hold `calcs`; `hasher` gives the content hash (the real one arrives with T2)."""
+        """Check and hold `calcs`; `hasher` gives the content hash (default: the hash over the import closure)."""
+        if hasher is None:
+            from eng_harness._calc._hash import content_hash  # B-141: _hash imports this module
+
+            def hasher(definition: CalcDef) -> str:
+                return content_hash(definition, kinds)
+
+        removed = frozenset(removed_ids)
         entries: dict[str, CalcDef] = {}
         hashes: dict[str, str] = {}
         for definition in calcs:
             _check(definition, kinds)
             if definition.id in entries:
                 raise CalcRegistryError("duplicate", definition.id, "the id is already registered")
+            if definition.id in removed:
+                raise CalcRegistryError("removed", definition.id, "the id was removed and cannot be registered again")
             entries[definition.id] = definition
             hashes[definition.id] = hasher(definition)
         self._calcs = MappingProxyType(entries)

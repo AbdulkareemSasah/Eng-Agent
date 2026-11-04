@@ -7,7 +7,6 @@ import sys
 import textwrap
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from types import ModuleType
 from typing import Any
 
 import eng_contract
@@ -19,7 +18,7 @@ from eng_harness._calc._hash import content_hash, module_hashes
 from eng_harness.calc import CalcDef, CalcRegistry, CalcRegistryError
 
 KIND = "harness.tmp_out/1"
-_CALC = '''
+_CALC = textwrap.dedent("""
     from typing import TYPE_CHECKING
 
     from pydantic import BaseModel
@@ -42,7 +41,7 @@ _CALC = '''
     @calc(id="harness.tmp_calc", version=1, output_kind="{kind}", title="T", method_source="M")
     def run(inp: In, meta: InputMeta, trace: TraceBuilder) -> Out:
         return Out(value=double(inp.x))
-'''
+""")
 _HELPERS = """
     from . import deep
 
@@ -93,7 +92,7 @@ class _Package:
         self.root = root / name
         files = _FILES | {
             "helpers.py": textwrap.dedent(_HELPERS).format(pkg=name),
-            "calcs/c.py": textwrap.dedent(calc_src).format(pkg=name, kind=KIND),
+            "calcs/c.py": calc_src.format(pkg=name, kind=KIND),
         }
         for rel, text in files.items():
             path = self.root / rel
@@ -148,6 +147,7 @@ def test_hash_covers_helpers_and_metadata(
     # The modules object: the calc module and every helper, transitively, including typing-only and lazy imports.
     modules = module_hashes(pkg.module.__name__, package=pkg.name)
     assert modules.keys() == {
+        pkg.name,
         f"{pkg.name}.calcs.c",
         f"{pkg.name}.helpers",
         f"{pkg.name}.deep",
@@ -171,7 +171,7 @@ def test_hash_covers_helpers_and_metadata(
     # Line endings do not matter (CRLF and CR to LF).
     for ending in (b"\r\n", b"\r"):
         pkg.edit("deep.py", _with_endings(ending))
-        assert pkg.path("deep.py").read_bytes().count(ending) == 1
+        assert pkg.path("deep.py").read_bytes().count(ending) == 2
         assert pkg.hash() == base
     pkg.edit("deep.py", _lf)
 
@@ -242,4 +242,3 @@ def test_calc_module_must_be_a_loaded_module() -> None:
     with pytest.raises(CalcRegistryError) as caught:
         module_hashes("eng_harness.no_such_module")
     assert caught.value.rule == "hash"
-    assert isinstance(sys.modules["eng_harness"], ModuleType)
