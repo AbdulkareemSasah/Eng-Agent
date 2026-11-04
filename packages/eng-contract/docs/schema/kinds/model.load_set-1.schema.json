@@ -1,0 +1,274 @@
+{
+  "$defs": {
+    "AreaLoad": {
+      "additionalProperties": false,
+      "description": "A uniform load over an area.",
+      "properties": {
+        "area": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Area",
+          "type": "string"
+        },
+        "direction": {
+          "$ref": "#/$defs/LoadDirection"
+        },
+        "pattern": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Pattern",
+          "type": "string"
+        },
+        "q_kPa": {
+          "title": "Q Kpa",
+          "type": "number",
+          "x-eng-unit": "kPa"
+        }
+      },
+      "required": [
+        "area",
+        "pattern",
+        "direction",
+        "q_kPa"
+      ],
+      "title": "AreaLoad",
+      "type": "object"
+    },
+    "CaseRef": {
+      "additionalProperties": false,
+      "description": "A load pattern, case or combination; `step` is the envelope `Max`/`Min` or step number as the host reports it.",
+      "properties": {
+        "case": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Case",
+          "type": "string"
+        },
+        "case_type": {
+          "$ref": "#/$defs/CaseType"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        }
+      },
+      "required": [
+        "case",
+        "case_type"
+      ],
+      "title": "CaseRef",
+      "type": "object"
+    },
+    "CaseType": {
+      "description": "What a `CaseRef` names.",
+      "enum": [
+        "load_pattern",
+        "load_case",
+        "load_combination"
+      ],
+      "title": "CaseType",
+      "type": "string"
+    },
+    "Combination": {
+      "additionalProperties": false,
+      "description": "A load combination of at least one item; it may not reference itself.",
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/CombinationItem"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/CombinationType"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "items"
+      ],
+      "title": "Combination",
+      "type": "object"
+    },
+    "CombinationItem": {
+      "additionalProperties": false,
+      "description": "One case of a combination with its scale factor.",
+      "properties": {
+        "case": {
+          "$ref": "#/$defs/CaseRef"
+        },
+        "scale_ratio": {
+          "title": "Scale Ratio",
+          "type": "number",
+          "x-eng-unit": "1"
+        }
+      },
+      "required": [
+        "case",
+        "scale_ratio"
+      ],
+      "title": "CombinationItem",
+      "type": "object"
+    },
+    "CombinationType": {
+      "description": "How a combination adds its items.",
+      "enum": [
+        "linear_add",
+        "envelope",
+        "absolute_add",
+        "srss",
+        "range"
+      ],
+      "title": "CombinationType",
+      "type": "string"
+    },
+    "FrameLoad": {
+      "additionalProperties": false,
+      "description": "A uniform load over the full length of a frame.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/LoadDirection"
+        },
+        "frame": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Frame",
+          "type": "string"
+        },
+        "pattern": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Pattern",
+          "type": "string"
+        },
+        "w_kN_m": {
+          "title": "W Kn M",
+          "type": "number",
+          "x-eng-unit": "kN/m"
+        }
+      },
+      "required": [
+        "frame",
+        "pattern",
+        "direction",
+        "w_kN_m"
+      ],
+      "title": "FrameLoad",
+      "type": "object"
+    },
+    "LoadDirection": {
+      "description": "Direction of a uniform load.",
+      "enum": [
+        "gravity",
+        "global_x",
+        "global_y",
+        "global_z",
+        "local_1",
+        "local_2",
+        "local_3"
+      ],
+      "title": "LoadDirection",
+      "type": "string"
+    },
+    "LoadPattern": {
+      "additionalProperties": false,
+      "description": "A load pattern with its self-weight multiplier.",
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "self_weight_ratio": {
+          "minimum": 0,
+          "title": "Self Weight Ratio",
+          "type": "number",
+          "x-eng-unit": "1"
+        },
+        "type": {
+          "$ref": "#/$defs/PatternType"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "self_weight_ratio"
+      ],
+      "title": "LoadPattern",
+      "type": "object"
+    },
+    "PatternType": {
+      "description": "Type of a load pattern.",
+      "enum": [
+        "dead",
+        "superimposed_dead",
+        "live",
+        "roof_live",
+        "wind",
+        "seismic",
+        "snow",
+        "other"
+      ],
+      "title": "PatternType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.load_set/1`: every referenced pattern must exist in `patterns`.",
+  "properties": {
+    "area_loads": {
+      "items": {
+        "$ref": "#/$defs/AreaLoad"
+      },
+      "title": "Area Loads",
+      "type": "array"
+    },
+    "combinations": {
+      "items": {
+        "$ref": "#/$defs/Combination"
+      },
+      "title": "Combinations",
+      "type": "array"
+    },
+    "frame_loads": {
+      "items": {
+        "$ref": "#/$defs/FrameLoad"
+      },
+      "title": "Frame Loads",
+      "type": "array"
+    },
+    "patterns": {
+      "items": {
+        "$ref": "#/$defs/LoadPattern"
+      },
+      "title": "Patterns",
+      "type": "array"
+    }
+  },
+  "required": [
+    "patterns",
+    "combinations",
+    "frame_loads",
+    "area_loads"
+  ],
+  "title": "LoadSet",
+  "type": "object"
+}

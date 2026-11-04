@@ -1,0 +1,353 @@
+{
+  "$defs": {
+    "Cited": {
+      "additionalProperties": false,
+      "description": "Value, unit, source (document, edition, clause, table or page) and an optional note.",
+      "properties": {
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "source": {
+          "maxLength": 500,
+          "minLength": 8,
+          "pattern": "\\S",
+          "title": "Source",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "source"
+      ],
+      "title": "Cited",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Subject": {
+      "additionalProperties": false,
+      "description": "The object a verdict or issue is about; `station_mm` is the position along it, `case` the governing case.",
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "station_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Mm"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "SubjectKind": {
+      "description": "Kind of the checked object; new values are additive.",
+      "enum": [
+        "joint",
+        "frame",
+        "area",
+        "link",
+        "story",
+        "grid_line",
+        "section",
+        "material",
+        "load_pattern",
+        "load_combination",
+        "footing",
+        "model"
+      ],
+      "title": "SubjectKind",
+      "type": "string"
+    },
+    "TraceConstant": {
+      "additionalProperties": false,
+      "description": "A named, cited constant.",
+      "properties": {
+        "cited": {
+          "$ref": "#/$defs/Cited"
+        },
+        "name": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "cited"
+      ],
+      "title": "TraceConstant",
+      "type": "object"
+    },
+    "TraceInput": {
+      "additionalProperties": false,
+      "description": "An input value, with `ref` naming where it came from.",
+      "properties": {
+        "name": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#[\\s\\S]*)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "TraceInput",
+      "type": "object"
+    },
+    "TraceStep": {
+      "additionalProperties": false,
+      "description": "One calculation step; `uses` names earlier inputs, constants or steps.",
+      "properties": {
+        "formula": {
+          "maxLength": 1000,
+          "title": "Formula",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 500,
+          "title": "Source",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unit"
+        },
+        "uses": {
+          "items": {
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Uses",
+          "type": "array"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "formula",
+        "source",
+        "uses"
+      ],
+      "title": "TraceStep",
+      "type": "object"
+    },
+    "VerdictStatus": {
+      "description": "Outcome of a check; each member's value is its own name.",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NOT_APPLICABLE",
+        "NEEDS_ENGINEER",
+        "ERROR"
+      ],
+      "title": "VerdictStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A calculation trace; names are unique over inputs, constants and steps.",
+  "properties": {
+    "calc_id": {
+      "maxLength": 200,
+      "title": "Calc Id",
+      "type": "string"
+    },
+    "calc_version": {
+      "maxLength": 64,
+      "title": "Calc Version",
+      "type": "string"
+    },
+    "constants": {
+      "items": {
+        "$ref": "#/$defs/TraceConstant"
+      },
+      "title": "Constants",
+      "type": "array"
+    },
+    "content_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Content Sha256",
+      "type": "string"
+    },
+    "inputs": {
+      "items": {
+        "$ref": "#/$defs/TraceInput"
+      },
+      "title": "Inputs",
+      "type": "array"
+    },
+    "messages": {
+      "items": {
+        "maxLength": 2000,
+        "type": "string"
+      },
+      "title": "Messages",
+      "type": "array"
+    },
+    "outputs": {
+      "items": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        "type": "string"
+      },
+      "title": "Outputs",
+      "type": "array"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/VerdictStatus"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/TraceStep"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "subject": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Subject"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "calc_id",
+    "calc_version",
+    "content_sha256",
+    "inputs",
+    "constants",
+    "steps",
+    "outputs"
+  ],
+  "title": "Trace",
+  "type": "object"
+}

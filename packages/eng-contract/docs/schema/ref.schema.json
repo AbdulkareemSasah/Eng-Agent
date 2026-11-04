@@ -1,0 +1,17 @@
+{
+  "additionalProperties": false,
+  "description": "Input given as a reference: exactly the key `\"$ref\"` with a `RefString`.",
+  "properties": {
+    "$ref": {
+      "maxLength": 2000,
+      "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#[\\s\\S]*)?$",
+      "title": "$Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "$ref"
+  ],
+  "title": "Ref",
+  "type": "object"
+}
