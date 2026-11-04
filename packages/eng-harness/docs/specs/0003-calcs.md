@@ -259,9 +259,14 @@ already declares it in `calc_modules`, so gate FB005 applies.
 ### 4.2 Calcs and the registry
 
 ```python
-@calc(id="harness.model_diff", version=1, output_kind="harness.model_diff/1",
-      title="Difference report between two model states",
-      method_source="eng-harness spec 0003 §4.7 (D1 to D7); 18 §4 step 4", verification="draft")
+@calc(
+    id="harness.model_diff",
+    version=1,
+    output_kind="harness.model_diff/1",
+    title="Difference report between two model states",
+    method_source="eng-harness spec 0003 §4.7 (D1 to D7); 18 §4 step 4",
+    verification="draft",
+)
 def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDiff: ...
 ```
 
