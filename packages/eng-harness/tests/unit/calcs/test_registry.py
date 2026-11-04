@@ -4,9 +4,12 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 from eng_contract.kinds import NEUTRAL_KINDS, KindRegistry
+from pydantic import BaseModel
+
 from eng_harness.calc import (
     CalcDef,
     CalcInput,
@@ -17,7 +20,6 @@ from eng_harness.calc import (
     TraceBuilder,
     calc,
 )
-from pydantic import BaseModel
 
 HASH = "ab" * 32
 _PATH = Path(__file__).resolve().parents[2] / "data" / "calcs" / "fixture_calcs.py"
@@ -48,9 +50,9 @@ def _hasher(definition: CalcDef) -> str:
     return HASH
 
 
-def _build(fixtures: ModuleType, **override: object) -> CalcDef:
+def _build(fixtures: ModuleType, **override: Any) -> CalcDef:
     """A calc like the fixture one, with `override` replacing decorator arguments."""
-    args: dict[str, object] = {
+    args: dict[str, Any] = {
         "id": "harness.fixture_sum",
         "version": 1,
         "output_kind": fixtures.OUTPUT_KIND,
@@ -58,18 +60,21 @@ def _build(fixtures: ModuleType, **override: object) -> CalcDef:
         "method_source": "Test double",
     } | override
 
-    def fn(inp: fixtures.FixtureIn, meta: InputMeta, trace: TraceBuilder) -> fixtures.FixtureOut:
-        return fixtures.FixtureOut(total=0.0)
+    def fn(inp: Any, meta: InputMeta, trace: TraceBuilder) -> BaseModel:
+        result: BaseModel = fixtures.FixtureOut(total=0.0)
+        return result
 
-    return calc(**args)(fn)  # type: ignore[arg-type]  # B-140: the test passes deliberately wrong argument values
+    fn.__annotations__["inp"] = fixtures.FixtureIn
+
+    return calc(**args)(fn)
 
 
 def test_registration_rules(fixtures: ModuleType, kinds: KindRegistry) -> None:
     class NotACalcInput(BaseModel):
         pass
 
-    def wrong_input(inp: NotACalcInput, meta: InputMeta, trace: TraceBuilder) -> fixtures.FixtureOut:
-        return fixtures.FixtureOut(total=0.0)
+    def wrong_input(inp: NotACalcInput, meta: InputMeta, trace: TraceBuilder) -> BaseModel:
+        return NotACalcInput()
 
     decorate = calc(id="harness.fixture_sum", version=1, output_kind=fixtures.OUTPUT_KIND, title="t", method_source="m")
     cases: list[tuple[str, CalcDef]] = [
@@ -102,7 +107,8 @@ def test_registry_lookup_and_hash(fixtures: ModuleType, kinds: KindRegistry) -> 
     assert entry.input_type is fixtures.FixtureIn
     assert entry.verification == CalcStatus.DRAFT
     assert registry.content_hash("harness.fixture_sum") == HASH
-    assert issubclass(fixtures.FixtureIn, CalcInput)
+    assert isinstance(entry.input_type, type)
+    assert issubclass(entry.input_type, CalcInput)
     with pytest.raises(KeyError):
         registry["harness.absent"]
 

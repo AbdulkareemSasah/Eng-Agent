@@ -8,9 +8,9 @@ from types import ModuleType
 import pytest
 from eng_contract.cited import Cited
 from eng_contract.kinds import NEUTRAL_KINDS
-from eng_harness.calc import CalcRegistry, InputMeta, NotImplementedGap, RefMeta, TraceBuilder, TraceError
 
 from eng_harness import errors
+from eng_harness.calc import CalcRegistry, InputMeta, NotImplementedGap, RefMeta, TraceBuilder, TraceError
 
 HASH = "cd" * 32
 _PATH = Path(__file__).resolve().parents[2] / "data" / "calcs" / "fixture_calcs.py"
@@ -48,7 +48,7 @@ def test_trace_records_inputs_and_rules(fixtures: ModuleType) -> None:
     trace = TraceBuilder()
     out = definition(fixtures.FixtureIn(span_mm=500.0, offset=2.5), _meta(fixtures), trace)
     built = trace.build(definition, registry.content_hash(definition.id))
-    assert out.total == pytest.approx(502.5, abs=1e-9)
+    assert out.model_dump()["total"] == pytest.approx(502.5, abs=1e-9)
     assert (built.calc_id, built.calc_version, built.content_sha256) == ("harness.fixture_sum", "3", HASH)
     by_name = {i.name: i for i in built.inputs}
     assert by_name["span_mm"].ref == f"{fixtures.SYNTHETIC_ID}#/value"

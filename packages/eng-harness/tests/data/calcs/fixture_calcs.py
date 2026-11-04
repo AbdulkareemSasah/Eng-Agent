@@ -1,8 +1,9 @@
 """Test-double calcs for the framework tests (plan 0003 T1). Never registered in `REGISTRY`; no engineering content."""
 
 from eng_contract.params import eng_param
-from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from pydantic import BaseModel, ConfigDict
+
+from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 
 OUTPUT_KIND = "harness.fixture_out/1"
 SYNTHETIC_ID = "res_00000000000000000000000000"

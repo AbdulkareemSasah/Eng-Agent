@@ -48,7 +48,7 @@ markers = [
 profile = "harness"
 layer = 4
 import_names = ["eng_harness"]
-public_modules = ["eng_harness", "eng_harness.errors", "eng_harness.servers", "eng_harness.pages"]          # each later task adds the public modules it creates
+public_modules = ["eng_harness", "eng_harness.errors", "eng_harness.servers", "eng_harness.pages", "eng_harness.calc", "eng_harness.calcs"]          # each later task adds the public modules it creates
 coverage_line = 85                        # process/05 section 2
 coverage_branch = 75
 r1_modules = [
@@ -56,6 +56,7 @@ r1_modules = [
   "src/eng_harness/engine/_invariants.py", "src/eng_harness/engine/_hostsafety.py",
   "src/eng_harness/engine/_approvals.py", "src/eng_harness/engine/_modes.py",
   "src/eng_harness/engine/_promote.py", "src/eng_harness/engine/_replay.py",
+  "src/eng_harness/calcs/**",
 ]
 r2_modules = ["src/eng_harness/journal/**", "src/eng_harness/ctx.py", "src/eng_harness/block.py",
               "src/eng_harness/ports.py", "src/eng_harness/errors.py"]
