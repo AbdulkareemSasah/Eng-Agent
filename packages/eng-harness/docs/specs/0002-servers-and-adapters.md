@@ -231,6 +231,23 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   table and the JSON after the checks of §4.9, a `fail` among them gives exit 1, and a provider that raises gives one
   `fail` check naming it; and given unreleased tools (AC38), then a `warn` check lists them with their records. Test:
   `tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools`.
+- AC40. **[added: B-085]** Given a server section without `audit_log`, when its roles start, then `audit_log` is true
+  and each role's argv is the one of §4.3.2 with `--audit-log` (the CSI argv is unchanged); given `audit_log = false`,
+  then no `--audit-log` argument is built and reconciliation reads no audit log; a value that is not a boolean is a
+  `ConfigError`. Tests: `tests/unit/servers/test_config.py::test_audit_log_flag`,
+  `tests/unit/servers/test_launch_args.py::test_audit_log_default_and_off`.
+- AC41. **[added: B-085]** Given an allowlist whose header declares `routes`, when it is loaded, then every entry
+  carries a non-empty `routes` list drawn from them (else a load error), and loading it for a server section's `route`
+  gives exactly the entries whose `routes` include that route, so a tool of another route is refused as in AC17; a
+  `route` the header does not declare, or a missing `route` for such an adapter, is a load error. Given an allowlist
+  without `routes` in its header (CSI), then an entry with `routes` or a server section with `route` is a load error.
+  The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. Tests:
+  `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter`,
+  `tests/unit/servers/test_config.py::test_route_key`.
+- AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
+  loaded, then each is exposed on the tool's descriptor; `unit_status` is `declared`, `missing` or `confirmed`, and an
+  unknown status, a `unit` with status `missing`, a status other than `missing` without a `unit`, or a `tool` that is
+  not an allowlisted entry is a load error. Test: `tests/unit/adapters/test_allowlist.py::test_unit_header_entries`.
 
 ## 4. Design
 
@@ -245,7 +262,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 | `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=()) -> int`, `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
 
 Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
-`servers/_procinfo.py`, `servers/_transport.py`, `servers/_session.py`, `servers/_buildcheck.py`,
+`servers/_procinfo.py`, `servers/_transport.py`, `servers/_launch_args.py` (the argv of §4.3.2, **[added: B-085]**),
+`servers/_session.py`, `servers/_buildcheck.py`,
 `servers/_hostlock.py`, `servers/_guard.py`, `servers/_record.py`; `adapters/_descriptors.py`, `adapters/_allowlist.py`,
 `adapters/_args.py`, `adapters/_envelope.py`, `adapters/_errors.py`, `adapters/_ledger.py`, `adapters/_toolport.py`,
 `adapters/_hostport.py`, `adapters/_identity.py`, `adapters/csi/` (`_allowlist.toml`, `_tools.py`, `_errors.py`,
@@ -270,6 +288,7 @@ shutdown_grace_s = 10                  # software setting
 build = { sasaah_commit = "<40 hex>", exe_sha256 = "<64 hex>", server_info_version = "<optional>" }
 host_key = "csi"
 mcp_mode = "legacy"                    # §11 Q3
+audit_log = true                       # [added: B-085] default; false for a server without --audit-log (spec 0014)
 
 [servers.csi.roles.main]               # one server process per role
 classes = ["session", "call"]
@@ -298,13 +317,20 @@ Rules:
 2. **Roles.** Each role is one server process with one server-wide `--call-timeout-sec` (the Sasaah server has no
    per-call timeout, S-12 §5). Every timeout class of the adapter's descriptors must be served by exactly one role. A
    configuration with only a `main` role serving all classes is allowed (`single` topology) and the doctor warns that
-   a hung read then waits as long as an analysis (§11 Q2).
+   a hung read then waits as long as an analysis (§11 Q2). **[added: B-085]** An adapter may require the `single`
+   topology when the server process itself holds the open project, so a second process cannot act on it (IDEA, spec
+   0014 §4.2 and its Q2): a second role is then a `ConfigError`, and the doctor's warning still applies.
 3. **Forbidden options and environment** (S-12 §8, `inventory/sasaah-csi-mcp.json` `server.start_options`):
    `--enable-script`, `--enable-generic-invoke`, `--allow-attached-writes`, `--read-only`, and the variables
    `SASAAH_CSI_ENABLE_SCRIPT` (any value) and `SASAAH_CSI_DISABLE_SCRIPT` other than true. `--disable-script` is
    required for the CSI adapter. `--call-timeout-sec`, `--audit-log` and `SASAAH_CSI_CALL_TIMEOUT_SEC` are set by the
-   adapter only. Phase 4 adds `--disable-script` as required for the IDEA server (OQ-G13).
+   adapter only (`--audit-log` only when `audit_log` is true, rule 5). Phase 4 adds `--disable-script` as required for
+   the IDEA server (OQ-G13); its other options are in spec 0014 §4.2.
 4. Paths are absolute; the loader never resolves against the working directory. The file holds no secrets.
+5. **[added: B-085]** `audit_log` (boolean, default true) says whether the server has Sasaah's `--audit-log` option;
+   false for a server without it (IDEA: an unknown argument would only be warned about and ignored, spec 0014 §4.2
+   rule 4). `route` (string) names one of the routes the adapter's allowlist header declares (§4.5.1); it is required
+   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI).
 
 ### 4.3 Server lifecycle
 
@@ -347,8 +373,9 @@ terminates through the same handle, so a reused pid is never hit.
 #### 4.3.2 Server roles and start
 
 `ServerManager` starts each role lazily before its first call, in the run folder, with
-`argv = [command, *args, "--call-timeout-sec", str(role.call_timeout_s), "--audit-log", run_dir/"servers"/f"{server}-{role}-audit.jsonl"]`
-and stderr to `run_dir/servers/<server>-<role>.stderr.log`. Integrity level (16 §6): the server inherits the
+`argv = [command, *args, "--call-timeout-sec", str(role.call_timeout_s), "--audit-log", run_dir/"servers"/f"{server}-{role}-audit.jsonl"]`,
+built by `servers/_launch_args.py`, without the two `--audit-log` items when the section's `audit_log` is false
+(§4.2 rule 5; an adapter adds its own required options there, spec 0014 §4.2), and stderr to `run_dir/servers/<server>-<role>.stderr.log`. Integrity level (16 §6): the server inherits the
 engine's; nothing elevates or lowers it.
 
 #### 4.3.3 Transport and MCP session
@@ -456,7 +483,8 @@ item 8). `ServerCheck.build` is `"<commit[:12]>+<exe sha256[:12]>"`, also used a
 
 An adapter's allowlist is a TOML file in the package (`adapters/csi/_allowlist.toml`), pinned with the server build:
 header `adapter`, `sasaah_commit`, `also_tested_commits`, `tool_fingerprint`, `fingerprint_source` (`s12-inventory`
-until a recording replaces it, then `recording`), and one `[[tool]]` entry per tool:
+until a recording replaces it, then `recording`), optionally `routes` and `[[unit]]` entries **[added: B-085]** (below),
+and one `[[tool]]` entry per tool:
 
 | Field | Values |
 |---|---|
@@ -472,6 +500,20 @@ until a recording replaces it, then `recording`), and one `[[tool]]` entry per t
 | `products` | products the entry applies to (`ETABS` in v1; SAFE and SAP2000 later) |
 | `release` | `released` (default) or `unreleased` (a project-lane tool not yet through the release lane, ADR-0026 §3) **[added: spec 0006 Q5]** |
 | `release_record` | repository path of the tool's gap report or session record; required when `release` is `unreleased`, refused otherwise |
+| `routes` | **[added: B-085]** the routes of the header's `routes` on which the tool is served; required and non-empty when the header declares `routes`, refused otherwise |
+
+**Routes [added: B-085].** A server whose tools work in more than one way on the host (IDEA: the hidden calculator on
+a file, `native`, or the REST service, `rest`, spec 0014 §1) declares the route names in the header `routes`; the
+server section's `route` selects one (§4.2 rule 5) and the allowlist is loaded for it: only the entries whose `routes`
+include it are served, so a tool of another route is refused as any tool outside the allowlist (AC17, AC41). The CSI
+and Revit allowlists declare no routes. The fingerprint and the "every allowlisted tool is listed" check of §4.3.4 cover
+all entries, whatever the route, because one build serves them all.
+
+**Unit header [added: B-085].** `[[unit]]` entries record what is known of a unit the server does not switch: `tool`,
+`field` (the argument or reply field), `unit` (a contract unit token, or absent), and `unit_status`: `declared` (from
+the tool's description or schema, not confirmed by a live run), `missing` (no unit is declared; the adapter's spec
+then serves no quantity of that field) or `confirmed` (a recorded local test confirms it). A change of status is a
+reviewed data change, not code. Spec 0014 §4.6 and AC16 are the first user (AC42).
 
 `ToolPort.unreleased_tools()` (engine §4.8) returns `{name: release_record}` for every allowlisted entry and every
 `[cli_tools.*]` entry (which takes the same two keys) marked `unreleased`; the engine records it in `run_started`
@@ -542,6 +584,11 @@ model are its units when the adapter first opened it, kept in the run state (§4
 
 The original code and message are kept in the stored failure evidence (never in a summary beyond 2000 characters).
 
+**Harness host codes [added: B-085].** Where a reply carries no Sasaah error code but must not be believed, the adapter
+raises `HOST_ERROR` itself, with `retryable: false`, `host_method` the tool, the reply stored only as failure evidence,
+and one of these `host_code` values: `OFFLINE_STUB` (the reply is a result the server invented, spec 0014 AC11) and
+`UNEXPECTED_REPLY` (the reply does not match the tool's reply model, spec 0014 AC12). The CSI table above is unchanged.
+
 #### 4.5.6 Timeouts
 
 - The server's `timeout` arrives within the role's `call_timeout_s`; the client backstop
@@ -576,7 +623,7 @@ with S-02, §12), so `proof_of_end` is `False` until one is accepted, and the an
 | `csi_run_analysis` | proof of end, and `csi_model_info.locked` changed from false (pre-image) to true; `csi_analysis_status` codes are stored as evidence, not decoded | proof of end, and `locked` still false | anything else (no proof of end, `locked` unreadable): `unknown` |
 | `csi_design_run` | — (the model is already locked; no readable state shows that a design ran) | — | always `unknown` |
 
-The evidence (reads, the Sasaah audit-log lines for the op, if any) is stored as a result and referenced from the
+The evidence (reads, the Sasaah audit-log lines for the op, if any; none when `audit_log` is false) is stored as a result and referenced from the
 `Reconciliation`. A re-run of an analysis or design after `unknown` is never decided by the adapter: it is the
 engineer's explicit retry decision, journaled by the engine (engine §4.5.3), and it is sent only after proof of end
 (§11 Q4). A read-back that is not available for the tool gives `unknown` (the engineer decides, engine §4.5.3).
@@ -590,7 +637,10 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
   read-back helpers, compares with the requested state, and returns `issues.model_check/1` with `READBACK_MISMATCH`
   or `READBACK_UNAVAILABLE` (error), plus the integrity checks that need no tolerance: frames or areas whose section is
   not defined (`SECTION_UNDEFINED`), combinations naming a missing pattern or combination (`COMBO_REFERENCE_MISSING`),
-  the model locked (`MODEL_LOCKED`, info). Quantities read back are compared within the design basis field
+  the model locked (`MODEL_LOCKED`, info). An adapter adds its own tolerance-free codes in its spec **[added: B-085]**:
+  for IDEA `LOADS_UNCONFIRMED_MAP` (info: the load map is unconfirmed, so no load is written) and
+  `LOAD_EFFECT_ZERO_DROPPED` (warning: the server dropped all-zero load effects before the write) (spec 0014 §4.10,
+  AC10). Quantities read back are compared within the design basis field
   `checks.readback_relative_tolerance` (required by every workflow that writes quantities; never a constant here,
   §11 G-2). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
 - **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
@@ -702,7 +752,7 @@ save. A fingerprint that changed with no adapter write since the last read incre
 |---|---|
 | SAFE, SAP2000 (phases 2, 3) | product modules and allowlist entries in the CSI adapter; the same error table, units, roles and reader structure |
 | `sasaah-revit-mcp` (phase 3, 07) | its error parser (one text `"<code> <message> <hint>"`, S-12 §6), the timeout text rule (never started → no effect, executing → unknown outcome), `catalog_version` recorded beside the harness fingerprint, no `units` tokens (mm and degrees in schemas), no save tool (gap OQ-G12) |
-| `sasaah-idea-mcp` (phase 4, 08) | `--disable-script` required (scripts are on by default), stub results of `idea_calculate` refused, the missing load unit of `idea_set_loads` (OQ-G13) |
+| `sasaah-idea-mcp` (phase 4, 08) | `--disable-script` required (scripts are on by default), stub results of `idea_calculate` refused, the missing load unit of `idea_set_loads` (OQ-G13); specified in spec 0014 on the additions A3 of §11 (`routes`, `audit_log = false`, the `single` topology, the unit header, its codes) |
 
 ### 4.7 Command-line tool adapter
 
@@ -826,6 +876,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | Model in a `Ton_*` unit system | `UNIT_MISMATCH` (`UnitGapError`) | `received` |
 | Edit kind or direction not implemented | `NotImplementedGap` (`NOT_IMPLEMENTED`) | gap id |
 | Sasaah error codes, timeouts, crashes | §4.5.5, §4.5.6 | as tabled |
+| Stub or unexpected reply (harness host codes, **[added: B-085]**) | `HOST_ERROR` (`OFFLINE_STUB`, `UNEXPECTED_REPLY`) | `host_method` |
 | Pinned command-line build artifact changed | `ToolFailed` (`BUILD_CHANGED`) | artifact base name |
 | Configuration invalid or forbidden | `ConfigError` (before any run) | key |
 
@@ -856,7 +907,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC39 | Unit | `tests/unit/` |
+| AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC42 | Unit | `tests/unit/` |
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35 | Contract (inventory, recordings; markers `synthetic`, `recorded`) | `tests/contract/` |
@@ -896,6 +947,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
+| A3 | **[added]** by B-085 for spec 0014 A1 (IDEA adapter): `routes` in the allowlist header and on entries, and the server section's `route`; `audit_log` on the server section (default true; false for IDEA, so no `--audit-log` argument); an adapter may require the `single` topology (one `main` role serving all classes); allowlist header `[[unit]]` entries with `unit_status`; the issue codes `LOADS_UNCONFIRMED_MAP` (info) and `LOAD_EFFECT_ZERO_DROPPED` (warning); the harness host codes `OFFLINE_STUB` and `UNEXPECTED_REPLY`; the harness kinds `harness.idea_status/1`, `harness.idea_project/1`, `harness.idea_loads/1`, `harness.idea_check_raw/1` (spec 0014 §4.5). AC40 to AC42 (plan T20); the IDEA uses of each are in spec 0014 and plan 0014 | Owner | Accept with spec 0014 |
 | C1 | Conflict: 11 §9 says analysis may be "started and then followed through `csi_analysis_status`"; S-12 §5 shows the call is synchronous | Owner | This spec follows S-12; amend 11 §9 and 18 step 11 (S-12 "Consequences") |
 | C2 | Conflict: 11 §9 and ADR-0008 name two excluded CSI tools; S-12 §8 finds seven, and `DisableScript` does not hide `csi_db_tables_apply` | Owner | This spec excludes all seven; amend 11 §9 and ADR-0008 |
 | C3 | The SDK's `stdio_client` on Windows assigns its job after the spawn and allows no breakaway | Owner | Not used (§2); recorded here so a later SDK upgrade is checked against it |
