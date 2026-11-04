@@ -42,10 +42,10 @@ def _errors(result: RunResult) -> set[str]:
     return {code for code, severity, _ in _findings(result) if severity == "error"}
 
 
-def _commit_and_check(repo: Repo, base: str, files: dict[str, str], body: str, **event: str) -> RunResult:
+def _commit_and_check(repo: Repo, base: str, files: dict[str, str], body: str, name: str = "event.json") -> RunResult:
     """Commit ``files`` on top of the branch and run ``gate-check`` on the event for the new head."""
     repo.commit(files, "docs: change")
-    return gate_check(repo, write_event(repo, base, body, **event))[0]
+    return gate_check(repo, write_event(repo, base, body, name=name))[0]
 
 
 @pytest.mark.parametrize(
