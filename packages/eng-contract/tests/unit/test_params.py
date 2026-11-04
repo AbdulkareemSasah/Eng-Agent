@@ -332,7 +332,7 @@ def test_unknown_unit_literal_names_the_field_and_the_expected_unit() -> None:
 
 
 def test_unknown_key_that_is_not_a_string_is_an_invalid_argument() -> None:
-    err = fails({**GOOD, 7: 1}).detail  # type: ignore[dict-item]
+    err = fails({**GOOD, 7: 1}).detail  # type: ignore[dict-item]  # B-018: a non-string key is the case under test
     assert (err.code, err.received) == (ErrorCode.INVALID_ARGUMENT, "7")
 
 
