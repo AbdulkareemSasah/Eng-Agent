@@ -1,8 +1,6 @@
 """``gate-check`` (spec 4.5): body parsing, plan and task, file scope and diff budget.
 
-Part 2 (base branch, lane, ``none`` reasons, spec and plan pull requests, protected paths) is in
-``gate_check_docs`` and ``codeowners``. The pull-request title and body are data: they are parsed, never executed or
-interpolated.
+Part 2 is in ``gate_check_docs`` and ``codeowners``. The pull-request title and body are data, never executed.
 """
 
 from __future__ import annotations
