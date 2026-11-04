@@ -22,6 +22,7 @@ TABLE = (
     "coverage_line = 95\ncoverage_branch = 90\n"
     'r1_modules = ["src/a/core.py"]\nr2_modules = ["src/a/rules/*.py"]\nmutation_min = {minimum}\n'
 )
+NO_MUTANT = "Failed: could not find any test case for any mutant"
 HEAD = '[project]\nname = "a"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
 
 
@@ -39,11 +40,13 @@ class FakeMutmut:
         self.calls.append(list(argv))
         if list(argv[:2]) == ["uv", "lock"]:
             return ToolResult(exit_code=self.lock_exit, output="lock is stale")
+        if "results" in argv:
+            lines = "".join(f"    a.core.x_f__mutmut_{i}: {s}\n" for i, s in enumerate(self.statuses))
+            return ToolResult(exit_code=0, output=lines)
         if "run" in argv:
             self.config = (cwd / "setup.cfg").read_text(encoding="utf-8")
             return ToolResult(exit_code=self.run_exit, output=self.run_output)
-        lines = "".join(f"    a.core.x_f__mutmut_{i}: {s}\n" for i, s in enumerate(self.statuses))
-        return ToolResult(exit_code=0, output=lines)
+        return ToolResult(exit_code=0, output="")
 
 
 def _mutmut_option(config: str, key: str) -> list[str]:
@@ -121,7 +124,7 @@ def test_package_without_r_modules_is_not_judged(repo: Repo) -> None:
         (["killed", "killed", "killed", "timeout", "survived"], 80, []),  # 4 of 5 = 80 %, timeouts count as killed
         (["killed", "killed", "killed", "timeout", "survived"], 81, ["MU001"]),
         (["killed", "survived", "no tests", "suspicious", "skipped"], 80, ["MU001"]),  # only killed and timeout count
-        ([], 100, []),  # nothing to mutate
+        (["killed"], 100, []),  # no mutant at all is MU003, see test_zero_mutants_is_nothing_to_mutate
     ],
 )
 def test_score_threshold(repo: Repo, statuses: list[str], minimum: int, expected: list[str]) -> None:
@@ -285,3 +288,40 @@ def test_an_unparsable_file_is_left_to_mutmut(repo: Repo) -> None:
     assert mutation.run_step(_context(repo, member, runner, base)) == []
     assert runner.config is not None
     assert _mutmut_option(runner.config, "only_mutate") == ["src/a/core.py"]
+
+
+@pytest.mark.parametrize(
+    ("run_exit", "run_output"),
+    [(1, NO_MUTANT), (0, "done"), (1, "no mutants")],
+    ids=["mutmut-stops", "clean-run", "stops-without-message"],
+)
+def test_zero_mutants_is_nothing_to_mutate(repo: Repo, run_exit: int, run_output: str) -> None:
+    """AC53a: no mutant at all (module-level lambda, decorated methods) passes with MU003, never MU002 for the stop."""
+    base, member = _setup(repo)
+    repo.commit({"pkgs/a/src/a/core.py": "X = lambda v: v\n"})
+    runner = FakeMutmut([], run_exit=run_exit, run_output=run_output)
+    if run_output == "no mutants":  # a crash with an empty listing is a backend fault, not an empty run
+        with pytest.raises(EnvironmentFaultError, match="MU002"):
+            mutation.run_step(_context(repo, member, runner, base))
+        return
+    findings = mutation.run_step(_context(repo, member, runner, base))
+    assert [(f.code, f.severity, f.path) for f in findings] == [("MU003", Severity.NOTICE, "pkgs/a")]
+
+
+def test_uncovered_mutants_count_as_survivors(repo: Repo) -> None:
+    """AC53a: mutants no test covers are survivors in the MU001 score, also when mutmut stops on them; not MU002."""
+    base, member = _setup(repo)
+    _change(repo)
+    stopped = FakeMutmut(["no tests"] * 3, run_exit=1, run_output=NO_MUTANT)
+    findings = mutation.run_step(_context(repo, member, stopped, base))
+    assert [(f.code, f.severity) for f in findings] == [("MU001", Severity.ERROR)]
+    assert "0/3" in findings[0].message
+    # real mutmut stops before it records any result: "not checked"
+    unchecked = FakeMutmut(["not checked"] * 3, run_exit=1, run_output=NO_MUTANT)
+    assert [f.code for f in mutation.run_step(_context(repo, member, unchecked, base))] == ["MU001"]
+    mixed = FakeMutmut(["killed", "killed", "killed", "killed", "no tests"], run_exit=1, run_output=NO_MUTANT)
+    assert mutation.run_step(_context(repo, member, mixed, base)) == []  # 4 of 5 = 80 %
+    mixed = FakeMutmut(["killed", "killed", "killed", "no tests", "no tests"])
+    assert [f.code for f in mutation.run_step(_context(repo, member, mixed, base))] == ["MU001"]
+    with pytest.raises(EnvironmentFaultError, match="MU002"):  # mutants exist and the run crashed: a backend fault
+        mutation.run_step(_context(repo, member, FakeMutmut(["no tests"], run_exit=1, run_output="boom"), base))
