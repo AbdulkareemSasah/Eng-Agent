@@ -393,3 +393,13 @@ def test_staleness_follows_the_stale_ok_flag() -> None:
     assert (err.code, err.field) == (ErrorCode.REF_STALE, "b_mm")
     ok = run({**GOOD, "dur_s": ref("/dur_s")}, source=source, revision=moved_on)  # a stale_ok parameter
     assert ok.model.dur_s == 30
+
+
+def test_values_that_are_not_json_and_unitless_bounds() -> None:
+    err = fails({**GOOD, "b_mm": object()}).detail
+    assert (err.code, err.field) == (ErrorCode.INVALID_ARGUMENT, "b_mm")
+
+    model = define("count", int, ge=1, le=10, bounds_source=WHY)
+    with pytest.raises(ContractError) as info:
+        validate_input(model, {"count": 11}, source=MemorySource(), current_revision=untracked, policy=InputPolicy())
+    assert info.value.detail.expected == {"min": 1, "max": 10}  # no unit key for a parameter without a unit
