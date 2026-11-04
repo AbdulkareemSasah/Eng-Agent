@@ -11,7 +11,7 @@ import json
 import sys
 from collections.abc import Callable, Mapping, Sequence
 
-from eng_dev_gate import __version__
+from eng_dev_gate import __version__, agents
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 
 Handler = Callable[[argparse.Namespace], Status]
@@ -30,7 +30,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--format", choices=("text", "json"), default="text")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in COMMANDS:
-        sub.add_parser(name, help=f"{name} command")
+        child = sub.add_parser(name, help=f"{name} command")
+        if name == "agents":
+            agents.add_arguments(child)
     return parser
 
 
@@ -60,7 +62,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = (handlers or {}).get(args.command)
+    handler = {"agents": agents.handle, **(handlers or {})}.get(args.command)
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")
