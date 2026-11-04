@@ -18,7 +18,7 @@ ACTIONS = "tools/eng-dev-gate/actions"
 NINE_JOBS = {
     "gate", "gate-check", "risk-floor", "test-first", "ci-review", "agents-drift", "security", "windows", "build",
 }  # fmt: skip
-PR_JOBS = ("gate", "agents-drift", "security", "build", "ci-review")  # the jobs so far; ci-review runs on pull requests only
+PR_JOBS = ("gate", "agents-drift", "security", "build", "ci-review")  # ci-review runs on pull requests only
 GATE_ROOT_RUN = 'uv run --project "$GATE_ROOT" --package eng-dev-gate eng-gate --root . --gate-root "$GATE_ROOT"'
 
 
