@@ -40,14 +40,17 @@ def _violations(path: Path) -> list[str]:
             found.append(f"{path.name}:{node.lineno} calls strftime")
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and _DIRECTIVE.search(node.value):
             found.append(f"{path.name}:{node.lineno} locale-dependent time directive")
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "format"
-            and len(node.args) == 2
-            and isinstance(node.args[1], ast.Constant)
-            and str(node.args[1].value).endswith("n")
-        ) or _n_spec(node):
+        elif isinstance(node, ast.expr) and (
+            (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "format"
+                and len(node.args) == 2
+                and isinstance(node.args[1], ast.Constant)
+                and str(node.args[1].value).endswith("n")
+            )
+            or _n_spec(node)
+        ):
             found.append(f"{path.name}:{node.lineno} uses the n format type")
     return found
 
