@@ -239,9 +239,14 @@ FB005). The directory `src/eng_harness/providers/` (phase 2 implementations) is 
 ### 4.2 Decision points
 
 ```python
-@decision_point(name="footing_fix_strategy", version=1, title="Footing fix strategy",
-                options=FootingAction, state=FootingFailureState)
-class FootingFixStrategy: ...                      # builds an immutable DecisionPoint; no global registration
+@decision_point(
+    name="footing_fix_strategy",
+    version=1,
+    title="Footing fix strategy",
+    options=FootingAction,
+    state=FootingFailureState,
+)
+class FootingFixStrategy: ...  # builds an immutable DecisionPoint; no global registration
 ```
 
 - `DecisionPoint` (frozen): `name`, `version`, `title` (`Label`), `options` (`StrEnum` type, or `Refs(labels_field=...)`),
@@ -288,9 +293,13 @@ a low-risk point is phase 2 work; no release exists in phase 1.
 ### 4.4 Rules and the registry
 
 ```python
-@rule(id="footing_fix_strategy.bearing_only", version=1, point="footing_fix_strategy",
-      rationale="Only the bearing check fails, and a larger plan lowers the bearing pressure.",
-      thresholds=("limits.bearing_ratio",))
+@rule(
+    id="footing_fix_strategy.bearing_only",
+    version=1,
+    point="footing_fix_strategy",
+    rationale="Only the bearing check fails, and a larger plan lowers the bearing pressure.",
+    thresholds=("limits.bearing_ratio",),
+)
 def bearing_only(state: FootingFailureState, basis: RuleBasis) -> Pick[FootingAction] | None: ...
 ```
 
@@ -357,27 +366,49 @@ phase 1 there are no providers, so no suggestion exists and the policy flags onl
 ### 4.7 Provider interfaces (no implementation in this spec)
 
 ```python
-class ProviderInfo(BaseModel):   # frozen
-    provider: str; model: str; version: str; is_local: bool; supports_batch: bool
+class ProviderInfo(BaseModel):  # frozen
+    provider: str
+    model: str
+    version: str
+    is_local: bool
+    supports_batch: bool
+
 
 class ProviderRequest(BaseModel):  # frozen; the only data a provider receives
-    request_id: str; point: str; point_version: int
-    options: tuple[ProviderOption, ...]        # value, label
-    state: Mapping[str, JsonValue]             # redaction-checked; no Ref fields
+    request_id: str
+    point: str
+    point_version: int
+    options: tuple[ProviderOption, ...]  # value, label
+    state: Mapping[str, JsonValue]  # redaction-checked; no Ref fields
 
-class ChoiceAnswer(BaseModel): choice: str; confidence: float
-class YesNoAnswer(BaseModel): answer: bool; confidence: float
 
-class DecisionProvider(Protocol):              # tier 2, 12 §4
+class ChoiceAnswer(BaseModel):
+    choice: str
+    confidence: float
+
+
+class YesNoAnswer(BaseModel):
+    answer: bool
+    confidence: float
+
+
+class DecisionProvider(Protocol):  # tier 2, 12 §4
     info: ProviderInfo
+
     async def choose(self, request: ProviderRequest) -> ChoiceAnswer: ...
     async def yes_no(self, request: ProviderRequest) -> YesNoAnswer: ...
     async def score(self, request: ProviderRequest) -> Mapping[str, float]: ...
     async def batch(self, requests: Sequence[ProviderRequest]) -> Sequence[ChoiceAnswer | ProviderFailure]: ...
 
-class LLMAnswer(BaseModel): choice: str; rationale: Rationale
-class LLMProvider(Protocol):                   # tier 3
+
+class LLMAnswer(BaseModel):
+    choice: str
+    rationale: Rationale
+
+
+class LLMProvider(Protocol):  # tier 3
     info: ProviderInfo
+
     async def decide(self, request: ProviderRequest) -> LLMAnswer: ...
 ```
 
