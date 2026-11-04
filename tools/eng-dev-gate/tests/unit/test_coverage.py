@@ -122,5 +122,5 @@ def test_report_faults(repo: Repo) -> None:
 
 def test_registered_in_spec_order() -> None:
     names = [s.name for s in STEPS]
-    assert names[-1] == "tests"
+    assert names[-4] == "tests"
     assert [n for n in STEP_ORDER if n in names] == names

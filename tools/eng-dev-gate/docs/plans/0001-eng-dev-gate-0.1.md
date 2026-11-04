@@ -202,7 +202,10 @@ tasks:
     depends_on: [T3, T5]
   - id: T11
     title: "forbidden part 2: FB004, FB005, FB006, FB008"
+    # Amendment (B-094, documents only): T11 also edits the package __init__.py, where the step's rule tuple is
+    # assembled (T10 put RULES = RULES_A there for a later task to extend); without it the new rules are never run.
     files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/__init__.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/rules_b.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/engine.py"
       - ".gate/forbidden.yml"
@@ -247,9 +250,10 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_plan_not_on_gate_branch"
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_unknown_task"
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_file_outside_globs_including_rename"
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_changelog_and_local_testing_in_scope"
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_budget_counting"
       - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_plan_front_matter_rules"
-    covers: [AC6, AC7, AC8, AC9, AC10, AC11, AC13]
+    covers: [AC6, AC7, AC8, AC9, AC10, AC10a, AC11, AC13]
     depends_on: [T2b, T3]
   - id: T14
     title: "gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job"

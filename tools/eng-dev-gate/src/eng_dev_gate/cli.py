@@ -14,8 +14,9 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import imports
+from eng_dev_gate.checks import imports, licenses, ratchet
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
+from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
 from eng_dev_gate.report import AWAITING_TITLE, CommandResult, escape_data, render
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
@@ -41,6 +42,9 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "gate-check":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
@@ -48,6 +52,11 @@ def _parser() -> argparse.ArgumentParser:
         if name == "imports":
             child.add_argument("--package", default=None, help="report only this workspace member")
             child.add_argument("--all", action="store_true", help="every member (the default)")
+        if name == "ratchet":
+            child.add_argument("--update", action="store_true", help="lower the recorded counts; never raises one")
+        if name == "licenses":
+            child.add_argument("--package", default=None, help="check this workspace member")
+            child.add_argument("--all", action="store_true", help="check every member")
         if name in ("check", "forbidden"):
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
@@ -76,6 +85,23 @@ def _forbidden(args: argparse.Namespace) -> Status:
         root, context.policy_root, members, SubprocessToolRunner(), fail_fast=False,
     )  # fmt: skip
     result = context.with_findings(CommandResult(command="forbidden", mode=context.config.mode.value, steps=steps))
+    render(result, args.format, sys.stdout, os.environ)
+    return result.status
+
+
+def _workflows(args: argparse.Namespace) -> Status:
+    """``workflows``: the step of that name on the tree under check (no member is involved)."""
+    context: gate_root.GateContext = args.gate_context
+    root = _workspace_root(Path(args.root).resolve())
+    steps = run_check(
+        [step for step in STEPS if step.name == "workflows"],
+        root,
+        context.policy_root,
+        [],
+        SubprocessToolRunner(),
+        False,
+    )
+    result = context.with_findings(CommandResult(command="workflows", mode=context.config.mode.value, steps=steps))
     render(result, args.format, sys.stdout, os.environ)
     return result.status
 
@@ -122,7 +148,9 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "agents": agents.handle,
         "forbidden": _forbidden,
         "imports": imports.handle,
+        "gate-check": handle_gate_check,
         "packages": _packages,
+        "workflows": _workflows,
         **(handlers or {}),
     }.get(args.command)
     try:
@@ -137,4 +165,9 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:], {"check": make_handler()}))
+    raise SystemExit(
+        main(
+            sys.argv[1:],
+            {"check": make_handler(), "licenses": licenses.make_handler(), "ratchet": ratchet.make_handler()},
+        )
+    )
