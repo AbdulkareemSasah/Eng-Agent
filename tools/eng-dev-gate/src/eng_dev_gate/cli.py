@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses, ratchet, secrets, test_first, windows_tests
+from eng_dev_gate.checks import licenses, ratchet, review, secrets, test_first, windows_tests
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
@@ -57,6 +57,8 @@ def _parser() -> argparse.ArgumentParser:
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
+        if name == "review":
+            child.add_argument("--check-prompts", action="store_true", help="only verify the pinned prompts")
         if name == "ratchet":
             child.add_argument("--update", action="store_true", help="lower the recorded counts; never raises one")
         if name == "licenses":
@@ -154,6 +156,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "forbidden": _forbidden,
         "gate-check": handle_gate_check,
         "packages": _packages,
+        "review": review.handle,
         "secrets": secrets.handle,
         "test-first": test_first.handle,
         "workflows": _workflows,
