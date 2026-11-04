@@ -255,7 +255,7 @@ of each clause spec.
 - PK-AC2. Given each shared precondition, when tested just below, at and above its limit, then the outcomes of the
   clause specs (`fc = 17` passes `FC_MIN`, `fy = 550` passes `FY_MAX`, `q_min = 0` passes `FULL_CONTACT`). Test:
   `tests/unit/test_common.py::test_shared_preconditions`.
-- PK-AC3. Given `Registry.discover()`, when the pack is loaded, then it holds at least the six check ids of §1 (later plans of the same pack add theirs, for example the column checks of plan 0004; amendment B-097) and each
+- PK-AC3. Given `Registry.discover()`, when the pack is loaded, then it holds exactly the check ids of the pack's merged plans (the six of §1 and those of later plans of the pack) and each
   `CheckMeta.spec` names an existing clause spec file. Test: `tests/unit/test_pack.py::test_registry_and_specs`.
 - PK-AC4. Given every check, when `lint_scope_violations(check, check_modules)` runs, then it is empty; and every
   `Cited` source in the pack starts with `ACI 318-14 `, `SI prefix`, `Mechanics of materials`, `Statics`, `Geometry`

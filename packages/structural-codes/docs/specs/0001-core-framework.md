@@ -70,9 +70,12 @@ engineering meaning"`.
   `OUT_OF_RANGE` from `validate_input` (EC §5) and nothing is clamped. Test:
   `tests/unit/test_inputs.py::test_bounded_helper_and_out_of_range`.
 - AC4a. Given a field declared with `unbounded(reason="signed reaction; no physical bound")`, when the JSON Schema is
-  generated, then it carries no numeric bounds and `x-unbounded-reason` with that text, and the reason appears with the
-  field's `TraceInput`; given an empty or blank reason, when the check is defined, then `CheckDefinitionError`
-  (amendment B-097). Test: `tests/unit/test_inputs.py::test_unbounded_helper`.
+  generated, then it carries no numeric bounds and `x-unbounded-reason` with that text; given an empty or blank
+  reason, when the check is defined, then `CheckDefinitionError` (amendment B-097). Test:
+  `tests/unit/test_inputs.py::test_unbounded_helper`.
+- AC4b. Given an evaluation of a check with an unbounded field, when the trace is recorded, then `Trace.messages`
+  holds `<field>: unbounded (<reason>)` for it, and the calculation note shows that message (amendment B-097). Test:
+  `tests/unit/test_trace.py::test_unbounded_reason_message`.
 - AC5. Given a check whose preconditions are `[P1 → NOT_APPLICABLE, P2 → NEEDS_ENGINEER]`, when P1 fails, then one
   verdict `NOT_APPLICABLE` with `demand`, `capacity` and `ratio` null, the body is not run, and the trace messages name
   `P1` and its clause; when only P2 fails, then `NEEDS_ENGINEER` likewise; when both fail, P1 wins (declared order).
@@ -283,7 +286,9 @@ the contract pattern (AC1).
 `TraceInput`; nested or list inputs are a later version (§7). Every numeric field has physical bounds with
 `bounds_source` (they are not code limits; code limits are preconditions giving `NEEDS_ENGINEER`, 04 §7), or is
 declared unbounded with a stated reason when no physical bound exists, for example a signed force or moment
-(amendment B-097, from plan 0002 Q1). Fields that are engineering quantities are `ref_capable` and
+**[added]** (amendment B-097, from plan 0002 Q1). Each clause spec lists its unbounded fields with their reasons,
+and the clause-spec and source-check review (process/10) confirms that none has a physical bound; signed force and
+moment fields are the intended use. Fields that are engineering quantities are `ref_capable` and
 `engineering_quantity` (EC §5).
 
 `bounded(*, ge=None, gt=None, le=None, lt=None, **eng_param_kwargs)` takes `Cited` bounds (so pack check modules write
@@ -292,8 +297,8 @@ joined from the citations.
 
 `unbounded(*, reason: str, **eng_param_kwargs)` returns `eng_param(...)` with no numeric bounds and the JSON Schema key
 `x-unbounded-reason` set to `reason`, a non-empty text that says why the quantity has no physical bound (no number is
-needed, so FB005 does not apply). The reason is carried into the field's `TraceInput` so the calculation note shows
-it. It never replaces a code limit: those stay preconditions.
+needed, so FB005 does not apply). The runner adds the trace message `<field>: unbounded (<reason>)` to
+`Trace.messages` (the contract `TraceInput` has no field for it), so the calculation note shows it. It never replaces a code limit: those stay preconditions.
 
 Reserved field on `CheckInputs`: `ratio_limit: float | None` (ref-capable, from the design basis), bounded `> 0` and
 `<= ` the contract default (04 §5.1) **[added]**.
@@ -323,7 +328,7 @@ messages (AC6).
 
 | Call | Effect |
 |---|---|
-| inputs (automatic) | One `TraceInput` per field, value, unit from field metadata, `ref` from the `ValidatedInput` provenance |
+| inputs (automatic) | One `TraceInput` per field, value, unit from field metadata, `ref` from the `ValidatedInput` provenance; one message `<field>: unbounded (<reason>)` per unbounded field |
 | `t.const(name, cited) -> float` | Records `TraceConstant{name, cited}`; returns `cited.value` as `float` |
 | `t.step(name, value, *, unit, formula, source, uses) -> float` | Records a `TraceStep`; `value` must be a finite `float` (or `bool` for logical steps); `uses` must name earlier inputs, constants or steps |
 | `t.value(name) -> float` | Reads a recorded value |
@@ -553,7 +558,7 @@ payload (EC §4.10.2) and HTML notes. Inputs of each check are defined in its cl
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC6 (with AC5a, AC5b), AC8 to AC14, AC16 to AC25 (with AC22a, AC24a), AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
+| AC1 to AC6 (with AC4a, AC4b, AC5a, AC5b), AC8 to AC14, AC16 to AC25 (with AC22a, AC24a), AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
 | AC15, AC26 | Contract (against eng-contract models) | `tests/contract/` |
 | AC7 | Replay (determinism across runs and processes) | `tests/replay/` |
 | AC34 | Golden | `tests/golden/`, `tests/data/golden/notes/` |
@@ -586,4 +591,5 @@ content-hash format is a major change of the core and resets every approval (17 
 | Q13 | 10 §6 default tolerance 0.5% comes from a `Proposed` document | Owner | Accept with 10; until then it is the documented default |
 | Q14 | At runtime a `verified`, unapproved check resolves to `draft` (watermarked), because case files are not installed | Owner | Keep; 10 §4 makes both trial-only. Shipping case files as package data would only remove the watermark |
 | Q15 | `CheckMeta.unconditional` lets a check declare no precondition beyond member scope | Owner | Accept; the clause-spec reviewer confirms the stated section |
+| Q16 | `unbounded()` is **[added]** (B-097); nothing in code stops a bounded quantity being declared unbounded | Owner | Keep; the clause-spec and source-check review lists and checks each unbounded field |
 | G-1 | No worked examples from books or code examples exist here for any check; every case in this build is a labeled hand check | Owner | Owner supplies book, edition, page and example per check (pack specs list them) |
