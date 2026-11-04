@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from eng_dev_gate.checks.forbidden.engine import parse_config, scan_member
 from eng_dev_gate.checks.forbidden.rules_a import RULES_A
+from eng_dev_gate.checks.forbidden.rules_b import RULES_B
 from eng_dev_gate.config import load_gate_config
 from eng_dev_gate.report import Finding
 from eng_dev_gate.results import UsageError
@@ -13,7 +14,7 @@ from eng_dev_gate.results import UsageError
 if TYPE_CHECKING:
     from eng_dev_gate.checks.registry import StepContext
 
-RULES = RULES_A  # a later task appends its rules here
+RULES = (*RULES_A, *RULES_B)
 
 
 def run_step(ctx: StepContext) -> list[Finding]:
