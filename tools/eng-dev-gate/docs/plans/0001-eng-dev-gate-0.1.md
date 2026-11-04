@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -545,6 +545,37 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_clause_specs_are_specs"
     covers: [AC12b, AC13a]
     depends_on: [T13, T14, T30]
+  - id: T32
+    title: "types and imports resolve third-party names in the judged environment (pull-request context)"
+    # Amendment (B-345, documents only): a pull request that adds a dependency failed types (mypy import-untyped) and
+    # imports (IM006) in pull-request mode, because both read the base gate's interpreter (B-024, PR 112).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/tool_steps.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/imports.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/licenses.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/judged_metadata.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 160
+    max_sessions: 2
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_tool_steps.py::test_types_resolve_in_judged_environment"
+      - "tools/eng-dev-gate/tests/unit/test_imports.py::test_judged_distribution_map"
+    covers: [AC54a]
+    depends_on: [T5, T12, T19, T26]
+  - id: T33
+    title: "risk-floor: an in-scope ratchet count change does not raise the floor"
+    # Amendment (B-345, documents only): a justified suppression raises .gate/ratchet.json in the task's scope (AC10b),
+    # and the risk map put that file at r3, so every r1 or r2 plan failed RF001 on it.
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/risk_floor.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_risk_floor.py::test_in_scope_ratchet_change_does_not_raise_floor"
+    covers: [AC21b]
+    depends_on: [T14b, T15, T27]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
