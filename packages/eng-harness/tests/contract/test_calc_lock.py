@@ -9,7 +9,7 @@ import pytest
 from eng_contract.kinds import NEUTRAL_KINDS
 
 from eng_harness._calc import _hash
-from eng_harness.calc import CalcRegistry
+from eng_harness.calc import CalcRegistry, CalcRegistryError
 from eng_harness.calcs import REGISTRY
 
 _FIXTURES = Path(__file__).resolve().parents[1] / "data" / "calcs" / "fixture_calcs.py"
@@ -65,3 +65,81 @@ def test_lock_detects_drift_and_keeps_removed_ids(fixtures: ModuleType, tmp_path
     assert _hash.read_lock(target) == good
     with pytest.raises(SystemExit):
         _hash.main([], registry=registry, lock_path=target)
+
+
+def test_render_lock_is_sorted_indented_utf8_lf() -> None:
+    lock = {"schema": 1, "calcs": [{"version": 2, "id": "b", "content_sha256": "c"}]}
+    assert _hash.render_lock(lock) == (
+        b'{\n  "calcs": [\n    {\n      "content_sha256": "c",\n      "id": "b",\n      "version": 2\n    }\n  ],\n'
+        b'  "schema": 1\n}\n'
+    )
+
+
+def test_lock_problem_messages(fixtures: ModuleType) -> None:
+    kinds = NEUTRAL_KINDS.extend({fixtures.OUTPUT_KIND: fixtures.FixtureOut})
+    registry = CalcRegistry(kinds, [fixtures.fixture_sum])
+    digest = registry.content_hash("harness.fixture_sum")
+    entry = {"id": "harness.fixture_sum", "version": 3, "content_sha256": digest}
+    gone = {"id": "harness.gone", "version": 1, "content_sha256": digest}
+    missing = ["harness.fixture_sum: registered but missing from the lock or marked removed"]
+    differs = ["harness.fixture_sum: the lock entry differs from the registry (run the lock writer)"]
+    assert _hash.lock_problems(registry, {"schema": 2, "calcs": [entry]}) == ["unsupported lock schema"]
+    assert _hash.lock_problems(registry, {"calcs": [entry]}) == ["unsupported lock schema"]
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [entry, entry]}) == [
+        "harness.fixture_sum: duplicate lock entry"
+    ]
+    assert _hash.lock_problems(registry, EMPTY) == missing
+    assert _hash.lock_problems(registry, {"schema": 1}) == missing
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [{"id": "harness.fixture_sum", "removed": True}]}) == (
+        missing
+    )
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [entry | {"version": 4}]}) == differs
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [entry | {"content_sha256": "0" * 64}]}) == differs
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [entry, gone]}) == [
+        "harness.gone: in the lock but not registered and not marked removed"
+    ]
+    assert _hash.lock_problems(registry, {"schema": 1, "calcs": [entry, {"id": "harness.gone", "removed": True}]}) == []
+    assert _hash.lock_problems(CalcRegistry(kinds), {"schema": 1}) == []
+    assert _hash.removed_ids({"schema": 1}) == frozenset()
+    assert _hash.removed_ids({"schema": 1, "calcs": [entry, {"id": "x", "removed": False}]}) == frozenset()
+
+
+def test_build_lock_sorts_by_id_and_keeps_every_removed_id(fixtures: ModuleType) -> None:
+    kinds = NEUTRAL_KINDS.extend({fixtures.OUTPUT_KIND: fixtures.FixtureOut})
+    registry = CalcRegistry(kinds, [fixtures.fixture_sum])
+    digest = registry.content_hash("harness.fixture_sum")
+    previous = {
+        "schema": 1,
+        "calcs": [
+            {"id": "z.old", "removed": True},
+            {"id": "a.old", "version": 1, "content_sha256": "1" * 64},
+            {"id": "harness.fixture_sum", "version": 1, "content_sha256": "2" * 64},
+        ],
+    }
+    assert _hash.build_lock(registry, previous) == {
+        "schema": 1,
+        "calcs": [
+            {"id": "a.old", "removed": True},
+            {"id": "harness.fixture_sum", "version": 3, "content_sha256": digest},
+            {"id": "z.old", "removed": True},
+        ],
+    }
+    assert _hash.build_lock(registry, {"schema": 1}) == _hash.build_lock(registry, EMPTY)
+
+
+def test_registry_refuses_a_removed_id(fixtures: ModuleType) -> None:
+    kinds = NEUTRAL_KINDS.extend({fixtures.OUTPUT_KIND: fixtures.FixtureOut})
+    with pytest.raises(CalcRegistryError) as caught:
+        CalcRegistry(kinds, [fixtures.fixture_sum], removed={"harness.fixture_sum"})
+    assert caught.value.rule == "removed"
+    assert CalcRegistry(kinds, [fixtures.fixture_sum], removed={"other"}).content_hash("harness.fixture_sum")
+
+
+def test_main_requires_exactly_the_write_flag(fixtures: ModuleType, tmp_path: Path) -> None:
+    kinds = NEUTRAL_KINDS.extend({fixtures.OUTPUT_KIND: fixtures.FixtureOut})
+    target = tmp_path / "calcs.lock.json"
+    target.write_bytes(_hash.render_lock(EMPTY))
+    for argv in (["--write-lock", "x"], ["--other"], ["x", "--write-lock"]):
+        with pytest.raises(SystemExit):
+            _hash.main(argv, registry=CalcRegistry(kinds), lock_path=target)
+    assert target.read_bytes() == _hash.render_lock(EMPTY)
