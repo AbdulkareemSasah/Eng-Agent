@@ -106,14 +106,13 @@ def resolve_workspace(env: Mapping[str, str], probe: LocationProbe) -> Workspace
         root.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
         raise LocalWorkspaceError(
-            "the workspace folder cannot be created", "set ENG_WORKSPACE to a writable folder"
+            "cannot create the workspace folder", "set ENG_WORKSPACE to a writable folder"
         ) from exc
     classification = probe.classify(root)
     if classification is not LocationClass.LOCAL:
+        kind = classification.value
         raise LocalWorkspaceError(
-            f"the workspace is {classification.value}, not local",
-            f"location is {classification.value}; set ENG_WORKSPACE to a folder on a local drive",
-            classification.value,
+            f"the workspace is {kind}, not local", f"{kind}: set ENG_WORKSPACE to a local drive", kind
         )
     return Workspace(root=root, classification=classification)
 

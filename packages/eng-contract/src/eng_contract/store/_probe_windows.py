@@ -84,11 +84,9 @@ if sys.platform == "win32":
             self._kernel32.GetFileAttributesW.restype = wintypes.DWORD  # 0xFFFFFFFF must not read as -1
 
         def drive_type(self, root: str) -> int:
-            """`GetDriveTypeW(root)`."""
             return int(self._kernel32.GetDriveTypeW(root))
 
         def file_attributes(self, path: str) -> int:
-            """`GetFileAttributesW(path)`."""
             return int(self._kernel32.GetFileAttributesW(path))
 
         def sync_root_status(self, path: str) -> int | None:
