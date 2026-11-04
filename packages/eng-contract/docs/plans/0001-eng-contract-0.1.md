@@ -226,7 +226,7 @@ tasks:
       - "packages/eng-contract/tests/contract/test_kinds.py::test_basis_sources"
       - "packages/eng-contract/tests/contract/test_kinds.py::test_verdict_set_trace_refs"
     covers: [AC44, AC46, AC48]
-    depends_on: [T11]
+    depends_on: [T11, T11b]
   - id: T13
     title: Workspace resolution and location probes (POSIX, Windows, fake)
     files:
@@ -414,8 +414,10 @@ six-step pipeline with error mapping.
 
 **T10 Verdicts, issues, traces** (spec §4.9), including `Verdict` equality with optional quantities (AC35a).
 
-**T11 Kinds I** (spec §4.10.1, the `model.*` rows of §4.10.2). Registry, kind names, common sub-models and the eight
-`model.*` kinds with one valid and several invalid fixtures each.
+**T11 Kinds I** (spec §4.10.1). Registry, kind names and common sub-models.
+
+**T11b Kinds I fixtures** (the `model.*` rows of §4.10.2). The eight `model.*` kinds with one valid and several invalid
+fixtures each, and the fixture machinery (`test_kinds.py::test_fixtures`).
 Budget amendment (B-020), superseded by B-028: the writer measured 543 changed lines for T11, more than the size cap of
 400 lines allows for one task (`limits.max_task_lines`), so the plan records the delivered work as T11 (registry and shared
 helpers, 161 lines) and T11b (the model.* kinds, 382 lines); both were merged together in B-020's pull request.
@@ -430,7 +432,9 @@ workspace on a OneDrive folder (including a Files On-Demand sync root) and on a 
 
 **T14 Store** (spec §4.5.3 to §4.5.5). The file-system port and its fake, the atomic write protocol, retries, payload
 split, payload normalization (spec §4.4), hash verification with `canonical.loads` and the wrapping of read errors
-as `StoreIntegrityError`, `ModelStateStore`, and the end-to-end trace-reference test (AC21a).
+as `StoreIntegrityError`, and the end-to-end trace-reference test (AC21a).
+
+**T14b Model state** (spec §4.5, AC22). `ModelStateStore`: create, increment by compare-and-set, and the promotion record.
 
 **T15 MCP mapping** (spec §4.11), with `output_schema()` as an object schema (AC49a).
 
