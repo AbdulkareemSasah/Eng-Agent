@@ -148,6 +148,22 @@ def test_range_scan_passes_a_clean_merge_resolution(repo: Repo) -> None:
     assert repo.run(["secrets", "--range", f"{base}..HEAD"]).code == 0
 
 
+def test_range_scan_keeps_its_place_after_a_merge_that_keeps_one_side(repo: Repo) -> None:
+    """A merge resolution that keeps one side's line and adds one must not hide a secret in an older commit."""
+    base = repo.commit({".gate/gate.yml": _gate_yml(), "conf.txt": "a\nvalue\nz\n"})
+    repo.branch("side")
+    repo.commit({"conf.txt": "a\nside\nz\n", "s.txt": f"{GITHUB_TOKEN}\n"}, "feat: side")
+    repo.git("checkout", "-q", "main")
+    repo.commit({"conf.txt": "a\nmain\nz\n"}, "feat: main")
+    with pytest.raises(subprocess.CalledProcessError):
+        repo.git("merge", "--no-edit", "side")
+    repo.commit({"conf.txt": "a\nside\nextra\nz\n"}, "merge: resolve")
+    result = repo.run(["--format", "json", "secrets", "--range", f"{base}..HEAD"])
+    assert result.code == 1
+    assert [(f["path"], f["line"]) for f in _findings(result)] == [("s.txt", 1)]
+    assert GITHUB_TOKEN not in result.out + result.err
+
+
 def test_hunk_lines_that_look_like_headers(repo: Repo) -> None:
     """An added line that reads like a diff header is data: the hunk counts decide, not the line prefix."""
     base = _repo_with_base(repo)
