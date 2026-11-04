@@ -20,6 +20,7 @@ from typing import LiteralString
 from eng_harness._text import sanitize_html, truncate
 
 _TOKEN = re.compile(r"[A-Za-z0-9_.-]{1,64}", re.ASCII)
+_PATH = re.compile(r"(/[A-Za-z0-9_.-]{1,64})*/?", re.ASCII)
 _ATTRS = frozenset(
     {"class", "id", "href", "action", "method", "name", "type", "value", "for", "dir", "colspan", "scope"}
 )
@@ -47,12 +48,17 @@ class SafeToken(str):
 class Href:
     """A site-relative URL path made only of validated segments (a route constant or a validated id)."""
 
-    __slots__ = ("value",)
+    __slots__ = ("_value",)
 
     def __init__(self, value: str, _mint: object = None) -> None:
         if _mint is not _MINT:
             raise HtmlError("Href is created only by href()")
-        self.value = value
+        self._value = value
+
+    @property
+    def value(self) -> str:
+        """The path (read-only)."""
+        return self._value
 
 
 def href(*segments: SafeToken) -> Href:
@@ -155,7 +161,7 @@ def _attr(name: str, value: object) -> str:
     if key not in _ATTRS:
         raise HtmlError("attribute not allowed")
     if key in _URL_ATTRS:
-        if not isinstance(value, Href):
+        if type(value) is not Href or _PATH.fullmatch(value.value) is None:
             raise HtmlError("a URL attribute takes an Href")
         text = value.value
     elif isinstance(value, SafeToken):
