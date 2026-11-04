@@ -9,6 +9,7 @@ if sys.platform == "win32":
     from pathlib import Path, PureWindowsPath
 
     import pytest
+
     from eng_contract.store import LocationClass
     from eng_contract.store._probe_windows import CtypesWinApi, WindowsProbe
 
