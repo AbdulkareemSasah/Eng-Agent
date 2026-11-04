@@ -36,18 +36,14 @@ class _Blocker(importlib.abc.MetaPathFinder):
 
 
 def block_imports(names: Iterable[str]) -> None:
-    """Make ``names`` (top-level import names) unimportable for the rest of the process.
-
-    Raises:
-        ModuleNotFoundError: later, on each import of a blocked name.
-    """
+    """Make ``names`` (top-level import names) unimportable: each later import raises ``ModuleNotFoundError``."""
     sys.meta_path.insert(0, _Blocker(names))
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Block the names of ``BLOCKED_ENV``; load the Hypothesis ``ci`` profile when Hypothesis is installed."""
+    """Load the Hypothesis ``ci`` profile when Hypothesis is installed (it is optional for a package)."""
     config.stash[_DESELECTED] = 0
-    if names := [n for n in os.environ.get(BLOCKED_ENV, "").split(",") if n]:
+    if names := [n for n in os.environ.get(BLOCKED_ENV, "").split(",") if n]:  # also blocks outside judged_run
         block_imports(names)
     try:
         from hypothesis import settings

@@ -176,18 +176,21 @@ def _probe(
 def _run(
     runner: Runner, python: Sequence[str], folder: Path, env: Mapping[str, str], files: Sequence[str], report: Path,
     limit: int, hidden: Sequence[str] = (),
-) -> None:  # fmt: skip
-    """Run pytest on ``files`` in ``folder``, writing ``report``; exit codes 0 and 1 are verdicts, others TF009.
+) -> bool:  # fmt: skip
+    """Run pytest on ``files`` in ``folder``, writing ``report``; exit 0 and 1 are verdicts, others TF009.
 
-    With ``hidden`` names (set in ``env``) pytest runs through the base plugin, which blocks them.
+    ``hidden`` names (set in ``env``) are blocked by the base plugin; ``True``: a conftest.py imported one (red).
     """
     start = [_SCRIPT, "pytest", "-p", judged_run.BASE_PLUGIN] if hidden else ["-m", "pytest"]
     argv = [*python, *start, "-p", "no:cacheprovider", "--continue-on-collection-errors",
             "--rootdir", str(folder), "--junitxml", str(report), *files]  # fmt: skip
     done = runner.run(argv, folder, env, limit)
+    if hidden and done.exit_code == 4 and "TF011: " in done.output:
+        return True
     if done.exit_code not in (0, 1):
         tail = " | ".join(done.output.splitlines()[-5:])
         raise RunFaultError("TF009", f"pytest exited {done.exit_code} in {folder}: {tail}")
+    return False
 
 
 def judge(
@@ -236,8 +239,8 @@ def judge(
                 if tree is base:
                     _probe(runner, python, base, member, env, limit, blocked)
                 report = base.parent / f"{number}-{wanted}.xml"
-                _run(runner, python, tree / member.path, env, files, report, limit, blocked)
-                found = outcomes(report, local)
+                red = _run(runner, python, tree / member.path, env, files, report, limit, blocked)
+                found = {t: {"failed"} for t in local} if red else outcomes(report, local)
                 for test, local_id in zip(ids, local, strict=True):
                     kinds = found[local_id]
                     # red: some case failed (a parametrized test gains cases); green: every case passed

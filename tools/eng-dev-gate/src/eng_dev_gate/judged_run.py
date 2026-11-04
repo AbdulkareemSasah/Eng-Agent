@@ -80,8 +80,8 @@ def main(argv: Sequence[str]) -> int:
     _working_directory_first()
     try:
         plugin = load_base_plugin()
+        plugin.block_imports([n for n in os.environ.get(plugin.BLOCKED_ENV, "").split(",") if n])
         if argv[:1] == ["probe"]:
-            plugin.block_imports([n for n in os.environ.get(plugin.BLOCKED_ENV, "").split(",") if n])
             return _probe(argv[1:])
         if argv[:1] == ["pytest"]:
             import pytest
