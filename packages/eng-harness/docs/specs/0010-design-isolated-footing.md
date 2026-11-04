@@ -102,8 +102,11 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   and `As` grows with the bar count. Tests: `tests/golden/footing/test_layout.py::test_golden_cases`,
   `tests/property/test_footing_layout.py::test_spacing_bound`.
 - AC9. `harness.footing_resize`: each action of §4.4.4 gives the next size; a step past a bound leaves the size
-  unchanged with `LIMIT_REACHED`; `engineer_set` takes the engineer-input references and flags values outside the basis
-  bounds. Test: `tests/golden/footing/test_resize.py::test_golden_cases`.
+  unchanged with `LIMIT_REACHED`; `engineer_set` takes the single plan size `L`, `h` and `s` as engineer-input
+  references, sets `Lx = Ly = L`, and flags values outside the basis bounds (`OUTSIDE_BASIS_BOUNDS`) and a plan that is
+  not a multiple of `plan_increment` (`OFF_INCREMENT`); `enlarge_plan` from a plan that is not a multiple gives the
+  smallest multiple above it (golden cases: an engineer plan between multiples, then enlarged). Test:
+  `tests/golden/footing/test_resize.py::test_golden_cases`.
 - AC10. `harness.footing_status`: golden cases of §4.4.5 for the family status order, the closure and the decision
   state, including a mix of `FAIL` and `NEEDS_ENGINEER`. Test: `tests/golden/footing/test_status.py::test_golden_cases`.
 - AC11. `harness.footing_schedule`: golden cases of §4.4.6 (overlap, corner distance below and at the clear distance,
@@ -135,10 +138,14 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 - AC18. Given a footing that fails punching only, then the depth increases; given flexure only, then the spacing
   reduces. Tests: `::test_shear_deepens`, `::test_flexure_reduces_spacing`.
 - AC19. Given the last attempt with footings still failing, then they are closed `NEEDS_ENGINEER`
-  (`ATTEMPTS_EXHAUSTED`), the closed footings keep their result, and the workflow continues to the schedule. Test:
-  `::test_attempts_exhausted_closes_open_footings`.
-- AC20. Given the engineer chooses `ask_engineer`, then the block asks the dimensions, the schedule marks them
-  `engineer`, and the next round checks them; given `combine_with_neighbor`, then the footing is closed
+  (`ATTEMPTS_EXHAUSTED`), the closed footings keep their result, and the workflow continues to the schedule. Given an
+  eccentric reaction (a large moment with the axial force) whose minimum corner pressure is negative at the size of
+  §4.4.2, then bearing is `NEEDS_ENGINEER` (BP precondition `FULL_CONTACT`, gap G-1), no other family fails, no
+  decision is requested, no enlargement round runs, and the footing is closed `NEEDS_ENGINEER` with the gap (Q18).
+  Tests: `::test_attempts_exhausted_closes_open_footings`, `::test_eccentric_reaction_needs_engineer`.
+- AC20. Given the engineer chooses `ask_engineer`, then the block asks one plan size, a depth and a spacing (no
+  separate `Lx` and `Ly`, so no rectangular footing can be entered, Q17), the schedule marks them `engineer`, and the
+  next round checks them; given `combine_with_neighbor`, then the footing is closed
   `NEEDS_ENGINEER` (`COMBINE_REQUESTED`); given a resize at its bound, then closed (`LIMIT_REACHED`). Tests:
   `::test_engineer_dimensions`, `::test_combine_closes`, `::test_limit_closes`.
 
@@ -167,8 +174,10 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   test"; `LIMIT_EXCEEDED` on soil pressures is reported and the stage continues. Test:
   `tests/workflow/footing/test_safe_stage.py::test_stage_steps`, `::test_candidate_pressure_no_verdict`,
   `::test_soil_pressure_limit_reported`.
-- AC27. Given `safe.cross_check = off` (or no `--safe-model`), then no SAFE server starts; given it on with a SAFE
-  basis field missing, then the run refuses to start. Test: `::test_stage_off_and_missing_fields`.
+- AC27. Given `safe.cross_check = off` (or no `--safe-model`), then no SAFE server starts; given a basis without
+  `compare.length` or `checks.equilibrium_relative_tolerance` (required whatever `safe.cross_check` says, §4.7, Q19),
+  then the basis does not freeze (spec 0004 AC23) and the run does not start. Test:
+  `::test_stage_off_and_missing_fields`.
 - AC28. Given the tool names any step of this workflow can call, then they are a subset of the CSI allowlist and none is
   an escape hatch (`csi_db_tables_apply`, `csi_run_script`, ...). Test:
   `tests/contract/test_footing_tools.py::test_tools_allowlisted`.
@@ -246,8 +255,8 @@ block code imports no pack.
 ### 4.4 Calcs
 
 All calcs follow calcs §4.2 and §4.4: pure, exact (`Fraction`) for every comparison, basis fields read as field objects,
-constants only `Cited` (the integers of geometric identities with source `Geometry`, and `k_m` with source "SI prefix
-milli", as BP §5). Each ships `draft` with a verification record.
+constants only `Cited` (the integers of geometric identities with source `Geometry`, `k_m` with source "SI prefix
+milli", as BP §5, and π with source "mathematical constant, area of a circle", used by L2 only). Each ships `draft` with a verification record.
 
 #### 4.4.1 `harness.footing_subjects` v1
 
@@ -273,8 +282,10 @@ Input: `subjects`, `reactions`, `service_cases` (engineer input reference), `bas
   `NEEDS_ENGINEER` (`UPLIFT`).
 - P2. `w = h·γc + soil_depth·γs + surcharge` (BP S3 per unit area); `q_net = q_allow − w`; `q_net ≤ 0` gives
   `NEEDS_ENGINEER` (`OVERBURDEN`).
-- P3. `A_req = max_k N_k / q_net`. Moments are not used: the bearing check with moments decides, and the rounds enlarge
-  the plan (§4.6).
+- P3. `A_req = max_k N_k / q_net`. Moments are not used here. The bearing check then includes them: a bearing `FAIL`
+  (full contact, `q_max` above the allowable) is enlarged by the rounds (§4.6, `ff.bearing_only`), but partial contact
+  at the trial size (`q_min < 0`) is bearing `NEEDS_ENGINEER` (BP precondition `FULL_CONTACT`, gap G-1), which closes
+  the footing `needs_engineer` under §4.4.5 without a round (AC19, Q18).
 - P4. `n` is the smallest integer with `(n·i)² ≥ A_req` and `n·i ≥ min_plan`, found with integer square roots of the
   exact fraction and confirmed by both comparisons; `Lx = Ly = n·i`.
 - P5. `n·i > max_plan` gives the largest multiple not above `max_plan`, `plan_at_max = true` and status
@@ -288,7 +299,8 @@ across `Lx`); `c` is the cover, `db` the diameter.
 
 - L1. `n_x = ⌊(Ly − 2c − db)/s⌋ + 1`, `s_x = (Ly − 2c − db)/(n_x − 1)`; the same for `n_y` with `Lx`. `n < 2` gives
   `NEEDS_ENGINEER` (`WIDTH_TOO_SMALL`).
-- L2. `As = n·π·db²/4` each way (geometry).
+- L2. `As = n·π·db²/4` each way (geometry). `As` is a float output (`As_x_mm2`, `As_y_mm2`) passed to the checks by
+  reference; no comparison inside the calcs of §4.4 uses it, so the exact-comparison rule holds.
 - L3. `bottom_layer = x_bottom`: `d_x = h − c − db/2`, `d_y = h − c − 3·db/2`; `y_bottom` swaps them; `d = (d_x + d_y)/2`
   for punching (ACI plan Q5).
 - L4. `cover_x = cover_y = end_cover = c` (bars end at the cover from each face).
@@ -297,12 +309,15 @@ across `Lx`); `c` is the cover, `db` the diameter.
 #### 4.4.4 `harness.footing_resize` v1
 
 Input: `dims`, `actions` (per footing: `enlarge_plan`, `increase_depth`, `reduce_bar_spacing`, `engineer_set` with
-references to the `basis.engineer_input/1` fields `Lx`, `Ly`, `h`, `s`, or `none`), `basis` (`foundation.plan_increment`,
-`.max_plan_dimension`, `.depth_increment`, `.max_depth`, `reinforcement.spacing_increment`, `.min_spacing`). R1
-`enlarge_plan`: `Lx = Ly = (n + 1)·i`. R2 `increase_depth`: `h + depth_increment`. R3 `reduce_bar_spacing`:
+references to the `basis.engineer_input/1` fields `L`, `h`, `s`, or `none`), `basis` (`foundation.plan_increment`,
+`.max_plan_dimension`, `.depth_increment`, `.max_depth`, `reinforcement.spacing_increment`, `.min_spacing`). Footings
+stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
+`i` above `L` (`(n + 1)·i` when `L = n·i`; exact floor division of the fractions). R2 `increase_depth`: `h + depth_increment`. R3 `reduce_bar_spacing`:
 `s − spacing_increment`. A result past its bound leaves the size unchanged, sets the flag and status `LIMIT_REACHED`.
-R4 `engineer_set` takes the four values with `source: engineer`; a value outside the basis bounds is kept and flagged
-`OUTSIDE_BASIS_BOUNDS` (Q13). Depths are counted from `min_depth`, plans from zero.
+R4 `engineer_set` takes the three values `L`, `h`, `s` of `basis.engineer_input/1` with `source: engineer` and sets
+`Lx = Ly = L`; the engineer cannot enter a rectangle (Q17). A value outside the basis bounds is kept and flagged
+`OUTSIDE_BASIS_BOUNDS` (Q13); a plan that is not a multiple of `i` is kept and flagged `OFF_INCREMENT` (no check
+depends on the increment). Depths are counted from `min_depth`, plans from zero.
 
 #### 4.4.5 `harness.footing_status` v1
 
@@ -357,7 +372,8 @@ Input: `subjects`, `reactions`, `service_cases`, `factored_cases` (references), 
    3. `ctx.calc("harness.footing_status", ...)`: `passed` and `needs_engineer` footings close.
    4. No failing footing: `break`. On `a.is_last`: failing footings close `ATTEMPTS_EXHAUSTED`, then `break` (Q1).
    5. `ctx.decide_many` with one request per failing footing (rules of §4.5).
-   6. `ask_engineer`: `ctx.ask(FootingDimensions, title=...)` per such footing (`Lx`, `Ly`, `h`, `s` with units);
+   6. `ask_engineer`: `ctx.ask(FootingDimensions, title=...)` per such footing (`L` the square plan size, `h`, `s`,
+      with units; no separate `Lx` and `Ly`, Q17);
       `combine_with_neighbor`: closes `COMBINE_REQUESTED`.
    7. `dims = ctx.calc("harness.footing_resize", ...)`; `LIMIT_REACHED` closes.
 
@@ -394,7 +410,7 @@ No value is shipped (spec 0004 Q8). Paths of the ACI clause specs are kept (ACI 
 | `compare.angle` | quantity | deg | subjects (calcs §4.4) |
 | `attempts.footing_rounds`, `attempts.cases` | count | — | `ctx.attempts` (engine Q1) |
 | `safe.cross_check` | choice `off`, `loads_and_analysis` | — | §4.9 |
-| `compare.length`, `checks.equilibrium_relative_tolerance` | quantity | mm, 1 | §4.9 (not required; required when `safe.cross_check` is on) |
+| `compare.length`, `checks.equilibrium_relative_tolerance` | quantity | mm, 1 | §4.9 (required in every run: spec 0004 has no conditional requirement, Q19) |
 
 ### 4.8 The workflow steps
 
@@ -508,6 +524,9 @@ code-pack route (additive to engine §4.8).
 | Q14 | `foundation.min_depth` is the engineer's value; the code minimum effective depth is not checked (ACI plan Q13) | Owner | Add the check to the pack later |
 | Q15 | Bar spacing limits of the code are not checked; the basis spacings are the engineer's (ACI plan Q7) | Owner | As Q14 |
 | Q16 | No measured manual time for footing design exists | Owner | Prepare a footing benchmark (two or three past projects) before the first release, for F6 and F7 |
+| Q17 | Engineer dimensions are one square plan size `L` with `h` and `s`; a rectangular footing cannot be entered, because the band rule is not checked (Q2, ACI plan Q7); an engineer plan off the increment is kept and flagged, and `enlarge_plan` then rounds up to the next multiple | Owner | Accept for v1; add `Lx`, `Ly` in a new `FootingDimensions` version together with the band-rule check |
+| Q18 | A large moment can give partial contact (`q_min < 0`) at the size found from `N` only; bearing is then `NEEDS_ENGINEER` (BP G-1), not `FAIL`, so the footing goes to the engineer with no enlargement round | Owner | Accept for v1 (explicit and tested, AC19). Later, preferred: a cited calc that sizes for `q_min ≥ 0` from the moments (BP S5 solved for the plan), so the first size already has full contact; alternative: a rule that may enlarge a bearing `NEEDS_ENGINEER` with reason `FULL_CONTACT` while `plan_at_max` is false (needs the reason in the decision state, a new point version) |
+| Q19 | `compare.length` and `checks.equilibrium_relative_tolerance` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |
 | FG-3 | Footings cannot be resized in SAFE (SAFE SG-4); the cross-check uses the prepared geometry | Owner | Sasaah typed `csi_resize_area_rect` (SAFE Q5) |

@@ -82,7 +82,7 @@ Steps 8 to 12 form one round and repeat, bounded by the basis attempt limit, whi
 | 8 | Bars and effective depths | Harness calc | At least two bars each way | That footing needs the engineer |
 | 9 | Code checks, all footings at once | Code pack: bearing, one-way shear, punching, flexure, minimum steel, development length | Verdicts per footing and case | A failing footing goes to step 10 |
 | 10 | Choose a fix per failing footing | Rules, then the engineer on one screen per round | §5 | — |
-| 11 | Engineer dimensions (only when chosen) | Page | Values entered with their unit | — |
+| 11 | Engineer dimensions (only when chosen) | Page | One square plan size, a depth and a spacing, each with its unit (no rectangle in v1) | — |
 | 12 | Resize | Harness calc | Next plan, depth or spacing within the basis bounds | At a bound: that footing needs the engineer |
 | 13 | Clearance and schedule | Harness calc | Plans do not overlap and keep the basis clear distance | Conflicting footings are marked for the engineer (combined footings are not designed in v1) |
 | 14 | SAFE cross-check (optional) | SAFE through `sasaah-csi-mcp`: column loads, analysis, soil pressures and reactions | Loads read back; applied loads against base reactions within the basis tolerance | Shown in the report; never changes a verdict |
@@ -101,7 +101,9 @@ bound. The rules are engineering content: draft until the owner approves them.
 
 "Combine with a neighbor" marks the footing for the engineer: v1 designs no combined footing. A footing with a check
 that needs the engineer (a code gap, or every SBC 304-2018 check until the owner confirms its clause, overlay spec Q3)
-and no failing check is not decided: it is listed for the engineer with the gap.
+and no failing check is not decided: it is listed for the engineer with the gap. This includes a footing whose column
+moment lifts one edge at the first size (partial contact, a gap of the bearing check): v1 does not enlarge it
+automatically (spec Q18).
 
 ## 6. Approvals / الموافقات
 

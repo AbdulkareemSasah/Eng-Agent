@@ -156,6 +156,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_block.py"
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py"
       - "packages/eng-harness/tests/data/footing/**"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -163,6 +164,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_shear_deepens"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_flexure_reduces_spacing"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_attempts_exhausted_closes_open_footings"
+      - "packages/eng-harness/tests/workflow/footing/test_block.py::test_eccentric_reaction_needs_engineer"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_engineer_dimensions"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_combine_closes"
       - "packages/eng-harness/tests/workflow/footing/test_block.py::test_limit_closes"
@@ -231,6 +233,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/conftest.py"
       - "packages/eng-harness/tests/workflow/footing/test_safe_stage.py"
       - "packages/eng-harness/tests/contract/test_footing_tools.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"
+      - "packages/eng-harness/tests/data/footing/**"
     max_changed_lines: 300
     max_sessions: 3
     tests_first:
@@ -291,8 +295,10 @@ useful without it. T12 adds the report sections and the acceptance audits; T13 i
 
 Reuse (spec §2): plans 0001 to 0009 and the structural-codes packs; no code is copied from Sasaah or elsewhere (A12). The
 footing calcs do not reuse `harness.section_round`, whose single increment field does not fit plan and depth. Tests use
-the synthetic CSI fake (plan 0002 T4, SAFE mode from plan 0008 T2), extended in T8 with joint-reaction replies for the
-footing scenarios, the fake decision provider of plan 0009, scripted page answers, `FixedClock` and `SeededIdSource`.
+the synthetic CSI fake (plan 0002 T4, SAFE mode from plan 0008 T2, in `tests/fakes/sasaah_csi/**`), extended in T8
+with joint-reaction replies for the footing scenarios and in T11 with a prepared SAFE model (points, load patterns,
+soil-pressure and base-reaction replies); both tasks list the fake's files, and the scenario data lives under
+`tests/data/footing/**`, the fake decision provider of plan 0009, scripted page answers, `FixedClock` and `SeededIdSource`.
 
 Every calc and rule ships `draft`; nothing is added to `approvals.yaml` (ADR-0028 §4). Every test value is synthetic and
 labelled so; no case reproduces a project.
