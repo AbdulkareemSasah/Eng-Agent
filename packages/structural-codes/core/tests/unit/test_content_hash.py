@@ -255,3 +255,18 @@ def test_relative_import_beyond_top_level(hashpack: Fixture) -> None:
     hashpack.append("sub/leaf.py", "\nfrom ... import consts\n")
     with pytest.raises(CheckDefinitionError, match="beyond"):
         content_hash(hashpack.check)
+
+
+def test_dynamic_import_rule_covers_pack_modules_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A real pack builds PACK with `structural_codes.pack`, which uses importlib.metadata: that is no violation."""
+    monkeypatch.syspath_prepend(str(Path(__file__).parent.parent / "fixtures" / "synthbase" / "src"))
+    try:
+        pack = importlib.import_module("synth" + "base").PACK
+        for synth_check in pack.checks:
+            assert re.fullmatch(r"[0-9a-f]{64}", content_hash(synth_check))
+            # the core's source is still hashed: it is in the document, only exempt from the dynamic-import rule
+            assert "structural_codes.pack" in _document(synth_check, None)["modules"]
+            assert lint_scope_violations(synth_check, ["src/**/*.py"]) == ()
+    finally:
+        for name in [n for n in sys.modules if n == "synthbase" or n.startswith("synthbase.")]:
+            del sys.modules[name]
