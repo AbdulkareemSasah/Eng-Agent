@@ -91,6 +91,17 @@ def test_command_lines(repo: Repo) -> None:
     assert "--rcfile" in json_argv
 
 
+def test_no_cov_only_when_pytest_cov_is_installed(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    """pytest rejects ``--no-cov`` without pytest-cov, which is a dev dependency only; the step must not pass it then."""
+    import eng_dev_gate.checks.tests_step as step_module
+
+    for installed, expected in ((True, True), (False, False)):
+        monkeypatch.setattr(step_module, "_pytest_cov_installed", lambda installed=installed: installed)
+        runner = FakeCoverage(_totals(1, 1, 0, 0))
+        _step(repo, runner)
+        assert ("--no-cov" in runner.calls[0][0]) is expected
+
+
 def test_pytest_exit_codes(repo: Repo) -> None:
     ok = _totals(1, 1, 0, 0)
     assert _codes(_step(repo, FakeCoverage(ok, pytest_exit=1))) == ["ST001"]
