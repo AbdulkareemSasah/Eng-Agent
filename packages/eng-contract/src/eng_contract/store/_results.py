@@ -14,6 +14,7 @@ from pathlib import Path
 from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from eng_contract._fs import FileSystem, RealFileSystem, StoreIntegrityError, checked_id, write_atomic
+from eng_contract._validation import _field_path
 from eng_contract.canonical import CanonicalJsonError, canonical_json, loads, payload_sha256
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError, ErrorCode
@@ -72,7 +73,16 @@ class ResultStore:
         except ValidationError as exc:
             first = exc.errors()[0]
             hint = f"{'.'.join(map(str, first['loc']))}: {first['msg']}"
-            raise ContractError(ErrorCode.INVALID_ARGUMENT, f"payload is not a valid {kind}", hint=hint[:2000]) from exc
+            location = ""
+            for part in first["loc"]:
+                location += f"[{part}]" if isinstance(part, int) else (f".{part}" if location else str(part))
+            raise ContractError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"payload is not a valid {kind}",
+                field=_field_path(location),
+                expected={"kind": kind},
+                hint=hint[:2000],
+            ) from exc
         if len(set(parents)) != len(parents):
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "parents must be unique", hint="remove the repeated id")
         for parent in parents:
@@ -120,7 +130,9 @@ class ResultStore:
             if payload_sha256(payload) != record.payload_sha256:
                 raise ValueError("the payload hash differs from payload_sha256")
         except (CanonicalJsonError, OSError, ValueError, EOFError, zlib.error) as exc:
-            raise StoreIntegrityError(f"stored result {result_id} is damaged: {exc}", self._ids) from exc
+            raise StoreIntegrityError(
+                f"stored result {result_id} is damaged: {exc}", self._ids, received=result_id
+            ) from exc
         return record, payload
 
     def get(self, result_id: str) -> ResultRecord:

@@ -22,8 +22,8 @@ RETRY_DELAYS_S = (0.05, 0.1, 0.2)
 
 
 class _InternalStoreError(ContractError):
-    def __init__(self, message: str, ids: IdSource) -> None:
-        super().__init__(ErrorCode.INTERNAL, message[:2000], incident_id=ids.new_ulid())
+    def __init__(self, message: str, ids: IdSource, *, received: str | None = None, hint: str | None = None) -> None:
+        super().__init__(ErrorCode.INTERNAL, message[:2000], incident_id=ids.new_ulid(), received=received, hint=hint)
 
 
 class StoreWriteError(_InternalStoreError):
@@ -200,4 +200,9 @@ def write_atomic(
             fs.remove(tmp)
         except OSError:
             _LOG.warning("temporary file not removed", extra={"file": tmp.name}, exc_info=True)
-        raise StoreWriteError(f"cannot write {final.name}: {exc}", ids) from exc
+        hint = (
+            "a result id collided; this is a bug, report the incident id"
+            if isinstance(exc, FileExistsError)
+            else "retry the call; if it fails again report the incident id"
+        )
+        raise StoreWriteError(f"cannot write {final.name}: {exc}", ids, hint=hint) from exc

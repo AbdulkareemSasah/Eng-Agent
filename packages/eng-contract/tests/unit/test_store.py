@@ -177,6 +177,7 @@ def test_rename_gives_up(tmp_path: Path) -> None:
     assert delays == [0.05, 0.1, 0.2]
     assert info.value.detail.code is ErrorCode.INTERNAL
     assert info.value.detail.incident_id
+    assert info.value.detail.hint is not None
     assert isinstance(info.value.__cause__, PermissionError)
     assert fs.files == {}  # no record and no temporary file
 
@@ -202,6 +203,7 @@ def test_exclusive_create(tmp_path: Path, real: bool) -> None:
         _store(tmp_path, fs, delays.append).put("test.note/1", {"text": "x"}, PRODUCER)
     assert info.value.detail.code is ErrorCode.INTERNAL
     assert isinstance(info.value.__cause__, FileExistsError)
+    assert info.value.detail.hint is not None  # spec 6: StoreWriteError carries incident_id and hint
     assert delays == []  # a collision is not retried
     assert fs.read(existing) == b"old"
     assert [p.name for p in tmp_path.rglob("*") if p.is_file()] == ([existing.name] if real else [])
@@ -243,6 +245,7 @@ def _integrity(store: ResultStore, result_id: str) -> StoreIntegrityError:
         store.get(result_id)
     assert info.value.detail.code is ErrorCode.INTERNAL
     assert info.value.detail.incident_id
+    assert info.value.detail.received == result_id  # spec 6
     return info.value
 
 
@@ -442,6 +445,8 @@ def test_invalid_payload_hint_names_the_path(tmp_path: Path) -> None:
         store.put("test.rich/1", {"when": "2026-01-02T03:04:05Z", "odd-name": 7, "items": [1, "a"]}, PRODUCER)
     detail = info.value.detail
     assert detail.message == "payload is not a valid test.rich/1"
+    assert detail.field == "items[1]"  # spec 6: the path inside the payload
+    assert detail.expected == {"kind": "test.rich/1"}
     assert detail.hint is not None
     assert detail.hint.startswith("items.1: ")
     with pytest.raises(ContractError) as long:
