@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -513,6 +513,18 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_uncovered_mutants_count_as_survivors"
     covers: [AC53a]
     depends_on: [T20]
+  - id: T30
+    title: "root gate.yml: workflow specs are specs (spec_globs)"
+    # Amendment (B-340, documents only): turns the plan-less lead fix B-027 (PR 92) into a plan task.
+    files:
+      - ".gate/gate.yml"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 10
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_workflow_specs_are_specs"
+    covers: [AC12a]
+    depends_on: [T3, T14]
 ---
 
 # Implementation plan: eng-dev-gate 0.1

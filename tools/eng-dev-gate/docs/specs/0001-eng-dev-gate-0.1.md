@@ -83,6 +83,9 @@ gate-check (§4.5)
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
   `Plan-Task:` line must be `none (spec and plan)`.
+- AC12a. Given the committed root `.gate/gate.yml`, then its `spec_globs` match `docs/workflows/*.md` under any
+  directory as well as `docs/specs/*.md`, so the documents-only pull request of a workflow spec (process/03, front
+  matter of §5) is a spec and plan pull request (amendment B-340).
 - AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
   task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
 - AC14. Given a branch `lane/<issue>-<slug>`, when the pull request is a draft, then gate-check passes with a notice;
@@ -343,7 +346,9 @@ Checks, in order (all run; findings accumulate):
    the size cap `limits.max_task_lines` (initially 400, "about 400" in process/04 §4) (GC005). A pull request that
    adds or changes `status: approved` fails in bootstrap mode (GC014); with bootstrap off, the approvals of
    process/01 §5 (strictest over the risk set) must exist on the pull request that merged the approving commit,
-   from the logins in `identities`, through `ApprovalSource` (GC015).
+   from the logins in `identities`, through `ApprovalSource` (GC015). Workflow specs (`<package>/docs/workflows/<name>.md`,
+   process/03) carry spec front matter and are specs: the committed `spec_globs` include `**/docs/workflows/*.md`
+   (AC12a; amendment B-340).
 9. **Protected paths.** Changed files matched by `CODEOWNERS` (`.github/CODEOWNERS` or `CODEOWNERS`; patterns
    follow the gitignore subset `*`, `**`, leading `/`, trailing `/`) give AW02 in bootstrap mode; otherwise an approving
    review by `identities.owner_login` on the head commit is required (GC015). Changes to `tools/eng-dev-gate/**`,
@@ -844,6 +849,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
 | AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
+| AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
 | AC19 to AC21a | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27) |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
 | AC23, AC24, AC27 | integration | `test_test_first_run.py::test_red_green`, `::test_passes_at_base_and_fails_at_head`, `::test_base_isolation_and_cleanup` |
