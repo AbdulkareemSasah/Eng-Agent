@@ -1,1 +1,33 @@
-{"version": 1, "counts": {"tools/eng-dev-gate": {"noqa": 19, "skip": 0}, "packages/eng-contract": {"noqa": 3, "type_ignore": 1}, "packages/eng-harness": {"noqa": 1}}}
+{
+  "counts": {
+    "packages/eng-contract": {
+      "noqa": 3,
+      "pragma_no_cover": 0,
+      "skip": 0,
+      "type_ignore": 1,
+      "xfail": 0
+    },
+    "packages/eng-harness": {
+      "noqa": 2,
+      "pragma_no_cover": 0,
+      "skip": 0,
+      "type_ignore": 0,
+      "xfail": 0
+    },
+    "packages/structural-codes/core": {
+      "noqa": 0,
+      "pragma_no_cover": 0,
+      "skip": 0,
+      "type_ignore": 0,
+      "xfail": 0
+    },
+    "tools/eng-dev-gate": {
+      "noqa": 18,
+      "pragma_no_cover": 0,
+      "skip": 0,
+      "type_ignore": 0,
+      "xfail": 0
+    }
+  },
+  "version": 1
+}
