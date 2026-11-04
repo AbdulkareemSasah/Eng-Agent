@@ -170,7 +170,9 @@ def tracked_files(root: Path) -> list[str]:
     """Return the POSIX paths from ``git ls-files`` in ``root``. Raises ``GitError`` (exit 3)."""
     command = ["git", "-c", "core.quotepath=off", "ls-files", "-z"]
     try:
-        done = subprocess.run(command, cwd=root, capture_output=True, timeout=GIT_TIMEOUT_SECONDS, check=False)  # noqa: S603
+        done = subprocess.run(  # noqa: S603  # B-033: no shell; the caller passes a fixed argument list
+            command, cwd=root, capture_output=True, timeout=GIT_TIMEOUT_SECONDS, check=False
+        )
         if done.returncode != 0:
             raise GitError(f"git ls-files failed with exit {done.returncode}")
         return [p for p in done.stdout.decode("utf-8").split("\0") if p]
