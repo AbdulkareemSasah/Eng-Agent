@@ -7,7 +7,7 @@ and never raises (AC35a).
 """
 
 import re
-from enum import StrEnum
+from enum import StrEnum, auto
 from typing import Annotated, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
@@ -28,13 +28,18 @@ class VerdictSource(StrEnum):
 
 
 class VerdictStatus(StrEnum):
-    """Outcome of a check."""
+    """Outcome of a check; each member's value is its own name."""
 
-    PASS = "PASS"  # noqa: S105 (a status name, not a password)
-    FAIL = "FAIL"
-    NOT_APPLICABLE = "NOT_APPLICABLE"
-    NEEDS_ENGINEER = "NEEDS_ENGINEER"
-    ERROR = "ERROR"
+    @staticmethod
+    def _generate_next_value_(name: str, start: int, count: int, last_values: list[str]) -> str:
+        """Use the member name as its value (the default would lower-case it)."""
+        return name
+
+    PASS = auto()
+    FAIL = auto()
+    NOT_APPLICABLE = auto()
+    NEEDS_ENGINEER = auto()
+    ERROR = auto()
 
 
 class SubjectKind(StrEnum):

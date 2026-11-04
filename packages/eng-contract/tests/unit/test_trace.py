@@ -80,6 +80,8 @@ def test_rejects_invalid_fields(over: dict[str, Any]) -> None:
 def test_names_are_unique_across_inputs_constants_and_steps() -> None:
     with pytest.raises(ValidationError):
         Trace.model_validate(_trace(steps=[_step("phi", [])], outputs=[]))
+    with pytest.raises(ValidationError):
+        Trace.model_validate(_trace(inputs=[{"name": "phi", "value": 2}], outputs=[]))
     dup_in = {"name": "Vc", "value": 2}
     with pytest.raises(ValidationError):
         Trace.model_validate(_trace(inputs=[dup_in, dup_in]))
