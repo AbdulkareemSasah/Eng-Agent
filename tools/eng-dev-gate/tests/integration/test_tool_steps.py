@@ -14,7 +14,7 @@ BAD_MODULE = "import os\n\n\ndef f(a: int)->str:\n    return a\n"
 
 
 def _check(repo: Repo, *argv: str) -> RunResult:
-    argv = ("--skip", "tests,docs-fresh,licenses,mutation", *argv)  # the tests step is covered by test_coverage.py
+    argv = ("--skip", "tests,docs-fresh,licenses,mutation,workflows", *argv)  # the tests step is covered by test_coverage.py
     return repo.run(["--format", "json", "check", *argv], {"check": make_handler(SubprocessToolRunner())})
 
 
@@ -34,7 +34,9 @@ def test_ruff_mypy_on_toy_package(repo: Repo) -> None:
     repo.commit({"pkgs/a/src/a/mod.py": BAD_MODULE})
     bad = _check(repo, "--skip", "lock")
     assert bad.code == 1
-    assert _statuses(bad) == {"format": "fail", "lint": "fail", "types": "fail", "forbidden": "pass"}
+    assert _statuses(bad) == {
+        "format": "fail", "lint": "fail", "types": "fail", "forbidden": "pass", "ratchet": "pass",
+    }  # fmt: skip
     codes = {f["code"] for s in json.loads(bad.out)["steps"] for f in s["findings"]}
     assert codes == {"ST001"}
 

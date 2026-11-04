@@ -157,6 +157,7 @@ def test_platform_without_backend(repo: Repo, monkeypatch: pytest.MonkeyPatch) -
     base, member = _setup(repo)
     _change(repo)
     monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.delenv("CI", raising=False)  # the CI runner sets it; the local case needs it unset
     runner = FakeMutmut(["killed"])
     findings = mutation.run_step(_context(repo, member, runner, base))  # local: reported, not failed
     assert [(f.code, f.severity) for f in findings] == [("MU002", Severity.NOTICE)]
