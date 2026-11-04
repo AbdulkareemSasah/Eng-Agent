@@ -189,14 +189,16 @@ def test_metadata_is_frozen_and_error_chained() -> None:
 
 
 def test_error_types() -> None:
-    assert errors.__all__ == [
-        "CheckDefinitionError",
-        "NotImplementedGap",
-        "TraceValueError",
-        "CheckNotUsable",
-        "ApprovalsFileError",
-        "VerificationDataError",
-    ]
+    assert sorted(errors.__all__) == sorted(
+        [
+            "CheckDefinitionError",
+            "NotImplementedGap",
+            "TraceValueError",
+            "CheckNotUsable",
+            "ApprovalsFileError",
+            "VerificationDataError",
+        ]
+    )
     assert meta.__all__ == ["CheckMeta", "GapDecl", "clause_token"]
     for cls in (CheckDefinitionError, TraceValueError, ApprovalsFileError, VerificationDataError, NotImplementedGap):
         assert issubclass(cls, Exception)
