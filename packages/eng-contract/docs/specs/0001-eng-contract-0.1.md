@@ -122,8 +122,9 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC18. Given a final path that already exists, when `put` tries to commit there, then the existing file is unchanged
   and `StoreWriteError` (mapped to `INTERNAL`) is raised. Test: `test_store.py::test_exclusive_create`.
 - AC19. Given a payload whose canonical form exceeds 8 388 608 bytes, when stored, then the record has
-  `payload_file` and the gzip file holds the canonical payload; `get` returns the payload with the same hash. Test:
-  `test_store.py::test_large_payload_split`.
+  `payload_file` and the gzip file holds the canonical payload; `get` returns the verified record with `payload_file`
+  set and `payload` null, and `payload()` returns the loaded payload, whose hash is the recorded one (§4.5.3;
+  amendment B-358). Test: `test_store.py::test_large_payload_split`.
 - AC20. Given a stored record whose payload (inline or gzip) was altered on disk, or a record file rewritten on disk
   to hold a duplicate key, a `NaN` literal, or JSON that does not validate as a `ResultRecord`, when read, then
   `StoreIntegrityError` (mapped to `INTERNAL`, never `INVALID_ARGUMENT`) is raised. Test:
@@ -565,7 +566,8 @@ For each file (the gzip payload first, then the record; the record's presence co
 3. Write all bytes, `flush`, `os.fsync(fd)`, close.
 4. Commit with exclusive create: on Windows `os.rename(tmp, final)` (fails if `final` exists); on POSIX
    `os.link(tmp, final)` then `os.unlink(tmp)` (`link` fails if `final` exists); then, on POSIX, `fsync` the folder.
-   `os.replace` is never used for records.
+   `os.replace` is never used for records. Once `os.link` has succeeded the record is committed: a failure of the
+   `unlink` or of the folder `fsync` after it is logged as a warning and does not fail the write (amendment B-358).
 5. `PermissionError` (Windows sharing violations from scanners, 04 §3.1) on step 4 is retried after 0.05, 0.1 and
    0.2 s (three retries, four attempts; delays from the injected `sleep`) **[added: values are a software decision,
    not engineering values]**; after the last failure the temporary file is removed and `StoreWriteError` is raised.
