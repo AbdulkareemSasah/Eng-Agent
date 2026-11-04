@@ -24,6 +24,7 @@ tasks:
   - id: T2
     title: "HTML builder: escaping by construction, safe tokens, labeled untrusted fields, style hash"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/_html.py"
       - "packages/eng-harness/src/eng_harness/pages/_css.py"
@@ -70,6 +71,7 @@ tasks:
   - id: T4
     title: "Expected times from earlier journals and the progress renderer"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.progress (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/progress/__init__.py"
       - "packages/eng-harness/src/eng_harness/progress/_expected.py"
@@ -91,6 +93,7 @@ tasks:
   - id: T5
     title: "Non-blocking progress sink, heartbeat task and liveness reader"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.progress (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/progress/_sink.py"
       - "packages/eng-harness/src/eng_harness/progress/_heartbeat.py"
@@ -108,6 +111,7 @@ tasks:
   - id: T6
     title: "Page server: loopback bind, launch code and session, Host, Origin and CSRF checks, headers, routes, lockdown"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/__init__.py"
       - "packages/eng-harness/src/eng_harness/pages/_security.py"
@@ -136,6 +140,7 @@ tasks:
   - id: T7
     title: "Answer models and checks, approval and input ports, durable wait, stop-file run control"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli, eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_answers.py"
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
@@ -163,6 +168,7 @@ tasks:
   - id: T8
     title: "Report package skeleton, release marks and lineage closure"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/__init__.py"
       - "packages/eng-harness/src/eng_harness/report/_lineage.py"
@@ -178,6 +184,7 @@ tasks:
   - id: T9
     title: "Approval screens: change set, promotion, info and sign-off"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_labels.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_approval.py"
@@ -195,6 +202,7 @@ tasks:
   - id: T10
     title: "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_screens_choice.py"
       - "packages/eng-harness/src/eng_harness/pages/_answers_file.py"
@@ -212,6 +220,7 @@ tasks:
   - id: T11
     title: "Report model: fold the journal and the store; timings, waiting and machine time"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_model.py"
       - "packages/eng-harness/tests/unit/report/test_timings.py"
@@ -225,6 +234,7 @@ tasks:
   - id: T12
     title: "Report sections: changes, results, sources, decisions; renderer registry; value cells with sources"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_sections.py"
       - "packages/eng-harness/tests/unit/report/test_sources.py"
@@ -242,6 +252,7 @@ tasks:
   - id: T13
     title: "Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_document.py"
       - "packages/eng-harness/src/eng_harness/report/_write.py"
@@ -264,6 +275,7 @@ tasks:
     # handling, the launch address on the terminal only (AC10, AC61) and the decision layer of amendment B-098
     # (AC62, AC63).
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_options.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
@@ -288,6 +300,7 @@ tasks:
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_signals.py"
@@ -308,6 +321,7 @@ tasks:
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_screens_basis.py"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py"
@@ -323,6 +337,7 @@ tasks:
   - id: T16
     title: "Commands status, stop, report and doctor"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_status.py"
       - "packages/eng-harness/src/eng_harness/cli/_stop.py"

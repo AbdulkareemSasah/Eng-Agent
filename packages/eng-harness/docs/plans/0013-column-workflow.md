@@ -4,11 +4,12 @@ issue: "B-083"
 spec: packages/eng-harness/docs/specs/0013-column-workflow.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1]               # binding for every pull request of this plan
+risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: Column workflow kinds and request models
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.column_design, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/__init__.py"
       - "packages/eng-harness/src/eng_harness/kinds/column_design.py"
@@ -26,6 +27,7 @@ tasks:
   - id: T2
     title: Calc harness.column_select with golden and property tests
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_select (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_select.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
@@ -49,6 +51,7 @@ tasks:
   - id: T3
     title: Calc harness.column_demands (sign, axes, length, layout, not-checked reasons)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_demands (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_demands.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
@@ -74,6 +77,7 @@ tasks:
   - id: T4
     title: Calc harness.column_review (members, governing references, changes)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_review (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_review.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
@@ -95,6 +99,7 @@ tasks:
   - id: T5
     title: Calcs harness.column_section_match and harness.column_change_set
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.change_set and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_section_match.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_change_set.md"
@@ -141,6 +146,7 @@ tasks:
   - id: T7
     title: Calc harness.revit_column_update (plan of Revit type changes by reference)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.revit_update (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.revit_column_update.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
@@ -166,6 +172,7 @@ tasks:
   - id: T8
     title: Calc harness.revit_column_readback
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.revit_readback (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.revit_column_readback.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
@@ -186,6 +193,7 @@ tasks:
   - id: T9
     title: Decision points and rules of the column workflow
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.column_design, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_points.py"
       - "packages/eng-harness/src/eng_harness/rules/column_design.py"
@@ -202,6 +210,7 @@ tasks:
   - id: T10
     title: Engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.block, eng_harness.calcs, eng_harness.calcs.edit_cycle and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/block.py"
       - "packages/eng-harness/src/eng_harness/errors.py"
@@ -225,6 +234,7 @@ tasks:
   - id: T11
     title: Workflow column_design part 1 - definition, basis fields, scope, review cycle (steps 1 to 10 and 15)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_cycle.py"
@@ -249,6 +259,7 @@ tasks:
   - id: T12
     title: Workflow column_design part 2 - proposals, rounding and match, decisions, apply, design record (steps 11 to 14)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_cycle.py"
@@ -270,6 +281,7 @@ tasks:
   - id: T13
     title: Workflow column_revit_update (steps R1 to R9)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_revit.py"
@@ -292,6 +304,7 @@ tasks:
   - id: T14
     title: Report renderers, verdict-source audit and the local-testing list
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_column_design.py"
       - "packages/eng-harness/src/eng_harness/report/_sections.py"

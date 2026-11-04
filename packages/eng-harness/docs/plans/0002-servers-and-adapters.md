@@ -30,6 +30,7 @@ tasks:
   - id: T2
     title: Process launcher and inspector ports, POSIX implementation
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_launcher.py"
       - "packages/eng-harness/src/eng_harness/servers/_procinfo.py"
@@ -49,6 +50,7 @@ tasks:
   - id: T3
     title: Windows launcher, per-server Job Objects with breakaway, Windows process inspector
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_launcher_windows.py"
       - "packages/eng-harness/src/eng_harness/servers/_procinfo.py"
@@ -82,6 +84,7 @@ tasks:
   - id: T5
     title: Process transport, MCP client session, crash detection, restart and shutdown
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/__init__.py"
       - "packages/eng-harness/src/eng_harness/servers/_transport.py"
@@ -128,6 +131,7 @@ tasks:
   - id: T6b
     title: Build check, tool-list fingerprint pinned from the inventory, and ServerCheck
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
@@ -148,6 +152,7 @@ tasks:
   - id: T7
     title: Machine-level host-instance lock and process guard
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_hostlock.py"
       - "packages/eng-harness/src/eng_harness/servers/_guard.py"
@@ -169,6 +174,7 @@ tasks:
     # lead decision D-12: split. T8 keeps the argument and envelope layers (AC18, AC19); T8b keeps the write ledger and
     # the ToolPort over them (AC17, AC38 port side, B-068). T8 waits for T6b because provenance records the build.
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/_args.py"
@@ -186,6 +192,7 @@ tasks:
   - id: T8b
     title: Write ledger and ToolPort describe, call and unreleased_tools
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/_ledger.py"
@@ -202,6 +209,7 @@ tasks:
   - id: T9
     title: Error and timeout mapping, the CSI error table (interim model_locked)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/_errors.py"
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
@@ -219,6 +227,7 @@ tasks:
   - id: T10
     title: Harness-side model identity (ADR-0032), CSI session operations, HostPort file and instance methods
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/_identity.py"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
@@ -237,6 +246,7 @@ tasks:
   - id: T11
     title: CSI model-state reader, model kinds, fingerprint and units read
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_replies.py"
@@ -257,6 +267,7 @@ tasks:
   - id: T12
     title: CSI edit kinds, read-back helpers and check_model
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_edits.py"
@@ -278,6 +289,7 @@ tasks:
   - id: T13
     title: CSI analysis, design and results through the long role
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_replies.py"
@@ -293,6 +305,7 @@ tasks:
   - id: T14
     title: Reconciliation by reading model state, preview and read_back
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
@@ -308,6 +321,7 @@ tasks:
   - id: T15
     title: ADR-0031 switch - model_locked as model_unlocked precondition and the approved unlock step (blocked until accepted)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_errors.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
@@ -323,6 +337,7 @@ tasks:
   - id: T16
     title: Command-line tool adapter (dxf-prep, etabs-model build)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/cli/_adapter.py"
@@ -339,6 +354,7 @@ tasks:
   - id: T17
     title: Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_record.py"
       - "packages/eng-harness/src/eng_harness/servers/__init__.py"
@@ -374,6 +390,7 @@ tasks:
   - id: T19
     title: Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/docs/local-testing.md"
@@ -391,6 +408,7 @@ tasks:
   - id: T20
     title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_launch_args.py"
