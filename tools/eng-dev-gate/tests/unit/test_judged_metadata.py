@@ -53,7 +53,8 @@ def test_script_entry_point_writes_the_json_file(tmp_path: Path, monkeypatch: py
     with pytest.raises(SystemExit) as stopped:
         runpy.run_path(str(Path(judged_metadata.__file__)), run_name="__main__")
     assert stopped.value.code == 0
-    assert any(entry["name"].lower() == "pytest" for entry in json.loads(out.read_text(encoding="utf-8")))
+    written = json.loads(out.read_text(encoding="utf-8"))
+    assert any(entry["name"].lower() == "pytest" for entry in written["distributions"])
 
 
 def test_reader_imports_nothing_from_the_gate_package() -> None:

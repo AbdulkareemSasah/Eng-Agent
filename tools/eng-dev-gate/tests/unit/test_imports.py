@@ -5,10 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from eng_dev_gate.checks import imports
+import pytest
+from eng_dev_gate.checks import imports, tests_step
 from eng_dev_gate.checks.imports import check_workspace
 from eng_dev_gate.checks.registry import STEPS, StepContext
 from eng_dev_gate.report import Finding
+from eng_dev_gate.results import EnvironmentFaultError
 from support.repo import Repo
 from support.scripted import EnvironmentRunner, environment_payload
 from support.toy import GATE_YML
@@ -188,3 +190,16 @@ def test_step_with_a_stale_lock_is_st001(repo: Repo, tmp_path: Path) -> None:
 
 def test_the_registry_gives_the_imports_step_the_whole_context() -> None:
     assert {step.name: step.run for step in STEPS}["imports"] is imports.step
+
+
+def test_head_run_reads_the_interpreter_of_the_gate(repo: Repo) -> None:
+    root = _importer(repo)
+    runner = EnvironmentRunner(environment_payload({"somemod": ["some-dist"]}))
+    assert _codes(imports.step(StepContext(root, root, None, runner))) == [("IM006", "pkgs/p-a/src/p_a/a.py")]
+    assert runner.calls == []
+
+
+def test_step_without_uv_is_an_environment_fault(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tests_step, "_uv_available", lambda: False)
+    with pytest.raises(EnvironmentFaultError, match="imports: uv is not available"):
+        imports.step(StepContext(_importer(repo), tmp_path, None, EnvironmentRunner()))

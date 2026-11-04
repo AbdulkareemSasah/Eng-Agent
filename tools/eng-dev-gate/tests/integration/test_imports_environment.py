@@ -27,3 +27,12 @@ def test_declared_dependency_installed_only_in_the_judged_environment_is_im006_f
     gate = make_gate_root(tmp_path / "base")
     head = make_judged_tree(tmp_path / "head", extra_files=stubbed_dependency(USES_DEPENDENCY))
     assert _judge(gate, head) == (0, [])
+
+
+def test_undeclared_dependency_is_still_im006(tmp_path: Path) -> None:
+    """A module of a distribution that the member does not declare stays IM006 in the judged environment."""
+    gate = make_gate_root(tmp_path / "base")
+    files = stubbed_dependency(USES_DEPENDENCY)
+    files["pyproject.toml"] = files["pyproject.toml"].replace('["dep-dist", "types-dep-dist"]', '["types-dep-dist"]')
+    head = make_judged_tree(tmp_path / "head", extra_files=files)
+    assert _judge(gate, head) == (1, [("IM006", "pkgs/a/src/a/uses.py")])
