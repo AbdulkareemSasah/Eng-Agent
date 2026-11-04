@@ -1,0 +1,25 @@
+# Root gate configuration of eng-dev-gate (spec 4.4, section 5). Protected path (.gate/**).
+# The mode comes only from bootstrap.enabled in this file (AC4). Owner switches it off and fills identities.
+bootstrap:
+  enabled: true
+  gate_branch: build/v1
+main_branch: main
+identities:  # all three must be set before bootstrap.enabled can be false (CF008)
+  owner_login: AbdulkareemSasah
+  agent_logins: []
+  reviewer_app: ""
+spec_globs: ["**/docs/specs/*.md"]
+plan_globs: ["**/docs/plans/*.md"]
+test_globs: ["**/tests/**", "**/test_*.py", "**/conftest.py"]
+generated_globs: ["uv.lock", "**/AGENTS.md"]
+spike_globs: ["spikes/**"]
+agents:
+  unmanaged_ok: ["design/**"]
+limits:  # max_task_lines: process/04 section 4. The others are gate settings proposed here (owner queue).
+  diff_lines: 200
+  max_task_lines: 400
+  test_run_seconds: 600
+  max_file_bytes: 1048576
+license_exceptions: []
+secrets:
+  allow: []
