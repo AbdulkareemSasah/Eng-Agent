@@ -17,6 +17,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, field_validator
 
 from eng_dev_gate.checks.gate_check import parse_body
+from eng_dev_gate.checks.gate_check_docs import NONE_LINE
 from eng_dev_gate.config import GateConfig
 from eng_dev_gate.event import event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, parse_plan, parse_spec, safe_relative_path
@@ -109,6 +110,13 @@ def _body_risk(body: str) -> list[set[str] | None]:
     return [parse_risk_line(line.removeprefix("Risk:")) for line in body.splitlines() if line.startswith("Risk:")]
 
 
+def _is_none_reason(body: str) -> bool:
+    """True for one ``Plan-Task: none (<reason>)`` line whose reason is not ``spec and plan`` (amendment B-336)."""
+    lines = parse_body(body).plan_task
+    found = NONE_LINE.fullmatch(lines[0][1]) if len(lines) == 1 else None
+    return found is not None and found[1] != "spec and plan"
+
+
 def _rf004(message: str) -> Finding:
     return Finding(code="RF004", severity=Severity.ERROR, message=f"no recorded risk: {message}")
 
@@ -170,9 +178,10 @@ def check_risk_floor(
     lane = head_ref is not None and _LANE.fullmatch(head_ref) is not None
     documents = bool(changed) and all(matches_any(p, [*config.spec_globs, *config.plan_globs]) for p in changed)
     declared = _body_risk(body)
-    if lane:
+    from_body = lane or (not documents and _is_none_reason(body))
+    if from_body:
         recorded = declared[0] if len(declared) == 1 else None
-        recorded_or_finding = recorded if recorded is not None else _rf004("a lane branch needs one valid `Risk:` line")
+        recorded_or_finding = recorded if recorded is not None else _rf004("the body needs one valid `Risk:` line")
     elif documents:
         recorded_or_finding = _documents_risk(git, shas[1], changed, config)
     else:
@@ -186,7 +195,7 @@ def check_risk_floor(
             f"floor {sorted(floor)} is not within the recorded risk {sorted(recorded_or_finding)}; raised by {raised}"
         )
         findings.append(Finding(code="RF001", severity=Severity.ERROR, message=message))
-    if not (lane or documents) and declared and declared != [recorded_or_finding]:
+    if not (from_body or documents) and declared and declared != [recorded_or_finding]:
         message = f"the body `Risk:` line must name the plan's set {sorted(recorded_or_finding)}"
         findings.append(Finding(code="RF002", severity=Severity.ERROR, message=message))
     return findings
