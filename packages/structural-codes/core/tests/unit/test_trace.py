@@ -24,7 +24,7 @@ _SYNTH = "synthetic"
 
 class _Inputs(CheckInputs):
     width_mm: float = bounded(ge=_LOW, le=_HIGH, unit="mm")
-    reaction_kN: float = unbounded(reason="signed reaction; no physical bound", unit="kN")
+    reaction_kN: float = unbounded(reason="signed reaction; no physical bound", unit="kN")  # noqa: N815  # B-258: unit suffix of EC 4.7.2
     flag: bool = False
 
 
@@ -49,7 +49,9 @@ def test_recording_rules() -> None:
     assert t.value("phi") == 0.5
     assert t.value("width_mm") == 10.0
     assert t.value("flag") == 0.0
-    assert t.step("area_mm2", 100.0, unit="mm2", formula="width_mm * width_mm", source=_SYNTH, uses=["width_mm"]) == 100.0
+    assert (
+        t.step("area_mm2", 100.0, unit="mm2", formula="width_mm * width_mm", source=_SYNTH, uses=["width_mm"]) == 100.0
+    )
     assert t.step("ok", True, unit=None, formula="area_mm2 > 0", source=_SYNTH, uses=["area_mm2"]) == 1.0
     assert t.value("area_mm2") == 100.0
     assert t.step("n", 2, unit=None, formula="2", source=_SYNTH, uses=[]) == 2.0
@@ -103,8 +105,10 @@ def test_inputs_and_contract_shape() -> None:
 
     with pytest.raises(CheckDefinitionError, match="outputs"):
         t.to_trace(outputs=["missing"], status=None)
-    t.step("long_step", 1.0, unit=None, formula="x" * 1001, source=_SYNTH, uses=[])
     with pytest.raises(CheckDefinitionError, match="long_step"):
+        t.step("long_step", 1.0, unit=None, formula="x" * 1001, source=_SYNTH, uses=[])
+    t.note("x" * 2001)
+    with pytest.raises(CheckDefinitionError, match="invalid"):
         t.to_trace(outputs=[], status=None)
 
 
@@ -120,7 +124,7 @@ def test_step_units() -> None:
     ):
         t.step(name, 1.0, unit=unit, formula="x", source=_SYNTH, uses=[])
 
-    with pytest.raises(CheckDefinitionError, match="demand_kN.*'N'"):
+    with pytest.raises(CheckDefinitionError, match=r"demand_kN.*'N'"):
         t.step("demand_kN", 1.0, unit="N", formula="x", source=_SYNTH, uses=[])
     with pytest.raises(CheckDefinitionError, match="depth_mm"):
         t.step("depth_mm", 1.0, unit=None, formula="x", source=_SYNTH, uses=[])
