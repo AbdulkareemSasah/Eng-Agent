@@ -2,7 +2,7 @@
 # A change gets at least the risk of the highest entry it touches. Packages refine this map
 # with their own .gate/risk-map.yml.
 - paths:  # R1: engineering content
-    - "**/checks/**"
+    - "packages/**/checks/**"  # engineering checks; the gate's own checks/ code is r3 (B-099)
     - "**/tests/data/golden/**"
     - "**/approvals.yaml"
     - "packages/eng-harness/src/eng_harness/calcs/**"
