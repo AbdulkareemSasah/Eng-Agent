@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 _RESULT = re.compile(r"^\s+\S+: (.+)$")  # a line of ``mutmut results --all true``: "    <mutant>: <status>"
 _KILLED = ("killed", "timeout")  # spec 4.12: the score counts timeouts as killed
 _SPINNER = re.compile(r"^[\u2800-\u28ff]")  # the braille frames of the progress display of mutmut
+_NO_MUTANT = "could not find any test case for any mutant"  # what mutmut says when no mutant has a test to run
 _TAIL_LINES = 8  # lines of mutmut output quoted in MU002; presentation only
 _IGNORED = (".git", "mutants", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache")
 
@@ -148,15 +149,20 @@ def run_step(ctx: StepContext) -> list[Finding]:
             encoding="utf-8",
         )
         ran = ctx.runner.run(_mutmut(ctx, "run"), copy)
-        if ran.exit_code != 0:
-            raise _fault("mutmut run", ran.exit_code, ran.output)
         listing = ctx.runner.run(_mutmut(ctx, "results", "--all", "true"), copy)
-        if listing.exit_code != 0:
+        counts = parse_results(listing.output) if listing.exit_code == 0 else None
+        stopped = ran.exit_code == 0 or _NO_MUTANT in ran.output  # mutmut ended without a fault of its own
+        if counts is not None and not counts and stopped:
+            # mutmut mutates less than _has_code admits (a module-level lambda, decorated methods only): AC53a
+            return _notice(member.path, "nothing to mutate: mutmut produced no mutant", "MU003")
+        if not stopped:
+            raise _fault("mutmut run", ran.exit_code, ran.output)
+        if counts is None:
             raise _fault("mutmut results", listing.exit_code, listing.output)
-    counts = parse_results(listing.output)
+    # mutants no test covers ("no tests") are survivors: only killed and timeout count (AC53a)
     total, killed = counts.total(), sum(counts[status] for status in _KILLED)
     minimum = MUTATION_FLOOR if config.mutation_min is None else config.mutation_min
-    if total and killed * 100 < minimum * total:
+    if killed * 100 < minimum * total:
         message = f"mutation score {killed}/{total} is below {minimum} % on {', '.join(modules)}"
         return [Finding(code="MU001", severity=Severity.ERROR, path=member.path, message=message)]
     return []
