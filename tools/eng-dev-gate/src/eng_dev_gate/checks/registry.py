@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal
 
 from eng_dev_gate.checks import (
+    config_step,
     forbidden,
     generated,
     licenses,
@@ -53,6 +54,7 @@ class Step:
 
 STEPS: tuple[Step, ...] = (
     Step("lock", "root", tool_steps.lock),
+    Step("config", "package", config_step.config),
     Step("format", "package", tool_steps.format_),
     Step("lint", "package", tool_steps.lint),
     Step("types", "package", tool_steps.types),
