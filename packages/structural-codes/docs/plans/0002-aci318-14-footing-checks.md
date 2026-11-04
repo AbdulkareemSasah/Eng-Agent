@@ -1,7 +1,7 @@
 ---
 id: plan-b071-aci318-14-footing-checks
 issue: "B-071"
-spec: packages/structural-codes/docs/clauses/aci318_14/   # the six clause specs listed in §1
+spec: packages/structural-codes/docs/clauses/aci318_14/   # a directory on purpose: this plan's spec is the six clause specs of §1, one per check
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
 risk: [r1, r3]           # binding for every pull request of this plan; r3 from T1 (pyproject.toml, uv.lock, .gate/)
@@ -210,7 +210,9 @@ assembly (T9), which registers the pack and runs the pack-level tests. Each task
 
 Start condition: core plan 0001 tasks T1 (shared folder files), T6 (checks and registry) and T8 (runner) are merged
 before T2; T9 (verification) before T3 to T8 (their case files are run through `verify_check`); T11 and T12
-(lifecycle, command line) before T9. T1 needs core T1 only.
+(lifecycle, command line) before T9. T1 needs core T1 only. T9 also needs the clause-spec folder settled (§6 Q12):
+CF §4.1 and §4.2 amended to `docs/clauses/<pack>/`, or these clause specs moved to the folder the core resolves, so
+that PK-AC3 finds every `CheckMeta.spec` file.
 
 ## 2. Tasks
 
@@ -228,7 +230,8 @@ touch a shared file.
 steps on the caller's `TraceRecorder` (so every intermediate appears in each check's trace) and the two exact
 integrals of the one-way shear and flexure specs. `_common.py`: the `Cited` constants used by more than one check
 (`phi_v`, `lambda_nw`, `sf_max`, `fc_min`, `fy_max`, SI prefixes, mechanics identities) and the shared preconditions
-`NORMALWEIGHT`, `FC_MIN`, `FY_MAX`, `COMPRESSION`, `FULL_CONTACT` with their clauses. R1 module; reviewed with the
+`NORMALWEIGHT`, `FC_MIN`, `FY_MAX`, `COMPRESSION`, `FULL_CONTACT` with their clauses. `FC_MIN` uses the general row
+of Table 19.2.1.1 and carries the recorded SDC assumption of the clause specs (§6 Q16). R1 module; reviewed with the
 source-check lens.
 
 **T3 to T8 Checks.** One check per task, each with its unit tests, its hand-check case file
@@ -279,6 +282,10 @@ to B-075.
 - Local gate per task: `uv run eng-gate check` once `eng-dev-gate` exists; until then `uv run ruff format --check`,
   `uv run ruff check`, `uv run mypy --strict src tests` and `uv run pytest` with coverage, from
   `packages/structural-codes/aci318-14/`.
+- Hand-check tolerances are absolute and stated in §8 of each clause spec. They replace the default of
+  [10](../../../../design/docs/architecture/10-structural-codes.md) §6 (0.5% relative with an absolute floor) for hand
+  checks only, because a hand check repeats the spec's own equations and differs from the check only by floating-point
+  rounding; worked examples and program comparisons keep the 10 §6 default.
 - Review: each pull request by a subagent that did not write it, with the R1 source-check lens (constants and
   equations against the clause spec, tracing of every intermediate). The C3 line-by-line comparison against the code
   text and the owner's G1 approval are `awaiting owner` in bootstrap mode.
@@ -323,6 +330,7 @@ to B-075.
 | Q13 | Minimum effective depth of footings (13.3.1.2) is not in the 10 §9 list | Add a check `aci318_14.13_3_1_2.min_effective_depth` in a later version |
 | Q14 | Bearing at the column-footing interface and dowels are not in scope (clause numbers confirmed when specified) | Add with the column workflow (phase 3) |
 | Q15 | process/05 §2 requires worked examples for every check in `structural-codes`; none exists here | The gate reports this `awaiting owner` in bootstrap mode; the owner supplies G-WE |
+| Q16 | `FC_MIN` (`fc_min = 17 MPa`) is the general row of Table 19.2.1.1; the table's foundation rows depend on the Seismic Design Category, and their limits are not confirmed here (one-way C-2, punching C-1, flexure C-2, development C-3) | Confirm the foundation rows at C3; until then B-075 refuses footings of structures in SDC D, E or F (`NEEDS_ENGINEER`), which needs a design-basis field for the SDC (B-063) |
 
 ### 6.2 Gaps
 
@@ -330,7 +338,7 @@ to B-075.
 |---|---|---|
 | G-WE | No worked example from a book or the code's own examples: the owner supplies book, edition, page and example number for each of the six checks; every case here is a labeled hand check | WE-1 of each clause spec |
 | Check gaps | Bearing G-1, G-2; one-way G-1, G-2; punching G-1 to G-4; flexure G-1, G-2; development G-1, G-2: each returns `NEEDS_ENGINEER` and is tested | §10 of each clause spec |
-| C items | Clause chains to confirm at C3: one-way C-1 (critical section at `d`), flexure C-1 (`fy_max` row, `β1` boundary), minimum reinforcement C-1, development C-1 | §10 of each clause spec |
+| C items | Clause chains to confirm at C3: one-way C-1 (critical section at `d`), flexure C-1 (`fy_max` row, `β1` boundary), minimum reinforcement C-1, development C-1; the foundation rows of Table 19.2.1.1 behind `FC_MIN` (one-way C-2, punching C-1, flexure C-2, development C-3; Q16) | §10 of each clause spec |
 
 ### 6.3 Non-goals
 
