@@ -9,7 +9,11 @@ dependencies = ["pydantic>=2.14,<3"]
 # Test-only dependencies of this package, declared here so the package keeps them when it leaves the workspace
 # (imports rule IM006 of the gate, spec 4.10); the versions follow the workspace root's dev group.
 [dependency-groups]
-dev = ["pytest>=9.2.0", "hypothesis>=6.170.14"]
+dev = [
+    "pytest>=9.2.0",
+    "hypothesis>=6.170.14",
+    "jsonschema>=4.26.0",
+]
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
