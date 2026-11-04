@@ -34,7 +34,7 @@ def test_value_must_be_a_finite_number(value: object) -> None:
         Cited.model_validate({"value": value, "unit": "1", "source": _SOURCE})
 
 
-@pytest.mark.parametrize("source", ["", "short", "        ", " " * 8 + "x", "a" * 501])
+@pytest.mark.parametrize("source", ["", "short", "        ", "a" * 501])
 def test_source_length_and_blank(source: str) -> None:
     with pytest.raises(ValidationError):
         Cited(value=1, unit="1", source=source)

@@ -84,7 +84,7 @@ def test_frozen() -> None:
 def test_comparisons() -> None:
     inch, mm = Quantity(1, "in"), Quantity(25.4, "mm")
     assert inch == mm
-    assert not inch != mm
+    assert operator.ne(inch, mm) is False
     assert not inch < mm
     assert not mm < inch
     assert inch <= mm
@@ -92,14 +92,14 @@ def test_comparisons() -> None:
     assert Quantity(24, "mm") < inch < Quantity(26, "mm")
     assert Quantity(26, "mm") > inch
     assert Quantity(212, "degF") == Quantity(100, "degC")
-    assert Quantity(0, "degC") < Quantity(1, "K") < Quantity(300, "K")
+    assert Quantity(1, "K") < Quantity(0, "degC") < Quantity(300, "K")
 
     force, length = Quantity(1, "kN"), Quantity(1, "mm")
     for op in (operator.lt, operator.le, operator.gt, operator.ge):
         with pytest.raises(TypeError):
             op(force, length)
     assert force != length
-    assert not force == length
+    assert operator.eq(force, length) is False
 
     other: Any
     for other in (1, 1.0, None, "1 mm"):
@@ -108,7 +108,7 @@ def test_comparisons() -> None:
                 op(length, other)
             with pytest.raises(TypeError):
                 op(other, length)
-        assert not length == other
+        assert operator.eq(length, other) is False
         assert length != other
 
 
