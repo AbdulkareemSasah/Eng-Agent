@@ -74,10 +74,11 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 - AC3. Given a check id of a registered pack and `items` of references, when `ctx.calc` runs it, then the CalcPort calls
   `evaluate_batch` with the store as `source` and `require_refs`, stores the `verdicts.set/1` payload with `draft` from
-  the check state, provenance `tool: "structural_codes"`, the pack version and the check's `content_sha256`, and returns
+  the check state, provenance `tool: "structural-codes"` (the spelling of spec 0013 §4.5), the pack version and the check's `content_sha256`, and returns
   a summary of counts only. Test: `tests/unit/calcs/test_code_pack_route.py::test_batch_stored_as_verdict_set`.
 - AC4. Given a draft check, then a `trial` run evaluates it and a `production` run refuses it with `CalcRefused`
-  (calcs §4.12, CF AC25); given an unknown check id or one outside the route's allowlist (§4.3), then `NOT_FOUND` before any evaluation; given a literal where a
+  (calcs §4.12, CF AC25); given an unknown check id or one outside the route's allowlist (§4.3), then `ContractError` `NOT_FOUND` before any
+  evaluation (as calcs AC13 and §6 for an unknown calc id; spec 0013 AC13 expects `RegistryError` here, C4); given a literal where a
   reference is required, then `INVALID_ARGUMENT`. Tests: `::test_production_refuses_draft`, `::test_unknown_id`,
   `::test_literal_refused`.
 - AC5. Given `design.code_pack = sbc304_2018`, when the workflow runs, then every check id is resolved with
@@ -243,7 +244,8 @@ argument below, beside `batch`; and `NotImplementedGap` as a verdict. `CodePackR
 `HarnessCalcPort` for an id that is not a harness calc (harness ids start with `harness.`):
 
 1. `describe(check_id)`: looks the id up in the `Registry` the run was built with (packs discovered once at engine
-   construction, CF §4.6; an id outside the allowlist is `NOT_FOUND`); `CalcInfo` with the check's version, `content_sha256`, state, `basis_fields` (the basis paths
+   construction, CF §4.6; an id outside the allowlist is `NOT_FOUND`, as an unknown calc id in calcs §6, never a
+   `RegistryError` raised to the block, C4); `CalcInfo` with the check's version, `content_sha256`, state, `basis_fields` (the basis paths
    its input model declares as sources) and `ref_rules` (no `stale_ok`).
 2. `run(check_id, {"items": [{"subject": Subject, "inputs": {name: Ref}}]})`: refuses by run class as calcs §4.12
    (production needs `approved`), calls `evaluate_batch(check_id, items, mode, registry, source=store,
@@ -539,7 +541,8 @@ code-pack route (additive to engine §4.8).
 | A1 | **[added]** Kinds of §4.2; the code-pack route; calcs of §4.4 and §4.9; option `reduce_bar_spacing`; basis paths of §4.7; `footing_review` | Owner | Accept with this spec |
 | C1 | Conflict: 12 §2 lists four options; flexure and minimum-steel failures need a fifth | Owner | Amend 12 §2's example when accepted |
 | C2 | Conflict: engine §4.8 says the `CalcPort` serves code packs; calcs §4.12 defines harness calcs only | Owner | §4.3 and Q10 |
-| C3 | Conflict: spec 0013 §4.5 (merged first) defines the code-pack route with a fixed allowlist and a `batch` reference; §4.3 here used a registry lookup and inline `items` | Owner | One route (§4.3): the allowlist holds both workflows' ids, `run` takes `items` or `batch`; the first of plan 0013 T6 and plan T2 builds it, the other extends it |
+| C3 | Conflict: spec 0013 §4.5 (merged first) defines the code-pack route with a fixed allowlist and a `batch` reference; §4.3 here used a registry lookup and inline `items` | Owner | One route (§4.3): the allowlist holds both workflows' ids, `run` takes `items` or `batch`; the first of plan 0013 T6 and plan T2 builds it, the other extends it. The route is one only after C4 is settled; the provenance spelling is already one (`tool: "structural-codes"`, as spec 0013 §4.5; AC3 follows it) |
+| C4 | Conflict: for a check id outside the allowlist, spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py::test_only_listed_checks`) expects `RegistryError`; AC4 and §4.3 here expect `ContractError` `NOT_FOUND`. Both specs map their tests to the same test file, so the second of plan 0013 T6 and plan T2 to merge cannot meet both without changing an existing expectation (A4) | Lead, then owner | `NOT_FOUND`: it is the CalcPort's answer for an unknown calc id (calcs AC13 and §6), it reaches the block as a `ContractError` like every other CalcPort failure, and a `RegistryError` is an internal exception of `structural_codes`. Amend spec 0013 AC13 and §4.5 (and the expectation of `::test_only_listed_checks`) in a documents pull request before plan 0013 T6 or plan T2 starts, whichever is first; until it merges, neither task may write that expectation |
 
 ## 12. Needs local test
 

@@ -314,7 +314,10 @@ Tests use a small test pack built with `Registry.of` in `tests/unit/calcs/fixtur
 for the ACI pack. Starts only after the documents pull request that amends engine §4.8 and calcs §4.12 (spec Q10).
 Spec 0013 §4.5 defines the same route (spec C3): if plan 0013 T6 has merged when T2 starts, T2 adds the footing ids,
 the `items` argument and its tests to that route (the dependencies are then already in place), and the lead records
-which by a plan amendment; otherwise T2 builds the route with both workflows' ids and plan 0013 T6 extends it.
+which by a plan amendment; otherwise T2 builds the route with both workflows' ids and plan 0013 T6 extends it. T2 also
+starts only after the documents pull request that settles spec C4 (an id outside the allowlist gives `NOT_FOUND`, spec
+0013 AC13 amended); T2 never changes an expectation of a merged test of that file to meet this spec (A4). Provenance is
+`tool: "structural-codes"` in both specs.
 
 **T3 Subjects** (spec §4.4.1). Creates `calcs/footing/`, the registration test shared by the calc tasks, and the first
 verification record (from the spec 0003 template).
