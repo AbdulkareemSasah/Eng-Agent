@@ -1,6 +1,4 @@
-"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8, 9 and 10): base branch, lane, ``none`` reasons, spec and plan pull
-requests and protected paths. The approvals port is plan task T24, so verification with bootstrap off fails closed.
-"""
+"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8 to 10); the approvals port is T24, so bootstrap off fails closed."""
 
 from __future__ import annotations
 
@@ -18,7 +16,6 @@ from eng_dev_gate.report import Finding, Severity
 
 NONE_LINE = re.compile(r"none \((.+)\)")
 TRIVIAL_MAX_LINES = 10  # changed counted lines of a `trivial` change: process/01 section 2
-PATHS_SHOWN = 10  # paths named in one message (presentation only)
 _LANE = re.compile(r"lane/[0-9]+-[a-z0-9-]+")
 _TRIVIAL_EXCLUDED_DIRS = frozenset({"src", "tests", ".gate", ".github"})
 _CONFIG_SUFFIXES = frozenset({".toml", ".yml", ".yaml", ".json", ".ini", ".cfg"})  # with names holding `schema`
@@ -26,7 +23,7 @@ _RELEASE_FILES = frozenset({"pyproject.toml", "CHANGELOG.md", "uv.lock"})
 _NOT_VERIFIED = "verification through the approvals port is not implemented (plan task T24)"
 
 
-def error(code: str, message: str, path: str | None = None) -> Finding:
+def _error(code: str, message: str, path: str | None = None) -> Finding:
     """Return an error finding."""
     return Finding(code=code, severity=Severity.ERROR, path=path, message=message)
 
@@ -37,32 +34,19 @@ def counted_lines(entries: Sequence[NumstatEntry], config: GateConfig) -> list[N
     return [e for e in entries if not matches_any(e.path, exempt)]
 
 
-def _shown(paths: Sequence[str]) -> str:
-    more = f" and {len(paths) - PATHS_SHOWN} more" if len(paths) > PATHS_SHOWN else ""
-    return ", ".join(paths[:PATHS_SHOWN]) + more
-
-
 def entry_findings(pr: PullRequest, config: GateConfig) -> tuple[list[Finding], bool]:
-    """Steps 1 and 2: the base branch (GC013, AW06) and the project lane (GC012).
-
-    Returns:
-        The findings and whether the remaining checks are skipped.
-    """
+    """Steps 1 and 2: the base branch (GC013, AW06) and the project lane (GC012); True skips the remaining checks."""
     gate = config.gate_branch
     if config.mode is Mode.BOOTSTRAP and pr.head_ref == gate and pr.base_ref == config.main_branch:
         message = f"the merge of {gate} into {config.main_branch} is the owner's after local tests"
         return [awaiting_finding(config, "AW06", message)], True
-    findings = (
-        [error("GC013", f"base branch {pr.base_ref!r} is not the gate branch {gate!r}")] if pr.base_ref != gate else []
-    )
+    findings = [_error("GC013", f"base branch {pr.base_ref!r} is not {gate!r}")] if pr.base_ref != gate else []
     if not pr.head_ref.startswith("lane/"):
         return findings, False
     if not _LANE.fullmatch(pr.head_ref):
-        findings.append(
-            error("GC012", f"lane branch {pr.head_ref!r} is not `lane/<issue>-<slug>` (lowercase, digits, -)")
-        )
+        findings.append(_error("GC012", f"lane branch {pr.head_ref!r} is not `lane/<issue>-<slug>`"))
     elif not pr.draft:
-        findings.append(error("GC012", "a project lane pull request must be a draft; it never reaches the gate branch"))
+        findings.append(_error("GC012", "a project lane pull request must be a draft"))
     else:
         message = "project lane: draft pull request; the remaining checks run in the release lane"
         findings.append(Finding(code="GC012", severity=Severity.NOTICE, message=message))
@@ -98,9 +82,8 @@ def none_findings(
 ) -> list[Finding]:
     """Step 3: GC011 unless ``reason`` is in the table of spec 4.5 and the changed ``paths`` fit it."""
     lines = sum(e.added + e.deleted for e in counted_lines(entries, config))
-    if _fits(reason.strip(), paths, lines, config):
-        return []
-    return [error("GC011", f"`Plan-Task: none ({reason})` is not an allowed reason or the diff does not fit it")]
+    message = f"`Plan-Task: none ({reason})` is not an allowed reason or the diff does not fit it"
+    return [] if _fits(reason.strip(), paths, lines, config) else [_error("GC011", message)]
 
 
 def owner_decides(doc: Spec) -> bool:
@@ -120,7 +103,7 @@ def _check_document(git: Git, config: GateConfig, path: str, head: str, base: st
     try:
         doc = parse(git.show(head, path))
     except FrontMatterError as problem:
-        return [error("GC005", str(problem), path)]
+        return [_error("GC005", str(problem), path)]
     try:
         was = parse(git.show(base, path)).status
     except PathNotFoundError, FrontMatterError:
@@ -129,17 +112,17 @@ def _check_document(git: Git, config: GateConfig, path: str, head: str, base: st
     if doc.status == "approved" and was != "approved":
         if config.mode is Mode.BOOTSTRAP:
             findings.append(
-                error("GC014", "`status: approved` is the owner's act and cannot be set by a pull request", path)
+                _error("GC014", "`status: approved` is the owner's act and cannot be set by a pull request", path)
             )
         else:
-            findings.append(error("GC015", f"approvals of process/01 section 5 are required; {_NOT_VERIFIED}", path))
+            findings.append(_error("GC015", f"approvals of process/01 section 5 are required; {_NOT_VERIFIED}", path))
     if isinstance(doc, Plan):
         try:
             missing = uncovered_criteria(doc, git.show(head, doc.spec))
         except PathNotFoundError:
-            return [*findings, error("GC004", f"{doc.spec} named by the plan is not in the pull request head", path)]
+            return [*findings, _error("GC004", f"{doc.spec} named by the plan is not in the pull request head", path)]
         if missing:
-            findings.append(error("GC016", f"no task covers {', '.join(missing)}", path))
+            findings.append(_error("GC016", f"no task covers {', '.join(missing)}", path))
     return findings
 
 
@@ -147,7 +130,7 @@ def spec_plan_findings(git: Git, config: GateConfig, changes: Sequence[Change], 
     """Step 8: GC010 for any other file, then the front matter, coverage and status of each changed document."""
     paths = list(dict.fromkeys(p for c in changes for p in c.paths))
     findings = [
-        error("GC010", "a spec or plan pull request changes only specs and plans", p)
+        _error("GC010", "a spec or plan pull request changes only specs and plans", p)
         for p in paths
         if not is_document(p, config)
     ]
@@ -162,10 +145,10 @@ def protected_findings(paths: Sequence[str], patterns: Sequence[str], config: Ga
     covered = protected_paths(paths, patterns)
     if not covered:
         return []
-    listed = f"{len(covered)} protected path(s): {_shown(covered)}"
+    listed = f"{len(covered)} protected path(s): {', '.join(covered)}"
     if config.mode is Mode.BOOTSTRAP:
         return [awaiting_finding(config, "AW02", f"CODEOWNERS review is required for {listed}")]
-    return [error("GC015", f"the owner's approving review is required for {listed}; {_NOT_VERIFIED}")]
+    return [_error("GC015", f"the owner's approving review is required for {listed}; {_NOT_VERIFIED}")]
 
 
 def identity_findings(config: GateConfig) -> list[Finding]:
@@ -175,4 +158,4 @@ def identity_findings(config: GateConfig) -> list[Finding]:
             awaiting_finding(config, "AW08", "the identity checks (author and approver logins) are the owner's"),
             awaiting_finding(config, "AW03", "the G3 approvals of process/01 section 5 are the owner's"),
         ]
-    return [error("GC015", f"the identity checks and the G3 approvals are required; {_NOT_VERIFIED}")]
+    return [_error("GC015", f"the identity checks and the G3 approvals are required; {_NOT_VERIFIED}")]

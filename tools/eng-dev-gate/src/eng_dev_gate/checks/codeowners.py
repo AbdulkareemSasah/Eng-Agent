@@ -41,12 +41,7 @@ def protected_paths(paths: Iterable[str], patterns: Sequence[str]) -> list[str]:
 
 
 def load_patterns(git: Git, refs: Iterable[str]) -> list[str]:
-    """Read the patterns of every CODEOWNERS file present at each of ``refs`` (the base and the head commit).
-
-    Raises:
-        UsageError: see :func:`parse_patterns`.
-        GitError: git failed.
-    """
+    """Read the patterns of every CODEOWNERS file at each of ``refs``; raises UsageError, GitError."""
     patterns: list[str] = []
     for ref in refs:
         for name in CODEOWNERS_FILES:

@@ -26,9 +26,6 @@ from eng_dev_gate.checks.gate_check_docs import (
     protected_findings,
     spec_plan_findings,
 )
-from eng_dev_gate.checks.gate_check_docs import (
-    error as _error,
-)
 from eng_dev_gate.checks.ratchet import RATCHET_FILE, RatchetFile
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest, event_path, read_event
@@ -94,6 +91,10 @@ def parse_body(body: str) -> BodyFields:
     return BodyFields(**fields)
 
 
+def _error(code: str, message: str, path: str | None = None) -> Finding:
+    return Finding(code=code, severity=Severity.ERROR, path=path, message=message)
+
+
 def _work_item(fields: BodyFields, config: GateConfig) -> list[Finding]:
     bootstrap = config.mode is Mode.BOOTSTRAP
     if fields.closes or (bootstrap and any(_BOOTSTRAP_ITEM.fullmatch(v) for _, v in fields.work_item)):
@@ -134,8 +135,8 @@ def _status(doc: Spec, path: str, config: GateConfig) -> list[Finding]:
     if doc.status == "approved":
         return []
     if config.mode is Mode.BOOTSTRAP:
-        owner = owner_decides(doc)
-        return [awaiting_finding(config, "AW01", f"{path} is a draft that needs the owner", path)] if owner else []
+        needed = awaiting_finding(config, "AW01", f"{path} is a draft that needs the owner", path)
+        return [needed] if owner_decides(doc) else []
     return [_error("GC006", f"status {doc.status!r} is not acceptable; it must be approved", path)]
 
 
