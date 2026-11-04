@@ -177,11 +177,12 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
+      - "packages/eng-harness/src/eng_harness/decisions/_cascade.py"
       - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py"
       - "packages/eng-harness/tests/replay/test_decision_replay.py"
       - "packages/eng-harness/tests/contract/test_decision_port.py"
       - "packages/eng-harness/tests/perf/test_rule_latency.py"
-    max_changed_lines: 150
+    max_changed_lines: 170
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_rules_run_under_the_guard"
@@ -191,7 +192,8 @@ tasks:
       - "packages/eng-harness/tests/replay/test_decision_replay.py::test_crash_while_pending"
       - "packages/eng-harness/tests/contract/test_decision_port.py::test_cascade_conforms"
       - "packages/eng-harness/tests/perf/test_rule_latency.py::test_rule_decision_p95"
-    covers: [AC16, AC17, AC20, AC30, AC40, AC41]
+      - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_runtime_summary_in_run_header"
+    covers: [AC16, AC17, AC20, AC30, AC40, AC41, AC43]
     depends_on: [T9]
 ---
 
@@ -251,7 +253,9 @@ resume, all-or-nothing engineer answers.
 **T10 Wiring and acceptance** (spec §4.12). Small changes to the engine's `_decide` (the engine plan T14 may already
 call the port; if so this task is tests, documents and the `engine.decision` request kind only), the workflow, replay
 (crash while pending) and conformance tests, the p95 test, and the items of §4 in `docs/local-testing.md`. If T14 of
-the engine plan has not merged, this task waits.
+the engine plan has not merged, this task waits. Amendment B-098: the cascade's `runtime_summary()` (spec §4.12,
+AC43; `_cascade.py` gains the constructor argument and the getter, about 20 lines, which raised the budget from 150 to
+170), tested through the real engine's run header (engine AC69).
 
 ## 3. Dependencies
 
