@@ -369,7 +369,7 @@ determinism. The non-test lines are at most a test-support helper.
 | T2 | plan 0003 T5 (CalcPort); SC T8, T11 (evaluate, lifecycle); the documents pull request of spec Q10 |
 | T3 to T6, T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
 | T7 | plan 0005 T1 to T4, T7 |
-| T8 | plan 0001 T10, T14 (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
+| T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
 | T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19; plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); SBC T3 |
 | T10 | plan 0008 T5 (`harness.joint_loads/1`, points) |
 | T11 | plan 0008 T6, T7 (load import, analysis, soil pressures, reactions) |

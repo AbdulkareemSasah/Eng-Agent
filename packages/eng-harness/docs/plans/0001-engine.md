@@ -198,28 +198,41 @@ tasks:
     covers: [AC9, AC11, AC12, AC13, AC14, AC15, AC27]
     depends_on: [T9]
   - id: T11
+    title: Input requests (the x-eng-input marker, choice schemas, answer checks) and the escalation request
+    # Amendment (B-342, documents only): the original T11 (440 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T11 keeps the input-request builders of B-068 (`_inputs.py`, AC67); T11b keeps the
+    # in-flight reconciliation and the host-state check, which present their requests through T11.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_inputs.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_inputs.py"
+    max_changed_lines: 140
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_inputs.py::test_input_request_markers"
+    covers: [AC67]
+    depends_on: [T10]
+  - id: T11b
     title: In-flight reconciliation and the host-state check before live execution
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
       - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
-      - "packages/eng-harness/src/eng_harness/engine/_inputs.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
-      - "packages/eng-harness/tests/unit/test_inputs.py"
       - "packages/eng-harness/tests/replay/test_in_flight.py"
       - "packages/eng-harness/tests/replay/test_host_state.py"
       - "packages/eng-harness/tests/workflows/**"
-    max_changed_lines: 440
-    max_sessions: 3
+    max_changed_lines: 300
+    max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_read_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
-      - "packages/eng-harness/tests/unit/test_inputs.py::test_input_request_markers"
-    covers: [AC31, AC32, AC34, AC63, AC64, AC67]
-    depends_on: [T10]
+    covers: [AC31, AC32, AC34, AC63, AC64]
+    depends_on: [T11]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
     files:
@@ -243,7 +256,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_save_before_analysis"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_inserted_steps_are_replayed"
     covers: [AC5, AC37, AC38, AC39, AC43, AC47]
-    depends_on: [T10, T11]
+    depends_on: [T10, T11b]
   - id: T13
     title: Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases)
     files:
@@ -268,9 +281,30 @@ tasks:
       - "packages/eng-harness/tests/replay/test_resume.py::test_close_started_after_resume"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation"
     covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62]
-    depends_on: [T11, T12]
+    depends_on: [T11b, T12]
   - id: T14
-    title: ctx.decide, ctx.decide_many and ctx.ask (invariant 4)
+    title: ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4)
+    # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
+    # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ports.py"
+      - "packages/eng-harness/src/eng_harness/engine/_decide.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
+    max_changed_lines: 330
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port"
+    covers: [AC40, AC66, AC67]
+    depends_on: [T13]
+  - id: T14b
+    title: ctx.ask and the decision runtime record (run header and reader view)
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/ports.py"
@@ -281,21 +315,18 @@ tasks:
       - "packages/eng-harness/src/eng_harness/journal/_reader.py"
       - "packages/eng-harness/tests/fakes/**"
       - "packages/eng-harness/tests/contract/test_ports_conformance.py"
-      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py"
       - "packages/eng-harness/tests/unit/test_runner.py"
       - "packages/eng-harness/tests/unit/test_journal_reader.py"
-    max_changed_lines: 450
-    max_sessions: 2
+    max_changed_lines: 120
+    max_sessions: 1
     tests_first:
-      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
-      - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_input_request_markers"
       - "packages/eng-harness/tests/unit/test_runner.py::test_decision_runtime_recorded"
       - "packages/eng-harness/tests/unit/test_journal_reader.py::test_decision_runtime_view"
-    covers: [AC40, AC61, AC66, AC67, AC69]
-    depends_on: [T13]
+    covers: [AC61, AC67, AC69]
+    depends_on: [T14]
   - id: T15
     title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
     files:
@@ -315,7 +346,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_resume.py::test_pending_requests_represented"
       - "packages/eng-harness/tests/workflow/test_pause.py::test_except_exception_cannot_swallow_pause"
     covers: [AC10, AC36, AC54, AC55, AC56]
-    depends_on: [T12, T14]
+    depends_on: [T12, T14b]
   - id: T16
     title: Permission modes, always-ask list, working copies and file-copy promotion
     files:
@@ -376,7 +407,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_progress.py::test_sink_order_and_failure"
       - "packages/eng-harness/tests/perf/test_overhead.py::test_engine_overhead_p95"
     covers: [AC58, AC59, AC60]
-    depends_on: [T14, T17]
+    depends_on: [T14b, T17]
   - id: T19
     title: Crash-matrix replay suite with a worker process
     files:
@@ -399,14 +430,15 @@ tasks:
 
 The engine is built bottom-up in the order its own imports require: errors, the journal (the most safety-relevant
 storage, built and tested before anything writes to it), the reader, blocks and the registry, ports with their fakes,
-the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, in-flight
-reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
+the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, the input-request
+builders, in-flight reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3), path identity (T8) and replay (T9) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
-by `depends_on` (T10, T12, T13, T14, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11 shares
-`CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11 and T13 on both: the
-tasks from T10 to T18 run one after another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
+by `depends_on` (T10, T12, T13, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
+shares `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11b and T13 on
+both; T11b follows T11 (the input requests it presents), and T14b follows T14: the tasks from T10 to T18 run one after
+another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
 to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T6 and T7; T19 beside T17 and T18) share those two
 files only: their lines are merged in pull-request order, and they share no other file.
 
@@ -513,15 +545,19 @@ is wired here so the divergence tests can run; T10 completes it.
 `escalate`, and pause and resume through a test approval stub (the full approval rules come in T15); `CalcRefused`
 from the CalcPort becomes a failed step (AC13).
 
-**T11 In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
+**T11 Input requests** (spec §4.9.1, AC67; B-068). The first input requests the engine presents are built in
+`engine/_inputs.py`: the `x-eng-input` marker, the choice-schema builder of spec §4.9.1, the refusal of a schema without
+`data` or `choice` before `present`, and the answer-shape check (`values` against `choices`). The `engine.escalation`
+request (from `_runner.py`) is built with it, and `tests/unit/test_inputs.py` covers the marker, the refusals, the
+answer-shape check and that request. Budget 140 lines (the original T11 measured 440 and was split by B-342, D-12).
+
+**T11b In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
 `restore`, the instance binding (`model_bound` at first use, after a restore and for a reopened model), and lost or
 reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding, AC63,
-AC64), with `model_bound.file_names` from `HostPort.model_files`. T11 presents the first input requests, so it builds
-`engine/_inputs.py`: the `x-eng-input` marker, the choice-schema builder of spec §4.9.1, the refusal of a schema
-without `data` or `choice` before `present`, and the answer-shape check (`values` against `choices`); the
-`engine.in_flight`, `engine.host_state` and `engine.escalation` requests (the last from `_runner.py`) are built with
-it (AC67, `tests/unit/test_inputs.py`). The budget rose from 380 to 440 lines with this (B-068).
+AC64), with `model_bound.file_names` from `HostPort.model_files`. The `engine.in_flight` and `engine.host_state`
+requests are built with T11's `_inputs.py`, and their tests assert the `choice` marker of AC67. Budget 300 lines (the
+original 440 less T11's 140).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
@@ -532,22 +568,26 @@ and the test that inserted steps are replayed.
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
 reconciliation pending, server checks at start and resume, unit reads (first contact, every resume, after epoch
 changes and observed timeouts), host leases, `host_started` journaling and `close_started` from the journal at run
-end, and the resume order of spec §4.5.1 (preflight, leases and units before T11's reconciliation, AC62).
+end, and the resume order of spec §4.5.1 (preflight, leases and units before T11b's reconciliation, AC62).
 
-**T14 Decisions and inputs** (spec §4.3.2, §4.6 item 4). `decide`, `decide_many` and `ask` over the ports; option and
-answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stored as `basis.engineer_input/1`
-(AC61); the `DecisionPort` protocol in `ports.py` over the types of `eng_harness.decisions.interfaces`, its fake in
-`tests/fakes/` and its case in the conformance test (AC57); the `DecisionCall` with `sensitive_values` (from the
-journal's `model_bound.file_names`, `model_saved.origin_file_names` and `file_name`), the `engine.decision` request
-through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`, and the `EngineerChoice` round trip (AC66);
-the `data` marker of `ctx.ask` and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the frozen
-dataclass of spec §4.3.2. The budget rose from 280 to 420 lines with these (B-068). Amendment B-098:
-`DecisionPort.runtime_summary()`, recorded as `decision_runtime` in `run_started` and, when changed, in `run_resumed`,
-and shown as `RunView.decision_runtime` (AC69); the field and the reader view follow the `unreleased_tools` pattern of
-T3, T4 and T9 (about 30 lines, so 450). Build order: T14 starts only
+**T14 Decisions** (spec §4.3.2, §4.6 item 4). `decide` and `decide_many` over the ports; option and answer validation;
+`decision_made`; engineer-tier pauses; the `DecisionPort` protocol in `ports.py` over the types of
+`eng_harness.decisions.interfaces`, its fake in `tests/fakes/` and its case in the conformance test (AC57); the
+`DecisionCall` with `sensitive_values` (from the journal's `model_bound.file_names`, `model_saved.origin_file_names`
+and `file_name`), the `engine.decision` request through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`,
+the `EngineerChoice` round trip (AC66), and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the
+frozen dataclass of spec §4.3.2. Budget 330 lines. Build order: T14 starts only
 after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
 port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
 plan.
+
+**T14b Ask and the decision runtime record** (spec §4.3.2, §4.6 item 4, AC61, AC67, AC69). `ask`: the `data` marker
+(AC67), validation of the answer against `fields`, `input_requested` and the pause, and the answer stored as
+`basis.engineer_input/1` (AC61). Amendment B-098: `DecisionPort.runtime_summary()` (protocol and fake), recorded as
+`decision_runtime` in `run_started` and, when changed, in `run_resumed`, and shown as `RunView.decision_runtime`
+(AC69); the field and the reader view follow the `unreleased_tools` pattern of T3, T4 and T9 (about 30 lines). Budget
+120 lines. The original T14 (decisions and inputs: 280 lines at first, 420 with B-068, 450 with B-098) was split by
+B-342 (D-12) so that neither part exceeds the 400-line cap.
 
 **T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
 re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
@@ -583,7 +623,7 @@ ledger and the outputs with an uninterrupted run. Almost all of it is test code.
   `agents render` (B-030 to B-055) if available at T1, otherwise as described there. Specs 0002 to 0007 implement the
   ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19. T14 waits for decision plan T1, T4
   and T5 (the decision port types, spec §4.8), which wait for this plan's T6 and T7; decision plan T7 and T10 wait for
-  T14, so the order has no cycle.
+  T14 (T10 also for T14b, the run header's decision runtime), so the order has no cycle.
 
 ## 4. Verification
 
@@ -599,7 +639,7 @@ ledger and the outputs with an uninterrupted run. Almost all of it is test code.
   (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program. Every
   step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T9, T11, T12, T13, T15 and T16 additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T9, T11b, T12, T13, T15 and T16 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16 and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 

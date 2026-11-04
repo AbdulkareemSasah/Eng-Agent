@@ -387,8 +387,8 @@ processes, the stale-map test, and the Revit section of `docs/local-testing.md` 
 ## 3. Dependencies
 
 - Runtime: none new (`mcp`, `eng-contract`, `pydantic` as in plan 0002). Development: none new.
-- Work items before T1: plan 0002 T6 (allowlist, build check), T7 to T10 (lock, guard, framework, errors, identity,
-  session operations) as the tasks named below need them: T3 needs plan 0002 T8, T5 needs T9, T7 needs T11, T8 needs
+- Work items before T1: plan 0002 T6 and T6b (allowlist, build check), T7 to T10 (lock, guard, framework, errors, identity,
+  session operations) as the tasks named below need them: T3 needs plan 0002 T8b, T5 needs T9, T7 needs T11, T8 needs
   T12, T10 needs T14, T11 needs T10, T13 needs T17, T14 needs T18, T15 needs T19. Engine plan 0001 as for plan 0002 (T1
   edits `ports.py` of engine T6).
 - T12 needs the calc framework of plan 0003 (T1 to T6) and the helper style of its T12 (`placement_compare`).

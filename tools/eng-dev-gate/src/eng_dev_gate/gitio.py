@@ -67,6 +67,10 @@ class Git(Protocol):
         """Content of ``path`` at ``ref``."""
         ...
 
+    def list_files(self, ref: str, directory: str) -> list[str]:
+        """Paths of the files directly in ``directory`` (ending in ``/``) at ``ref``; empty when there are none."""
+        ...
+
     def merge_base(self, a: str, b: str) -> str:
         """Best common ancestor commit of two refs."""
         ...
@@ -163,6 +167,19 @@ class SubprocessGit:
         if not self._run("ls-tree", "-z", ref, "--", path):
             raise PathNotFoundError(f"{path} does not exist at {ref}")
         return self._run("show", f"{ref}:{path}")
+
+    def list_files(self, ref: str, directory: str) -> list[str]:
+        """Return the paths of the files directly in ``directory`` (``git ls-tree``), sorted; none for a missing one.
+
+        Raises:
+            GitError: the ref is invalid or git failed.
+        """
+        entries = (
+            e.partition("\t") for e in self._run("ls-tree", "-z", "--full-tree", ref, "--", directory).split("\0")
+        )
+        return sorted(
+            name for meta, _, name in entries if meta.split(" ")[1:2] == ["blob"] and name.startswith(directory)
+        )
 
     def merge_base(self, a: str, b: str) -> str:
         """Return the merge base of ``a`` and ``b``; GitError if there is none."""

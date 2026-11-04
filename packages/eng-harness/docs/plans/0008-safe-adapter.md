@@ -232,7 +232,7 @@ keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
 **T1 Separation** (spec §4.1). `ProductProfile` and the registry in `products/__init__.py`; `_etabs.py` reduced to its
 profile (behavior unchanged, the 0002 suite still passes); `[servers.<name>].product` and `[host_programs.safe]` in
 `ServersConfig`; the allowlist header table `[fingerprint]` with one entry per product and the loader's `products` filter;
-the build check takes the server's product; product by model extension. Touches files that plan 0002 T1, T6 and T11 create,
+the build check takes the server's product; product by model extension. Touches files that plan 0002 T1, T6, T6b and T11 create,
 so it starts after those are merged. The two existing 0002 tests that read the pinned fingerprint
 (`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`, `test_session.py::test_build_mismatch_stops_run`) are in
 T1's files: they change only in how they read the header (the ETABS entry of `[fingerprint]`), never in the value they
@@ -283,7 +283,7 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 ## 3. Dependencies
 
 - Runtime: none new (`mcp`, `eng-contract`, `pydantic` as in plan 0002). Development: none new.
-- Work items: plan 0002 T1 (config), T6 (allowlist, build check), T7 (guard), T8 to T10 (framework, errors, session
+- Work items: plan 0002 T1 (config), T6 and T6b (allowlist, build check), T7 (guard), T8 to T10 (framework, errors, session
   operations), T11 to T14 (state, edits, analysis, reconciliation) before T1 of this plan; T15 (ADR-0031 switch) before the
   `csi_unlock_model` SAFE entry; T17 (record mode) before T8 of this plan. Engine plan 0001 as for plan 0002.
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
