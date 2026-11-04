@@ -96,6 +96,8 @@ class ServerConfig(_Model):
     @classmethod
     def _env_allowed(cls, value: Mapping[str, str]) -> Mapping[str, str]:
         names = {key.upper(): item for key, item in value.items()}  # Windows env names are case-insensitive
+        if len(names) != len(value):
+            raise ValueError("env names that differ only in case collide on Windows (SASAAH_CSI_DISABLE_SCRIPT check)")
         if "SASAAH_CSI_ENABLE_SCRIPT" in names:
             raise ValueError("SASAAH_CSI_ENABLE_SCRIPT is forbidden")
         if names.get("SASAAH_CSI_DISABLE_SCRIPT", "true").lower() != "true":
