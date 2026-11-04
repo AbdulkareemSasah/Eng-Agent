@@ -276,18 +276,25 @@ tasks:
       - "packages/eng-harness/src/eng_harness/ports.py"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"
+      - "packages/eng-harness/src/eng_harness/journal/_reader.py"
       - "packages/eng-harness/tests/fakes/**"
       - "packages/eng-harness/tests/contract/test_ports_conformance.py"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py"
-    max_changed_lines: 420
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/unit/test_journal_reader.py"
+    max_changed_lines: 450
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_input_request_markers"
-    covers: [AC40, AC61, AC66, AC67]
+      - "packages/eng-harness/tests/unit/test_runner.py::test_decision_runtime_recorded"
+      - "packages/eng-harness/tests/unit/test_journal_reader.py::test_decision_runtime_view"
+    covers: [AC40, AC61, AC66, AC67, AC69]
     depends_on: [T13]
   - id: T15
     title: Approvals (binding, single use, re-check before the write, items, pause and re-presentation)
@@ -534,7 +541,10 @@ answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stor
 journal's `model_bound.file_names`, `model_saved.origin_file_names` and `file_name`), the `engine.decision` request
 through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`, and the `EngineerChoice` round trip (AC66);
 the `data` marker of `ctx.ask` and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the frozen
-dataclass of spec §4.3.2. The budget rose from 280 to 420 lines with these (B-068). Build order: T14 starts only
+dataclass of spec §4.3.2. The budget rose from 280 to 420 lines with these (B-068). Amendment B-098:
+`DecisionPort.runtime_summary()`, recorded as `decision_runtime` in `run_started` and, when changed, in `run_resumed`,
+and shown as `RunView.decision_runtime` (AC69); the field and the reader view follow the `unreleased_tools` pattern of
+T3, T4 and T9 (about 30 lines, so 450). Build order: T14 starts only
 after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
 port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
 plan.
