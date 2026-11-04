@@ -7,6 +7,7 @@ import copy
 import gzip
 import json
 import logging
+import os
 import stat
 import sys
 from collections.abc import Callable
@@ -143,6 +144,18 @@ def test_parents_must_exist(tmp_path: Path) -> None:
     with pytest.raises(ContractError) as info:
         store.put("test.note/1", {"text": "c"}, PRODUCER, parents=[_next_id(b"other")])
     assert info.value.detail.code is ErrorCode.REF_NOT_FOUND
+
+
+def test_duplicate_parents_are_invalid_argument_and_write_nothing(tmp_path: Path) -> None:
+    fs = FakeFileSystem()
+    store = _store(tmp_path, fs)
+    first = store.put("test.note/1", {"text": "a"}, PRODUCER)
+    before = dict(fs.files)
+    with pytest.raises(ContractError) as info:
+        store.put("test.note/1", {"text": "b"}, PRODUCER, parents=[first.result_id, first.result_id])
+    assert info.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    assert "unique" in info.value.detail.message
+    assert fs.files == before
 
 
 @pytest.mark.parametrize("failures", [0, 1, 2, 3])
@@ -365,6 +378,23 @@ def test_real_filesystem_commit_by_rename(tmp_path: Path) -> None:
     fs.remove(tmp_path / "d" / "a")
     fs.remove(tmp_path / "d" / "a")  # removing a missing file is not an error
     assert not fs.exists(tmp_path / "d" / "a")
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="link commit is the POSIX path")
+@pytest.mark.parametrize("failing", ["unlink", "fsync"])
+def test_failure_after_the_link_still_counts_as_committed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failing: str
+) -> None:
+    def boom(*_args: object) -> None:
+        raise PermissionError("after the commit")
+
+    monkeypatch.setattr(os, failing, boom)
+    fs = RealFileSystem(link_commit=True)
+    with caplog.at_level(logging.WARNING):
+        write_atomic(fs, tmp_path / "a.json", b"data", _ids(), lambda _s: None)  # no StoreWriteError
+    assert (tmp_path / "a.json").read_bytes() == b"data"
+    assert [r.levelno for r in caplog.records] == [logging.WARNING]
+    assert "committed" in caplog.records[0].getMessage()
 
 
 def test_real_filesystem_write_is_exclusive(tmp_path: Path) -> None:
