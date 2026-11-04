@@ -1,0 +1,40 @@
+{
+  "rule": "greater than 0",
+  "payload": {
+    "frame_sections": [
+      {
+        "name": "C400",
+        "material": "C30",
+        "shape": {
+          "type": "rectangular",
+          "b_mm": 0,
+          "h_mm": 400
+        }
+      },
+      {
+        "name": "P300",
+        "material": "C30",
+        "shape": {
+          "type": "circular",
+          "D_mm": 300
+        }
+      },
+      {
+        "name": "X",
+        "material": "ST",
+        "shape": {
+          "type": "other",
+          "host_shape": "I/Wide Flange"
+        }
+      }
+    ],
+    "area_sections": [
+      {
+        "name": "S200",
+        "material": "C30",
+        "kind": "slab",
+        "thickness_mm": 200
+      }
+    ]
+  }
+}
