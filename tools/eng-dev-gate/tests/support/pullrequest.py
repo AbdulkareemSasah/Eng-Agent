@@ -85,6 +85,7 @@ def write_event(
     head_repo: str = "o/r",
     name: str = "event.json",
     head_ref: str = "feat/x",
+    draft: bool = False,
 ) -> Path:
     """Write a pull-request event for the current ``HEAD`` against ``base`` and return its path (outside the tree)."""
     head = repo.git("rev-parse", "HEAD").strip()
@@ -92,7 +93,7 @@ def write_event(
         "number": 7,
         "title": "feat(x): y (B-001)",
         "body": body,
-        "draft": False,
+        "draft": draft,
         "base": {"ref": base_ref, "sha": base, "repo": {"full_name": "o/r"}},
         "head": {"ref": head_ref, "sha": head, "repo": {"full_name": head_repo}},
         "user": {"login": "agent"},
