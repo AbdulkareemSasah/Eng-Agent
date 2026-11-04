@@ -172,10 +172,10 @@ def _ratchet_in_scope(git: Git, base: str, head: str, anchors: set[str]) -> bool
     )
 
 
-def _scope(
+def accepted_paths(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
-) -> list[Finding]:
-    """GC008 for each changed path (a rename counts both) outside the task's globs.
+) -> tuple[list[str], set[str]]:
+    """Return the changed paths (a rename counts both) and the subset inside the task's scope (also used by risk-floor).
 
     The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
     scope when another changed file under that directory matches a glob of the task (AC10a); so is the ratchet
@@ -195,6 +195,14 @@ def _scope(
         }
     if RATCHET_FILE in paths and _ratchet_in_scope(git, base, head, anchors):
         inside.add(RATCHET_FILE)
+    return list(paths), inside
+
+
+def _scope(
+    changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
+) -> list[Finding]:
+    """GC008 for each changed path outside the task's globs."""
+    paths, inside = accepted_paths(changes, task, plan_path, member_dirs, git, base, head)
     return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
 
 

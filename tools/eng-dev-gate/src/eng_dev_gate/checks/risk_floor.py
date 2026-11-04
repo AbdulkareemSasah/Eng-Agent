@@ -16,8 +16,9 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, field_validator
 
-from eng_dev_gate.checks.gate_check import parse_body
+from eng_dev_gate.checks.gate_check import accepted_paths, parse_body
 from eng_dev_gate.checks.gate_check_docs import NONE_LINE
+from eng_dev_gate.checks.ratchet import RATCHET_FILE
 from eng_dev_gate.config import GateConfig
 from eng_dev_gate.event import event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, parse_plan, parse_spec, safe_relative_path
@@ -30,7 +31,7 @@ from eng_dev_gate.workspace import discover_members
 
 MAP_FILE = ".gate/risk-map.yml"
 _LANE = re.compile(r"lane/\d+-[a-z0-9-]+")
-_PLAN_TASK = re.compile(r"(\S+)#T\d+[a-z]*")
+_PLAN_TASK = re.compile(r"(\S+)#(T\d+[a-z]*)")
 _RISK = re.compile(r"r[0-3]")
 
 
@@ -150,6 +151,26 @@ def _plan_risk(git: Git, gate_ref: str, body: str, config: GateConfig) -> set[st
         return _rf004(f"plan {found[1]} on {gate_ref}: {error}")
 
 
+def _ratchet_accepted(
+    git: Git, shas: tuple[str, str], gate_ref: str, body: str, config: GateConfig, members: list[str]
+) -> bool:
+    """True when gate-check accepts the ``.gate/ratchet.json`` change in the named task's scope (AC21b)."""
+    lines = parse_body(body).plan_task
+    found = _PLAN_TASK.fullmatch(lines[0][1]) if len(lines) == 1 else None
+    if not found or not safe_relative_path(found[1]) or not matches_any(found[1], config.plan_globs):
+        return False
+    try:
+        plan = parse_plan(git.show(gate_ref, found[1]), config.limits.max_task_lines)
+    except PathNotFoundError, FrontMatterError:
+        return False
+    base = git.merge_base(*shas)
+    task = next((t for t in plan.tasks if t.id == found[2]), None)
+    if task is None:
+        return False
+    _, inside = accepted_paths(git.name_status(base, shas[1]), task, found[1], members, git, base, shas[1])
+    return RATCHET_FILE in inside
+
+
 def check_risk_floor(
     git: Git,
     config: GateConfig,
@@ -174,9 +195,15 @@ def check_risk_floor(
         RiskMapError: RF003.
     """
     changed = list(dict.fromkeys(p for c in git.name_status(git.merge_base(*shas), shas[1]) for p in c.paths))
-    floor = risk_floor(git, shas, changed, members)
     lane = head_ref is not None and _LANE.fullmatch(head_ref) is not None
     documents = bool(changed) and all(matches_any(p, [*config.spec_globs, *config.plan_globs]) for p in changed)
+    if (
+        RATCHET_FILE in changed
+        and not (lane or documents)
+        and _ratchet_accepted(git, shas, gate_ref, body, config, members)
+    ):
+        changed.remove(RATCHET_FILE)  # the rise is AW05 for the owner, not a change of process (AC21b)
+    floor = risk_floor(git, shas, changed, members)
     declared = _body_risk(body)
     from_body = lane or (not documents and _is_none_reason(body))
     if from_body:
