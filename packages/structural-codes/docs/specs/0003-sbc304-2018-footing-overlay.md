@@ -107,7 +107,9 @@ first hand-check case (its case file under `aci318_14`); they are used only to r
 - AC13. Given the shipped `approvals.yaml`, when each check's state is resolved, then `draft`, and in `production` mode
   every check is refused with `CheckNotUsable` (CF AC25). Test: `tests/unit/test_pack.py::test_all_draft`.
 - AC14. Given the pack sources, when scanned, then `lint_scope_violations` is empty for every check, and no module
-  holds a `Cited` value or a numeric literal (AST scan): the pack adds no engineering number. Test: `tests/unit/test_pack.py::test_no_engineering_numbers`.
+  holds a `Cited` value or a numeric literal (AST scan): the pack adds no engineering number. The row validation of
+  AC2 needs none: it tests strings for non-emptiness only, and every length limit is the core's (`CheckMeta`,
+  `GapDecl`, CF §4.2; CM §2). Test: `tests/unit/test_pack.py::test_no_engineering_numbers`.
 - AC15. Given base inputs for every check, when evaluated as one batch per check, then each payload validates as
   `verdicts.set/1` (EC §4.10.2) with `draft: true` and only `NEEDS_ENGINEER` verdicts. Test:
   `tests/contract/test_pack_payloads.py::test_needs_engineer_payloads`.

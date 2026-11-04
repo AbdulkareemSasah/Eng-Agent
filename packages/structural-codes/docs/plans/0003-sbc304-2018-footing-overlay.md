@@ -113,7 +113,11 @@ Reuse: the core overlay entries (`Overridden`, `Inherited`), `NotImplementedGap`
 Start condition: core plan 0001 T10 (overlay), T11 (lifecycle) and T12 (command line) merged; ACI plan 0002 T1 (shared
 folder files) before T1, and plan 0002 T9 (ACI pack registered) before T2. T4 needs ACI plan 0004 T5 (column checks
 registered); until then those three checks get the missing-row default `G-0` (SP AC3), so plan 0004 T5 never breaks
-this pack. Each task is test-first: its first commit is `test:` with the tests of `tests_first`, failing on `build/v1`
+this pack. Ordering: SP AC1 compares the module with the CM §3 rows of every *registered* base check, so the rows T2
+writes depend on what is merged when T2 starts. If plan 0004 T5 is not merged, T2 writes G-1 to G-6 and T4 follows
+T5. If plan 0004 T5 is already merged, T2 writes G-1 to G-9, takes T4's test
+`test_clause_map.py::test_column_rows_explicit` into its `tests_first`, T3 adds the three column case files, and T4 is
+dropped (recorded in the T2 pull request); the three extra rows fit T2's budget. Each task is test-first: its first commit is `test:` with the tests of `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9).
 
 ## 2. Tasks
@@ -127,12 +131,13 @@ dependency); `[tool.eng-gate]` with `profile = "codes"`, `layer = 3`, `import_na
 Adds the pack's paths to the shared `.gate/risk-map.yml` as `r1`, renders the shared `AGENTS.md` again, and adds an
 SBC section to `docs/local-testing.md` stating that no item needs a host in this version (§4).
 
-**T2 Clause map and builder.** `clause_map.py` holds `CLAUSE_MAP` with rows G-1 to G-6 of CM §3, exactly as the
-table. `_overlay.py` holds `MapStatus`, `MapRow`, `GapReason`, the row validation (SP AC2), the missing-row default
+**T2 Clause map and builder.** `clause_map.py` holds `CLAUSE_MAP` with rows G-1 to G-6 of CM §3 (G-1 to G-9 when plan
+0004 T5 is already merged, §1), exactly as the table. `_overlay.py` holds `MapStatus`, `MapRow`, `GapReason`, the row validation (SP AC2), the missing-row default
 (SP AC3) and `build_overlay(rows, base_pack) -> (checks, Overlay)` producing `Inherited` entries for `inherited` rows
 and the gap check of SP §4.3 as `Overridden` entries. The doc-match test parses the table between the
 `clause-map-rows` markers of CM §3. R1 modules, reviewed with the source-check lens: the reviewer confirms the module
-states no SBC clause number and no number at all.
+states no SBC clause number and no number at all. The row validation has no numeric length limit; limits come from
+the core when the builder creates `CheckMeta` and `GapDecl` (CM §2), so T3's `test_no_engineering_numbers` holds.
 
 **T3 Assembly.** `PACK` with `base="aci318_14"` and the built overlay, the entry point
 `[project.entry-points."structural_codes.packs"] sbc304_2018 = "sbc304_2018:PACK"`, `check_id_for`; one case file per
@@ -140,7 +145,7 @@ check with one `boundary` case expecting `NEEDS_ENGINEER` and `program_compariso
 with `check_id_for` and `structural_codes.evaluate`; changelog entry for 0.1.0.
 
 **T4 Column rows.** Rows G-7 to G-9 of CM §3 replace the missing-row default for the three column checks, with their
-case files. Separate because it waits for plan 0004 T5.
+case files. Separate because it waits for plan 0004 T5; dropped when T5 merged before T2 (§1).
 
 ## 3. Dependencies
 

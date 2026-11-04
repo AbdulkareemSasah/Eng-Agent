@@ -22,7 +22,9 @@ of every SBC check. Design: [spec 0003](../../specs/0003-sbc304-2018-footing-ove
 
 No SBC 304-2018 text was available to the author, and memory is not a source (process/10 §2). This file therefore
 states **no SBC clause number and no SBC content**. Every row is `unconfirmed`. The base clause chains in §3 are copied
-from the header of each ACI clause spec; they say what the owner must compare, not what SBC contains.
+from the header of each ACI clause spec, except clauses the header marks "gap only" (the base check does not
+implement them): those are named in the row's "Also confirm" cell instead. The chains say what the owner must
+compare, not what SBC contains.
 
 ## 2. Row format
 
@@ -32,11 +34,15 @@ from the header of each ACI clause spec; they say what the owner must compare, n
 |---|---|---|
 | `base_check_id` | `str` | An existing `aci318_14` check id; unique in the map |
 | `status` | `MapStatus` | `inherited` or `unconfirmed`; nothing else is accepted (SP §4.1) |
-| `sbc_clause` | `str` or `None` | `inherited`: the SBC 304-2018 clause number as printed, 1 to 40 characters; `unconfirmed`: `None` |
-| `sbc_source` | `str` or `None` | `inherited`: document, edition, clause and page the row was checked against (8 to 500 characters); `unconfirmed`: `None` |
+| `sbc_clause` | `str` or `None` | `inherited`: the SBC 304-2018 clause number as printed, non-empty; it becomes `CheckMeta.clauses[0]` of the inherited check, whose length limit is the core's (CF §4.2); `unconfirmed`: `None` |
+| `sbc_source` | `str` or `None` | `inherited`: document, edition, clause and page the row was checked against, non-empty; `unconfirmed`: `None` |
 | `gap_id` | `str` or `None` | `unconfirmed`: `^G-[1-9][0-9]*$`, unique in the map (`G-0` is reserved for the missing-row default, SP §4.3); `inherited`: `None` |
 | `base_clauses` | `tuple[str, ...]` | The base clause chain of §3, first entry the base check's first clause |
-| `confirm` | `str` | The row's "Also confirm" cell of §3, verbatim, 1 to 500 characters; goes into the gap reason, which adds "and the common items of clause-map §3" |
+| `confirm` | `str` | The row's "Also confirm" cell of §3, verbatim, non-empty; goes into the gap reason (`GapDecl.reason`, CF §4.2), which adds "and the common items of clause-map §3" |
+
+The row validation sets no numeric length limit of its own: "non-empty" is a truthiness test, and every length limit
+is the core's, applied when the builder creates `CheckMeta` and `GapDecl` (CF §4.2). So `_overlay.py` holds no
+numeric literal (SP AC14).
 
 Rules (SP AC2): any other status, a missing or extra field for the status, or a duplicate raises
 `CheckDefinitionError` at import. Changing a row changes the content hash of its check (SP AC10). Rows are ordered as
@@ -56,7 +62,7 @@ resulting status: `inherited` with `sbc_clause` and `sbc_source`, or a reserved 
 |---|---|---|---|---|
 | G-1 | `aci318_14.13_3_1_1.bearing_pressure_service` | unconfirmed | 13.3.1.1 | The SBC rule for sizing the base area from service loads and the allowable soil pressure, and whether the allowable pressure comes from the geotechnical report as in the base spec |
 | G-2 | `aci318_14.22_5_5_1.one_way_shear` | unconfirmed | 22.5.5.1, 22.5.1.1, 22.5.3.1, 13.3.3.1, 13.2.7.2, 21.2.1, 19.2.1.1, 19.2.4.2 | The one-way shear strength expression, the shear strength reduction factor, the location of the critical section and the concrete strength limits |
-| G-3 | `aci318_14.22_6_5_2.punching_shear` | unconfirmed | 22.6.5.2, 22.6.1, 22.6.4.1, 22.6.5.3, 22.6.3.1, 13.3.3.1, 21.2.1, 19.2.1.1, 19.2.4.2 | The three two-way shear stress expressions and their location factor, the critical perimeter, the strength reduction factor and the concrete strength limits |
+| G-3 | `aci318_14.22_6_5_2.punching_shear` | unconfirmed | 22.6.5.2, 22.6.1, 22.6.4.1, 22.6.5.3, 22.6.3.1, 13.3.3.1, 21.2.1, 19.2.1.1, 19.2.4.2 | The three two-way shear stress expressions and their location factor, the critical perimeter, the strength reduction factor and the concrete strength limits; and the SBC counterpart of 8.4.4.2 (shear from moment transfer), which the base check leaves as its gap G-4 |
 | G-4 | `aci318_14.13_2_7_1.flexure_at_column_face` | unconfirmed | 13.2.7.1, 13.3.3.1, 22.3.1.1, 22.2.2.1, 22.2.2.4.1, 22.2.2.4.3, 21.2.1, 21.2.2, 20.2.2.4, 19.2.1.1 | The moment section, the stress-block assumptions and factor table, the strength reduction factors and their strain limits, and the steel strength limit |
 | G-5 | `aci318_14.8_6_1_1.min_flexural_reinforcement` | unconfirmed | 8.6.1.1, 13.3.3.1, 20.2.2.4 | The minimum flexural reinforcement rows and the referral from footings to the two-way slab minimum |
 | G-6 | `aci318_14.25_4_2_3.development_length_bottom_bars` | unconfirmed | 25.4.2.3, 25.4.2.1, 25.4.2.4, 25.4.1.4, 13.2.7.1, 19.2.1.1, 19.2.4.2, 20.2.2.4 | The development length expression, its modification factors and their limits, the limit on the square root of concrete strength and the minimum length |
@@ -66,7 +72,8 @@ resulting status: `inherited` with `sbc_clause` and `sbc_source`, or a reserved 
 <!-- clause-map-rows:end -->
 
 Rows G-1 to G-6 are the footing scope of B-072 (10 §9); rows G-7 to G-9 exist because the core requires an entry for
-every base check (core AC17) and are added when the column checks are registered (plan 0003 T4).
+every base check (core AC17) and are added when the column checks are registered: by plan 0003 T4, or by T2 when
+ACI plan 0004 T5 is already merged (plan 0003 §1).
 
 ## 4. Confirmation procedure (owner)
 
