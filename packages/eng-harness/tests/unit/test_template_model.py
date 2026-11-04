@@ -266,3 +266,39 @@ def test_ask_each_run_must_be_a_list() -> None:
 def test_bound_with_unknown_unit_is_invalid() -> None:
     bound = {"min": {"value": 1, "unit": "furlong", "source": "Synthetic placeholder bound"}}
     assert _refused(_with_entry("strength_MPa", _entry(2, bounds=bound))).reason == "bounds_invalid"
+
+
+def test_models_refuse_invalid_entries_without_from_data() -> None:
+    for entry in (
+        {"value": math.nan, "unit": "kPa", "citation": ""},
+        {"value": 1, "unit": "MPa", "citation": CITE, "bounds": {"min": _bound(5), "max": _bound(1)}},
+        {"value": [None], "unit": None, "citation": CITE},
+    ):
+        with pytest.raises(TemplateInvalid):
+            Entry.model_validate(entry)
+    with pytest.raises(TemplateInvalid):
+        Entry(value=1, unit="MPa", citation="short")
+    data = _with_entry("strength_MPa", {"value": 1, "unit": "kPa", "citation": CITE})
+    with pytest.raises(TemplateInvalid) as caught:
+        Template.model_validate(data)
+    assert (caught.value.reason, caught.value.path) == ("unit_mismatch", "materials.alpha.strength_MPa")
+
+
+@pytest.mark.parametrize(
+    "ask",
+    [
+        {"path": "analysis.n", "label": "n", "kind": "count", "bounds": {"min": _bound(5, "1"), "max": _bound(1, "1")}},
+        {"path": "analysis.mode", "label": "m", "kind": "text", "bounds": {"min": _bound(1, "1")}},
+        {"path": "analysis.n", "label": "n", "kind": "count", "bounds": {"min": _bound(1, "MPa")}},
+        {"path": "analysis.störies", "label": "n", "kind": "count"},
+    ],
+)
+def test_ask_item_bounds_and_path_rules(ask: dict[str, Any]) -> None:
+    data = _data()
+    data["ask_each_run"] = [ask]
+    assert _refused(data).reason in ("bounds_invalid", "value_invalid")
+
+
+def test_null_inside_a_value_is_refused() -> None:
+    assert _refused(_with_entry("note", _entry([None], None))).reason == "value_invalid"
+    assert _refused(_with_entry("note", _entry({"k": None}, None))).reason == "value_invalid"
