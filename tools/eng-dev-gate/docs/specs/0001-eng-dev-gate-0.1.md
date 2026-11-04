@@ -508,7 +508,9 @@ policy comes from a gate root other than the judged tree (§4.16), relative patt
 `extend-exclude`, `src`, `mypy_path`, `exclude`) apply to the judged tree: `ruff` receives the gate root's `[tool.ruff]`
 table as `--isolated --config key=value` options and runs in the judged tree (a configuration file would anchor the
 patterns at the gate root), and `mypy` receives the gate root's `pyproject.toml` by absolute path and runs in the
-judged tree. A member that has its own `[tool.ruff]` or `[tool.mypy]` table is configured by that table, as before.
+judged tree. Tool caches never live in the judged tree, where a pull request could forge them: `ruff` runs with
+`--no-cache` and `mypy` with `--cache-dir` set to a fresh temporary directory outside every checkout, removed afterwards.
+A member that has its own `[tool.ruff]` or `[tool.mypy]` table is configured by that table, as before.
 
 Floors, from process/05 §2 (a package may set a higher value, never a lower one):
 

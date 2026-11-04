@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
 import tomllib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -88,9 +89,9 @@ def _ruff(ctx: StepContext, step: str, *args: str) -> list[Finding]:
     assert ctx.member is not None  # noqa: S101
     target = str(ctx.member.directory)
     if _has_own_table(ctx, "ruff"):
-        argv = python_module("ruff", *args, "--config", "pyproject.toml", target)
+        argv = python_module("ruff", *args, "--no-cache", "--config", "pyproject.toml", target)
         return _fail_or_fault(ctx, step, "ruff", argv, ctx.member.directory)
-    argv = python_module("ruff", *args, "--isolated", *_base_ruff_options(ctx.gate_root), target)
+    argv = python_module("ruff", *args, "--isolated", "--no-cache", *_base_ruff_options(ctx.gate_root), target)
     return _fail_or_fault(ctx, step, "ruff", argv, ctx.root)
 
 
@@ -113,12 +114,14 @@ def types(ctx: StepContext) -> list[Finding]:
     """``mypy --strict`` on ``src/`` and ``tests/`` of the package (those that exist).
 
     mypy resolves ``mypy_path``, ``files`` and ``exclude`` against the working directory and has no per-file anchor, so
-    the base configuration is given by absolute path and the tool runs in the judged tree (spec 4.16).
+    the base configuration is given by absolute path and the tool runs in the judged tree (spec 4.16). The incremental
+    cache lives in a fresh directory outside every checkout and is removed afterwards: a ``.mypy_cache`` committed to
+    the pull request could otherwise mark a badly typed module as clean.
     """
     assert ctx.member is not None  # noqa: S101
     folders = [str(ctx.member.directory / d) for d in ("src", "tests") if (ctx.member.directory / d).is_dir()]
-    if _has_own_table(ctx, "mypy"):
-        argv = python_module("mypy", "--strict", "--config-file", "pyproject.toml", *folders)
-        return _fail_or_fault(ctx, "types", "mypy", argv, ctx.member.directory)
-    argv = python_module("mypy", "--strict", "--config-file", str(ctx.gate_root / "pyproject.toml"), *folders)
-    return _fail_or_fault(ctx, "types", "mypy", argv, ctx.root)
+    own = _has_own_table(ctx, "mypy")
+    config, cwd = ("pyproject.toml", ctx.member.directory) if own else (str(ctx.gate_root / "pyproject.toml"), ctx.root)
+    with tempfile.TemporaryDirectory(prefix="eng-gate-mypy-") as cache:
+        argv = python_module("mypy", "--strict", "--cache-dir", cache, "--config-file", config, *folders)
+        return _fail_or_fault(ctx, "types", "mypy", argv, cwd)
