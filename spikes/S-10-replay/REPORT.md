@@ -1,7 +1,7 @@
 # Spike report S-10: can async Python blocks resume by replay from an append-only journal, and can Job Objects stop child servers with the engine?
 
 Work item: B-006 · Time box: at most two days ([19](../../design/docs/architecture/19-roadmap-and-spikes.md) §2) · Date: 2026-11-03 · Author: agent (Claude)
-Environment: Python 3.14.6, Linux 6.18 (ext4, 4 CPUs, SQLite 3.53.1), no host program. Windows: not available; **the Windows result is pending** (see Answer).
+Environment: Python 3.14.6, Linux 6.18 (ext4, 4 CPUs, SQLite 3.53.1), no host program. Windows: GitHub Actions `windows-latest` (Windows Server 2025, Python 3.14.10, SQLite 3.50.4, 2 CPUs), CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/runs/41729982994) on 2026-11-03 (see "Windows results").
 
 ## Question
 
@@ -136,8 +136,8 @@ by run-to-run noise.
 the 64-bit Win32 sizes (`IO_COUNTERS` 48, `JOBOBJECT_BASIC_LIMIT_INFORMATION` 64, `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`
 144, `THREADENTRY32` 28 bytes), and `windows_check.py` prints `SKIPPED`. The statements below come from the Microsoft
 Win32 documentation (Job Objects, Nested Jobs, AssignProcessToJobObject, Process Creation Flags) and are to be confirmed
-by the post-merge Windows CI job, which runs every `spikes/*/windows_check.py`. **The Windows result is pending until that job
-runs.** Until it passes, nothing here may be quoted as measured.
+by the post-merge Windows CI job, which runs every `spikes/*/windows_check.py`. That job ran on 2026-11-03 and passed; its
+results are in "Windows results" below.
 
 | Finding | Evidence |
 |---|---|
@@ -174,12 +174,30 @@ resumed.** Each job has `KILL_ON_JOB_CLOSE` and its handle is held by the engine
    from a crash at four points; in-flight writes are reconciled and never silently repeated; changed blocks are
    detected, within the limit described above.
 2. **Overhead: yes, by a wide margin.** p50 0.26 ms and p95 0.54 ms per write step with the journal on disk (`mixed`
-   policy), against a target of 20 ms at p95. Measured on a Linux virtual disk; the Windows figure is produced by
-   `windows_check.py` Part B and is pending.
-3. **Job Objects: partly, pending Windows.** The design is settled from the documentation and the code and the check script
-   are written (structure sizes verified on Linux), but **no Windows run exists yet. The result is pending until the
-   post-merge Windows CI job runs `windows_check.py`.** If that job passes, the recommendation above stands. If a case fails,
-   this spike is reopened for that case; the owner decides whether ADR-0014 can be accepted before.
+   policy), against a target of 20 ms at p95, on a Linux virtual disk. On the Windows CI runner: p50 3.5 ms and p95 7.0 ms
+   (see "Windows results"); a workstation disk with antivirus still needs a local run.
+3. **Job Objects: yes, on the Windows CI runner.** Every case of `windows_check.py` Part A passed on `windows-latest`
+   (see "Windows results"), so the recommendation above stands. The breakaway case of the open risks (host programs
+   leaving a server's job) is not yet in the check and remains to be added and run.
+
+### Windows results
+
+From CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/runs/41729982994) (job `windows`, step "Windows spike checks"), `windows-latest`, Python 3.14.10:
+
+| Case | Expected | Observed |
+|---|---|---|
+| The check process itself | | already inside a job (nested jobs in use) |
+| `none` (no job) | children survive the engine | survive: pass |
+| `assign_after`, engine exit and engine kill | children end | none alive: pass |
+| `suspended`, engine exit and engine kill | children end | none alive: pass |
+| `self_assign`, engine exit and engine kill | children end | none alive: pass |
+| `late` assignment | grandchildren started before assignment escape | 2 escaped (2 expected): pass |
+| `nested` | inner job ends its tree; the outer job ends the rest | pass |
+| Suspended start, 40 immediate grandchildren | none escape | 0 of 40: pass |
+| Plain `Popen` then assign, 40 grandchildren | informational | 0 of 40 (Python starts slowly, so this does not prove safety) |
+| Part B: the replay scenarios of `check.py` | pass | all pass |
+| Engine overhead, `mixed` policy, write step | under 20 ms at p95 | p50 3.5 ms, p95 7.0 ms; raw append plus fsync p50 2.5 ms |
+| Replay of a paused run | | 1,000 steps in 31 ms; 10,000 steps in 141 ms |
 
 Not covered: power loss during commits, the host-state check against `model_saved` (11 §5), the working-copy save after
 write steps, `ctx.ask`, `ctx.decide`, `ctx.attempts`, `ctx.read`, and a real `reconcile_operation` of a Sasaah server
