@@ -4,11 +4,12 @@ issue: "B-073"
 spec: packages/eng-harness/docs/specs/0008-safe-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1]               # binding for every pull request of this plan
+risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
@@ -47,6 +48,7 @@ tasks:
   - id: T3
     title: SAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
@@ -76,6 +78,7 @@ tasks:
   - id: T4
     title: Table reader framework, field-map data with statuses, sections, materials and soil supports
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tables.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_tables.toml"
@@ -95,6 +98,7 @@ tasks:
   - id: T5
     title: SAFE model-state reader, points and joint-load kinds, fingerprint
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
@@ -113,6 +117,7 @@ tasks:
   - id: T6
     title: Joint-load import, pattern and combination edits for SAFE, read-back, SAFE check_model, point-load reconciliation
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_loads.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
@@ -142,6 +147,7 @@ tasks:
   - id: T7
     title: SAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_results.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
@@ -187,6 +193,7 @@ tasks:
   - id: T9
     title: SAFE slab design run and punching and flexure readers (blocked until local tests L5 and L11 give the keys)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_tables.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_results.py"

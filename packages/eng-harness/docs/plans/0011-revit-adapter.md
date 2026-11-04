@@ -4,11 +4,12 @@ issue: "B-080"
 spec: packages/eng-harness/docs/specs/0011-revit-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1]               # binding for every pull request of this plan
+risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: Framework extensions (attended class, host_dialog confirm, optional pid, deny-list names) and the Revit server section
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.ports, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/ports.py"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
@@ -43,6 +44,7 @@ tasks:
   - id: T3
     title: Revit allowlist data, argument models and pinned role fingerprints
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_allowlist.toml"
@@ -61,6 +63,7 @@ tasks:
   - id: T4
     title: Revit build check (excluded tools, toolset reason, catalog version), role start options and the pinned pipe
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
@@ -77,6 +80,7 @@ tasks:
   - id: T5
     title: Reply parsing, error and timeout mapping, units from specification identifiers
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_replies.py"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_errors.py"
@@ -101,6 +105,7 @@ tasks:
   - id: T6
     title: Revit kinds and the parameter role map
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/revit.py"
       - "packages/eng-harness/src/eng_harness/kinds/__init__.py"
@@ -118,6 +123,7 @@ tasks:
   - id: T7
     title: Revit state reader, chunked reads, fingerprint and the neutral kinds
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
@@ -136,6 +142,7 @@ tasks:
   - id: T8
     title: Revit edit kinds, value encoding, call preconditions (identity, active document, shared type, parameter resolution)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_edits.py"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_tools.py"
@@ -159,6 +166,7 @@ tasks:
   - id: T9
     title: Attended writes (dialog outcomes), read-back and check_model for Revit
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_checks.py"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_edits.py"
@@ -178,6 +186,7 @@ tasks:
   - id: T10
     title: Reconciliation by reading for the Revit write tools
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_reconcile.py"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py"
@@ -193,6 +202,7 @@ tasks:
   - id: T11
     title: Revit session operations (working copy, gaps), Revit identity rules and the pipe-keyed host lock
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_session_ops.py"
       - "packages/eng-harness/src/eng_harness/adapters/_identity.py"
@@ -214,6 +224,7 @@ tasks:
   - id: T12
     title: Calc harness.frame_element_map and its kind, with golden cases
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.frame_element_map.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
@@ -240,6 +251,7 @@ tasks:
   - id: T13
     title: Record mode scenario for Revit, sanitizer rules, recordings contract tests and the record script
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_record.py"
       - "packages/eng-harness/acceptance/recordings/README.md"
@@ -257,6 +269,7 @@ tasks:
   - id: T14
     title: Doctor checks for the Revit server
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.doctor (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/doctor.py"
       - "packages/eng-harness/tests/unit/test_doctor.py"
@@ -269,6 +282,7 @@ tasks:
   - id: T15
     title: Port wiring, crash matrix, stale-map test and the Revit local-testing document
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/docs/local-testing.md"

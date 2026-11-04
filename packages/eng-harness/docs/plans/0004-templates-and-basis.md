@@ -9,6 +9,7 @@ tasks:
   - id: T1
     title: "Template model, entries, citations, canonical units and bounds"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/templates/__init__.py"
       - "packages/eng-harness/src/eng_harness/templates/_model.py"
@@ -42,6 +43,7 @@ tasks:
   - id: T3
     title: "Inheritance, merge rules, ask paths and the resolved content hash"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/templates/_resolve.py"
       - "packages/eng-harness/tests/unit/test_template_resolve.py"
@@ -57,6 +59,7 @@ tasks:
   - id: T4
     title: "Template repository (shipped and user folders) and check_template"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/templates/_repository.py"
       - "packages/eng-harness/src/eng_harness/templates/_check.py"
@@ -73,6 +76,7 @@ tasks:
   - id: T5
     title: "FieldSpec and the workflow declaration rules"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.basis (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/basis/__init__.py"
       - "packages/eng-harness/src/eng_harness/basis/_fields.py"
@@ -86,6 +90,7 @@ tasks:
   - id: T6
     title: "Basis draft: precedence, sources, citations, pending list and draft hash"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.basis (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/basis/__init__.py"
       - "packages/eng-harness/src/eng_harness/basis/_build.py"
@@ -105,6 +110,7 @@ tasks:
   - id: T7
     title: "Setup view, answer model and BasisSetupPort"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.basis (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/basis/__init__.py"
       - "packages/eng-harness/src/eng_harness/basis/_setup.py"
@@ -119,6 +125,7 @@ tasks:
   - id: T8
     title: "Freeze, storage as basis.design_basis/1 and StoreBasisPort"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.basis (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/basis/__init__.py"
       - "packages/eng-harness/src/eng_harness/basis/_freeze.py"
