@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses
+from eng_dev_gate.checks import licenses, windows_tests
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
@@ -159,4 +159,13 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:], {"check": make_handler(), "licenses": licenses.make_handler()}))
+    raise SystemExit(
+        main(
+            sys.argv[1:],
+            {
+                "check": make_handler(),
+                "licenses": licenses.make_handler(),
+                "windows-tests": windows_tests.make_handler(),
+            },
+        )
+    )

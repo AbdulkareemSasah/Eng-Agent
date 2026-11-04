@@ -1,4 +1,4 @@
-"""Tests of the ``windows-tests`` command (spec 4.14, AC63): exactly the declared paths run; none declared is a notice."""
+"""Tests of the ``windows-tests`` command (spec 4.14, AC63): the declared paths run; none declared is a notice."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from eng_dev_gate.checks import windows_tests
 from eng_dev_gate.cli import main
 from eng_dev_gate.results import EnvironmentFaultError, Status
 from eng_dev_gate.toolrun import ToolResult
+from support.toy import GATE_YML
 
 
 class Recorder:
@@ -31,7 +32,7 @@ def _workspace(tmp_path: Path, declared: dict[str, list[str] | None]) -> Path:
         f'[project]\nname = "r"\nversion = "0"\n[tool.uv.workspace]\nmembers = [{members}]\n', encoding="utf-8"
     )
     (tmp_path / ".gate").mkdir()
-    gate_yml = "bootstrap:\n  enabled: true\n  gate_branch: build/v1\n"
+    gate_yml = GATE_YML
     (tmp_path / ".gate" / "gate.yml").write_text(gate_yml, encoding="utf-8")
     for name, paths in declared.items():
         folder = tmp_path / "pkgs" / name
