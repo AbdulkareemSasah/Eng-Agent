@@ -130,3 +130,17 @@ def test_actions_are_composite(name: str) -> None:
     assert action["runs"]["using"] == "composite"
     assert action["inputs"]["gate-root"]["default"] == ""
     assert all("shell" in s for s in action["runs"]["steps"] if "run" in s)
+
+
+def test_windows_job_only_on_push() -> None:
+    """AC59: the windows job runs only on pushes to build/v1, with the head variants and the windows action."""
+    job = _workflow()["jobs"]["windows"]
+    assert job["if"] == "github.event_name == 'push' && github.ref == 'refs/heads/build/v1'"
+    assert job["runs-on"] == "windows-latest"
+    uses = [s["uses"] for s in job["steps"] if s.get("uses", "").startswith("./")]
+    assert uses == [f"./{ACTIONS}/setup", f"./{ACTIONS}/windows"]
+    assert not any("pytest" in s.get("run", "") for s in job["steps"])  # the windows-tests command picks the paths
+    action = _action("windows")
+    assert action["runs"]["using"] == "composite"
+    assert "uv run eng-gate windows-tests" in _runs(action)
+    assert "github.event" not in _runs(action)

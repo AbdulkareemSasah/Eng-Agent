@@ -139,7 +139,7 @@ jobs:
       - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/build/action.yml') == ''
         uses: ./tools/eng-dev-gate/actions/build
 
-  # Replaced by the windows-tests command in task T23. Pushes to build/v1 only (head variants: the commit is merged).
+  # Pushes to build/v1 only (head variants: the commit is merged).
   windows:
     if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
     runs-on: windows-latest
@@ -148,16 +148,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./tools/eng-dev-gate/actions/setup
-      - name: Windows tests
-        shell: bash
-        run: |
-          if [ -n "$(find packages tools -name 'test_*.py' -not -path '*/.venv/*' 2>/dev/null | head -n 1)" ]; then
-            status=0
-            uv run pytest -m windows || status=$?
-            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then exit "$status"; fi
-          else
-            echo "No tests yet; skipping."
-          fi
+      - uses: ./tools/eng-dev-gate/actions/windows
       - name: Windows spike checks
         shell: bash
         run: |

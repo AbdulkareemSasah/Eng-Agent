@@ -24,7 +24,7 @@ def _member(repo: Repo, table: str) -> Member:
             "pyproject.toml": root_pyproject(["pkgs/a"]),
             ".gate/gate.yml": GATE_YML,
             ".gate/forbidden.yml": POLICY_TEXT,
-            "pkgs/a/pyproject.toml": member_pyproject("a") + table,
+            "pkgs/a/pyproject.toml": member_pyproject("a", gate_table=False) + table,
             "pkgs/a/src/a/blocks/beam.py": SOURCE,
             "pkgs/a/src/a/calc.py": SOURCE,
             "pkgs/a/src/a/other.py": SOURCE,
