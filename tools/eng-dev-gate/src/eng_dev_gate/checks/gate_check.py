@@ -134,7 +134,12 @@ def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list
     exempt = [*config.test_globs, *config.generated_globs, *config.spike_globs]
     counted = [e for e in entries if not matches_any(e.path, exempt)]
     findings = [
-        Finding(code="GC009", severity=Severity.NOTICE, path=e.path, message="binary file counts zero lines")
+        Finding(
+            code="GC009",
+            severity=Severity.NOTICE,
+            path=e.path,
+            message="notice, not a budget failure: binary file counts zero",
+        )
         for e in counted
         if e.binary
     ]
