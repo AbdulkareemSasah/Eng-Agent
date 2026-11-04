@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses, ratchet, test_first, windows_tests
+from eng_dev_gate.checks import licenses, ratchet, secrets, test_first, windows_tests
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
@@ -42,6 +42,8 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "secrets":
+            secrets.add_arguments(child)
         if name == "gate-check":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
@@ -152,6 +154,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "forbidden": _forbidden,
         "gate-check": handle_gate_check,
         "packages": _packages,
+        "secrets": secrets.handle,
         "test-first": test_first.handle,
         "workflows": _workflows,
         **(handlers or {}),
