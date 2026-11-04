@@ -160,6 +160,7 @@ def define(name: str, annotation: type, **meta: Any) -> type[ParamModel]:
         pytest.param("b_mm", {"unit": "furlong"}, id="unknown-unit"),
         pytest.param("b_mm", {"unit": "mm", "ge": 1.0}, id="bounds-without-source"),
         pytest.param("b_mm", {"unit": "mm", "le": 1.0, "bounds_source": "short"}, id="source-too-short"),
+        pytest.param("b_mm", {"unit": "mm", "le": 1.0, "bounds_source": "x" * 7}, id="source-one-short-of-minimum"),
         pytest.param("b_mm", {"unit": "mm", "le": 1.0, "bounds_source": "x" * 501}, id="source-too-long"),
         pytest.param("b_mm", {"unit": "mm", "ge": 1.0, "gt": 1.0, "bounds_source": WHY}, id="two-lower-bounds"),
         pytest.param("b_mm", {"unit": "mm", "le": 1.0, "lt": 1.0, "bounds_source": WHY}, id="two-upper-bounds"),
@@ -238,6 +239,13 @@ def test_json_schema_metadata() -> None:
     assert schema["additionalProperties"] is False
 
 
+def test_quantity_bounds_are_described_on_the_value_property() -> None:
+    h = Beam.model_json_schema()["properties"]["h_mm"]["anyOf"][0]
+    assert h["$ref"] == "#/$defs/Quantity"
+    assert (h["properties"]["value"]["minimum"], h["properties"]["value"]["maximum"]) == (100, 5000)
+    assert "minimum" not in h
+
+
 def test_json_schema_without_ref_capable_fields_has_no_ref_definition() -> None:
     schema = define("cover_mm", float, unit="mm", ge=0.0, bounds_source=WHY).model_json_schema()
     assert "Ref" not in schema.get("$defs", {})
@@ -311,6 +319,21 @@ def test_out_of_range_detail_and_boundaries() -> None:
     assert fails({**GOOD, "dur_s": 200}).detail.field == "dur_s"
     err = fails({**GOOD, "h_mm": {"value": 99.9, "unit": "mm"}}).detail  # a Quantity is bounded by its value
     assert (err.code, err.field, err.received) == (ErrorCode.OUT_OF_RANGE, "h_mm", 99.9)
+
+
+def test_unknown_unit_literal_names_the_field_and_the_expected_unit() -> None:
+    err = fails({**GOOD, "h_mm": {"value": 5, "unit": "furlong"}}).detail
+    assert (err.code, err.field, err.expected, err.received) == (
+        ErrorCode.UNIT_MISMATCH,
+        "h_mm",
+        {"unit": "mm"},
+        "furlong",
+    )
+
+
+def test_unknown_key_that_is_not_a_string_is_an_invalid_argument() -> None:
+    err = fails({**GOOD, 7: 1}).detail  # type: ignore[dict-item]
+    assert (err.code, err.received) == (ErrorCode.INVALID_ARGUMENT, "7")
 
 
 def test_non_finite_numbers_are_rejected_as_invalid_arguments() -> None:
