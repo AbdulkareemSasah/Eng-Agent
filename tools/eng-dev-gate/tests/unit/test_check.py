@@ -51,7 +51,8 @@ def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
     assert [s.name for s in STEPS] == [
-        "lock", "config", "format", "lint", "types", "forbidden", "tests", "docs-fresh", "licenses", "workflows"
+        "lock", "config", "format", "lint", "types", "forbidden", "ratchet", "tests", "docs-fresh",
+        "licenses", "workflows",
     ]  # fmt: skip
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
@@ -60,13 +61,13 @@ def test_step_order_and_aggregate(repo: Repo) -> None:
     assert ok.code == 0
     assert list(_statuses(ok).items()) == [
         ("lock", "pass"), ("config", "pass"), ("format", "pass"), ("lint", "pass"), ("types", "pass"),
-        ("forbidden", "pass"),
+        ("forbidden", "pass"), ("ratchet", "pass"),
     ]  # fmt: skip
     bad = _run(repo, FakeRunner({"format": 1, "types": 1}))
     assert bad.code == 1
     assert list(_statuses(bad).items()) == [
         ("lock", "pass"), ("config", "pass"), ("format", "fail"), ("lint", "pass"), ("types", "fail"),
-        ("forbidden", "pass"),
+        ("forbidden", "pass"), ("ratchet", "pass"),
     ]  # fmt: skip
     assert json.loads(bad.out)["status"] == "fail"
 
@@ -82,11 +83,8 @@ def test_only_and_skip(repo: Repo) -> None:
     make_workspace(repo, ["a"])
     assert list(_statuses(_run(repo, FakeRunner(), "--only", "lint", "--only", "types"))) == ["lint", "types"]
     assert list(_statuses(_run(repo, FakeRunner(), "--skip", "lock,types"))) == [
-        "config",
-        "format",
-        "lint",
-        "forbidden",
-    ]
+        "config", "format", "lint", "forbidden", "ratchet",
+    ]  # fmt: skip
     assert _run(repo, FakeRunner(), "--only", "nonsense").code == 2
 
 
@@ -152,10 +150,10 @@ def test_workspace_selection(repo: Repo) -> None:
     both = _statuses(_run(repo, FakeRunner()))
     assert list(both) == [
         "lock", "config:a", "config:b", "format:a", "format:b", "lint:a", "lint:b", "types:a", "types:b",
-        "forbidden:a", "forbidden:b",
+        "forbidden:a", "forbidden:b", "ratchet",
     ]  # fmt: skip
     one = _statuses(_run(repo, FakeRunner(), "--package", "b"))
-    assert list(one) == ["lock", "config", "format", "lint", "types", "forbidden"]
+    assert list(one) == ["lock", "config", "format", "lint", "types", "forbidden", "ratchet"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
     argv = [
         "--root",
