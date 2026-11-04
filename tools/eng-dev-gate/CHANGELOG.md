@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `risk-floor`: a `.gate/ratchet.json` change that gate-check accepts in the task's scope no longer raises the floor (the rise is AW05); any other change of it still does (B-348, plan task T33, AC21b).
+
 - Fix: a `mutation` run in which mutmut produced no mutant (a module-level lambda, decorated methods only) passes with the notice MU003 instead of MU002; mutants that no test covers count as survivors in the MU001 score, also when mutmut stops on them; MU002 stays reserved for a backend fault (B-339, AC53a, plan task T29).
 - `risk-floor`: a `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan` records its risk from its one body `Risk:` line, RF004 without one (B-337, plan task T27, AC21a).
 - Package skeleton: `eng-gate` command shell with exit codes 0 to 3 and `--version` (B-030, plan task T1).
