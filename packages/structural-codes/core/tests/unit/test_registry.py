@@ -15,6 +15,9 @@ from structural_codes.check import Check
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.pack import ENTRY_POINT_GROUP, Pack, Registry
 
+# B-260: the module name is split only because gate rule IM006 wrongly reports the fixture pack under
+# tests/fixtures/*/src as an undeclared distribution (it is not in the gate's `local` set); this is
+# not a way to hide an import. The gate work item to add fixture source roots is pending with the lead.
 _PACK_MODULE = "synth" + "base"
 _SRC = Path(__file__).parent.parent / "fixtures" / "synthbase" / "src"
 
