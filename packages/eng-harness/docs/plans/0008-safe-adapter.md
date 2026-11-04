@@ -20,6 +20,8 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"
       - "packages/eng-harness/tests/unit/adapters/test_products.py"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
+      - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -29,7 +31,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_products.py::test_product_by_extension"
       - "packages/eng-harness/tests/unit/adapters/test_products.py::test_no_product_branches_in_shared"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_tool_not_served_for_product"
-    covers: [AC1, AC2, AC4]
+    covers: [AC1, AC2, AC3, AC4]
     depends_on: []
   - id: T2
     title: Synthetic SAFE mode of the CSI fake and its schema check
@@ -86,6 +88,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py::test_sections_and_materials"
       - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py::test_soil_supports"
       - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py::test_missing_column"
+      - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py::test_ambiguous_column"
       - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py::test_unknown_table_is_gap"
     covers: [AC11, AC12, AC13]
     depends_on: [T3]
@@ -156,7 +159,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_truncated"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_soil_pressure_group"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_base_and_joint_reactions"
-      - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_analysis_messages"
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_analysis_status"
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_results.py::test_analysis_messages_unknown_is_gap"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_gaps.py::test_slab_design_gap"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_gaps.py::test_gaps_not_implemented"
     covers: [AC21, AC22, AC23, AC24, AC25]
@@ -228,7 +232,10 @@ keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
 profile (behavior unchanged, the 0002 suite still passes); `[servers.<name>].product` and `[host_programs.safe]` in
 `ServersConfig`; the allowlist header table `[fingerprint]` with one entry per product and the loader's `products` filter;
 the build check takes the server's product; product by model extension. Touches files that plan 0002 T1, T6 and T11 create,
-so it starts after those are merged.
+so it starts after those are merged. The two existing 0002 tests that read the pinned fingerprint
+(`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`, `test_session.py::test_build_mismatch_stops_run`) are in
+T1's files: they change only in how they read the header (the ETABS entry of `[fingerprint]`), never in the value they
+expect, and they are the regression proof that the ETABS fingerprint is unchanged.
 
 **T2 Fake** (spec §4.1 and 0002 §4.8.3). Test code only: the fake gains a `product` setting; SAFE mode has points, slab
 areas, sections, materials, patterns, combinations, joint loads, the area-spring tables, the result tables with
@@ -247,7 +254,7 @@ inventory and pinned; `working_copy` and `restore` for `.FDB` through the 0002 s
 `csi_new_model`, `csi_new_blank_model`, `csi_define_*`, `csi_design_*` and `csi_results_story_drifts` are not SAFE entries.
 
 **T4 Tables** (spec §4.5). `read_table` with units labelling and `truncated` handling, the field-map data with the three
-statuses, the readers for slab sections, concrete materials and soil supports, the harness kinds they produce. No key is
+statuses (exact normalized-name matching; none or several matching columns is `INTERNAL`, never a first match), the readers for slab sections, concrete materials and soil supports, the harness kinds they produce. No key is
 added whose source is not named in the data file next to it.
 
 **T5 State** (spec §4.4). The SAFE reader: grids, points, areas, frames, load set, joint loads, soil supports, status;
@@ -259,7 +266,7 @@ dimension comparison, SAFE integrity issues, reconciliation of a point load from
 mapping including `SuperDead`.
 
 **T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group`, the
-base-reaction and joint-reaction readers, analysis status and messages (a gap until recorded), and the explicit gaps for
+base-reaction and joint-reaction readers, analysis status, the `Analysis Messages` read as a `NotImplementedGap` until recorded, and the explicit gaps for
 slab design.
 
 **T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the crash matrix at
@@ -298,6 +305,6 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 ## 5. Rollback
 
 Each task is one squash-merged pull request into `build/v1`; reverting it removes it and its dependants. T1 changes the
-allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite is its
-regression test. Nothing here writes to a host program in CI. A wrong field key is fixed forward in the data file; a SAFE
+allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite (with the two tests
+T1 adapts) is its regression test. Nothing here writes to a host program in CI. A wrong field key is fixed forward in the data file; a SAFE
 build the allowlist was not tested with is refused by the build check rather than run.

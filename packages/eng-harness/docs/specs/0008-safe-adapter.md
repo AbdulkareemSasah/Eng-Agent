@@ -118,8 +118,10 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   each area with its property name or `null` for "None". Test: `tests/unit/adapters/test_safe_tables.py::test_soil_supports`.
 - AC13. Given a table whose reply lacks a column the field map requires, or whose map entry is unknown (§4.5), then
   `INTERNAL` with an `incident_id` naming the table and the missing logical column when the entry is `reference` or
-  `candidate`, and `NotImplementedGap` when the entry is `unknown`; the columns seen are stored as failure evidence. Test:
-  `tests/unit/adapters/test_safe_tables.py::test_missing_column`, `::test_unknown_table_is_gap`.
+  `candidate`, and `NotImplementedGap` when the entry is `unknown`; the columns seen are stored as failure evidence. Given
+  a reply in which two or more columns match one logical column, then `INTERNAL` naming the logical column and the
+  matching columns, never a first match. Tests: `tests/unit/adapters/test_safe_tables.py::test_missing_column`,
+  `::test_ambiguous_column`, `::test_unknown_table_is_gap`.
 
 ### 3.4 Loads and edits
 
@@ -158,15 +160,18 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   after the engine's save; the model is `locked` afterwards and an edit before `csi_unlock_model` is refused as in 0002
   AC29. Test: `tests/workflow/adapters/test_safe_analysis.py::test_long_role_save_first_and_locked`.
 - AC22. Given the tables of §4.6 and a case list, when soil pressures are read, then `harness.safe_soil_pressures/1` holds
-  the rows (area, element and joint when the table has them, case, pressure in `kPa` converted from the present units),
+  the rows (`area`, `element` and `joint` each when the table has the column and `null` otherwise, case, pressure in `kPa`
+  converted from the present units), `field_map_status` is `candidate` until L5 promotes the entry (§4.5),
   `sign_convention` is `host_unconfirmed/1`, no absolute value is taken, `group` is passed when requested, and a
   `truncated` reply gives `LIMIT_EXCEEDED` (gap SG-6) with the `group` hint. Tests:
   `tests/workflow/adapters/test_safe_results.py::test_soil_pressure_rows`, `::test_soil_pressure_truncated`,
   `::test_soil_pressure_group`.
 - AC23. Given `csi_results_base_reactions` and `csi_results_joint_reactions`, then the replies become
   `harness.base_reactions/1` and `forces.joint_reactions/1` in canonical units; the moment reference of the base
-  reactions is `host_unconfirmed/1`. `csi_analysis_status` and the table `Analysis Messages` become the harness kinds of
-  0002 §4.6.1 step 11 and 13. Test: `tests/workflow/adapters/test_safe_results.py::test_base_and_joint_reactions`, `::test_analysis_messages`.
+  reactions is `host_unconfirmed/1`. `csi_analysis_status` becomes `harness.csi_analysis_status/1` (0002 §4.6.1 step 11). Reading the table
+  `Analysis Messages` gives `NotImplementedGap` as for any `unknown` entry (AC13, §4.5) until an owner recording (L5) sets
+  its keys. Tests: `tests/workflow/adapters/test_safe_results.py::test_base_and_joint_reactions`, `::test_analysis_status`,
+  `::test_analysis_messages_unknown_is_gap`.
 - AC24. Given a request to run SAFE slab design (flexure, shear, punching) or to read its results, then
   `NotImplementedGap` (gap SG-5), nothing is sent; `csi_design_run` and `csi_design_results` are not served for SAFE until plan task T9 (blocked on local tests L5 and L11) replaces
   this criterion with the accepted behavior, tested by `tests/workflow/adapters/test_safe_slab_design.py::test_design_run_and_punching_rows`. Test:
@@ -215,7 +220,8 @@ or a wedged ETABS would otherwise stall or de-own the SAFE instance. Q1.
 **Allowlist [added]**: the header's `tool_fingerprint` becomes a table `[fingerprint]` with one entry per product, each
 computed over the entries that list the product (0002 §4.3.4 item 4); `products` on an entry may list several products.
 SAFE needs no change of the forbidden options (0002 §4.2 item 3): `--disable-script` stays required, and
-`csi_db_tables_apply` stays listed by the server and refused by the loader.
+`csi_db_tables_apply` stays listed by the server and refused by the loader. The pinned ETABS value is unchanged, so the
+existing 0002 tests that read the header change only in how they read it, not in what they expect (plan T1).
 
 ### 4.2 Footing workflow steps on SAFE
 
@@ -230,7 +236,7 @@ needs from the adapter, in order:
 | 4 | Column loads in | `csi_set_point_load`, `csi_add_load_pattern`, `csi_add_load_combo`, `csi_delete_load_combo` (main) | input `harness.joint_loads/1` (§4.3) |
 | 5 | Read back and check | table reads, `csi_list_*` | `issues.model_check/1` |
 | 6 | Save, analysis | `csi_save_model`, `csi_run_analysis` (long), `csi_analysis_status` | `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1` |
-| 7 | Results | `csi_db_table_read` (soil pressures, analysis messages), `csi_results_base_reactions`, `csi_results_joint_reactions` | §4.6 |
+| 7 | Results | `csi_db_table_read` (soil pressures; analysis messages are a gap until recorded, §4.5), `csi_results_base_reactions`, `csi_results_joint_reactions` | §4.6 |
 | 8 | Slab design and punching | none confirmed | gap SG-5 |
 | 9 | Unlock for the next iteration | `csi_unlock_model` (ADR-0031, 0002 T15) | approved step |
 
@@ -288,17 +294,19 @@ and maps columns to logical names through the data file `products/_safe_tables.t
 | Status | Meaning | Tables |
 |---|---|---|
 | `reference` | field keys from the Sasaah SAFE 22 table reference (importable tables); confirmed by `csi_db_table_fields` at the first local run | `Slab Property Definitions` (`Name`, `PropType`, `Material`, `Thickness`), `Material Properties - General` (`Material`, `Type`), `- Basic Mechanical Properties` (`Material`, `UnitWeight`, `E1`, `U12`), `- Concrete Data` (`Material`, `Fc`), `Spring Property Definitions - Area Springs` (`Name`, `StiffOpt`, `StiffU1`, `StiffU2`, `StiffU3`, `NonlinOpt3`), `Area Assignments - Area Springs` (`UniqueName`, `SpringProp`), `Joint Loads Assignments - Force` (`UniqueName`, `LoadPattern`, `FX`..`MZ`, `XDim`, `YDim`), `Load Pattern Definitions`, `Load Combination Definitions` |
-| `candidate` | the column is located by a normalized name (lower case, letters and digits only) among the names the Sasaah footing tool uses today (`SafePhase.cs`, reading `Soil Pressures`: case `outputcase`, `loadcase`, `case`; pressure `pressure`, `soilpressure`; `joint`; `uniquename`; `shellelm`, `element`) | `Soil Pressures` |
+| `candidate` | each logical column has a fixed list of accepted names, taken from the names the Sasaah footing tool reads in `Soil Pressures` (`SafePhase.cs:529-531` and `550-551`; `uniquename` is the area part of its (area, element, joint) key, line 573) and compared by **exact equality** of the normalized name (lower case, letters and digits only): `case` = `outputcase`, `loadcase`, `case`; `pressure` = `pressure`, `soilpressure`; `joint` = `joint`; `area` = `uniquename`; `element` = `shellelm`, `element`. `case` and `pressure` are required; `area`, `element` and `joint` are optional and `null` in the row when absent. Exactly one column of the reply may match a logical column: none for a required one, or more than one for any, is `INTERNAL` with the columns seen (AC13), never a first match. Sasaah's own `FindColumn` (`CsiHelpers.cs:188-200`) matches by substring and takes the first hit, and falls back to column 0 for a missing `uniquename`; the adapter does neither | `Soil Pressures` |
 | `unknown` | the SAFE 22 reference lists the table with no fields and no Sasaah code reads it; the reader is a gap until a recording gives the keys | `Soil Pressures Summary`, `Soil Pressures Enveloping Summary`, `Base Reactions`, `Analysis Messages`, `Concrete Slab Design - Punching Shear Data`, `Concrete Slab Design - Flexure and Shear Data` |
 
-No field key is invented: an `unknown` entry becomes `reference` or `candidate` only from a recording the owner commits
+A `candidate` table may be read before any recording, because a wrong or ambiguous column raises instead of being picked
+and the result carries `field_map_status: "candidate"`; the workflow decides whether a candidate-mapped result may feed a
+verdict (recommendation Q8). No field key is invented: an `unknown` entry becomes `reference` or `candidate` only from a recording the owner commits
 (§12 L5) in a pull request that edits the data file and its tests. The field-map data is the single place a Sasaah or
 SAFE change is absorbed.
 
 ### 4.6 Results
 
 - **Soil pressures** (`harness.safe_soil_pressures/1` **[added]**): `source_table`; `sign_convention:
-  "host_unconfirmed/1"`; `rows`: `{area, element|null, joint|null, case: CaseRef, pressure_kPa}`; `summary` with the row
+  "host_unconfirmed/1"`; `field_map_status` (`candidate` or `reference`); `rows`: `{area|null, element|null, joint|null, case: CaseRef, pressure_kPa}`; `summary` with the row
   count and the raw minimum and maximum (no absolute values, no envelope computed by the adapter; the Sasaah tool takes
   `abs` and superposes service patterns itself, which is a calc, not a read). The case list is an argument, the `group`
   filter optional. **Limit (SG-6):** the tool returns at most 2000 rows and has no case or area filter; a realistic
@@ -383,7 +391,7 @@ Everything of 0002 §6 applies. Additions:
 | Wrong sign or wrong axes of loads or pressures read from SAFE | R1 | No sign flip in the adapter; `host_unconfirmed/1` conventions; read-back equality; local tests L7, L8 |
 | A load lands 1000 times too large or small (units) | R1 | Token always passed; AC17; read-back of every load |
 | A load replace silently changes the punching dimensions | R1 | Before/after comparison of `XDim`, `YDim` (AC18) |
-| A table column guessed wrongly | R1 | Field-map statuses; no invented keys; recordings before use (§4.5, AC13) |
+| A table column guessed wrongly | R1 | Field-map statuses; no invented keys; exact-name matching and an error on none or several matches; `unknown` tables are gaps until recorded; candidate results are flagged and promoted only by an owner recording (§4.5, AC13, AC22) |
 | Product sessions disturbing each other | R1 | One server per product (AC5, Q1) |
 | Soil pressure result truncated and used as complete | R1 | `LIMIT_EXCEEDED`, never a partial payload (AC10, AC22) |
 | Sasaah SAFE behavior differs from the fake | R3 | Fake built from the inventory; fidelity test against recordings (AC28) |
@@ -418,6 +426,7 @@ package, changelog entries). `eng-contract` is unchanged; Q2 and Q3 ask for addi
 | Q5 | v1 route to a SAFE model: engineer-prepared `.FDB` with footings, soil springs and column dimensions, versus a project-lane tool | Owner | Prepared model plus gap reports to Sasaah in this order: soil pressure result tool (SG-6), `csi_resize_area_rect` (SG-4), spring tools (SG-3), `csi_set_point_load` dimensions (SG-7), typed slab section (SG-2) |
 | Q6 | Sign conventions and moment reference of SAFE soil pressures and base reactions | Owner | Record `host_unconfirmed/1`; settle by local test L7 and then add the convention to the kinds as a new kind version |
 | Q7 | `SuperDead` as the pattern type name | Owner | Use after L12; keeps `superimposed_dead` mapped for SAFE only |
+| Q8 | May a result read through a `candidate` field map (soil pressures before L5) feed a verdict | Owner | No verdict before L5 promotes the map to `reference`; the footing workflow spec checks `field_map_status` and reports `needs local test` otherwise |
 | SG-1 to SG-9 | §4.8 | Owner | As tabled |
 | A1 | **[added]** `ProductProfile`; `[servers.<name>].product`; allowlist `[fingerprint]` per product; harness kinds `harness.joint_loads/1`, `harness.model_points/1`, `harness.safe_soil_supports/1`, `harness.safe_soil_pressures/1`, `harness.base_reactions/1`; warnings `ZERO_LOAD_SKIPPED`; issue codes `SECTION_TYPE_NOT_MAPPED`, `JOINT_LOAD_ON_MISSING_JOINT`, `AREA_WITHOUT_SOIL_SUPPORT` | Owner | Accept with this spec |
 | C1 | Conflict: 06 §8 lists soil supports, punching output and strip results as SAFE tools; `sasaah-csi-mcp` has none of them (ADR-0024 made 06 a target) | Owner | This spec follows the server; amend 06 §8 with the gap table when the owner accepts it |
