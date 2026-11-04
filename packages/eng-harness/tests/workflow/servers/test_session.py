@@ -97,7 +97,7 @@ def _text(result: Any) -> dict[str, Any]:
     return body
 
 
-def _arm(control: Path, *faults: dict[str, str]) -> None:
+def _arm(control: Path, *faults: dict[str, Any]) -> None:
     control.write_text(json.dumps({"faults": list(faults), "seed": {}}))
 
 
@@ -246,7 +246,7 @@ def test_backstop_timeout_restarts_role(
         before = manager.session_epoch("csi")
         _arm(control, {"fault": "slow_analysis", "tool": "csi_run_analysis", "seconds": 30})
         with pytest.raises(ToolFailed) as failure:  # backstop = 1 s call timeout + 1 s grace
-            await manager.call("csi", "main", "csi_run_analysis", {}, CallEffect.WRITE)
+            await manager.call("csi", "main", "csi_run_analysis", {"confirm": True}, CallEffect.WRITE)
         assert failure.value.detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
         assert manager.session_epoch("csi") == before + 1
         await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)  # a new process serves it
