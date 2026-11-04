@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 
 from eng_dev_gate import __version__, agents, gate_root
+from eng_dev_gate.checks import secrets
 from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.report import AWAITING_TITLE, escape_data
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
@@ -36,6 +37,8 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "secrets":
+            secrets.add_arguments(child)
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
@@ -94,7 +97,9 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = {"agents": agents.handle, "packages": _packages, **(handlers or {})}.get(args.command)
+    handler = {"agents": agents.handle, "packages": _packages, "secrets": secrets.handle, **(handlers or {})}.get(
+        args.command
+    )
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")

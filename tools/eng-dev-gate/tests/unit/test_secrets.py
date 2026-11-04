@@ -137,7 +137,10 @@ def test_skipped_files_are_sc002(repo: Repo) -> None:
     for argv in (["--range", f"{base}..HEAD"], ["--tree"]):
         result = repo.run(["--format", "json", "secrets", *argv])
         assert result.code == 0, argv
-        assert {(f["code"], f["path"]) for f in _findings(result)} == {("SC002", "big.txt"), ("SC002", "bin.dat")}
+        skipped = {
+            (f["code"], f["path"]) for f in _findings(result) if f["path"] != ".gate/gate.yml"
+        }  # also over 64 bytes
+        assert skipped == {("SC002", "big.txt"), ("SC002", "bin.dat")}
 
 
 def test_tree_scan_reads_tracked_files_only(repo: Repo) -> None:

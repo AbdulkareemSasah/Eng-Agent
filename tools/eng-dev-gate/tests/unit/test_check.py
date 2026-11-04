@@ -36,8 +36,8 @@ class FakeRunner:
 
 
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
-    # the tests step has its own tests (test_coverage.py); the fake runner here writes no coverage report
-    return repo.run(["--format", "json", "check", "--skip", "tests", *argv], {"check": make_handler(runner)})
+    # the tests and secrets steps have their own tests (test_coverage.py, test_secrets.py)
+    return repo.run(["--format", "json", "check", "--skip", "tests,secrets", *argv], {"check": make_handler(runner)})
 
 
 def _statuses(result: RunResult) -> dict[str, str]:
