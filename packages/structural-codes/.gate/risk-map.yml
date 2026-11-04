@@ -14,3 +14,7 @@
 - paths:
     - "core/src/**"
   risk: r2
+# Every module of the ACI 318-14 pack is r1 (plan 0002 T1).
+- paths:
+    - "aci318-14/src/aci318_14/**"
+  risk: r1

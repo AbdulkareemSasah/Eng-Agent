@@ -565,7 +565,7 @@ file or folder of the run carries an answer: answers reach the engine only in me
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;  -- schema_version, run_id, created_at
 CREATE TABLE events (
   seq            INTEGER PRIMARY KEY,          -- 1, 2, 3, ... assigned by the writer, no gaps (trigger)
-  type           TEXT NOT NULL CHECK (type IN (<the 20 types of 4.4.2>)),
+  type           TEXT NOT NULL CHECK (type IN (<the 21 types of 4.4.2>)),
   path           TEXT,                         -- step path; NULL for run-level events
   attempt        INTEGER CHECK (attempt IS NULL OR attempt >= 1),
   at             TEXT NOT NULL,                -- contract Timestamp, from the injected Clock
