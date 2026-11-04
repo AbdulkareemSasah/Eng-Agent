@@ -70,6 +70,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_http.py::test_missing_key"
       - "packages/eng-harness/tests/unit/providers/test_http.py::test_trust_env_is_off"
       - "packages/eng-harness/tests/unit/providers/test_outgoing.py::test_final_body_scan"
+      - "packages/eng-harness/tests/unit/providers/test_outgoing.py::test_object_keys_are_scanned"
       - "packages/eng-harness/tests/unit/providers/test_outgoing.py::test_adapter_rechecks_state"
       - "packages/eng-harness/tests/property/test_provider_properties.py::test_sensitive_text_never_reaches_the_transport"
     covers: [AC9, AC10, AC11, AC12, AC13, AC14, AC15]
@@ -145,7 +146,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_summary_has_no_secrets"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_absent_provider_is_phase1_behavior"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_check_command_makes_one_call_per_provider"
-    covers: [AC28, AC29, AC30]
+    covers: [AC28, AC29, AC30, AC47]
     depends_on: [T2, T4, T6]
   - id: T8
     title: Evaluation core (thresholds, metrics, eligibility)
@@ -232,8 +233,8 @@ and `_outgoing.py`, `_credentials.py`, `_http.py`, `evaluation.py` and `_evalsto
 ## 2. Tasks
 
 **T1 Dependencies, errors, configuration, network guard** (spec §4.2, §4.3, §4.11). Adds the three runtime dependencies
-with their package ADRs (`docs/adr/0001` to `0003`, status Proposed, owner review), `ProviderErrorCode`, `ProviderError`
-and `ProviderFailure` to `decisions/interfaces.py`, the `[providers.*]` models with endpoint, secret-key and timeout
+with their package ADRs (`docs/adr/0001` to `0003`, status Proposed, owner review), `ProviderErrorCode`, `ProviderError`,
+`ProviderFailure` and `OutgoingPlace` to `decisions/interfaces.py`, the `[providers.*]` models with endpoint, secret-key and timeout
 rules, and the autouse fixture that refuses non-loopback connections and PydanticAI model requests for the whole test
 tree. The only task that touches `pyproject.toml` and `uv.lock` (risk floor r3). The lock must show `pydantic-ai-slim`
 at an exact version; the HTTP library is the one the pinned `pydantic-ai-slim` and `openai` resolve to (ADR-0003 names
@@ -245,7 +246,8 @@ and `python -m eng_harness.providers` with `set-key`, `delete-key` and `status` 
 ever accepted as an argument.
 
 **T3 Shared HTTP client and outgoing guard** (spec §4.5). The `httpx2` client with redirects off and a bearer auth hook,
-the error mapping table, the one-request rule, the final-body scan and the direct-call state recheck, plus the exception
+the error mapping table, the one-request rule, the final-body scan (string values and object keys, with `REDACTION_BLOCKED` carrying only a fixed `where` place, never a
+data-derived path) and the direct-call state recheck, plus the exception
 tests (the `assert_no_leak` helper walks `__cause__`, `__context__` and traceback locals), the log tests over the shared
 client, `trust_env=False`, and the property test with sensitive strings (non-ASCII, quotes, backslashes). The module
 also sets the third-party logger levels (spec §4.5). R3 and the security lens apply.
@@ -264,14 +266,14 @@ output retries, no instrumentation, over the shared client; cancellation and cei
 
 **T7 Factory** (spec §4.1, §4.4, §4.8). `build_providers`: config to providers, `local_only` builds nothing remote and
 reads no key, absent or failing providers become `None` with a warning, the summary for the run header, the `check`
-subcommand (it edits the `__main__.py` of T2; its live calls are local-test only, its test uses fakes).
+subcommand (AC47; it edits the `__main__.py` of T2; its live calls are local-test only, its test uses recorded transports).
 
 **T8 Evaluation core** (spec §4.10). `EvalThresholds` with the 12 §6 and 12 §3 values (golden file citing them),
 `evaluate_point` (pure), eligibility with the explicit calibration gap, override handling. R1: the thresholds and the
 fixture report go to the owner queue.
 
-**T9 Evaluation store and release** (spec §4.10). `evaluations.sqlite` with append-only triggers, `verify_releases` and
-`ReleaseFinding`, the `evaluate` command with `--from-export`; it writes no configuration.
+**T9 Evaluation store and release** (spec §4.10). `evaluations.sqlite` with append-only triggers, `verify_releases(settings, store, provider_infos, policies)`
+(including the `threshold_mismatch` check) and `ReleaseFinding`, the `evaluate` command with `--from-export`; it writes no configuration.
 
 **T10 Assembly and acceptance** (spec §4.9, §4.11). `assemble_decision_runtime` (providers, verified releases, summary),
 the fake-host workflow tests with the real engine and cascade (one screen, batching, outage, timeouts), the replay test,
@@ -282,8 +284,12 @@ the import-isolation test (not vacuous: it requires the modules), recordings, an
 
 - Runtime (new, each with a package ADR in this pull request, status Proposed, for the owner to accept before T1 merges
   its lock change): `pydantic-ai-slim` with the `openai` extra ([ADR-0001](../adr/0001-pydantic-ai-slim.md)), `keyring`
-  ([ADR-0002](../adr/0002-keyring.md)), `httpx2` ([ADR-0003](../adr/0003-httpx2.md)). Licenses: MIT, MIT, BSD-3-Clause
-  (allowed, process/04 §7). Transitive licenses are checked by the gate's license step.
+  ([ADR-0002](../adr/0002-keyring.md)), `httpx2` ([ADR-0003](../adr/0003-httpx2.md)). Licenses of the three direct dependencies: MIT, MIT,
+  BSD-3-Clause (allowed, process/04 §7). Two transitive packages are outside the allowed list of process/04 §7 and need
+  the owner's approval of the ADR that names them: `regex` (Apache-2.0 AND CNRI-Python, in ADR-0001) and `cffi`
+  (MIT-0, Linux only, in ADR-0002). The gate's license step would otherwise fail T1; the entries in
+  `license_exceptions` of `.gate/gate.yml` (a protected path, so made by the owner or at the owner's request) are a
+  precondition of T1 and are not part of any task's file list. All other transitive licenses are checked by the step.
 - Development: none new (Hypothesis, pytest and the coverage plugin from engine plan T1; PydanticAI's test models and
   `httpx2.MockTransport` ship with the runtime dependencies).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9

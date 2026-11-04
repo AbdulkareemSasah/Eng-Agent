@@ -39,9 +39,21 @@ Other transitive packages named by the resolution, with published license and in
 (Apache-2.0, 229 KiB), `urllib3` 2.8.0 (MIT, 440 KiB), `certifi` 2026.10.23 (MPL-2.0, 239 KiB), `charset-normalizer`
 3.5.2 (MIT, 743 KiB), `regex` 2026.9.29 (Apache-2.0 AND CNRI-Python, 2983 KiB), `typing-inspection` 0.4.4 (MIT, 53
 KiB), `annotated-types` 0.8.0 (MIT, 35 KiB), `sniffio` 1.3.1 (MIT OR Apache-2.0, 22 KiB). `anyio` is covered in
-[ADR-0003](0003-httpx2.md). The licenses are all permissive or weak-copyleft file-level (MPL-2.0 for `certifi`); the
-gate's license step enforces the project's accepted list. `pydantic` is already a dependency. The HTTP client library is
+[ADR-0003](0003-httpx2.md). Every license above is on the allowed list of process/04 §7 (MIT, BSD, Apache-2.0, ISC,
+PSF, MPL-2.0; `certifi` is MPL-2.0, file-level weak copyleft) except one, named in the next paragraph. `pydantic` is already a dependency. The HTTP client library is
 the subject of [ADR-0003](0003-httpx2.md). No telemetry exporter is installed, and the adapter enables none (spec AC24).
+
+### Licenses outside the process/04 §7 list: owner approval requested
+
+`regex` 2026.9.29 (a transitive dependency of `tiktoken`) is published as `Apache-2.0 AND CNRI-Python`. CNRI-Python is
+not on the allowed list of process/04 §7, which says that anything else needs an ADR approved by the owner. This ADR
+asks for that approval for `regex` only. The CNRI-Python license is the permissive license of the Corporation for
+National Research Initiatives; the package is installed as a dependency, not copied into the repository. Accepting this
+ADR is the approval; the matching entry (`distribution: regex`, `license: Apache-2.0 AND CNRI-Python`, `adr`: this
+file) in `license_exceptions` of `.gate/gate.yml` is a protected path and is made by the owner, or by the agent when
+the owner asks, before T1 merges. It is one named exception, not a change of the allowed list. If the owner declines, the `openai` extra cannot be used as published
+(the `regex` requirement comes through `tiktoken`), and the fallback is a hand-written client behind the same
+`LLMProvider` interface (the option ADR-0013 rejected); the owner should say so before T1 starts.
 
 ## Consequences
 - Easier: typed output validation, model test doubles (`FunctionModel`, `TestModel`) for CI without the network, one

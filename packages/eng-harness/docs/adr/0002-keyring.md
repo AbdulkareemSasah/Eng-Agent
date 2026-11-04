@@ -38,8 +38,16 @@ added.
 | `pywin32-ctypes` 0.2.3 (Windows only) | Windows Credential Manager access | BSD-3-Clause | about 30 KiB (wheel size; not installed here) |
 
 On Linux `secretstorage` also brings `cryptography` 50.0.2 (Apache-2.0 OR BSD-3-Clause, 14648 KiB), `cffi` 2.1.1
-(MIT-0, 714 KiB) and `pycparser` 3.12 (BSD-3-Clause, 256 KiB), all within the licenses the gate accepts; they are Linux
-only and add about 15.6 MiB there. A headless Linux CI runner has no Secret Service, so tests use an in-memory backend double and the real stores are
+(MIT-0, 714 KiB) and `pycparser` 3.12 (BSD-3-Clause, 256 KiB); they are Linux only and add about 15.6 MiB there.
+
+**License outside the process/04 §7 list: owner approval requested.** `cffi` is published as MIT-0 (MIT No
+Attribution), which is not named in the allowed list of process/04 §7 (MIT, BSD, Apache-2.0, ISC, PSF, MPL-2.0), so by
+that rule it needs an ADR approved by the owner. MIT-0 is the MIT license without the attribution condition, so it is
+no more restrictive than MIT. This ADR asks for the approval of `cffi` under MIT-0 only; the matching entry
+(`distribution: cffi`, `license: MIT-0`, `adr`: this file) in `license_exceptions` of `.gate/gate.yml` is a protected path
+and is made by the owner, or by the agent when the owner asks, before T1 merges. It is one named exception, not a
+change of the allowed list. Every
+other package in the table is on the allowed list. A headless Linux CI runner has no Secret Service, so tests use an in-memory backend double and the real stores are
 "needs local test".
 
 ## Consequences
