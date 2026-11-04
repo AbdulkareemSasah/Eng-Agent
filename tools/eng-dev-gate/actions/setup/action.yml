@@ -1,0 +1,26 @@
+name: setup
+description: Install uv and sync the head environment, and the gate environment when gate-root is set (spec 4.14).
+inputs:
+  gate-root:
+    description: Checkout of the base commit that holds the gate (.gate-base in pull requests); empty for a head run.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Read the Python version
+      id: py
+      shell: bash
+      run: echo "version=$(tr -d '[:space:]' < .python-version)" >> "$GITHUB_OUTPUT"
+    - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      with:
+        enable-cache: true
+        python-version: ${{ steps.py.outputs.version }}
+    - name: Sync the head environment
+      shell: bash
+      run: uv sync --all-packages --locked
+    - name: Sync the gate environment
+      if: inputs.gate-root != ''
+      shell: bash
+      env:
+        GATE_ROOT: ${{ inputs.gate-root }}
+      run: uv sync --project "$GATE_ROOT" --package eng-dev-gate --locked
