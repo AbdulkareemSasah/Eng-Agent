@@ -9,7 +9,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints, field_validator
 
-from eng_contract.quantity import check_unit_symbol
+from eng_contract.units import unit as lookup_unit
 
 
 class Cited(BaseModel):
@@ -22,4 +22,8 @@ class Cited(BaseModel):
     source: Annotated[str, StringConstraints(min_length=8, max_length=500, pattern=r"\S")]
     note: Annotated[str, StringConstraints(max_length=500)] | None = None
 
-    _unit_known = field_validator("unit")(check_unit_symbol)
+    @field_validator("unit")
+    @classmethod
+    def _unit_known(cls, symbol: str) -> str:
+        lookup_unit(symbol)  # raises UnitError (UNIT_MISMATCH) for an unknown symbol
+        return symbol

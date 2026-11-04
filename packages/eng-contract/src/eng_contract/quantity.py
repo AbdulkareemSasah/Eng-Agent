@@ -14,32 +14,22 @@ from typing import Annotated, NoReturn, Self
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator, model_validator
 
 from eng_contract.units import QUANTITY_KINDS, UNITS, Dimension, UnitError, convert
+from eng_contract.units import unit as lookup_unit
 
 
 def _refuse(self: object, *args: object, **kwargs: object) -> NoReturn:
     raise TypeError(f"{type(self).__name__} supports no arithmetic or number conversion; read .value explicitly")
 
 
-def check_unit_symbol(symbol: str) -> str:
-    """Return `symbol` if it is in `UNITS`.
-
-    Raises:
-        UnitError: the symbol is unknown.
-    """
-    if symbol not in UNITS:
-        raise UnitError(f"unknown unit symbol {symbol!r}", received=symbol)
-    return symbol
-
-
 class Quantity(BaseModel):
     """A finite value in a unit; frozen, hashable, with physical equality and same-dimension ordering.
 
     Equality and ordering compare exact fractions of the coherent SI value (spec 4.8 rule 4). A float enters the
-    fraction as its shortest round-trip decimal (the number as written, so 25.4 mm equals 1 in); the spec text says
-    `Fraction(value)`, which would make AC35 false (owner queue). Between units with different powers of pi (`deg`
-    against `rad`) the single float64 step `sifloat` is compared instead; equality across powers of pi is therefore
-    not transitive at the last bit, and canonical stored data never mixes them. `sifloat` saturates to infinity
-    beyond the float64 range, which only coarsens the hash and the cross-pi comparison there.
+    fraction as its shortest round-trip decimal (the number as written, so 25.4 mm equals 1 in). Between units with
+    different powers of pi (`deg` against `rad`) the single float64 step `sifloat` is compared instead; equality
+    across powers of pi is therefore not transitive at the last bit, and canonical stored data never mixes them.
+    `sifloat` saturates to infinity beyond the float64 range, which only coarsens the hash and the cross-pi
+    comparison there.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -51,13 +41,19 @@ class Quantity(BaseModel):
         """Build from a value and a unit symbol (keywords `value` and `unit` also work)."""
         super().__init__(value=value, unit=unit, **extra)
 
-    _unit_known = field_validator("unit")(check_unit_symbol)
+    @field_validator("unit")
+    @classmethod
+    def _unit_known(cls, symbol: str) -> str:
+        lookup_unit(symbol)  # raises UnitError (UNIT_MISMATCH) for an unknown symbol
+        return symbol
 
     __add__ = __radd__ = __sub__ = __rsub__ = __mul__ = __rmul__ = _refuse
     __truediv__ = __rtruediv__ = __floordiv__ = __mod__ = __pow__ = _refuse
     __neg__ = __pos__ = __abs__ = __round__ = _refuse
     __float__ = __int__ = __index__ = __bool__ = _refuse
 
+    # Spec 4.8 rule 4 says Fraction(value), which would make AC35 false; the shortest round-trip decimal is used
+    # instead (owner queue: amend the spec rule and AC36).
     def _key(self) -> tuple[Dimension, Fraction, int]:
         u = UNITS[self.unit]
         return u.dimension, Fraction(repr(self.value)) * u.factor + u.offset, u.pi_power
@@ -139,4 +135,4 @@ class LabeledQuantity(Quantity):
         return self
 
 
-__all__ = ["LabeledQuantity", "Quantity", "check_unit_symbol"]
+__all__ = ["LabeledQuantity", "Quantity"]
