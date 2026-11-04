@@ -22,7 +22,7 @@ def _spec(**changes: Any) -> FieldSpec:
 def _reason(**changes: Any) -> str:
     with pytest.raises(BasisInvalid) as caught:
         _spec(**changes)
-    assert caught.value.code is ErrorCode.INVALID_ARGUMENT
+    assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
     return caught.value.reason
 
 
