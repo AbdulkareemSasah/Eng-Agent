@@ -237,6 +237,14 @@ def test_own_namespace_override_rejected_without_valid_table(tmp_path: Path, tab
     assert any(f.code == "CF003" and "own namespace" in f.message for f in findings)
 
 
+def test_wildcard_override_has_its_own_message(tmp_path: Path) -> None:
+    """A wildcard module pattern is CF003 with a message about wildcards, not about the package namespace."""
+    pyproject = BASE + '[[tool.mypy.overrides]]\nmodule = ["*.foo"]\nignore_missing_imports = true\n'
+    messages = [f.message for f in _config_step(tmp_path, pyproject) if f.code == "CF003"]
+    assert any("wildcard" in m for m in messages)
+    assert not any("own namespace" in m for m in messages)
+
+
 @pytest.mark.parametrize(
     "name", ["pytest.ini", "tox.ini", "setup.cfg", "ruff.toml", ".ruff.toml", "mypy.ini", ".mypy.ini", ".coveragerc"]
 )
