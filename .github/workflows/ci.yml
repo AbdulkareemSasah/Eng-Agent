@@ -1,9 +1,12 @@
-# CI skeleton (B-002). The eng-dev-gate task replaces it with the full gate.
+# Thin root workflow (eng-dev-gate spec 4.14): triggers, checkouts and calls to the composite actions in
+# tools/eng-dev-gate/actions. Pull-request jobs judge the head with the gate of the base commit (.gate-base);
+# the head variant of an action runs only when the base commit does not have that action yet.
 name: ci
 
 on:
   pull_request:
-    branches: [main, build/v1]
+    branches: [build/v1, main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [build/v1]
 
@@ -11,45 +14,36 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
+  gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
-      - name: Read the Python version
-        id: py
-        shell: bash
-        run: echo "version=$(tr -d '[:space:]' < .python-version)" >> "$GITHUB_OUTPUT"
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          enable-cache: true
-          python-version: ${{ steps.py.outputs.version }}
-      - name: Sync
-        run: uv sync --locked --all-packages
-      - name: Format
-        run: uv run ruff format --check .
-      - name: Lint
-        run: uv run ruff check .
-      - name: Types and tests
-        shell: bash
-        run: |
-          roots=()
-          for d in packages tools; do
-            if [ -n "$(find "$d" -name '*.py' -not -path '*/.venv/*' 2>/dev/null | head -n 1)" ]; then roots+=("$d"); fi
-          done
-          if [ "${#roots[@]}" -gt 0 ]; then
-            uv run mypy "${roots[@]}"
-            status=0
-            uv run pytest || status=$?
-            if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then exit "$status"; fi
-          else
-            echo "No Python sources under packages/ or tools/ yet; skipping mypy and pytest."
-          fi
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/gate
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/gate
       - name: Spike checks
         shell: bash
         run: |
@@ -64,6 +58,61 @@ jobs:
             echo "::endgroup::"
           done
 
+  agents-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/agents-drift/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/agents-drift
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/agents-drift/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/agents-drift
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/build/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/build
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/build/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/build
+
+  # Replaced by the windows-tests command in task T23. Pushes to build/v1 only (head variants: the commit is merged).
   windows:
     if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
     runs-on: windows-latest
@@ -71,16 +120,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Read the Python version
-        id: py
-        shell: bash
-        run: echo "version=$(tr -d '[:space:]' < .python-version)" >> "$GITHUB_OUTPUT"
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-          python-version: ${{ steps.py.outputs.version }}
-      - name: Sync
-        run: uv sync --locked --all-packages
+      - uses: ./tools/eng-dev-gate/actions/setup
       - name: Windows tests
         shell: bash
         run: |
