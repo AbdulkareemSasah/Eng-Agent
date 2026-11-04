@@ -44,6 +44,7 @@ markers = [
 # layer_name/risk_floor/may_import/[tool.eng-gate.coverage]/[tool.eng-gate.mutation].
 [tool.eng-gate]
 profile = "contract"
+windows_tests = ["tests/windows"]  # AC15 runs on the Windows CI job (B-029)
 layer = 1
 import_names = ["eng_contract"]
 public_modules = [
