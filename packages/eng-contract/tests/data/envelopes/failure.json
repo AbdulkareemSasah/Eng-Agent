@@ -1,0 +1,13 @@
+{
+  "contract": "eng-contract/1",
+  "ok": false,
+  "error": {
+    "code": "OUT_OF_RANGE",
+    "message": "b_mm must be between 150 and 3000.",
+    "field": "sections[3].b_mm",
+    "expected": {"min": 150, "max": 3000, "unit": "mm"},
+    "received": 45,
+    "hint": "Values below 150 mm are not valid column widths. Check the source result.",
+    "retryable": false
+  }
+}
