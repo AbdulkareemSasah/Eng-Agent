@@ -71,10 +71,13 @@ def test_urls_are_built_from_validated_segments_only() -> None:
     link = href(SafeToken("answer"), SafeToken("req-1"))
     assert isinstance(link, Href)
     assert el(Tag.A, Text("go"), href=link).render() == '<a href="/answer/req-1">go</a>'
-    assert el(Tag.FORM, action=href(SafeToken("setup"), SafeToken("s.1"))).render() == '<form action="/setup/s.1"></form>'
+    assert (
+        el(Tag.FORM, action=href(SafeToken("setup"), SafeToken("s.1"))).render() == '<form action="/setup/s.1"></form>'
+    )
     assert href().value == "/"
     smuggled: Any = "/answer/x"
-    for bad in (smuggled, SafeToken("answer"), "javascript:alert(1)"):
+    bad_urls: tuple[Any, ...] = (smuggled, SafeToken("answer"), "javascript:alert(1)")
+    for bad in bad_urls:
         with pytest.raises(HtmlError):
             el(Tag.A, href=bad)
     with pytest.raises(HtmlError):
@@ -110,7 +113,7 @@ def test_text_is_escaped_and_sanitized() -> None:
         "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; &amp; &#x27;q&#x27;"
     )
     assert Text("a\x00b\x1b[31m").render() == "a&lt;U+0000&gt;b&lt;U+001B&gt;[31m"
-    assert Text("x‮y").render() == "x&lt;U+202E&gt;y"
+    assert Text("x\u202ey").render() == "x&lt;U+202E&gt;y"
     assert Text("tab\there\nline").render() == "tab\there\nline"
     assert Text("مرحبا 123").render() == "مرحبا 123"
 
@@ -130,9 +133,9 @@ def test_field_labels_and_wraps_untrusted_value() -> None:
         '<span class="field"><span class="label">Drawing</span> '
         '<bdi dir="auto">&lt;img src=x onerror=&quot;y&quot;&gt;</bdi></span>'
     )
-    mixed = field(trusted("Name"), "عمود C12 ٣٠×٤٠")
-    assert '<bdi dir="auto">عمود C12 ٣٠×٤٠</bdi>' in mixed.render()
-    assert "&lt;U+202E&gt;" in field(trusted("Name"), "a‮b").render()
+    mixed = field(trusted("Name"), "عمود C12 ٣٠ ٤٠")
+    assert '<bdi dir="auto">عمود C12 ٣٠ ٤٠</bdi>' in mixed.render()
+    assert "&lt;U+202E&gt;" in field(trusted("Name"), "a\u202eb").render()
     assert "&lt;U+0000&gt;" in field(trusted("Name"), "a\x00b").render()
 
 
