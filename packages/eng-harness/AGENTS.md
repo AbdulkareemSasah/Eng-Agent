@@ -9,7 +9,7 @@
 The harness (layer 4) of the Eng-Agent platform: the run engine, the append-only journal, the ports to host adapters and models, the block and workflow registry, and the workflows built on them. It depends on eng-contract only, talks to host programs through ports (fakes in tests, no host program in CI), and holds no engineering decisions beyond what its specs cite.
 
 - Layer: 4 harness (import name `eng_harness`)
-- May import: eng-contract (public modules only); Pydantic 2 · Must never import: no package imports eng-harness yet; its public modules are listed in `[tool.eng-gate] public_modules` of `pyproject.toml`
+- May import: eng-contract (public modules only); Pydantic 2 · Must never import: Sasaah code (reached only over MCP or as a tool step); internal modules of any package; any package other than eng-contract until a later plan names it
 - Governing documents: [docs/specs/0001-engine.md](docs/specs/0001-engine.md), [docs/plans/0001-engine.md](docs/plans/0001-engine.md), [../../design/docs/architecture/03-repositories.md](../../design/docs/architecture/03-repositories.md), [../../design/process/11-repository-standard.md](../../design/process/11-repository-standard.md), [../../design/process/08-agent-operating-rules.md](../../design/process/08-agent-operating-rules.md)
 
 ## 2. Commands (uv only)

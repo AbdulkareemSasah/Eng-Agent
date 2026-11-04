@@ -7,7 +7,7 @@ values:  # key = the exact text between the double braces in the template
   "one-paragraph purpose": "The harness (layer 4) of the Eng-Agent platform: the run engine, the append-only journal, the ports to host adapters and models, the block and workflow registry, and the workflows built on them. It depends on eng-contract only, talks to host programs through ports (fakes in tests, no host program in CI), and holds no engineering decisions beyond what its specs cite."
   "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "4 harness (import name `eng_harness`)"
   "packages": "eng-contract (public modules only); Pydantic 2"
-  "for servers: other servers, structural-codes, eng-harness": "no package imports eng-harness yet; its public modules are listed in `[tool.eng-gate] public_modules` of `pyproject.toml`"
+  "for servers: other servers, structural-codes, eng-harness": "Sasaah code (reached only over MCP or as a tool step); internal modules of any package; any package other than eng-contract until a later plan names it"
   "links": "[docs/specs/0001-engine.md](docs/specs/0001-engine.md), [docs/plans/0001-engine.md](docs/plans/0001-engine.md), [../../design/docs/architecture/03-repositories.md](../../design/docs/architecture/03-repositories.md), [../../design/process/11-repository-standard.md](../../design/process/11-repository-standard.md), [../../design/process/08-agent-operating-rules.md](../../design/process/08-agent-operating-rules.md)"
   "entry-point": "eng-gate check (the engine is a library; a command line arrives with plan 0006)"
   "C# rows if applicable: dotnet build -warnaserror, dotnet test": "| Not applicable | This package has no C# code |"
