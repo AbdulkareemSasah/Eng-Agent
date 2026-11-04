@@ -1,0 +1,13 @@
+{
+  "source": "RFC 8785 section 3.2.3 (Sorting of Object Properties), the property-name sorting example",
+  "input": {
+    "€": "Euro Sign",
+    "\r": "Carriage Return",
+    "דּ": "Hebrew Letter Dalet With Dagesh",
+    "1": "One",
+    "😀": "Emoji: Grinning Face",
+    "\u0080": "Control",
+    "ö": "Latin Small Letter O With Diaeresis"
+  },
+  "sorted_names": ["\r", "1", "\u0080", "ö", "€", "😀", "דּ"]
+}
