@@ -621,6 +621,20 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_empty_test_package_marker_in_scope"
     covers: [AC10c]
     depends_on: [T13, T14b]
+  - id: T37
+    title: "mutation step: the member's other top-level files are copied into mutmut's working folder (also_copy)"
+    # Amendment (B-370, documents only): mutmut copies only the source, tests/, setup.cfg, pyproject.toml and lock files,
+    # so eng-harness's wheel-build test failed MU002 in every pull request that changed eng-harness source (B-369 skips it
+    # inside mutmut runs until this task removes the cause).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/mutation.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_package_files_are_copied"
+    covers: [AC53b]
+    depends_on: [T20, T29]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
