@@ -8,15 +8,20 @@ import os
 import re
 import sys
 import tomllib
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.metadata import packages_distributions
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+from eng_dev_gate.checks.tests_step import _judged_environment, read_judged_environment
 from eng_dev_gate.config import load_package_config
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult, render
 from eng_dev_gate.results import Status, UsageError
 from eng_dev_gate.workspace import Member, discover_members
+
+if TYPE_CHECKING:
+    from eng_dev_gate.checks.registry import StepContext
 
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _DYNAMIC = {"import_module", "__import__"}
@@ -92,9 +97,10 @@ def _layer_ok(importer: _Pkg, other: _Pkg) -> bool:
     return importer.layer == other.layer == 3 and _norm(other.member.name) in importer.declared
 
 
-def _file_findings(pkg: _Pkg, path: str, tree: ast.AST, world: dict[str, _Pkg], local: set[str]) -> list[Finding]:
+def _file_findings(
+    pkg: _Pkg, path: str, tree: ast.AST, world: dict[str, _Pkg], local: set[str], dists: Mapping[str, Sequence[str]]
+) -> list[Finding]:
     found: list[Finding] = []
-    dists = packages_distributions()
 
     def add(code: str, line: int, message: str) -> None:
         found.append(Finding(code=code, severity=Severity.ERROR, path=path, line=line, message=message))
@@ -147,12 +153,15 @@ def _cycles(pkgs: list[_Pkg]) -> list[Finding]:
     ]  # fmt: skip
 
 
-def check_workspace(root: Path, only: str | None = None) -> list[Finding]:
+def check_workspace(
+    root: Path, only: str | None = None, distributions: Mapping[str, Sequence[str]] | None = None
+) -> list[Finding]:
     """Check every member of the workspace at ``root`` and return the IM findings.
 
     Args:
         root: the workspace root.
         only: report only findings of this member name (IM005 is kept when the member's name appears in the cycle).
+        distributions: module name to distribution names for IM006; the gate's interpreter when ``None``.
 
     Raises:
         UsageError: unreadable workspace or member, or ``only`` names no member.
@@ -162,6 +171,7 @@ def check_workspace(root: Path, only: str | None = None) -> list[Finding]:
     if only is not None and only not in {p.member.name for p in pkgs}:
         raise UsageError(f"no workspace member named {only!r}")
     world = {n: p for p in pkgs for n in p.names}
+    dists = packages_distributions() if distributions is None else distributions
     findings: list[Finding] = []
     for pkg in pkgs:
         if only not in (None, pkg.member.name):
@@ -174,8 +184,16 @@ def check_workspace(root: Path, only: str | None = None) -> list[Finding]:
                 except (OSError, SyntaxError, UnicodeDecodeError) as error:
                     raise UsageError(f"cannot parse {file}: {error}") from error
                 path = file.relative_to(root).as_posix()
-                findings += _file_findings(pkg, path, tree, world, local)
+                findings += _file_findings(pkg, path, tree, world, local, dists)
     return findings + [f for f in _cycles(pkgs) if only is None or only in f.message]
+
+
+def step(ctx: StepContext) -> list[Finding]:
+    """The ``imports`` step; with a gate root other than the judged tree IM006 uses its module map (AC54a)."""
+    if not _judged_environment(ctx):
+        return check_workspace(ctx.root)
+    environment = read_judged_environment(ctx, "imports")
+    return [environment] if isinstance(environment, Finding) else check_workspace(ctx.root, None, environment.packages)
 
 
 def handle(args: argparse.Namespace) -> Status:

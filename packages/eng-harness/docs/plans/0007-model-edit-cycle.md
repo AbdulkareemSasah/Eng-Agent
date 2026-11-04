@@ -4,11 +4,12 @@ issue: "B-066"
 spec: packages/eng-harness/docs/specs/0007-model-edit-cycle.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r2]           # binding for every pull request of this plan; r2 because T1 adds kinds
+risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: Edit-cycle kinds and the change-set model
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/_kinds.py"
@@ -28,6 +29,7 @@ tasks:
   - id: T2
     title: Calc harness.change_set_check (resolve, validate, conflicts, refused kinds)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.change_set_check (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
@@ -47,6 +49,7 @@ tasks:
   - id: T3
     title: Calc harness.expected_effects (projection of a resolved change set)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/expected_effects.py"
@@ -65,6 +68,7 @@ tasks:
   - id: T4
     title: Calcs harness.host_design_verdicts and harness.analysis_summary
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.analysis_summary and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/host_design_verdicts.py"
@@ -86,6 +90,7 @@ tasks:
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_read_state_tool.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_revisions.py"
@@ -104,6 +109,7 @@ tasks:
   - id: T6
     title: Engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.block, eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/block.py"
       - "packages/eng-harness/src/eng_harness/engine/_modes.py"
@@ -124,6 +130,7 @@ tasks:
   - id: T7
     title: Decision points and rules of the edit cycle
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_points.py"
       - "packages/eng-harness/src/eng_harness/rules/edit_cycle.py"
@@ -139,6 +146,7 @@ tasks:
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
@@ -167,6 +175,7 @@ tasks:
   - id: T9
     title: Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
@@ -202,6 +211,7 @@ tasks:
   - id: T10
     title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/report/_sections.py"
@@ -223,17 +233,23 @@ tasks:
   - id: T11
     title: Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
+      - "packages/eng-harness/src/eng_harness/report/__main__.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py"
-    max_changed_lines: 80
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py"
+    # Amendment B-354: the read-only entry point for A3 and A7 on real journals (spec AC35), about 70 lines; 80 -> 150.
+    max_changed_lines: 150
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_unclassified_messages_use_the_prompt"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced"
-    covers: [AC25, AC26]
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_entry_is_read_only_and_exit_codes"
+    covers: [AC25, AC26, AC35]
     depends_on: [T9, T10]
   - id: T12
     title: Replay test and crash matrix of the workflow (A6)
@@ -327,6 +343,10 @@ AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8 and T9 (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
+Amendment B-354 (spec AC35, Q11): `python -m eng_harness.report` with `audit-sources RUN_DIR` and
+`count-prompts RUN_DIR`, a read-only wrapper over the T10 functions so that the owner can run A3 and A7 on the
+journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-testing.md` names the command form
+`uv run --package eng-harness python -m eng_harness.report ...` (spec 0006 §4.1).
 
 **T12 Replay and crash matrix** (spec AC27, AC28). A two-cycle run killed at every step in a worker process (plan 0001
 T19's harness) and resumed with the same scripted answers; the replay test over a journal recorded by the
