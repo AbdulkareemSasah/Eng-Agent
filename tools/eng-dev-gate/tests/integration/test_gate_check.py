@@ -378,7 +378,7 @@ def test_ratchet_baseline_created_in_scope(repo: Repo) -> None:
 
 
 def test_plan_with_clause_spec_directory(repo: Repo) -> None:
-    """AC13a: every `*.md` directly in the spec directory is a spec (GC005); none at all is GC004; others are ignored."""
+    """AC13a: every `*.md` directly in the spec directory is a spec (GC005), none at all is GC004."""
     clauses = {f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1"), f"{CLAUSE_DIR}ov.md": clause_spec("OV-AC1")}
     junk = {f"{CLAUSE_DIR}notes.txt": "not a spec\n", f"{CLAUSE_DIR}sub/deep.md": "no front matter\n"}
     base = make_gate_repo(repo, plan=clause_plan("BP-AC1"), base_files={**clauses, **junk})

@@ -189,7 +189,7 @@ def test_clause_spec_directory_plan() -> None:
             parse_plan(_clause_plan(bad), CAP)
     for bad_spec in ("a//", "/a/", "a/../", "a\\b/", "/", "a/./"):
         with pytest.raises(FrontMatterError, match="spec"):
-            parse_plan(_plan(_task("T1"), spec=f'"{bad_spec}"'), CAP)
+            parse_plan(_plan(_task("T1"), spec=f"'{bad_spec}'"), CAP)
     clauses = [BP_CLAUSE, OV_CLAUSE]
     own = "\n# Plan\n\n- PK-AC1. Given the package, then it imports.\nPK-AC2. bare line\nPK-AC3 no dot\n"
     # only the prefix BP is covered: OV-AC1 of the other clause spec is not demanded; the plan's own PK criteria are
