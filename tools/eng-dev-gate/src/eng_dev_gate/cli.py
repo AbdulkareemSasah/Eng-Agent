@@ -35,7 +35,6 @@ def _parser() -> argparse.ArgumentParser:
         if name == "agents":
             agents.add_arguments(child)
         if name == "check":
-        if name == "check":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
             child.add_argument("--only", action="append", default=[], help="run only these steps (comma list)")
