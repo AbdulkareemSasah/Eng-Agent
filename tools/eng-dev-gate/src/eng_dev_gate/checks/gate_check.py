@@ -22,6 +22,7 @@ from eng_dev_gate.checks.gate_check_docs import (
     entry_findings,
     identity_findings,
     is_document,
+    load_specs,
     none_findings,
     owner_decides,
     protected_findings,
@@ -30,7 +31,7 @@ from eng_dev_gate.checks.gate_check_docs import (
 from eng_dev_gate.checks.ratchet import RATCHET_FILE, RatchetFile
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest, event_path, read_event
-from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, parse_spec, safe_relative_path
+from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, safe_relative_path
 from eng_dev_gate.gitio import Change, Git, NumstatEntry, PathNotFoundError, SubprocessGit
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult, render
@@ -249,8 +250,14 @@ def _judge(
         return [*findings, plan]
     risks.update(plan.risk)
     findings += _status(plan, plan_path, config)
-    spec = _read(git, gate_ref, plan.spec, parse_spec)
-    findings += [spec] if isinstance(spec, Finding) else _status(spec, plan.spec, config)
+    try:
+        _, specs, bad = load_specs(git, gate_ref, plan.spec)
+    except PathNotFoundError:
+        findings.append(
+            _error("GC004", f"{plan.spec} is not on the gate branch ({gate_ref}) or holds no spec", plan.spec)
+        )
+    else:
+        findings += [*bad, *(f for path, spec in specs.items() for f in _status(spec, path, config))]
     task = next((t for t in plan.tasks if t.id == task_id), None)
     if task is None:
         return [*findings, _error("GC007", f"plan {plan_path} defines no task {task_id}", plan_path)]

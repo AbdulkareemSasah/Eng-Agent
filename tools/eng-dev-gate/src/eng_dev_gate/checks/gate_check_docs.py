@@ -96,6 +96,32 @@ def is_document(path: str, config: GateConfig) -> bool:
     return matches_any(path, [*config.spec_globs, *config.plan_globs])
 
 
+def load_specs(git: Git, ref: str, spec: str) -> tuple[dict[str, str], dict[str, Spec], list[Finding]]:
+    """Read the spec at ``ref``: a file, or every ``*.md`` directly in a directory ending in ``/`` (AC13a).
+
+    Returns:
+        The texts by path, the parsed specs by path, and a GC005 finding for each text that does not parse.
+
+    Raises:
+        PathNotFoundError: the file is absent, or the directory holds no ``*.md`` file (GC004).
+    """
+    if spec.endswith("/"):
+        paths = [p for p in git.list_files(ref, spec) if p.endswith(".md")]
+        if not paths:
+            raise PathNotFoundError(f"{spec} holds no *.md file at {ref}")
+    else:
+        paths = [spec]
+    texts = {p: git.show(ref, p) for p in paths}
+    docs: dict[str, Spec] = {}
+    findings: list[Finding] = []
+    for path, text in texts.items():
+        try:
+            docs[path] = parse_spec(text)
+        except FrontMatterError as problem:
+            findings.append(_error("GC005", str(problem), path))
+    return texts, docs, findings
+
+
 def _check_document(
     git: Git, config: GateConfig, path: str, head: str, base: str, approvals: Approvals | None, risks: set[str]
 ) -> list[Finding]:
@@ -125,9 +151,11 @@ def _check_document(
             )
     if isinstance(doc, Plan):
         try:
-            missing = uncovered_criteria(doc, git.show(head, doc.spec))
+            texts, _, bad = load_specs(git, head, doc.spec)
         except PathNotFoundError:
             return [*findings, _error("GC004", f"{doc.spec} named by the plan is not in the pull request head", path)]
+        findings += bad if doc.spec_is_directory else []
+        missing = uncovered_criteria(doc, list(texts.values()), git.show(head, path))
         if missing:
             findings.append(_error("GC016", f"no task covers {', '.join(missing)}", path))
     return findings

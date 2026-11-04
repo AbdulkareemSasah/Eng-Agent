@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `gate-check`: a plan whose `spec:` is a directory (path ending in `/`) of clause specs loads every `*.md` directly in it from the gate ref with `git ls-tree` (GC005 for each that does not parse, GC004 when there is none); `covers` ids may carry a prefix (`BP-AC1`); GC016 lists the uncovered criteria of the clause specs whose prefix the plan covers and of the plan's own text; `.gate/gate.yml` `spec_globs` gains `**/docs/clauses/**/*.md`. New `Git.list_files` (B-344, plan task T31, AC12b, AC13a).
 - Fix: a `mutation` run in which mutmut produced no mutant (a module-level lambda, decorated methods only) passes with the notice MU003 instead of MU002; mutants that no test covers count as survivors in the MU001 score, also when mutmut stops on them; MU002 stays reserved for a backend fault (B-339, AC53a, plan task T29).
 - `risk-floor`: a `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan` records its risk from its one body `Risk:` line, RF004 without one (B-337, plan task T27, AC21a).
 - Package skeleton: `eng-gate` command shell with exit codes 0 to 3 and `--version` (B-030, plan task T1).
