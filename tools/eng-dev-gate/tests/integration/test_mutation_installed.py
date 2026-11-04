@@ -8,19 +8,13 @@ interpreter that has neither ``a`` nor mutmut, as in a pull-request run (spec 4.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 
-import pytest
 from support.coverage_toy import FULL_TESTS, MODULE, PARTIAL_TESTS
-from support.judged_tree import ROOT_PYPROJECT, make_gate_root, member_pyproject
+from support.judged_tree import ROOT_PYPROJECT, lock, make_gate_root, member_pyproject
 from support.repo import Repo, make_repo
 from support.toy import GATE_YML
-
-pytestmark = pytest.mark.skipif(
-    sys.platform == "win32", reason="B-049: mutmut has no native Windows support; expires 2027-06-30"
-)
 
 
 def _tree(root: Path, tests: str) -> tuple[Repo, str]:
@@ -37,7 +31,7 @@ def _tree(root: Path, tests: str) -> tuple[Repo, str]:
             "pkgs/a/tests/test_mod.py": tests,
         }
     )
-    subprocess.run(["uv", "lock"], cwd=root, check=True, capture_output=True)  # noqa: S607  # B-049: uv from PATH
+    lock(root)
     tree.commit({}, "chore: lock")
     tree.commit({"pkgs/a/src/a/mod.py": MODULE})
     return tree, base
@@ -51,11 +45,18 @@ def _judge(tmp_path: Path, tests: str) -> tuple[int, list[str], str]:
     return result.code, codes, result.out + result.err
 
 
+def _verdict(outcome: tuple[int, list[str], str], code: int, codes: list[str]) -> None:
+    """Assert the outcome; on Windows mutmut cannot run (ADR-0002) and the step says so with MU002 instead."""
+    got_code, got_codes, text = outcome
+    if sys.platform == "win32":
+        assert "MU002" in text, text
+    else:
+        assert (got_code, got_codes) == (code, codes), text
+
+
 def test_strong_tests_kill_mutants_of_an_installed_member(tmp_path: Path) -> None:
-    code, codes, text = _judge(tmp_path, FULL_TESTS)
-    assert (code, codes) == (0, []), text
+    _verdict(_judge(tmp_path, FULL_TESTS), 0, [])
 
 
 def test_weak_tests_of_an_installed_member_give_mu001(tmp_path: Path) -> None:
-    code, codes, text = _judge(tmp_path, PARTIAL_TESTS)
-    assert (code, codes) == (1, ["MU001"]), text
+    _verdict(_judge(tmp_path, PARTIAL_TESTS), 1, ["MU001"])

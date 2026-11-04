@@ -51,7 +51,8 @@ def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
     assert [s.name for s in STEPS] == [
-        "lock", "format", "lint", "types", "forbidden", "ratchet", "tests", "docs-fresh", "licenses", "mutation", "workflows"
+        "lock", "format", "lint", "types", "forbidden", "ratchet", "tests", "docs-fresh", "licenses",
+        "mutation", "workflows",
     ]  # fmt: skip
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
@@ -169,5 +170,7 @@ def test_workspace_selection(repo: Repo) -> None:
 
 def test_text_output_starts_with_mode(repo: Repo) -> None:
     make_workspace(repo, ["a"])
-    result = repo.run(["check", "--skip", "tests,docs-fresh,licenses,mutation,workflows"], {"check": make_handler(FakeRunner())})
+    result = repo.run(
+        ["check", "--skip", "tests,docs-fresh,licenses,mutation,workflows"], {"check": make_handler(FakeRunner())}
+    )
     assert result.out.splitlines()[0] == "mode: bootstrap"

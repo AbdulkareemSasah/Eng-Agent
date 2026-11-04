@@ -95,8 +95,9 @@ def run_step(ctx: StepContext) -> list[Finding]:
         UsageError: the package configures mutmut itself (exit 2).
         EnvironmentFaultError: MU002, mutmut failed or cannot run in CI (exit 3).
     """
-    assert ctx.member is not None  # noqa: S101  # B-049: package steps always have a member
     member = ctx.member
+    if member is None:
+        raise UsageError("mutation: the step needs a workspace member")
     config = load_package_config(member.directory / "pyproject.toml")
     if not (config.r1_modules or config.r2_modules):
         return []
