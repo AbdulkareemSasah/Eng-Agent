@@ -52,7 +52,8 @@ tasks:
     tests_first:
       - "packages/structural-codes/core/tests/unit/test_inputs.py::test_definition_rules"
       - "packages/structural-codes/core/tests/unit/test_inputs.py::test_bounded_helper_and_out_of_range"
-    covers: [AC3, AC4]
+      - "packages/structural-codes/core/tests/unit/test_inputs.py::test_unbounded_helper"
+    covers: [AC3, AC4, AC4a]
     depends_on: [T2]
   - id: T4
     title: Trace recorder
@@ -65,7 +66,8 @@ tasks:
       - "packages/structural-codes/core/tests/unit/test_trace.py::test_recording_rules"
       - "packages/structural-codes/core/tests/unit/test_trace.py::test_inputs_and_contract_shape"
       - "packages/structural-codes/core/tests/unit/test_trace.py::test_step_units"
-    covers: [AC8, AC9, AC10]
+      - "packages/structural-codes/core/tests/unit/test_trace.py::test_unbounded_reason_message"
+    covers: [AC4b, AC8, AC9, AC10]
     depends_on: [T3]
   - id: T5
     title: Verdict builder and governing selection

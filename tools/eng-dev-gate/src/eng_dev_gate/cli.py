@@ -14,11 +14,11 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses, ratchet, windows_tests
+from eng_dev_gate.checks import licenses, mutation, ratchet, review, secrets, test_first, windows_tests
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
-from eng_dev_gate.checks.registry import STEPS
-from eng_dev_gate.report import AWAITING_TITLE, CommandResult, escape_data, render
+from eng_dev_gate.checks.registry import STEPS, StepContext
+from eng_dev_gate.report import AWAITING_TITLE, CommandResult, StepResult, escape_data, render
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 from eng_dev_gate.toolrun import SubprocessToolRunner
 from eng_dev_gate.workspace import discover_members
@@ -42,21 +42,33 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "secrets":
+            secrets.add_arguments(child)
         if name == "gate-check":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+        if name == "test-first":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans (default: origin/<gate>)")
+            child.add_argument("--base", default=None, help="base commit (with --head and --title, no event)")
+            child.add_argument("--head", default=None, help="head commit")
+            child.add_argument("--title", default=None, help="pull-request title")
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
+        if name == "review":
+            child.add_argument("--check-prompts", action="store_true", help="only verify the pinned prompts")
         if name == "ratchet":
             child.add_argument("--update", action="store_true", help="lower the recorded counts; never raises one")
         if name == "licenses":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
-        if name in ("check", "forbidden"):
+        if name in ("check", "forbidden", "mutation"):
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
+        if name == "mutation":
+            child.add_argument("--base", default=None, help="commit to compare with (default: the event's base)")
         if name == "check":
             child.add_argument("--only", action="append", default=[], help="run only these steps (comma list)")
             child.add_argument("--skip", action="append", default=[], help="skip these steps (comma list)")
@@ -82,6 +94,25 @@ def _forbidden(args: argparse.Namespace) -> Status:
         root, context.policy_root, members, SubprocessToolRunner(), fail_fast=False,
     )  # fmt: skip
     result = context.with_findings(CommandResult(command="forbidden", mode=context.config.mode.value, steps=steps))
+    render(result, args.format, sys.stdout, os.environ)
+    return result.status
+
+
+def _mutation(args: argparse.Namespace) -> Status:
+    """``mutation``: the step of that name on the selected members, optionally against ``--base``."""
+    context: gate_root.GateContext = args.gate_context
+    start = Path(args.root).resolve()
+    root = _workspace_root(start)
+    members = _select_members(discover_members(root), start, root, args)
+    runner = SubprocessToolRunner()
+    steps = [
+        StepResult(
+            name=f"mutation:{m.name}" if len(members) > 1 else "mutation",
+            findings=mutation.run_step(StepContext(root, context.policy_root, m, runner, base=args.base)),
+        )
+        for m in members
+    ]
+    result = context.with_findings(CommandResult(command="mutation", mode=context.config.mode.value, steps=steps))
     render(result, args.format, sys.stdout, os.environ)
     return result.status
 
@@ -145,7 +176,11 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "agents": agents.handle,
         "forbidden": _forbidden,
         "gate-check": handle_gate_check,
+        "mutation": _mutation,
         "packages": _packages,
+        "review": review.handle,
+        "secrets": secrets.handle,
+        "test-first": test_first.handle,
         "workflows": _workflows,
         **(handlers or {}),
     }.get(args.command)

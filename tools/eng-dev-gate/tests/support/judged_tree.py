@@ -54,9 +54,14 @@ def make_judged_tree(
     }
     files.update({f"pkgs/a/{name}": text for name, text in (extra_files or {}).items()})
     tree.commit(files)
-    subprocess.run(["uv", "lock"], cwd=root, check=True, capture_output=True)  # noqa: S607  # B-059: uv from PATH
+    lock(root)
     tree.commit({}, "chore: lock")
     return tree
+
+
+def lock(root: Path) -> None:
+    """Write ``uv.lock`` of the workspace in ``root``."""
+    subprocess.run(["uv", "lock"], cwd=root, check=True, capture_output=True)  # noqa: S607  # B-059: uv from PATH
 
 
 def make_gate_root(root: Path) -> Repo:

@@ -212,6 +212,11 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
   header, key or endpoint), makes no call for a provider skipped by `local_only`, and exits non-zero if any provider
   failed. Its live use is local-test only (§4.4). Test:
   `tests/unit/providers/test_factory.py::test_check_command_makes_one_call_per_provider`.
+- AC48. Given the real engine and cascade wired as spec 0006 §4.2.2 wires them, from an assembled runtime with recorded
+  providers, then `run_started.decision_runtime` equals `DecisionRuntime.summary` (its JSON form, AC29); given a resume
+  after a provider's `model_version` changed, then `run_resumed.decision_runtime` holds the new summary; and no journal
+  byte holds an endpoint, a `key_ref` or the sentinel key (amendment B-098: spec 0005 §4.12, engine AC69). Test:
+  `tests/workflow/providers/test_shadow_workflow.py::test_run_header_records_runtime_summary`.
 
 ### 3.7 Shadow mode with recorded providers
 
@@ -299,6 +304,9 @@ Follows 12 §4 and spec 0005: the cascade owns timeouts, option validity, the co
 `decisions/_evalstore.py`. `ProviderErrorCode`, `ProviderError` and `ProviderFailure` live in
 `decisions/interfaces.py` (§4.3), because the cascade catches them. `eng_harness.providers` does not import the engine,
 the journal or the ports; it imports `decisions.interfaces`, `decisions.types` and the redaction function of spec 0005.
+`DecisionRuntime.summary` is a JSON object (`Mapping[str, JsonValue]`, the fields of AC29), because the engine records
+it as given in the run header through `DecisionPort.runtime_summary()` and reads no field of it (engine AC69); spec 0006
+calls `assemble_decision_runtime` and builds the cascade with it (spec 0006 §4.2.2, spec 0005 §4.12; Q7).
 
 ### 4.2 Configuration (`harness.toml`, sections owned here)
 
@@ -355,8 +363,8 @@ class ProviderFailure(BaseModel):  # frozen; the batch entry for one failed requ
     code: ProviderErrorCode
 ```
 
-Spec 0005 §4.7 uses `ProviderFailure` without defining it and records "the provider's code" on failure (AC22); this
-makes both concrete. The cascade records `ProviderError.code` in the suggestion and shows it to the engineer; the
+Spec 0005 §4.7 used `ProviderFailure` without defining it and records "the provider's code" on failure (AC22); this
+makes both concrete, and spec 0005 §4.7 now carries the same definitions (amendment B-098). The cascade records `ProviderError.code` in the suggestion and shows it to the engineer; the
 messages are fixed, so remote text never reaches the journal, a log or the engineer screen through an error.
 
 ### 4.4 Credentials (16 §3)
@@ -602,7 +610,7 @@ deliberately with the evaluation suite as the gate" is enforced for a model chan
 | AC1 to AC11, AC13, AC15 to AC26, AC28 to AC30, AC47 | Unit (with `MockTransport`, recorded fakes, `FunctionModel`/`TestModel` of the pinned PydanticAI, a temporary workspace) | `tests/unit/providers/` |
 | AC12 (text in values and in nested keys), AC14 (any text and failure kind; also over the full PydanticAI path) | Unit and property (Hypothesis, `derandomize=True`) | `tests/unit/providers/`, `tests/property/` |
 | AC27, AC36, AC46 | Contract | `tests/contract/` |
-| AC31 to AC34 | Fake-host workflow (real engine, cascade and adapters; recorded transports) | `tests/workflow/providers/` |
+| AC31 to AC34, AC48 | Fake-host workflow (real engine, cascade and adapters; recorded transports) | `tests/workflow/providers/` |
 | AC35 | Replay (process/05 §1) | `tests/replay/` |
 | AC37, AC38, AC39 | Golden (sources 12 §3, §6; hand-computed fixture) and unit | `tests/data/golden/`, `tests/unit/decisions/` |
 | AC45 | Unit (source rules) | `tests/rules/` |
@@ -635,7 +643,7 @@ New modules of `eng-harness` (phase 2). `decisions.interfaces` gains `ProviderEr
 | Q4 | Calibration has no metric (spec 0005 Q4), and a minimum count of above-threshold answers behind the 95% has no source | Owner | Choose a calibration metric and threshold, and set `min_above_threshold`, before the first `evaluation`-basis release; until then only owner-basis releases are possible |
 | Q5 | `local = true` only for loopback; a LAN model server is "private" (12 §4) but not on the machine, so `local_only` skips it | Owner | Accept for v1; add an explicit trusted-network setting later if needed |
 | Q6 | Key management is a module entry point (`python -m eng_harness.providers`), not a command of the closed table of spec 0006 | Owner | Accept now; add `providers` to the command table in a later amendment of spec 0006 |
-| Q7 | Amendments: spec 0005 §4.7 gets the definitions of §4.3 (`ProviderFailure` was undefined); the run header (spec 0006, engine) records `DecisionRuntime.summary`; spec 0006 reads `[providers.*]` and calls `assemble_decision_runtime` | Owner | Accept; made in the amending pull requests of those specs |
+| Q7 | Amendments: spec 0005 §4.7 gets the definitions of §4.3 (`ProviderFailure` was undefined); the run header (spec 0006, engine) records `DecisionRuntime.summary`; spec 0006 reads `[providers.*]` and calls `assemble_decision_runtime` | Owner | Accept; made by amendment B-098: spec 0005 §4.7, §4.12 and AC43; engine §4.4.2, §4.8 and AC69; spec 0006 §4.2.2, §4.2.4, AC62 and AC63; AC48 here. Left open there: the `[decisions]` section of `DecisionSettings` (spec 0006 Q15), the arguments of `assemble_decision_runtime` and release findings in the journal (spec 0006 Q16) |
 | Q8 | No circuit breaker: a provider that is down costs its timeout once per decision point | Owner | Accept for v1; measure in the first local runs |
 | Q9 | Recording real exchanges for tests (a record mode like spec 0002's) | Owner | Yes, with the format task: redact `Authorization`, review bodies, store under `tests/data/recordings/` |
 | Q10 | `info.version` is the owner-set `model_version` plus the format or prompt revision, not a value the service reports | Owner | Accept; compare with what S-07 shows the service reports |

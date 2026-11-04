@@ -1,0 +1,57 @@
+{
+  "rule": "itself",
+  "payload": {
+    "patterns": [
+      {
+        "name": "DEAD",
+        "type": "dead",
+        "self_weight_ratio": 1
+      },
+      {
+        "name": "LIVE",
+        "type": "live",
+        "self_weight_ratio": 0
+      }
+    ],
+    "combinations": [
+      {
+        "name": "C1",
+        "type": "linear_add",
+        "items": [
+          {
+            "case": {
+              "case": "C1",
+              "case_type": "load_combination",
+              "step": null
+            },
+            "scale_ratio": 1.2
+          },
+          {
+            "case": {
+              "case": "LIVE",
+              "case_type": "load_pattern",
+              "step": null
+            },
+            "scale_ratio": 1.6
+          }
+        ]
+      }
+    ],
+    "frame_loads": [
+      {
+        "frame": "B1",
+        "pattern": "LIVE",
+        "direction": "gravity",
+        "w_kN_m": 10
+      }
+    ],
+    "area_loads": [
+      {
+        "area": "A1",
+        "pattern": "DEAD",
+        "direction": "gravity",
+        "q_kPa": 5
+      }
+    ]
+  }
+}

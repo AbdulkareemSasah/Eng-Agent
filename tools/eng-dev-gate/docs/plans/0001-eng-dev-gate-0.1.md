@@ -256,6 +256,7 @@ tasks:
     covers: [AC6, AC7, AC8, AC9, AC10, AC10a, AC11, AC13]
     depends_on: [T2b, T3]
   - id: T14
+    # Amendment (B-088, documents only): T14 also implements AC10b (the ratchet baseline in a task's scope).
     title: "gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job"
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
@@ -267,13 +268,14 @@ tasks:
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_ratchet_baseline_in_scope"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_spec_plan_pull_request_only"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_lane_branch"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_none_reasons"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_status_approved"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_protected_paths_awaiting_owner"
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_gate_branch_merge"
-    covers: [AC12, AC14, AC15, AC16, AC17, AC18]
+    covers: [AC12, AC14, AC15, AC16, AC17, AC18, AC10b]
     depends_on: [T6, T13]
   - id: T15
     title: risk-floor command and job
@@ -325,8 +327,11 @@ tasks:
     depends_on: [T16]
   - id: T18
     title: secrets command and the security job
+    # Amendment (B-099, documents only): T18 also edits .gate/gate.yml for the secret-scan allowlist entries its own
+    # step needs on the existing tree (a reviewed false positive is allowlisted by rule, path and fingerprint).
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/secrets.py"
+      - ".gate/gate.yml"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - ".github/workflows/ci.yml"
