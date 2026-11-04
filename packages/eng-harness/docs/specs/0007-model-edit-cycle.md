@@ -109,19 +109,19 @@ defines its method; values are synthetic and say so.
   copy (step 2), the step 7 revision save passed `under=` the step 6 approval as its first write, check after write
   before step 9's reads, and the `pre_analysis` save before steps 11 and 12; no `ApprovalVoid` is raised and step 6 is
   asked once. Test: `tests/workflow/edit_cycle/test_cycle.py::test_one_cycle_step_sequence`.
-- AC10 (A1). Given that cycle, then the read-back check is `PASS`, the difference report from the step 3 read to the
+- AC10. (A1) Given that cycle, then the read-back check is `PASS`, the difference report from the step 3 read to the
   step 9 read holds exactly the expected effects, and the fake's final model equals the baseline plus the effects.
   Test: `tests/workflow/edit_cycle/test_apply.py::test_model_holds_exactly_the_changes`.
 - AC11. Given an approval with rejected items, then no write step names a rejected item; given a rejection of the
   whole set, then no write runs, steps 7 to 14 are skipped and the engineer turn follows. Test:
   `tests/workflow/edit_cycle/test_apply.py::test_rejected_items_not_written`.
-- AC12 (A5). Given a fake hand edit between two cycles, then it appears in the next step 4 difference report, in the
+- AC12. (A5) Given a fake hand edit between two cycles, then it appears in the next step 4 difference report, in the
   change-set preview's `diff_ref` and in the report's changes section, and the engineer's value stays when the
   conflicting item is rejected. Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_hand_edit_between_cycles`.
-- AC13 (A5). Given a fake hand edit while the run waits at the change-set approval, then the first write raises
+- AC13. (A5) Given a fake hand edit while the run waits at the change-set approval, then the first write raises
   `ApprovalVoid`, nothing is written under that approval, and the cycle returns to step 3 with the edit in the new
   differences. Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait`.
-- AC14 (A5). Given a fake hand edit while the run is stopped, when it resumes and the engineer chooses `accept` at the
+- AC14. (A5) Given a fake hand edit while the run is stopped, when it resumes and the engineer chooses `accept` at the
   host-state check, then the next step 4 shows the edit. Test:
   `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_while_stopped`.
 - AC15. Given a locked model at step 8 of cycle 2, then the change-set preview lists the unlock item and
@@ -129,7 +129,7 @@ defines its method; values are synthetic and say so.
   `autonomous_logged` the engine asks separately (§4.7). Test:
   `tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval` (needs spec 0002 plan T15, blocked
   on ADR-0031; until then the test expects the interim `HOST_LOCKED` stop).
-- AC16 (A2). Given a fake timeout during analysis, and separately during design, then the step ends
+- AC16. (A2) Given a fake timeout during analysis, and separately during design, then the step ends
   `TIMEOUT_UNKNOWN_OUTCOME`, the engine's `engine.in_flight` request opens, the outcome is not decided automatically
   (spec 0002 Q4, gap H-G7: unknown in v1, the engineer decides), and no further step on the host runs until it is
   answered; given a stale build pin, then the run is refused before any write. Tests:
@@ -138,7 +138,7 @@ defines its method; values are synthetic and say so.
 - AC17. Given a read-back `FAIL` or `NEEDS_ENGINEER`, then the D-2 screen opens and analysis does not run;
   `restore_previous` opens a new working file copied from this cycle's step 7 snapshot `P[k]` (§4.5.1) and returns to
   step 3. Test: `tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes`.
-- AC34 (A5). Given a fake hand edit between cycles 1 and 2, then a read-back `FAIL` in cycle 2 and the choice
+- AC34. (A5) Given a fake hand edit between cycles 1 and 2, then a read-back `FAIL` in cycle 2 and the choice
   `restore_previous`, then the restored model holds the engineer's value, `P[2]` is unchanged on disk, and the next
   step 4 still shows the edit; given a snapshot whose file hash no longer equals its `model_saved`, then the restore
   ends `CONFLICT`, nothing is opened and the run escalates. Tests:
@@ -167,12 +167,12 @@ defines its method; values are synthetic and say so.
 
 ### 3.4 Acceptance support (18 §5)
 
-- AC25 (A3). Given any journal of this workflow, when `audit_value_sources` runs, then it reports every write step
+- AC25. (A3) Given any journal of this workflow, when `audit_value_sources` runs, then it reports every write step
   argument at an engineering parameter that is not a reference to `basis.design_basis/1` or `basis.engineer_input/1`;
   it reports nothing for every workflow test journal, reports a forged literal, and holds over generated change sets.
   Tests: `tests/unit/edit_cycle/test_audit.py::test_audit_finds_literal`,
   `tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced`.
-- AC26 (A7). Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests of §4.9 (a
+- AC26. (A7) Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests of §4.9 (a
   repeated step 6 approval, a re-asked change set and every engine request count; the first step 6 approval, the
   first change-set request, the engineer turn and the run-level steps 16 and 17 do not); every normal-path scenario of
   §4.9 (AC9 to AC12, AC15, AC19, AC21, AC22, with the fake returning no analysis messages) in `work_on_copy` has at
@@ -182,7 +182,7 @@ defines its method; values are synthetic and say so.
   `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
   `tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt`,
   `::test_unclassified_messages_use_the_prompt`.
-- AC35 (A3, A7 on real journals; B-354). Given the module entry point `python -m eng_harness.report` (run from the
+- AC35. (A3, A7 on real journals; B-354) Given the module entry point `python -m eng_harness.report` (run from the
   workspace root as `uv run --package eng-harness python -m eng_harness.report ...`, spec 0006 §4.1) with the
   subcommand `audit-sources RUN_DIR` or `count-prompts RUN_DIR` (and `--json`), then it opens the run folder read-only
   through `JournalReader` and the run's result store, calls `audit_value_sources` or `count_prompts` on it and prints
@@ -195,12 +195,12 @@ defines its method; values are synthetic and say so.
   and folder bytes and modification times are unchanged; and `eng-harness --help` still lists exactly the six commands
   of spec 0006 AC1. Tests: `tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder`,
   `::test_entry_is_read_only_and_exit_codes`.
-- AC27 (A6). Given a two-cycle run in a worker process, when the engine is killed at every step and resumed with the
+- AC27. (A6) Given a two-cycle run in a worker process, when the engine is killed at every step and resumed with the
   same scripted answers, then each run ends with the same fake model, revision chain and outputs as the uninterrupted
   run, and no write is sent twice. Test: `tests/replay/edit_cycle/test_crash_matrix.py::test_every_step`.
 - AC28. Given a recorded journal of the workflow, then it replays without divergence (process/05 §2). Test:
   `tests/replay/edit_cycle/test_replay.py::test_recorded_journal_replays`.
-- AC29 (B-1). Given a fixture journal, when `edit_cycle_timings` runs, then it gives the measures of §4.9 and their sums
+- AC29. (B-1) Given a fixture journal, when `edit_cycle_timings` runs, then it gives the measures of §4.9 and their sums
   equal the sums over the fixture events. Test: `tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings`.
 - AC30. Given synthetic host design results and analysis messages, then `harness.host_design_verdicts` and
   `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4. Tests:

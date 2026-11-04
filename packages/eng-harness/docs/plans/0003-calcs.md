@@ -133,6 +133,7 @@ tasks:
   - id: T7
     title: Calc 1, model fingerprint, with the canonical-state helper
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_fingerprint (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/docs/verification/calcs/harness.model_fingerprint.md"
@@ -158,6 +159,7 @@ tasks:
   - id: T8
     title: Calc 2, difference report, with the tolerance-comparison helper
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_diff (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.model_diff.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
@@ -188,6 +190,7 @@ tasks:
   - id: T9
     title: Calc 3, read-back check
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.readback_check (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/docs/verification/calcs/harness.readback_check.md"
@@ -211,6 +214,7 @@ tasks:
   - id: T10
     title: Calc 4, design results summary
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.design_summary (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/docs/verification/calcs/harness.design_summary.md"
@@ -233,6 +237,7 @@ tasks:
   - id: T11
     title: Calc 5, section size rounding
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.section_round (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.section_round.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
@@ -255,6 +260,7 @@ tasks:
   - id: T12
     title: Calc 6, element count and position comparison
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.placement_compare (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.placement_compare.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
