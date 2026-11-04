@@ -9,10 +9,13 @@ import pytest
 from support.approvals import FakeApprovals
 from support.pullrequest import (
     BODY,
+    CLAUSE_DIR,
     PLAN_PATH,
     PLAN_TASK,
     SPEC_PATH,
     base_checkout,
+    clause_plan,
+    clause_spec,
     gate_check,
     make_gate_repo,
     plan_text,
@@ -333,3 +336,43 @@ def test_head_run_reports_aw09(repo: Repo) -> None:
     result = gate_check(repo, write_event(repo, base, BODY))[0]
     steps = {step["name"]: [f["code"] for f in step["findings"]] for step in json.loads(result.out)["steps"]}
     assert steps["gate-root"] == ["AW09"]
+
+
+PK_LINE = "\n- PK-AC1. Given the package, then it loads.\n"
+
+
+@pytest.mark.parametrize(
+    ("covers", "extra", "errors", "needle"),
+    [
+        (("BP-AC1", "BP-AC2"), "", set(), ""),  # OV is not covered by the plan: its criterion is not demanded
+        (("BP-AC1", "BP-AC2", "OV-AC1"), "", set(), ""),
+        (("BP-AC1",), "", {"GC016"}, "BP-AC2"),
+        (("BP-AC1", "BP-AC2"), PK_LINE, {"GC016"}, "PK-AC1"),  # a criterion the plan's own text defines
+        (("BP-AC1", "BP-AC2", "PK-AC1"), PK_LINE, set(), ""),
+    ],
+)
+def test_plan_with_clause_spec_directory(
+    repo: Repo, covers: tuple[str, ...], extra: str, errors: set[str], needle: str
+) -> None:
+    """AC13a: GC016 lists the uncovered criteria of the clause specs of covered prefixes and of the plan itself."""
+    clauses = {f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1", "BP-AC2"), f"{CLAUSE_DIR}ov.md": clause_spec("OV-AC1")}
+    base = make_gate_repo(repo, plan=clause_plan("BP-AC1", "BP-AC2"), base_files=clauses)
+    result = _commit_and_check(repo, base, {PLAN_PATH: clause_plan(*covers, extra=extra) + MORE}, DOCS)
+    assert (result.code, _errors(result)) == ((1, errors) if errors else (0, set()))
+    assert needle in result.out
+
+
+def test_plan_with_clause_spec_directory_errors(repo: Repo) -> None:
+    """AC13a: a clause spec that does not parse is GC005 and a directory without Markdown files is GC004."""
+    base = make_gate_repo(repo, plan=clause_plan("BP-AC1"), base_files={f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1")})
+    result = _commit_and_check(
+        repo, base, {f"{CLAUSE_DIR}raw.md": "no front matter\n", PLAN_PATH: clause_plan("BP-AC1") + MORE}, DOCS
+    )
+    assert (result.code, _errors(result)) == (1, {"GC005"})
+    assert f"{CLAUSE_DIR}raw.md" in result.out
+    empty = Repo(repo.root.parent / "empty")
+    base = make_gate_repo(empty, plan=clause_plan("BP-AC1"))
+    empty.commit({PLAN_PATH: clause_plan("BP-AC1") + MORE}, "docs: change")
+    result, _ = gate_check(empty, write_event(empty, base, DOCS))
+    assert (result.code, _errors(result)) == (1, {"GC004"})
+    assert CLAUSE_DIR in result.out
