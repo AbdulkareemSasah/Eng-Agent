@@ -1,8 +1,7 @@
 """Server roles, MCP sessions, crash detection, restart and shutdown (plan 0002 T5; spec 0002 sections 4.3.2 to 4.3.5).
 
 `ServerManager` starts each role (one server process) lazily, keeps one MCP `Client` per role and maps a lost session
-to the contract codes of spec section 4.5.6 (`ToolFailed`; an unknown server or role is a `KeyError`). The build check
-of section 4.3.4 follows in plan task T6b and runs after every start.
+to the contract codes of spec section 4.5.6 (`ToolFailed`). The build check of section 4.3.4 follows in task T6b.
 """
 
 import logging
