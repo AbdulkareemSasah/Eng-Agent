@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import configparser
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -27,18 +28,29 @@ HEAD = '[project]\nname = "a"\nversion = "0.1.0"\nrequires-python = ">=3.14"\nde
 class FakeMutmut:
     """ToolRunner that plays mutmut: records the generated setup.cfg and answers ``results`` with ``statuses``."""
 
-    def __init__(self, statuses: Sequence[str], run_exit: int = 0) -> None:
-        self.statuses, self.run_exit = list(statuses), run_exit
+    def __init__(
+        self, statuses: Sequence[str], run_exit: int = 0, run_output: str = "boom", lock_exit: int = 0
+    ) -> None:
+        self.statuses, self.run_exit, self.run_output, self.lock_exit = list(statuses), run_exit, run_output, lock_exit
         self.config: str | None = None
         self.calls: list[list[str]] = []
 
     def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
         self.calls.append(list(argv))
+        if list(argv[:2]) == ["uv", "lock"]:
+            return ToolResult(exit_code=self.lock_exit, output="lock is stale")
         if "run" in argv:
             self.config = (cwd / "setup.cfg").read_text(encoding="utf-8")
-            return ToolResult(exit_code=self.run_exit, output="boom")
+            return ToolResult(exit_code=self.run_exit, output=self.run_output)
         lines = "".join(f"    a.core.x_f__mutmut_{i}: {s}\n" for i, s in enumerate(self.statuses))
         return ToolResult(exit_code=0, output=lines)
+
+
+def _mutmut_option(config: str, key: str) -> list[str]:
+    """The lines of a multi-line option of the generated ``[mutmut]`` section."""
+    parser = configparser.ConfigParser()
+    parser.read_string(config)
+    return parser["mutmut"][key].split()
 
 
 def _setup(repo: Repo, minimum: int = 80, table: str | None = None) -> tuple[str, Member]:
@@ -74,8 +86,11 @@ def test_changed_modules_only(repo: Repo) -> None:
     runner = FakeMutmut(["killed"] * 5)
     assert mutation.run_step(_context(repo, member, runner, base)) == []
     assert runner.config is not None
-    listed = {line.strip() for line in runner.config.splitlines() if line.strip().startswith("src/")}
-    assert listed == {"src/a/core.py", "src/a/rules/r2.py", "src/a/rules/__init__.py"}
+    assert set(_mutmut_option(runner.config, "only_mutate")) == {
+        "src/a/core.py",
+        "src/a/rules/r2.py",
+        "src/a/rules/__init__.py",
+    }
 
 
 def test_nothing_changed_runs_no_tool(repo: Repo) -> None:
@@ -162,3 +177,61 @@ def test_parse_results() -> None:
         "warning: noise\n    a.x_f__mutmut_1: killed\n    a.x_f__mutmut_2: no tests\n\n    a.x_g__mutmut_1: timeout\n"
     )
     assert mutation.parse_results(text) == {"killed": 1, "no tests": 1, "timeout": 1}
+
+
+def test_whole_source_tree_is_copied_and_the_member_addopts_are_off(repo: Repo) -> None:
+    """The mutants must be a complete package so that they shadow an installed copy (B-049 review); addopts are off."""
+    base, member = _setup(repo)
+    _change(repo)
+    runner = FakeMutmut(["killed"])
+    mutation.run_step(_context(repo, member, runner, base))
+    assert runner.config is not None
+    assert _mutmut_option(runner.config, "source_paths") == ["src"]
+    assert _mutmut_option(runner.config, "pytest_add_cli_args") == ["-o", "addopts="]
+
+
+def test_fault_message_keeps_the_readable_tail_of_the_output(repo: Repo) -> None:
+    frames = "".join(f"\r\u280b Generating mutants {i}" for i in range(400))
+    base, member = _setup(repo)
+    _change(repo)
+    runner = FakeMutmut(
+        [], run_exit=1, run_output=f"{frames}\nImportError: no module named x\nfailed to collect stats\n"
+    )
+    with pytest.raises(EnvironmentFaultError) as caught:
+        mutation.run_step(_context(repo, member, runner, base))
+    assert "failed to collect stats" in str(caught.value)
+    assert "ImportError" in str(caught.value)
+    assert "Generating" not in str(caught.value)
+
+
+def test_judged_tree_runs_mutmut_in_its_own_environment(repo: Repo, tmp_path: Path) -> None:
+    base, member = _setup(repo)
+    _change(repo)
+    runner = FakeMutmut(["killed"] * 3)
+    ctx = StepContext(repo.root, tmp_path, member, runner, base=base)  # gate root differs from the judged tree
+    assert mutation.run_step(ctx) == []
+    ran = [call for call in runner.calls if "mutmut" in call]
+    assert ran
+    for call in ran:
+        assert call[:2] == ["uv", "run"]
+        assert call[call.index("--project") + 1] == str(repo.root)
+        assert "--locked" in call
+        assert call[call.index("python") + 1 :][:2] == ["-m", "mutmut"]
+
+
+def test_judged_tree_with_a_stale_lock_is_st001(repo: Repo, tmp_path: Path) -> None:
+    base, member = _setup(repo)
+    _change(repo)
+    runner = FakeMutmut(["killed"], lock_exit=2)
+    findings = mutation.run_step(StepContext(repo.root, tmp_path, member, runner, base=base))
+    assert [(f.code, f.severity) for f in findings] == [("ST001", Severity.ERROR)]
+    assert not [call for call in runner.calls if "mutmut" in call]
+
+
+def test_no_base_uses_the_merge_base_with_the_gate_branch(repo: Repo) -> None:
+    base, member = _setup(repo)
+    repo.git("update-ref", "refs/remotes/origin/build/v1", base)
+    _change(repo)
+    runner = FakeMutmut(["killed"] * 2)
+    assert mutation.run_step(_context(repo, member, runner, None)) == []
+    assert runner.config is not None  # mutation ran on the modules changed since the gate branch
