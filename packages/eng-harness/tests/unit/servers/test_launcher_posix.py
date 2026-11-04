@@ -6,7 +6,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,15 @@ def _alive(inspector: PosixProcessInspector, pid: int) -> bool:
     return identity is not None and inspector.alive(identity)
 
 
+def _wait_until(condition: Callable[[], bool], seconds: float = 10.0) -> bool:
+    """Poll `condition` every 0.05 s for up to `seconds`; members of a killed group end after the signal, not at it."""
+    for _ in range(int(seconds / 0.05)):
+        if condition():
+            return True
+        time.sleep(0.05)
+    return condition()
+
+
 @pytest.fixture
 def cleanup() -> Iterator[list[int]]:
     """Pids that a test may leave running; killed at teardown."""
@@ -64,9 +73,9 @@ def test_group_terminated(tmp_path: Path, cleanup: list[int]) -> None:
         assert {m.pid for m in process.job_members()} == {pids["server"], pids["child"]}  # host: own session
         process.terminate_job()
         assert process.wait(10) == -signal.SIGKILL
-        assert process.job_members() == []
-        for name in ("server", "child"):
-            assert not _alive(inspector, pids[name])
+        assert _wait_until(lambda: process.job_members() == [])
+        assert _wait_until(lambda: not _alive(inspector, pids["server"]))
+        assert _wait_until(lambda: not _alive(inspector, pids["child"]))
         assert _alive(inspector, pids["host"])
     finally:
         process.close()
@@ -83,11 +92,8 @@ def test_server_exits_when_engine_killed(tmp_path: Path, cleanup: list[int]) -> 
         assert _alive(inspector, server_pid)
         engine.terminate_job()  # the engine's group only: the server has a session of its own
         engine.wait(10)
-        for _ in range(200):  # the server ends on stdin end-of-file; poll for up to 10 s
-            if not _alive(inspector, server_pid):
-                break
-            time.sleep(0.05)
-        assert not _alive(inspector, server_pid)
+        # the server ends on stdin end-of-file; poll for up to 10 s
+        assert _wait_until(lambda: not _alive(inspector, server_pid))
     finally:
         engine.terminate_job()
         engine.close()
@@ -102,8 +108,8 @@ def test_tool_timeout_kills_group(tmp_path: Path, cleanup: list[int]) -> None:
         assert process.wait(0.2) is None  # the step's timeout elapsed with the tool still running
         process.terminate_job()
         assert process.wait(10) == -signal.SIGKILL
-        assert not _alive(inspector, pids["server"])
-        assert not _alive(inspector, pids["child"])
+        assert _wait_until(lambda: not _alive(inspector, pids["server"]))
+        assert _wait_until(lambda: not _alive(inspector, pids["child"]))
         process.terminate_job()  # idempotent once the group is gone
     finally:
         process.close()
