@@ -10,8 +10,13 @@ alternatives, license, maintenance health, size. ADR-0028 §5 already names Pyda
 
 The figures below were measured on 2026-11-04 in a scratch uv project outside the repository (CPython 3.14.6, Linux),
 adding `pydantic-ai-slim[openai]`, `keyring` and `httpx2`; sizes are the installed files listed in each package's
-`RECORD`. Licenses are those published in each package's metadata and are to be verified for the whole lock by the
-gate's license check. Maintenance health is for the owner to confirm at review.
+`RECORD`. Licenses are those published in each package's metadata and are enforced for the whole lock by the gate's
+license check.
+
+Maintenance health (PyPI release history, read 2026-11-04): `pydantic-ai-slim` has 351 releases since 2024-11-25, the
+latest 2.65.0 on 2026-11-03, so it is very active and moves fast (the reason for the exact pin); `openai` has 466
+releases since 2020, the latest 3.45.0 on 2026-11-04; `tiktoken` 20 releases, the latest 0.14.0 on 2026-08-17. All three
+have an active vendor or project behind them. Whether this health is acceptable is for the owner to confirm at review.
 
 ## Decision
 Add `pydantic-ai-slim` with the `openai` extra to `packages/eng-harness`, pinned exactly in `uv.lock`. It is imported by
@@ -30,9 +35,13 @@ interface; the engine never imports it.
 | `jiter` 0.18.0 | JSON parsing | MIT | 774 KiB |
 | `logfire-api` 5.4.0 (via `pydantic-graph`) | No-op shim without `logfire` | MIT | 438 KiB |
 
-Other transitive packages (`anyio`, `typing-inspection`, `regex`, `requests` and its dependencies, among them) are
-covered by the gate's license check; `pydantic` is already a dependency. The HTTP client library is the subject of
-[ADR-0003](0003-httpx2.md). No telemetry exporter is installed, and the adapter enables none (spec AC24).
+Other transitive packages named by the resolution, with published license and installed size: `requests` 2.34.2
+(Apache-2.0, 229 KiB), `urllib3` 2.8.0 (MIT, 440 KiB), `certifi` 2026.10.23 (MPL-2.0, 239 KiB), `charset-normalizer`
+3.5.2 (MIT, 743 KiB), `regex` 2026.9.29 (Apache-2.0 AND CNRI-Python, 2983 KiB), `typing-inspection` 0.4.4 (MIT, 53
+KiB), `annotated-types` 0.8.0 (MIT, 35 KiB), `sniffio` 1.3.1 (MIT OR Apache-2.0, 22 KiB). `anyio` is covered in
+[ADR-0003](0003-httpx2.md). The licenses are all permissive or weak-copyleft file-level (MPL-2.0 for `certifi`); the
+gate's license step enforces the project's accepted list. `pydantic` is already a dependency. The HTTP client library is
+the subject of [ADR-0003](0003-httpx2.md). No telemetry exporter is installed, and the adapter enables none (spec AC24).
 
 ## Consequences
 - Easier: typed output validation, model test doubles (`FunctionModel`, `TestModel`) for CI without the network, one

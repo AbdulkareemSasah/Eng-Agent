@@ -56,6 +56,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/_http.py"
       - "packages/eng-harness/src/eng_harness/providers/_outgoing.py"
+      - "packages/eng-harness/tests/unit/providers/_leaks.py"
       - "packages/eng-harness/tests/unit/providers/test_http.py"
       - "packages/eng-harness/tests/unit/providers/test_outgoing.py"
       - "packages/eng-harness/tests/property/test_provider_properties.py"
@@ -67,6 +68,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_http.py::test_one_request_no_retry_no_redirect"
       - "packages/eng-harness/tests/unit/providers/test_http.py::test_no_secret_or_body_in_logs_or_errors"
       - "packages/eng-harness/tests/unit/providers/test_http.py::test_missing_key"
+      - "packages/eng-harness/tests/unit/providers/test_http.py::test_trust_env_is_off"
       - "packages/eng-harness/tests/unit/providers/test_outgoing.py::test_final_body_scan"
       - "packages/eng-harness/tests/unit/providers/test_outgoing.py::test_adapter_rechecks_state"
       - "packages/eng-harness/tests/property/test_provider_properties.py::test_sensitive_text_never_reaches_the_transport"
@@ -124,8 +126,9 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_llm.py::test_agent_is_closed"
       - "packages/eng-harness/tests/unit/providers/test_llm.py::test_cancellation_and_ceiling"
       - "packages/eng-harness/tests/unit/providers/test_llm.py::test_local_and_remote_endpoints"
+      - "packages/eng-harness/tests/unit/providers/test_llm.py::test_no_secret_or_body_in_logs_full_stack"
       - "packages/eng-harness/tests/contract/test_decision_providers.py::test_adapters_conform"
-    covers: [AC23, AC24, AC25, AC26, AC27]
+    covers: [AC14, AC23, AC24, AC25, AC26, AC27]
     depends_on: [T3, T4, T5]
   - id: T7
     title: Provider factory, local_only, run summary
@@ -133,6 +136,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"
       - "packages/eng-harness/src/eng_harness/providers/_factory.py"
+      - "packages/eng-harness/src/eng_harness/providers/__main__.py"
       - "packages/eng-harness/tests/unit/providers/test_factory.py"
     max_changed_lines: 300
     max_sessions: 2
@@ -140,6 +144,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_local_only_builds_nothing_remote"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_summary_has_no_secrets"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_absent_provider_is_phase1_behavior"
+      - "packages/eng-harness/tests/unit/providers/test_factory.py::test_check_command_makes_one_call_per_provider"
     covers: [AC28, AC29, AC30]
     depends_on: [T2, T4, T6]
   - id: T8
@@ -236,12 +241,14 @@ at an exact version; the HTTP library is the one the pinned `pydantic-ai-slim` a
 
 **T2 Credentials** (spec §4.4). `CredentialStore`, `KeyringCredentialStore` with the allow-list and the direct use of
 one concrete backend (class names confirmed against the pinned `keyring`), `FakeCredentialStore` in `tests/fakes/`,
-and `python -m eng_harness.providers` with `set-key`, `delete-key` and `status` (`check` arrives with T7). No key is
+and `python -m eng_harness.providers` with `set-key`, `delete-key` and `status` (`check` is added by T7, which then edits `__main__.py`). No key is
 ever accepted as an argument.
 
 **T3 Shared HTTP client and outgoing guard** (spec §4.5). The `httpx2` client with redirects off and a bearer auth hook,
-the error mapping table, the one-request rule, the final-body scan and the direct-call state recheck, plus the log and
-exception tests with the real stack and the property test with sensitive strings. R3 and the security lens apply.
+the error mapping table, the one-request rule, the final-body scan and the direct-call state recheck, plus the exception
+tests (the `assert_no_leak` helper walks `__cause__`, `__context__` and traceback locals), the log tests over the shared
+client, `trust_env=False`, and the property test with sensitive strings (non-ASCII, quotes, backslashes). The module
+also sets the third-party logger levels (spec §4.5). R3 and the security lens apply.
 
 **T4 Jev adapter** (spec §4.6). `JevFormat`, `HttpCall`, `JevProvider` and `select_format`, which raises
 `NOT_IMPLEMENTED` for both backends, in `_jev_format.py`; test-double formats in `tests/fakes/jev_formats.py` with
@@ -250,13 +257,14 @@ different wire shapes; answer validation, batching, `info`.
 **T5 Output type and prompt** (spec §4.7). The per-request strict output model and the rendered messages with the
 golden prompt file (R1: it shapes decisions; owner review), `PROMPT_VERSION`, the injection test.
 
-**T6 PydanticAI adapter** (spec §4.7). The only importer of PydanticAI: agent with no tools, strict tool output, zero
+**T6 PydanticAI adapter** (spec §4.7). The only importer of PydanticAI (it also runs the AC14 log
+test over the full SDK path): agent with no tools, strict tool output, zero
 output retries, no instrumentation, over the shared client; cancellation and ceiling; the recorded providers of
 `tests/fakes/recorded_providers.py`; the conformance suite for fakes and both adapters.
 
 **T7 Factory** (spec §4.1, §4.4, §4.8). `build_providers`: config to providers, `local_only` builds nothing remote and
 reads no key, absent or failing providers become `None` with a warning, the summary for the run header, the `check`
-subcommand; sets the third-party logger levels.
+subcommand (it edits the `__main__.py` of T2; its live calls are local-test only, its test uses fakes).
 
 **T8 Evaluation core** (spec §4.10). `EvalThresholds` with the 12 §6 and 12 §3 values (golden file citing them),
 `evaluate_point` (pure), eligibility with the explicit calibration gap, override handling. R1: the thresholds and the

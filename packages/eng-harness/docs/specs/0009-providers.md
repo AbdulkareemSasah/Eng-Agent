@@ -97,27 +97,42 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
 ### 3.3 The outgoing path
 
 - AC9. Given a call with a sentinel key, then the sentinel appears only in the `Authorization` header that the
-  transport receives, in no URL, query, body, other header, log record, exception message, exception cause chain,
-  `ProviderInfo`, suggestion or summary; the OpenAI-compatible SDK is given a fixed placeholder, never the key. Test:
-  `tests/unit/providers/test_http.py::test_key_only_in_authorization_header`.
+  transport receives, in no URL, query, body, other header, log record, exception message, `__cause__`, `__context__`,
+  traceback frame local, `ProviderInfo`, suggestion or summary; the OpenAI-compatible SDK is given a fixed placeholder,
+  never the key. Test: `tests/unit/providers/test_http.py::test_key_only_in_authorization_header` (the exception walk is
+  the helper `assert_no_leak(err, secrets)` of AC10).
 - AC10. Given scripted transport behaviors, then the adapter raises `ProviderError` with the code of §4.5: connection
   failure `NETWORK`; adapter ceiling `TIMEOUT`; 401 and 403 `AUTH`; 429 `RATE_LIMITED`; other non-2xx `HTTP_STATUS`;
   3xx `HTTP_STATUS`; a body that is not JSON or does not match the mapped shape `BAD_RESPONSE`; each with the remote
-  text dropped (`raise ... from None`). Test: `test_http.py::test_error_mapping`.
+  text dropped and the original exception unreachable from the raised one: `__cause__` and `__context__` are both
+  `None` and no traceback frame holds the key or a response body (mechanism in §4.5). Test:
+  `test_http.py::test_error_mapping`, which calls the shared helper `assert_no_leak(err, secrets)` in
+  `tests/unit/providers/_leaks.py`; the helper walks `__cause__`, `__context__` and `__traceback__` frame locals
+  (recursively, including attributes of exception objects found there) and fails if it finds the sentinel key or any
+  response-body text.
 - AC11. Given any status, then exactly one HTTP request is made per provider call: no automatic retry, no
   `Retry-After` wait, no redirect followed (the client is built with redirects off); the SDK's own retry setting is zero.
-  Test: `test_http.py::test_one_request_no_retry_no_redirect`.
-- AC12. Given a serialized outgoing body that contains an entry of `DecisionSettings.sensitive_values` (case-insensitive,
-  length at least 3, spec 0005 §4.10), or the key itself, then `ProviderError` `REDACTION_BLOCKED` is raised before the
+  The client is built with `trust_env=False` (§4.5): with proxy and `.netrc` variables set in the environment, the
+  transport still receives the request unchanged. Tests: `test_http.py::test_one_request_no_retry_no_redirect`,
+  `test_http.py::test_trust_env_is_off`.
+- AC12. Given a serialized outgoing body that contains an entry of `DecisionSettings.sensitive_values` (compared after
+  JSON decoding, with Unicode NFC normalization and case folding, length at least 3, spec 0005 §4.10), or the key
+  itself, in any string of the body including the embedded data block of the user message and including values that
+  were escaped in transit (non-ASCII text as `\uXXXX`, quotes, backslashes), then `ProviderError` `REDACTION_BLOCKED` is raised before the
   transport is invoked (zero requests), whichever field carried it (state value, option label, point title). Tests:
   `tests/unit/providers/test_outgoing.py::test_final_body_scan`; property
-  `tests/property/test_provider_properties.py::test_sensitive_text_never_reaches_the_transport`.
+  `tests/property/test_provider_properties.py::test_sensitive_text_never_reaches_the_transport` (the strategies include
+  non-ASCII scripts, quotes, backslashes and mixed case).
 - AC13. Given an adapter called directly (outside the cascade, for example by evaluation tooling) with a
   `ProviderRequest` whose state fails the redaction check of spec 0005 §4.10, then `REDACTION_BLOCKED` and zero
   requests. Test: `test_outgoing.py::test_adapter_rechecks_state`.
 - AC14. Given a failure of each code of §4.5 with the root logger at `DEBUG` and the `openai`, `httpx2`, `httpcore2` and
   `pydantic_ai` loggers captured, then no record, message or traceback text contains the sentinel key, a request body,
-  a response body or a header value. Test: `test_http.py::test_no_secret_or_body_in_logs_or_errors`.
+  a response body or a header value. Tests: `test_http.py::test_no_secret_or_body_in_logs_or_errors` (the shared
+  client over `MockTransport`) and `tests/unit/providers/test_llm.py::test_no_secret_or_body_in_logs_full_stack` (the
+  full PydanticAI and `openai` SDK path over the same client, where the SDK's own DEBUG request logging is active);
+  both build the client through `_http.py`, which sets the logger levels, so the second test fails if that mitigation
+  is missing.
 - AC15. Given a `key_ref` with no stored key (or no `key_ref` for a non-local provider), when the provider is called,
   then `ProviderError` `NO_KEY` before any request; given `local = true` and no `key_ref`, the call proceeds without an
   `Authorization` header. Test: `test_http.py::test_missing_key`.
@@ -348,15 +363,26 @@ visible in process lists and shell history). Folding these into the command tabl
 ### 4.5 The outgoing path
 
 One module builds the client and nothing else does (AC45): `_http.py` makes an `httpx2.AsyncClient` with redirects off,
-no automatic retry, a bearer auth hook that reads the `SecretStr` at send time, and an injectable transport (tests pass
-`MockTransport`). The OpenAI-compatible SDK inside PydanticAI is given this client and the fixed placeholder key
-`unused`, so the SDK never holds the key and its retry count is zero (AC9, AC11). The factory also raises the level of the
-loggers `openai`, `httpx2`, `httpcore2` and `pydantic_ai` to `WARNING` when lower; AC14 proves the result with the real
-stack.
+no automatic retry, `trust_env=False` (no proxy, `.netrc` or certificate settings are read from the environment, so a
+loopback call is never routed through a proxy and no stray credential is attached; a deployment that needs a proxy sets
+it in `harness.toml` in a later amendment, not through the environment), a bearer auth hook that reads the `SecretStr`
+at send time, and an injectable transport (tests pass `MockTransport`). The OpenAI-compatible SDK inside PydanticAI is given this client and the fixed placeholder key
+`unused`, so the SDK never holds the key and its retry count is zero (AC9, AC11). The same module raises the level of the
+loggers `openai`, `httpx2`, `httpcore2` and `pydantic_ai` to `WARNING` when lower, in the function that builds the
+client, so no adapter and no factory path can skip it; AC14 proves the result with the real stack.
+
+An error is mapped inside the `except` block only to a code (a small value), and the `ProviderError` is raised after the
+block has ended (a `raise ... from None` inside the block is not enough: it clears `__cause__` and sets
+`__suppress_context__`, but `__context__` still points at the original exception, whose `.request` holds the
+`Authorization` header and whose `.response` holds the remote text). The raise site is a function that receives only the
+code, so no frame in the traceback of the raised error holds the original exception, the key or a body. The auth hook
+reads the key into a local that does not outlive the hook call, and no exception handler runs in a frame that holds it.
 
 Before any transport call, `_outgoing.py` (1) re-runs the redaction check of spec 0005 §4.10 on the request state (AC13),
 and (2) scans the final serialized body, with the point title and option labels included, for every `sensitive_values`
-entry and for the key (AC12). A finding raises `REDACTION_BLOCKED`; its message holds the field path, never a value. This
+entry and for the key (AC12). The scan does not search raw bytes: it parses the body as JSON, walks every string value,
+parses the embedded data block of the user message the same way and walks it too, and compares with NFC normalization
+and Unicode case folding, so escaping (`\uXXXX`, quotes, backslashes) cannot hide a value. A finding raises `REDACTION_BLOCKED`; its message holds the field path, never a value. This
 is a second line behind the cascade's check, so a caller that bypasses the cascade is still safe.
 
 | Condition | `ProviderErrorCode` |
@@ -546,7 +572,7 @@ deliberately with the evaluation suite as the gate" is enforced for a model chan
 | Criteria | Layer | Location |
 |---|---|---|
 | AC1 to AC11, AC13, AC15, AC16, AC18 to AC26, AC28 to AC30 | Unit (with `MockTransport`, recorded fakes, `FunctionModel`/`TestModel` of the pinned PydanticAI, a temporary workspace) | `tests/unit/providers/` |
-| AC12, AC14 (any text and failure kind) | Unit and property (Hypothesis, `derandomize=True`) | `tests/unit/providers/`, `tests/property/` |
+| AC12, AC14 (any text and failure kind; AC14 also over the full PydanticAI path) | Unit and property (Hypothesis, `derandomize=True`) | `tests/unit/providers/`, `tests/property/` |
 | AC27, AC36, AC46 | Contract | `tests/contract/` |
 | AC31 to AC34 | Fake-host workflow (real engine, cascade and adapters; recorded transports) | `tests/workflow/providers/` |
 | AC35 | Replay (process/05 §1) | `tests/replay/` |

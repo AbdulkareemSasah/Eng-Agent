@@ -11,9 +11,15 @@ Process/04 §7 requires an ADR for a runtime dependency.
 
 Measured on 2026-11-04 in a scratch uv project outside the repository (CPython 3.14.6, Linux): `keyring` 25.7.0 resolved
 with the packages below; sizes are installed files from each package's `RECORD`. Licenses are as published in each
-package's metadata, to be verified for the whole lock by the gate's license check; maintenance health is for the owner
-to confirm at review. The Windows resolution (`pywin32-ctypes`, declared by `keyring` for `sys_platform == "win32"`) was
-not resolved in this Linux environment and is checked by the Windows CI job of the first task that adds the dependency.
+package's metadata and enforced for the whole lock by the gate's license check. The Windows resolution
+(`pywin32-ctypes`, declared by `keyring` for `sys_platform == "win32"`) was not resolved in this Linux environment; its
+license and wheel size are taken from its PyPI page, and the Windows CI job of the first task that adds the dependency
+confirms the resolution.
+
+Maintenance health (PyPI release history, read 2026-11-04): `keyring` has 203 releases since 2009, the latest 25.7.0 on
+2025-11-16 (two to four releases a year recently); it is a long-lived, widely used library. `pywin32-ctypes` is a small,
+stable package (8 releases, the latest 0.2.3 on 2024-08-14), slow-moving by design. Whether this health is acceptable is
+for the owner to confirm at review.
 
 ## Decision
 Add `keyring` to `packages/eng-harness`, pinned exactly in `uv.lock`, imported by one module (`providers/_credentials.py`)
@@ -27,12 +33,13 @@ added.
 |---|---|---|---|
 | `keyring` 25.7.0 | Credential store interface | MIT | 101 KiB |
 | `jaraco.classes` 3.4.0, `jaraco.context` 6.1.2, `jaraco.functools` 4.6.0 | Helpers of `keyring` | MIT | 14, 18, 29 KiB |
-| `more-itertools` 11.2.1 | Helper of `jaraco.classes` | to be checked by the gate | not measured |
+| `more-itertools` 11.2.1 | Helper of `jaraco.classes` | MIT | 295 KiB |
 | `secretstorage` 3.5.0, `jeepney` 0.9.0 (Linux only) | Secret Service access | BSD-3-Clause, MIT | 37, 137 KiB |
-| `pywin32-ctypes` (Windows only) | Windows Credential Manager access | to be checked by the gate | not resolved here |
+| `pywin32-ctypes` 0.2.3 (Windows only) | Windows Credential Manager access | BSD-3-Clause | about 30 KiB (wheel size; not installed here) |
 
-On Linux `secretstorage` also brings `cryptography` and `cffi`, whose licenses the gate's license check must pass; a
-headless Linux CI runner has no Secret Service, so tests use an in-memory backend double and the real stores are
+On Linux `secretstorage` also brings `cryptography` 50.0.2 (Apache-2.0 OR BSD-3-Clause, 14648 KiB), `cffi` 2.1.1
+(MIT-0, 714 KiB) and `pycparser` 3.12 (BSD-3-Clause, 256 KiB), all within the licenses the gate accepts; they are Linux
+only and add about 15.6 MiB there. A headless Linux CI runner has no Secret Service, so tests use an in-memory backend double and the real stores are
 "needs local test".
 
 ## Consequences
