@@ -62,12 +62,17 @@ engineering meaning"`.
   `SubjectKind`, or with a `spec` path that is not a relative POSIX path ending in `.md`, when defined, then
   `CheckDefinitionError`. Test: `tests/unit/test_meta.py::test_metadata_fields`.
 - AC3. Given an input model that is not a `CheckInputs` subclass, has a field that is not a scalar (float, int, bool,
-  `StrEnum`/`Literal`), or a numeric field without physical bounds and `bounds_source`, when a check uses it, then
-  `CheckDefinitionError`. Test: `tests/unit/test_inputs.py::test_definition_rules`.
+  `StrEnum`/`Literal`), or a numeric field with neither physical bounds and `bounds_source` nor an unbounded reason
+  (`unbounded(reason=...)`, §4.3), when a check uses it, then `CheckDefinitionError`. Test:
+  `tests/unit/test_inputs.py::test_definition_rules`.
 - AC4. Given a field declared with `bounded(ge=Cited(...), le=Cited(...))`, when the JSON Schema is generated, then it
   carries the bounds and a `bounds_source` joined from the two citations; when a value outside them is evaluated, then
   `OUT_OF_RANGE` from `validate_input` (EC §5) and nothing is clamped. Test:
   `tests/unit/test_inputs.py::test_bounded_helper_and_out_of_range`.
+- AC4a. Given a field declared with `unbounded(reason="signed reaction; no physical bound")`, when the JSON Schema is
+  generated, then it carries no numeric bounds and `x-unbounded-reason` with that text, and the reason appears with the
+  field's `TraceInput`; given an empty or blank reason, when the check is defined, then `CheckDefinitionError`
+  (amendment B-097). Test: `tests/unit/test_inputs.py::test_unbounded_helper`.
 - AC5. Given a check whose preconditions are `[P1 → NOT_APPLICABLE, P2 → NEEDS_ENGINEER]`, when P1 fails, then one
   verdict `NOT_APPLICABLE` with `demand`, `capacity` and `ratio` null, the body is not run, and the trace messages name
   `P1` and its clause; when only P2 fails, then `NEEDS_ENGINEER` likewise; when both fail, P1 wins (declared order).
@@ -232,7 +237,7 @@ engineering meaning"`.
 ### 4.1 Layout and public API
 
 Workspace layout (task statement of B-070; 10 §2): `packages/structural-codes/` holds one `AGENTS.md`, `CLAUDE.md`,
-`.gate/` and the shared `docs/` (specs, plans, ADRs, clause specs under `docs/clause-specs/<pack>/<check_id>.md`,
+`.gate/` and the shared `docs/` (specs, plans, ADRs, clause specs under `docs/clauses/<pack>/<check_id>.md`,
 verification records under `docs/verification/<pack>/<check_id>.md`); the packages are `core/`, `aci318-14/` and
 `sbc304-2018/`, each a uv workspace member added by its own skeleton task (D-10).
 
@@ -262,7 +267,7 @@ R1 modules (mutation ≥ 80%): `trace`, `check` (verdict builder in `_verdict`),
 `CheckMeta` (frozen Pydantic model, `extra="forbid"`): `check_id`; `pack` (import name); `code` (for example
 `"ACI 318-14"`, 1 to 100); `edition` (1 to 20); `clauses` (non-empty tuple of clause numbers as printed in the code,
 each 1 to 40); `title` and optional `title_ar` (our own words, 1 to 200; no clause text, 10 §8); `members` (non-empty
-set of `SubjectKind`); `spec` (relative path of the clause spec under `docs/clause-specs/`); `gaps` (tuple of
+set of `SubjectKind`); `spec` (relative path of the clause spec under `docs/clauses/`); `gaps` (tuple of
 `GapDecl{id: ^G-[0-9]+$, clause, reason}`); `assumptions` (tuple of `str`, each max 500); `unconditional` (`str`
 1 to 500, or null: the clause-spec section stating that the clause has no applicability limit beyond `members`, §4.4)
 **[added]**.
@@ -276,12 +281,19 @@ the contract pattern (AC1).
 
 `CheckInputs` subclasses `eng_contract.params.ParamModel`. Fields are flat scalars **[added]** so every input is one
 `TraceInput`; nested or list inputs are a later version (§7). Every numeric field has physical bounds with
-`bounds_source` (they are not code limits; code limits are preconditions giving `NEEDS_ENGINEER`, 04 §7). Fields that
-are engineering quantities are `ref_capable` and `engineering_quantity` (EC §5).
+`bounds_source` (they are not code limits; code limits are preconditions giving `NEEDS_ENGINEER`, 04 §7), or is
+declared unbounded with a stated reason when no physical bound exists, for example a signed force or moment
+(amendment B-097, from plan 0002 Q1). Fields that are engineering quantities are `ref_capable` and
+`engineering_quantity` (EC §5).
 
 `bounded(*, ge=None, gt=None, le=None, lt=None, **eng_param_kwargs)` takes `Cited` bounds (so pack check modules write
 no bare literal, the gate's FB005 rule A1) and returns `eng_param(...)` with the numeric bounds and `bounds_source`
 joined from the citations.
+
+`unbounded(*, reason: str, **eng_param_kwargs)` returns `eng_param(...)` with no numeric bounds and the JSON Schema key
+`x-unbounded-reason` set to `reason`, a non-empty text that says why the quantity has no physical bound (no number is
+needed, so FB005 does not apply). The reason is carried into the field's `TraceInput` so the calculation note shows
+it. It never replaces a code limit: those stay preconditions.
 
 Reserved field on `CheckInputs`: `ratio_limit: float | None` (ref-capable, from the design basis), bounded `> 0` and
 `<= ` the contract default (04 §5.1) **[added]**.
@@ -563,7 +575,7 @@ content-hash format is a major change of the core and resets every approval (17 
 | Q2 | Core and eng-contract sources are in every check's hash, so any change to them resets all approvals | Owner | Keep (safe); revisit if re-approvals become a burden |
 | Q3 | The gate's FB004 (I/O imports) covers block and rule modules, not check modules | Owner | Extend FB004 to `check_modules` in eng-dev-gate |
 | Q4 | The gate assumes `<package>/docs/plans/` and `<package>/.gate/` per workspace member; `packages/structural-codes/` is a group folder, not a member | Owner, gate author | Let the gate treat a folder holding `.gate/agents.yml` as a repository root whose plans govern its members |
-| Q5 | process/03 places clause specs at `structural-codes/packages/<pack>/specs/<check_id>.md`; this workspace uses `packages/structural-codes/docs/clause-specs/<pack>/` | Owner | Amend process/03 to the shared `docs/` folder |
+| Q5 | process/03 places clause specs at `structural-codes/packages/<pack>/specs/<check_id>.md`; this workspace uses `packages/structural-codes/docs/clauses/<pack>/` | Owner | Amend process/03 to the shared `docs/` folder |
 | Q6 | PDF notes (10 §7) | Owner | Defer; add by package ADR when a dependency is chosen |
 | Q7 | Arabic framework labels of §4.10 | Owner | Review the wording before any note leaves trial use |
 | Q8 | Display precision of numbers in notes | Owner | Full round-trip values until the owner sets a rule; rounding would be an engineering decision |

@@ -52,7 +52,8 @@ tasks:
     tests_first:
       - "packages/structural-codes/core/tests/unit/test_inputs.py::test_definition_rules"
       - "packages/structural-codes/core/tests/unit/test_inputs.py::test_bounded_helper_and_out_of_range"
-    covers: [AC3, AC4]
+      - "packages/structural-codes/core/tests/unit/test_inputs.py::test_unbounded_helper"
+    covers: [AC3, AC4, AC4a]
     depends_on: [T2]
   - id: T4
     title: Trace recorder

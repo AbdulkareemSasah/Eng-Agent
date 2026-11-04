@@ -315,7 +315,7 @@ to B-075.
 
 | Id | Question | Recommendation |
 |---|---|---|
-| Q1 | Signed force inputs (`FX_kN` to `MY_kNm`) have no physical bound, but CF AC3 requires bounds and `bounds_source` on every numeric field | Amend the core spec to allow a numeric field declared unbounded with a reason (for example "signed reaction; no physical bound"), before T2. **Blocks T2 to T6** |
+| Q1 | Signed force inputs (`FX_kN` to `MY_kNm`) have no physical bound, but CF AC3 requires bounds and `bounds_source` on every numeric field | Resolved by B-097: the core spec allows `unbounded(reason=...)` (core §4.3, AC4a), implemented by core T3; T2 declares the signed force fields with it |
 | Q2 | Design-basis field paths used by the clause specs (`foundation.allowable_bearing_pressure`, `foundation.allowable_bearing_kind`, `foundation.soil_unit_weight`, `foundation.soil_depth_above_footing`, `foundation.surcharge`, `materials.concrete_fc`, `materials.concrete_class`, `materials.concrete_unit_weight`, `materials.rebar_fy`, `materials.rebar_coating`, `durability.cover_footing`, `limits.ratio_limit`) | Adopt them in the design-basis template spec (B-063), or rename there and here together |
 | Q3 | Punching with moment transfer (punching G-4): whether the Chapter 8 eccentric-shear rule applies to footings through 13.3.3.1 | Confirm at C3; then implement it as a new check version, since most real footings carry a base moment |
 | Q4 | Strength checks use the net factored pressure from the column load only (footing and soil weights excluded) | Accept: the uniform self-weight pressure is balanced by the weight itself and causes no shear or moment in the footing |
@@ -326,7 +326,7 @@ to B-075.
 | Q9 | Minimum flexural reinforcement: two-way slab minimum through 13.3.3.1, or also a beam-type minimum | Slab minimum (8.6.1.1), as specified; owner confirms |
 | Q10 | Development length uses `ψs = 1.0` for every bar, because metric bar sizes do not map to ASTM designations | Keep (safe side) until a typed bar-designation input exists |
 | Q11 | Development length has no program comparison (`program_comparison.not_available`) | Confirm |
-| Q12 | Folder name: the core spec (CF §4.1, §4.2) places clause specs under `docs/clause-specs/<pack>/`; this task placed them under `docs/clauses/aci318_14/` | Amend CF §4.1 and §4.2 to `docs/clauses/<pack>/` in the core's next documents change (the `CheckMeta.spec` value `aci318_14/<check_id>.md` is the same either way) |
+| Q12 | Folder name: the core spec (CF §4.1, §4.2) places clause specs under `docs/clause-specs/<pack>/`; this task placed them under `docs/clauses/aci318_14/` | Resolved by B-097: the core spec now names `docs/clauses/<pack>/` |
 | Q13 | Minimum effective depth of footings (13.3.1.2) is not in the 10 §9 list | Add a check `aci318_14.13_3_1_2.min_effective_depth` in a later version |
 | Q14 | Bearing at the column-footing interface and dowels are not in scope (clause numbers confirmed when specified) | Add with the column workflow (phase 3) |
 | Q15 | process/05 §2 requires worked examples for every check in `structural-codes`; none exists here | The gate reports this `awaiting owner` in bootstrap mode; the owner supplies G-WE |
