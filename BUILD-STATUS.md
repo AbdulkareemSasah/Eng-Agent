@@ -6,7 +6,7 @@ After a restart or a context compaction, read this file and `git log origin/buil
 - Integration branch: `build/v1` · Draft pull request to `main`: [AbdulkareemSasah/Eng-Agent#2](https://github.com/AbdulkareemSasah/Eng-Agent/pull/2)
 - Mode: bootstrap (ADR-0028 §4). Checks that need the owner or another identity report `awaiting owner`.
 - Live steps: [LOCAL-TESTING.md](LOCAL-TESTING.md). Nothing that needs a host program is claimed as working.
-- **Paused on the owner's instruction (2026-11-04, about 21:00 UTC): no new workflows or agents until the owner says to continue.** The tasks in progress were drained and the three wave 3n lanes stopped. Open on resume: B-364 ([#143](https://github.com/AbdulkareemSasah/Eng-Agent/pull/143), approved; its merge step gave up after repeated BEHIND), B-122 ([#142](https://github.com/AbdulkareemSasah/Eng-Agent/pull/142)) and B-256 ([#137](https://github.com/AbdulkareemSasah/Eng-Agent/pull/137)), both approved, whose CI failures were spurious (P-42), B-123 ([#132](https://github.com/AbdulkareemSasah/Eng-Agent/pull/132), approved), B-104 ([#146](https://github.com/AbdulkareemSasah/Eng-Agent/pull/146), conflict), B-141 (changes requested after a conflict fix), B-182 ([#134](https://github.com/AbdulkareemSasah/Eng-Agent/pull/134), fix), B-367 (E.T3b, not started), B-156 (writer stopped; its commit is on `backup/b156-writer-partial`). Before relaunching, remove the stopped lanes' worktrees (never `localci-*`) and free stale local task branches (P-42).
+- Paused on the owner's instruction from about 21:00 UTC and **resumed on the owner's instruction at about 21:30 UTC (2026-11-04)**: wave 3o runs the three lanes; the paused list was taken up in it.
 
 ## 1. Environment facts (recorded at the start)
 
@@ -179,7 +179,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-092 | docs | fix(eng-dev-gate): give every suppression comment an issue reference and a reason (B-092) | sonnet, low | opus, low | [#52](https://github.com/AbdulkareemSasah/Eng-Agent/pull/52) | done |
 | B-093 | docs | build(eng-contract): pyproject within the gate's config and imports rules (B-093) | sonnet, low | opus, low | [#53](https://github.com/AbdulkareemSasah/Eng-Agent/pull/53) | done |
 | B-094 | docs | docs(eng-dev-gate): T11 also edits the forbidden package's __init__.py (B-094 plan amendment) | sonnet, low | opus, low | [#54](https://github.com/AbdulkareemSasah/Eng-Agent/pull/54) | done |
-| B-095 | docs | eng-contract: follow-ups from the reviews of B-015 and B-069 | sonnet, low | opus, low | — | not started or in writing |
+| B-095 | docs | eng-contract: follow-ups from the reviews of B-015 and B-069 | sonnet, low | opus, low | [#151](https://github.com/AbdulkareemSasah/Eng-Agent/pull/151) | open |
 | B-096 | docs | docs(eng-dev-gate): a task's package changelog and local-testing list are in its scope (B-096) | sonnet, low | opus, low | [#57](https://github.com/AbdulkareemSasah/Eng-Agent/pull/57) | done |
 | B-097 | docs | docs(structural-codes): unbounded inputs with a stated reason; clause specs under docs/clauses (B-097) | sonnet, low | opus, medium | [#58](https://github.com/AbdulkareemSasah/Eng-Agent/pull/58) | done |
 | B-098 | docs | amend specs 0005, 0006 and the engine spec as the providers spec (0009 Q7) requires | opus, medium | opus, medium | [#81](https://github.com/AbdulkareemSasah/Eng-Agent/pull/81) | done |
@@ -206,8 +206,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-118 | E.T19 | Crash-matrix replay suite with a worker process | sonnet, high | opus, medium | — | not started or in writing |
 | B-120 | S.T1 | MCP SDK dependency ADR, harness.toml server and tool sections | sonnet, medium | opus, medium | [#117](https://github.com/AbdulkareemSasah/Eng-Agent/pull/117) | done |
 | B-121 | S.T2 | Process launcher and inspector ports, POSIX implementation | sonnet, high | opus, medium | [#124](https://github.com/AbdulkareemSasah/Eng-Agent/pull/124) | done |
-| B-122 | S.T3 | Windows launcher, per-server Job Objects with breakaway, Windows process inspector | sonnet, xhigh | opus, medium | [#142](https://github.com/AbdulkareemSasah/Eng-Agent/pull/142) | open |
-| B-123 | S.T4 | Synthetic Sasaah CSI fake server (test-only) and its schema check | sonnet, medium | opus, medium | [#132](https://github.com/AbdulkareemSasah/Eng-Agent/pull/132) | open |
+| B-122 | S.T3 | Windows launcher, per-server Job Objects with breakaway, Windows process inspector | sonnet, xhigh | opus, medium | [#142](https://github.com/AbdulkareemSasah/Eng-Agent/pull/142) | done (040c619) |
+| B-123 | S.T4 | Synthetic Sasaah CSI fake server (test-only) and its schema check | sonnet, medium | opus, medium | [#132](https://github.com/AbdulkareemSasah/Eng-Agent/pull/132) | done (c4a3a26) |
 | B-124 | S.T5 | Process transport, MCP client session, crash detection, restart and shutdown | sonnet, high | opus, medium | — | not started or in writing |
 | B-125 | S.T6 | Tool descriptors, allowlist data with escape-hatch refusal and release marks | sonnet, high | opus, medium | — | not started or in writing |
 | B-126 | S.T7 | Machine-level host-instance lock and process guard | sonnet, high | opus, medium | — | not started or in writing |
@@ -325,9 +325,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-250 | A.T6 | Analysis, result readers and design run and results for SAP2000 | sonnet, medium | opus, medium | — | not started or in writing |
 | B-251 | A.T7 | End-to-end block, crash matrix, recorded-reply contract tests and SAP2000 local-testing part | sonnet, medium | opus, medium | — | not started or in writing |
 | B-255 | K.T1 | Core package skeleton, shared folder files, dependency ADR, workspace member | sonnet, low | opus, low | [#88](https://github.com/AbdulkareemSasah/Eng-Agent/pull/88) | done |
-| B-256 | K.T2 | Errors, check metadata and the check_id rule | sonnet, medium | opus, medium | [#137](https://github.com/AbdulkareemSasah/Eng-Agent/pull/137) | open |
-| B-257 | K.T3 | Check inputs, bounded helper and preconditions | sonnet, medium | opus, medium | — | not started or in writing |
-| B-258 | K.T4 | Trace recorder | sonnet, medium | opus, medium | — | not started or in writing |
+| B-256 | K.T2 | Errors, check metadata and the check_id rule | sonnet, medium | opus, medium | [#137](https://github.com/AbdulkareemSasah/Eng-Agent/pull/137) | done (d0aa456) |
+| B-257 | K.T3 | Check inputs, bounded helper and preconditions | sonnet, medium | opus, medium | [#152](https://github.com/AbdulkareemSasah/Eng-Agent/pull/152) | done (45cce0d) |
+| B-258 | K.T4 | Trace recorder | sonnet, medium | opus, medium | [#155](https://github.com/AbdulkareemSasah/Eng-Agent/pull/155) | open |
 | B-259 | K.T5 | Verdict builder and governing selection | sonnet, high | opus, medium | — | not started or in writing |
 | B-260 | K.T6 | Check decorator, packs and registry | sonnet, medium | opus, medium | — | not started or in writing |
 | B-261 | K.T7 | Content hash over sources, imported helpers, metadata and inputs | sonnet, high | opus, medium | — | not started or in writing |
@@ -407,7 +407,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-363 | docs | docs(eng-dev-gate): an empty test package marker is in scope next to an in-scope test file, plan task T36 (B-363) | sonnet, low | opus, low | [#140](https://github.com/AbdulkareemSasah/Eng-Agent/pull/140) | done (5ddd0d5) |
 | B-364 | T36 | gate-check scope: an empty test package marker next to an in-scope test file | sonnet, medium | opus, medium | [#143](https://github.com/AbdulkareemSasah/Eng-Agent/pull/143) | open |
 | B-366 | docs | docs(eng-harness): split engine plan T3 into T3 (event models, kinds) and T3b (schema, writer) (B-366) | lead | opus, low | [#144](https://github.com/AbdulkareemSasah/Eng-Agent/pull/144) | done (44a303e) |
-| B-367 | E.T3b | Journal schema, append-only writer, hash chain, durability, payloads by reference | sonnet, high | opus, medium | — | not started or in writing |
+| B-367 | E.T3b | Journal schema, append-only writer, hash chain, durability, payloads by reference | sonnet, high | opus, medium | [#154](https://github.com/AbdulkareemSasah/Eng-Agent/pull/154) | open |
+| B-368 | S.T2 fix | test(eng-harness): the host stand-in leaves the process group before its pid is announced (flaky test_group_terminated; the reviewer measured 19 of 200 runs before, 0 of 200 after) | lead | opus, medium | [#153](https://github.com/AbdulkareemSasah/Eng-Agent/pull/153) | done (c389fbd) |
+| B-369 | S.T4 fix | test(eng-harness): the inventory tests skip only in the mutation step's package copy (MU002 on every eng-harness source change since B-123); skip expires 2026-12-31 | lead | opus, medium | [#156](https://github.com/AbdulkareemSasah/Eng-Agent/pull/156) | open |
 
 ## 4. Decisions by the lead
 
@@ -538,6 +540,7 @@ option and continued.
 
 | Id | Question | Lead's recommendation and what the build did |
 |---|---|---|
+| OQ-Q39 | eng-harness's contract test of the CSI fake (B-123, spec 0002 AC35) reads the S-12 inventory from `spikes/` at the repository root, outside the package: the gate's mutation step (a copy of the package alone) cannot see it, and the package will not see it after the split (ADR-0028). B-369 skips those tests only inside mutmut's runs, with an expiry of 2026-12-31 (eng-harness skip count 1, AW05) | Keep a snapshot of the inventory in eng-harness's test data and add a root-level test that the snapshot equals `spikes/S-12-.../inventory/sasaah-csi-mcp.json`; then remove the skip |
 | OQ-Q1 | License: ADR-0023 (Apache-2.0) is `Proposed`, so no `LICENSE` file is added | Accept Apache-2.0; then add `LICENSE` files. The build adds none |
 | OQ-Q2 | Phase time boxes (19 §1) are not set for this build | Set them for the local test stage |
 | OQ-Q3 | Benchmark B-1 (18 §5) is needed before the first release | Prepare it before the local A4 run |
