@@ -180,21 +180,32 @@ tasks:
     covers: [AC35a, AC44, AC45]
     depends_on: [T9]
   - id: T11
-    title: Kind names, the kind registry and the model.* kinds
+    title: Kind names, the kind registry and the shared kind helpers
+    # Amendment (B-028, documents only): T11 and T11b were delivered together by B-020 (PR 84, 543 lines) before the gate
+    # enforced limits.max_task_lines; the plan records them as two tasks within the 400-line cap (lead decision D-12).
     files:
       - "packages/eng-contract/src/eng_contract/kinds/__init__.py"
       - "packages/eng-contract/src/eng_contract/kinds/_registry.py"
       - "packages/eng-contract/src/eng_contract/kinds/_common.py"
+      - "packages/eng-contract/tests/contract/test_kinds.py"
+    max_changed_lines: 180
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-contract/tests/contract/test_kinds.py::test_kind_names_and_registry"
+    covers: [AC46]
+    depends_on: [T10]
+  - id: T11b
+    title: The model.* kinds and their fixtures
+    files:
       - "packages/eng-contract/src/eng_contract/kinds/model.py"
       - "packages/eng-contract/tests/contract/test_kinds.py"
       - "packages/eng-contract/tests/data/kinds/model.*/**"
-    max_changed_lines: 560
-    max_sessions: 3
+    max_changed_lines: 400
+    max_sessions: 2
     tests_first:
-      - "packages/eng-contract/tests/contract/test_kinds.py::test_kind_names_and_registry"
       - "packages/eng-contract/tests/contract/test_kinds.py::test_fixtures"
-    covers: [AC46, AC47]
-    depends_on: [T10]
+    covers: [AC47]
+    depends_on: [T11]
   - id: T12
     title: forces.*, basis.*, verdicts.set and issues.model_check kinds
     files:
@@ -238,15 +249,15 @@ tasks:
     covers: [AC13, AC14, AC15, AC15a]
     depends_on: [T12]
   - id: T14
-    title: Result store, atomic writes, payload split and model state
+    title: Result store, atomic writes and payload split
+    # Amendment (B-028, documents only): the model-state store moves to T14b; with it T14 measured 482 lines against 400
+    # (B-023). D-12: split, not a larger budget.
     files:
       - "packages/eng-contract/src/eng_contract/store/__init__.py"
       - "packages/eng-contract/src/eng_contract/store/_results.py"
-      - "packages/eng-contract/src/eng_contract/store/_model_state.py"
       - "packages/eng-contract/src/eng_contract/_fs.py"
       - "packages/eng-contract/tests/unit/test_store.py"
-      - "packages/eng-contract/tests/unit/test_model_state.py"
-    max_changed_lines: 400
+    max_changed_lines: 380
     max_sessions: 3
     tests_first:
       - "packages/eng-contract/tests/unit/test_store.py::test_put_get_round_trip"
@@ -259,9 +270,20 @@ tasks:
       - "packages/eng-contract/tests/unit/test_store.py::test_payload_validated_against_kind"
       - "packages/eng-contract/tests/unit/test_store.py::test_payload_stored_normalized"
       - "packages/eng-contract/tests/unit/test_store.py::test_verdict_trace_ref_end_to_end"
-      - "packages/eng-contract/tests/unit/test_model_state.py::test_increment_compare_and_set"
-    covers: [AC16, AC17, AC18, AC19, AC20, AC21, AC21a, AC22]
+    covers: [AC16, AC17, AC18, AC19, AC20, AC21, AC21a]
     depends_on: [T13]
+  - id: T14b
+    title: Model state (create, increment by compare-and-set, promotion record)
+    files:
+      - "packages/eng-contract/src/eng_contract/store/__init__.py"
+      - "packages/eng-contract/src/eng_contract/store/_model_state.py"
+      - "packages/eng-contract/tests/unit/test_model_state.py"
+    max_changed_lines: 160
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-contract/tests/unit/test_model_state.py::test_increment_compare_and_set"
+    covers: [AC22]
+    depends_on: [T14]
   - id: T15
     title: MCP mapping helpers
     files:
@@ -288,7 +310,7 @@ tasks:
     max_sessions: 2
     tests_first: ["packages/eng-contract/tests/contract/test_schema_snapshots.py::test_fresh"]
     covers: [AC51, AC52, AC53]
-    depends_on: [T15]
+    depends_on: [T15, T11b, T14b]
 ---
 
 # Implementation plan: eng-contract 0.1
@@ -394,10 +416,9 @@ six-step pipeline with error mapping.
 
 **T11 Kinds I** (spec §4.10.1, the `model.*` rows of §4.10.2). Registry, kind names, common sub-models and the eight
 `model.*` kinds with one valid and several invalid fixtures each.
-Budget amendment (B-020): `max_changed_lines` raised from 380 to 560, because the writer measured 543 changed lines in the
-code files alone (`model.py` 382, `_registry.py` 74, `_common.py` 61, `__init__.py` 26): the spec §4.10.2 rows need about
-35 small Pydantic classes, each with a docstring, and merging them would drop required behavior (frozen, extra-forbid
-models, discriminated shapes, enum validation). Recorded by work item B-020 through the plan amendment pull request.
+Budget amendment (B-020), superseded by B-028: the writer measured 543 changed lines for T11, more than the size cap of
+400 lines allows for one task (`limits.max_task_lines`), so the plan records the delivered work as T11 (registry and shared
+helpers, 161 lines) and T11b (the model.* kinds, 382 lines); both were merged together in B-020's pull request.
 
 **T12 Kinds II** (the remaining rows of §4.10.2). `forces.*`, `basis.*` with `DesignBasis.missing`, `verdicts.set/1`,
 `issues.model_check/1`, with the local trace-reference rule of `verdicts.set/1` (spec §4.6.3).
