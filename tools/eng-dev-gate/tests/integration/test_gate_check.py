@@ -176,6 +176,61 @@ def test_rename_into_outside_path(repo: Repo) -> None:
     assert paths == ["pkg/outside/keep.py"]
 
 
+WORKSPACE = {
+    "pyproject.toml": '[tool.uv.workspace]\nmembers = ["lib", "pkg"]\n',
+    "lib/pyproject.toml": '[project]\nname = "lib"\nversion = "0"\n',
+    "pkg/pyproject.toml": '[project]\nname = "pkg"\nversion = "0"\n',
+}
+NOTES = "# notes\n"
+
+
+def _scope_repo(repo: Repo, globs: tuple[str, ...] = ("pkg/src/**", "lib/src/**")) -> str:
+    """Plan package ``pkg`` and workspace members ``lib`` and ``pkg``; task globs ``globs``."""
+    return make_gate_repo(repo, base_files=WORKSPACE, plan=plan_text(files=globs))
+
+
+def _gc008_paths(out: str) -> list[str]:
+    findings = json.loads(out)["steps"][0]["findings"]
+    return sorted(f["path"] for f in findings if f["code"] == "GC008")
+
+
+def test_changelog_and_local_testing_in_scope(repo: Repo) -> None:
+    """AC10a: the two files of a member or plan package are in scope beside a changed file matching a task glob."""
+    base = _scope_repo(repo)
+    files = {
+        "pkg/src/new.py": "y = 2\n",
+        "pkg/CHANGELOG.md": NOTES,
+        "pkg/docs/local-testing.md": NOTES,
+        "lib/src/a.py": "a = 1\n",
+        "lib/CHANGELOG.md": NOTES,
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, errors) == (0, {})
+
+
+def test_changelog_and_local_testing_without_task_file_are_outside(repo: Repo) -> None:
+    """AC10a: without another changed file under the directory that matches a task glob, they are GC008."""
+    base = _scope_repo(repo)
+    files = {
+        "pkg/CHANGELOG.md": NOTES,
+        "pkg/docs/local-testing.md": NOTES,
+        "lib/src/a.py": "a = 1\n",  # anchors lib, not pkg
+        "pkg/sub/CHANGELOG.md": NOTES,  # not the <dir>/CHANGELOG.md of a member or of the plan package
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == ["pkg/CHANGELOG.md", "pkg/docs/local-testing.md", "pkg/sub/CHANGELOG.md"]
+
+
+def test_changelog_in_other_directory_is_outside(repo: Repo) -> None:
+    """AC10a: a directory that is neither a workspace member nor holds the plan has no exception."""
+    base = _scope_repo(repo, ("pkg/src/**", "other/src/**"))
+    files = {"other/src/b.py": "b = 1\n", "other/CHANGELOG.md": NOTES}
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == ["other/CHANGELOG.md"]
+
+
 def _lines(n: int) -> str:
     return "".join(f"v{i} = {i}\n" for i in range(n))
 
