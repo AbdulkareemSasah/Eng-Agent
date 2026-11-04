@@ -1,0 +1,33 @@
+{
+  "rule": "unknown unit",
+  "payload": {
+    "template": {
+      "name": "office_rc",
+      "version": "1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "fields": {
+      "limits.drift_ratio": {
+        "value": 0.02,
+        "unit": "furlong",
+        "source": "template:office_rc@1",
+        "confirmed": true,
+        "citation": "ASCE 7-16 Table 12.12-1"
+      },
+      "materials.fc_MPa": {
+        "value": 28,
+        "unit": "MPa",
+        "source": "engineer:A. Engineer@2026-01-15T10:30:00.000Z",
+        "confirmed": false,
+        "citation": null
+      },
+      "site.name": {
+        "value": "Plot 4",
+        "unit": null,
+        "source": "model:res_01JABCDEFGHJKMNPQRSTVWXYZ0#/fields/site",
+        "confirmed": true,
+        "citation": null
+      }
+    }
+  }
+}
