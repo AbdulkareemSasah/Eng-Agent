@@ -595,7 +595,7 @@ backend mutates that file and runs the package tests; the score is killed (timeo
 must be at least `mutation_min`. The backend is chosen in the mutation task (§11 Q4); on a platform it does not support,
 the step is reported `skipped` with the reason locally and fails in CI if skipped there. Only changed files that hold at
 least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
-reaches); when none remain the step passes with the notice MU003 (amendment B-026).
+reaches); when none remain the step passes with the notice MU003 (amendment B-026). The same notice covers a run in which mutmut produced no mutant at all (a module-level lambda, a class whose only methods are decorated: its result list is empty and the run ends with "could not find any test case for any mutant"); mutants that exist but are not covered by a test still fail (MU001, MU002; amendment B-079).
 
 ### 4.13 agents render, keys, drift
 
