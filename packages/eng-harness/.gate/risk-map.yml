@@ -1,0 +1,19 @@
+# Risk floors of eng-harness (design/process/01-lifecycle.md section 6): model-writing engine modules are r1,
+# the journal, context, block, ports and errors modules are r2.
+- paths:
+    - "src/eng_harness/engine/_inflight.py"
+    - "src/eng_harness/engine/_hoststate.py"
+    - "src/eng_harness/engine/_invariants.py"
+    - "src/eng_harness/engine/_hostsafety.py"
+    - "src/eng_harness/engine/_approvals.py"
+    - "src/eng_harness/engine/_modes.py"
+    - "src/eng_harness/engine/_promote.py"
+    - "src/eng_harness/engine/_replay.py"
+  risk: r1
+- paths:
+    - "src/eng_harness/journal/**"
+    - "src/eng_harness/ctx.py"
+    - "src/eng_harness/block.py"
+    - "src/eng_harness/ports.py"
+    - "src/eng_harness/errors.py"
+  risk: r2
