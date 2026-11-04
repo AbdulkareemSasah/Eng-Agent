@@ -59,14 +59,34 @@ def _working_directory_first() -> None:
     sys.path.insert(0, os.getcwd())
 
 
+def _probe(names: Sequence[str]) -> int:
+    """Print ``<name> TAB <origin>`` per import name (empty origin: it does not resolve), after the blocking."""
+    for name in names:
+        try:
+            spec = importlib.util.find_spec(name)
+        except ModuleNotFoundError:
+            spec = None
+        sys.stdout.write(f"{name}\t{(spec.origin or '') if spec else ''}\n")
+    return 0
+
+
 def main(argv: Sequence[str]) -> int:
     """Run ``coverage`` with ``argv`` after pinning the base plugin; return coverage's exit status.
 
+    ``pytest <args>`` runs pytest and ``probe <names>`` prints where names resolve, both with the names of
+    ``BLOCKED_ENV`` hidden (the base run of a package that the pull request adds, AC27a).
     A missing ``pytest`` or ``coverage`` returns ``MISSING_TOOL_EXIT`` with a message on stderr.
     """
     _working_directory_first()
     try:
-        load_base_plugin()
+        plugin = load_base_plugin()
+        plugin.block_imports([n for n in os.environ.get(plugin.BLOCKED_ENV, "").split(",") if n])
+        if argv[:1] == ["probe"]:
+            return _probe(argv[1:])
+        if argv[:1] == ["pytest"]:
+            import pytest
+
+            return int(pytest.main(list(argv[1:])))
         from coverage.cmdline import main as coverage_main
     except ImportError as error:
         sys.stderr.write(f"the judged environment lacks {error.name or 'a required tool'}: {error}\n")

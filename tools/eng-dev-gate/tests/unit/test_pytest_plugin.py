@@ -53,3 +53,22 @@ def test_configure_without_hypothesis_is_quiet(monkeypatch: pytest.MonkeyPatch) 
     config = cast("pytest.Config", SimpleNamespace(stash={}))
     pytest_plugin.pytest_configure(config)
     assert pytest_plugin._count(config) == 0
+
+
+def test_blocked_imports_do_not_resolve_and_are_not_importable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """B-355: a name blocked by the base run raises ModuleNotFoundError, also for its submodules; others import."""
+    monkeypatch.setattr(sys, "meta_path", list(sys.meta_path))
+    pytest_plugin.block_imports(["hidden_pkg_b355"])
+    for name in ("hidden_pkg_b355", "hidden_pkg_b355.sub"):
+        with pytest.raises(ModuleNotFoundError, match="TF011"):
+            __import__(name)
+    __import__("json")  # an unblocked module still imports
+
+
+def test_configure_blocks_the_names_of_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "meta_path", list(sys.meta_path))
+    monkeypatch.setenv(pytest_plugin.BLOCKED_ENV, "hidden_a_b355,hidden_b_b355")
+    pytest_plugin.pytest_configure(cast(pytest.Config, SimpleNamespace(stash={})))
+    for name in ("hidden_a_b355", "hidden_b_b355"):
+        with pytest.raises(ModuleNotFoundError):
+            __import__(name)
