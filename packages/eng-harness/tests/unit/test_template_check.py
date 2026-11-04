@@ -93,3 +93,34 @@ def test_extends_checked_against_a_repository(tmp_path: Path) -> None:
     source = TemplateRepository(tmp_path / "shipped", tmp_path / "user", allow_synthetic=True)
     assert _pairs(check_template(path, source=source).errors) == {("extends_invalid", "meta.extends")}
     assert check_template(path).ok  # without a source the parent is not looked up
+
+
+def test_report_lists_every_ask_error_next_to_an_entry_error(tmp_path: Path) -> None:
+    data = _good()
+    data["limits"]["no_cite_mm"] = {"value": 1, "unit": "mm", "citation": ""}
+    data["ask_each_run"] += [
+        {"path": "limits.ratio_limit_ratio", "label": "Ratio", "kind": "count"},
+        {"path": "analysis.stories", "label": "Again", "kind": "count"},
+    ]
+    report = check_template(_file(tmp_path, data))
+    assert _pairs(report.errors) == {
+        ("citation_missing", "limits.no_cite_mm"),
+        ("ask_has_value", "limits.ratio_limit_ratio"),
+        ("ask_has_value", "analysis.stories"),
+    }
+
+
+def test_extends_is_checked_next_to_other_errors(tmp_path: Path) -> None:
+    data = _good()
+    data["meta"]["extends"] = "synthetic-parent@0.1.0"
+    data["limits"]["no_cite_mm"] = {"value": 1, "unit": "mm", "citation": ""}
+    source = TemplateRepository(tmp_path / "shipped", tmp_path / "user", allow_synthetic=True)
+    report = check_template(_file(tmp_path, data), source=source)
+    assert _pairs(report.errors) == {("citation_missing", "limits.no_cite_mm"), ("extends_invalid", "meta.extends")}
+
+
+def test_bad_group_key_is_reported_once(tmp_path: Path) -> None:
+    data = _good()
+    data["limits"]["grp"] = {"bad-key": {"x_ratio": {"value": 1, "unit": "1", "citation": CITE}}}
+    report = check_template(_file(tmp_path, data))
+    assert [(i.reason, i.path) for i in report.errors].count(("unknown_key", "limits.grp.bad-key")) == 1

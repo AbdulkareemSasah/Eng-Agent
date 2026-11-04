@@ -13,7 +13,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict
 
 from eng_harness.templates._model import SCHEMA, SECTIONS, Template, TemplateInvalid
-from eng_harness.templates._resolve import TemplateSource, _check_asks, resolve
+from eng_harness.templates._resolve import TemplateSource, resolve
 from eng_harness.templates._yaml import load_strict
 
 _PLACEHOLDER = {"name": "synthetic-check", "version": "0.0.0", "synthetic": True}
@@ -76,45 +76,55 @@ def _walk(node: object, keys: list[str], errors: list[TemplateIssue], leaves: li
             errors.append(TemplateIssue(reason="value_invalid", path=".".join(below)))
 
 
-def _pieces(data: Mapping[str, object], file: str) -> tuple[list[TemplateIssue], list[str]]:
-    """Errors found piece by piece, and the paths of the valid entries and ask items."""
+def _pieces(data: Mapping[str, object], file: str) -> tuple[list[TemplateIssue], list[str], list[str], Template | None]:
+    """Errors found piece by piece, the valid entry paths, the valid ask paths and the head (meta only) if valid."""
     errors = [
         TemplateIssue(reason="unknown_key", path=str(key))
         for key in data
         if key not in ("schema", "meta", "ask_each_run", *SECTIONS)
     ]
-    head = {key: data[key] for key in ("schema", "meta") if key in data}
+    head: Template | None = None
     try:
-        Template.from_data(head, file_name=file)
+        head = Template.from_data({key: data[key] for key in ("schema", "meta") if key in data}, file_name=file)
     except TemplateInvalid as error:
         errors.append(TemplateIssue(reason=error.reason, path=error.path))
-    leaves: list[str] = []
+    entries: list[str] = []
     for section in SECTIONS:
         if data.get(section) is not None:
-            _walk(data[section], [section], errors, leaves)
+            _walk(data[section], [section], errors, entries)
     asks = data.get("ask_each_run") or []
+    ask_paths: list[str] = []
     if not isinstance(asks, list):
-        return [*errors, TemplateIssue(reason="value_invalid", path="ask_each_run")], leaves
+        return [*errors, TemplateIssue(reason="value_invalid", path="ask_each_run")], entries, ask_paths, head
     for index, item in enumerate(asks):
         if issue := _try({"ask_each_run": [item]}):
             path = issue.path.replace("ask_each_run[0]", f"ask_each_run[{index}]", 1)
             errors.append(TemplateIssue(reason=issue.reason, path=path))
         elif isinstance(item, Mapping):
-            leaves.append(str(item["path"]))
-    return errors, leaves
+            ask_paths.append(str(item["path"]))
+    return errors, entries, ask_paths, head
 
 
-def _whole(data: Mapping[str, object], file: str, source: TemplateSource | None) -> TemplateIssue | None:
-    """Checks that need the whole template (ask paths, and the `extends` chain when a `source` is given)."""
+def _ask_errors(entries: list[str], ask_paths: list[str]) -> list[TemplateIssue]:
+    """Every ask path that is repeated or also has an entry (AC10), each reported."""
+    return [
+        TemplateIssue(reason="ask_has_value", path=path)
+        for index, path in enumerate(ask_paths)
+        if path in ask_paths[:index] or path in entries
+    ]
+
+
+def _extends_errors(
+    head: Template | None, whole: Mapping[str, object], file: str, source: TemplateSource | None, clean: bool
+) -> list[TemplateIssue]:
+    """The `extends` chain problems (needs a `source`); the whole template is resolved only when `clean`."""
+    if source is None or head is None:
+        return []
     try:
-        template = Template.from_data(data, file_name=file)
-        if source is None:
-            _check_asks(template)
-        else:
-            resolve(template, source)
+        resolve(Template.from_data(whole, file_name=file) if clean else head, source)
     except TemplateInvalid as error:
-        return TemplateIssue(reason=error.reason, path=error.path)
-    return None
+        return [TemplateIssue(reason=error.reason, path=error.path)]
+    return []
 
 
 def check_template(
@@ -131,9 +141,11 @@ def check_template(
         return TemplateReport(file=path.name, errors=(TemplateIssue(reason=error.reason, path=error.path),))
     if not isinstance(data, Mapping):
         return TemplateReport(file=path.name, errors=(TemplateIssue(reason="value_invalid", path=""),))
-    errors, leaves = _pieces(data, path.name)
-    if not errors and (issue := _whole(data, path.name, source)):
-        errors.append(issue)
+    errors, entries, ask_paths, head = _pieces(data, path.name)
+    errors.extend(_ask_errors(entries, ask_paths))
+    errors.extend(_extends_errors(head, data, path.name, source, clean=not errors))
+    errors = list(dict.fromkeys(errors))  # first occurrence of each (reason, path), in order
+    leaves = [*entries, *ask_paths]
     warnings = [] if known_paths is None else [p for p in leaves if p not in known_paths]
     return TemplateReport(
         file=path.name,
