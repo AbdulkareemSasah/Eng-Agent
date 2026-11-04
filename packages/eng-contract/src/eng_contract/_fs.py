@@ -90,17 +90,23 @@ class RealFileSystem:
             os.fsync(handle.fileno())
 
     def commit(self, tmp: Path, final: Path) -> None:
-        """Exclusive move; with `link_commit` the folder is fsynced afterwards. `os.replace` is never used here."""
+        """Exclusive move, never `os.replace`; with `link_commit` the folder is fsynced afterwards.
+
+        Failures after the link are logged only: the record is already committed.
+        """
         if not self._link:
             os.rename(tmp, final)
             return
-        os.link(tmp, final)
-        os.unlink(tmp)
-        fd = os.open(final.parent, os.O_RDONLY)
+        os.link(tmp, final)  # the commit: from here on the record exists, so later failures must not fail the write
         try:
-            os.fsync(fd)
-        finally:
-            os.close(fd)
+            os.unlink(tmp)
+            fd = os.open(final.parent, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        except OSError:
+            _LOG.warning("committed; cleanup or folder sync failed", extra={"file": final.name}, exc_info=True)
 
     def replace(self, tmp: Path, final: Path) -> None:
         os.replace(tmp, final)

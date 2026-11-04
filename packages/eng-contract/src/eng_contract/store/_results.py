@@ -63,7 +63,8 @@ class ResultStore:
         """Validate, normalize (spec 4.4), hash and commit a new record; it is visible only once committed.
 
         Raises:
-            ContractError: `INVALID_ARGUMENT` (unregistered kind, invalid payload), `REF_NOT_FOUND` (a parent).
+            ContractError: `INVALID_ARGUMENT` (unregistered kind, invalid payload,
+            repeated parent), `REF_NOT_FOUND` (a parent).
             StoreWriteError: the files could not be committed.
         """
         try:
@@ -72,6 +73,8 @@ class ResultStore:
             first = exc.errors()[0]
             hint = f"{'.'.join(map(str, first['loc']))}: {first['msg']}"
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"payload is not a valid {kind}", hint=hint[:2000]) from exc
+        if len(set(parents)) != len(parents):
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, "parents must be unique", hint="remove the repeated id")
         for parent in parents:
             if not self.exists(parent):
                 raise ContractError(ErrorCode.REF_NOT_FOUND, "parent result not found", received=parent)

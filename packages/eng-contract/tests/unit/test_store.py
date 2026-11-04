@@ -380,15 +380,21 @@ def test_real_filesystem_commit_by_rename(tmp_path: Path) -> None:
     assert not fs.exists(tmp_path / "d" / "a")
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="link commit is the POSIX path")
 @pytest.mark.parametrize("failing", ["unlink", "fsync"])
 def test_failure_after_the_link_still_counts_as_committed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failing: str
 ) -> None:
+    real_fsync = os.fsync
+
     def boom(*_args: object) -> None:
         raise PermissionError("after the commit")
 
-    monkeypatch.setattr(os, failing, boom)
+    def folder_fsync_fails(fd: int) -> None:  # the file's own fsync, before the commit, must still work
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            boom()
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, failing, boom if failing == "unlink" else folder_fsync_fails)
     fs = RealFileSystem(link_commit=True)
     with caplog.at_level(logging.WARNING):
         write_atomic(fs, tmp_path / "a.json", b"data", _ids(), lambda _s: None)  # no StoreWriteError
