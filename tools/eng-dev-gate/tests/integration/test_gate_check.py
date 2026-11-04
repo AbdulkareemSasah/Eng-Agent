@@ -310,3 +310,65 @@ def test_gate_ref_option(repo: Repo) -> None:
     event = _change(repo, base)
     assert repo.run(["gate-check", "--event", str(event)]).code == 3  # default ref origin/build/v1 does not resolve
     assert repo.run(["gate-check", "--event", str(event), "--gate-ref", "elsewhere"]).code == 0
+
+
+def _ratchet(**counts: dict[str, int]) -> str:
+    return json.dumps({"version": 1, "counts": counts}) + "\n"
+
+
+def _ratchet_case(repo: Repo, recorded: str, changed: str, flagged: bool) -> None:
+    base = make_gate_repo(
+        repo, base_files={**WORKSPACE, ".gate/ratchet.json": recorded}, plan=plan_text(files=("pkg/src/**",))
+    )
+    files = {"pkg/src/new.py": "y = 2\n", ".gate/ratchet.json": changed}
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == ((1, {"GC008"}) if flagged else (0, set()))
+    assert _gc008_paths(result.out) == ([".gate/ratchet.json"] if flagged else [])
+
+
+_ONE = {"noqa": 1}
+_TWO = {"noqa": 2}
+_ZERO = {"noqa": 0}
+_EMPTY: dict[str, int] = {}
+
+
+@pytest.mark.parametrize(
+    ("recorded", "changed", "flagged"),
+    [
+        (_ratchet(pkg=_ZERO, lib=_ONE), _ratchet(pkg=_ONE, lib=_ONE), False),  # in scope: only pkg changes
+        (_ratchet(pkg=_ONE), _ratchet(pkg=_ZERO), False),  # lowering of an in-scope package
+        (_ratchet(pkg=_ONE), _ratchet(), False),  # entry of an in-scope package removed
+        (_ratchet(lib=_ONE), _ratchet(lib=_ONE, pkg=_ONE), False),  # key added with a count of an in-scope package
+        (_ratchet(pkg=_ZERO), _ratchet(pkg=_ONE, lib=_ONE), True),  # count of another package (new entry)
+        (_ratchet(pkg=_ONE, lib=_ONE), _ratchet(pkg=_TWO, lib=_TWO), True),  # one package in scope, one not
+        (_ratchet(pkg=_ONE, lib=_TWO), _ratchet(pkg=_ONE, lib=_ONE), True),  # lowering of another package
+        (_ratchet(pkg=_ONE, lib=_ONE), _ratchet(pkg=_TWO), True),  # entry of another package removed
+        (_ratchet(pkg=_ONE, lib=_ONE), _ratchet(pkg=_TWO, libx=_ONE), True),  # another package renamed
+        (_ratchet(pkg=_ONE), _ratchet(pkg=_TWO).replace('"version": 1', '"version": 2'), True),  # version change
+        (_ratchet(pkg=_ONE), _ratchet(pkg=_TWO, lib=_EMPTY), True),  # key added without a count change
+        (_ratchet(pkg=_ONE, lib=_EMPTY), _ratchet(pkg=_TWO), True),  # key removed without a count change
+        (_ratchet(pkg=_ONE), _ratchet(pkg=_ONE).replace(", ", ","), True),  # a reformat changes no count
+        (_ratchet(pkg=_ONE), "not json", True),  # a file that does not parse fails closed
+    ],
+)
+def test_ratchet_baseline_in_scope(repo: Repo, recorded: str, changed: str, flagged: bool) -> None:
+    """AC10b: only counts of packages with another in-scope change are in scope; any other change is GC008."""
+    _ratchet_case(repo, recorded, changed, flagged)
+
+
+def test_ratchet_baseline_root_never_anchors(repo: Repo) -> None:
+    """AC10b: a count of the workspace root (.) is GC008."""
+    _ratchet_case(repo, _ratchet(), _ratchet(**{".": _ONE}), True)
+
+
+def test_ratchet_baseline_root_beside_package(tmp_path: Path) -> None:
+    """AC10b: an in-scope package does not carry a root count along."""
+    _ratchet_case(Repo(tmp_path / "r"), _ratchet(pkg=_ONE), _ratchet(pkg=_TWO, **{".": _ONE}), True)
+
+
+def test_ratchet_baseline_created_in_scope(repo: Repo) -> None:
+    """AC10b: a baseline that did not exist before counts every package as zero before the change."""
+    base = make_gate_repo(repo, base_files=WORKSPACE)
+    files = {"pkg/src/new.py": "y = 2\n", ".gate/ratchet.json": _ratchet(pkg=_ONE)}
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, errors) == (0, {})
