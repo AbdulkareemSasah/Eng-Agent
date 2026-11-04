@@ -335,7 +335,7 @@ Checks, in order (all run; findings accumulate):
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
    is GC009 ("BLOCKED, propose a plan change", rule A22). `max_sessions` cannot be observed and is left to review.
-8. **Spec and plan pull requests.** (Workflow specs under `docs/workflows/` carry spec front matter and are listed in the workspace's `spec_globs`, so they follow the spec rules; amendment B-027.) If any changed file matches `spec_globs` or `plan_globs`, every changed file must
+8. **Spec and plan pull requests.** If any changed file matches `spec_globs` or `plan_globs`, every changed file must
    (GC010); each changed spec or plan must have valid front matter (GC005); a changed plan must cover every
    acceptance criterion (`AC<n>.` lines) of its spec in some task's `covers` (GC016), and every task must stay within
    the size cap `limits.max_task_lines` (initially 400, "about 400" in process/04 §4) (GC005). A pull request that
