@@ -45,19 +45,34 @@ tasks:
     covers: [AC10]
     depends_on: [T1]
   - id: T3
+    title: Journal event payload models and the harness kinds module
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/journal/__init__.py"
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"
+      - "packages/eng-harness/tests/unit/test_journal_events.py"
+    max_changed_lines: 400
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_event_models_forbid_extra_fields"
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_every_event_type_has_a_model"
+      - "packages/eng-harness/tests/unit/test_journal_events.py::test_harness_kinds_are_registered"
+    covers: [AC26]
+    depends_on: [T2]
+  - id: T3b
     title: Journal schema, append-only writer, hash chain, durability, payloads by reference
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/journal/__init__.py"
       - "packages/eng-harness/src/eng_harness/journal/_schema.py"
-      - "packages/eng-harness/src/eng_harness/journal/_events.py"
       - "packages/eng-harness/src/eng_harness/journal/_writer.py"
-      - "packages/eng-harness/src/eng_harness/_kinds.py"
       - "packages/eng-harness/tests/unit/test_journal.py"
       - "packages/eng-harness/tests/conftest.py"
-    max_changed_lines: 400
-    max_sessions: 3
+    max_changed_lines: 260
+    max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_journal.py::test_append_only"
       - "packages/eng-harness/tests/unit/test_journal.py::test_hash_chain_detects_tampering"
@@ -65,7 +80,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_journal.py::test_large_payloads_by_reference"
       - "packages/eng-harness/tests/unit/test_journal.py::test_payload_models"
     covers: [AC20, AC21, AC22, AC24, AC26]
-    depends_on: [T2]
+    depends_on: [T3]
   - id: T4
     title: Journal reader API and views
     files:
@@ -81,7 +96,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_journal_reader.py::test_views_and_follow"
       - "packages/eng-harness/tests/unit/test_journal_reader.py::test_run_class_and_unreleased_tools"
     covers: [AC25, AC68]
-    depends_on: [T3]
+    depends_on: [T3b]
   - id: T5
     title: Blocks, workflows, registry, code hash and the block lock file
     files:
@@ -114,7 +129,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/contract/test_ports_conformance.py::test_fakes_conform"
     covers: [AC57]
-    depends_on: [T3]
+    depends_on: [T3b]
   - id: T7
     title: ctx types, basis view and the result codec
     files:
@@ -445,13 +460,13 @@ storage, built and tested before anything writes to it), the reader, blocks and 
 the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, the input-request
 builders, in-flight reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
-together. Risky parts come early: the journal (T3), path identity (T8) and replay (T9) are the core S-10 proved, so a
+together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
 by `depends_on` (T10, T12, T13, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
 shares `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11b and T13 on
 both; T11b follows T11 (the input requests it presents), and T14b follows T14: the tasks from T10 to T18 run one after
 another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
-to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T6 and T7; T19 beside T17 and T18) share those two
+to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 and T7; T19 beside T17 and T18) share those two
 files only: their lines are merged in pull-request order, and they share no other file.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
@@ -511,20 +526,30 @@ containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to 
 subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
 Budget amendment (B-101-amend): `max_changed_lines` raised from 150 to 240 because the 19 exception classes and the 18-member `HarnessCode` enum with their docstrings measured 221 changed non-test lines in the B-101 writer's run (`errors.py` 218, `pyproject.toml` 2, `CHANGELOG.md` 1), which rounds up to 240.
 
-**T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
-the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models (with the B-068 fields `run_class`,
+**T3 Journal events** (spec §4.4.2). The 21 event payload models (with the B-068 fields `run_class`,
 `unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`, `model_bound.file_names`,
-`model_saved.origin_file_names` and the kind `engine.decision`), the writer with the
-hash chain, per-event durability, the inline limit and `harness.journal_blob/1`, and the harness kinds module
-(`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`, `harness.approval_preview/1`,
-`harness.journal_blob/1`, registered with `KindRegistry.extend`). AC22 is tested by wrapping the connection and
-recording the `synchronous` value of each commit.
+`model_saved.origin_file_names` and the kind `engine.decision`), the event type enumeration and the model for each
+type, and the harness kinds module (`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`,
+`harness.approval_preview/1`, `harness.journal_blob/1`, registered with `KindRegistry.extend`). The tests check the
+models directly (every type has a model, `extra="forbid"`, the B-068 fields) and the kind registration; AC26 on
+append and on read is tested through T3b's writer and T4's reader.
+
+**T3b Journal writer** (spec §4.4.1 and §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that
+close the `REPLACE` path and enforce gap-free `seq`), the writer with the hash chain, per-event durability, the inline
+limit and `harness.journal_blob/1` payloads by reference, and payload validation on append (AC26). AC22 is tested by
+wrapping the connection and recording the `synchronous` value of each commit.
+
+Split (B-366): the B-102 writer measured 617 changed non-test lines for the former T3 (`_events.py` 340, `_writer.py`
+146, `_schema.py` 84, `_kinds.py` 29, `journal/__init__.py` 15, `pyproject.toml` 2, `CHANGELOG.md` 1), above the
+400-line task cap, so the payload models and the kinds module stay in T3 (about 390 lines) and the schema and the
+writer move to T3b (about 240 lines). T4 and T6 depend on T3b. The count of event types is 21, as the table of spec
+§4.4.2 lists (the earlier "20" was a miscount, corrected in the spec's schema comment as well).
 
 **T4 Journal reader** (spec §4.4.5). Read-only connection, chain verification, the views and `follow`, and
 `is_locked` over the run-lock helper `_runlock.py` (`fcntl` and `msvcrt`), which T9's engine uses to hold the lock.
 `RunView.run_class` (from `run_started`) and `RunView.unreleased_tools` (the union over `run_started` and every
 `run_resumed`, AC68), and `RequestView` resolution per kind, an `engine.decision` request by the first `decision_made`
-that names its `request_id` (AC25). The tests write the events through T3's writer, so no engine is needed.
+that names its `request_id` (AC25). The tests write the events through T3b's writer, so no engine is needed.
 
 **T5 Registry** (spec §4.2). Decorators, `BlockDef`, `WorkflowDef`, `Registry`, the code hash, `check_lock`, the
 `--write-lock` entry point and an empty `blocks.lock.json` (no blocks exist yet). AC4's contract test runs on fixture
@@ -652,7 +677,7 @@ ledger and the outputs with an uninterrupted run. Almost all of it is test code.
   (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program. Every
   step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T9, T11b, T12, T13, T15 and T16 additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T3b, T9, T11b, T12, T13, T15 and T16 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16 and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 
