@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
+from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.results import UsageError
+from eng_dev_gate.toolrun import SubprocessToolRunner
 from eng_dev_gate.workspace import discover_members
 from support.repo import Repo
+from support.toy import make_workspace
 
 
 def _pyproject(name: str) -> str:
@@ -73,3 +77,17 @@ def test_members_must_be_a_list_of_strings(repo: Repo) -> None:
     repo.write({"pyproject.toml": "[tool.uv.workspace]\nmembers = 3\n"})
     with pytest.raises(UsageError):
         discover_members(repo.root)
+
+
+def test_member_without_table(repo: Repo) -> None:
+    """AC54: a workspace member without [tool.eng-gate] fails the config step with CF006; the others are unaffected."""
+    make_workspace(repo, ["a", "b"])
+    repo.commit({"pkgs/b/pyproject.toml": '[project]\nname = "b"\nversion = "0.1.0"\n'})
+    result = repo.run(
+        ["--format", "json", "check", "--only", "config"], {"check": make_handler(SubprocessToolRunner())}
+    )
+    assert result.code == 1
+    steps = {s["name"]: s for s in json.loads(result.out)["steps"]}
+    assert steps["config:a"]["status"] == "pass"
+    assert [f["code"] for f in steps["config:b"]["findings"]] == ["CF006"]
+    assert steps["config:b"]["findings"][0]["path"] == "pkgs/b/pyproject.toml"

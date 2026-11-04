@@ -45,9 +45,18 @@ def root_pyproject(members: list[str]) -> str:
     )
 
 
-def member_pyproject(name: str) -> str:
-    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name)."""
-    return f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
+def member_pyproject(name: str, gate_table: bool = True) -> str:
+    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name).
+
+    ``gate_table`` appends a default ``[tool.eng-gate]`` table; pass False when the caller appends its own.
+    """
+    head = f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
+    if not gate_table:
+        return head
+    return (
+        head + f'[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["{name}"]\n'
+        "coverage_line = 95\ncoverage_branch = 90\n"
+    )
 
 
 def make_workspace(repo: Repo, names: list[str], module: str = CLEAN_MODULE) -> None:
