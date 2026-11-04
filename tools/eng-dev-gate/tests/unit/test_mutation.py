@@ -196,7 +196,7 @@ def test_whole_source_tree_is_copied_and_the_member_addopts_are_off(repo: Repo) 
 
 
 def test_package_files_are_copied(repo: Repo) -> None:
-    """AC53b: the member's other top-level entries are listed under also_copy; mutmut copies only its own set (B-370)."""
+    """AC53b: the member's other top-level entries are listed under also_copy (B-370)."""
     base, member = _setup(repo)
     repo.commit(
         {

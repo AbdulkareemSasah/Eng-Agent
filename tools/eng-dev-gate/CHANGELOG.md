@@ -7,6 +7,7 @@ contains every entry listed below; README documents every command with an exampl
 
 ## Unreleased
 
+- Fix: the `mutation` step lists the member's other top-level files and folders (README, LICENSE, docs and so on) under mutmut's `also_copy`, so a mutated test run that builds the package or reads its own files behaves as in the tests step (B-371, plan task T37, AC53b).
 - `gate-check`: an empty (0 bytes at head) `__init__.py`, added or modified, under a workspace member's `tests/` directory is in scope when another changed file in the same directory matches a task glob; a non-empty one, a renamed or deleted one, or one without such a neighbour stays GC008 (B-364, plan task T36, AC10c).
 - Root `.gate/gate.yml`: `generated_globs` gains `**/docs/schema/**`, so JSON Schema snapshots no longer count toward the task diff budget (B-360, plan task T35, AC12c).
 - `test-first`: for a package that the pull request adds, the base run blocks the package's import names (read from the head's `[tool.eng-gate] import_names`) with a meta-path finder of the base pytest plugin, so an editable install of the head cannot make a first-commit test pass at the base (TF004); the names are blocked before conftest.py files load (a conftest.py that imports one makes the base run red); a name that still resolves is TF011. `judged_run.py` gains the modes `pytest` and `probe` (B-357, plan task T34, AC27a).
