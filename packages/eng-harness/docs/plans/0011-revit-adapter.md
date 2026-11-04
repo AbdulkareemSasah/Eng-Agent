@@ -37,7 +37,7 @@ tasks:
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/contract/test_revit_allowlist.py::test_fake_schemas_match_inventory"
-      - "packages/eng-harness/tests/unit/test_package_contents.py::test_fakes_not_shipped"
+      - "packages/eng-harness/tests/unit/test_package_contents.py::test_revit_fake_not_shipped"
     covers: [AC30]
     depends_on: [T1]
   - id: T3
@@ -92,6 +92,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py::test_mapping_table"
       - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py::test_timeout_text_rule"
       - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py::test_unexpected_text_on_write"
+      - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py::test_consumed_token_and_not_executed_on_write_unknown"
       - "packages/eng-harness/tests/unit/adapters/test_revit_units.py::test_length_feet_to_mm"
       - "packages/eng-harness/tests/unit/adapters/test_revit_units.py::test_unmapped_spec_listed"
       - "packages/eng-harness/tests/unit/adapters/test_revit_units.py::test_display_value_never_used"
@@ -185,6 +186,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py::test_outcomes_per_tool"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py::test_retry_duplicate_setter_applied"
       - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py::test_duplicate_type_after_retry"
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_reconcile.py::test_retry_token_consumed_applied"
     covers: [AC20, AC21]
     depends_on: [T9]
   - id: T11
@@ -316,7 +318,8 @@ role map and the specification-identifier table ship as data with the status `ca
 
 **T1 Framework and config** (spec §4.2, §4.4, §11 A1). `attended` as a timeout class and `confirm = "host_dialog"` in
 the descriptor model, `ToolInfo.attended`, `HostInstance.pid` optional in `ports.py`, the deny-list names
-(`shutdown_bridge`, `authenticate`, `prepare_destructive`, `revit_switch_target`), `[servers.revit]` with `pipe_name`,
+(`revit_shutdown_bridge`, `revit_authenticate`, `revit_prepare_destructive`, `revit_switch_target`, and the
+code-toolset names `revit_compile_and_run`, `revit_batch_execute` and the others of spec §4.4, all as exact MCP names), `[servers.revit]` with `pipe_name`,
 `build.addin_sha256` and `addin_paths`, the role-to-class table, required and forbidden options, and the add-in hash
 check in the build check. The tests of plan 0002 that read these structures change only in how they construct them,
 never in what they expect.
@@ -324,7 +327,7 @@ never in what they expect.
 **T2 Fake** (spec §4.13). Test code only. A stdio MCP server built from the inventory schemas of the allowlisted
 tools, with levels, grids, columns, framing, types and parameters (raw feet values, `specId`, `builtInParameter`), one
 document with a path, `open_model`, transactions that validate then apply, and the faults `dialog_declined`,
-`dialog_unanswered`, `commit_unchecked`, `retry_duplicate`, `timeout_not_started`, `timeout_executing`,
+`dialog_unanswered`, `commit_unchecked`, `retry_duplicate`, `retry_token_consumed`, `timeout_not_started`, `timeout_executing`,
 `response_too_large`, `element_replaced`, `other_document_active`, `workshared_open`, `lost_pipe`,
 `destructive_toolset_off`, `code_toolset_on`. The contract test checks that its tool list equals the inventory for the
 allowlisted tools.
@@ -339,7 +342,8 @@ recorded, server start options per role (`--read-only` on `read` only, the expli
 `revit_get_current_target` equality check; the read role lists no bridge write tool.
 
 **T5 Replies, errors, units** (spec §4.5 to §4.7). The reply parser with the `_warning` rule, the error table with the
-text rules ("NOT executed", "already executing", the code-less texts) and the write-certainty rule, and the
+text rules ("NOT executed", "already executing", the code-less texts) and the write-certainty rule (only a text that a
+resend cannot produce is certain: the declined dialog; a consumed-token or "NOT executed" text on a write is unknown), and the
 specification table `_specs.toml` (length and angle only) with the conversions through `eng_contract.units`.
 
 **T6 Kinds and role map** (spec §4.5, §4.8). The `harness.revit_*` kinds with strict models and the `frame_element_map`
@@ -399,7 +403,7 @@ processes, the stale-map test, and the Revit section of `docs/local-testing.md` 
   `packages/eng-harness/`); the pull request links its CI run.
 - Fake-host workflow tests run the Revit fake as a real process through the harness launcher (POSIX in Linux CI).
 - Review: correctness, Python, type-design, silent-failure and test lenses on every task; the security lens on T1, T3
-  and T4 (the deny list and the build check are the barrier against `compile_and_run`, `shutdown_bridge`, `batch_execute`
+  and T4 (the deny list and the build check are the barrier against `revit_compile_and_run`, `revit_shutdown_bridge`, `revit_batch_execute`
   and the other forwarders); R1 review of T8 to T11 against the spec's unit, read-back, reconciliation and active-document
   rules. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
 - Needs local test (spec §12, listed in `docs/local-testing.md` by T15): everything that drives `sasaah-revit-mcp` and

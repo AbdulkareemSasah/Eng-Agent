@@ -85,14 +85,14 @@ the real ports of this adapter against the synthetic fake.
   role started with `--read-only` gives `ConfigError` naming the key. Tests:
   `tests/unit/servers/test_config.py::test_revit_server_section`, `::test_revit_forbidden_options`.
 - AC2. Given the allowlist data, when loaded, then every entry has the fields of 0002 AC16 plus `attended`; any name of
-  the deny list of §4.4, any tool the inventory marks `excluded_from_allowlist`, a name containing `script`, `invoke`,
+  the deny list of §4.4 (tested with the `revit_`-prefixed MCP names and with the bare bridge names), any tool the inventory marks `excluded_from_allowlist`, a name containing `script`, `invoke`,
   `eval` or `tables_apply`, or a tool absent from the inventory is refused; the two role fingerprints computed from the
   inventory equal the values pinned in the header. Tests: `tests/unit/adapters/test_revit_allowlist.py::test_entries_complete`,
   `::test_escape_hatches_refused`, `tests/unit/adapters/test_allowlist.py::test_attended_class_and_deny_names`,
   `tests/contract/test_revit_allowlist.py::test_against_inventory`,
   `::test_fingerprints_from_inventory`.
 - AC3. Given the build check (§4.3), when the executable hash, the add-in hash, the commit, a role fingerprint, or the
-  excluded-tool rule fails, or a write tool is missing because the destructive toolset is off, then the check fails
+  excluded-tool rule fails (tested with a fake that lists `revit_compile_and_run` and the other prefixed code-toolset names), or a write tool is missing because the destructive toolset is off, then the check fails
   with a reason that names the cause (for a missing write tool: the Revit setting `bridgeToolsets`), and the engine
   stops before any write; the `read` role lists no bridge tool that writes. Tests:
   `tests/unit/servers/test_buildcheck.py::test_addin_hashes`,
@@ -109,9 +109,10 @@ the real ports of this adapter against the synthetic fake.
   `tests/unit/adapters/test_revit_replies.py::test_parse_warning_truncated`.
 - AC6. Given each error form of §4.7, then the mapped code, `retryable`, `host_code` and the applied/not-applied
   certainty are as tabled, including the case-insensitive code token, the "NOT executed" and "already executing"
-  texts, the dialog declined, and the code-less "unexpected error" text on a write (`TIMEOUT_UNKNOWN_OUTCOME`). Tests:
+  texts, the dialog declined, and the code-less "unexpected error" text on a write (`TIMEOUT_UNKNOWN_OUTCOME`); on a write,
+  `forbidden_destructive` with a consumed-token text and "NOT executed" are `TIMEOUT_UNKNOWN_OUTCOME`, not certain. Tests:
   `tests/unit/adapters/test_revit_errors.py::test_mapping_table` (parametrized), `::test_timeout_text_rule`,
-  `::test_unexpected_text_on_write`.
+  `::test_unexpected_text_on_write`, `::test_consumed_token_and_not_executed_on_write_unknown`.
 - AC7. Given a parameter with a length specification and a raw value in feet, then the payload value is millimetres
   by `eng_contract.units.convert(value, "ft", "mm")`; a specification with no entry in the spec table is left out and
   listed as an `info` issue `PARAMETER_UNIT_UNMAPPED`; a display string is never parsed. Tests:
@@ -141,8 +142,10 @@ the real ports of this adapter against the synthetic fake.
 - AC12. Given a write to elements, when called, then the adapter first reads `get_element_details` for the same ids in
   the same epoch and compares each `uniqueId` with the reference; a mismatch is `CONFLICT` and nothing is sent. Test:
   `tests/workflow/adapters/test_revit_identity_check.py::test_unique_id_verified_before_write`.
-- AC13. Given any call, then `revit_get_model_metadata` is read first and its path must be the bound working copy; if
-  another document is active the call fails `PRECONDITION_FAILED` (`model_open`) and nothing is sent. Test:
+- AC13. Given a write or a model read after the working copy is bound, then `revit_get_model_metadata` is read first and
+  its path must be the bound working copy; if another document is active the call fails `PRECONDITION_FAILED`
+  (`model_open`) and nothing is sent. Exempt: the session tools, and the `revit_open_model` of the `working_copy` step,
+  where nothing is bound yet (its reply is checked by AC23). Test:
   `tests/workflow/adapters/test_revit_active_document.py::test_active_document_checked`.
 
 ### 3.4 Edits
@@ -177,8 +180,9 @@ the real ports of this adapter against the synthetic fake.
 
 - AC20. Given a timeout on each write tool, then the adapter reads the targets and answers `applied`, `not_applied`,
   `partial` or `unknown` per §4.10, with the evidence stored as a result; a setter applied twice by the server's retry
-  (fault `retry_duplicate`) is `applied`. Tests: `tests/workflow/adapters/test_revit_reconcile.py::test_outcomes_per_tool`
-  (parametrized), `::test_retry_duplicate_setter_applied`.
+  (fault `retry_duplicate`) is `applied`; a write applied once whose resend failed with a consumed token (fault
+  `retry_token_consumed`) is `applied` by the read, never `not_applied`. Tests: `tests/workflow/adapters/test_revit_reconcile.py::test_outcomes_per_tool`
+  (parametrized), `::test_retry_duplicate_setter_applied`, `::test_retry_token_consumed_applied`.
 - AC21. Given `duplicate_family_type` whose reply is `invalid_request` "already exists" for the name the adapter just
   requested (fault `retry_duplicate`), then the adapter reads the family and answers `applied` when the type exists and
   was absent in the pre-image, and no second type is created; a type that exists with other parameters is `unknown`.
@@ -224,7 +228,7 @@ the real ports of this adapter against the synthetic fake.
 - AC30. Given the synthetic Revit fake, then its tool list equals the inventory schemas for every allowlisted tool
   (so its fingerprints equal the pinned ones), it implements the faults of §4.13, and it is never part of the built
   package. Tests: `tests/contract/test_revit_allowlist.py::test_fake_schemas_match_inventory`,
-  `tests/unit/test_package_contents.py::test_fakes_not_shipped`.
+  `tests/unit/test_package_contents.py::test_revit_fake_not_shipped` (new; the CSI test of plan 0002 T4 is not changed).
 - AC31. Given recordings, then record mode drops model titles and paths and the adapter's contract tests pass on them;
   without a recording the tests skip with a reason. Tests: `tests/unit/servers/test_record.py::test_revit_sanitized`,
   `tests/contract/test_revit_recordings.py::test_adapter_on_recordings`.
@@ -291,10 +295,12 @@ still differ from what Revit loaded, since specs 008 and 009 hot-reload; L1); (3
 (4) the **tool-list fingerprint** of 0002 §4.3.4 item 4 over the allowlisted tools of the role equals `[fingerprint].<role>`
 (the `read` role lists only read and session tools because of `--read-only`); every allowlisted tool of the role must be
 listed, and a missing write tool fails with the reason "destructive toolset disabled in Revit (`bridgeToolsets`)" when
-the missing tools are exactly the bridge-destructive ones; (5) a listed `revit_send_code_to_revit`, `compile_and_run`,
-`dev_hot_run`, `dev_hot_unload` or `run_baked_tool` fails the check (the code toolset is on); the other tools of the deny
-list (§4.4) that the server lists whatever the options (`batch_execute`, `run_synapse_command`, `shutdown_bridge`,
-`authenticate`, `prepare_destructive`, `revit_switch_target`, the local bake-suggestion tools) are tolerated and never
+the missing tools are exactly the bridge-destructive ones; (5) a listed `revit_send_code_to_revit`, `revit_compile_and_run`,
+`revit_dev_hot_run`, `revit_dev_hot_unload`, `revit_dev_hot_sessions`, `revit_run_baked_tool` or `revit_list_baked_tools`
+fails the check (the code toolset is on); the other tools of the deny
+list (§4.4) that the server lists whatever the options (`revit_batch_execute`, `revit_run_synapse_command`,
+`revit_shutdown_bridge`, `revit_authenticate`, `revit_prepare_destructive`, `revit_switch_target`, the local
+bake-suggestion tools) are tolerated and never
 callable, as `csi_db_tables_apply` is for CSI; (6) `revit_connection_status` reports `ping_status` ok and a `catalog_version`, recorded
 beside the fingerprint (it covers the whole 248-tool catalog, S-12 §3, and is pinned from the first recording, since
 the inventory cannot reproduce the server's schema bytes). `ServerCheck.build` is `"<commit[:12]>+<exe sha256[:12]>"`.
@@ -329,12 +335,16 @@ Every write has `confirm = "host_dialog"` **[added]**: the adapter sets no flag 
 engine's approval comes first and the person's answer in Revit second. `ToolInfo.attended` is true for them **[added]**
 so the interface can say "waiting for you in Revit".
 
-**Deny list** (refused at load, whatever the inventory says, 0002 §4.5.1 plus **[added]**): `revit_send_code_to_revit`,
-`compile_and_run`, `dev_hot_run`, `dev_hot_unload`, `run_baked_tool`, the three bake-suggestion tools, `batch_execute`,
-`run_synapse_command` (both forward other tools or commands; S-12 left them for the owner, Q8), `shutdown_bridge`
-(served as read-only although it changes bridge state), `authenticate`, `prepare_destructive` (the adapter must never mint
-a token or open the dialog itself), `revit_switch_target` (session-wide state; the pipe is pinned), `revit_get_change_records`
-and `revit_record_change` (not reconciliation evidence, R-G10). **Not allowlisted for this workflow** (not escape hatches):
+**Deny list** (refused at load, whatever the inventory says, 0002 §4.5.1 plus **[added]**), as **exact MCP names**, the
+form in which the server lists them (the inventory's `mcp_name`); a bare bridge name (`compile_and_run`) is refused too, so
+the list matches both forms: `revit_send_code_to_revit`, `revit_compile_and_run`, `revit_dev_hot_run`,
+`revit_dev_hot_unload`, `revit_dev_hot_sessions`, `revit_run_baked_tool`, `revit_list_baked_tools`,
+`revit_list_bake_suggestions`, `revit_accept_bake_suggestion`, `revit_dismiss_bake_suggestion`, `revit_batch_execute`,
+`revit_run_synapse_command` (both forward other tools or commands; S-12 left them for the owner, Q8),
+`revit_shutdown_bridge` (served as read-only although it changes bridge state), `revit_authenticate`,
+`revit_prepare_destructive` (the adapter must never mint a token or open the dialog itself), `revit_switch_target`
+(session-wide state; the pipe is pinned), `revit_get_change_records` and `revit_record_change` (not reconciliation
+evidence, R-G10). **Not allowlisted for this workflow** (not escape hatches):
 `delete_element`, `overwrite_model`, every `create_*`, `set_parameter` (string value by display name), `set_project_info`,
 `export_*`, and all tools of other toolsets; adding one is a spec change.
 
@@ -384,17 +394,20 @@ The server answers a failure with `isError` and one string, `"<code> <message> <
 snake-case token of `ErrorCode` (`01_Core/Sasaah.Mcp.Protocol/Messages/ErrorCode.cs`); the parser lowercases and
 accepts a missing code. Paths in messages are replaced by `<path>` by the server. A rule for every write: **only the
 texts below marked "certain" prove that nothing was applied; every other failure of a write is
-`TIMEOUT_UNKNOWN_OUTCOME` and goes to reconciliation.**
+`TIMEOUT_UNKNOWN_OUTCOME` and goes to reconciliation.** The server resends a call once after a pipe error
+(`S/BridgeClient.cs:71-93`, the same arguments, so the same `confirm_token`), so a text that the *second* attempt can
+produce proves nothing about the first: it is "certain" only when it cannot follow a resend.
 
 | Form | Contract code | Rule |
 |---|---|---|
-| `invalid_request` | `NOT_FOUND` when the text says "was not found" or "not found on element", else `INVALID_ARGUMENT` | write: certain not applied, except `duplicate_family_type` "already exists" (§4.10) |
-| `forbidden_destructive` or "Destructive operation was not confirmed in Revit." | `CONFIRMATION_REQUIRED`; message "declined in Revit" when the text says "declined by the user" | certain not applied; never retried; the engine escalates |
+| `invalid_request` | `NOT_FOUND` when the text says "was not found" or "not found on element", else `INVALID_ARGUMENT` | write: certain not applied (validation precedes the transaction), except `duplicate_family_type` "already exists" and any text a resend of an applied change can produce (§4.10) |
+| `forbidden_destructive` or "Destructive operation was not confirmed in Revit." whose text says "declined by the user" (the answer to `prepare_destructive`, which comes before any write is sent) | `CONFIRMATION_REQUIRED`, message "declined in Revit" | certain not applied; never retried; the engine escalates |
+| `forbidden_destructive` with any other text ("Invalid or already consumed confirmation token", "expired", "Token was prepared for", `DestructiveOpGate.cs:52-66`) on a write | `TIMEOUT_UNKNOWN_OUTCOME` | tokens are single use (`DestructiveOpGate.cs:22`): if the first attempt was applied and the pipe broke before the reply, the resend carries the consumed token and fails this way; reconcile (§4.10) |
 | `bridge_busy` | `HOST_BUSY` | certain not applied; retry `always` |
-| `timeout`, text contains "was NOT executed" | `TIMEOUT_NO_EFFECT` | certain not applied (a queued call that timed out never runs later, `E/Runtime/MainThreadRequestQueue.cs` stale-command guard) |
+| `timeout`, text contains "was NOT executed" | read: `TIMEOUT_NO_EFFECT`; write: `TIMEOUT_UNKNOWN_OUTCOME` | the text describes the attempt that produced it. A resent call can queue behind the still-running first attempt and time out with this text (`E/Runtime/MainThreadRequestQueue.cs:181-185`) while the first one is applied, and the server does not say whether a resend happened, so a write is reconciled. Whether a lone "NOT executed" can be trusted is a local test (L5); until then it is not |
 | `timeout`, text contains "already executing" and names `prepare_destructive` | `HOST_BUSY`, `host_code: MODAL_DIALOG` | the gate is waiting for a person; no write was sent |
 | `timeout`, text contains "already executing" and names a write | read: `TIMEOUT_NO_EFFECT`; write: `TIMEOUT_UNKNOWN_OUTCOME` | host marked wedged, epoch increases |
-| `cancelled` | write: `TIMEOUT_UNKNOWN_OUTCOME` unless "NOT executed" (then `TIMEOUT_NO_EFFECT`) | |
+| `cancelled` | write: `TIMEOUT_UNKNOWN_OUTCOME`; read: `TIMEOUT_NO_EFFECT` | including texts with "NOT executed" on a write (same reason as above) |
 | `bridge_unavailable`, "Unknown tool or Revit bridge is not reachable." | `HOST_NOT_CONNECTED` | the second form is certain not applied (nothing was sent) |
 | `internal_error` with "did not commit the transaction" | `HOST_ERROR`, `host_code: TRANSACTION_NOT_COMMITTED` | `duplicate_family_type` rolls back: certain not applied |
 | `internal_error`, other | read: `INTERNAL` with an `incident_id`; write: `TIMEOUT_UNKNOWN_OUTCOME` | |
@@ -470,7 +483,8 @@ accept) after the `unique_id` check of AC12.
 
 The risk is concrete: after a pipe error the client resends the call once with a new id (S-12 §6, `S/BridgeClient.cs:71-93`),
 the bridge cannot recognize it, and the add-in journal that would show two calls is unreachable (R-G10). The adapter
-therefore never treats a failed write as not applied, never retries one, and decides from state. Ledger and pre-image as
+therefore never treats a failed write as not applied unless the text is one that a resend cannot produce (§4.7: the
+dialog "declined by the user" answer, before any write was sent), never retries one, and decides from state. Ledger and pre-image as
 0002 §4.5.7; `reconcile` first reads `revit_get_model_metadata` (active document is the bound one, else `unknown`).
 
 | Tool | `applied` | `not_applied` | `partial` / `unknown` |
@@ -537,7 +551,8 @@ A test-only MCP server in `tests/fakes/sasaah_revit/` (D-5), built from the inve
 levels, grids, columns and framing with types and parameters (raw feet values, `specId`, `builtInParameter`), a document
 with a path, `open_model`, and the write tools with transactions that validate then apply. Faults, selected by the test:
 `dialog_declined`, `dialog_unanswered`, `commit_unchecked` (success reply, nothing applied), `retry_duplicate` (the write
-applied twice, or applied once and the first reply lost), `timeout_not_started`, `timeout_executing`, `response_too_large`,
+applied twice, or applied once and the first reply lost), `retry_token_consumed` (the write applied once, the pipe broke
+before the reply, and the resend fails `forbidden_destructive` "Invalid or already consumed confirmation token"), `timeout_not_started`, `timeout_executing`, `response_too_large`,
 `element_replaced` (`change_element_type` gives the element a new id), `other_document_active`, `workshared_open`,
 `lost_pipe`, `destructive_toolset_off`, `code_toolset_on`. Record mode (0002 §4.8.1) gets a Revit scenario that drops
 titles, paths and user names.
@@ -572,7 +587,7 @@ titles, paths and user names.
 ## 7. Non-goals
 
 - Any Revit server or add-in change (ADR-0024); fakes under `tests/` are test doubles only.
-- Scripts, code execution, `batch_execute`, `run_synapse_command`, baked tools, or any escape hatch, including as a workaround
+- Scripts, code execution, `revit_batch_execute`, `revit_run_synapse_command`, baked tools, or any escape hatch, including as a workaround
   for a gap.
 - Creating, deleting or moving elements; levels and grids; family editing; materials, rebar, loads, the analytical model;
   sheets, views, export.
@@ -631,7 +646,7 @@ engine spec 0001; plan T1 carries them.
 | Q5 | Write the ETABS link into Revit (`Sasaah_EtabsElementId` through `set_parameter_value_by_guid`) | Owner | Not in v1: it writes into the engineer's model for a convenience; the map is kept in the harness. Revisit with the column workflow |
 | Q6 | Origin offset between ETABS and Revit: basis fields (v1) or derived from named grid lines | Owner | Basis fields now, no rotation; a grid-derived offset as a later calc. The basis template (spec 0004) needs `mapping.offset_x/_y/_z` and a source for each |
 | Q7 | `compare.length` as the single tolerance of the mapping | Owner | Reuse it; a separate `mapping.*` tolerance only if the owner wants two |
-| Q8 | `batch_execute` and `run_synapse_command` on the deny list (S-12 left them for the owner) | Owner | Deny: they forward other tools or commands |
+| Q8 | `revit_batch_execute` and `revit_run_synapse_command` on the deny list (S-12 left them for the owner) | Owner | Deny: they forward other tools or commands |
 | Q9 | Revit version: specs 008 and 009 say 2026, 07 says "2025 and newer" | Owner | Pin 2026 in the allowlist header; widen only after a local test on another version (17) |
 | R-G1 | No save tool (S12-G11): `HostPort.save` is `NotImplementedGap`; edits stay unsaved | Owner | Q2 |
 | R-G2 | No close or revert tool: the working copy stays open, `restore` unavailable, promotion by file copy impossible | Owner | Q2 |
@@ -650,7 +665,7 @@ engine spec 0001; plan T1 carries them.
 | R-G15 | Column rotation, base and top: no field in the details reply | Owner | Candidate parameter and bounding box, confirmed locally (L6); rows without them are left out of the neutral kind |
 | C1 | **Correction to S-12 §10 and the inventory notes** ("the token is not a human confirmation"): the add-in shows a Yes/No dialog for every `destructive` call (§1) | Owner | Amend S-12 §10 and the notes in `inventory/sasaah-revit-mcp.json` in a spikes change; this spec follows the source |
 | C2 | Conflict: 07 §5 and §6 describe a bounded queue, a journal of `op_id`s, dialog handling by the add-in, dry runs; Sasaah has none of them | Owner | ADR-0024 already makes 07 a target; this spec follows Sasaah |
-| A1 | **[added]** descriptor class `attended`, `confirm = "host_dialog"`, `ToolInfo.attended`, deny-list names `shutdown_bridge`, `authenticate`, `prepare_destructive`, `revit_switch_target`, `HostInstance.pid` optional, `harness.toml` `addin_sha256` and `addin_paths`, harness kinds of §4.5, calc `harness.frame_element_map`, codes `ELEMENT_MISSING`, `TYPE_UNDEFINED`, `REVIT_WARNINGS_INCREASED`, `MODEL_UNSAVED`, `PARAMETER_UNIT_UNMAPPED`, `ROTATION_UNAVAILABLE`, `SECTION_ROLES_UNMAPPED` | Owner | Accept with this spec |
+| A1 | **[added]** descriptor class `attended`, `confirm = "host_dialog"`, `ToolInfo.attended`, deny-list names `revit_shutdown_bridge`, `revit_authenticate`, `revit_prepare_destructive`, `revit_switch_target` (exact MCP names), `HostInstance.pid` optional, `harness.toml` `addin_sha256` and `addin_paths`, harness kinds of §4.5, calc `harness.frame_element_map`, codes `ELEMENT_MISSING`, `TYPE_UNDEFINED`, `REVIT_WARNINGS_INCREASED`, `MODEL_UNSAVED`, `PARAMETER_UNIT_UNMAPPED`, `ROTATION_UNAVAILABLE`, `SECTION_ROLES_UNMAPPED` | Owner | Accept with this spec |
 
 ## 12. Needs local test
 
@@ -664,7 +679,7 @@ levels and grids (field names, id types, the `_warning` member); L3 the destruct
 the 500-character summary, the effect of Yes, No and no answer, what the calls queued behind it do, which reads answer while
 it is open, and the real deadline of a call; L4 transactions and rollback: a write that Revit rejects, the status the
 handlers ignore, the undo entries, whether a batch is all-or-nothing, warning dialogs on commit; L5 the server's resend:
-break the pipe during a write and compare the state with the reconciliation rules of §4.10, and the timeout texts of §4.7;
+break the pipe during a write and compare the state with the reconciliation rules of §4.10, the timeout texts of §4.7, and whether a resent destructive write fails with the consumed-token text or a lone "NOT executed" after the first attempt was applied;
 L6 column geometry: the location of vertical and sloped columns, base and top from the bounding box, the rotation
 parameter, level of a column spanning stories; L7 specification identifiers and raw values for the mapped roles, and
 which doubles the write tools convert; L8 `change_element_type` on structural columns: do `ElementId` and `UniqueId`
