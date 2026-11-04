@@ -14,7 +14,7 @@ BAD_MODULE = "import os\n\n\ndef f(a: int)->str:\n    return a\n"
 
 
 def _check(repo: Repo, *argv: str) -> RunResult:
-    argv = ("--skip", "tests", *argv)  # the tests step is covered by test_coverage.py
+    argv = ("--skip", "tests,docs-fresh,licenses", *argv)  # the tests step is covered by test_coverage.py
     return repo.run(["--format", "json", "check", *argv], {"check": make_handler(SubprocessToolRunner())})
 
 
@@ -23,7 +23,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 
 
 def _uv_lock(repo: Repo) -> None:
-    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S607
+    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S607  # B-034: uv from PATH
 
 
 def test_ruff_mypy_on_toy_package(repo: Repo) -> None:

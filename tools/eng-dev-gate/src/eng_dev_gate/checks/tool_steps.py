@@ -41,7 +41,7 @@ def _read_pyproject(path: Path) -> dict[str, Any]:
 
 def _has_own_table(ctx: StepContext, table: str) -> bool:
     """True when the member's own ``pyproject.toml`` has ``[tool.<table>]``; it then configures the tool itself."""
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    assert ctx.member is not None  # noqa: S101  # B-058: package steps always have a member
     return table in _read_pyproject(ctx.member.directory / "pyproject.toml").get("tool", {})
 
 
@@ -86,7 +86,7 @@ def _base_ruff_options(gate_root: Path) -> list[str]:
 
 
 def _ruff(ctx: StepContext, step: str, *args: str) -> list[Finding]:
-    assert ctx.member is not None  # noqa: S101
+    assert ctx.member is not None  # noqa: S101  # B-058: package steps always have a member
     target = str(ctx.member.directory)
     if _has_own_table(ctx, "ruff"):
         argv = python_module("ruff", *args, "--no-cache", "--config", "pyproject.toml", target)
@@ -118,7 +118,7 @@ def types(ctx: StepContext) -> list[Finding]:
     cache lives in a fresh directory outside every checkout and is removed afterwards: a ``.mypy_cache`` committed to
     the pull request could otherwise mark a badly typed module as clean.
     """
-    assert ctx.member is not None  # noqa: S101
+    assert ctx.member is not None  # noqa: S101  # B-034: package steps always have a member
     folders = [str(ctx.member.directory / d) for d in ("src", "tests") if (ctx.member.directory / d).is_dir()]
     own = _has_own_table(ctx, "mypy")
     config, cwd = ("pyproject.toml", ctx.member.directory) if own else (str(ctx.gate_root / "pyproject.toml"), ctx.root)

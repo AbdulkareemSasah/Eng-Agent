@@ -50,7 +50,7 @@ class SubprocessToolRunner:
             EnvironmentFaultError: the executable is missing, cannot start, or the call timed out.
         """
         try:
-            done = subprocess.run(  # noqa: S603
+            done = subprocess.run(  # noqa: S603  # B-034: no shell; the arguments are a list
                 list(argv),
                 cwd=cwd,
                 capture_output=True,
