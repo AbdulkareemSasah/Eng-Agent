@@ -4,11 +4,12 @@ issue: "B-081"
 spec: packages/eng-harness/docs/specs/0012-sap2000-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1]               # binding for every pull request of this plan
+risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
     title: SAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/adapters/_allowlist.py"
@@ -49,6 +50,7 @@ tasks:
   - id: T3
     title: Session operations for .SDB, SAP2000 gap entries and product isolation
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_gaps.py"
@@ -70,6 +72,7 @@ tasks:
   - id: T4
     title: Table data (all unknown), model-state reader with declared absences, fingerprint
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_tables.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_state.py"
@@ -91,6 +94,7 @@ tasks:
   - id: T5
     title: Add-frame edit with name from the reply, typed read-back edits, reconciliation by geometry
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_edits.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
@@ -111,6 +115,7 @@ tasks:
   - id: T6
     title: Analysis, result readers and design run and results for SAP2000
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_results.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
