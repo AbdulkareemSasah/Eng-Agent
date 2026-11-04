@@ -336,6 +336,7 @@ name = "eng-harness"
 version = "0.1.0.dev0"
 source = { editable = "packages/eng-harness" }
 dependencies = [
+    { name = "anyio" },
     { name = "eng-contract" },
     { name = "mcp" },
     { name = "pydantic" },
@@ -349,6 +350,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.16,<5" },
     { name = "eng-contract", editable = "packages/eng-contract" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.14,<3" },

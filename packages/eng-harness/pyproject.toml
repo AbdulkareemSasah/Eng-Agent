@@ -5,6 +5,7 @@ description = "Harness of the Eng-Agent platform: run engine, journal, ports and
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [
+    "anyio>=4.16,<5",
     "eng-contract",
     "mcp>=2.3,<3",
     "pydantic>=2.14,<3",
