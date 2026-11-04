@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `risk-floor`: a `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan` records its risk from its one body `Risk:` line, RF004 without one (B-337, plan task T27, AC21a).
 - Package skeleton: `eng-gate` command shell with exit codes 0 to 3 and `--version` (B-030, plan task T1).
 - Proposed ADR-0001 for the runtime dependencies (owner queue).
 - Foundations A: finding and step results with text, JSON, Actions annotation and summary output, POSIX glob matching, GitHub event file reader and the temporary-repository test fixture (B-031, plan task T2a).
