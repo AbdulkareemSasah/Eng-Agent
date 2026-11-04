@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Process transport and MCP client session: `ServerManager` (lazy role start, uncached complete tool list, raw calls with the client backstop, crash detection, restart with re-attach by process id within `max_restarts_per_run`, session epoch, shutdown that leaves host instances) over `ProcessTransport`, which speaks MCP over the pipes of a harness-launched process; `CallEffect` decides `HOST_NOT_CONNECTED`, `TIMEOUT_NO_EFFECT` or `TIMEOUT_UNKNOWN_OUTCOME` for a lost call (plan 0002 T5, B-124; spec 0002 AC8, AC11, AC12). The build check after each start follows in T6b.
 - Template inheritance: `eng_harness.templates._resolve.resolve` follows `meta.extends` (exact pin, depth at most 8, cycles refused), merges per the spec rules, refuses an ask path that is repeated or has a value, and computes the resolved `sha256` over the chain and the canonical model (B-157; spec 0004 AC8 to AC11).
 - Launch-address opener `eng_harness.cli._opener` (platform opener with `BROWSER` removed from the child environment, `os.startfile` on Windows, address written to the controlling terminal only) as the default `CliDeps.opener` (plan 0006 T3b, B-362; spec 0006 AC61).
 - Strict YAML 1.2 loader `eng_harness.templates._yaml` (`load_strict`, `loads_strict`): refuses duplicate keys, anchors, aliases, tags, non-string keys, non-finite numbers, more than one document, files over 1 MiB and nesting deeper than 8; `ruamel-yaml>=0.19,<0.20` runtime dependency with ADR-0004 (Proposed) (B-156; spec 0004 AC7).
