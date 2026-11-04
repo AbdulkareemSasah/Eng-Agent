@@ -227,3 +227,39 @@ def test_row_limit_truncates_table_read(control: Path) -> None:
         assert body["truncated"] is True
     finally:
         client.close()
+
+
+def test_timeout_fires_on_a_read(rpc: Rpc, control: Path) -> None:
+    """AC21: a timeout on any call, a read included, invalidates the launched session."""
+    _launch(rpc)
+    _fault(control, "timeout_before_apply", tool="csi_list_points")
+    error, body = rpc.call("csi_list_points")
+    assert error
+    assert body["code"] == "timeout"
+    assert rpc.call("csi_status")[1]["current_target"]["launched"] is False
+
+
+def test_timeout_after_apply_on_design_run(rpc: Rpc, control: Path) -> None:
+    """A design run that times out is still applied (reconciliation tests of section 4.5.7)."""
+    _launch(rpc)
+    _fault(control, "timeout_after_apply", tool="csi_design_run")
+    error, body = rpc.call("csi_design_run", confirm=True)
+    assert error
+    assert body["code"] == "timeout"
+
+
+def test_model_locked_on_destructive_tool(rpc: Rpc) -> None:
+    """S-12 report section 7: Destructive tools other than the four exceptions raise model_locked."""
+    _launch(rpc)
+    assert not rpc.call("csi_run_analysis", confirm=True)[0]
+    error, body = rpc.call("csi_new_blank_model", confirm=True)
+    assert error
+    assert body["code"] == "model_locked"
+    assert not rpc.call("csi_save_model", confirm=True)[0]
+    assert not rpc.call("csi_design_run", confirm=True)[0]
+
+
+def test_model_locked_on_design_prefs_set(rpc: Rpc) -> None:
+    _launch(rpc)
+    assert not rpc.call("csi_run_analysis", confirm=True)[0]
+    assert rpc.call("csi_design_prefs_set")[1]["code"] == "model_locked"

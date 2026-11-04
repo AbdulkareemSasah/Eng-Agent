@@ -35,3 +35,11 @@ def test_fake_has_no_escape_hatch() -> None:
     names = {t["name"] for t in _load(SCHEMAS)["tools"]}
     assert excluded
     assert names.isdisjoint(excluded)
+
+
+def test_fake_server_kinds_match_inventory() -> None:
+    """The fake classifies each tool by the inventory's server_kind, so its write set cannot drift."""
+    inventory = _load(INVENTORY)
+    expected = {t["name"]: t["server_kind"] for t in inventory["tools"] if not t["excluded_from_allowlist"]}
+    actual = {t["name"]: t.get("server_kind") for t in _load(SCHEMAS)["tools"]}
+    assert actual == expected

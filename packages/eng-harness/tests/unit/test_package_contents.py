@@ -23,6 +23,9 @@ async def _build_wheel(uv: str, out_dir: Path) -> int:
 
 
 def test_fakes_not_shipped(tmp_path: Path) -> None:
+    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_csi"
+    assert (fake / "server.py").is_file()
+    assert (fake / "schemas.json").is_file()
     uv = shutil.which("uv")
     assert uv is not None
     assert asyncio.run(_build_wheel(uv, tmp_path)) == 0
