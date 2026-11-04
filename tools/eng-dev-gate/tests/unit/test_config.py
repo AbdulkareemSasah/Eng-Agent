@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.metadata
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -232,7 +233,7 @@ def test_rerun_plugins_are_cf005(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
             self.metadata = {"Name": name}
 
     monkeypatch.setattr(
-        config_step.importlib.metadata,
+        importlib.metadata,
         "distributions",
         lambda: [_Dist("pytest"), _Dist("pytest_rerunfailures"), _Dist("Flaky"), _Dist("pytest-retry")],
     )
