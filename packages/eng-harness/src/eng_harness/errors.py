@@ -85,6 +85,8 @@ class EngineStop(_Fields, BaseException):
 
     def __init__(self, message: str, *, evidence: Sequence[str] = ()) -> None:
         """Build the stop with the class's fixed code."""
+        if not hasattr(type(self), "_CODE"):
+            raise TypeError(f"{type(self).__name__} is abstract: it has no harness code")
         BaseException.__init__(self, message)
         self._set(self._CODE, message, evidence)
 
@@ -132,6 +134,8 @@ class _Plain(_Fields, Exception):
 
     def __init__(self, message: str, *, evidence: Sequence[str] = ()) -> None:
         """Build the exception with the class's fixed code."""
+        if not hasattr(type(self), "_CODE"):
+            raise TypeError(f"{type(self).__name__} is abstract: it has no harness code")
         Exception.__init__(self, message)
         self._set(self._CODE, message, evidence)
 

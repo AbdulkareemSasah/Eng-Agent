@@ -110,3 +110,14 @@ def test_tool_failed_carries_contract_detail() -> None:
 
 def test_module_exports() -> None:
     assert set(errors.__all__) >= {"HarnessCode", "EngineStop", "StepError", "RunRefused", "ToolFailed"}
+
+
+def test_bases_refuse_instantiation_with_typed_error() -> None:
+    import pytest
+
+    from eng_harness.errors import EngineStop, StepError
+
+    with pytest.raises(TypeError, match="abstract"):
+        EngineStop("x")
+    with pytest.raises(TypeError, match="abstract"):
+        StepError("x")
