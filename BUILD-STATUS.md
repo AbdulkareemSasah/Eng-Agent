@@ -30,10 +30,10 @@ After a restart or a context compaction, read this file and `git log origin/buil
 | 0 | Spike S-12 (Sasaah tool inventory from catalog sources) | done (B-005); live comparison with `tools/list` needs local test |
 | 0 | Spike S-10 (replay; Job Object termination) | done (B-006). Windows evidence from CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/runs/41729982994) (windows-latest, Python 3.14.10): all Job Object cases pass (kill on close at engine exit and kill, nested jobs, suspended start 0 of 40 escaped, late assignment escapes as expected); replay scenarios pass; write-step overhead p95 7.0 ms (target 20 ms). Report update queued (B-067) |
 | 0 | Spikes S-02 and S-04 (scripts for local runs) | queued (B-007) |
-| 1 | `eng-harness` (engine, journal, replay, ctx, CSI adapter, calcs, templates, basis, decisions, CLI, progress, approval page, run report, edit-cycle workflow) | not started |
-| 2 | `structural-codes` (core, `aci318-14`, `sbc304-2018` draft), SAFE via CSI adapter, providers (Jev shadow, PydanticAI), `design_isolated_footing` | not started |
+| 1 | `eng-harness` (engine, journal, replay, ctx, CSI adapter, calcs, templates, basis, decisions, CLI, progress, approval page, run report, edit-cycle workflow) | specs 0001 and 0002 merged; 0003 to 0007 in progress |
+| 2 | `structural-codes` (core, `aci318-14`, `sbc304-2018` draft), SAFE via CSI adapter, providers (Jev shadow, PydanticAI), `design_isolated_footing` | core framework spec merged; other specs in progress |
 | 3 | `sasaah-revit-mcp` adapter, SAP2000 via CSI adapter, column checks, column workflow | not started |
-| 4 | `sasaah-idea-mcp` adapter; desktop products (overlap with Sasaah to the owner queue) | not started |
+| 4 | `sasaah-idea-mcp` adapter; desktop products (overlap with Sasaah to the owner queue) | products: analysis done, nothing built (ADR-0033, B-091); IDEA adapter spec queued |
 
 ## 3. Tasks
 
@@ -51,14 +51,18 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-007 | Spikes S-02 and S-04: scripts for local runs | sonnet, medium | opus, low | [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) | done (6fdc739) |
 | B-008 | Hub: stale 04 section references; ADR-0029 (Proposed) eng-contract 0.1 details | sonnet, medium | opus, low | [#13](https://github.com/AbdulkareemSasah/Eng-Agent/pull/13) | done (f93732b) |
 | B-009 | Root workspace members listed explicitly (D-10) | lead | opus, low | [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) | done (fe5fea2) |
-| B-010 | `eng-contract` T1: package skeleton | sonnet, low | opus, medium | [#9](https://github.com/AbdulkareemSasah/Eng-Agent/pull/9) | conflict resolution (wave 2b) |
-| B-011 to B-025 | `eng-contract` T2 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | queued (wave 2b) |
+| B-010 | `eng-contract` T1: package skeleton | sonnet, low | opus, medium | [#9](https://github.com/AbdulkareemSasah/Eng-Agent/pull/9) | done |
+| B-011 | `eng-contract` T2: error codes, retry rules, warnings | sonnet, medium | opus, medium | [#17](https://github.com/AbdulkareemSasah/Eng-Agent/pull/17) | done |
+| B-012 | `eng-contract` T3: canonical JSON (RFC 8785), payload hash | sonnet, high | opus, medium | [#22](https://github.com/AbdulkareemSasah/Eng-Agent/pull/22) | done |
+| B-013 to B-025 | `eng-contract` T4 to T16 (serialized) | sonnet, low to high per task | opus, medium (R2) | — | in progress (wave 2b) |
 | B-030 | `eng-dev-gate` T1: package skeleton, dependency ADR, CLI shell | sonnet, low | opus, low | [#10](https://github.com/AbdulkareemSasah/Eng-Agent/pull/10) | done (365f3b9) |
-| B-056 | `eng-dev-gate` plan amendment: split T2 into T2a and T2b (D-12) | sonnet, low | opus, low | — | queued (wave 2b) |
-| B-031, B-057 | `eng-dev-gate` T2a, T2b (foundations), from the B-031 branch | sonnet, medium | opus, low | — | queued (wave 2b) |
-| B-032 to B-055 | `eng-dev-gate` T3 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | queued (wave 2b) |
-| B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium | opus, medium | [#12](https://github.com/AbdulkareemSasah/Eng-Agent/pull/12) | fourth fix round (wave 2b) |
-| B-061 | `eng-harness` spec and plan 0002 servers and adapters; ADR-0031, ADR-0032 (Proposed) | opus, medium | opus, medium | — | queued (wave 2) |
+| B-056 | `eng-dev-gate` plan amendment: split T2 into T2a and T2b (D-12) | sonnet, low | opus, low | [#14](https://github.com/AbdulkareemSasah/Eng-Agent/pull/14) | done |
+| B-031 | `eng-dev-gate` T2a: reporting, globs, event file | sonnet, medium | opus, low | [#18](https://github.com/AbdulkareemSasah/Eng-Agent/pull/18) | done |
+| B-057 | `eng-dev-gate` T2b: git port, workspace discovery | sonnet, medium | opus, low | [#19](https://github.com/AbdulkareemSasah/Eng-Agent/pull/19) | done |
+| B-032 | `eng-dev-gate` T3: configuration models, floors, bootstrap mode | sonnet, medium | opus, low | [#24](https://github.com/AbdulkareemSasah/Eng-Agent/pull/24) | done |
+| B-033 to B-055 | `eng-dev-gate` T4 to T26 (dependency graph) | sonnet, low to high per task | opus, low; medium for T13, T14, T16 to T18, T26 | — | in progress (wave 2b) |
+| B-060 | `eng-harness` spec and plan 0001 engine; ADR-0030 (Proposed) | opus, medium (4 fix rounds) | opus, medium | [#12](https://github.com/AbdulkareemSasah/Eng-Agent/pull/12) | done |
+| B-061 | `eng-harness` spec and plan 0002 servers and adapters; ADR-0031, ADR-0032 (Proposed) | opus, medium | opus, medium | [#21](https://github.com/AbdulkareemSasah/Eng-Agent/pull/21) | done |
 | B-062 | `eng-harness` spec and plan 0003 calcs | opus, medium | opus, medium | — | queued (wave 2) |
 | B-063 | `eng-harness` spec and plan 0004 templates and design basis | sonnet, medium | opus, medium | — | queued (wave 2) |
 | B-064 | `eng-harness` spec and plan 0005 decision layer | sonnet, medium | opus, low | — | queued (wave 2) |
@@ -67,7 +71,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-067 | S-10 report: record the Windows CI results | haiku | opus, low | — | queued |
 | B-070 to B-075 | Phase 2 specs: structural-codes core, ACI 318-14 footing clauses, SBC 304-2018 overlay, SAFE adapter, providers, footing block and workflow | opus or sonnet per task | opus, medium (low for none) | — | queued (wave 2b, after their dependencies) |
 | B-080 to B-083 | Phase 3 specs: Revit adapter, SAP2000, ACI 318-14 column clauses, column workflow | opus or sonnet per task | opus, medium or low | — | queued (wave 2b) |
-| B-090, B-091 | Phase 4 specs: IDEA adapter; desktop products overlap with Sasaah and ADR-0033 | sonnet | opus, medium or low | — | queued (wave 2b) |
+| B-070 | structural-codes core framework spec and plan | opus, medium | opus, medium | [#16](https://github.com/AbdulkareemSasah/Eng-Agent/pull/16) | done |
+| B-090 | Phase 4 spec: IDEA adapter | sonnet, high | opus, medium | — | queued (wave 2b) |
+| B-091 | Desktop products overlap with Sasaah; ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done (08c2161; merged by the lead, P-9) |
 
 ## 4. Decisions by the lead
 
@@ -96,6 +102,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
 | P-5 | The harness flagged the merge of B-009 as possible self-approval: the lead wrote that 3-line fix, an independent subagent reviewed it, and the merge step merged it. In bootstrap mode every pull request is opened and merged under the owner's GitHub account (no separate identities yet, OQ-2) | Lead-written changes are kept to integration fixes; the owner may re-review [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) |
 | P-7 | The harness flagged the merge of B-007 as "merge without review": the subagent review (APPROVE, recorded in the PR body) is not a GitHub review, because every account action is the owner's in bootstrap mode | Reviews stay recorded in the PR body (D-6); the owner can audit [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) |
+| P-9 | The merge step of B-091 declined to merge because GitHub showed no GitHub review | The lead merged after CI passed on the conflict-resolved head; merge prompts now say a missing GitHub review is expected in bootstrap mode |
 | P-8 | Wave 2 stopped early on three blockers: B-010 CI (the skeleton ran mypy on an empty folder; B-030 fixed it first, leaving B-010 in conflict), B-031 over budget (573 of 380 lines), B-060 one open MEDIUM after three rounds | Relaunched as wave 2b: conflict resolution for B-010, the T2 split (D-12), a fourth fix round for B-060 |
 | P-6 | The merge step merged B-005 after only the Dependabot check had reported, before the CI job appeared; the content was validated by the next push run on `build/v1` (green) | The merge step now requires a pull-request workflow run for the exact head commit to succeed |
 
@@ -122,6 +129,10 @@ option and continued.
 | OQ-A4 | ADR amending 04 §3.3: a harness-side model identity when the host cannot stamp one (S12-G6) | To be written as `Proposed` with the CSI adapter spec |
 | OQ-A5 | `eng-dev-gate` package ADR-0001: runtime dependencies PyYAML, Pydantic, ruff, mypy, pytest, coverage (gate spec; licenses to be confirmed by the gate's license check) | Approve |
 | OQ-A6 | ADR-0029 (Proposed): eng-contract 0.1 details recorded in 04 (B-008) | Accept: all items are additive |
+| OQ-A7 | ADR-0030 (Proposed): replay by step path and reconciliation, amending ADR-0014 (B-060) | Accept with ADR-0014; the Windows CI evidence in §2 supports the Job Object part |
+| OQ-A8 | ADR-0031 (Proposed): `model_locked` after analysis is a precondition with an approved unlock step (B-061) | Accept |
+| OQ-A9 | ADR-0032 (Proposed): harness-side model identity when the host cannot stamp one (B-061) | Accept until Sasaah offers a typed identity tool |
+| OQ-A10 | ADR-0033 (Proposed): desktop products stay in Sasaah during v1; overlap items O-1 to O-6 in `products/README.md` (B-091) | Accept; decide O-1 to O-6 |
 
 ### 6.3 Gaps (engineering content left draft or not implemented)
 
