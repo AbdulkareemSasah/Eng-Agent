@@ -9,10 +9,10 @@ from eng_contract.canonical import canonical_json, payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import ResultStore
-from eng_harness.journal import INLINE_EVENT_BYTES, PAYLOAD_MODELS, EventType, JournalWriter
-from eng_harness.journal._schema import chain_hash, iter_events
 
 from eng_harness.errors import JournalIntegrityError
+from eng_harness.journal import INLINE_EVENT_BYTES, PAYLOAD_MODELS, EventType, JournalWriter
+from eng_harness.journal._schema import chain_hash, iter_events
 
 REF = "res_" + "0" * 26
 SHA = "a" * 64
@@ -301,7 +301,8 @@ def test_payload_models(name: str, run_dir: Path, store: ResultStore, ids: Seede
     model = PAYLOAD_MODELS[kind]
     assert model.model_validate(sample) == next(iter_events(_raw(run_dir))).payload
     assert writer.append(kind, model.model_validate(sample)) == 2  # a model instance is accepted too
-    bad: list[dict[str, Any]] = [{**sample, "unknown_field": 1}, dict(list(sample.items())[1:])]
+    required = next(n for n, f in model.model_fields.items() if f.is_required())
+    bad: list[dict[str, Any]] = [{**sample, "unknown_field": 1}, {k: v for k, v in sample.items() if k != required}]
     for payload in bad:
         with pytest.raises(ContractError) as caught:
             writer.append(kind, payload)
