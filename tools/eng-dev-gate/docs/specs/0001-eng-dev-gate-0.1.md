@@ -327,7 +327,10 @@ Checks, in order (all run; findings accumulate):
    (`<dir>/docs/plans/`) when another changed file under `<dir>` matches a task glob: process/04 asks every task for a
    changelog entry and process/05 for its local-testing items (amendment B-096). `.gate/ratchet.json` is also in scope
    when every count it changes belongs to a package that has another changed file matching a task glob: a task that
-   adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Else GC008.
+   adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Any other
+   change to that file is GC008: the `version` field, a package key added, removed or renamed without a count change of
+   an in-scope package, and counts of other packages, lowerings by `ratchet --update` included (they go in a pull
+   request of their own); the workspace root (`.`) never anchors a change (amendment B-089). Else GC008.
 7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
@@ -832,7 +835,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
