@@ -48,7 +48,8 @@ def test_placeholder_errors() -> None:
     with pytest.raises(RenderError) as error:
         render_template(TEMPLATE, missing)
     assert [c for c, _ in error.value.codes] == ["AG001"]
-    assert "name" in error.value.codes[0][1] and "optional rows" in error.value.codes[0][1]
+    assert "name" in error.value.codes[0][1]
+    assert "optional rows" in error.value.codes[0][1]
     assert error.value.exit_code is ExitCode.FAILED
     with pytest.raises(RenderError) as error:
         render_template(TEMPLATE, {**good, "unused": "x"})
