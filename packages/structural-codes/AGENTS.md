@@ -10,7 +10,7 @@ The engineering-library folder of the Eng-Agent platform (architecture 10): the 
 
 - Layer: 3 engineering library (import name `structural_codes`; folders `core/`, `aci318-14/`, `sbc304-2018/`, each a workspace member added by its own skeleton task)
 - May import: `eng_contract` (public modules only), `pydantic`, `yaml` (PyYAML, `safe_load` only, package ADR-0001) and the standard library · Must never import: eng-harness, MCP servers, any host-program library and every product; only the public modules listed in the spec (section 4.1) are imported by other packages
-- Governing documents: [docs/specs/0001-core-framework.md](docs/specs/0001-core-framework.md), [docs/plans/0001-core-framework.md](docs/plans/0001-core-framework.md), [docs/adr/0001-core-runtime-dependencies.md](docs/adr/0001-core-runtime-dependencies.md), [../../design/docs/architecture/10-structural-codes.md](../../design/docs/architecture/10-structural-codes.md), [../../design/process/11-repository-standard.md](../../design/process/11-repository-standard.md), [../../design/process/08-agent-operating-rules.md](../../design/process/08-agent-operating-rules.md)
+- Governing documents: [docs/specs/0001-core-framework.md](docs/specs/0001-core-framework.md), [docs/plans/0001-core-framework.md](docs/plans/0001-core-framework.md), [docs/plans/0002-aci318-14-footing-checks.md](docs/plans/0002-aci318-14-footing-checks.md), [docs/adr/0001-core-runtime-dependencies.md](docs/adr/0001-core-runtime-dependencies.md), [../../design/docs/architecture/10-structural-codes.md](../../design/docs/architecture/10-structural-codes.md), [../../design/process/11-repository-standard.md](../../design/process/11-repository-standard.md), [../../design/process/08-agent-operating-rules.md](../../design/process/08-agent-operating-rules.md)
 
 ## 2. Commands (uv only)
 
@@ -102,4 +102,4 @@ The session's configured model provider (Anthropic); CI reviewer providers: awai
 - Fake host and how to run it: not applicable (this folder is not a server)
 - Live acceptance scripts: `acceptance/scripts/` (run by the owner only)
 - Coverage thresholds: line 95, branch 90, mutation score 80 on the R1 modules of each package (`[tool.eng-gate]` in its `pyproject.toml`; process/05 section 2)
-- Known host quirks: none; the core needs no host program, see `docs/local-testing.md`
+- Known host quirks: none; the core needs no host program, and the ACI 318-14 pack lists its program comparisons in `docs/local-testing.md`
