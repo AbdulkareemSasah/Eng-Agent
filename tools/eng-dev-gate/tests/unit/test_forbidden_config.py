@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 from eng_dev_gate.checks.forbidden.engine import parse_config, scan_file
 from eng_dev_gate.checks.forbidden.rules_a import RULES_A
 from eng_dev_gate.results import UsageError
@@ -50,12 +51,12 @@ def test_initial_lists_part_2() -> None:
         "sqlite3", "time", "datetime", "random", "secrets", "uuid", "requests", "httpx",
     ]  # fmt: skip
     assert config.cited.callables == ["Cited"]
-    assert config.rationale.types == ["Rationale"]
+    assert config.rationale_policy.types == ["Rationale"]
 
 
 @pytest.mark.parametrize("key", ["io_modules", "cited", "rationale"])
 def test_policy_cannot_drop_a_rule_list(key: str) -> None:
-    kept = [line for line in POLICY_TEXT.splitlines() if not line.startswith(key)]
-    assert len(kept) < len(POLICY_TEXT.splitlines())
+    config = yaml.safe_load(POLICY_TEXT)
+    del config[key]
     with pytest.raises(UsageError):
-        parse_config("\n".join(kept), "forbidden.yml")
+        parse_config(yaml.safe_dump(config), "forbidden.yml")

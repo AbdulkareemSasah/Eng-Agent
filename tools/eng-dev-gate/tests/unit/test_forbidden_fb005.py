@@ -102,3 +102,8 @@ def test_message_names_the_value() -> None:
 def test_annotations_and_docstrings_are_not_scanned() -> None:
     source = '"""Doc 1."""\nx: Literal[1, 2] = None\n\n\ndef f(a: Literal[3]) -> Literal[4]:\n    """Doc 2."""\n'
     assert scan_b(source, "src/pkg/calc/c.py") == []
+
+
+def test_type_alias_value_is_an_annotation() -> None:
+    assert scan_b("type Level = Literal[1, 2]\nX = (1)\n", "src/pkg/calc/c.py")[0].line == 2
+    assert len(scan_b("type Level = Literal[1, 2]\nX = (1)\n", "src/pkg/calc/c.py")) == 1

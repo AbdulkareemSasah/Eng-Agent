@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from eng_dev_gate.checks.forbidden.rules_b import RULES_B
 from support.forbidden import lines
 from support.forbidden_b import expected_lines, scan_b
 
@@ -57,7 +58,7 @@ def test_rationale_digit_probe() -> None:
     ("pattern", "flagged"),
     [
         (r"^\D*$", False),
-        (r"^[^0-9]*$", False),
+        (r"^[^0-9]*$", True),  # the Arabic-Indic and extended digits match
         (r"^[^0-9\u0660-\u0669\u06f0-\u06f9]*$", False),
         (r"^[^0-9\u0660-\u0669]*$", True),  # the extended digits U+06F0 to U+06F9 match
         (r"^[^0-9\u06f0-\u06f9]*$", True),  # the Arabic-Indic digits U+0660 to U+0669 match
@@ -74,4 +75,14 @@ def test_each_digit_set_is_probed(pattern: str, flagged: bool) -> None:
 
 def test_applies_to_every_source_module() -> None:
     assert lines(scan_b("class M:\n    rationale: str\n", "src/pkg/anything/else.py"), "FB006") == [2]
-    assert lines(scan_b("class M:\n    rationale: str\n", "tests/test_model.py"), "FB006") == []
+    assert {rule.code: rule.scope for rule in RULES_B} == {
+        "FB004": "src",
+        "FB005": "src",
+        "FB006": "src",
+        "FB008": "tests",
+    }
+
+
+def test_other_class_statements_are_ignored() -> None:
+    source = 'class M:\n    """Doc."""\n\n    def rationale(self) -> str: ...\n\n    rationale: str\n'
+    assert lines(scan_b(source, "src/pkg/model.py"), "FB006") == [6]
