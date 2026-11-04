@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33, T34, T36]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33, T34, T35, T36]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -595,6 +595,19 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_test_first_run.py::test_new_package_hidden_at_base"
     covers: [AC27a]
     depends_on: [T17]
+  - id: T35
+    title: "root gate.yml: JSON Schema snapshots are generated files (generated_globs)"
+    # Amendment (B-359, documents only): contract T16 (B-025) failed GC009 with 7107 changed lines, almost all of them
+    # the generated docs/schema snapshots that its own files require.
+    files:
+      - ".gate/gate.yml"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 10
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_schema_snapshots_are_generated"
+    covers: [AC12c]
+    depends_on: [T3, T30]
   - id: T36
     title: "gate-check scope: an empty test package marker next to an in-scope test file"
     # Amendment (B-363, documents only): interface T6 (B-180) needs an empty tests/helpers/__init__.py for mypy to
