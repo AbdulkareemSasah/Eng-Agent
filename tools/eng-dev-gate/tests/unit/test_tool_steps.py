@@ -1,0 +1,152 @@
+"""Unit tests of how the format, lint and types steps build the tool command lines (B-058; spec 4.12, 4.16)."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from pathlib import Path
+
+import pytest
+from eng_dev_gate.checks import tool_steps
+from eng_dev_gate.checks.registry import StepContext
+from eng_dev_gate.results import UsageError
+from eng_dev_gate.toolrun import ToolResult
+from eng_dev_gate.workspace import Member
+
+
+class Recorder:
+    """ToolRunner that records the command line and the working directory of each call and succeeds."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[list[str], Path]] = []
+
+    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+        self.calls.append((list(argv), cwd))
+        return ToolResult(exit_code=0, output="")
+
+
+def _context(tmp_path: Path, gate_pyproject: str, member_pyproject: str = "") -> tuple[StepContext, Recorder]:
+    gate, root = tmp_path / "gate", tmp_path / "root"
+    directory = root / "pkgs" / "a"
+    for folder in (gate, directory):
+        folder.mkdir(parents=True)
+    (gate / "pyproject.toml").write_text(gate_pyproject, encoding="utf-8")
+    (directory / "pyproject.toml").write_text(member_pyproject, encoding="utf-8")
+    runner = Recorder()
+    member = Member(name="a", path="pkgs/a", directory=directory)
+    return StepContext(root, gate, member, runner), runner
+
+
+def _options(argv: list[str]) -> list[str]:
+    return [argv[i + 1] for i, arg in enumerate(argv) if arg == "--config"]
+
+
+def test_ruff_policy_is_passed_as_options_and_runs_in_the_judged_tree(tmp_path: Path) -> None:
+    gate_pyproject = (
+        '[tool.ruff]\nline-length = 100\nextend-exclude = ["spikes"]\ntarget-version = "py314"\n'
+        '[tool.ruff.lint]\nselect = ["E", "S"]\n[tool.ruff.lint.per-file-ignores]\n"**/tests/**" = ["S101"]\n'
+    )
+    ctx, runner = _context(tmp_path, gate_pyproject)
+    assert tool_steps.lint(ctx) == []
+    ((argv, cwd),) = runner.calls
+    assert cwd == ctx.root
+    assert "--isolated" in argv
+    assert argv[-1] == str(ctx.root / "pkgs" / "a")
+    assert _options(argv) == [
+        "line-length = 100",
+        'extend-exclude = ["spikes"]',
+        'target-version = "py314"',
+        'lint = {select = ["E", "S"], per-file-ignores = {"**/tests/**" = ["S101"]}}',
+    ]
+
+
+def test_format_uses_the_same_policy_options(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, "[tool.ruff]\nline-length = 90\n")
+    assert tool_steps.format_(ctx) == []
+    ((argv, cwd),) = runner.calls
+    assert argv[3:6] == ["format", "--check", "--isolated"]
+    assert _options(argv)[0] == "line-length = 90"
+    assert cwd == ctx.root
+
+
+def test_target_version_is_derived_from_requires_python_like_ruff(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, '[project]\nrequires-python = ">=3.14,<3.15"\n[tool.ruff]\nline-length = 90\n')
+    tool_steps.lint(ctx)
+    assert 'target-version = "py314"' in _options(runner.calls[0][0])
+
+
+def test_target_version_of_the_table_wins_and_none_is_invented(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, '[project]\nrequires-python = ">=3.14"\n[tool.ruff]\ntarget-version = "py312"\n')
+    tool_steps.lint(ctx)
+    assert _options(runner.calls[0][0]) == ['target-version = "py312"']
+    bare, bare_runner = _context(tmp_path / "bare", "[tool.ruff]\nline-length = 90\n")
+    tool_steps.lint(bare)
+    assert _options(bare_runner.calls[0][0]) == ["line-length = 90"]
+
+
+def test_a_gate_root_without_a_ruff_table_gives_the_defaults(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, "[tool.other]\nx = 1\n")
+    tool_steps.lint(ctx)
+    assert _options(runner.calls[0][0]) == []
+    assert "--isolated" in runner.calls[0][0]
+
+
+def test_the_members_own_ruff_table_configures_the_tool_in_its_directory(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, "[tool.ruff]\nline-length = 90\n", "[tool.ruff]\nline-length = 80\n")
+    tool_steps.lint(ctx)
+    ((argv, cwd),) = runner.calls
+    assert cwd == ctx.root / "pkgs" / "a"
+    assert argv[-3:-1] == ["--config", "pyproject.toml"]
+    assert "--isolated" not in argv
+
+
+def test_extend_in_the_base_policy_is_refused(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, '[tool.ruff]\nextend = "other.toml"\n')
+    with pytest.raises(UsageError, match="extend"):
+        tool_steps.lint(ctx)
+    assert runner.calls == []
+
+
+def test_an_unreadable_base_configuration_is_a_usage_error(tmp_path: Path) -> None:
+    ctx, _ = _context(tmp_path, "[tool.ruff\n")
+    with pytest.raises(UsageError, match="cannot read"):
+        tool_steps.lint(ctx)
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (True, "true"),
+        (False, "false"),
+        (3, "3"),
+        (1.5, "1.5"),
+        ('a"b\\c', '"a\\"b\\\\c"'),
+        (["x", 1], '["x", 1]'),
+        ({"a b": [1], "c": {"d": True}}, '{"a b" = [1], c = {d = true}}'),
+    ],
+)
+def test_toml_values(value: object, text: str) -> None:
+    assert tool_steps._toml_value(value) == text
+
+
+def test_an_unsupported_value_is_a_usage_error() -> None:
+    with pytest.raises(UsageError, match="unsupported"):
+        tool_steps._toml_value(None)
+
+
+def test_mypy_gets_the_base_configuration_by_path_and_runs_in_the_judged_tree(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, "[tool.mypy]\nstrict = true\n")
+    assert ctx.member is not None
+    (ctx.member.directory / "src").mkdir()
+    tool_steps.types(ctx)
+    ((argv, cwd),) = runner.calls
+    assert cwd == ctx.root
+    assert argv[argv.index("--config-file") + 1] == str(ctx.gate_root / "pyproject.toml")
+    assert argv[-1] == str(ctx.member.directory / "src")
+
+
+def test_mypy_uses_the_members_own_table_in_its_directory(tmp_path: Path) -> None:
+    ctx, runner = _context(tmp_path, "[tool.mypy]\nstrict = true\n", "[tool.mypy]\nstrict = true\n")
+    tool_steps.types(ctx)
+    ((argv, cwd),) = runner.calls
+    assert cwd == ctx.root / "pkgs" / "a"
+    assert argv[argv.index("--config-file") + 1] == "pyproject.toml"
