@@ -117,6 +117,8 @@ tasks:
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_tool_save_journals_revision"
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_mode_resolved_approval_not_always_ask"
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_required_basis_from_fields"
+      - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_save_under_approval_keeps_chain"
+      - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_revision_save_no_write_preview"
     covers: [AC33]
     depends_on: []
   - id: T7
@@ -185,14 +187,17 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_hand_edit_between_cycles"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_while_stopped"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_keeps_hand_edit"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_refuses_changed_snapshot"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py::test_engineer_turn_branches"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_design_timeout_reconciles"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_save_before_analysis_and_design"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_stale_build_stops_before_any_write"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_promote_and_conflict"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode"
-    covers: [AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23]
+    covers: [AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23, AC34]
     depends_on: [T4, T8]
   - id: T10
     title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
@@ -293,7 +298,9 @@ and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no es
 tools only, checked by plan 0002's allowlist contract test); fake extensions.
 
 **T6 Engine amendments** (spec AC33). `WorkflowDef.copy_on_open` and `basis_fields` (deriving `required_basis`);
-`model_saved` for tool steps with action `save`; an approval resolved by the mode never satisfies an always-ask step.
+`model_saved` for tool steps with action `save`; a save passed `under=` an approval is re-checked and continues the
+approval's write chain (with the engine's `p~post.save` results), and a save to a new file gets no
+`approve_each_write` preview (spec Q3); an approval resolved by the mode never satisfies an always-ask step.
 Starts only after the engine spec amendment is merged.
 
 **T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules (`rb.pass`,
@@ -307,8 +314,8 @@ owner queue (process/05 §5); if T9 has not merged yet, T9 takes the list from s
 the template. Tests drive the child blocks through test
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
 
-**T9 Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7). `run_and_summarize` (analysis, design, results, D-3
-batched with D-2 when both are open, summaries), the engineer turn, the cycle loop, promotion and sign-off in
+**T9 Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7). `run_and_summarize` (analysis, design, results, D-3,
+summaries; D-2 and D-3 are never open together, spec §4.6), the engineer turn, the cycle loop, promotion and sign-off in
 `_finish.py`, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
 stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched with T15.
 
@@ -316,7 +323,8 @@ stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test s
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
 `report/cycle-timings.json` (base names only).
 
-**T11 Acceptance support** (spec AC25, AC26). The prompt-count check over every workflow scenario of T8 and T9 and the
+**T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8 and T9 (the
+A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
 
 **T12 Replay and crash matrix** (spec AC27, AC28). A two-cycle run killed at every step in a worker process (plan 0001

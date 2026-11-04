@@ -70,7 +70,10 @@ defines its method; values are synthetic and say so.
   `revision` when `as_new_revision`); an always-ask step is not satisfied by an approval resolved `mode:*`; and
   `required_basis` is derived from `basis_fields`. Tests:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode`, `::test_tool_save_journals_revision`,
-  `::test_mode_resolved_approval_not_always_ask`, `::test_required_basis_from_fields`.
+  `::test_mode_resolved_approval_not_always_ask`, `::test_required_basis_from_fields`; and a save passed `under=` an
+  approval is re-checked against the binding like a write and its result is the expected state of the next write under
+  that approval, as is each engine `p~post.save`, and a save to a new file gets no `approve_each_write` preview (Q3).
+  Tests: `::test_save_under_approval_keeps_chain`, `::test_revision_save_no_write_preview`.
 
 ### 3.2 Change set (§4.3)
 
@@ -101,9 +104,11 @@ defines its method; values are synthetic and say so.
 
 ### 3.3 The cycle (§4.5)
 
-- AC9. Given a valid change set in `work_on_copy`, when one cycle runs, then the journal holds the step sequence of
-  §4.5 in order, with the engine-inserted working copy (step 2), check after write before step 9's reads, and the
-  `pre_analysis` save before steps 11 and 12. Test: `tests/workflow/edit_cycle/test_cycle.py::test_one_cycle_step_sequence`.
+- AC9. Given a valid change set in `work_on_copy`, when one cycle runs with the engine's real approval binding and
+  re-check (engine §4.9), then the journal holds the step sequence of §4.5 in order, with the engine-inserted working
+  copy (step 2), the step 7 revision save passed `under=` the step 6 approval as its first write, check after write
+  before step 9's reads, and the `pre_analysis` save before steps 11 and 12; no `ApprovalVoid` is raised and step 6 is
+  asked once. Test: `tests/workflow/edit_cycle/test_cycle.py::test_one_cycle_step_sequence`.
 - AC10 (A1). Given that cycle, then the read-back check is `PASS`, the difference report from the step 3 read to the
   step 9 read holds exactly the expected effects, and the fake's final model equals the baseline plus the effects.
   Test: `tests/workflow/edit_cycle/test_apply.py::test_model_holds_exactly_the_changes`.
@@ -124,13 +129,21 @@ defines its method; values are synthetic and say so.
   `autonomous_logged` the engine asks separately (§4.7). Test:
   `tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval` (needs spec 0002 plan T15, blocked
   on ADR-0031; until then the test expects the interim `HOST_LOCKED` stop).
-- AC16 (A2). Given a fake timeout during analysis, then the step ends `TIMEOUT_UNKNOWN_OUTCOME`, the engine's
-  `engine.in_flight` request opens, and no further step on the host runs until it is answered; given a stale build pin,
-  then the run is refused before any write. Tests: `tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles`,
+- AC16 (A2). Given a fake timeout during analysis, and separately during design, then the step ends
+  `TIMEOUT_UNKNOWN_OUTCOME`, the engine's `engine.in_flight` request opens, the outcome is not decided automatically
+  (spec 0002 Q4, gap H-G7: unknown in v1, the engineer decides), and no further step on the host runs until it is
+  answered; given a stale build pin, then the run is refused before any write. Tests:
+  `tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles`, `::test_design_timeout_reconciles`,
   `::test_save_before_analysis_and_design`, `::test_stale_build_stops_before_any_write`.
-- AC17. Given a read-back `FAIL` or `NEEDS_ENGINEER`, then the D-2 screen opens and analysis does not run; `restore`
-  opens the previous revision as a new revision and returns to step 3. Test:
-  `tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes`.
+- AC17. Given a read-back `FAIL` or `NEEDS_ENGINEER`, then the D-2 screen opens and analysis does not run;
+  `restore_previous` opens a new working file copied from this cycle's step 7 snapshot `P[k]` (§4.5.1) and returns to
+  step 3. Test: `tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes`.
+- AC34 (A5). Given a fake hand edit between cycles 1 and 2, then a read-back `FAIL` in cycle 2 and the choice
+  `restore_previous`, then the restored model holds the engineer's value, `P[2]` is unchanged on disk, and the next
+  step 4 still shows the edit; given a snapshot whose file hash no longer equals its `model_saved`, then the restore
+  ends `CONFLICT`, nothing is opened and the run escalates. Tests:
+  `tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_keeps_hand_edit`,
+  `::test_restore_refuses_changed_snapshot`.
 - AC18. Given each rule of §4.6, then a typical case and a boundary case (equality with its basis threshold where it
   has one) give the stated option, and states outside the rule give `None`. Test:
   `tests/unit/edit_cycle/test_rules.py::test_rules_typical_and_boundary`.
@@ -159,9 +172,11 @@ defines its method; values are synthetic and say so.
   it reports nothing for every workflow test journal, reports a forged literal, and holds over generated change sets.
   Tests: `tests/unit/edit_cycle/test_audit.py::test_audit_finds_literal`,
   `tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced`.
-- AC26 (A7). Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests other than the
-  change-set approval, the engineer turn and the change-set request (§4.9); every scenario of AC9 to AC24 in
-  `work_on_copy` has at most one per cycle. Tests: `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
+- AC26 (A7). Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests of §4.9 (a
+  repeated step 6 approval, a re-asked change set and every engine request count; the first step 6 approval, the
+  first change-set request, the engineer turn and the run-level steps 16 and 17 do not); every normal-path scenario of
+  §4.9 (AC9 to AC12, AC14, AC15, AC19, AC21, AC22) in `work_on_copy` has at most one per cycle, and the failure and
+  escalation scenarios (AC13, AC16, AC17, AC20, AC24, AC34) are counted and reported but not bounded. Tests: `tests/unit/edit_cycle/test_prompts.py::test_prompt_counter`,
   `tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt`.
 - AC27 (A6). Given a two-cycle run in a worker process, when the engine is killed at every step and resumed with the
   same scripted answers, then each run ends with the same fake model, revision chain and outputs as the uninterrupted
@@ -176,9 +191,10 @@ defines its method; values are synthetic and say so.
   `tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases`.
 - AC31. Given the read tool of §4.10 against the fake, then it stores the read set and the name lists; a truncated list
   raises `LIMIT_EXCEEDED`; a read-back gap leaves its section out (`not_read` downstream). Given `as_new_revision`,
-  then the save goes to a new file in the run's copies folder and an existing file is refused; given
-  `csi_open_revision`, then the earlier revision file is copied to a new revision file and opened, and the earlier
-  file is unchanged. Tests: `tests/workflow/adapters/test_csi_read_state_tool.py::test_read_set`,
+  then the open working file is saved in place, its files are copied to a new snapshot file in the run's copies folder,
+  the host keeps the working file open, and an existing target is refused; given `csi_open_revision`, then the snapshot
+  is copied to a new working file and opened, and the snapshot is unchanged; a snapshot whose hash differs from its
+  `model_saved` is refused with `CONFLICT`. Tests: `tests/workflow/adapters/test_csi_read_state_tool.py::test_read_set`,
   `tests/workflow/adapters/test_csi_revisions.py::test_save_as_new_revision_and_open_revision`.
 - AC32. Given the kinds of §4.2, then the report renders them through registered renderers with a source on every value
   cell, and adds the timings of §4.9. Test: `tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources`.
@@ -327,12 +343,12 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
 | 4 | `ctx.calc("harness.model_diff", {"before": R[k-1], "after": S[k], "basis": B.ref(...)})` | `before` is `stale_ok`, `after` current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
-| 6 | `ctx.approve(title, Preview(items=<one per item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
-| 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True})` | `model_saved` role `revision` (Q3); never over an existing file |
+| 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
+| 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` for the snapshot `P[k]` (§4.5.1); never over an existing file |
 | 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
 | 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before": S[k], "after": S', "basis"})`; then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
-| 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 reconciliation on unknown outcome; invariant 9 units after a timeout |
+| 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
 | 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", ...), ctx.tool("csi_design_results", ...))` (reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
 | 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; `ctx.calc("harness.host_design_verdicts", ...)`, `ctx.calc("harness.design_summary", {"verdicts", "frames", "previous": <cycle k-1>, "basis"})` | Invariant 3 |
@@ -344,6 +360,24 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
 the step 3 read of cycle `k`. When the step 3 fingerprint equals that of `R[k-1]`, step 4 still runs (a cheap,
 journaled proof that nothing changed).
+
+#### 4.5.1 Revision files
+
+- `W`, the working file: step 2's working copy, the only file the host has open. Every write, the engine's
+  `p~post.save` after each write (engine §4.7), the step 10 and `pre_analysis` saves, and the engineer's own saves in
+  ETABS go into `W` in place.
+- `P[k]`, the snapshot of cycle `k`: step 7 (`as_new_revision`, §4.10) saves `W` in place, copies its files to a new
+  file in the run's copies folder, verifies the copy's hash and journals `model_saved` (role `revision`) with the
+  snapshot's name and hash; the host keeps `W` open. `P[k]` holds `S[k]`, so the engineer's changes are in it. No
+  tool writes a snapshot: the adapter refuses a write or save whose target is one, and the page tells the engineer to
+  edit only the open model. A new approval-void iteration (D-5) makes a new snapshot at its own step 7.
+- `restore_previous` (D-2) runs `csi_open_revision` on this cycle's latest `P[k]`, never on `R[k-1]`: it checks that
+  the snapshot's file hash equals its `model_saved`, copies it to a new working file, opens that file on the bound
+  instance without saving `W` (action `open`, `model_bound`, `model_saved` role `revision`), and the new file becomes
+  `W`. The writes of the failed apply are gone and the engineer's changes stay (AC34). A snapshot whose hash differs
+  (someone saved over it) gives `CONFLICT`: nothing is opened and the run escalates; the engineer decides.
+- The accepted revision that step 16 promotes is `W` as saved at step 10 of the accepted cycle (or by a later engineer
+  save, which the promotion binding shows).
 
 **Return to step 3 (D-5).** Steps 3 to 8 run inside `async for v in ctx.attempts(B.count("attempts.approval_void"))`.
 `ApprovalVoid` before the first write starts the next iteration (a new read, difference report and approval). A void
@@ -361,17 +395,20 @@ statuses, booleans and labels only; no rule holds a number (thresholds are in th
 | `edit_cycle.analysis_messages` (D-3) | `continue`, `stop_cycle` | `has_errors`, `has_unclassified`, drift status, refs | `am.clean`: not `has_errors`, not `has_unclassified` → `continue` | same |
 | `edit_cycle.engineer_turn` (D-6) | `accept`, `more_edits`, `hand_edit` | readback, analysis and design statuses, counts as labels, refs to the summaries and the difference report | none | `require_engineer=True` |
 
-When D-2 and D-3 are both open in one cycle, they are asked with one `ctx.decide_many` (one batched screen, 12 §1),
-so A7 holds. D-1 (WS §5) is the attempts loop of step 5 and D-5 the loop of §4.5; neither is a decision point. D-4 is
+D-2 and D-3 are never open at the same time: D-2 is asked before analysis and an open D-2 means analysis does not
+run (AC17), so no batching is needed. D-2 reaches the engineer only on a read-back failure, a failure path of §4.9;
+on a normal path at most D-3 reaches the engineer, so A7 holds. D-1 (WS §5) is the attempts loop of step 5 and D-5 the loop of §4.5; neither is a decision point. D-4 is
 the engine's in-flight request (engine §4.5.3), not a workflow point. `stop_cycle` skips to the engineer turn of the
 same cycle with the summaries available so far; `restore_previous` runs `ctx.tool("csi_open_revision", {"model": m,
-"revision": R[k-1]})` (§4.10, Q4) and starts the next approval-void iteration.
+"revision": P[k]})` (§4.5.1, §4.10, Q4) and starts the next approval-void iteration (a new step 3 read, a step 4
+difference report against `R[k-1]` that still shows the engineer's changes, and a new approval).
 
 ### 4.7 Approvals, permission modes and the engineer turn
 
 | Request | `work_on_copy` | `approve_each_write` | `autonomous_logged` |
 |---|---|---|---|
 | Step 6 `CHANGE_SET` | page | page | resolved by the mode (engine §4.7) |
+| Step 7 revision save | `under=` step 6 (item `revision`) | `under=` step 6, no per-write preview (Q3) | direct |
 | Step 8 writes | `under=` step 6 | `under=` step 6, plus the engine's `p~pre.approve` preview per write | direct |
 | Unlock, combination delete | `under=` step 6, listed as items | same | the engine inserts its always-ask approval (Q5) |
 | Steps 11, 12 | none | engine preview per call (analysis and design are writes) | none |
@@ -426,9 +463,15 @@ the journal sufficient for B-1:
 - the report shows them in its timings section, and `report` also writes `report/cycle-timings.json` (base names
   only) for the owner's B-1 sheet.
 
-`count_prompts` counts, per cycle, every `input_requested` and `approval_requested` other than the step 6 approval,
-the engineer turn and the first change-set request of the cycle; a re-asked change set, an engine request and a
-separately asked always-ask approval count; one batched screen counts once.
+`count_prompts` counts, per cycle, every `input_requested`, `approval_requested` and engineer-decided decision request
+except the first step 6 approval of the cycle, the first change-set request of the cycle and the engineer turn. A
+repeated step 6 approval (after `ApprovalVoid` or `restore_previous`), a re-asked change set, an engine request
+(`engine.in_flight`, `engine.host_state`, `engine.escalation`), a separately asked always-ask approval and a D-2 or D-3
+screen each count; one batched screen counts once. Steps 16 and 17 are once per run, outside the cycle, and are not
+counted. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC14, AC15, AC19, AC21 and
+AC22. Failure and escalation paths (approval void, read-back failure and restore, timeout, change-set re-asks and
+exhaustion, cycle limit: AC13, AC16, AC17, AC20, AC24, AC34) are counted and shown in the report but not bounded; the
+B-1 journals show how often they occur.
 
 ### 4.10 Adapter additions (spec 0002 amendment, Q1 **[added]**)
 
@@ -440,12 +483,15 @@ server tool):
   `model.load_set/1`, `model.joint_restraints/1`, `harness.csi_model_status/1`) plus `harness.csi_name_lists/1`
   (frame section, area section, material, pattern and combination names). Its summary holds the references. A
   section that a read-back gap leaves unreadable is absent, so downstream calcs give `not_read` (spec 0003 §4.8).
-- `csi_open_revision` (effect `write`, action `open`): copies an earlier revision file of this run to a new revision
-  file, opens it on the bound instance, and records `model_saved` (role `revision`); used by D-2 `restore_previous`.
+- `csi_open_revision` (effect `write`, action `open`): checks that a snapshot of this run still has the file hash of
+  its `model_saved` (else `CONFLICT`), copies it to a new working file in the run's copies folder, opens that file on
+  the bound instance without saving the current one, and records `model_saved` (role `revision`); used by D-2
+  `restore_previous` (§4.5.1).
 - `csi_read_analysis_messages` (effect `read`): the `Analysis Messages` table through `csi_db_table_read` (read
   only), stored as `harness.csi_analysis_messages/1`.
-- `csi_save_model` gains `as_new_revision` (a path in the run's copies folder chosen by the adapter; refuses an
-  existing file).
+- `csi_save_model` gains `as_new_revision`: saves the open file in place, then copies its files to a snapshot at a
+  path in the run's copies folder chosen by the adapter (refuses an existing file) and verifies the copy's hash; the
+  host keeps the working file open (§4.5.1). The adapter refuses any write or save whose target is a snapshot.
 
 ## 5. Inputs and outputs
 
@@ -501,7 +547,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC3 (kinds) | Contract | `tests/contract/` |
 | AC4, AC5, AC7, AC8, AC30 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
-| AC9 to AC17, AC19 to AC24, AC26, AC31 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
+| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle/` |
 
 No host program and no network. Coverage floors 85% line and 75% branch; mutation score at least 80% on the R1
@@ -518,12 +564,12 @@ start at version 1 with lock entries.
 |---|---|---|---|
 | Q1 | Adapter-local tools `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages` and `as_new_revision` (§4.10) are not in spec 0002 | Owner | Accept as a spec 0002 amendment carried by this plan's T5 |
 | Q2 | 18 §3 says the run works on a copy in every case, while engine §4.7 takes a working copy only before the first write and only in `work_on_copy` | Owner | Add `WorkflowDef.copy_on_open` (engine amendment): the copy is taken right after the open, in every mode; amend 11 §7 |
-| Q3 | 18 step 7 saves "as the next revision" (a new file, baseline أ5); engine §4.6 journals `model_saved` only for its own saves | Owner | The engine journals `model_saved` (role `revision`) for a tool step with action `save` from its result's provenance |
-| Q4 | Restoring an earlier revision inside a cycle (D-2) has no engine or adapter operation | Owner | `csi_open_revision` (§4.10); it never overwrites a file |
+| Q3 | 18 step 7 saves "as the next revision" (a new file, baseline أ5); engine §4.6 journals `model_saved` only for its own saves, and its re-check (§4.9) would void the step 6 approval at the first write because the save changes the file hash | Owner | Engine amendment: journal `model_saved` (role `revision`) for a tool step with action `save` from its result's provenance; a save passed `under=` an approval is re-checked against the binding like a write and its result (and each engine `p~post.save` result) becomes the expected state of the next write under that approval; a save to a new file (not `overwrites_original`) gets no `approve_each_write` preview |
+| Q4 | Restoring an earlier revision inside a cycle (D-2) has no engine or adapter operation | Owner | `csi_open_revision` on this cycle's step 7 snapshot (§4.5.1, §4.10), which keeps the engineer's changes; it never overwrites a file and refuses a changed snapshot |
 | Q5 | Conflict: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval would satisfy it (engine §4.7) | Owner | Engine amendment: an approval resolved by `mode:*` never satisfies an always-ask step |
 | Q6 | Two read-back tolerances: spec 0002 `checks.readback_relative_tolerance` and spec 0003 `compare.*` | Owner | Keep both in v1 (both required); converge on `compare.*` in the next spec 0002 revision |
 | Q7 | The first change set arrives only by `resume --answers` after `run` pauses at the request | Owner | Let `run --answers FILE` pre-answer the first data request (spec 0006 amendment); until then `run --no-wait` then `resume --answers` |
-| Q8 | Which A7 requests count (§4.9) | Owner | As §4.9: the change-set request is the request itself and does not count; re-asks do |
+| Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |

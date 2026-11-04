@@ -85,7 +85,7 @@ Steps 1 and 2 run once per run; steps 3 to 15 form one cycle and repeat until th
 | 4 | Compare with the last recorded revision | Harness calc (difference report) | — | Differences are engineer changes: shown and recorded, never overwritten |
 | 5 | Ask for and validate the change set | Engineer answers file; harness calc | Types, units, bounds from the basis; objects and sections exist; kinds are supported; conflicts with engineer changes are marked | An invalid set is refused with its reasons and asked again (bounded by the basis) |
 | 6 | Approve the change set, with the differences | Approval page | The approval is bound to this change set and this model state; single items can be rejected | Rejected: nothing is written; the engineer turn follows |
-| 7 | Save as the next revision | ETABS save to a new file | File hash and fingerprint recorded | Stop; the previous revision file is intact |
+| 7 | Save as the next revision | ETABS save, then a copy of the saved file as this cycle's revision snapshot (covered by the change-set approval) | File hash and fingerprint recorded; the model still equals the approved state | Stop; the previous revision file is intact |
 | 8 | Apply the edits (unlock first when the model is locked after analysis) | ETABS writes, one call per object | Before the first write, the model equals the approved state | If the model changed since the approval, the cycle goes back to step 3 |
 | 9 | Read back and check | ETABS reads; harness calc (read-back check) | Every written value matches the change set and nothing else changed | Mismatch: the engineer chooses (§5, D-2) |
 | 10 | Save | ETABS save | File hash recorded | Stop with the reason |
@@ -105,14 +105,16 @@ design basis field.
 | Decision point | Options | Rule (if the answer is known) | Who decides when no rule matches |
 |---|---|---|---|
 | D-1 Change set invalid (step 5) | ask again; stop the cycle | Always ask again while attempts remain (basis `attempts.change_set`) | Engineer, by a corrected answers file |
-| D-2 Read-back result (step 9) | continue; restore the previous revision and return to step 3; stop the cycle | `PASS` → continue | Engineer (one screen) |
+| D-2 Read-back result (step 9) | continue; restore the revision saved at step 7 of this cycle (it holds the engineer's own changes) and return to step 3; stop the cycle | `PASS` → continue | Engineer (one screen) |
 | D-3 Analysis messages (step 13) | continue; stop the cycle | No error-level message → continue | Engineer (one screen) |
-| D-4 Unknown outcome of a write, analysis or design (steps 8, 11, 12) | applied; not applied; abandon | None: the engine's reconciliation decides when the model state shows it, else the engineer | Engineer (engine screen) |
+| D-4 Unknown outcome of a write, analysis or design (steps 8, 11, 12) | applied; not applied; abandon | A write: the engine's reconciliation decides when the model state shows it, else the engineer. Analysis and design: in v1 the outcome is always unknown and the engineer decides, because nothing yet proves that the abandoned run ended (gap H-G7) | Engineer (engine screen) |
 | D-5 Model changed after the approval (step 8) | back to step 3 | Always (bounded by `attempts.approval_void`) | — |
 | D-6 Engineer turn (step 15) | accept; more edits; edited by hand | None | Engineer, always |
 
-At most one engineer screen per cycle besides the change-set approval and the engineer turn (A7); D-2 and D-3 are shown
-together when both are open.
+At most one engineer screen per cycle besides the change-set approval and the engineer turn (A7) on the normal path.
+D-2 and D-3 are never open together: an open D-2 stops the cycle before analysis. Failure paths (a model changed
+after the approval, a read-back failure, a timeout, a refused change set) may ask more; they are counted and shown in
+the report.
 
 ## 6. Approvals / الموافقات
 
@@ -130,8 +132,9 @@ In every mode the run writes only to copies in the run folder; the original chan
 
 ## 7. Outputs / المخرجات
 
-- One revision file per cycle in the run folder (never written over), each with its identity, fingerprint and file
-  hash; the accepted revision copied to the original's path with a backup of the original.
+- One working file that the run and the engineer edit and save, and a revision snapshot taken at step 7 before each
+  apply (normally one per cycle) in the run folder; snapshots are never written over, each with its identity,
+  fingerprint and file hash. The accepted revision is copied to the original's path with a backup of the original.
 - Per cycle: the difference report (engineer changes), the change set check, the read-back check, the analysis and
   design summaries.
 - The HTML run report: changes, results, the source of every value, decisions, and timings per step, per cycle and per
@@ -152,7 +155,7 @@ has a source, and every result shown was read from the saved model after the wri
 | A4 | Median request-to-accepted-revision time, engineer included, at most 50% of the B-1 time | **Local only**: B-1 with the journal timings |
 | A5 | A hand edit between cycles always appears in the next differences and is never written over | CI: fake hand edits between cycles, during an approval wait, and while the run is stopped. Local: a hand edit in every B-1 project |
 | A6 | A run killed at any step resumes and ends with the same model as an uninterrupted run | CI: engine kill at every step against the fake. Local: process kill and ETABS kill |
-| A7 | At most one extra engineer prompt per cycle | CI: prompt count from the test journals. Local: the B-1 journals |
+| A7 | At most one extra engineer prompt per cycle on the normal path | CI: prompt count from the test journals (failure paths counted and reported). Local: the B-1 journals |
 
 ## 9. Out of scope / خارج النطاق
 
