@@ -58,6 +58,34 @@ jobs:
             echo "::endgroup::"
           done
 
+  ci-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/ci-review/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/ci-review
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/ci-review/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/ci-review
+
   agents-drift:
     runs-on: ubuntu-latest
     steps:
@@ -84,6 +112,33 @@ jobs:
           gate-root: .gate-base
       - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/agents-drift/action.yml') == ''
         uses: ./tools/eng-dev-gate/actions/agents-drift
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/security/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/security
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/security/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/security
 
   risk-floor:
     runs-on: ubuntu-latest
