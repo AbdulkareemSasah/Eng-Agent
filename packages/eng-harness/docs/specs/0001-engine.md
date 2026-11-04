@@ -29,6 +29,7 @@ are made here and listed in §11 (Q17 to Q23): the run class and `CalcRefused` (
 `RefRule` from `CalcInfo.ref_rules` (invariant 3), the decision-layer types and `DecisionCall` (§4.1.2, §4.8,
 §4.9.1), the input-request marker `x-eng-input` and the choice convention (§4.9.1), `item_reasons` (§4.9), the
 unreleased-tool record (§4.4.2), and the removal of `inbox/` (§4.4.1). New criteria are AC65 to AC68.
+The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.interfaces`, §4.8).
 
 ## 1. Problem
 
@@ -132,16 +133,20 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `input_requested` (kind `engine.decision`, request id the `DecisionCall.request_id`) is journaled, the request is
   presented through `InputPort` with a choice schema (§4.9.1) and the run pauses (`awaiting_input`); when it is
   resumed with an `InputAnswer` whose choice is an option, then the engine calls `DecisionPort.decide` again with that
-  `EngineerChoice`, journals `decision_made` (`decided_by` `engineer:<name>`) and no `input_provided`, and the block
-  receives the option; a `PendingAnswer` with `rejected` set presents the same request id again. For `decide_many`,
-  the pending calls of one batch are one request (id the `batch_id`) with one question per call. Every
-  `DecisionCall` carries `sensitive_values` (§4.9.1). Test:
+  `EngineerChoice`, journals `decision_made` (`decided_by` `engineer:<name>`, `request_id` the input request's id) and
+  no `input_provided`, the reader's `RequestView` of that request is resolved, and the block receives the option; a
+  `PendingAnswer` with `rejected` set presents the same request id again. For `decide_many`, the pending calls of one
+  batch are one request (id the `batch_id`) with one question per call, and each of its `decision_made` events names
+  the `batch_id`. Every `DecisionCall` carries `sensitive_values` (§4.9.1): the base names of the files of every model
+  the run bound and of every working copy's original, and no other file name. Test:
   `tests/unit/test_ctx_decide.py::test_engineer_tier_through_input_port`.
 - AC67. Given each input request the engine presents, then its `fields_schema` carries `x-eng-input`: `data` for
   `ctx.ask` (kind `block`) and `choice` for every `engine.*` kind; a schema built without one of these two values is
   refused before `present` with `ContractError` `INTERNAL`; `fields_schema_sha256` covers the marker; and an
   `InputAnswer` that gives `values` to a choice request or `choices` to a data request is refused and the request
-  stays open. Test: `tests/unit/test_ctx_ask.py::test_input_request_markers`.
+  stays open. Tests: `tests/unit/test_inputs.py::test_input_request_markers` (the shared builder, the refusal, and
+  the `engine.in_flight`, `engine.host_state` and `engine.escalation` requests),
+  `tests/unit/test_ctx_ask.py::test_input_request_markers` (`ctx.ask` and `engine.decision`).
 - AC16. Given a run input that fails the workflow's input model, then `start` raises `ContractError`
   (`INVALID_ARGUMENT`) and creates no run folder; given a block that returns a value that is not an instance of its
   output model, then `BlockRuleViolation`. Test: `tests/unit/test_runner.py::test_input_and_output_validation`.
@@ -151,8 +156,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `tests/unit/test_runner.py::test_run_class_recorded_and_checked`.
 - AC68. Given a ToolPort whose `unreleased_tools()` names tools with their records, then `run_started` records the
   mapping in `unreleased_tools`; when the mapping differs at a resume, then `run_resumed` records the new one; and the
-  reader's `RunView.unreleased_tools` is the union over the run. Test:
-  `tests/unit/test_runner.py::test_unreleased_tools_recorded`.
+  reader's `RunView.unreleased_tools` is the union over `run_started` and every `run_resumed`, and `RunView.run_class`
+  is the recorded class. Tests: `tests/unit/test_runner.py::test_unreleased_tools_recorded`,
+  `tests/unit/test_journal_reader.py::test_run_class_and_unreleased_tools`.
 - AC17. Given a design basis, then `ctx.basis.ref(path)` is the reference of contract §4.10.2
   (`res_<id>#/fields/<path>/value`), `ctx.basis.quantity(path)` is a `Quantity`, and a path the workflow did not
   declare in `required_basis` raises `BlockRuleViolation`. Test: `tests/unit/test_ctx_basis.py::test_basis_view`.
@@ -188,8 +194,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   holds a `result_id` of a `harness.journal_blob/1` result instead, and the reader returns the full value. Test:
   `tests/unit/test_journal.py::test_large_payloads_by_reference`.
 - AC25. Given a journal being appended by an engine, then `JournalReader` (read-only) folds the events into
-  `RunView`, `StepView`, `RequestView` and `ModelSavedView` as §4.4.5 states, and `follow(after_seq)` returns only
-  newer events. Test: `tests/unit/test_journal_reader.py::test_views_and_follow`.
+  `RunView`, `StepView`, `RequestView` and `ModelSavedView` as §4.4.5 states (an `engine.decision` request is resolved
+  by the first `decision_made` whose `request_id` names it), and `follow(after_seq)` returns only newer events. Test:
+  `tests/unit/test_journal_reader.py::test_views_and_follow`.
 - AC26. Given any event, then its payload is validated against its model on append and on read; an invalid payload is
   refused on append with `ContractError` `INTERNAL` (an engine bug, not a block error), and an invalid stored payload
   is `JournalIntegrityError`. Test:
@@ -328,9 +335,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 
 - AC54. Given an answer whose `shown_sha256` differs from the request, a second answer to a resolved request, an
   approval answer to an input request, an `item_reasons` key that is not an item of the request, or a rejected item
-  without an `item_reasons` entry, then each is refused, journaled as nothing, and the request stays open (the first
-  is presented again); an accepted answer's `item_reasons` is journaled in `approval_resolved` and returned in
-  `Approval.item_reasons`. Test: `tests/unit/test_approvals.py::test_binding_and_single_use`.
+  without an `item_reasons` entry, or an approving `SIGN_OFF` answer with `acknowledged_unreleased` false in a run
+  whose recorded `unreleased_tools` is not empty, then each is refused, journaled as nothing, and the request stays
+  open (the first is presented again); an accepted answer's `item_reasons` and `acknowledged_unreleased` are journaled
+  in `approval_resolved` and `item_reasons` is returned in `Approval.item_reasons`. Test:
+  `tests/unit/test_approvals.py::test_binding_and_single_use`.
 - AC55. Given an approved change set, when the bound model's revision or fingerprint changed before the first write
   under it, then `ApprovalVoid` is raised before the write and the port is not called. Test:
   `tests/unit/test_approvals.py::test_recheck_before_write`.
@@ -374,7 +383,8 @@ module has a leading underscore (contract §4.1 convention, 03 §3 rule 2).
 Internal modules (planned): `engine/_runner.py` (start, resume, run loop), `engine/_ctx_impl.py`, `engine/_steps.py`
 (paths, scopes, `op_id`, overlap), `engine/_replay.py` (index, divergence), `engine/_inflight.py`,
 `engine/_hoststate.py`, `engine/_invariants.py` (1 to 3, 7), `engine/_hostsafety.py` (5, 6, 8 to 10),
-`engine/_decide.py`, `engine/_approvals.py`, `engine/_modes.py`, `engine/_promote.py`, `engine/_guard.py`,
+`engine/_decide.py`, `engine/_inputs.py` (input requests: marker, choice schemas, answer shape),
+`engine/_approvals.py`, `engine/_modes.py`, `engine/_promote.py`, `engine/_guard.py`,
 `engine/_codec.py`, `engine/_resources.py`, `_runlock.py` (the run lock, used by the engine and by
 `journal.is_locked`), `_kinds.py` (harness kinds), `journal/_schema.py`, `journal/_writer.py`, `journal/_events.py`,
 `journal/_reader.py`. Block modules live in `workflows/` and `blocks/`, rule modules in `rules/`
@@ -484,14 +494,19 @@ Result types (frozen Pydantic models): `ToolResult` (`tool`, `ref: Ref`, `summar
 `warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`), where `SummaryValue` is a JSON
 value in which every quantity object of contract §4.8 is a `Quantity` or `LabeledQuantity`; `ReadResult` (`ref`,
 `kind`, `value`); `CalcResult` (`calc_id`, `calc_version`, `status`, `ref`, `summary`, `draft: bool`); `Decision`
-(`choice`, `decided_by`, `confidence: float | None`); `DecisionRequest` (the block-level item of `decide_many`:
-`question`, `options`, `state`, `rules`, `policy`, the arguments of `decide`); `Answered[M]` (`value: M`, `ref: Ref` of the
+(`choice`, `decided_by`, `confidence: float | None`); `Answered[M]` (`value: M`, `ref: Ref` of the
 `basis.engineer_input/1` result, `field_ref(name) -> Ref`); `Approval` (§4.9); `Attempt` (`index`, `is_last`).
+`DecisionRequest`, the block-level item of `decide_many` (`question`, `options`, `state`, `rules`, `policy`, the
+arguments of `decide`), is not a Pydantic model: it is a frozen, slotted standard-library dataclass, which Python 3.14
+builds without evaluating its annotations, so `rules` and `policy` need no run-time import. The engine checks its
+`options` and `state` as it checks those of `decide` (§4.3.4 rule 6, invariant 4) and passes `rules` and `policy`
+unchanged; the cascade validates them (spec 0005 §4.5 step 1).
 `ctx.tool` raises `ToolFailed` for a failure envelope (it never returns `ok: false`); `TIMEOUT_UNKNOWN_OUTCOME` and
 `HOST_WEDGED` never reach the block (§4.5.3). `Rule` and `DecisionPolicy` in the `decide` signature are the types of
 `eng_harness.decisions.types` (spec 0005 §4.3, §4.4); `ctx.py` names them for annotations only (under
-`typing.TYPE_CHECKING`), so `eng_harness.ctx` does not import the decision layer at run time, and the engine passes
-them to `DecisionCall` unchanged.
+`typing.TYPE_CHECKING`, in the `Ctx` protocol and in `DecisionRequest`, neither of which Pydantic validates), so
+`eng_harness.ctx` does not import the decision layer at run time and can be built before it (decision plan T4 needs
+`BasisView`), and the engine passes them to `DecisionCall` unchanged.
 
 **Parallel error choice.** `ctx.parallel` waits for every child (no child is cancelled, so no write is interrupted)
 and then raises one error: the first by class rank `ReplayDivergence` > `NeedsReconciliation` > `BlockRuleViolation`
@@ -592,15 +607,15 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `step_failed` | `error` (contract `ErrorDetail`, or `{harness_code, message}`), `retryable`, `duration_ms` | NORMAL |
 | `step_reconciled` | `op_id`, `outcome` (`applied`, `not_applied`), `result`, `decided_by` (`adapter`, `engineer:<name>`), `evidence` (refs) | FULL |
 | `step_rerun` | `reason` (`read_in_flight`, `retryable_failure`, `restored`) | NORMAL |
-| `decision_made` | 12 §5: `point`, `options`, `choice`, `decided_by`, `confidence`, `latency_ms`, `state_sha256`, `suggestions` | NORMAL |
+| `decision_made` | 12 §5: `point`, `options`, `choice`, `decided_by`, `confidence`, `latency_ms`, `state_sha256`, `suggestions`; `request_id` (the `engine.decision` input request it resolves: the `DecisionCall.request_id`, or the `batch_id` for `decide_many`; `null` for an answer of another tier) | NORMAL |
 | `input_requested` | `request_id`, `kind` (`block`, `engine.in_flight`, `engine.host_state`, `engine.escalation`, `engine.decision`), `title`, `fields_schema_sha256` (of the schema with its `x-eng-input` marker, §4.9.1) | NORMAL |
 | `input_provided` | `request_id`, `answer_ref` (`basis.engineer_input/1`), `by` | FULL |
 | `approval_requested` | `request_id`, `kind`, `title`, `preview_ref`, `shown_sha256`, `binding` (§4.9), `items` (ids) | FULL |
-| `approval_resolved` | `request_id`, `shown_sha256`, `decision` (`approve`, `reject`), `rejected_items`, `item_reasons` (item id to reason; empty by default), `reason`, `by` (`engineer:<name>` or `mode:<mode>`) | FULL |
+| `approval_resolved` | `request_id`, `shown_sha256`, `decision` (`approve`, `reject`), `rejected_items`, `item_reasons` (item id to reason; empty by default), `acknowledged_unreleased` (default false), `reason`, `by` (`engineer:<name>` or `mode:<mode>`) | FULL |
 | `host_started` | `host_key`, `instance_id` (opaque, from HostPort), `pid`, `process_started_at` (contract Timestamp), `program` (host kind) | FULL |
-| `model_bound` | `model_key`, `host_key`, `instance_id` (opaque, from HostPort), `reason` (`first_use`, `restored`, `reopened`) | FULL |
+| `model_bound` | `model_key`, `host_key`, `instance_id` (opaque, from HostPort), `reason` (`first_use`, `restored`, `reopened`), `file_names` (base names of `HostPort.model_files(model_key)` at binding) | FULL |
 | `check_enforced` | `invariant` (1 to 10), `model_key` or `host_key`, `outcome` (`pass`, `fail`), `ref` | NORMAL |
-| `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` (working copies) | FULL |
+| `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` and `origin_file_names` (base names of the original's files; working copies) | FULL |
 | `run_paused` | `reason` (`awaiting_approval`, `awaiting_input`, `stop_requested`), `request_ids` | NORMAL |
 | `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq`, `unreleased_tools` (only when it differs from the last recorded mapping) | NORMAL |
 | `run_escalated` | `reason` (`replay_divergence`, `needs_reconciliation`, `host_state_mismatch`, `units_mismatch`, `attempts_exhausted`, `block_escalation`, `block_rule_violation`, `unhandled_error`), `detail`, `evidence`, `request_id` | NORMAL |
@@ -642,7 +657,7 @@ an engine is live (it tries the lock and releases it at once).
 | `follow(after_seq: int) -> list[Event]` | Same as `events`, for polling by the progress display |
 | `run() -> RunView` | `run_id`, `workflow`, `mode`, `status` (`RUNNING`, `INTERRUPTED` when the last event is not run-level terminal or paused and no engine holds the lock, `PAUSED`, `NEEDS_ENGINEER`, `COMPLETED`, `FAILED`), `started_at`, `ended_at`, `draft`, `pending` (request ids), `escalation`, `run_class`, `unreleased_tools` (union of the run's recorded mappings, AC68) |
 | `steps() -> list[StepView]` | One per path and attempt: `path`, `kind`, `name`, `status` (`running`, `completed`, `failed`, `reconciled`, `rerun`), `started_at`, `ended_at`, `duration_ms`, `result_ref`, `error`, `inserted: bool` |
-| `requests() -> list[RequestView]` | Approvals and inputs with their resolution, for the approval page |
+| `requests() -> list[RequestView]` | Approvals and inputs with their resolution, for the approval page: an approval by its `approval_resolved`, a `block` input by its `input_provided`, an `engine.decision` input by the first `decision_made` whose `request_id` names it (a batch is answered all or nothing, spec 0005 §4.8) |
 | `models() -> list[ModelSavedView]` | `model_saved` history per model, for the report and the host-state check |
 | `decisions() -> list[DecisionView]` | `decision_made` events, for the report |
 
@@ -828,8 +843,15 @@ subclass); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unk
 `file_sha256`; the last four `None` when `loaded` is false);
 `SavedModel` (`model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name`); `UnitsState` (`loaded`, `ok`, `present`,
 `expected`; `ok` true and `present` `None` when `loaded` is false); `HostLease`; `HostInstance` (`instance_id`, `pid`, `process_started_at`, `program`); `RunClass` (`StrEnum`: `trial`, `production`; spec 0003 §4.5); `ApprovalRequest`,
-`ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9, §4.9.1); `DecisionCall`, `EngineerChoice`, `DecisionAnswer`,
-`PendingAnswer` (the fields of spec 0005 §4.5, plus `DecisionCall.sensitive_values`, §4.9.1).
+`ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9, §4.9.1).
+
+**Decision port types.** `DecisionCall`, `EngineerChoice`, `DecisionAnswer` and `PendingAnswer` have one owner: spec
+0005 §4.5, built in `eng_harness.decisions.interfaces` (decision plan T5), with `DecisionCall.sensitive_values`
+(§4.9.1). `eng_harness.ports` imports them from there for the `DecisionPort` signature and re-exports them; it defines
+no copy. `decisions.interfaces` imports `eng_harness.ctx` (`BasisView`) and `eng_harness.decisions.types`, and no
+engine, journal or port module, so the import has no cycle. Build order: engine plan T6 builds every other port; the
+`DecisionPort` protocol, its fake and its conformance case come with engine plan T14, after engine T7 and decision
+plan T1, T4 and T5.
 
 **Instance binding.** Each model key is bound to one host instance, recorded as `model_bound` (FULL); the reference
 instance of a model is the `instance_id` of its last `model_bound`. The engine journals a binding (a) with reason
@@ -857,7 +879,11 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 - `ApprovalAnswer` (`request_id`, `shown_sha256`, `decision` (`approve`, `reject`), `rejected_items`, `item_reasons`
   (item id to reason: required for each rejected item, optional for an accepted one such as an accepted sign-off
   exception, spec 0006 §4.4.6; every key an item of the request; each reason 1 to 500 characters after trimming, the
-  bound of spec 0006 AC31), `reason`, `by`). A violation is refused like a hash mismatch (AC54).
+  bound of spec 0006 AC31), `acknowledged_unreleased` (`bool`, default false; spec 0006 AC32, §4.6.3), `reason`,
+  `by`). An approving `SIGN_OFF` answer needs `acknowledged_unreleased` true when the run's recorded
+  `unreleased_tools` (§4.4.2) is not empty; `approval_resolved` journals the flag. A violation is refused like a hash
+  mismatch (AC54). The page's `confirmed_sections` belong to the setup form's answer (spec 0006 §4.4) and never reach
+  the engine.
 - `Approval` (`request_id`, `approved`, `rejected_items`, `item_reasons`, `reason`, `accepts(item_id) -> bool`). A rejected approval
   returns `approved: false` to the block (the block decides); `ApprovalRejected` is raised only for the engine's own
   inserted approvals.
@@ -892,14 +918,18 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
   (`"dec_" + sha256(run_id + "\n" + path).hexdigest()[:32]`; for call `i` of a `decide_many`, `path + "/" + str(i)` in
   place of `path`), `run_id`, `step_path`, `point`, `options`, `state`, `rules`, `policy`, `basis` (the run's
   `BasisView`), `engineer_choice` (`None` until answered) and `sensitive_values` **[added: spec 0005 Q1 (d) names no
-  channel]**: the `file_name` of every `model_saved` of the run so far, which the cascade adds to
-  `DecisionSettings.sensitive_values`. A `PendingAnswer` becomes an input request of kind `engine.decision` (for
-  `decide_many`, one request per `batch_id`, with one question per pending call), journaled with `input_requested`
-  and presented through `InputPort`; `answer` returning `None` pauses (`awaiting_input`). An answer becomes an
-  `EngineerChoice` (`choice`, `by`, `answered_at` from the engine's `Clock`) per call, and the engine calls the port
-  again; a `PendingAnswer` with `rejected` set presents the same request again. The answer is journaled only as
-  `decision_made` (`decided_by` `engineer:<name>`): the cascade's label and pending stores keep it durable, so a rerun
-  of the step after a crash returns it without asking (spec 0005 AC19) (AC66).
+  channel]**: the base names of the model files the run touches (spec 0005 §4.3), read from the journal so far: the
+  `file_names` of every `model_bound` (every model a step addresses, read or written, is bound first, §4.8), the
+  `origin_file_names` of every working copy's `model_saved` (the original client file), and the `file_name` of every
+  `model_saved`. The cascade adds them to `DecisionSettings.sensitive_values`. Read from the journal, they are the
+  same at replay; they are not part of the step's `args_sha256`. A `PendingAnswer` becomes an input request of kind
+  `engine.decision` (for `decide_many`, one request per `batch_id`, with one question per pending call), journaled
+  with `input_requested` and presented through `InputPort`; `answer` returning `None` pauses (`awaiting_input`). An
+  answer becomes an `EngineerChoice` (`choice`, `by`, `answered_at` from the engine's `Clock`) per call, and the engine
+  calls the port again; a `PendingAnswer` with `rejected` set presents the same request again. The answer is journaled
+  only as `decision_made` (`decided_by` `engineer:<name>`, `request_id` the input request's id, so the reader can close
+  the request, §4.4.5): the cascade's label and pending stores keep it durable, so a rerun of the step after a crash
+  returns it without asking (spec 0005 AC19) (AC66).
 
 ### 4.10 Concurrency, resources and performance (11 §8, §10)
 
@@ -1000,9 +1030,11 @@ at least 80% on the R1 modules listed in the plan.
 
 New package; `eng-harness` 0.1.0 when phase 1 is complete. The journal `schema_version` is 1; a change to it or to an
 event payload is a new schema version that the reader must still read (its changelog entry states the impact). The
-B-068 fields (`run_class`, `unreleased_tools`, `item_reasons`, the kind `engine.decision`) are part of version 1,
-because no journal exists yet; `item_reasons` and `unreleased_tools` default to empty, so a reader also accepts a
-payload written without them.
+B-068 fields (`run_class`, `unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`,
+`model_bound.file_names`, `model_saved.origin_file_names`, the kind `engine.decision`) are part of version 1, because
+no journal exists yet; `item_reasons`, `unreleased_tools`, `file_names` and `origin_file_names` default to empty,
+`acknowledged_unreleased` to false and `request_id` to `null`, so a reader also accepts a payload written without
+them.
 
 ## 11. Open questions, gaps and additions
 
@@ -1027,8 +1059,8 @@ payload written without them.
 | Q16 | A `model_bound` event (not in 11 §5) binds each model to one host instance, including instances the engineer opened, and moves after a restore or a reopen | Owner | Accept with ADR-0030 (decision 4); spec 0002 defines how `locate` identifies the instance holding a model file |
 | Q17 | Spec 0003 Q11: the run class (`RunRequest.run_class`, `CalcPort.run_class`, recorded in `run_started`), `CalcRefused` with `CALC_NOT_APPROVED` and `CALC_WITHDRAWN`, and `CalcInfo.basis_fields` and `ref_rules`. The run-class check at start and resume (`RUN_CLASS_MISMATCH`) is **[added]**: without it a production run could be resumed with a trial CalcPort and run draft calcs | Owner | Accept (§4.5.1, §4.8, §6, AC65) |
 | Q18 | Spec 0003 Q11: invariant 3 builds each calc argument's `RefRule` from `CalcInfo.ref_rules`, `stale_ok` false for a path not listed; `decide` and `approve` keep the default rule. This departs from 11 §6 invariant 3 as spec 0003 Q13 states | Owner | Accept (§4.6, AC39); the hub amendment is spec 0003 Q13 |
-| Q19 | Spec 0005 Q1: `eng_harness.decisions.types` in the block allow-list; `DecisionRequest` and `DecisionCall`; kind `engine.decision`; `rule_guard` and `sensitive_values` from the engine; `Rule` and `DecisionPolicy` are the decision layer's types. The channel for `sensitive_values` is **[added]** (`DecisionCall.sensitive_values`, from `model_saved.file_name`); a model the run only reads is never saved, so its file name is not added | Owner | Accept (§4.1.2, §4.3.2, §4.9.1, AC66); spec 0005 §4.5 lists the field at its next amendment; revisit if read-only models need their names protected |
+| Q19 | Spec 0005 Q1: `eng_harness.decisions.types` in the block allow-list; `DecisionRequest` and `DecisionCall`; kind `engine.decision`; `rule_guard` and `sensitive_values` from the engine; `Rule` and `DecisionPolicy` are the decision layer's types. The channel for `sensitive_values` is **[added]** (`DecisionCall.sensitive_values`, from the journal's `model_bound.file_names`, `model_saved.origin_file_names` and `model_saved.file_name`); it covers every model the run touches, read-only models and working-copy originals included, as spec 0005 §4.3 asks. The four port types have one owner, `eng_harness.decisions.interfaces` (§4.8); `DecisionRequest` is a frozen dataclass, not a Pydantic model (§4.3.2) | Owner | Accept (§4.1.2, §4.3.2, §4.8, §4.9.1, AC66); spec 0005 §4.5 and decision plan T5 add `DecisionCall.sensitive_values` at their next amendment, and decision plan §3 adds engine T7 before its T5 (`BasisView`) |
 | Q20 | Spec 0006 Q6: the `x-eng-input` marker (`data`, `choice`) and the choice convention; the engine refuses a schema it built without a marker | Owner | Accept (§4.9.1, AC67) |
-| Q21 | Spec 0006 Q8: `item_reasons` in `ApprovalAnswer`, `Approval` and `approval_resolved`, required for each rejected item | Owner | Accept (§4.9, AC54) |
+| Q21 | Spec 0006 Q8: `item_reasons` in `ApprovalAnswer`, `Approval` and `approval_resolved`, required for each rejected item; and `acknowledged_unreleased` (spec 0006 AC32) in `ApprovalAnswer` and `approval_resolved`, which the engine also requires for an approving sign-off when unreleased tools are recorded **[added]** | Owner | Accept (§4.9, AC54) |
 | Q22 | Spec 0006 Q4: remove `inbox/` from the run folder; a file there would let any local process answer | Owner | Accept (§4.4.1) |
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |

@@ -78,7 +78,8 @@ tasks:
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_journal_reader.py::test_views_and_follow"
-    covers: [AC25]
+      - "packages/eng-harness/tests/unit/test_journal_reader.py::test_run_class_and_unreleased_tools"
+    covers: [AC25, AC68]
     depends_on: [T3]
   - id: T5
     title: Blocks, workflows, registry, code hash and the block lock file
@@ -202,11 +203,13 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
       - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inputs.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_inputs.py"
       - "packages/eng-harness/tests/replay/test_in_flight.py"
       - "packages/eng-harness/tests/replay/test_host_state.py"
       - "packages/eng-harness/tests/workflows/**"
-    max_changed_lines: 380
+    max_changed_lines: 440
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
@@ -214,7 +217,8 @@ tasks:
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
-    covers: [AC31, AC32, AC34, AC63, AC64]
+      - "packages/eng-harness/tests/unit/test_inputs.py::test_input_request_markers"
+    covers: [AC31, AC32, AC34, AC63, AC64, AC67]
     depends_on: [T10]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
@@ -269,11 +273,14 @@ tasks:
     title: ctx.decide, ctx.decide_many and ctx.ask (invariant 4)
     files:
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ports.py"
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py"
-    max_changed_lines: 380
+    max_changed_lines: 420
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
@@ -454,7 +461,8 @@ subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_con
 
 **T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
 the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models (with the B-068 fields `run_class`,
-`unreleased_tools`, `item_reasons` and the kind `engine.decision`), the writer with the
+`unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`, `model_bound.file_names`,
+`model_saved.origin_file_names` and the kind `engine.decision`), the writer with the
 hash chain, per-event durability, the inline limit and `harness.journal_blob/1`, and the harness kinds module
 (`_kinds.py`: `harness.run_input/1`, `harness.run_output/1`, `harness.approval_preview/1`,
 `harness.journal_blob/1`, registered with `KindRegistry.extend`). AC22 is tested by wrapping the connection and
@@ -462,17 +470,23 @@ recording the `synchronous` value of each commit.
 
 **T4 Journal reader** (spec §4.4.5). Read-only connection, chain verification, the views and `follow`, and
 `is_locked` over the run-lock helper `_runlock.py` (`fcntl` and `msvcrt`), which T9's engine uses to hold the lock.
+`RunView.run_class` (from `run_started`) and `RunView.unreleased_tools` (the union over `run_started` and every
+`run_resumed`, AC68), and `RequestView` resolution per kind, an `engine.decision` request by the first `decision_made`
+that names its `request_id` (AC25). The tests write the events through T3's writer, so no engine is needed.
 
 **T5 Registry** (spec §4.2). Decorators, `BlockDef`, `WorkflowDef`, `Registry`, the code hash, `check_lock`, the
 `--write-lock` entry point and an empty `blocks.lock.json` (no blocks exist yet). AC4's contract test runs on fixture
 blocks in `tests/data/blocks/` and on the real (empty) registry.
 
-**T6 Ports** (spec §4.8). The nine protocols and their data types (including `RunClass`, `CalcPort.run_class`,
-`CalcInfo.basis_fields` and `ref_rules`, `ToolPort.unreleased_tools`, `DecisionCall` and the input request and answer
-models of spec §4.9.1); fakes in `tests/fakes/`: a fake host with a ledger
+**T6 Ports** (spec §4.8). Eight of the nine protocols and their data types (including `RunClass`,
+`CalcPort.run_class`, `CalcInfo.basis_fields` and `ref_rules`, `ToolPort.unreleased_tools`, and the approval and input
+request and answer models of spec §4.9, §4.9.1, with `ApprovalAnswer.acknowledged_unreleased`). `DecisionPort` is not
+built here: its data types are owned by `eng_harness.decisions.interfaces` (spec §4.8 "Decision port types"), which
+needs this task and T7 first, so T14 adds the protocol, its fake and its conformance case. Fakes in `tests/fakes/`: a
+fake host with a ledger
 of every call and `op_id` (S-10's reconciler stand-in), scripted outcomes per call (success, failure envelope,
 `TIMEOUT_UNKNOWN_OUTCOME`, `HOST_WEDGED`, raise), model state with revision and fingerprint, units, a host crash (models reported not loaded), session epochs,
-leases; fake CalcPort, BasisPort, DecisionPort, ApprovalPort and InputPort with scripted answers; a recording
+leases; fake CalcPort, BasisPort, ApprovalPort and InputPort with scripted answers; a recording
 ProgressSink; a RunControlPort. The fakes count as tests for the budget.
 
 **T7 ctx types and codec** (spec §4.3.2, §4.5.2 "Codec"). The result models, `Preview`, `Approval`, `ModelHandle`,
@@ -496,7 +510,11 @@ from the CalcPort becomes a failed step (AC13).
 request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
 `restore`, the instance binding (`model_bound` at first use, after a restore and for a reopened model), and lost or
 reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding, AC63,
-AC64).
+AC64), with `model_bound.file_names` from `HostPort.model_files`. T11 presents the first input requests, so it builds
+`engine/_inputs.py`: the `x-eng-input` marker, the choice-schema builder of spec §4.9.1, the refusal of a schema
+without `data` or `choice` before `present`, and the answer-shape check (`values` against `choices`); the
+`engine.in_flight`, `engine.host_state` and `engine.escalation` requests (the last from `_runner.py`) are built with
+it (AC67, `tests/unit/test_inputs.py`). The budget rose from 380 to 440 lines with this (B-068).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
@@ -511,18 +529,25 @@ end, and the resume order of spec §4.5.1 (preflight, leases and units before T1
 
 **T14 Decisions and inputs** (spec §4.3.2, §4.6 item 4). `decide`, `decide_many` and `ask` over the ports; option and
 answer validation; `decision_made`; engineer-tier and `ask` pauses; answers stored as `basis.engineer_input/1`
-(AC61); the `DecisionCall` with `sensitive_values`, the `engine.decision` request through `InputPort` and the
-`EngineerChoice` round trip against a fake DecisionPort (AC66); the `x-eng-input` marker and the choice convention
-(AC67). The budget rose from 280 to 380 lines with these (B-068). `Rule` and `DecisionPolicy` are annotations only
-(`TYPE_CHECKING`), so this task does not wait for the decision plan.
+(AC61); the `DecisionPort` protocol in `ports.py` over the types of `eng_harness.decisions.interfaces`, its fake in
+`tests/fakes/` and its case in the conformance test (AC57); the `DecisionCall` with `sensitive_values` (from the
+journal's `model_bound.file_names`, `model_saved.origin_file_names` and `file_name`), the `engine.decision` request
+through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`, and the `EngineerChoice` round trip (AC66);
+the `data` marker of `ctx.ask` and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the frozen
+dataclass of spec §4.3.2. The budget rose from 280 to 420 lines with these (B-068). Build order: T14 starts only
+after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
+port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
+plan.
 
 **T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
-re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`, `signed_off`, pause and the
+re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
+`acknowledged_unreleased` (required for an approving sign-off when `unreleased_tools` is recorded), `signed_off`, pause
+and the
 `except Exception` test.
 
-**T16 Modes and promotion** (spec §4.7). Working copies, approval per write, mode-resolved approvals, the always-ask
-list, file-copy promotion over the internal `FileOps` port with its fake (including the re-check of the `PROMOTION`
-approval's binding before copying), and the `REPLAY_WRITES` gap.
+**T16 Modes and promotion** (spec §4.7). Working copies (with `origin_sha256` and `origin_file_names`), approval
+per write, mode-resolved approvals, the always-ask list, file-copy promotion over the internal `FileOps` port with its
+fake (including the re-check of the `PROMOTION` approval's binding before copying), and the `REPLAY_WRITES` gap.
 
 **T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
 call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
@@ -546,7 +571,9 @@ ledger and the outputs with an uninterrupted run. Almost all of it is test code.
   gate's mutation tool; no new development dependency.
 - Work items: `eng-contract` 0.1.0 merged (B-010 to B-025) before T1, because T2 onward import it; `eng-dev-gate`
   `agents render` (B-030 to B-055) if available at T1, otherwise as described there. Specs 0002 to 0007 implement the
-  ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19.
+  ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19. T14 waits for decision plan T1, T4
+  and T5 (the decision port types, spec §4.8), which wait for this plan's T6 and T7; decision plan T7 and T10 wait for
+  T14, so the order has no cycle.
 
 ## 4. Verification
 
