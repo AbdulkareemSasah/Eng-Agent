@@ -7,6 +7,7 @@ from datetime import date
 from pathlib import Path
 
 from eng_dev_gate.checks import ratchet
+from eng_dev_gate.checks.check import make_handler
 from support.repo import Repo, RunResult, make_repo
 from support.toy import GATE_YML, make_workspace
 
@@ -85,7 +86,7 @@ def test_step_runs_in_check(repo: Repo) -> None:
     """The ``ratchet`` step is part of ``check`` and fails it on a missing issue reference (RT006)."""
     make_workspace(repo, ["a"], module="x = 1  # noqa: E501\n")
     repo.commit(_file(1))
-    result = repo.run(["--format", "json", "check", "--only", "ratchet"])
+    result = repo.run(["--format", "json", "check", "--only", "ratchet"], {"check": make_handler()})
     assert result.code == 1, result.out
     (step,) = json.loads(result.out)["steps"]
     assert step["name"] == "ratchet"
