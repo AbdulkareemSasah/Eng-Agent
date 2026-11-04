@@ -49,7 +49,7 @@ def test_kind_names_and_registry() -> None:
     assert set(_MODEL_KINDS) <= set(NEUTRAL_KINDS)
     assert NEUTRAL_KINDS["model.stories/1"] is model_kinds.Stories
     with pytest.raises(KindNotRegistered) as caught:
-        NEUTRAL_KINDS["model.nothing/1"]  # noqa: B018  # B-020: the lookup itself is the behavior under test
+        NEUTRAL_KINDS["model.nothing/1"]
     assert isinstance(caught.value, ContractError)
     assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert "model.nothing/1" not in NEUTRAL_KINDS
@@ -136,3 +136,13 @@ def test_names_are_one_to_two_hundred_characters() -> None:
         base["stories"][0]["name"] = bad
         with pytest.raises(ValidationError):
             model_kinds.Stories.model_validate(base)
+
+
+def test_registry_is_a_sized_mapping() -> None:
+    assert len(NEUTRAL_KINDS) == len(list(NEUTRAL_KINDS)) >= len(_MODEL_KINDS)
+
+
+def test_combination_may_reference_load_cases_the_host_defines() -> None:
+    payload = json.loads((_folder("model.load_set/1") / "valid.json").read_text(encoding="utf-8"))
+    payload["combinations"][0]["items"][0]["case"] = {"case": "EQX", "case_type": "load_case", "step": "Max"}
+    assert model_kinds.LoadSet.model_validate(payload).combinations[0].items[0].case.step == "Max"
