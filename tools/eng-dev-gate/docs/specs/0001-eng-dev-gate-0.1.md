@@ -78,6 +78,7 @@ gate-check (§4.5)
 - AC9. Given a task id that the plan does not define, then GC007.
 - AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each.
 - AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
+- AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008.
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
@@ -324,7 +325,9 @@ Checks, in order (all run; findings accumulate):
    cross `/`, `**` matches any number of directories, matching is case-sensitive), or be the `<dir>/CHANGELOG.md` or
    `<dir>/docs/local-testing.md` of a directory `<dir>` that is a workspace member or holds the plan
    (`<dir>/docs/plans/`) when another changed file under `<dir>` matches a task glob: process/04 asks every task for a
-   changelog entry and process/05 for its local-testing items (amendment B-096). Else GC008.
+   changelog entry and process/05 for its local-testing items (amendment B-096). `.gate/ratchet.json` is also in scope
+   when every count it changes belongs to a package that has another changed file matching a task glob: a task that
+   adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Else GC008.
 7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
@@ -567,10 +570,18 @@ The gate's pytest plugin (`-p eng_dev_gate.pytest_plugin`) loads the Hypothesis 
 when Hypothesis is installed (process/11 §3) and fails the session if any test is deselected (CV003).
 
 License check: the closure is the package's runtime dependencies and dependency groups, resolved through
-`importlib.metadata` of the active environment. Allowed (process/04 §7): MIT, BSD (2 and 3 clause), Apache-2.0, ISC, PSF,
+`importlib.metadata`. Allowed (process/04 §7): MIT, BSD (2 and 3 clause), Apache-2.0, ISC, PSF,
 MPL-2.0, taken from `License-Expression`, the `License` field or trove classifiers. `OR` needs one allowed alternative;
 `AND` needs all. Missing metadata is LC002. An exception is an entry `{distribution, license, adr}` in `.gate/gate.yml`
 whose `adr` file exists (LC003 otherwise). Workspace members are not checked.
+In pull-request context (a gate root other than the judged tree, §4.16) the closure is read from the judged
+environment, like the tests of the `tests` step: `judged_metadata.py`, a file of the base commit's package that imports
+nothing from `eng_dev_gate`, runs as `uv run --project <judged tree> --locked --all-packages --group dev python -I
+judged_metadata.py <output file>` and writes name, `License-Expression`, `License`, license classifiers and
+`Requires-Dist` of every installed distribution as JSON; the gate validates it and evaluates the policy itself. A stale
+`uv.lock` is ST001 of the step, a missing `uv` or unusable output an environment fault; the residual risk is that of
+the `tests` step (the judged lock file chooses what is installed and what its metadata says). Head runs read the
+interpreter of the gate.
 
 Generated documents: each `[[tool.eng-gate.generated]]` entry names `path`, `module` and `args`; the gate runs
 `sys.executable -m <module> <args>` in the package directory (no shell; the module must belong to a workspace
@@ -821,7 +832,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 (with AC10a), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
