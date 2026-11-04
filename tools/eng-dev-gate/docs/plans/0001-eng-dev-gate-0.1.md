@@ -500,7 +500,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_ci_files.py::test_gate_action_runs_only_check"
     covers: [AC59]
-    depends_on: [T6]
+    depends_on: [T6, T7]
   - id: T29
     title: "mutation: a run that produces no mutant passes with MU003"
     files:
@@ -510,6 +510,7 @@ tasks:
     max_sessions: 1
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_zero_mutants_is_nothing_to_mutate"
+      - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_uncovered_mutants_count_as_survivors"
     covers: [AC53a]
     depends_on: [T20]
 ---
