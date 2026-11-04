@@ -781,7 +781,8 @@ Rules (11 §3 rule 2):
    itself. Equality across π powers is not transitive at the last float64 bit; this is documented on the class, and
    canonical stored data never mixes `deg` and `rad` (angles are canonical `deg`).
 6. `Quantity.to(symbol) -> Quantity` converts through `units.convert`; `Quantity.canonical(kind)` converts to the
-   canonical unit of a quantity kind.
+   canonical unit of a quantity kind. Both convert the float's binary value with one rounding, so `q.to(u)` need not
+   compare equal to `q` (for example `25.4 mm` to `in` gives `0.9999999999999999 in`).
 
 `Cited` (frozen model): `value` (finite `float` or `int`), `unit` (`str` in `UNITS`; `"1"` for dimensionless),
 `source` (`str`, 8 to 500 characters, non-blank: document, edition and clause, table or page, for example
