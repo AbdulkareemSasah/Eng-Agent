@@ -1,0 +1,3103 @@
+{
+ "sasaah_commit": "61da80f61a6562c8e3553168056bc107e3f93013",
+ "source": "spikes/S-12-sasaah-tool-inventory/inventory/sasaah-csi-mcp.json",
+ "tools": [
+  {
+   "name": "csi_status",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_attach",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "product": {
+      "type": "string",
+      "description": "ETABS, SAFE or SAP2000."
+     },
+     "version": {
+      "type": "string",
+      "description": "Major version, e.g. 22 or 26."
+     },
+     "pid": {
+      "type": "integer",
+      "description": "Process id of a running instance."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_detach",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_launch",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "product": {
+      "type": "string",
+      "description": "ETABS, SAFE or SAP2000."
+     },
+     "version": {
+      "type": "string",
+      "description": "Installed major version, e.g. 22 or 26. Defaults to the newest installed."
+     },
+     "visible": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show the application window."
+     }
+    },
+    "required": [
+     "product"
+    ],
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_model_info",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_stories",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_grids",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_points",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_frames",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_areas",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_materials",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_frame_sections",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_area_sections",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_load_patterns",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_load_cases",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_load_combos",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_db_tables_list",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "filter": {
+      "type": "string",
+      "description": "Case-insensitive substring filter on the table key."
+     },
+     "only_importable": {
+      "type": "boolean",
+      "default": false,
+      "description": "Only tables with import_type 2 or 3 (interactively importable via ApplyEditedTables)."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_db_table_read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "table": {
+      "type": "string",
+      "description": "Database table key."
+     },
+     "fields": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Optional field keys to include."
+     },
+     "group": {
+      "type": "string",
+      "default": "",
+      "description": "Group name filter."
+     },
+     "row_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 200,
+      "description": "Maximum rows to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_db_table_fields",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "table": {
+      "type": "string",
+      "description": "Database table key, e.g. Material Properties - General."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_analysis_status",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_joint_reactions",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string",
+      "description": "Optional joint name. Defaults to all joints."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_frame_forces",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string",
+      "description": "Optional frame name. Defaults to all frames."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_story_drifts",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_base_reactions",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_joint_displacements",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string",
+      "description": "Optional joint name. Defaults to all joints."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_add_frame_by_coord",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "start": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Start point [x, y, z]."
+     },
+     "end": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "End point [x, y, z]."
+     },
+     "section": {
+      "type": "string",
+      "description": "Frame section property. Defaults to the first available."
+     },
+     "name": {
+      "type": "string",
+      "description": "Optional name; assigned by the program when omitted."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call. Restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_add_area_by_coord",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "points": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+       "type": "array",
+       "items": {
+        "type": "number"
+       },
+       "minItems": 3,
+       "maxItems": 3
+      },
+      "description": "Boundary points [x, y, z]."
+     },
+     "section": {
+      "type": "string",
+      "description": "Area section property. Defaults to the first available."
+     },
+     "name": {
+      "type": "string",
+      "description": "Optional name; assigned by the program when omitted."
+     },
+     "method": {
+      "type": "string",
+      "default": "bycoord",
+      "description": "Bridge-only creation path: bycoord (AreaObj.AddByCoord) or bypoints (points + AreaObj.AddByPoint; use above the base story on SAFE). The engine COM path always uses bycoord."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call. Restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_add_load_pattern",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Load pattern name."
+     },
+     "type": {
+      "type": "string",
+      "default": "Dead",
+      "description": "Pattern type, e.g. Dead, Live, Quake, Wind, Snow, Other."
+     },
+     "self_weight": {
+      "type": "number",
+      "default": 0,
+      "description": "Self-weight multiplier."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_add_load_combo",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Combination name."
+     },
+     "combo_type": {
+      "type": "integer",
+      "default": 0,
+      "description": "0 Add, 1 Envelope, 2 Absolute, 3 SRSS."
+     },
+     "components": {
+      "type": "array",
+      "description": "Components {name, factor, kind: case|combo}.",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "factor": {
+         "type": "number"
+        },
+        "kind": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "name"
+       ]
+      }
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_delete_load_combo",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Combination name."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: the combination is deleted."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_assign_frame_section",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Frame object name."
+     },
+     "section": {
+      "type": "string",
+      "description": "Frame section property name."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_frame_load_distributed",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Frame object name."
+     },
+     "load_pattern": {
+      "type": "string",
+      "description": "Load pattern name."
+     },
+     "value": {
+      "type": "number",
+      "description": "Load value in present units."
+     },
+     "direction": {
+      "type": "string",
+      "default": "gravity",
+      "description": "x, y, z or gravity."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call. Restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_area_load_uniform",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Area object name."
+     },
+     "load_pattern": {
+      "type": "string",
+      "description": "Load pattern name."
+     },
+     "value": {
+      "type": "number",
+      "description": "Uniform load value [F/L2] in present units."
+     },
+     "direction": {
+      "type": "string",
+      "default": "gravity",
+      "description": "x, y, z or gravity."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call. Restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_point_restraint",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Point/joint object name."
+     },
+     "restraint": {
+      "type": "string",
+      "default": "fixed",
+      "description": "Preset: fixed or pinned. Ignored when values is given."
+     },
+     "values": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+       "type": "boolean"
+      },
+      "description": "Explicit six-DOF restraint flags [Ux, Uy, Uz, Rx, Ry, Rz]."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_move_area",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Area object name."
+     },
+     "dx": {
+      "type": "number",
+      "default": 0,
+      "description": "Delta X in present units."
+     },
+     "dy": {
+      "type": "number",
+      "default": 0,
+      "description": "Delta Y in present units."
+     },
+     "dz": {
+      "type": "number",
+      "default": 0,
+      "description": "Delta Z in present units."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_run_analysis",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true for destructive operations."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_save_model",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "File path. Defaults to the current model path."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true when overwriting an existing file."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_new_blank_model",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true for destructive operations."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_new_model",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "units": {
+      "type": "string",
+      "description": "Present units for the new model, e.g. kN_m_C. The original units are restored afterwards."
+     },
+     "template": {
+      "type": "string",
+      "default": "grid_only",
+      "description": "grid_only or blank."
+     },
+     "grid": {
+      "type": "object",
+      "description": "Grid for the grid_only template: line counts and spacings in present length units.",
+      "properties": {
+       "nx": {
+        "type": "integer",
+        "default": 4
+       },
+       "ny": {
+        "type": "integer",
+        "default": 4
+       },
+       "spacing_x": {
+        "type": "number",
+        "default": 5.0
+       },
+       "spacing_y": {
+        "type": "number",
+        "default": 5.0
+       }
+      },
+      "additionalProperties": false
+     },
+     "stories": {
+      "type": "array",
+      "description": "Stories bottom -> top {name, height}; a leading Base names the implicit level. Heights are per-story, in present length units.",
+      "items": {
+       "type": "object",
+       "properties": {
+        "name": {
+         "type": "string"
+        },
+        "height": {
+         "type": "number"
+        }
+       },
+       "required": [
+        "name",
+        "height"
+       ],
+       "additionalProperties": false
+      }
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: the current in-memory model is replaced."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_unlock_model",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true for destructive operations."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_open_model",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Model file path (.EDB, .SDB, .MDB)."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: the current in-memory model is replaced."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_exit",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: the application closes."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_get_selection",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_point_connectivity",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "joint": {
+      "type": "string",
+      "description": "Point/joint object name."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_frame_details",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "frames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "Frame object names (at least one)."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_frame_joint_forces",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "frames": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Frame names. Defaults to all frames."
+     },
+     "joint": {
+      "type": "string",
+      "description": "Optional joint name; rows are filtered to it."
+     },
+     "combo_prefix": {
+      "type": "string",
+      "description": "Optional prefix selecting response combos (e.g. DStlS)."
+     },
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_list_design_combos",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Design kind: steel, concrete, aluminum or coldformed."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_design_run",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Design kind: steel or concrete."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: design results are recomputed."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_design_results",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Design kind: steel or concrete."
+     },
+     "name": {
+      "type": "string",
+      "description": "Optional frame/beam name. Defaults to all designed members."
+     },
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum rows to return."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_capture_window",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "max_width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3840,
+      "description": "Optional downscale width; native size when omitted."
+     },
+     "format": {
+      "type": "string",
+      "description": "PNG only; omitted means PNG."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_export_joint",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "joint": {
+      "type": "string",
+      "description": "Joint name. Pass either joint or use_selection."
+     },
+     "use_selection": {
+      "type": "boolean",
+      "default": false,
+      "description": "Export every selected point."
+     },
+     "combo_prefix": {
+      "type": "string",
+      "description": "Optional prefix selecting response combos."
+     },
+     "design_combos": {
+      "type": "string",
+      "description": "Optional design kind whose combos are added: steel, concrete, aluminum or coldformed."
+     },
+     "out_path": {
+      "type": "string",
+      "description": "Bundle file path (single joint) or directory (several selected points)."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_add_point",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "x": {
+      "type": "number"
+     },
+     "y": {
+      "type": "number"
+     },
+     "z": {
+      "type": "number"
+     },
+     "name": {
+      "type": "string"
+     },
+     "units": {
+      "type": "string"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_delete_object",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "object_type": {
+      "type": "string"
+     },
+     "name": {
+      "type": "string"
+     },
+     "confirm": {
+      "type": "boolean"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_point_load",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "load_pattern": {
+      "type": "string"
+     },
+     "force": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+     },
+     "moment": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+     },
+     "units": {
+      "type": "string"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_frame_load_point",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "load_pattern": {
+      "type": "string"
+     },
+     "value": {
+      "type": "number"
+     },
+     "relative_distance": {
+      "type": "number"
+     },
+     "direction": {
+      "type": "string",
+      "default": "gravity"
+     },
+     "units": {
+      "type": "string"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_get_assigned_loads",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "object_type": {
+      "type": "string",
+      "default": "point"
+     },
+     "name": {
+      "type": "string"
+     },
+     "units": {
+      "type": "string"
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_define_material",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "spec": {
+      "type": "object"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_define_frame_section",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "spec": {
+      "type": "object"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_define_area_section",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "spec": {
+      "type": "object"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_define_wall_section",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Section name."
+     },
+     "material": {
+      "type": "string",
+      "description": "Concrete material name."
+     },
+     "thickness": {
+      "type": "number",
+      "description": "Wall thickness in present length units."
+     },
+     "wall_type": {
+      "type": "string",
+      "default": "Specified",
+      "description": "Specified (only supported type)."
+     },
+     "shell_type": {
+      "type": "string",
+      "default": "ShellThin",
+      "description": "ShellThin, ShellThick or Membrane."
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call. Restored afterwards."
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_assign_area_section",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Area object name (UniqueName)."
+     },
+     "section": {
+      "type": "string",
+      "description": "Area section property name."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_area_pier",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Area object name (UniqueName)."
+     },
+     "pier": {
+      "type": "string",
+      "description": "Pier label. Omit to leave unchanged."
+     },
+     "spandrel": {
+      "type": "string",
+      "description": "Spandrel label. Omit to leave unchanged."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_define_load_case",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "spec": {
+      "type": "object"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_frame_modifiers",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "modifiers": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_frame_releases",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "ii": {
+      "type": "array",
+      "items": {
+       "type": "boolean"
+      }
+     },
+     "jj": {
+      "type": "array",
+      "items": {
+       "type": "boolean"
+      }
+     },
+     "start_values": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "end_values": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_frame_offsets",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "length_i": {
+      "type": "number"
+     },
+     "length_j": {
+      "type": "number"
+     },
+     "rz": {
+      "type": "number",
+      "default": 1
+     },
+     "units": {
+      "type": "string"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_area_modifiers",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "name": {
+      "type": "string"
+     },
+     "modifiers": {
+      "type": "array",
+      "items": {
+       "type": "number"
+      }
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_get_design_code",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_set_design_code",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "code": {
+      "type": "string"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_area_forces",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string"
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_link_forces",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string"
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_modal_periods",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_results_displacements_envelope",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "cases": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load case names selected for output."
+     },
+     "combos": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "default": [],
+      "description": "Load combination names selected for output."
+     },
+     "object": {
+      "type": "string"
+     },
+     "units": {
+      "type": "string",
+      "description": "Present units for this call, e.g. kN_m_C, kN_mm_C, N_mm_C, kip_ft_F. The original units are restored afterwards."
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_design_prefs_get",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_design_prefs_set",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "kind": {
+      "type": "string"
+     },
+     "prefs": {
+      "type": "object"
+     },
+     "dry_run": {
+      "type": "boolean",
+      "default": false
+     },
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "csi_refresh_view",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "target": {
+      "type": "object",
+      "description": "Optional target override {product, version?, pid?}. Overrides the session's current target for this call.",
+      "properties": {
+       "product": {
+        "type": "string",
+        "description": "ETABS, SAFE or SAP2000."
+       },
+       "version": {
+        "type": "string",
+        "description": "Major version, e.g. 22 or 26."
+       },
+       "pid": {
+        "type": "integer",
+        "description": "Process id of a running instance."
+       }
+      },
+      "additionalProperties": false
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ ]
+}

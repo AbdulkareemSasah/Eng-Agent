@@ -1,8 +1,8 @@
 """Behaviors of the synthetic Sasaah CSI fake server (spec 0002 section 4.8.3), run as a real process."""
 
+import asyncio
 import json
 import os
-import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -14,12 +14,15 @@ SERVER = Path(__file__).resolve().parent / "server.py"
 
 
 class Rpc:
-    """Newline-delimited JSON-RPC over the fake's stdio."""
+    """Newline-delimited JSON-RPC over the fake's stdio, driven from a private event loop."""
 
     def __init__(self, control: Path) -> None:
+        self.loop = asyncio.new_event_loop()
         env = {**os.environ, "SASAAH_CSI_FAKE_CONTROL": str(control)}
-        self.proc = subprocess.Popen(  # noqa: S603  # B-123: the test's own interpreter and fake script
-            [sys.executable, str(SERVER)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=env, text=True
+        self.proc = self.loop.run_until_complete(
+            asyncio.create_subprocess_exec(
+                sys.executable, str(SERVER), stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, env=env
+            )
         )
         self._id = 0
         self.request(
@@ -30,14 +33,20 @@ class Rpc:
 
     def send(self, message: dict[str, Any]) -> None:
         assert self.proc.stdin is not None
-        self.proc.stdin.write(json.dumps(message) + "\n")
-        self.proc.stdin.flush()
+        self.proc.stdin.write((json.dumps(message) + "\n").encode())
+        self.loop.run_until_complete(self.proc.stdin.drain())
+
+    def readline(self) -> str:
+        assert self.proc.stdout is not None
+        return self.loop.run_until_complete(asyncio.wait_for(self.proc.stdout.readline(), 30)).decode()
+
+    def wait(self) -> int:
+        return self.loop.run_until_complete(asyncio.wait_for(self.proc.wait(), 10))
 
     def request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         self._id += 1
         self.send({"jsonrpc": "2.0", "id": self._id, "method": method, "params": params})
-        assert self.proc.stdout is not None
-        line = self.proc.stdout.readline()
+        line = self.readline()
         assert line, "the fake closed its output"
         reply = json.loads(line)
         assert reply["id"] == self._id
@@ -45,8 +54,8 @@ class Rpc:
         assert isinstance(result, dict)
         return result
 
-    def call(self, name: str, **arguments: Any) -> tuple[bool, dict[str, Any]]:
-        result = self.request("tools/call", {"name": name, "arguments": arguments})
+    def call(self, tool: str, /, **arguments: Any) -> tuple[bool, dict[str, Any]]:
+        result = self.request("tools/call", {"name": tool, "arguments": arguments})
         blocks = result["content"]
         assert len(blocks) == 1
         assert blocks[0]["type"] == "text"
@@ -55,10 +64,10 @@ class Rpc:
 
     def close(self) -> None:
         assert self.proc.stdin is not None
-        assert self.proc.stdout is not None
-        self.proc.stdin.close()
-        self.proc.stdout.close()
-        self.proc.wait(timeout=10)
+        if not self.proc.stdin.is_closing():
+            self.proc.stdin.close()
+        self.wait()
+        self.loop.close()
 
 
 @pytest.fixture
@@ -200,10 +209,11 @@ def test_com_worker_recycled_fault(rpc: Rpc, control: Path) -> None:
 def test_crash_during_call(rpc: Rpc, control: Path) -> None:
     _launch(rpc)
     _fault(control, "crash_during_call")
-    rpc.send({"jsonrpc": "2.0", "id": 99, "method": "tools/call", "params": {"name": "csi_model_info", "arguments": {}}})
-    assert rpc.proc.stdout is not None
-    assert rpc.proc.stdout.readline() == ""
-    assert rpc.proc.wait(timeout=10) != 0
+    rpc.send(
+        {"jsonrpc": "2.0", "id": 99, "method": "tools/call", "params": {"name": "csi_model_info", "arguments": {}}}
+    )
+    assert rpc.readline() == ""
+    assert rpc.wait() != 0
 
 
 def test_row_limit_truncates_table_read(control: Path) -> None:
