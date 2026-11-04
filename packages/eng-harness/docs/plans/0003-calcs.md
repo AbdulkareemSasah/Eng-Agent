@@ -330,7 +330,8 @@ engine's `_kinds.py` with `KindRegistry.extend`. Fixtures go in `tests/data/kind
 **T5 CalcPort** (spec §4.12). `HarnessCalcPort` and `CalcSettings` go in `_calc/_port.py`. The port validates with
 `validate_input` under `require_refs`, builds `InputMeta` from the records, applies the item limit, runs the pure
 function, adds `CalcMeta`, `draft` and the trace, stores the result and returns the envelope. It also implements
-`preflight` and the run class. The workflow test runs a test block through the real engine (engine plan T10) with the
+`preflight` and the run class. `describe` builds `CalcInfo.ref_rules` (path to `RefRule`, `stale_ok` included) from
+the input model's `x-eng` metadata (spec AC13). The workflow test runs a test block through the real engine (engine plan T10) with the
 real CalcPort and a fixture calc.
 
 **T6 Rules and golden harness** (spec AC3, AC46). The AST rules test covers every module under `calcs/`: allowed
@@ -354,7 +355,9 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
   engine's `eng-contract` and `pydantic`.
 - Development: the shared group (`pytest`, `pytest-cov`, `hypothesis`, `mypy`, `ruff`). No new development dependency.
 - Other plans: engine plan T2 (errors), T3 (`_kinds.py`), T6 (ports and fakes) and T10 (`ctx.calc`) are merged before
-  T1, T4 and T5 respectively. `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
+  T1, T4 and T5 respectively. The engine-spec amendment of spec Q11 (engine invariant 3 builds each argument's
+  `RefRule` from `CalcInfo.ref_rules`) is merged before T8, whose workflow test (spec AC48) depends on it.
+  `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
   and host verdicts that the workflow passes. Spec 0007 (B-066) supplies `harness.expected_effects/1`. Neither blocks
   this plan: its tests use synthetic records of the neutral kinds.
 

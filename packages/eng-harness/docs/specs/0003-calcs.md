@@ -102,8 +102,11 @@ proposed project value.
 ### 3.3 CalcPort
 
 - AC13. Given `describe(calc_id)`, then `CalcInfo` carries `id`, `version`, `content_sha256`, `status`,
-  `engineering_params` (every ref-capable input field) and `basis_fields` (the basis paths the calc reads) **[added]**.
-  An unknown id gives `ContractError` `NOT_FOUND`. Test: `test_port.py::test_describe`.
+  `engineering_params` (every ref-capable input field), `basis_fields` (the basis paths the calc reads) **[added]** and
+  `ref_rules` **[added]**: a map from every reference-carrying field path to its `RefRule` (`kinds`, `unit`,
+  `stale_ok`, contract §4.6.2), built from the input model's `x-eng` metadata. The paths with `stale_ok` true are
+  exactly those of the §4.13 table for that calc. An unknown id gives `ContractError` `NOT_FOUND`. Test:
+  `test_port.py::test_describe`.
 - AC14. Given `run(calc_id, args)` with a literal for an engineering input, a reference of the wrong kind, a pointer
   that does not resolve, or an out-of-bounds value, then the failure envelope carries the contract code of contract §5
   (validation order unchanged), and nothing is stored. Test: `test_port.py::test_input_validation_codes`.
@@ -119,8 +122,10 @@ proposed project value.
   `NOT_IMPLEMENTED`, engine §6) names the gap id, and nothing is stored. Test: `test_port.py::test_not_implemented_gap`.
 - AC48. Given the real engine, the real CalcPort and fake tool ports, a model read at revision n, then written (n+1)
   and read again, when a block calls `ctx.calc("harness.model_diff", before=<refs at n>, after=<refs at n+1>, ...)`,
-  then the calc succeeds. When `after` holds a reference at n while the model is at n+1, then `REF_STALE` and no
-  step result is stored (§4.13). Test: `tests/workflow/test_calc_step.py::test_older_revision_inputs`.
+  then the calc succeeds, because engine invariant 3 resolves `before` with the `RefRule` of
+  `CalcInfo.ref_rules` (`stale_ok` true). When `after` holds a reference at n while the model is at n+1, then the
+  engine raises `REF_STALE` before the port call and no step result is stored (§4.13). Test:
+  `tests/workflow/test_calc_step.py::test_older_revision_inputs`.
 - AC49. Given every registered calc, then the input fields whose JSON Schema carries `x-eng.stale_ok: true` are
   exactly those of the §4.13 table for that calc, and no `basis`, `effects`, `after`, `b_*`, `verdicts`, `frames` or
   `required` field carries it. Test: `tests/contract/test_calc_lock.py::test_stale_ok_fields_match_spec`.
@@ -555,12 +560,12 @@ the member key, both statuses and both member ratios; `appeared` and `disappeare
 
   | Previous member status | Current member status | Listed in |
   |---|---|---|
-  | anything but `FAIL` | `FAIL` | `newly_failing` |
-  | `FAIL` | `PASS` | `newly_passing` |
-  | any other pair of different statuses (for example `FAIL` to `NEEDS_ENGINEER`, `PASS` to `ERROR`, `FAIL` to `NOT_APPLICABLE`) | | `other_changes` |
+  | present, anything but `FAIL` | present, `FAIL` | `newly_failing` |
+  | present, `FAIL` | present, `PASS` | `newly_passing` |
+  | any other pair of different statuses, member present on both sides (for example `FAIL` to `NEEDS_ENGINEER`, `PASS` to `ERROR`, `FAIL` to `NOT_APPLICABLE`) | | `other_changes` |
   | equal statuses | | not listed (a ratio change alone is not a status change) |
-  | absent | present | `appeared` |
-  | present | absent | `disappeared` |
+  | absent | present | `appeared` (only here, whatever its status) |
+  | present | absent | `disappeared` (only here, whatever its status) |
 - S6. Status: `FAIL` if any `FAIL`. Otherwise `NEEDS_ENGINEER` if any `NEEDS_ENGINEER` or `ERROR`, any
   `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`.
 
@@ -655,11 +660,13 @@ coincident frames (`ambiguous`).
 
 `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` implements engine §4.8 `CalcPort`:
 
-1. `describe` (AC13).
+1. `describe` (AC13). `CalcInfo.ref_rules` is the only channel through which the engine learns each field's
+   `RefRule`, `stale_ok` included.
 2. `run(calc_id, args)`: status check (AC11). Then `validate_input(InputCls, args, source=store,
    current_revision=lambda _: None, policy=InputPolicy(require_refs=True))`. The engine already checked staleness
-   (engine invariant 3) with each parameter's `RefRule`, which carries `stale_ok` (§4.13), so the CalcPort does not
-   repeat it with a partial revision map. Then the record metadata
+   (engine invariant 3) with the `RefRule` it takes from `CalcInfo.ref_rules` for each argument path (§4.13), so the
+   CalcPort does not repeat it with a partial revision map. An argument path missing from `ref_rules` is resolved by
+   the engine with `stale_ok` false. Engine invariant 3 and `CalcInfo` change accordingly (Q11). Then the record metadata
    (`InputMeta`), the item limit, the pure function, `CalcMeta` (`id`, `version`, `content_sha256`, `status`),
    `draft`, and the trace. The result is stored with `ResultStore.put` (kind, parents, provenance `tool: "harness"`,
    `tool_version` = the package version, `inputs` = references), and the return is `make_success` with a summary of
@@ -777,7 +784,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q8 | The content hash covers `eng-contract`'s version but not third-party libraries (Pydantic) | Owner | Accept. Golden tests run on every dependency update. Including them would invalidate every approval on each patch release |
 | Q9 | `approvals.yaml` needs a YAML parser, which is a runtime dependency (ADR needed) | Owner | One package ADR for a safe YAML parser shared with plan 0004 (templates). Whichever task lands first writes it |
 | Q10 | All six calcs ship `draft`: `harness.model_fingerprint`, `harness.model_diff`, `harness.readback_check`, `harness.design_summary`, `harness.section_round`, `harness.placement_compare` | Owner | Review the verification records and approve by `approvals.yaml` entries after the local tests |
-| Q11 | Production run class and `CalcRefused` with two harness codes are additions to the engine spec | Owner | Accept. Spec 0006 adds the `--production` option |
+| Q11 | Additions to the engine spec: the production run class, `CalcRefused` with two harness codes, and `CalcInfo.basis_fields` and `CalcInfo.ref_rules` (path to `RefRule`), from which engine invariant 3 builds each argument's `RefRule` (`stale_ok` false for a path not listed) | Owner | Accept. Amend engine spec §4.8 and invariant 3 in the engine plan's next task; spec 0006 adds the `--production` option |
 | Q12 | `HostPort.model_state` (spec 0002) needs the fingerprint. In a production run it must be approved | Owner, B-061 | Spec 0002 computes it through the CalcPort, and the command-line preflight includes it |
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
 | Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance`, `mm`, no default) and a new calc version |
