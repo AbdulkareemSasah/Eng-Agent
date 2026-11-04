@@ -95,11 +95,12 @@ class ServerConfig(_Model):
     @field_validator("env")
     @classmethod
     def _env_allowed(cls, value: Mapping[str, str]) -> Mapping[str, str]:
-        if "SASAAH_CSI_ENABLE_SCRIPT" in value:
+        names = {key.upper(): item for key, item in value.items()}  # Windows env names are case-insensitive
+        if "SASAAH_CSI_ENABLE_SCRIPT" in names:
             raise ValueError("SASAAH_CSI_ENABLE_SCRIPT is forbidden")
-        if value.get("SASAAH_CSI_DISABLE_SCRIPT", "true").lower() != "true":
+        if names.get("SASAAH_CSI_DISABLE_SCRIPT", "true").lower() != "true":
             raise ValueError("SASAAH_CSI_DISABLE_SCRIPT must be true")
-        if _ADAPTER_ONLY_ENV in value:
+        if _ADAPTER_ONLY_ENV in names:
             raise ValueError(f"{_ADAPTER_ONLY_ENV} is set by the adapter only")
         return value
 
