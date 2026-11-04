@@ -14,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses
+from eng_dev_gate.checks import licenses, test_first
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS
@@ -45,6 +45,12 @@ def _parser() -> argparse.ArgumentParser:
         if name == "gate-check":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+        if name == "test-first":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans (default: origin/<gate>)")
+            child.add_argument("--base", default=None, help="base commit (with --head and --title, no event)")
+            child.add_argument("--head", default=None, help="head commit")
+            child.add_argument("--title", default=None, help="pull-request title")
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
@@ -127,6 +133,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "forbidden": _forbidden,
         "gate-check": handle_gate_check,
         "packages": _packages,
+        "test-first": test_first.handle,
         **(handlers or {}),
     }.get(args.command)
     try:
