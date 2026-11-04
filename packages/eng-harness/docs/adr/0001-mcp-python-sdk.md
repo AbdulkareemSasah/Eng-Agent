@@ -17,11 +17,16 @@ Declare `mcp>=2.3,<3` as a direct runtime dependency of `packages/eng-harness`, 
 from `servers/` (transport and session modules of later plan tasks). `httpx2` 2.16.0 in the lock is the same version as
 in [ADR-0003](0003-httpx2.md), so the lock holds one HTTP stack.
 
+Amendment B-124 (servers plan T5, B-373): `anyio>=4.16,<5` is also declared as a direct dependency, because the process
+transport builds the anyio memory-object streams the SDK's client session reads; it is already locked through `mcp`
+(4.16.0, MIT), so the lock gains no package.
+
 | Package (resolved version) | Role | License | Installed size |
 |---|---|---|---|
 | `mcp` 2.3.0 | MCP client and server framework | MIT | 1171 KiB |
 | `mcp-types` 2.3.0 | Protocol message types | MIT | 346 KiB |
-| `anyio` 4.16.0, `httpx2` 2.16.0, `httpcore2` 2.16.0, `httpx2-jsfetch` 1.0 | Async layer and HTTP transports (unused by us) | MIT, BSD-3-Clause | about 1.3 MiB |
+| `anyio` 4.16.0 | Async layer; direct dependency since amendment B-124 (memory-object streams of the process transport) | MIT | within the next row's size |
+| `httpx2` 2.16.0, `httpcore2` 2.16.0, `httpx2-jsfetch` 1.0 | HTTP transports (unused by us) | MIT, BSD-3-Clause | about 1.3 MiB (including `anyio`) |
 | `starlette` 1.10.0, `uvicorn` 0.54.0, `sse-starlette` 3.6.0, `python-multipart` 0.0.33 | Server-side web stack of the SDK (unused by us) | BSD-3-Clause, Apache-2.0 | about 0.7 MiB |
 | `jsonschema` 4.26.0 with `referencing`, `rpds-py`, `attrs`, `jsonschema-specifications` | Schema validation | MIT | about 1.9 MiB |
 | `pyjwt` 2.15.1, `cryptography` 50.0.2, `cffi` 2.1.1, `pycparser` 3.12 | Authentication helpers (unused by us) | MIT, Apache-2.0 OR BSD-3-Clause, MIT-0 | about 15.7 MiB |
