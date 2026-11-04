@@ -46,7 +46,7 @@ how the accepted ETABS sections reach Revit by reference, with read-back, under 
 | `harness.host_design_verdicts` (EC §4.4.3) | Steel ratio per frame; concrete `NEEDS_ENGINEER` | Used unchanged; concrete columns have no host verdict (CW-G1) |
 | `harness.frame_element_map` (RV §4.11) | Exact geometric pairing, links as hints | Used unchanged |
 | Code checks `aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits` (CK §1) | Draft, pure, `evaluate_batch` (CF §4) | Called through the CalcPort code-pack route (§4.5, C2) |
-| Sasaah `classify-columns.ps1`, `column-angles` check (baseline) | Unsourced thresholds; a check that compared a constant with itself | Not used; selection is by the engineer plus geometry, orientation stays a gap (CW-G7) |
+| Sasaah `classify-columns.ps1`, `column-angles` check (baseline) | Unsourced thresholds; a check that compared a constant with itself | Not used; selection is by the engineer plus geometry, orientation stays unverified (CW-G7) |
 | SAP2000 through the CSI adapter (0012 §4.2) | No concrete column design results (SP-3), no design orientation (SP-5) | Not in v1 (Q9) |
 
 No runtime dependency is added. `eng-harness` already may import `structural-codes` (CF §1 consumers).
@@ -83,12 +83,14 @@ values are synthetic and say so.
 - AC5. Given any permutation of the frames, sections or scope lists, when `harness.column_select` runs, then the output
   and its content hash are equal. Test: `tests/property/test_column_select.py::test_permutation_invariant`.
 - AC6. Given the golden cases of §4.4.2 (compression and tension rows, one moment zero, both moments non-zero, a square
-  section, a layout missing, a circular and an `other` section, the bar area from the basis), when
+  section, a layout missing, a circular and an `other` section, the bar area from the basis, a square section with
+  `n_bars_b ≠ n_bars_h`, the one-per-column `longitudinal_reinforcement_limits` item with `Ag_mm2` and `case: null`), when
   `harness.column_demands` runs, then the items per check, their converted values and units, `not_checked` and the
   trace equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-demands-*]`.
 - AC7. Given forces whose `sign_convention` is not `host_local/1`, or a basis without a confirmed field of §4.7 A it
-  reads, when `harness.column_demands` runs, then `CalcRefused` and nothing is stored; given a non-square rectangular
-  section and no axis declaration from the adapter (CW-G9), then no `axial_flexure_uniaxial` item is built for it
+  reads, when `harness.column_demands` runs, then `CalcRefused` and nothing is stored; given a rectangular section that is
+  not symmetric (`b_mm ≠ h_mm`, or `b_mm == h_mm` with `n_bars_b ≠ n_bars_h`) and no axis declaration from the adapter
+  (CW-G9), then no `axial_flexure_uniaxial` item is built for it
   (`not_checked` `AXES_UNDECLARED`) while its other two checks are. Tests:
   `tests/unit/calcs/test_column_demands.py::test_refusals`, `::test_axes_undeclared`.
 - AC8. Given the golden cases of §4.4.3 (steel host-only, concrete code-only, a `PASS` and a `FAIL` at two ends, a
@@ -106,7 +108,8 @@ values are synthetic and say so.
   item per accepted frame with status `matched`, sorted by frame id, and each accepted frame without a match is an
   issue `NOT_IMPLEMENTED` with gap CW-G3 and no item. Test: `tests/unit/calcs/test_column_change_set.py::test_items_and_refusals`.
 - AC11. Given the golden cases of §4.4.5 (no change; reuse of an existing type; one new type shared by two pairs of one
-  family and section; a name clash; unmapped roles; circular; `other` shape; non-square rotation info), when
+  family and section; a name clash; unmapped roles; circular; `other` shape; a non-square orientation-unverified issue with both rotations; one
+  `preexisting` and one `changed_in_design` assignment), when
   `harness.revit_column_update` runs, then the plan equals the expected one and every length is a reference to an
   ETABS `model.sections/1` field, never a number; any permutation gives the same output. Tests:
   `tests/golden/column_design/test_golden.py::test_case[revit-update-*]`,
@@ -124,7 +127,7 @@ values are synthetic and say so.
   Tests: `tests/unit/calcs/test_code_pack_route.py::test_batch_through_calcport`, `::test_production_refused`,
   `::test_only_listed_checks`.
 - AC14. Given every state of the §4.8 tables, when the rules run, then the listed option or no decision (engineer)
-  results, and the points and rules are in `decisions.lock.json`. Tests:
+  results (a `FAIL` or `NEEDS_ENGINEER` column with `proposal` `none` gets no decision and reaches the engineer), and the points and rules are in `decisions.lock.json`. Tests:
   `tests/unit/rules/test_column_design_rules.py::test_member_action_rules`, `::test_revit_rules`, `::test_lock`.
 
 ### 3.4 `column_design` (fake-host workflow)
@@ -268,21 +271,24 @@ scope answer), `basis` (`materials.concrete_fc`, `materials.rebar_fy`, `columns.
 - E3 `Pu_kN = −P_kN`: `host_local/1` reports axial tension positive (contract G-3, CSI convention; a C item for the
   owner and local test 3, §12). `Mu_kNm` and `Mu_other_kNm` are the magnitudes of the moments about the axes parallel
   to `b` and to `h`. Which of `M2`, `M3` that is depends on how the adapter maps `b_mm` and `h_mm` to the local axes,
-  which no spec states (CW-G9): for a square section the axial-flexure item takes `Mu = |M3|`,
-  `Mu_other = |M2|` (labels symmetric by geometry); for any other rectangular section no axial-flexure item is built
-  (`AXES_UNDECLARED`) until spec 0002 declares the mapping. Both moments non-zero give an item that the check answers
+  which no spec states (CW-G9): only for a section that is symmetric by geometry and layout (`b_mm == h_mm` and
+  `n_bars_b == n_bars_h`) does the axial-flexure item take `Mu = |M3|`, `Mu_other = |M2|` (the labels are then
+  interchangeable); for any other rectangular section, a square one with unequal bar counts included, no axial-flexure
+  item is built (`not_checked` `AXES_UNDECLARED`) until spec 0002 declares the mapping. Both moments non-zero give an item that the check answers
   `NEEDS_ENGINEER` (AF G-1).
 - E4 `lu_mm = length_mm`: the distance between the frame's end joints, not less than the clear height of 6.2.3, so the
   slenderness applicability limit is tested on the safe side (C item, CW-G11). `k_factor` from the basis.
-- E5 section: `b_mm`, `h_mm` from `model.sections/1`; layout fields from the answer; `Ast_mm2` is the bar count of the
-  layout times `A_bar` (the count of AF CS S1, `2·n_bars_b + 2·n_bars_h − 4`, a geometry identity); `fc_MPa`, `fy_MPa`
-  from the basis.
+- E5 section: `b_mm`, `h_mm` from `model.sections/1`; `Ag_mm2 = b_mm·h_mm` (rectangular, a geometry identity);
+  layout fields from the answer; `Ast_mm2` is the bar count of the layout times `A_bar` (the count of AF CS S1,
+  `2·n_bars_b + 2·n_bars_h − 4`, a geometry identity); `fc_MPa`, `fy_MPa` from the basis.
 - E6 `circular` and `other` shapes and sections without a layout are `not_checked` (`SHAPE_NOT_CHECKED`,
   `LAYOUT_MISSING`). The contract has no material type, so a rectangular section the engineer gives no layout for
   (for example a steel tube) is `LAYOUT_MISSING`; steel members have host verdicts only (CW-G5).
 
 Output `harness.column_check_items/1`: per check id of §4.5 a list of `{subject: {kind: frame, id, station_mm, case},
-inputs}` (input names and units of the clause specs' §3), `not_checked` (`frame_id`, `code`, `gap`), trace with E3 to
+inputs}` (input names and units of the clause specs' §3): for the two strength checks one item per E2 row; for
+`aci318_14.10_6_1_1.longitudinal_reinforcement_limits` one item per selected column with inputs `Ag_mm2` and `Ast_mm2`,
+no station and `case: null` (its clause spec §3: the limits do not depend on loads); `not_checked` (`frame_id`, `code`, `gap`), trace with E3 to
 E5 as steps. Each code-check input is passed as a reference into this result.
 
 #### 4.4.3 `harness.column_review` v1
@@ -312,7 +318,8 @@ per accepted, matched frame, sorted by frame id; others are issues `NOT_IMPLEMEN
 #### 4.4.5 `harness.revit_column_update` v1
 
 Input: `map` (`harness.frame_element_map/1`), `frames`, `sections` (this run's ETABS reads), `revit`
-(`harness.revit_structure/1`, with role statuses, RV §4.8), `basis` (`compare.length`). Method:
+(`harness.revit_structure/1`, with role statuses, RV §4.8), `changed` (reference to the changed frames of the design
+record, AC22), `basis` (`compare.length`). Method:
 
 - U1 targets per pair from the frame's ETABS section: `rectangular` sets roles `section_b` and `section_h`,
   `circular` sets `section_D`; `other` is `not_updatable` `SHAPE_NOT_SUPPORTED`. Each target is the reference
@@ -324,10 +331,17 @@ Input: `map` (`harness.frame_element_map/1`), `frames`, `sections` (this run's E
   duplicated from the current type of the first pair by `unique_id`; a type of that name already in the family is
   `NAME_CONFLICT` (RV AC16). The new type's role sets carry the U1 references; its instances before the assignment
   are none (RV AC15 `expected_instances: []`).
-- U5 a non-square rectangular target carries the info issue `ROTATION_UNAVAILABLE` (RV R-G15, CW-G7).
+- U5 both sides carry `rotation_deg` (`model.frame_placements/1` of ETABS and of Revit; RV §4.5 leaves an element
+  with a null rotation out of that kind, so every paired element has one), but how the two conventions relate is
+  unverified until local test 6 (CW-G7). A non-square rectangular target carries the info issue
+  `ORIENTATION_UNVERIFIED` with references to both rotations, shown in the R6 preview; no rotation is compared or
+  written. Without a mapped `rotation` role no Revit element enters `model.frame_placements/1`, so no column maps (all
+  frames `unmatched_frames`) and nothing is written.
+- U6 each assignment carries `origin`: `changed_in_design` when its frame is in `changed`, otherwise `preexisting`
+  (Q10); a new type lists the origins of its pairs.
 
-Output `harness.revit_column_update/1`: `new_types`, `assignments` (`unique_id`, `element_id`, `from_type_id`, target
-type id or new type name), `no_change`, `not_updatable`, `expected` (per element its type; per type its role
+Output `harness.revit_column_update/1`: `new_types` (with the origins of their pairs), `assignments` (`unique_id`,
+`element_id`, `from_type_id`, target type id or new type name, `origin`), `no_change`, `not_updatable`, `expected` (per element its type; per type its role
 references), `complete`.
 
 #### 4.4.6 `harness.revit_column_readback` v1
@@ -380,8 +394,8 @@ engine checks.
 | R2 | `ctx.tool("csi_open_model", ...)` (copy), `ctx.tool("csi_read_model_state", ...)`, `ctx.calc("harness.model_fingerprint", ...)`; unequal to `design_record.fingerprint` → `PRECONDITION_FAILED` (`etabs_revision`) |
 | R3 | `ctx.tool("revit_open_model", ...)` (the adapter's `working_copy`, RV AC23); the Revit state reader (RV §4.9) |
 | R4 | `ctx.calc("harness.frame_element_map", {"frames": <selected columns of this read>, ...})`; `ctx.decide("column_revit.map_result", ...)` |
-| R5 | `ctx.calc("harness.revit_column_update", ...)` |
-| R6 | `ctx.approve(..., Preview(items=<map summary, one item per new type, role set and assignment>, models=[etabs, revit]), kind=CHANGE_SET)` |
+| R5 | `ctx.calc("harness.revit_column_update", {"changed": <design record changed frames ref>, ...})` |
+| R6 | `ctx.approve(..., Preview(items=<map summary, one item per new type, role set and assignment, each with its origin and issues>, models=[etabs, revit]), kind=CHANGE_SET)` |
 | R7 | per accepted item in the order new types, role sets, assignments: `ctx.tool("revit_duplicate_family_type" | "revit_set_type_parameter_values" | "revit_change_element_type", args, under=approval, item=<id>)`, lengths as references (engine invariant 2); `approve_each_write` previews and the Revit dialog follow |
 | R8 | Revit state read; `ctx.calc("harness.revit_column_readback", ...)`; `ctx.decide("column_revit.readback_result", ...)` |
 | R9 | `ctx.approve(..., kind=SIGN_OFF)`; no promotion (RV R-G1, R-G2) |
@@ -415,7 +429,7 @@ rules, `model=False`, `llm=False` (Q8). States hold statuses, booleans and label
 
 | Point | Options | State | Rules, in order |
 |---|---|---|---|
-| `column_design.member_action` (per column, `decide_many`) | `keep`, `change_section`, `refer_to_engineer` | `status`, `host_status`, `code_status`, `has_not_checked`, `proposal` (`none`, `matched`, `no_section_in_model`, `ambiguous`), refs | `cm.no_proposal`: `proposal` `none` → `keep`; `cm.fail_matched`: `status` `FAIL` and `proposal` `matched` → `change_section` |
+| `column_design.member_action` (per column, `decide_many`) | `keep`, `change_section`, `refer_to_engineer` | `status`, `host_status`, `code_status`, `has_not_checked`, `proposal` (`none`, `matched`, `no_section_in_model`, `ambiguous`), refs | `cm.no_proposal`: `status` `PASS` and `proposal` `none` → `keep`; `cm.fail_matched`: `status` `FAIL` and `proposal` `matched` → `change_section` |
 | `column_design.engineer_turn` | `accept`, `revise`, `hand_edit` | review and read-back statuses, counts as labels, refs | none (engineer, always) |
 | `column_revit.map_result` | `continue_matched`, `stop` | `has_ambiguous`, `has_unmatched_frames`, `has_conflicts`, `complete` | `map.clean`: all false and `complete` → `continue_matched` |
 | `column_revit.readback_result` | `accept`, `abandon` | `status`, issue codes as labels | `rr.pass`: `PASS` → `accept` |
@@ -478,12 +492,12 @@ Errors of the engine, adapters, calcs and code pack pass through unchanged.
 
 | Risk | Class | Mitigation |
 |---|---|---|
-| A wrong demand reaches a check (sign, axis, station) | R1 | E1 refusal, E3 square-only axis rule, golden cases, C items, local test 3 |
+| A wrong demand reaches a check (sign, axis, station) | R1 | E1 refusal, E3 symmetric-section-only axis rule, golden cases, C items, local test 3 |
 | A draft check is mistaken for an approved one | R1 | Trial run class, `draft: true`, DRAFT SOURCES mark, production refusal (AC13) |
 | A section change hits a frame the engineer edited | R1 | EC difference report, K6 warning, approval binding (AC20) |
 | Revit gets a size from a stale ETABS state | R1 | Fingerprint gate (AC24), references and `REF_STALE` (§4.10) |
 | A Revit column is paired or typed wrongly | R1 | Exact map, no write for ambiguous or conflicting pairs, engineer approval, plan read-back (AC12, AC27) |
-| Orientation of non-square columns differs between models | R1 | `ROTATION_UNAVAILABLE` on each item, local test 6; the engineer sees it at R6 |
+| Orientation of non-square columns differs between models | R1 | `ORIENTATION_UNVERIFIED` with both rotations on each item, local test 6; the engineer sees it at R6 |
 | Most real columns return `NEEDS_ENGINEER` (biaxial moments) | R2 | Stated in the report; first follow-up CK Q3 |
 
 ## 9. Test strategy
@@ -532,7 +546,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | CW-G4 | Biaxial bending, slenderness effects, tension, non-unique root (CK §6.2) | Owner | `NEEDS_ENGINEER`; CK Q3 first |
 | CW-G5 | No steel column code check; steel Revit types not mapped | Owner | Host steel verdicts only; Revit steel later |
 | CW-G6 | Revit document left unsaved; no promotion (RV R-G1, R-G2) | Owner | Engineer saves; project-lane save and close tools |
-| CW-G7 | Revit column rotation not readable (RV R-G15): `b`/`h` orientation of non-square columns unverified | Owner | Info issue per item; local test 6 |
+| CW-G7 | Both models give `rotation_deg`, but how the ETABS and Revit conventions relate is unverified, and the Revit rotation comes from a role confirmed only locally (RV R-G15, L6); without that role no Revit column maps | Owner | Info issue with both rotations per non-square item; local test 6 |
 | CW-G8 | Spirals and special seismic columns (CK Q4, Q10) | Owner | Refused in the requests |
 | CW-G9 | Which local axis `b_mm` and `h_mm` of `model.sections/1` lie along is not stated by spec 0002 | Owner | Spec 0002 amendment after local test 3; until then axial-flexure items for square sections only |
 | CW-G10 | Sign of `P` in `host_local/1` (contract G-3) | Owner | E3 as written; confirm in local test 3 |

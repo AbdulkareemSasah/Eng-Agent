@@ -77,7 +77,7 @@ Steps 1 and 2 run once per run; steps 3 to 14 form one cycle and repeat until th
 | 6 | Read frame forces of the selected columns and combinations, analysis messages and the host design results | ETABS reads | Every selected column has forces for every selected combination | Missing rows are listed; those columns get `NEEDS_ENGINEER` |
 | 7 | Host verdicts | Harness calc | Steel: host ratio against the basis limit. Concrete: `NEEDS_ENGINEER` (the host reply holds beams only, gap CW-G1) | — |
 | 8 | Code checks (ACI 318-14, draft) | `structural-codes` through the harness | Maximum axial strength, axial force with uniaxial flexure, longitudinal reinforcement limits, per column, combination and end | Biaxial moments, slender columns, tension, circular and steel sections: `NEEDS_ENGINEER` with the gap id |
-| 9 | Summaries | Harness calc (design summary, once for host and once for code verdicts) | Governing ratio, failing members, changes from the previous cycle | — |
+| 9 | Summaries | Harness calc (column review, which summarises the host and code verdicts by reference) | Governing ratio, failing members, changes from the previous cycle | — |
 | 10 | Engineer turn | Approval page | — | Accept (go to 15); revise (go to 11); "I edited by hand: continue" (next cycle at 3) |
 | 11 | Ask for required sizes of the columns to change | Engineer answers file | Each names a selected column | Asked again (bounded) |
 | 12 | Round and match | Rounding calc; section match calc | Size is the smallest basis multiple not below the required size; a model section of that shape, size and material exists | None exists: the item is refused with gap CW-G3; the engineer defines it in ETABS and continues with "I edited by hand" |

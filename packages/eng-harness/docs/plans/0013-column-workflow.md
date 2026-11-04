@@ -62,6 +62,8 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-compression-tension]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-square-uniaxial]"
+      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-square-unequal-bars]"
+      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-reinforcement-limits-per-column]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-biaxial]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-not-checked]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-bar-area-from-basis]"
@@ -156,7 +158,8 @@ tasks:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-name-conflict]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-roles-unmapped]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-shapes]"
-      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-rotation-info]"
+      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-orientation-unverified]"
+      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[revit-update-origin]"
       - "packages/eng-harness/tests/property/test_revit_column_update.py::test_permutation_invariant"
     covers: [AC11]
     depends_on: [T2]
@@ -241,7 +244,6 @@ tasks:
       - "packages/eng-harness/tests/rules/test_column_design_modules.py::test_modules_follow_block_rules"
       - "packages/eng-harness/tests/workflow/column_design/test_cycle.py::test_review_only_cycle"
       - "packages/eng-harness/tests/workflow/column_design/test_checks.py::test_gaps_reach_review"
-      - "packages/eng-harness/tests/workflow/column_design/test_checks.py::test_production_refused"
     covers: [AC1, AC2, AC15, AC18]   # AC1 for column_design; T13 adds column_revit_update
     depends_on: [T3, T4, T6, T9, T10]
   - id: T12
@@ -359,7 +361,8 @@ variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reaso
 `compare.length`, shape and material per column, issues, and the shared golden test module for the column calcs.
 
 **T3 `harness.column_demands`** (spec §4.4.2). Refusal unless `host_local/1`; rows per selected column and combination;
-`Pu_kN = −P_kN`; the square-only axis rule and `AXES_UNDECLARED`; `lu_mm` from the frame length; `Ast_mm2` from the
+`Pu_kN = −P_kN`; the axis rule for sections symmetric by geometry and layout only (`b_mm == h_mm` and `n_bars_b == n_bars_h`) and
+`AXES_UNDECLARED` otherwise; `Ag_mm2 = b_mm·h_mm` and one reinforcement-limits item per column with `case: null`; `lu_mm` from the frame length; `Ast_mm2` from the
 layout; `not_checked` reasons; the trace steps E3 to E5. The verification record names each conversion as a C item
 for the owner (contract G-3, CW-G9 to CW-G11).
 
@@ -378,13 +381,14 @@ route when T6 starts, T6 adds the three ids to it and its tests instead; the lea
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
-rotation info issue, and the expected effects for the read-back.
+orientation-unverified issue with both rotations, the `origin` of each assignment from the design record's
+changed frames, and the expected effects for the read-back.
 
 **T8 `harness.revit_column_readback`** (spec §4.4.6). Type and value checks per planned element and type, unplanned
 type changes, missing elements, `not_read`, `stale_ok` on `before` only.
 
-**T9 Points and rules** (spec §4.8). The four points with their state models, the rules `cm.no_proposal`,
-`cm.fail_matched`, `map.clean`, `rr.pass`, policy without the model and language-model tiers, lock entries.
+**T9 Points and rules** (spec §4.8). The four points with their state models, the rules `cm.no_proposal` (only
+for `PASS` columns), `cm.fail_matched`, `map.clean`, `rr.pass`, policy without the model and language-model tiers, lock entries.
 
 **T10 Amendments** (spec §11 Q2 to Q4). `WorkflowDef.allowed_modes` with `RunRefused MODE_NOT_ALLOWED` before
 `run_started`; the edit cycle exports `read_state`, `apply_change_set`, `run_and_summarize` and `finish`, and
