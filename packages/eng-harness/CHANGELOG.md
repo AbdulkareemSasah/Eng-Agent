@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Template inheritance: `eng_harness.templates._resolve.resolve` follows `meta.extends` (exact pin, depth at most 8, cycles refused), merges per the spec rules, refuses an ask path that is repeated or has a value, and computes the resolved `sha256` over the chain and the canonical model (B-157; spec 0004 AC8 to AC11).
 - Strict YAML 1.2 loader `eng_harness.templates._yaml` (`load_strict`, `loads_strict`): refuses duplicate keys, anchors, aliases, tags, non-string keys, non-finite numbers, more than one document, files over 1 MiB and nesting deeper than 8; `ruamel-yaml>=0.19,<0.20` runtime dependency with ADR-0004 (Proposed) (B-156; spec 0004 AC7).
 - Calc-module rules test (imports, purity, module state, FB005 forms), golden data loader and file lint, and the verification record template (plan 0003 T6, B-145; spec 0003 AC3, AC46).
 - Journal event payload models: `eng_harness.journal` (the 21 event types and `PAYLOAD_MODELS`) and the harness result kinds in `eng_harness._kinds` (plan 0001 T3, B-102).
