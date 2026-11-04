@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "Axis": {
+      "description": "Direction a grid line is perpendicular to.",
+      "enum": [
+        "x",
+        "y"
+      ],
+      "title": "Axis",
+      "type": "string"
+    },
+    "GridLine": {
+      "additionalProperties": false,
+      "description": "A grid line at `coordinate_mm` along its axis.",
+      "properties": {
+        "axis": {
+          "$ref": "#/$defs/Axis"
+        },
+        "coordinate_mm": {
+          "title": "Coordinate Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "visible": {
+          "title": "Visible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "axis",
+        "coordinate_mm",
+        "visible"
+      ],
+      "title": "GridLine",
+      "type": "object"
+    },
+    "GridSystem1": {
+      "additionalProperties": false,
+      "description": "One Cartesian grid system.",
+      "properties": {
+        "lines": {
+          "items": {
+            "$ref": "#/$defs/GridLine"
+          },
+          "title": "Lines",
+          "type": "array"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "origin_x_mm": {
+          "title": "Origin X Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "origin_y_mm": {
+          "title": "Origin Y Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "rotation_deg": {
+          "title": "Rotation Deg",
+          "type": "number",
+          "x-eng-unit": "deg"
+        }
+      },
+      "required": [
+        "name",
+        "origin_x_mm",
+        "origin_y_mm",
+        "rotation_deg",
+        "lines"
+      ],
+      "title": "GridSystem1",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.grid_system/1`: Cartesian grid systems only (other grid types are a later kind version).",
+  "properties": {
+    "systems": {
+      "items": {
+        "$ref": "#/$defs/GridSystem1"
+      },
+      "title": "Systems",
+      "type": "array"
+    }
+  },
+  "required": [
+    "systems"
+  ],
+  "title": "GridSystem",
+  "type": "object"
+}
