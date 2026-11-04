@@ -7,13 +7,12 @@ size: large
 risk: [r1]               # binding for every pull request of this plan
 tasks:
   - id: T1
-    title: Framework extensions (routes on allowlist entries, audit_log flag) and the IDEA server section
+    title: The IDEA server section on the framework additions of plan 0002 T20 (routes, audit_log flag)
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_launch_args.py"
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
-      - "packages/eng-harness/src/eng_harness/adapters/_descriptors.py"
       - "packages/eng-harness/tests/unit/servers/test_config.py"
       - "packages/eng-harness/tests/unit/servers/test_launch_args.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
@@ -27,7 +26,7 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_launch_args.py::test_idea_argv_has_no_audit_log"
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_idea_launcher_receives_no_audit_log"
     covers: [AC1]
-    depends_on: []   # after the `_session.py` tasks of plan 0002 (T5 to T7), see section 3
+    depends_on: []   # after plan 0002 T20 (framework additions, which follows its `_session.py` tasks T5 to T7), see section 3
   - id: T2
     title: Synthetic IDEA fake server (test-only), its faults and its schema check
     files:
@@ -235,12 +234,13 @@ the local-test steps of spike S-08.
 
 ## 2. Tasks
 
-**T1 Framework and server section** (AC1). `routes` on allowlist entries, `audit_log` on the server section (false for
-IDEA: no `--audit-log` argument is built; `_launch_args.py` is wired into `_session.py`, and a workflow test checks the argv
-the launcher actually receives, because Sasaah ignores unknown arguments with only a warning), and the `[servers.idea]`
-rules of spec §4.2 (required `--disable-script`, forbidden `--read-only`, `--default-project`, other arguments and
-`SASAAH_IDEA_*`, `SASAH_IDEA_*`, `IDEA_*` variables, loopback-only `service_url`). The amendment of the text of spec 0002
-(item A1 of spec 0014) is made by the lead in its own documents-only pull request, not here.
+**T1 Server section** (AC1). The `[servers.idea]` rules of spec §4.2 on the framework of plan 0002 T20, which adds
+`routes`, the `route` key, `audit_log` and `servers/_launch_args.py` (spec 0002 AC40 to AC42, §11 A3, amended by B-085):
+`audit_log = false` for IDEA (no `--audit-log` argument; a workflow test checks the argv the launcher actually receives,
+because Sasaah ignores unknown arguments with only a warning), the `single` topology required (a second role is refused),
+`route` required (`native` or `rest`), required `--disable-script`, forbidden `--read-only`, `--default-project`, other
+arguments and `SASAAH_IDEA_*`, `SASAH_IDEA_*`, `IDEA_*` variables, loopback-only `service_url`. T3's allowlist declares
+`routes = ["native", "rest"]` in its header and its `[[unit]]` entries in the framework's format.
 
 **T2 Fake** (AC21 in part). The test-only fake of spec §4.12 with all faults, schemas from the inventory, and the
 check that it is not packaged.
@@ -283,8 +283,9 @@ gap tests for that tool (a spec change, not a test changed to pass). Its own pla
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new.
-- Plans: plan 0002 T1, T5 to T10 and T14 (config, transport, allowlist and build check, lock and guard, adapter
-  framework, error mapping, model identity, reconciliation) before T1 and T3 of this plan; plan 0001 (engine ports,
+- Plans: plan 0002 T1, T5 to T10, T14 and T20 (config, transport, allowlist and build check, lock and guard, adapter
+  framework, error mapping, model identity, reconciliation, and the framework additions of spec 0002 §11 A3: routes,
+  `audit_log`, the unit header) before T1 and T3 of this plan; plan 0001 (engine ports,
   `NotImplementedGap`) and plan 0004 (design-basis fields `connection.design_code` and `checks.readback_relative_tolerance`
   must exist in the workflow's template, which the workflow spec adds) before T7 runs a workflow. Specs: `eng-contract`
   0.1.0 merged and its `verdicts.set/1`, `forces.member_end/1` and `issues.model_check/1` kinds built (contract tasks

@@ -350,13 +350,39 @@ tasks:
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
+      - "packages/eng-harness/tests/workflow/test_build_ports.py"
     max_changed_lines: 200
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
-    covers: [AC36]
-    depends_on: [T17, T18]
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
+    covers: [AC36, AC41]
+    depends_on: [T17, T18, T20]
+  - id: T20
+    title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/servers/_config.py"
+      - "packages/eng-harness/src/eng_harness/servers/_launch_args.py"
+      - "packages/eng-harness/src/eng_harness/servers/_session.py"
+      - "packages/eng-harness/src/eng_harness/adapters/_descriptors.py"
+      - "packages/eng-harness/src/eng_harness/adapters/_allowlist.py"
+      - "packages/eng-harness/tests/unit/servers/test_config.py"
+      - "packages/eng-harness/tests/unit/servers/test_launch_args.py"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
+    max_changed_lines: 200
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/servers/test_config.py::test_audit_log_flag"
+      - "packages/eng-harness/tests/unit/servers/test_config.py::test_route_key"
+      - "packages/eng-harness/tests/unit/servers/test_launch_args.py::test_audit_log_default_and_off"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_routes_declared"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_route_filter"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_unit_header_entries"
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_unit_header_missing_on_unserved_tool"
+    covers: [AC40, AC41, AC42]
+    depends_on: [T7]
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -370,14 +396,16 @@ and allowlist (T6), the first safety gate of a run; the host-instance lock and g
 T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), model state (T11), edits
 and read-back (T12), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
 command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19) that wires the ports into
-the engine and runs the crash matrix.
+the engine and runs the crash matrix. T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1)
+needs and that no CSI task uses.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line and
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6, T7), `_toolport.py` (T8, T9, T14, T16), `_hostport.py` (T10, T11,
-T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6). Parallel tasks
+serialized by `depends_on`: `_session.py` (T5, T6, T7, T20), `_toolport.py` (T8, T9, T14, T16), `_hostport.py` (T10, T11,
+T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
+`_allowlist.py` and `test_allowlist.py` (T6, T20). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -466,7 +494,17 @@ JSON output, exit codes; the unreleased-tools check and the `extra_checks` exten
 
 **T19 End to end.** `build_ports` wiring; a test block that runs the cycle's steps through the real engine and real
 fake-server processes; the crash matrix that kills the engine at each write step and resumes. Completes
-`docs/local-testing.md`.
+`docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20); the route-bearing
+case is tested in `test_build_ports.py` with a synthetic routed allowlist (test data, product-neutral), since the CSI
+cycle has no route (AC41).
+
+**T20 Framework additions for the IDEA adapter** (AC40 to AC42, spec §11 A3, B-085). `audit_log` on the server
+section (default true) and the argv builder `servers/_launch_args.py`, wired into `_session.py`, so the CSI argv stays
+as it is and a section with `audit_log = false` gets no `--audit-log`; the `route` key and the allowlist header
+`routes` with the entries' `routes` and loading for one route; the header `[[unit]]` entries with `unit_status` on the
+descriptors and `Allowlist.units`, where a `missing` entry may name an unserved tool. Product-neutral: no module names IDEA. The IDEA server section, its options and its allowlist are plan
+0014 T1 and T3, which start after this task; the issue codes, host codes and harness kinds of A3 are implemented where
+they are used (plan 0014 T5, T7, T8).
 
 ## 3. Dependencies
 
