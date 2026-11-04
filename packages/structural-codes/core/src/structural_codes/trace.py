@@ -15,11 +15,13 @@ from collections.abc import Sequence
 from eng_contract.cited import Cited
 from eng_contract.envelope import RefInput
 from eng_contract.params import ParamSpec, ValidatedInput
+from eng_contract.quantity import Quantity
 from eng_contract.trace import Trace, TraceConstant, TraceInput, TraceStep
 from eng_contract.units import UNITS, kind_for_field
 from eng_contract.verdicts import Subject, VerdictStatus
 from pydantic import JsonValue, ValidationError
 
+from structural_codes._verdict import DEFAULT_RATIO_LIMIT, VerdictDraft, assess
 from structural_codes.errors import CheckDefinitionError, TraceValueError
 from structural_codes.inputs import CheckInputs, _UnboundedSpec
 
@@ -51,6 +53,8 @@ class TraceRecorder:
         self._constants: list[TraceConstant] = []
         self._steps: list[TraceStep] = []
         self._messages: list[str] = []
+        self._units: dict[str, str | None] = {}
+        self._verdicts: list[VerdictDraft] = []
         dumped = validated.model.model_dump(mode="json")
         for name, info in type(validated.model).model_fields.items():
             spec = info.json_schema_extra
@@ -60,6 +64,7 @@ class TraceRecorder:
             ref = provenance.ref if isinstance(provenance, RefInput) else None
             self._inputs.append(TraceInput(name=name, value=value, unit=unit, ref=ref))
             self._names.add(name)
+            self._units[name] = unit
             if isinstance(value, bool | int | float):
                 self._values[name] = float(value)
             if isinstance(spec, _UnboundedSpec):
@@ -90,6 +95,7 @@ class TraceRecorder:
         self._claim(name, cited.unit)
         self._constants.append(TraceConstant(name=name, cited=cited))
         self._names.add(name)
+        self._units[name] = cited.unit
         self._values[name] = float(cited.value)
         return self._values[name]
 
@@ -115,6 +121,7 @@ class TraceRecorder:
             raise CheckDefinitionError(f"step {name}: invalid step: {exc}") from exc
         self._steps.append(recorded)
         self._names.add(name)
+        self._units[name] = unit
         self._values[name] = float(value)
         return self._values[name]
 
@@ -133,6 +140,66 @@ class TraceRecorder:
     def note(self, text: str) -> None:
         """Add a trace message."""
         self._messages.append(text)
+
+    @property
+    def verdicts(self) -> tuple[VerdictDraft, ...]:
+        """The verdicts built so far, in order; the runner turns them into contract verdicts."""
+        return tuple(self._verdicts)
+
+    def _operand(self, name: str) -> tuple[float, str]:
+        """Return a recorded value and its unit symbol (`"1"` for a name without a unit)."""
+        return self.value(name), self._units[name] or "1"
+
+    def verdict(
+        self, *, demand: str, capacity: str, clause: str | None = None, assumptions: Sequence[str] = ()
+    ) -> None:
+        """Build one verdict from two recorded names (AC11, AC12); `clause` is checked by `build_verdict`.
+
+        Records step `ratio` (`ratio_2`, ... for later verdicts) and decides the status against the reserved input
+        `ratio_limit` (the contract default when null). An unusable demand or capacity gives an `ERROR` draft with a
+        trace message and no ratio step. Units: both names must have one unit, or none.
+
+        Raises:
+            CheckDefinitionError: a name is unknown or has no numeric value, the two differ in dimension or unit,
+                or the ratio name is taken.
+        """
+        demand_value, demand_unit = self._operand(demand)
+        capacity_value, capacity_unit = self._operand(capacity)
+        if UNITS[demand_unit].dimension != UNITS[capacity_unit].dimension:
+            raise CheckDefinitionError(f"{demand} ({demand_unit}) and {capacity} ({capacity_unit}) differ in dimension")
+        if demand_unit != capacity_unit:
+            raise CheckDefinitionError(f"{demand} and {capacity} must be recorded in the same unit")
+        limit = self._values.get("ratio_limit")
+        limit = DEFAULT_RATIO_LIMIT if limit is None else limit
+        ratio, status, message = assess(demand, demand_value, capacity, capacity_value, limit)
+        ordinal = len(self._verdicts) + 1
+        ratio_name = None
+        if ratio is not None:
+            ratio_name = "ratio" if ordinal == 1 else f"ratio_{ordinal}"
+            self.step(
+                ratio_name,
+                ratio,
+                unit="1",
+                formula="demand / capacity",
+                source="04-tool-contract §5.1",
+                uses=[demand, capacity],
+            )
+        if message is not None:
+            self.note(message)
+        self._verdicts.append(
+            VerdictDraft(
+                status,
+                demand,
+                capacity,
+                Quantity(demand_value, demand_unit),
+                Quantity(capacity_value, capacity_unit),
+                ratio_name,
+                ratio,
+                limit,
+                clause,
+                tuple(assumptions),
+            )
+        )
 
     def to_trace(self, *, outputs: Sequence[str], status: VerdictStatus | None) -> Trace:
         """Build the contract `Trace` with the runner's `outputs` and `status` (AC9).
