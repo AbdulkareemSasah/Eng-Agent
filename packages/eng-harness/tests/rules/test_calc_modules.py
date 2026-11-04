@@ -63,9 +63,8 @@ def _allowed_literals(tree: ast.Module) -> set[int]:
             keywords = {k.arg: k.value for k in node.keywords}
             value = node.args[0] if node.args else keywords.get("value")
             source = node.args[1] if len(node.args) > 1 else keywords.get("source")
-            if value is not None and (c := _numeric(value)):
-                if isinstance(source, ast.Constant) and source.value:
-                    ok.add(id(c))
+            if value is not None and (c := _numeric(value)) and isinstance(source, ast.Constant) and source.value:
+                ok.add(id(c))
         elif isinstance(node, ast.Subscript):
             sl = node.slice
             for part in [sl.lower, sl.upper] if isinstance(sl, ast.Slice) else [sl]:
