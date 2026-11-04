@@ -28,8 +28,9 @@ CONTROL = os.environ.get("SASAAH_CSI_FAKE_CONTROL")
 DEFAULT_UNITS = "kN_m_C"
 DEFAULT_LIMIT = 2000  # S-12 section 2: `limit` is at most 2000 on every list tool
 PID = 4242  # a fixed fake process id
-WRITE_PREFIXES = ("csi_add_", "csi_set_", "csi_define_", "csi_assign_", "csi_delete_", "csi_move_")
-MUTATING = {"csi_run_analysis", "csi_save_model", "csi_unlock_model", "csi_open_model", "csi_new_model"}
+KINDS: dict[str, str] = {t["name"]: t["server_kind"] for t in SCHEMAS["tools"]}  # S-12 inventory `server_kind`
+WRITE_KINDS = {"Write", "Destructive"}  # S-12 report section 7: these raise model_locked while the model is locked
+LOCK_EXEMPT = {"csi_unlock_model", "csi_save_model", "csi_run_analysis", "csi_design_run"}  # S-12 report section 7
 NEEDS_LAUNCHED = {"csi_open_model", "csi_new_model", "csi_new_blank_model", "csi_exit"}
 COLLECTIONS = (
     "stories", "grids", "points", "frames", "areas", "materials", "frame_sections", "area_sections",
@@ -155,25 +156,21 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         raise SasaahError("confirmation_required", f"{name} requires confirm=true.")
     if name in NEEDS_LAUNCHED and not STATE.target["launched"]:
         raise SasaahError("not_launched_by_server", "The instance was not launched by this server.")
-    write = name.startswith(WRITE_PREFIXES)
-    if write and name != "csi_unlock_model" and STATE.model["locked"]:
+    if KINDS[name] in WRITE_KINDS and name not in LOCK_EXEMPT and STATE.model["locked"]:
         raise SasaahError("model_locked", "The model is locked after analysis.")
-    mutating = write or name in MUTATING
-    if mutating and STATE.pop_fault(name, {"timeout_before_apply"}):
+    if STATE.pop_fault(name, {"timeout_before_apply"}):  # any call can time out, a read included (S-12 section 5)
         raise _timeout()
     if name == "csi_run_analysis" and (slow := STATE.pop_fault(name, {"slow_analysis"})):
         await asyncio.sleep(float(slow.get("seconds", 1.0)))
-    if name == "csi_exit":
-        return _session(name, args)
     previous = STATE.model["units"]
     requested = args.get("units") if "units" in props else None
     leave = bool(requested) and STATE.pop_fault(name, {"units_left_changed"}) is not None
     if requested:
         STATE.model["units"] = requested
-    result = _apply(name, args, STATE.model["units"])
+    result = _session(name, args) if name == "csi_exit" else _apply(name, args, STATE.model["units"])
     if requested and not leave:
         STATE.model["units"] = previous
-    if mutating and STATE.pop_fault(name, {"timeout_after_apply"}):
+    if STATE.pop_fault(name, {"timeout_after_apply"}):
         raise _timeout()
     return result
 

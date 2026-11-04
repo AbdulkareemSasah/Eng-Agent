@@ -4,6 +4,7 @@
  "tools": [
   {
    "name": "csi_status",
+   "server_kind": "Meta",
    "input_schema": {
     "type": "object",
     "properties": {},
@@ -12,6 +13,7 @@
   },
   {
    "name": "csi_attach",
+   "server_kind": "Meta",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -52,6 +54,7 @@
   },
   {
    "name": "csi_detach",
+   "server_kind": "Meta",
    "input_schema": {
     "type": "object",
     "properties": {},
@@ -60,6 +63,7 @@
   },
   {
    "name": "csi_launch",
+   "server_kind": "Meta",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -85,6 +89,7 @@
   },
   {
    "name": "csi_model_info",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -113,6 +118,7 @@
   },
   {
    "name": "csi_list_stories",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -152,6 +158,7 @@
   },
   {
    "name": "csi_list_grids",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -191,6 +198,7 @@
   },
   {
    "name": "csi_list_points",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -230,6 +238,7 @@
   },
   {
    "name": "csi_list_frames",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -269,6 +278,7 @@
   },
   {
    "name": "csi_list_areas",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -308,6 +318,7 @@
   },
   {
    "name": "csi_list_materials",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -343,6 +354,7 @@
   },
   {
    "name": "csi_list_frame_sections",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -378,6 +390,7 @@
   },
   {
    "name": "csi_list_area_sections",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -413,6 +426,7 @@
   },
   {
    "name": "csi_list_load_patterns",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -448,6 +462,7 @@
   },
   {
    "name": "csi_list_load_cases",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -483,6 +498,7 @@
   },
   {
    "name": "csi_list_load_combos",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -518,6 +534,7 @@
   },
   {
    "name": "csi_db_tables_list",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -562,6 +579,7 @@
   },
   {
    "name": "csi_db_table_read",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -613,6 +631,7 @@
   },
   {
    "name": "csi_db_table_fields",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -645,6 +664,7 @@
   },
   {
    "name": "csi_analysis_status",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -673,6 +693,7 @@
   },
   {
    "name": "csi_results_joint_reactions",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -725,6 +746,7 @@
   },
   {
    "name": "csi_results_frame_forces",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -777,6 +799,7 @@
   },
   {
    "name": "csi_results_story_drifts",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -825,6 +848,7 @@
   },
   {
    "name": "csi_results_base_reactions",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -873,6 +897,7 @@
   },
   {
    "name": "csi_results_joint_displacements",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -925,6 +950,7 @@
   },
   {
    "name": "csi_add_frame_by_coord",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -983,6 +1009,7 @@
   },
   {
    "name": "csi_add_area_by_coord",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1041,6 +1068,7 @@
   },
   {
    "name": "csi_add_load_pattern",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1083,6 +1111,7 @@
   },
   {
    "name": "csi_add_load_combo",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1141,6 +1170,7 @@
   },
   {
    "name": "csi_delete_load_combo",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1177,6 +1207,7 @@
   },
   {
    "name": "csi_assign_frame_section",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1213,6 +1244,7 @@
   },
   {
    "name": "csi_set_frame_load_distributed",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1262,6 +1294,7 @@
   },
   {
    "name": "csi_set_area_load_uniform",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1311,6 +1344,7 @@
   },
   {
    "name": "csi_set_point_restraint",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1357,6 +1391,7 @@
   },
   {
    "name": "csi_move_area",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1404,6 +1439,7 @@
   },
   {
    "name": "csi_run_analysis",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1436,6 +1472,7 @@
   },
   {
    "name": "csi_save_model",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1472,6 +1509,7 @@
   },
   {
    "name": "csi_new_blank_model",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1504,6 +1542,7 @@
   },
   {
    "name": "csi_new_model",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1588,6 +1627,7 @@
   },
   {
    "name": "csi_unlock_model",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1620,6 +1660,7 @@
   },
   {
    "name": "csi_open_model",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1656,6 +1697,7 @@
   },
   {
    "name": "csi_exit",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1669,6 +1711,7 @@
   },
   {
    "name": "csi_get_selection",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1697,6 +1740,7 @@
   },
   {
    "name": "csi_point_connectivity",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1729,6 +1773,7 @@
   },
   {
    "name": "csi_frame_details",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1768,6 +1813,7 @@
   },
   {
    "name": "csi_results_frame_joint_forces",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1839,6 +1885,7 @@
   },
   {
    "name": "csi_list_design_combos",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1871,6 +1918,7 @@
   },
   {
    "name": "csi_design_run",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1907,6 +1955,7 @@
   },
   {
    "name": "csi_design_results",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1950,6 +1999,7 @@
   },
   {
    "name": "csi_capture_window",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -1988,6 +2038,7 @@
   },
   {
    "name": "csi_export_joint",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2053,6 +2104,7 @@
   },
   {
    "name": "csi_add_point",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2100,6 +2152,7 @@
   },
   {
    "name": "csi_delete_object",
+   "server_kind": "Destructive",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2141,6 +2194,7 @@
   },
   {
    "name": "csi_set_point_load",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2198,6 +2252,7 @@
   },
   {
    "name": "csi_set_frame_load_point",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2249,6 +2304,7 @@
   },
   {
    "name": "csi_get_assigned_loads",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2287,6 +2343,7 @@
   },
   {
    "name": "csi_define_material",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2322,6 +2379,7 @@
   },
   {
    "name": "csi_define_frame_section",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2357,6 +2415,7 @@
   },
   {
    "name": "csi_define_area_section",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2392,6 +2451,7 @@
   },
   {
    "name": "csi_define_wall_section",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2450,6 +2510,7 @@
   },
   {
    "name": "csi_assign_area_section",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2486,6 +2547,7 @@
   },
   {
    "name": "csi_set_area_pier",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2526,6 +2588,7 @@
   },
   {
    "name": "csi_define_load_case",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2561,6 +2624,7 @@
   },
   {
    "name": "csi_set_frame_modifiers",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2602,6 +2666,7 @@
   },
   {
    "name": "csi_set_frame_releases",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2661,6 +2726,7 @@
   },
   {
    "name": "csi_set_frame_offsets",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2709,6 +2775,7 @@
   },
   {
    "name": "csi_set_area_modifiers",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2750,6 +2817,7 @@
   },
   {
    "name": "csi_get_design_code",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2781,6 +2849,7 @@
   },
   {
    "name": "csi_set_design_code",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2819,6 +2888,7 @@
   },
   {
    "name": "csi_results_area_forces",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2870,6 +2940,7 @@
   },
   {
    "name": "csi_results_link_forces",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2921,6 +2992,7 @@
   },
   {
    "name": "csi_results_modal_periods",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -2953,6 +3025,7 @@
   },
   {
    "name": "csi_results_displacements_envelope",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -3004,6 +3077,7 @@
   },
   {
    "name": "csi_design_prefs_get",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -3035,6 +3109,7 @@
   },
   {
    "name": "csi_design_prefs_set",
+   "server_kind": "Write",
    "input_schema": {
     "type": "object",
     "properties": {
@@ -3073,6 +3148,7 @@
   },
   {
    "name": "csi_refresh_view",
+   "server_kind": "Read",
    "input_schema": {
     "type": "object",
     "properties": {
