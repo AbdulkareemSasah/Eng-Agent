@@ -114,7 +114,9 @@ def test_security_and_build_commands() -> None:
 
 def test_ignored_base_checkout_and_spikes() -> None:
     """`.gate-base/` is ignored; every spike check still runs (Linux in the gate job, Windows in the windows job)."""
-    assert ".gate-base/" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    ignored = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert ".gate-base/" in ignored
+    assert f"!{ACTIONS}/build/" in ignored  # the rule `build/` would otherwise hide the build action
     jobs = _workflow()["jobs"]
     assert "spikes/*/check.py" in "\n".join(s.get("run", "") for s in jobs["gate"]["steps"])
     assert "spikes/*/windows_check.py" in "\n".join(s.get("run", "") for s in jobs["windows"]["steps"])
