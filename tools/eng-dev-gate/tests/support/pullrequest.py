@@ -77,7 +77,14 @@ def make_gate_repo(
 
 
 def write_event(
-    repo: Repo, base: str, body: str, *, base_ref: str = "build/v1", head_repo: str = "o/r", name: str = "event.json"
+    repo: Repo,
+    base: str,
+    body: str,
+    *,
+    base_ref: str = "build/v1",
+    head_repo: str = "o/r",
+    name: str = "event.json",
+    head_ref: str = "feat/x",
 ) -> Path:
     """Write a pull-request event for the current ``HEAD`` against ``base`` and return its path (outside the tree)."""
     head = repo.git("rev-parse", "HEAD").strip()
@@ -87,7 +94,7 @@ def write_event(
         "body": body,
         "draft": False,
         "base": {"ref": base_ref, "sha": base, "repo": {"full_name": "o/r"}},
-        "head": {"ref": "feat/x", "sha": head, "repo": {"full_name": head_repo}},
+        "head": {"ref": head_ref, "sha": head, "repo": {"full_name": head_repo}},
         "user": {"login": "agent"},
         "labels": [],
     }
