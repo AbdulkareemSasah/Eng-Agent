@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "AreaSection": {
+      "additionalProperties": false,
+      "description": "A named area section of thickness `thickness_mm`.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/AreaSectionKind"
+        },
+        "material": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Material",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "thickness_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Thickness Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        }
+      },
+      "required": [
+        "name",
+        "material",
+        "kind",
+        "thickness_mm"
+      ],
+      "title": "AreaSection",
+      "type": "object"
+    },
+    "AreaSectionKind": {
+      "description": "Kind of an area section.",
+      "enum": [
+        "slab",
+        "wall",
+        "deck"
+      ],
+      "title": "AreaSectionKind",
+      "type": "string"
+    },
+    "Circular": {
+      "additionalProperties": false,
+      "description": "Circular section of diameter `D_mm`.",
+      "properties": {
+        "D_mm": {
+          "exclusiveMinimum": 0,
+          "title": "D Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "type": {
+          "const": "circular",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "D_mm"
+      ],
+      "title": "Circular",
+      "type": "object"
+    },
+    "FrameSection": {
+      "additionalProperties": false,
+      "description": "A named frame section.",
+      "properties": {
+        "material": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Material",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "shape": {
+          "discriminator": {
+            "mapping": {
+              "circular": "#/$defs/Circular",
+              "other": "#/$defs/OtherShape",
+              "rectangular": "#/$defs/Rectangular"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Rectangular"
+            },
+            {
+              "$ref": "#/$defs/Circular"
+            },
+            {
+              "$ref": "#/$defs/OtherShape"
+            }
+          ],
+          "title": "Shape"
+        }
+      },
+      "required": [
+        "name",
+        "material",
+        "shape"
+      ],
+      "title": "FrameSection",
+      "type": "object"
+    },
+    "OtherShape": {
+      "additionalProperties": false,
+      "description": "A shape that the host names and this contract does not describe.",
+      "properties": {
+        "host_shape": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Host Shape",
+          "type": "string"
+        },
+        "type": {
+          "const": "other",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "host_shape"
+      ],
+      "title": "OtherShape",
+      "type": "object"
+    },
+    "Rectangular": {
+      "additionalProperties": false,
+      "description": "Rectangular section, width `b_mm` and depth `h_mm`.",
+      "properties": {
+        "b_mm": {
+          "exclusiveMinimum": 0,
+          "title": "B Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "h_mm": {
+          "exclusiveMinimum": 0,
+          "title": "H Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "type": {
+          "const": "rectangular",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "b_mm",
+        "h_mm"
+      ],
+      "title": "Rectangular",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.sections/1`.",
+  "properties": {
+    "area_sections": {
+      "items": {
+        "$ref": "#/$defs/AreaSection"
+      },
+      "title": "Area Sections",
+      "type": "array"
+    },
+    "frame_sections": {
+      "items": {
+        "$ref": "#/$defs/FrameSection"
+      },
+      "title": "Frame Sections",
+      "type": "array"
+    }
+  },
+  "required": [
+    "frame_sections",
+    "area_sections"
+  ],
+  "title": "Sections",
+  "type": "object"
+}

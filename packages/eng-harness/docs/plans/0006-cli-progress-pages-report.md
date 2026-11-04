@@ -37,7 +37,8 @@ tasks:
     covers: [AC49]
     depends_on: [T1]
   - id: T3
-    title: "Command line shell: parser, exit codes, configuration, output encoding, launch-address opener, entry point"
+    title: "Command line shell: parser, exit codes, configuration, output encoding, entry point"
+    # Amendment (B-359): split; the launch-address opener moves to T3b (the task measured 418 lines against the 400-line cap, D-12).
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -47,27 +48,37 @@ tasks:
       - "packages/eng-harness/src/eng_harness/cli/_exit.py"
       - "packages/eng-harness/src/eng_harness/cli/_config.py"
       - "packages/eng-harness/src/eng_harness/cli/_encoding.py"
-      - "packages/eng-harness/src/eng_harness/cli/_opener.py"
-      - "packages/eng-harness/tests/unit/cli/test_opener.py"
       - "packages/eng-harness/tests/unit/cli/test_parser.py"
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"
       - "packages/eng-harness/tests/unit/cli/test_config.py"
       - "packages/eng-harness/tests/unit/cli/test_encoding.py"
       - "packages/eng-harness/tests/rules/test_cli_cannot_answer.py"
       - "packages/eng-harness/tests/rules/test_imports.py"
-    max_changed_lines: 400
+    max_changed_lines: 380
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_parser.py::test_commands_exact_and_no_approve"
-      - "packages/eng-harness/tests/unit/cli/test_opener.py::test_browser_variable_ignored"
       - "packages/eng-harness/tests/rules/test_cli_cannot_answer.py::test_no_answer_construction_outside_pages"
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py::test_outcome_mapping"
       - "packages/eng-harness/tests/unit/cli/test_config.py::test_discovery_and_sections"
       - "packages/eng-harness/tests/unit/cli/test_encoding.py::test_redirected_output_is_utf8"
       - "packages/eng-harness/tests/rules/test_imports.py::test_third_party_imports_limited"
       - "packages/eng-harness/tests/unit/cli/test_parser.py::test_entry_point_and_root_form"
-    covers: [AC1, AC2, AC3, AC4, AC5, AC60, AC61, AC65]
+    covers: [AC1, AC2, AC3, AC4, AC5, AC60, AC65]
     depends_on: [T1]
+  - id: T3b
+    title: "Launch-address opener: platform opener with BROWSER removed, address to the controlling terminal only"
+    # Amendment (B-359): the opener part of the former T3; CliDeps gets its default opener here.
+    files:
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
+      - "packages/eng-harness/src/eng_harness/cli/_opener.py"
+      - "packages/eng-harness/tests/unit/cli/test_opener.py"
+    max_changed_lines: 100
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/cli/test_opener.py::test_browser_variable_ignored"
+    covers: [AC61]
+    depends_on: [T3]
   - id: T4
     title: "Expected times from earlier journals and the progress renderer"
     files:
@@ -296,7 +307,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request"
     covers: [AC6, AC7, AC8, AC14, AC46, AC64]
-    depends_on: [T3, T5, T7, T9, T10, T13]
+    depends_on: [T3, T3b, T5, T7, T9, T10, T13]
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
     files:
@@ -416,10 +427,14 @@ element builder, style element and its SHA-256 for the policy. Property tests on
 
 **T3 Shell** (spec §4.1, §4.2.1, §4.2.3, §4.2.4, §4.4.4). `main(argv, deps)`, six subcommands registered as stubs that
 call into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream encoding setup, the launch-address
-opener of `CliDeps` (platform opener with `BROWSER` removed; writer to the controlling terminal only); `[project.scripts]`,
+`CliDeps` with an opener slot; `[project.scripts]`,
 `__main__`, `public_modules`. The rules tests for AC2 and AC60 start here and tighten as modules appear. Amendment
 B-354: the entry point test of AC65 (the declared script, `python -m eng_harness`, no root script); the supported root
 form `uv run --package eng-harness eng-harness` needs no change to the root `pyproject.toml` (spec §4.1).
+
+**T3b Launch-address opener** (spec §4.2.1, AC61; amendment B-359, split from T3 at 418 lines). The platform opener with
+`BROWSER` removed from the child environment and the writer to the controlling terminal only, as the default opener of
+`CliDeps`.
 
 **T4 Progress display** (spec §4.3). `ExpectedTimes.build` (read-only journals, median, range, sample floor) and
 `ProgressRenderer` for the three modes, with text snapshots.

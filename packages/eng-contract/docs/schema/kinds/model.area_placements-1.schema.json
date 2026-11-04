@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "Area": {
+      "additionalProperties": false,
+      "description": "An area object bounded by at least three points.",
+      "properties": {
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "joints": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 200,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Joints"
+        },
+        "kind": {
+          "$ref": "#/$defs/AreaKind"
+        },
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point3"
+          },
+          "minItems": 3,
+          "title": "Points",
+          "type": "array"
+        },
+        "section": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Section",
+          "type": "string"
+        },
+        "story": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Story"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "section",
+        "points"
+      ],
+      "title": "Area",
+      "type": "object"
+    },
+    "AreaKind": {
+      "description": "Role of an area object.",
+      "enum": [
+        "slab",
+        "wall",
+        "deck",
+        "other"
+      ],
+      "title": "AreaKind",
+      "type": "string"
+    },
+    "Point3": {
+      "additionalProperties": false,
+      "description": "A point in model global coordinates, millimetres.",
+      "properties": {
+        "x_mm": {
+          "title": "X Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "y_mm": {
+          "title": "Y Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "z_mm": {
+          "title": "Z Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        }
+      },
+      "required": [
+        "x_mm",
+        "y_mm",
+        "z_mm"
+      ],
+      "title": "Point3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.area_placements/1`.",
+  "properties": {
+    "areas": {
+      "items": {
+        "$ref": "#/$defs/Area"
+      },
+      "title": "Areas",
+      "type": "array"
+    }
+  },
+  "required": [
+    "areas"
+  ],
+  "title": "AreaPlacements",
+  "type": "object"
+}
