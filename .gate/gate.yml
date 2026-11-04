@@ -8,7 +8,8 @@ identities:  # all three must be set before bootstrap.enabled can be false (CF00
   owner_login: AbdulkareemSasah
   agent_logins: []
   reviewer_app: ""
-spec_globs: ["**/docs/specs/*.md"]
+# Workflow documents are specs (gate spec AC12a, 4.5 step 8).
+spec_globs: ["**/docs/specs/*.md", "**/docs/workflows/*.md"]
 plan_globs: ["**/docs/plans/*.md"]
 test_globs: ["**/tests/**", "**/test_*.py", "**/conftest.py"]
 generated_globs: ["uv.lock", "**/AGENTS.md"]
