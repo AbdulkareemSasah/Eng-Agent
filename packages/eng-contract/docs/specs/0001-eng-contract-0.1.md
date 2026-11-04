@@ -191,7 +191,7 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
   verdicts that differ only in holding `1 in` and `25.4 mm` compare equal. Test:
   `tests/unit/test_verdicts.py::test_model_equality`.
 - AC36. Given random quantity pairs of one dimension (Hypothesis), when compared, then the ordering is total and
-  consistent with exact conversion to the canonical unit. Test:
+  consistent with exact conversion of each value's shortest round-trip decimal to the canonical unit. Test:
   `tests/property/test_quantity_props.py::test_order_consistent`.
 - AC37. Given the field name `w_kN_m`, `Sx_mm3`, `drift_ratio` and `label`, when the suffix is looked up, then the
   quantity kinds are line load, section modulus, dimensionless and none. Test: `test_units.py::test_suffix_lookup`.
@@ -768,8 +768,10 @@ Rules (11 §3 rule 2):
    or kind payloads holding `None` against a `Quantity`, or a force against a moment, must compare unequal rather
    than raise (AC35a). Comparing a quantity with a bare number in block or calc code is still a defect: the
    `eng-dev-gate` lint rejects it (owner queue item, not this package's code).
-4. Comparison key: each side is converted to its coherent SI value `r = Fraction(value) × factor + offset` with its π
-   power `p`. When both π powers are equal, the keys `r` are compared as fractions (exact). When they differ (only
+4. Comparison key: each side is converted to its coherent SI value `r = Fraction(repr(value)) × factor + offset` with
+   its π power `p`, where `repr(value)` is the shortest decimal that round-trips to the float. The binary value
+   `Fraction(value)` would make AC35 false (`25.4 mm` is not exactly `1 in` in binary); the shortest round-trip decimal
+   is monotonic in the float, so ordering within a unit is unchanged (amended by B-069). When both π powers are equal, the keys `r` are compared as fractions (exact). When they differ (only
    `deg` against `rad` today), both are compared as `sifloat = float(r) * math.pi ** p`, the single float64 step of
    §4.7.4.
 5. `__hash__` is `hash((dimension, sifloat))` for every unit, π power 0 included. It is consistent with rule 3:

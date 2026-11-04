@@ -23,7 +23,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 
 
 def _uv_lock(repo: Repo) -> None:
-    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S607
+    subprocess.run(["uv", "lock"], cwd=repo.root, check=True, capture_output=True)  # noqa: S607  # B-034: uv from PATH
 
 
 def test_ruff_mypy_on_toy_package(repo: Repo) -> None:
@@ -34,7 +34,9 @@ def test_ruff_mypy_on_toy_package(repo: Repo) -> None:
     repo.commit({"pkgs/a/src/a/mod.py": BAD_MODULE})
     bad = _check(repo, "--skip", "lock")
     assert bad.code == 1
-    assert _statuses(bad) == {"format": "fail", "lint": "fail", "types": "fail", "ratchet": "pass"}
+    assert _statuses(bad) == {
+        "format": "fail", "lint": "fail", "types": "fail", "forbidden": "pass", "ratchet": "pass",
+    }  # fmt: skip
     codes = {f["code"] for s in json.loads(bad.out)["steps"] for f in s["findings"]}
     assert codes == {"ST001"}
 
