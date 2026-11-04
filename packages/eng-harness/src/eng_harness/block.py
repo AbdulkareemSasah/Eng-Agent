@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import inspect
 import json
+import linecache
 import re
 import sys
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
@@ -81,20 +82,10 @@ class LockFinding:
 def _code_hash(fn: Callable[..., object]) -> str:
     """Return the SHA-256 of the module source of `fn` with LF line endings; `RegistryError` without source."""
     module = sys.modules.get(fn.__module__)
-    loader = getattr(getattr(module, "__spec__", None), "loader", None)
-    get_source = getattr(loader, "get_source", None)
-    try:
-        source = get_source(fn.__module__) if get_source is not None else None
-    except ImportError as error:
-        raise RegistryError(f"source of {fn.__module__} cannot be read: {error}") from error
-    if source is None:
-        # The loader gave no source (for example a test module under importlib import mode): read its file.
-        path = Path(fn.__code__.co_filename) if hasattr(fn, "__code__") else None
-        source = path.read_text(encoding="utf-8") if path is not None and path.is_file() else None
-    if source is None:
+    lines = linecache.getlines(fn.__code__.co_filename, getattr(module, "__dict__", None))
+    if not lines:
         raise RegistryError(f"source of module {fn.__module__} is not available")
-    text = source.replace("\r\n", "\n").replace("\r", "\n")
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256("".join(lines).replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")).hexdigest()
 
 
 def _checked[I: BaseModel, O: BaseModel](name: str, version: int, fn: _Fn[I, O]) -> tuple[type[I], type[O], str]:

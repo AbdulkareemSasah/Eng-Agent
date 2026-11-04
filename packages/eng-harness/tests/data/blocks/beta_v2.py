@@ -1,7 +1,8 @@
 """Fixture workflow module: workflow `beta` version 2 (plan 0001 T5). A test double, never shipped."""
 
-from eng_harness.block import workflow
 from pydantic import BaseModel
+
+from eng_harness.block import workflow
 
 
 class BetaInput(BaseModel):

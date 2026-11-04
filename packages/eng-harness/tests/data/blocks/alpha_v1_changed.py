@@ -1,7 +1,8 @@
 """Fixture block module: block `alpha` version 1 with another body (plan 0001 T5). A test double, never shipped."""
 
-from eng_harness.block import block
 from pydantic import BaseModel
+
+from eng_harness.block import block
 
 
 class AlphaInput(BaseModel):
