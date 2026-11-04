@@ -218,9 +218,11 @@ def judge(
                     _probe(runner, python, base, member, env, limit)
                 report = base.parent / f"{number}-{wanted}.xml"
                 _run(runner, python, tree / member.path, env, files, report, limit)
+                found = outcomes(report, local)
                 for test, local_id in zip(ids, local, strict=True):
-                    kinds = outcomes(report, [local_id])[local_id]
-                    if kinds != {wanted}:
+                    kinds = found[local_id]
+                    # red: some case failed (a parametrized test gains cases); green: every case passed
+                    if (wanted not in kinds) if tree is base else (kinds != {wanted}):
                         code, what = ("TF004", "red at the base") if tree is base else ("TF005", "green at the head")
                         message = f"test {test} is not {what} (reported {', '.join(sorted(kinds))})"
                         path = test.partition("::")[0]
