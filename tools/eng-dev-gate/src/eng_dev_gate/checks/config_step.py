@@ -76,11 +76,11 @@ def _mypy(table: Table, own: list[str]) -> list[str]:
             continue
         if set(override) != {"module", "ignore_missing_imports"} or override["ignore_missing_imports"] is not True:
             problems.append("[[tool.mypy.overrides]] may only set ignore_missing_imports = true")
-        problems += [
-            f"[[tool.mypy.overrides]] module {m!r} is inside the package's own namespace"
-            for m in modules
-            if m.split(".")[0] in own or m.startswith("*")
-        ]
+        for m in modules:
+            if m.startswith("*"):
+                problems.append(f"[[tool.mypy.overrides]] module {m!r} is a wildcard pattern, which is not allowed")
+            elif m.split(".")[0] in own:
+                problems.append(f"[[tool.mypy.overrides]] module {m!r} is inside the package's own namespace")
     return problems
 
 
