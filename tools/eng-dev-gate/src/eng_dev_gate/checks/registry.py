@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from eng_dev_gate.checks import forbidden, tests_step, tool_steps
+from eng_dev_gate.checks import (
+    config_step,
+    forbidden,
+    generated,
+    licenses,
+    ratchet,
+    tests_step,
+    tool_steps,
+    workflows,
+)
 from eng_dev_gate.report import Finding
 from eng_dev_gate.toolrun import ToolRunner
 from eng_dev_gate.workspace import Member
@@ -40,9 +49,14 @@ class Step:
 
 STEPS: tuple[Step, ...] = (
     Step("lock", "root", tool_steps.lock),
+    Step("config", "package", config_step.config),
     Step("format", "package", tool_steps.format_),
     Step("lint", "package", tool_steps.lint),
     Step("types", "package", tool_steps.types),
     Step("forbidden", "package", forbidden.run_step),
+    Step("ratchet", "root", ratchet.step),
     Step("tests", "package", tests_step.tests),
+    Step("docs-fresh", "package", generated.generated),
+    Step("licenses", "package", licenses.licenses),
+    Step("workflows", "root", workflows.workflows),
 )
