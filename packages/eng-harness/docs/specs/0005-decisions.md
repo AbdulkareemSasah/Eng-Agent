@@ -24,6 +24,12 @@ marked **[added]** and listed in §11. The contract API it uses is
 come from [16 §2](../../../../design/docs/architecture/16-security-safety-privacy.md) and the evaluation rules from
 [process/05 §7](../../../../design/process/05-testing-and-verification.md).
 
+**Amendment B-098.** The provider-layer spec ([spec 0009](0009-providers.md) Q7) asked for two changes, made here: §4.7
+gains the provider error types of spec 0009 §4.3 (`ProviderErrorCode`, `OutgoingPlace`, `ProviderError`,
+`ProviderFailure`, which `DecisionProvider.batch` used without a definition), and the cascade reports the decision
+runtime it was built with for the run header (§4.12, engine AC69). They are listed in §11 (Q12); the new criterion is
+AC43.
+
 ## 1. Problem
 
 Workflows reach points where the next step depends on a judgment: which fix to try after a failed design check, which
@@ -140,7 +146,7 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
 - AC22. Given a provider that times out (after `timeout_ms_model`), raises, returns a choice outside the options, or a
   confidence that is not a finite number in [0, 1], then the suggestion is recorded with outcome `timeout`, `error` or
   `invalid`, nothing is raised, and the cascade moves on. The recorded error is the exception class name and the
-  provider's code, never its message. Test: `test_cascade.py::test_provider_failures_fall_through`.
+  provider's code (`ProviderError.code`, or `ProviderFailure.code` for a failed batch entry, §4.7), never its message. Test: `test_cascade.py::test_provider_failures_fall_through`.
 - AC23. Given a fake `LLMProvider`, `policy.llm=True`, effective shadow off, tier 2 not accepted, and an answer with a
   valid option and a `Rationale`, then the answer is the LLM's with `decided_by` `llm:<...>`; an answer whose rationale
   contains a digit, or an option outside the options, is `invalid` and the engineer is asked. Test:
@@ -219,6 +225,10 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
 - AC42. Given `eng_harness.decisions.types`, then it imports nothing from `engine`, `journal`, `ports`, a network or
   database module, and block and rule modules may import it (amendment of engine spec §4.1.2, Q1). Test:
   `tests/rules/test_decision_imports.py::test_types_module_is_block_safe`.
+- AC43. Given the cascade built with a decision-runtime summary (a JSON object, §4.12), when the real engine starts a
+  run and later resumes it, then `DecisionPort.runtime_summary()` returns that object unchanged, does no I/O and calls
+  no provider, and `run_started.decision_runtime` equals it; given the cascade built without one (phase 1, tests), then
+  it returns `{}`. Test: `tests/workflow/decisions/test_engine_decisions.py::test_runtime_summary_in_run_header`.
 
 ## 4. Design
 
@@ -230,7 +240,7 @@ engine AC40) and calls `DecisionPort`; the cascade of this spec resolves it.
 `src/eng_harness/decisions/`. Public: `eng_harness.decisions` (cascade, stores, settings; for the engine, the command
 line and tests), `eng_harness.decisions.types` (block-safe: `DecisionPolicy`, `Rule`, `rule`, `Pick`, `RuleBasis`,
 `Rationale`, `Label`, `DecisionPoint`, `decision_point`), `eng_harness.decisions.interfaces` (`DecisionProvider`,
-`LLMProvider`, request and answer models). Private: `_policy.py`, `_points.py`, `_rules.py`, `_redaction.py`,
+`LLMProvider`, request and answer models, the provider error types of §4.7). Private: `_policy.py`, `_points.py`, `_rules.py`, `_redaction.py`,
 `_labels.py` (labels and pending), `_cascade.py`, `_batch.py`, `_record.py`. Rule modules of workflows live in
 `src/eng_harness/rules/` and policy constants in `src/eng_harness/policies/` (later specs; both are R1 paths in
 `.gate/risk-map.yml`). The framework is not in `rules/`, because that glob is subject to the rule-module lint (FB004,
@@ -410,7 +420,47 @@ class LLMProvider(Protocol):  # tier 3
     info: ProviderInfo
 
     async def decide(self, request: ProviderRequest) -> LLMAnswer: ...
+
+
+class ProviderErrorCode(StrEnum):  # spec 0009 §4.3 and §4.5
+    NO_KEY = "no_key"
+    CREDENTIAL_STORE = "credential_store"
+    NETWORK = "network"
+    TIMEOUT = "timeout"
+    AUTH = "auth"
+    RATE_LIMITED = "rate_limited"
+    HTTP_STATUS = "http_status"
+    BAD_RESPONSE = "bad_response"
+    INVALID_OUTPUT = "invalid_output"
+    REDACTION_BLOCKED = "redaction_blocked"
+    NOT_IMPLEMENTED = "not_implemented"
+
+
+class OutgoingPlace(StrEnum):  # the kind of place a REDACTION_BLOCKED finding was in; never a path built from data
+    POINT = "point"
+    OPTION_VALUE = "option_value"
+    OPTION_LABEL = "option_label"
+    STATE_KEY = "state_key"
+    STATE_VALUE = "state_value"
+    KEY_MATERIAL = "key_material"
+
+
+class ProviderError(Exception):  # str() is the code value only
+    code: ProviderErrorCode
+    gap: str | None  # a fixed gap id such as "J-G1" for NOT_IMPLEMENTED, else None
+    where: OutgoingPlace | None  # set for REDACTION_BLOCKED only
+
+
+class ProviderFailure(BaseModel):  # frozen; the batch entry for one failed request
+    code: ProviderErrorCode
 ```
+
+- **Provider errors (amendment B-098, from spec 0009 §4.3).** A provider reports a failure only as `ProviderError`
+  (a single call) or as a `ProviderFailure` entry (one request of a `batch`); spec 0009 §4.3 and §4.5 define when each
+  code is raised, and its AC5 tests the shapes. The messages are fixed, so remote text never reaches a suggestion, the
+  journal, a log or the engineer screen through an error. The cascade records the code in the suggestion (AC22);
+  the outcomes are unchanged (§4.9). These types live here, not in
+  `eng_harness.providers`, because the cascade catches them and the cascade imports no provider implementation.
 
 - `yes_no` is used only for points with `yes_no` set; `choose` otherwise. `score` returns a value per option and is
   used only to order options on the engineer screen, never to choose **[added]**: a score is a number and a decision
@@ -476,6 +526,13 @@ from the `DecisionAnswer`, and presents a `PendingAnswer` through the `InputPort
 `engine.decision` (a kind added to engine spec §4.4.2, Q1). `ctx.decide` and `ctx.decide_many` keep the signatures of
 engine spec §4.3.2. `DecisionPolicy` and `Rule` are the types of those signatures.
 
+**Run header (amendment B-098).** The cascade implements `DecisionPort.runtime_summary()` (engine spec §4.8, AC69): it
+returns the JSON object it was constructed with, unchanged, or `{}` when it was constructed without one (AC43). The
+command line (spec 0006 §4.2.2) constructs it with `DecisionRuntime.summary` of
+[spec 0009](0009-providers.md) §4.1 (AC29 there: per provider name, model, version, locality, tier and status; per
+released point its release; no endpoint or key), so the engine records which providers and releases a run used without
+importing `eng_harness.providers`. The cascade does not read, build or check the summary.
+
 ## 5. Inputs and outputs
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
@@ -529,7 +586,7 @@ engine spec §4.3.2. `DecisionPolicy` and `Rule` are the types of those signatur
 |---|---|---|
 | AC1 to AC3, AC5 to AC15, AC17 to AC19, AC21 to AC39 | Unit (with fake providers and a temporary workspace) | `tests/unit/decisions/` |
 | AC4, AC10 (lock), AC12, AC41 | Contract | `tests/contract/` |
-| AC16, AC17 (engine), AC30 | Fake-host workflow (real engine, real cascade, fake ports) | `tests/workflow/decisions/` |
+| AC16, AC17 (engine), AC30, AC43 | Fake-host workflow (real engine, real cascade, fake ports) | `tests/workflow/decisions/` |
 | AC20, AC29 | Replay (process/05 §1) | `tests/replay/` |
 | AC33 (any text), AC21/AC22 (random provider answers never reach the block unvalidated) | Property (Hypothesis, `derandomize=True`) | `tests/property/` |
 | AC6 | Golden (source 12 §3) | `tests/data/golden/` |
@@ -546,7 +603,9 @@ and fake-host test that process/05 §2 asks of every workflow.
 New modules of `eng-harness` 0.1.0 (phase 1). `decisions.lock.json` and `rules.lock.json` are new committed files. A
 change of a point's options or state, or of a rule, needs a version bump (AC4, AC10). The `decision_made` payload
 gains the `suggestions` shape of §4.9; the engine's journal schema stays at version 1 because the field is already
-`suggestions` (engine spec §4.4.2).
+`suggestions` (engine spec §4.4.2). Amendment B-098 adds `ProviderErrorCode`, `OutgoingPlace`, `ProviderError` and
+`ProviderFailure` to `decisions.interfaces` and `runtime_summary()` to the cascade (additive; built by plan 0009 T1 and
+by this spec's plan T10).
 
 ## 11. Open questions, gaps and additions
 
@@ -563,3 +622,4 @@ gains the `suggestions` shape of §4.9; the engine's journal schema stays at ver
 | Q9 | A failed label write fails the decision step (AC37) instead of continuing | Owner | Accept: the labels are the point of phase 1 shadow data, and the failure is rare |
 | Q10 | A matching rule does not trigger shadow runs of tiers 2 and 3, so rule-decided cases give no evaluation data | Owner | Accept for v1; revisit after the first evaluation shows the volume of engineer-decided cases |
 | Q11 | Floor of `max_options` 32 and `max_state_bytes` 4096 are software limits chosen here | Owner | Accept as settings; raise on need |
+| Q12 | Spec 0009 Q7 (amendment B-098): §4.7 carries the provider error types of spec 0009 §4.3 (`ProviderFailure` was used and undefined), and the cascade hands the decision-runtime summary to the engine for the run header (§4.12, engine Q24) | Owner | Accept (§4.7, §4.12, AC22, AC43); spec 0009 §4.3 and this section must stay identical, and spec 0009 AC5 tests the shapes |
