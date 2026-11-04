@@ -82,14 +82,18 @@ tasks:
     covers: [AC35]
     depends_on: [T1]
   - id: T5
+    # Amendment (B-373, documents only): the process transport builds the anyio memory-object streams the SDK's client
+    # session reads, so anyio becomes a direct dependency (already locked through mcp); tests/workflow/servers/__init__.py
+    # leaves the files (mypy reports a duplicate module "servers" next to tests/unit/servers/__init__.py).
     title: Process transport, MCP client session, crash detection, restart and shutdown
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.servers (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry (B-356); the anyio dependency (B-373)
+      - "uv.lock"  # the anyio dependency, already locked through mcp (B-373)
+      - "packages/eng-harness/docs/adr/0001-mcp-python-sdk.md"  # records anyio as a direct dependency (B-373)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/__init__.py"
       - "packages/eng-harness/src/eng_harness/servers/_transport.py"
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
-      - "packages/eng-harness/tests/workflow/servers/__init__.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
       - "packages/eng-harness/tests/workflow/conftest.py"
     max_changed_lines: 400
