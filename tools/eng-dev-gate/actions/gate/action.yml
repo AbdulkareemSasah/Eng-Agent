@@ -1,0 +1,26 @@
+name: gate
+description: Run every step of eng-gate check on every workspace member (spec 4.14), then the tests until the tests step exists.
+inputs:
+  gate-root:
+    description: Checkout of the base commit that holds the gate; empty for a head run.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Gate
+      shell: bash
+      env:
+        GATE_ROOT: ${{ inputs.gate-root }}
+      run: |
+        if [ -n "$GATE_ROOT" ]; then
+          uv run --project "$GATE_ROOT" --package eng-dev-gate eng-gate --root . --gate-root "$GATE_ROOT" check --all
+        else
+          uv run eng-gate check --all
+        fi
+    # Interim (task T7 replaces it with the tests step): the skeleton ran pytest and dropping it would weaken CI.
+    - name: Tests
+      shell: bash
+      run: |
+        status=0
+        uv run pytest || status=$?
+        if [ "$status" -ne 0 ] && [ "$status" -ne 5 ]; then exit "$status"; fi
