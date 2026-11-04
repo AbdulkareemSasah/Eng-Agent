@@ -29,17 +29,36 @@ OVERRIDE_FILES = (
 RERUN_PLUGINS = frozenset({"pytest-rerunfailures", "flaky", "pytest-retry"})  # process/05 section 3
 
 
+def _strings(value: object) -> list[str] | None:
+    """A string or a list of strings as a list; ``None`` when the value has any other shape."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return list(value)
+    return None
+
+
+def _sub(table: Table, key: str, label: str, problems: list[str]) -> Table:
+    """The sub-table ``key`` (``{}`` when absent); a value of any other type is reported and read as empty."""
+    value = table.get(key, {})
+    if isinstance(value, dict):
+        return value
+    problems.append(f"{label} must be a table")
+    return {}
+
+
 def _ruff(table: Table) -> list[str]:
     problems = [f"[tool.ruff] {k} is not allowed" for k in sorted(table.keys() - RUFF_KEYS)]
     if table.get("exclude", ["spikes"]) != ["spikes"]:
         problems.append("[tool.ruff] exclude may only be ['spikes']")
-    lint = table.get("lint", {})
+    lint = _sub(table, "lint", "[tool.ruff.lint]", problems)
     problems += [f"[tool.ruff.lint] {k} is not allowed" for k in sorted(lint.keys() - {"select", "per-file-ignores"})]
-    if not set(lint.get("select", [])) >= LINT_BASELINE:
+    select = _strings(lint.get("select", []))
+    if select is None or not set(select) >= LINT_BASELINE:
         problems.append(
             "[tool.ruff.lint] select must contain the baseline families " + ", ".join(sorted(LINT_BASELINE))
         )
-    for pattern, rules in lint.get("per-file-ignores", {}).items():
+    for pattern, rules in _sub(lint, "per-file-ignores", "[tool.ruff.lint.per-file-ignores]", problems).items():
         if pattern not in TESTS_GLOBS or rules != ["S101"]:
             problems.append(f"[tool.ruff.lint.per-file-ignores] only tests/** with S101 is allowed, not {pattern!r}")
     return problems
@@ -49,9 +68,12 @@ def _mypy(table: Table, own: list[str]) -> list[str]:
     problems = [f"[tool.mypy] {k} is not allowed" for k in sorted(table.keys() - MYPY_KEYS)]
     if table.get("strict") is not True:
         problems.append("[tool.mypy] strict must be true")
-    for override in table.get("overrides", []):
-        modules = override.get("module", [])
-        modules = [modules] if isinstance(modules, str) else modules
+    overrides = table.get("overrides", [])
+    for override in overrides if isinstance(overrides, list) else [overrides]:
+        modules = _strings(override.get("module", [])) if isinstance(override, dict) else None
+        if modules is None:
+            problems.append("[[tool.mypy.overrides]] must be tables whose module is a string or a list of strings")
+            continue
         if set(override) != {"module", "ignore_missing_imports"} or override["ignore_missing_imports"] is not True:
             problems.append("[[tool.mypy.overrides]] may only set ignore_missing_imports = true")
         problems += [
@@ -62,15 +84,25 @@ def _mypy(table: Table, own: list[str]) -> list[str]:
     return problems
 
 
-def _pytest(table: Table) -> list[str]:
-    problems = [f"[tool.pytest.ini_options] {k} is not allowed" for k in sorted(table.keys() - PYTEST_KEYS)]
+def _pytest(tools: Table) -> list[str]:
+    """Rules for ``[tool.pytest]``: only ``ini_options`` is allowed, because pytest 9 also reads other keys."""
+    label = "[tool.pytest.ini_options]"
+    problems = [f"[tool.pytest] {k} is not allowed" for k in sorted(tools.keys() - {"ini_options"})]
+    table = _sub(tools, "ini_options", label, problems)
+    problems += [f"{label} {k} is not allowed" for k in sorted(table.keys() - PYTEST_KEYS)]
     addopts = table.get("addopts", [])
-    tokens = shlex.split(addopts) if isinstance(addopts, str) else addopts
-    problems += [f"[tool.pytest.ini_options] addopts {t!r} is not allowed" for t in tokens if t not in ADDOPTS]
-    warnings = table.get("filterwarnings", [])
-    for entry in [warnings] if isinstance(warnings, str) else warnings:
-        if entry.split(":")[0].strip() == "ignore":
-            problems.append("[tool.pytest.ini_options] filterwarnings must not ignore warnings")
+    tokens = shlex.split(addopts) if isinstance(addopts, str) else _strings(addopts)
+    if tokens is None:
+        problems.append(f"{label} addopts must be a string or a list of strings")
+    else:
+        problems += [f"{label} addopts {t!r} is not allowed" for t in tokens if t not in ADDOPTS]
+    entries = _strings(table.get("filterwarnings", []))
+    if entries is None:
+        problems.append(f"{label} filterwarnings must be a string or a list of strings")
+    else:
+        problems += [
+            f"{label} filterwarnings must not ignore warnings" for e in entries if e.split(":")[0].strip() == "ignore"
+        ]
     return problems
 
 
@@ -92,11 +124,15 @@ def config(ctx: StepContext) -> list[Finding]:
         return Finding(code=code, severity=Severity.ERROR, path=path, message=message)
 
     try:
-        tools = tomllib.loads((ctx.member.directory / "pyproject.toml").read_text(encoding="utf-8")).get("tool", {})
+        document = tomllib.loads((ctx.member.directory / "pyproject.toml").read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError) as exc:
         return [error("CF001", f"cannot read {path}: {exc}")]
     findings: list[Finding] = []
-    own: list[str] = []
+    problems: list[str] = []
+    tools = _sub(document, "tool", "[tool]", problems)
+    project = _sub(document, "project", "[project]", problems)
+    name = project.get("name")
+    own = [name.replace("-", "_").replace(".", "_").lower()] if isinstance(name, str) else []  # fallback namespace
     table = tools.get("eng-gate")
     if table is None:
         findings.append(error("CF006", f"{path} has no [tool.eng-gate] table"))
@@ -105,15 +141,16 @@ def config(ctx: StepContext) -> list[Finding]:
     else:
         try:
             package = parse_package_config(table)
-            own = package.import_names
+            own = [*own, *package.import_names]
             findings += check_floors(package, path)
         except ConfigError as exc:
             findings.append(error(exc.code, str(exc).removeprefix(f"{exc.code} ")))
-    problems = _ruff(tools.get("ruff", {})) if "ruff" in tools else []
-    problems += _mypy(tools["mypy"], own) if "mypy" in tools else []
-    problems += _pytest(tools["pytest"].get("ini_options", {})) if "pytest" in tools else []
+    for key, rule in (("ruff", _ruff), ("pytest", _pytest)):
+        problems += rule(_sub(tools, key, f"[tool.{key}]", problems)) if key in tools else []
+    problems += _mypy(_sub(tools, "mypy", "[tool.mypy]", problems), own) if "mypy" in tools else []
     problems += [
-        f"[tool.coverage.{k}] is not allowed: the gate generates the configuration" for k in tools.get("coverage", {})
+        f"[tool.coverage.{k}] is not allowed: the gate generates the configuration"
+        for k in _sub(tools, "coverage", "[tool.coverage]", problems)
     ]
     findings += [error("CF003", p) for p in problems]
     findings += [
