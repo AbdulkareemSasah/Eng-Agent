@@ -1,0 +1,24 @@
+{
+  "systems": [
+    {
+      "name": "G1",
+      "origin_x_mm": 0,
+      "origin_y_mm": 0,
+      "rotation_deg": 0,
+      "lines": [
+        {
+          "id": "A",
+          "axis": "x",
+          "coordinate_mm": 0,
+          "visible": true
+        },
+        {
+          "id": "1",
+          "axis": "y",
+          "coordinate_mm": 0,
+          "visible": true
+        }
+      ]
+    }
+  ]
+}
