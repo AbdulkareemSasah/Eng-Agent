@@ -18,6 +18,7 @@ from eng_dev_gate.checks import licenses, mutation, ratchet, review, secrets, te
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.checks.registry import STEPS, StepContext
+from eng_dev_gate.checks.risk_floor import handle_risk_floor
 from eng_dev_gate.report import AWAITING_TITLE, CommandResult, StepResult, escape_data, render
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 from eng_dev_gate.toolrun import SubprocessToolRunner
@@ -47,6 +48,12 @@ def _parser() -> argparse.ArgumentParser:
         if name == "gate-check":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+        if name == "risk-floor":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+            child.add_argument("--base", default=None, help="base commit (with --head and --body-file)")
+            child.add_argument("--head", default=None, help="head commit (with --base and --body-file)")
+            child.add_argument("--body-file", default=None, help="file with the pull-request body")
         if name == "test-first":
             child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
             child.add_argument("--gate-ref", default=None, help="ref of the plans (default: origin/<gate>)")
@@ -179,6 +186,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "mutation": _mutation,
         "packages": _packages,
         "review": review.handle,
+        "risk-floor": handle_risk_floor,
         "secrets": secrets.handle,
         "test-first": test_first.handle,
         "workflows": _workflows,
