@@ -26,7 +26,8 @@ host programs, so v1 could not test them in the build environment in any case.
 4. Until then 15 is read as the target description, not as a build instruction, and its phase 4 build of these three
    products is outside v1. The harness does not depend on them (15 §4).
 5. Documents that name the products as separate repositories stay unchanged until the owner accepts this ADR. On
-   acceptance, the same change updates 15 (status and §2 on tab ownership), 03 §2 and §5, 19 (phase 4) and ADR-0001.
+   acceptance, the same change updates 15 (status and §2 on tab ownership), 03 §2 and §5, 19 (phase 4), ADR-0001,
+   07 (the sheet-export note), ADR-0022 (the product repositories row) and the Arabic overview (§3).
 
 ## Consequences
 

@@ -30,25 +30,34 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_cli.py::test_version_option"
     covers: [AC1]
     depends_on: []
-  - id: T2
-    title: Foundations (reporting, git port, workspace discovery, globs, event file)
+  - id: T2a
+    title: Foundations A (reporting, globs, event file, repository fixture)
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/report.py"
-      - "tools/eng-dev-gate/src/eng_dev_gate/gitio.py"
-      - "tools/eng-dev-gate/src/eng_dev_gate/workspace.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/globs.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/event.py"
       - "tools/eng-dev-gate/tests/**"
-    max_changed_lines: 380
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_report.py::test_awaiting_owner_notice_and_summary"
       - "tools/eng-dev-gate/tests/unit/test_report.py::test_json_result_schema"
       - "tools/eng-dev-gate/tests/unit/test_globs.py::test_full_match_semantics"
+    covers: [AC1, AC2]
+    depends_on: [T1]
+  - id: T2b
+    title: Foundations B (git port, workspace discovery)
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/gitio.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/workspace.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 260
+    max_sessions: 2
+    tests_first:
       - "tools/eng-dev-gate/tests/integration/test_gitio.py::test_name_status_with_rename"
       - "tools/eng-dev-gate/tests/integration/test_workspace.py::test_discovers_members"
     covers: [AC1, AC2]
-    depends_on: [T1]
+    depends_on: [T2a]
   - id: T3
     title: Configuration models, floors and bootstrap mode (root gate.yml)
     files:
@@ -66,7 +75,7 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_modes.py::test_bootstrap_off_needs_identities"
       - "tools/eng-dev-gate/tests/unit/test_config.py::test_floors"
     covers: [AC3, AC4, AC5, AC48]
-    depends_on: [T2]
+    depends_on: [T2b]
   - id: T4
     title: agents render, keys and drift (and re-render of drifting AGENTS.md files)
     files:
@@ -84,7 +93,7 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_agents_drift.py::test_drift_unmanaged_and_pointer"
       - "tools/eng-dev-gate/tests/unit/test_agents.py::test_keys_skeleton"
     covers: [AC55, AC56, AC57, AC58]
-    depends_on: [T2, T3]
+    depends_on: [T2b, T3]
   - id: T5
     title: check orchestrator with the lock, format, lint and types steps
     files:
@@ -102,7 +111,7 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_tool_steps.py::test_ruff_mypy_on_toy_package"
       - "tools/eng-dev-gate/tests/integration/test_tool_steps.py::test_stale_lock_is_st001"
     covers: [AC47, AC54]
-    depends_on: [T2, T3]
+    depends_on: [T2b, T3]
   - id: T6
     title: "CI part 1: setup action and the gate, agents-drift and build jobs"
     files:
@@ -237,7 +246,7 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_budget_counting"
       - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_plan_front_matter_rules"
     covers: [AC6, AC7, AC8, AC9, AC10, AC11, AC13]
-    depends_on: [T2, T3]
+    depends_on: [T2b, T3]
   - id: T14
     title: "gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job"
     files:
@@ -483,7 +492,7 @@ that `hashFiles` in a step `if:` sees `.gate-base`, and that `PYTHONPATH` puts t
 install (T6 and T26, local testing list); Windows support of the mutation
 backend (T20, spec §11 Q4).
 
-**Test fixtures.** `tests/support/repo.py` (T2) builds temporary git repositories with fixed dates and a local identity,
+**Test fixtures.** `tests/support/repo.py` (T2a) builds temporary git repositories with fixed dates and a local identity,
 writes the `.gate/` files and a toy package, and returns a handle that runs `cli.main` in-process. External tools and
 GitHub are fake ports except in the one integration test per tool step.
 
@@ -500,9 +509,10 @@ committed file equals the rendering and re-renders if not), the `CLAUDE.md` poin
 dependency ADR (`docs/adr/0001-runtime-dependencies.md`, for the owner queue), and the CLI shell with the exit codes and
 `--version`.
 
-**T2** adds the pieces everything uses: Finding and step results with text, JSON, Actions annotation and summary
-output; the git port; workspace discovery from `[tool.uv.workspace]`; POSIX glob matching on `PurePosixPath.full_match`;
-the GitHub event file reader; and the repository fixture.
+**T2a** adds the pieces everything uses: Finding and step results with text, JSON, Actions annotation and summary
+output; POSIX glob matching on `PurePosixPath.full_match`; the GitHub event file reader; and the repository fixture.
+**T2b** adds the git port and workspace discovery from `[tool.uv.workspace]`. Amendment (B-056): the former single task
+T2 measured 573 changed lines of non-test code against its limit of 380, so it is split into T2a and T2b.
 
 **T3** adds `.gate/gate.yml` (initial values: bootstrap on, gate branch `build/v1`, globs, limits), the configuration
 models, the floors table with its citations, and the mode logic (read from the base commit in pull-request context,
