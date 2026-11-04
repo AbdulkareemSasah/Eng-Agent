@@ -6,6 +6,7 @@ After a restart or a context compaction, read this file and `git log origin/buil
 - Integration branch: `build/v1` · Draft pull request to `main`: [AbdulkareemSasah/Eng-Agent#2](https://github.com/AbdulkareemSasah/Eng-Agent/pull/2)
 - Mode: bootstrap (ADR-0028 §4). Checks that need the owner or another identity report `awaiting owner`.
 - Live steps: [LOCAL-TESTING.md](LOCAL-TESTING.md). Nothing that needs a host program is claimed as working.
+- **Paused on the owner's instruction (2026-11-04, about 21:00 UTC): no new workflows or agents until the owner says to continue.** The tasks in progress were drained and the three wave 3n lanes stopped. Open on resume: B-364 ([#143](https://github.com/AbdulkareemSasah/Eng-Agent/pull/143), approved; its merge step gave up after repeated BEHIND), B-122 ([#142](https://github.com/AbdulkareemSasah/Eng-Agent/pull/142)) and B-256 ([#137](https://github.com/AbdulkareemSasah/Eng-Agent/pull/137)), both approved, whose CI failures were spurious (P-42), B-123 ([#132](https://github.com/AbdulkareemSasah/Eng-Agent/pull/132), approved), B-104 ([#146](https://github.com/AbdulkareemSasah/Eng-Agent/pull/146), conflict), B-141 (changes requested after a conflict fix), B-182 ([#134](https://github.com/AbdulkareemSasah/Eng-Agent/pull/134), fix), B-367 (E.T3b, not started), B-156 (writer stopped; its commit is on `backup/b156-writer-partial`). Before relaunching, remove the stopped lanes' worktrees (never `localci-*`) and free stale local task branches (P-42).
 
 ## 1. Environment facts (recorded at the start)
 
@@ -109,7 +110,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-022 | T13 | Workspace resolution and location probes (POSIX, Windows, fake) | sonnet, high | opus, medium | [#89](https://github.com/AbdulkareemSasah/Eng-Agent/pull/89) | done |
 | B-023 | T14 | Result store, atomic writes and payload split (model state moved to T14b, B-077) | sonnet, high | opus, medium | [#103](https://github.com/AbdulkareemSasah/Eng-Agent/pull/103) | done |
 | B-024 | CT.T15 | MCP mapping helpers | sonnet, low | opus, medium | [#131](https://github.com/AbdulkareemSasah/Eng-Agent/pull/131) | done |
-| B-025 | CT.T16 | JSON Schema snapshots, freshness test and 0.1.0 changelog | sonnet, low | opus, medium | [#133](https://github.com/AbdulkareemSasah/Eng-Agent/pull/133) | open |
+| B-025 | CT.T16 | JSON Schema snapshots, freshness test and 0.1.0 changelog | sonnet, low | opus, medium | [#133](https://github.com/AbdulkareemSasah/Eng-Agent/pull/133) | done (80470e0) |
 | B-026 | docs | gate: skeleton packages pass the mutation step, and shared package folders are managed by agents drift | sonnet, high | opus, medium | [#90](https://github.com/AbdulkareemSasah/Eng-Agent/pull/90) | done |
 | B-027 | docs | fix(gate): workflow specs follow the spec rules of gate-check and risk-floor (B-027) | sonnet, low | opus, low | [#92](https://github.com/AbdulkareemSasah/Eng-Agent/pull/92) | closed: superseded by B-341 ([#105](https://github.com/AbdulkareemSasah/Eng-Agent/pull/105)); PR #92 closed |
 | B-028 | docs | docs(eng-contract): T11 and T14 split within the 400-line task cap (B-028) | sonnet, low | opus, low | [#94](https://github.com/AbdulkareemSasah/Eng-Agent/pull/94) | done |
@@ -140,7 +141,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | [#75](https://github.com/AbdulkareemSasah/Eng-Agent/pull/75) | done |
 | B-052 | T23 | windows-tests command and the windows job | sonnet, medium | opus, low | [#73](https://github.com/AbdulkareemSasah/Eng-Agent/pull/73) | done |
 | B-053 | T24 | approvals port and verification with bootstrap off | sonnet, medium | opus, low | [#101](https://github.com/AbdulkareemSasah/Eng-Agent/pull/101) | done |
-| B-054 | T25 | Documentation, changelog 0.1.0 and the self-gate run | sonnet, low | opus, low | [#136](https://github.com/AbdulkareemSasah/Eng-Agent/pull/136) | open |
+| B-054 | T25 | Documentation, changelog 0.1.0 and the self-gate run | sonnet, low | opus, low | [#150](https://github.com/AbdulkareemSasah/Eng-Agent/pull/150) | done (c9571db) |
 | B-055 | T26 | Base-commit gate (gate root, provenance, head-run rules); built before T6 | sonnet, high | opus, medium | [#31](https://github.com/AbdulkareemSasah/Eng-Agent/pull/31) | done |
 | B-056 | docs | amend the eng-dev-gate plan: split task T2 into T2a and T2b | sonnet, low | opus, low | [#14](https://github.com/AbdulkareemSasah/Eng-Agent/pull/14) | done |
 | B-057 | T2b | Foundations (reporting, git port, workspace discovery, globs, event file) (part B, after the B-056 split) | sonnet, medium | opus, low | [#19](https://github.com/AbdulkareemSasah/Eng-Agent/pull/19) | done |
@@ -186,7 +187,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-100 | E.T1 | Package skeleton, gate configuration and workspace member | sonnet, low | opus, medium | [#106](https://github.com/AbdulkareemSasah/Eng-Agent/pull/106) | done |
 | B-101 | E.T2 | Harness codes, EngineStop and StepError families | sonnet, low | opus, medium | [#135](https://github.com/AbdulkareemSasah/Eng-Agent/pull/135) | done |
 | B-101-amend | docs | docs: amend the T2 budget in 0001-engine.md (B-101 plan amendment) | sonnet, low | opus, low | — | not started or in writing |
-| B-102 | E.T3 | Journal event payload models and the harness kinds module (split by B-366; first attempt over budget, rebuilt) | sonnet, high | opus, medium | — | not started or in writing |
+| B-102 | E.T3 | Journal event payload models and the harness kinds module (split by B-366; first attempt over budget, rebuilt) | sonnet, high | opus, medium | [#149](https://github.com/AbdulkareemSasah/Eng-Agent/pull/149) | done (795a031) |
 | B-103 | E.T4 | Journal reader API and views | sonnet, medium | opus, medium | — | not started or in writing |
 | B-104 | E.T5 | Blocks, workflows, registry, code hash and the block lock file | sonnet, medium | opus, medium | [#146](https://github.com/AbdulkareemSasah/Eng-Agent/pull/146) | open |
 | B-105 | E.T6 | Ports, port data types and in-memory fakes | sonnet, medium | opus, medium | — | not started or in writing |
@@ -227,7 +228,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-142 | C.T3 | approvals.yaml schema, loader, status resolution and the YAML parser ADR | sonnet, medium | opus, medium | — | not started or in writing |
 | B-143 | C.T4 | Calc kinds and their registration | sonnet, medium | opus, medium | — | not started or in writing |
 | B-144 | C.T5 | HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test | sonnet, medium | opus, medium | — | not started or in writing |
-| B-145 | C.T6 | Calc-module rules test, golden data loader and golden file lint, verification record template | sonnet, low | opus, medium | — | not started or in writing |
+| B-145 | C.T6 | Calc-module rules test, golden data loader and golden file lint, verification record template | sonnet, low | opus, medium | [#148](https://github.com/AbdulkareemSasah/Eng-Agent/pull/148) | done (205dfd5) |
 | B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | opus, medium | opus, medium | — | not started or in writing |
 | B-147 | C.T8 | Calc 2, difference report, with the tolerance-comparison helper | opus, medium | opus, medium | — | not started or in writing |
 | B-148 | C.T9 | Calc 3, read-back check | opus, medium | opus, medium | — | not started or in writing |
@@ -401,7 +402,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-357 | T34 | test-first: a package new in the pull request is not importable in the base run | sonnet, medium | opus, medium | [#130](https://github.com/AbdulkareemSasah/Eng-Agent/pull/130) | done |
 | B-358 | docs | docs(eng-contract): AC19 names what get and payload return for a split payload; a failure after the link commit is logged (B-358) | sonnet, low | opus, low | [#128](https://github.com/AbdulkareemSasah/Eng-Agent/pull/128) | done |
 | B-359 | docs | docs: schema snapshots are generated files (gate T35); interface plan T3 split into T3 and T3b (B-359) | sonnet, low | opus, low | [#138](https://github.com/AbdulkareemSasah/Eng-Agent/pull/138) | done (f5f4e25) |
-| B-360 | T35 | root gate.yml: JSON Schema snapshots are generated files (generated_globs) | sonnet, low | opus, low | [#145](https://github.com/AbdulkareemSasah/Eng-Agent/pull/145) | open |
+| B-360 | T35 | root gate.yml: JSON Schema snapshots are generated files (generated_globs) | sonnet, low | opus, low | [#145](https://github.com/AbdulkareemSasah/Eng-Agent/pull/145) | done (42fe791) |
 | B-362 | I.T3b | Launch-address opener: platform opener with BROWSER removed, address to the controlling terminal only | sonnet, medium | opus, low | — | not started or in writing |
 | B-363 | docs | docs(eng-dev-gate): an empty test package marker is in scope next to an in-scope test file, plan task T36 (B-363) | sonnet, low | opus, low | [#140](https://github.com/AbdulkareemSasah/Eng-Agent/pull/140) | done (5ddd0d5) |
 | B-364 | T36 | gate-check scope: an empty test package marker next to an in-scope test file | sonnet, medium | opus, medium | [#143](https://github.com/AbdulkareemSasah/Eng-Agent/pull/143) | open |
