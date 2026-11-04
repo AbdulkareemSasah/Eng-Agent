@@ -38,7 +38,8 @@ class FakeRunner:
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
     # the tests step has its own tests (test_coverage.py); the fake runner here writes no coverage report
     return repo.run(
-        ["--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation", *argv], {"check": make_handler(runner)}
+        ["--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation", *argv],
+        {"check": make_handler(runner)},
     )
 
 
@@ -148,7 +149,15 @@ def test_workspace_selection(repo: Repo) -> None:
     one = _statuses(_run(repo, FakeRunner(), "--package", "b"))
     assert list(one) == ["lock", "format", "lint", "types", "forbidden"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
-    argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation"]
+    argv = [
+        "--root",
+        str(repo.root / "pkgs" / "a"),
+        "--format",
+        "json",
+        "check",
+        "--skip",
+        "tests,docs-fresh,licenses,mutation",
+    ]
     inside = repo.run(argv, {"check": make_handler(FakeRunner())})
     assert json.loads(inside.out)["steps"][1]["name"] == "format"
 

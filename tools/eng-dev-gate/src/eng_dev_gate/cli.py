@@ -14,8 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks import licenses
-from eng_dev_gate.checks import mutation
+from eng_dev_gate.checks import licenses, mutation
 from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
 from eng_dev_gate.checks.registry import STEPS, StepContext
 from eng_dev_gate.report import AWAITING_TITLE, CommandResult, StepResult, escape_data, render
