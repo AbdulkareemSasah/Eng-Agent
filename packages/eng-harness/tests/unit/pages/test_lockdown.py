@@ -5,9 +5,10 @@ import socket
 from urllib.parse import urlsplit
 
 import pytest
-from tests.helpers.page_client import RUN_DATA, PageClient, StubApp, serving
+from helpers.page_client import RUN_DATA, PageClient, StubApp, serving
 
-from eng_harness.pages import CSRF_FIELD, PageServer, PageSettings
+from eng_harness.pages import PageServer, PageSettings
+from eng_harness.pages._security import CSRF_FIELD
 
 FORM = {"decision": "approve", "reason": "ok"}
 
@@ -66,8 +67,9 @@ def test_each_security_refusal_counts(kind: str) -> None:
 def test_shutdown_releases_port() -> None:
     with serving() as page:
         port = page.server.port
-        assert page.server.running
+        serving_now = page.server.running
         assert page.client.get("/").status == 200
+    assert serving_now
     assert not page.server.running
     with pytest.raises(ConnectionRefusedError):
         socket.create_connection(("127.0.0.1", port), timeout=5)
@@ -76,8 +78,9 @@ def test_shutdown_releases_port() -> None:
 
 def test_a_server_that_was_never_started_frees_its_port_on_close() -> None:
     server = PageServer(StubApp())
-    assert not server.running
     port = server.port
+    before = server.running
     server.close()
+    assert not before
     with pytest.raises(ConnectionRefusedError):
         socket.create_connection(("127.0.0.1", port), timeout=5)

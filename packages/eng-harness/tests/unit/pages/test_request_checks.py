@@ -1,9 +1,11 @@
 """Host, Origin, Fetch Metadata and CSRF checks run before any handler (plan 0006 T6; AC24, AC25)."""
 
 import pytest
-from tests.helpers.page_client import PageClient, serving
+from helpers.page_client import PageClient, serving
 
-from eng_harness.pages import CSRF_FIELD, Kind, PageSettings
+from eng_harness.pages import PageSettings
+from eng_harness.pages._routes import Kind
+from eng_harness.pages._security import CSRF_FIELD
 
 MANY = PageSettings(max_failed_requests=1000)  # these tests refuse many requests on purpose
 FORM = {"decision": "approve", "reason": "ok"}
@@ -39,9 +41,9 @@ def test_host_origin_fetch_metadata() -> None:
 
 # (route kind, page, post path, kind and id the app knows it by, page of a sibling of the same kind)
 KINDS = [
-    pytest.param("approval", "/request/req-1", "/answer/req-1", Kind.REQUEST, "req-1", "/request/req-3", id="approval"),
-    pytest.param("choice", "/request/req-2", "/answer/req-2", Kind.REQUEST, "req-2", "/request/req-4", id="choice"),
-    pytest.param("setup", "/setup/setup-1", "/setup/setup-1", Kind.SETUP, "setup-1", "/setup/setup-2", id="setup"),
+    pytest.param("approval", "/request/req-1", "/answer/req-1", "request", "req-1", "/request/req-3", id="approval"),
+    pytest.param("choice", "/request/req-2", "/answer/req-2", "request", "req-2", "/request/req-4", id="choice"),
+    pytest.param("setup", "/setup/setup-1", "/setup/setup-1", "setup", "setup-1", "/setup/setup-2", id="setup"),
 ]
 PAGES = {"approval": "/request/req-1", "choice": "/request/req-2", "setup": "/setup/setup-1"}
 

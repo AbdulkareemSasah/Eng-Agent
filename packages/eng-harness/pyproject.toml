@@ -40,6 +40,7 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "R
 [tool.pytest.ini_options]
 addopts = "-ra -q --strict-markers --strict-config --import-mode=importlib"
 testpaths = ["tests"]
+pythonpath = ["tests"]  # shared test helpers import as helpers.<module>
 markers = [
     "windows: needs Windows; runs in the Windows CI job",
 ]

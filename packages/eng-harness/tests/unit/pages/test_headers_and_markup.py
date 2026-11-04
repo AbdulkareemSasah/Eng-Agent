@@ -4,10 +4,11 @@ import base64
 import hashlib
 from html.parser import HTMLParser
 
-from tests.helpers.page_client import RUN_DATA, Result, serving
+from helpers.page_client import RUN_DATA, Result, serving
 
-from eng_harness.pages import CSRF_FIELD, PageSettings
+from eng_harness.pages import PageSettings
 from eng_harness.pages._css import STYLESHEET
+from eng_harness.pages._security import CSRF_FIELD
 
 FORBIDDEN_TAGS = {"script", "iframe", "object", "embed", "link", "img"}
 URL_ATTRIBUTES = {"href", "action", "src", "data", "formaction", "poster", "srcset", "cite", "ping", "background"}

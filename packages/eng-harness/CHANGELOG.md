@@ -6,3 +6,4 @@
 - Servers configuration: `eng_harness.servers` loads and validates the `[servers.*]`, `[cli_tools.*]` and `[host_programs.*]` sections of `harness.toml` (required timeouts, forbidden options); `mcp>=2.3,<3` runtime dependency with ADR-0001 (Proposed) (B-120).
 - Text, date and number formatting and sanitizing: `eng_harness._text` and its culture-invariance rule test (B-175).
 - HTML builder: `eng_harness._html` (text escaped by construction, safe tokens, labeled untrusted `<bdi>` fields, style element with its SHA-256 policy source) and the shared style sheet `eng_harness.pages._css` (B-176).
+- Page server: `eng_harness.pages` binds the loopback interface on an operating-system port and checks launch code, session cookie, Host, Origin, Fetch Metadata and CSRF token, with the security headers, a fixed route table, request limits, lockdown and shutdown (B-180).

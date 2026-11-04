@@ -3,14 +3,16 @@
 import io
 import ipaddress
 import re
+import socket
 import tokenize
 from pathlib import Path
 
 import pytest
 from eng_contract.errors import ErrorCode
-from tests.helpers.page_client import StubApp, serving
+from helpers.page_client import StubApp, serving
 
-from eng_harness.pages import LOOPBACK, PageBindError, PageServer
+from eng_harness.pages import PageBindError, PageServer
+from eng_harness.pages._security import LOOPBACK
 
 PAGES = Path(__file__).resolve().parents[3] / "src" / "eng_harness" / "pages"
 _ADDRESS_WORDS = re.compile(r"0\.0\.0\.0|localhost", re.IGNORECASE)
@@ -49,3 +51,10 @@ def test_no_source_line_names_a_wildcard_or_name_address() -> None:
             if token.type == tokenize.STRING and _ANY_V6.fullmatch(token.string.strip("\"'").strip()):
                 offences.append(f"{path.name}:{token.start[0]}")
     assert offences == []
+
+
+def test_a_socket_not_on_the_loopback_address_is_refused_after_binding(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(socket.socket, "getsockname", lambda _self: ("192.0.2.1", 5))
+    with pytest.raises(PageBindError) as refused:
+        PageServer(StubApp())
+    assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT

@@ -10,24 +10,25 @@ import re
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from http import HTTPStatus
 from urllib.parse import urlencode, urlsplit
 
-from eng_harness.pages._security import Route
-
 from eng_harness._html import Node, SafeToken, Tag, Text, document, el, href, trusted
-from eng_harness.pages import CSRF_FIELD, Kind, PageServer, PageSettings, Reply, Screen, Subject
+from eng_harness.pages import PageServer, PageSettings, Screen
 from eng_harness.pages._css import STYLESHEET
+from eng_harness.pages._routes import Kind, Response, page
+from eng_harness.pages._security import CSRF_FIELD, Route, Subject
 
 RUN_DATA = "RUN-DATA-MARKER"  # on every page of the stub; a refusal must never show it
 FIELDS = frozenset({"decision", "reason"})
 # (kind, id) -> (CSRF route kind, hash bound to the screen); two ids per route kind so tokens can be swapped
 SPECS: dict[tuple[Kind, str], tuple[Route, str]] = {
-    (Kind.REQUEST, "req-1"): ("approval", "a" * 64),
-    (Kind.REQUEST, "req-3"): ("approval", "e" * 64),
-    (Kind.REQUEST, "req-2"): ("choice", "b" * 64),
-    (Kind.REQUEST, "req-4"): ("choice", "f" * 64),
-    (Kind.SETUP, "setup-1"): ("setup", "c" * 64),
-    (Kind.SETUP, "setup-2"): ("setup", "d" * 64),
+    ("request", "req-1"): ("approval", "a" * 64),
+    ("request", "req-3"): ("approval", "e" * 64),
+    ("request", "req-2"): ("choice", "b" * 64),
+    ("request", "req-4"): ("choice", "f" * 64),
+    ("setup", "setup-1"): ("setup", "c" * 64),
+    ("setup", "setup-2"): ("setup", "d" * 64),
 }
 _TOKEN = re.compile(r'<input type="hidden" name="csrf" value="([A-Za-z0-9_-]+)">')
 Headers = Mapping[str, str | None]
@@ -47,9 +48,9 @@ class StubApp:
         if self.failure is not None:
             raise self.failure
 
-    def index(self) -> Reply:
+    def index(self) -> Response:
         self._enter("index")
-        return Reply(trusted("Run"), [el(Tag.P, Text(RUN_DATA))])
+        return page(HTTPStatus.OK, trusted("Run"), [el(Tag.P, Text(RUN_DATA))])
 
     def screen(self, kind: Kind, subject_id: str) -> Screen | None:
         self._enter("screen")
@@ -58,7 +59,7 @@ class StubApp:
             return None
         route, bound = spec
         subject = Subject(route, subject_id, self.rebound.get((kind, subject_id), bound))
-        action = href(SafeToken("setup" if kind is Kind.SETUP else "answer"), SafeToken(subject_id))
+        action = href(SafeToken("setup" if kind == "setup" else "answer"), SafeToken(subject_id))
 
         def render(token: str) -> Sequence[Node]:
             form = el(
@@ -77,10 +78,10 @@ class StubApp:
         self._enter("report")
         return document(trusted("Report"), [el(Tag.P, Text(RUN_DATA))], STYLESHEET)
 
-    def submit(self, kind: Kind, subject_id: str, form: Mapping[str, str]) -> Reply:
+    def submit(self, kind: Kind, subject_id: str, form: Mapping[str, str]) -> Response:
         self._enter("submit")
         self.submitted.append((kind, subject_id, dict(form)))
-        return Reply(trusted("Recorded"), [el(Tag.P, Text("answer recorded"))])
+        return page(HTTPStatus.OK, trusted("Recorded"), [el(Tag.P, Text("answer recorded"))])
 
 
 @dataclass(frozen=True)

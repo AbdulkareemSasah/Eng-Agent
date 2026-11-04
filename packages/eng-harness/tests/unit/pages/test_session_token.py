@@ -6,10 +6,9 @@ import re
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
-from eng_harness.pages._security import PageSecurity, Refusal
-from tests.helpers.page_client import RUN_DATA, serving
+from helpers.page_client import RUN_DATA, serving
 
-from eng_harness.pages import Subject
+from eng_harness.pages._security import PageSecurity, RefusalError, Subject
 
 _COOKIE = re.compile(r"eh_(\d+)_session=([A-Za-z0-9_-]+); HttpOnly; SameSite=Strict; Path=/")
 
@@ -78,8 +77,8 @@ def test_secrets_are_compared_with_compare_digest(monkeypatch: pytest.MonkeyPatc
     real = hmac.compare_digest
     seen: set[bytes] = set()
 
-    def spy(left: bytes | str, right: bytes | str) -> bool:
-        seen.update(x.encode() if isinstance(x, str) else bytes(x) for x in (left, right))
+    def spy(left: bytes, right: bytes) -> bool:
+        seen.update((left, right))
         return real(left, right)
 
     monkeypatch.setattr(hmac, "compare_digest", spy)
@@ -106,11 +105,11 @@ def test_token_depends_on_route_subject_hash_and_session() -> None:
     assert len({security.csrf_token(s, session) for s, session in variants} | {token}) == 5
     security.verify_csrf(base, "session-1", token)  # does not raise
     for subject, session in variants:
-        with pytest.raises(Refusal) as refused:
+        with pytest.raises(RefusalError) as refused:
             security.verify_csrf(subject, session, token)
         assert refused.value.status == 403
     for bad in (None, "", token[:-1], token + "0", token.upper()):
-        with pytest.raises(Refusal):
+        with pytest.raises(RefusalError):
             security.verify_csrf(base, "session-1", bad)
     other = PageSecurity(port=50000, max_failed=100)  # another server (another key) issues other tokens
     assert other.csrf_token(base, "session-1") != token
