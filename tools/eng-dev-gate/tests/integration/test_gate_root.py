@@ -184,6 +184,18 @@ def test_head_run_in_both_modes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
         assert not summary.exists()
 
 
+def test_head_run_needs_a_gate_yml_at_the_base(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A head run reads the mode from the base commit; a base without gate.yml is CF007 (exit 2), not a guess."""
+    repo = make_repo(tmp_path / "repo")
+    base = repo.commit({"README.md": "base\n"})
+    head = repo.commit({".gate/gate.yml": _gate_yml(bootstrap=True, diff_lines=200)})
+    event = _event(tmp_path / "event.json", base, head)
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    result = World(repo, base, head, tmp_path / "none", event).run(use_gate_root=False)
+    assert result.code == 2
+    assert "CF007" in result.err
+
+
 @pytest.mark.parametrize("base_bootstrap", [True, False])
 def test_head_run_is_refused_when_the_base_has_the_action(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, base_bootstrap: bool

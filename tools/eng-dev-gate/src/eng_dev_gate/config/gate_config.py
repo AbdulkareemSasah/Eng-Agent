@@ -152,13 +152,25 @@ def load_gate_config(gate_root: Path) -> GateConfig:
     """
     path = gate_root / ".gate" / "gate.yml"
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as error:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
         raise ConfigError("CF007", f"cannot read {path}: {error}") from error
+    return parse_gate_config(text, str(path))
+
+
+def parse_gate_config(text: str, source: str) -> GateConfig:
+    """Parse the text of a ``gate.yml`` (a file, or the file at the base commit); ``source`` names it in errors.
+
+    Raises:
+        ConfigError: CF007 when the text is not YAML or invalid; CF008 when bootstrap is off and the identities are
+            incomplete.
+    """
     try:
-        return GateConfig.model_validate(data).validated()
+        return GateConfig.model_validate(yaml.safe_load(text)).validated()
+    except yaml.YAMLError as error:
+        raise ConfigError("CF007", f"cannot read {source}: {error}") from error
     except ValidationError as error:
-        raise ConfigError("CF007", f"invalid {path}: {error}") from error
+        raise ConfigError("CF007", f"invalid {source}: {error}") from error
 
 
 def awaiting_finding(config: GateConfig, code: str, message: str, path: str | None = None) -> Finding:

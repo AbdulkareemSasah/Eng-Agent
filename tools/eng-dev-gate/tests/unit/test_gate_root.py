@@ -5,9 +5,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+import eng_dev_gate
 import pytest
 from eng_dev_gate import gate_root
-from eng_dev_gate.config import parse_gate_config
+from eng_dev_gate.config.gate_config import parse_gate_config
 from eng_dev_gate.gate_root import GateContext, job_for
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult
 from eng_dev_gate.results import ExitCode, UsageError
@@ -63,3 +64,7 @@ def test_provenance_error_is_cf009_and_exit_1() -> None:
     error = gate_root.ProvenanceError("running package outside the gate root")
     assert str(error).startswith("CF009 ")
     assert error.exit_code is ExitCode.FAILED
+
+
+def test_running_package_is_the_imported_package() -> None:
+    assert gate_root.running_package() == Path(eng_dev_gate.__file__).resolve().parent
