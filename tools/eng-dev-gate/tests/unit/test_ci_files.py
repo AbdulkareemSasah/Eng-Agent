@@ -19,7 +19,7 @@ NINE_JOBS = {
     "gate", "gate-check", "risk-floor", "test-first", "ci-review", "agents-drift", "security", "windows", "build",
 }  # fmt: skip
 # ci-review runs on pull requests only
-PR_JOBS = ("gate", "gate-check", "agents-drift", "security", "build", "risk-floor", "ci-review")
+PR_JOBS = ("gate", "gate-check", "agents-drift", "security", "build", "risk-floor", "test-first", "ci-review")
 GATE_ROOT_RUN = 'uv run --project "$GATE_ROOT" --package eng-dev-gate eng-gate --root . --gate-root "$GATE_ROOT"'
 
 
@@ -110,6 +110,7 @@ def test_security_and_build_commands() -> None:
     assert "secrets --tree" in security
     assert "uv audit --locked" in security
     assert "risk-floor" in _runs(_action("risk-floor"))
+    assert "test-first" in _runs(_action("test-first"))
     for name in PR_JOBS:
         scripts = _runs(_action(name))
         assert GATE_ROOT_RUN in scripts, name  # the base variant
@@ -137,7 +138,8 @@ def test_ignored_base_checkout_and_spikes() -> None:
 
 
 @pytest.mark.parametrize(
-    "name", ["setup", "gate", "gate-check", "agents-drift", "security", "build", "risk-floor", "ci-review"]
+    "name",
+    ["setup", "gate", "gate-check", "agents-drift", "security", "build", "risk-floor", "test-first", "ci-review"],
 )
 def test_actions_are_composite(name: str) -> None:
     """Each action is composite, has the optional gate-root input and names the shell of every run step."""
