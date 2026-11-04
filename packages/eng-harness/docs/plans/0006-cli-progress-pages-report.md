@@ -24,6 +24,7 @@ tasks:
   - id: T2
     title: "HTML builder: escaping by construction, safe tokens, labeled untrusted fields, style hash"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/_html.py"
       - "packages/eng-harness/src/eng_harness/pages/_css.py"
@@ -64,11 +65,13 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_config.py::test_discovery_and_sections"
       - "packages/eng-harness/tests/unit/cli/test_encoding.py::test_redirected_output_is_utf8"
       - "packages/eng-harness/tests/rules/test_imports.py::test_third_party_imports_limited"
-    covers: [AC1, AC2, AC3, AC4, AC5, AC60, AC61]
+      - "packages/eng-harness/tests/unit/cli/test_parser.py::test_entry_point_and_root_form"
+    covers: [AC1, AC2, AC3, AC4, AC5, AC60, AC61, AC65]
     depends_on: [T1]
   - id: T4
     title: "Expected times from earlier journals and the progress renderer"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.progress (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/progress/__init__.py"
       - "packages/eng-harness/src/eng_harness/progress/_expected.py"
@@ -90,6 +93,7 @@ tasks:
   - id: T5
     title: "Non-blocking progress sink, heartbeat task and liveness reader"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.progress (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/progress/_sink.py"
       - "packages/eng-harness/src/eng_harness/progress/_heartbeat.py"
@@ -107,6 +111,7 @@ tasks:
   - id: T6
     title: "Page server: loopback bind, launch code and session, Host, Origin and CSRF checks, headers, routes, lockdown"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/__init__.py"
       - "packages/eng-harness/src/eng_harness/pages/_security.py"
@@ -135,6 +140,7 @@ tasks:
   - id: T7
     title: "Answer models and checks, approval and input ports, durable wait, stop-file run control"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli, eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_answers.py"
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
@@ -162,6 +168,7 @@ tasks:
   - id: T8
     title: "Report package skeleton, release marks and lineage closure"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/__init__.py"
       - "packages/eng-harness/src/eng_harness/report/_lineage.py"
@@ -177,6 +184,7 @@ tasks:
   - id: T9
     title: "Approval screens: change set, promotion, info and sign-off"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_labels.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_approval.py"
@@ -194,6 +202,7 @@ tasks:
   - id: T10
     title: "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_screens_choice.py"
       - "packages/eng-harness/src/eng_harness/pages/_answers_file.py"
@@ -211,6 +220,7 @@ tasks:
   - id: T11
     title: "Report model: fold the journal and the store; timings, waiting and machine time"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_model.py"
       - "packages/eng-harness/tests/unit/report/test_timings.py"
@@ -224,6 +234,7 @@ tasks:
   - id: T12
     title: "Report sections: changes, results, sources, decisions; renderer registry; value cells with sources"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_sections.py"
       - "packages/eng-harness/tests/unit/report/test_sources.py"
@@ -241,6 +252,7 @@ tasks:
   - id: T13
     title: "Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_document.py"
       - "packages/eng-harness/src/eng_harness/report/_write.py"
@@ -263,6 +275,7 @@ tasks:
     # handling, the launch address on the terminal only (AC10, AC61) and the decision layer of amendment B-098
     # (AC62, AC63).
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_options.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
@@ -272,7 +285,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
-    max_changed_lines: 310
+    # Amendment B-354: `run --answers FILE` (AC64), about 30 lines; budget 310 -> 340.
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
@@ -280,11 +294,13 @@ tasks:
       - "packages/eng-harness/tests/replay/test_cli_resume.py::test_no_wait_then_resume"
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
-    covers: [AC6, AC7, AC8, AC14, AC46]
+      - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request"
+    covers: [AC6, AC7, AC8, AC14, AC46, AC64]
     depends_on: [T3, T5, T7, T9, T10, T13]
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_signals.py"
@@ -305,6 +321,7 @@ tasks:
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_screens_basis.py"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py"
@@ -314,11 +331,13 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_basis_confirmation_flow"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_reject_leaves_no_run"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_stale_draft_hash_refused"
+      - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_no_wait_basis_exits_10_nothing_stored"
     covers: [AC47]
     depends_on: [T14b]
   - id: T16
     title: "Commands status, stop, report and doctor"
     files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_status.py"
       - "packages/eng-harness/src/eng_harness/cli/_stop.py"
@@ -398,7 +417,9 @@ element builder, style element and its SHA-256 for the policy. Property tests on
 **T3 Shell** (spec §4.1, §4.2.1, §4.2.3, §4.2.4, §4.4.4). `main(argv, deps)`, six subcommands registered as stubs that
 call into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream encoding setup, the launch-address
 opener of `CliDeps` (platform opener with `BROWSER` removed; writer to the controlling terminal only); `[project.scripts]`,
-`__main__`, `public_modules`. The rules tests for AC2 and AC60 start here and tighten as modules appear.
+`__main__`, `public_modules`. The rules tests for AC2 and AC60 start here and tighten as modules appear. Amendment
+B-354: the entry point test of AC65 (the declared script, `python -m eng_harness`, no root script); the supported root
+form `uv run --package eng-harness eng-harness` needs no change to the root `pyproject.toml` (spec §4.1).
 
 **T4 Progress display** (spec §4.3). `ExpectedTimes.build` (read-only journals, median, range, sample floor) and
 `ProgressRenderer` for the three modes, with text snapshots.
@@ -438,7 +459,9 @@ the mandatory source, the sources table, changes and results; snapshot.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
-tests. Budget 310 lines. The original T14 (430 lines) was split by B-342 (D-12).
+tests. Budget 340 lines. The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
+FILE` (AC64): the object is checked in step 2 and the page `InputPort` is wrapped in `_wiring.py` so that the first data
+request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340).
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
@@ -448,6 +471,7 @@ on standard error (AC62); the run header records the runtime's summary (AC63, th
 the 120. T15 and T16 follow T14b.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
+Amendment B-354: `run --no-wait` with required basis fields exits 10 before any run exists, nothing stored (AC47).
 
 **T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the `stop` command in
 `cli/_stop.py` (it writes and waits on the stop file whose protocol lives in `cli/_control.py`, T7),

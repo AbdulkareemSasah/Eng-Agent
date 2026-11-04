@@ -562,20 +562,21 @@ Use a normal PowerShell window in `C:\path\to\Eng-Agent`.
 1. Start the run:
 
    ```powershell
-   uv run --package eng-harness eng-harness run model_edit_cycle --input C:\path\to\input.json --template blank --basis C:\path\to\basis.yaml --run-class trial --no-wait
+   uv run --package eng-harness eng-harness run model_edit_cycle --input C:\path\to\input.json --template blank --basis C:\path\to\basis.yaml --run-class trial --answers C:\path\to\change-set.json
    ```
 
    Options defined for `run` ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1):
-   `--mode {work_on_copy, approve_each_write, autonomous_logged}` (default `work_on_copy`), `--no-wait`,
-   `--wait-timeout`, `--no-browser`, `--progress`, `--json`, `--no-report`. `blank` is the one template that ships.
-   `--no-wait` is in the command because step 6 needs it. If you started without it, start again with it. Note: spec
-   0006 says a `--no-wait` run does not serve the basis confirmation page (exit 10, nothing stored), so how to confirm
-   the basis before using `--no-wait` is not defined yet (Open points, item 13).
+   `--mode {work_on_copy, approve_each_write, autonomous_logged}` (default `work_on_copy`), `--answers FILE`,
+   `--no-wait`, `--wait-timeout`, `--no-browser`, `--progress`, `--json`, `--no-report`. `blank` is the one template
+   that ships. `--answers` gives the run your change set for its first change-set request (step 5), so prepare
+   `change-set.json` before you start; a file that is missing, not valid JSON or not one JSON object stops the command
+   with exit 2 before any run folder exists ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) AC64).
+   Do not use `--no-wait` for this workflow: a workflow that confirms a basis is started only by a waiting `run`, and
+   with `--no-wait` it exits 10 and stores nothing (spec 0006 §4.4.7, AC47; decided by amendment B-354).
 2. The **basis confirmation page** opens in your browser (or, with `--no-browser`, the address is printed to this
    terminal only). Check each section's values, units, sources and bounds. Tick each section, enter your name and
    confirm. The page does not let you edit values; edit the values file and run again if something is wrong.
-   Rejecting needs a reason and ends the run before it starts (exit 3, no run folder). See the note under step 1 on
-   `--no-wait`.
+   Rejecting needs a reason and ends the run before it starts (exit 3, no run folder).
 3. The terminal shows progress. Steps 1 and 2 of the workflow run once: the server builds and tool lists are
    checked, then a working copy of your model is saved into the run folder. Note the **run id** printed (it starts
    with `run_`).
@@ -583,8 +584,9 @@ Use a normal PowerShell window in `C:\path\to\Eng-Agent`.
    check failure (exit 3, `SERVER_CHECK_FAILED`, [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.3).
 4. Steps 3 and 4 read the model and compare it with the last recorded revision. Differences are your own changes;
    they are shown and recorded, never overwritten.
-5. Step 5 asks for the **change set**. This is a data request: the page shows the fields read-only and tells you to
-   use `resume --answers FILE`. Prepare `change-set.json`. Its shape ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md)
+5. Step 5 asks for the **change set**. This is a data request. The first one of the run is answered from the file you
+   gave with `--answers`, and no page is shown for it; if the file fails the request's checks, the request is shown
+   again on the page (spec 0006 AC64). Prepare `change-set.json` before step 1. Its shape ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md)
    §4.3.1) is `{"change_set": {"items": [...], "note": "...", "benchmark_request": "<B-1 request id>"}}`. Each item
    has a unique `id` and a `kind`. The kinds in v1 are `frame_section`, `area_section`, `wall_section`,
    `frame_uniform_load`, `area_uniform_load`, `load_pattern_add`, `load_combination_set`, `load_combination_delete`
@@ -607,10 +609,11 @@ Use a normal PowerShell window in `C:\path\to\Eng-Agent`.
    or a material, point loads and non-gravity directions, changing or deleting a load pattern, seismic parameters
    ([workflow page](packages/eng-harness/docs/workflows/model-edit-cycle.md) §3.1). A B-1 request that needs one of
    them cannot be run through the harness yet; note it as a finding.
-6. Give the answers to the run. Spec 0007 section 11 Q7 ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md))
-   gives the route until `run --answers` exists: start the run with `--no-wait` (step 1). It exits 10
-   (`AWAITING_ENGINEER`, [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1) at the
-   change-set request, with nothing answered. Then run:
+6. **Later change sets.** A change set that is asked again (a re-ask, or the next cycle after *more edits*) is never
+   taken from the `--answers` file (spec 0006 AC64). The page shows that request read-only and tells you to give it
+   with `resume --answers FILE` after the run has paused at the request
+   ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §4.3.1; [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md)
+   §4.2.1). How a waiting run is paused for that is not spelled out yet (Open points, item 5). The command is:
 
    ```powershell
    uv run --package eng-harness eng-harness resume <run_id> --answers C:\path\to\change-set.json
@@ -618,8 +621,6 @@ Use a normal PowerShell window in `C:\path\to\Eng-Agent`.
 
    `status <run_id>` shows where the run is and prints the next command to run. `status` never changes anything.
 
-   *(The form `run ... --answers FILE` is not available: it is a spec 0006 amendment proposed in spec 0007 Q7, and no
-   plan task in the repository delivers it yet; check BUILD-STATUS.md; Open points, item 5.)*
 7. Step 6, the **change-set approval page**. It shows the items, the differences from the last revision, the model
    state the approval is bound to, and a reject box per item. Approve, reject single items, or reject with a reason.
    Only you can approve; there is no command that approves ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md)
@@ -669,9 +670,10 @@ down any. Check a stale build: use a `harness.toml` whose pin names a different 
 before step 2 with a server check failure and the model untouched. Put the pin back afterwards.
 
 **A3. The audit shows that every engineering value written came from a reference (change set, basis or step result), checked automatically.**
-The audit is `audit_value_sources` ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) AC25). It
-is a function, not one of the six commands. How to run it over your real journals is not defined yet (Open points,
-item 7). The automatic check reports any write step argument at an engineering parameter that is not a reference to
+The audit is `audit_value_sources` ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) AC25). Run it
+on a run folder with `uv run --package eng-harness python -m eng_harness.report audit-sources <run folder>` (spec 0007
+AC35, amendment B-354; available once eng-harness plan 0007 task T11 has merged; check BUILD-STATUS.md). It only
+reads. The automatic check reports any write step argument at an engineering parameter that is not a reference to
 `basis.design_basis/1` or `basis.engineer_input/1`. What you can check by hand: in the report, every value cell names
 its source.
 
@@ -702,7 +704,9 @@ procedure (Open points, item 8). Promotion while the original is open in your ow
 check listed in section 7.
 
 **A7. At most one engineer prompt per cycle, besides the change-set approval and the engineer turn.**
-One batched screen counts as one. The report shows the prompt count per cycle (spec 0007 §4.9). A repeated approval,
+One batched screen counts as one. The report shows the prompt count per cycle (spec 0007 §4.9), and
+`uv run --package eng-harness python -m eng_harness.report count-prompts <run folder>` prints it for a run folder
+(spec 0007 AC35; available once plan 0007 task T11 has merged). A repeated approval,
 a re-asked change set and every engine screen count. Failure paths (a timeout, a void approval, a read-back failure)
 are counted and shown but are not what the bound measures; it applies to normal paths. Be aware that while every
 analysis message is `unclassified` (EC-G3), a cycle with analysis messages asks you once, which uses the prompt
@@ -980,14 +984,15 @@ Each is something this guide needs but the documents do not define, with the fil
    written yet. [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §4.3.4 and §4.5.1.
 4. **The `--input` JSON.** How the model file is written in `input.json` (the `harness.file_input/1` reference).
    [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §4.2 and [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §4.7.
-5. **Supplying the first change set.** Spec 0007 Q7 gives the interim route (`run --no-wait`, then `resume --answers`);
-   the amendment that would let `run --answers FILE` pre-answer it is proposed there and is not in spec 0006.
-   [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §11 Q7; [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1.
-6. **How to invoke the command from the root.** The entry point is `eng-harness`; whether `uv run eng-harness` works
-   at the root, or `uv run --package eng-harness eng-harness` is needed, depends on the root `pyproject.toml`
-   workspace members and dependency groups once the package is added. [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.1; [plan 0001](packages/eng-harness/docs/plans/0001-engine.md) T1.
-7. **Running the A3 audit and the A7 prompt counter on real journals.** `audit_value_sources` and `count_prompts`
-   are functions with no command; the CLI has six commands only. [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) AC25, AC26; [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) AC1.
+5. **Pausing a waiting run for a later change set.** The first change set comes from `run --answers FILE` (decided by
+   amendment B-354, spec 0006 AC64). A later one is given with `resume --answers FILE` "after a pause" (spec 0007
+   §4.3.1); how the waiting `run` is paused for it is not stated. [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1.
+6. **How to invoke the command from the root.** Resolved by amendment B-354: the supported form is
+   `uv run --package eng-harness eng-harness <command>` ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.1, AC65);
+   the owner confirms it against the uv documentation (spec 0006 Q18).
+7. **Running the A3 audit and the A7 prompt counter on real journals.** Resolved by amendment B-354: the read-only
+   entry point `python -m eng_harness.report` with `audit-sources` and `count-prompts`
+   ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) AC35, Q11).
 8. **Local comparison procedure for A6 and the B-1 sheet.** How to decide "the same model as an uninterrupted run"
    and the layout of the B-1 time sheet. [18](design/docs/architecture/18-first-slice-dxf-to-etabs.md) §5; [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §4.9.
 9. **The live acceptance script and record for A1 to A7.** [process/05](design/process/05-testing-and-verification.md)
@@ -1004,7 +1009,6 @@ Each is something this guide needs but the documents do not define, with the fil
     path `acceptance/recordings/` (git installation, branch `build/v1`, the commit message form, the push). Git is not
     listed in 1.2 because no document requires you to use it. Until this is defined, the agent states the procedure at
     the time (section 4, step 6).
-13. **`--no-wait` and basis confirmation.** Spec 0006 says a `--no-wait` run does not serve the basis confirmation
-    page (exit 10, nothing stored), while spec 0007 Q7 gives `run --no-wait` as the interim route for the first change
-    set. How to confirm the basis before that route is not defined.
-    [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.4.7 and §4.2.1; [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §11 Q7.
+13. **`--no-wait` and basis confirmation.** Resolved by amendment B-354: there is no deferred basis confirmation; a
+    workflow with required basis fields is started by a waiting `run`, and `--no-wait` exits 10 and stores nothing
+    ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.4.7, AC47).
