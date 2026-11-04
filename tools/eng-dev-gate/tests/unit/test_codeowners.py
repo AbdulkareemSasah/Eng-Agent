@@ -1,4 +1,4 @@
-"""Unit tests of the CODEOWNERS matcher (spec 4.5 step 9: the gitignore subset ``*``, ``**``, leading and trailing ``/``)."""
+"""Unit tests of the CODEOWNERS matcher (spec 4.5 step 9)."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def test_parse_patterns_rejects_syntax_outside_the_subset(pattern: str) -> None:
     ],
 )
 def test_pattern_semantics(pattern: str, path: str, expected: bool) -> None:
-    """A leading ``/`` or an inner slash anchors the pattern; otherwise it matches at any depth; a match covers the subtree."""
+    """A leading or inner ``/`` anchors the pattern, else it matches at any depth; a match covers the subtree."""
     assert protected_paths([path], [pattern]) == ([path] if expected else [])
 
 

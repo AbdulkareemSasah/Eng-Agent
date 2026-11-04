@@ -52,7 +52,7 @@ def _commit_and_check(repo: Repo, base: str, files: dict[str, str], body: str, *
     ("files", "body", "code", "needle"),
     [
         ({PLAN_PATH: plan_text() + MORE}, DOCS, None, ""),
-        ({PLAN_PATH: plan_text() + MORE, SPEC_PATH: spec_text() + "\n- AC1b. Extra.\n"}, DOCS, None, ""),
+        ({PLAN_PATH: plan_text() + MORE, SPEC_PATH: spec_text() + "\nA note.\n"}, DOCS, None, ""),
         ({PLAN_PATH: plan_text() + MORE, "pkg/src/new.py": "y = 2\n"}, DOCS, "GC010", "pkg/src/new.py"),
         ({PLAN_PATH: plan_text() + MORE}, BODY, "GC011", "spec and plan"),
         ({PLAN_PATH: plan_text() + MORE}, "Work-Item: B-001\n", "GC001", ""),
@@ -139,7 +139,7 @@ def _draft_gate_repo(repo: Repo, status: str) -> str:
 def test_status_approved(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """AC16: setting `approved` fails in bootstrap mode (GC014) and needs verified approvals otherwise (GC015)."""
     base = _draft_gate_repo(repo, "draft")
-    both = {PLAN_PATH: plan_text(status="approved"), SPEC_PATH: spec_text("approved"), NEW_PLAN: plan_text()}
+    both = {PLAN_PATH: plan_text(status="approved"), SPEC_PATH: spec_text("approved")}
     result = _commit_and_check(repo, base, both, DOCS)
     assert sorted(f for f in _findings(result) if f[0] == "GC014") == [
         ("GC014", "error", PLAN_PATH),
@@ -236,3 +236,18 @@ def test_gate_branch_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.Monk
     assert set(gate_check(normal, wrong, gate=gate)[1]) == {"GC013"}
     merge_like = write_event(normal, base, "Closes #1\n", base_ref="main", head_ref="build/v1", name="n.json")
     assert set(gate_check(normal, merge_like, gate=gate)[1]) == {"GC001"}
+
+
+def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
+    """Spec 4.5 step 4: in bootstrap mode a draft spec of risk r1 or r2 and a draft large plan are AW01."""
+    large = plan_text(status="draft").replace("size: small", "size: large")
+    r3_spec = spec_text("draft").replace("risk: r1", "risk: r3")
+    quiet = Repo(tmp_path / "quiet")  # a draft spec of risk r3 and a draft plan that is not large wait for no owner
+    base = make_gate_repo(quiet, plan=plan_text(status="draft"), base_files={SPEC_PATH: r3_spec})
+    result = _commit_and_check(quiet, base, {"pkg/src/new.py": "y = 2\n"}, BODY)
+    assert (result.code, _findings(result), json.loads(result.out)["status"]) == (0, [], "pass")
+    loud = Repo(tmp_path / "loud")
+    base = make_gate_repo(loud, plan=large, base_files={SPEC_PATH: spec_text("draft")})
+    result = _commit_and_check(loud, base, {"pkg/src/new.py": "y = 2\n"}, BODY)
+    assert result.code == 0
+    assert sorted(_findings(result)) == [("AW01", "awaiting", PLAN_PATH), ("AW01", "awaiting", SPEC_PATH)]
