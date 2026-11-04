@@ -60,20 +60,22 @@ def _setup(repo: Repo, minimum: int = 80, table: str | None = None) -> tuple[str
         ".gate/gate.yml": GATE_YML,
         "pkgs/a/pyproject.toml": HEAD + (table if table is not None else TABLE.format(minimum=minimum)),
         "pkgs/a/src/a/__init__.py": "",
-        "pkgs/a/src/a/core.py": "A = 1\n",
+        "pkgs/a/src/a/core.py": "def a():\n    return 1\n",
         "pkgs/a/src/a/other.py": "B = 1\n",
         "pkgs/a/src/a/gone.py": "C = 1\n",
         "pkgs/a/src/a/rules/__init__.py": "",
-        "pkgs/a/src/a/rules/r1.py": "D = 1\n",
+        "pkgs/a/src/a/rules/r1.py": "def d():\n    return 1\n",
     }
     base = repo.commit(files)
     return base, Member(name="a", path="pkgs/a", directory=repo.root / "pkgs" / "a")
 
 
 def _change(repo: Repo) -> None:
-    repo.commit({"pkgs/a/src/a/core.py": "A = 2\n", "pkgs/a/src/a/other.py": "B = 2\n"})
+    repo.commit({"pkgs/a/src/a/core.py": "def a():\n    return 2\n", "pkgs/a/src/a/other.py": "B = 2\n"})
     repo.git("rm", "-q", "pkgs/a/src/a/gone.py")
-    repo.commit({"pkgs/a/src/a/rules/r2.py": "E = 1\n", "pkgs/a/src/a/rules/__init__.py": "# changed\n"})
+    repo.commit(
+        {"pkgs/a/src/a/rules/r2.py": "def e():\n    return 1\n", "pkgs/a/src/a/rules/__init__.py": "# changed\n"}
+    )
 
 
 def _context(repo: Repo, member: Member, runner: FakeMutmut, base: str | None) -> StepContext:
@@ -89,7 +91,6 @@ def test_changed_modules_only(repo: Repo) -> None:
     assert set(_mutmut_option(runner.config, "only_mutate")) == {
         "src/a/core.py",
         "src/a/rules/r2.py",
-        "src/a/rules/__init__.py",
     }
 
 
@@ -236,3 +237,51 @@ def test_no_base_uses_the_merge_base_with_the_gate_branch(repo: Repo) -> None:
     runner = FakeMutmut(["killed"] * 2)
     assert mutation.run_step(_context(repo, member, runner, None)) == []
     assert runner.config is not None  # mutation ran on the modules changed since the gate branch
+
+
+def _constants_only(repo: Repo) -> None:
+    """Change an R1 file and an R2 file that hold module-level constants and no function body."""
+    repo.commit(
+        {"pkgs/a/src/a/core.py": "__version__ = '2'\n", "pkgs/a/src/a/rules/r1.py": "D = (1, 2)\nclass K:\n    x = 1\n"}
+    )
+
+
+def test_files_without_a_function_body_pass_with_a_notice(repo: Repo) -> None:
+    """Constants-only files give mutmut no test to attribute (MU002 fault before B-026); the step passes (MU003)."""
+    base, member = _setup(repo)
+    _constants_only(repo)
+    runner = FakeMutmut(["survived"])
+    findings = mutation.run_step(_context(repo, member, runner, base))
+    assert [(f.code, f.severity, f.path) for f in findings] == [("MU003", Severity.NOTICE, "pkgs/a")]
+    assert runner.calls == []
+
+
+def test_only_files_with_a_function_body_are_mutated(repo: Repo) -> None:
+    base, member = _setup(repo)
+    repo.commit(
+        {
+            "pkgs/a/src/a/core.py": "__version__ = '2'\n",
+            "pkgs/a/src/a/rules/r1.py": "D = lambda x: x\n",
+            "pkgs/a/src/a/rules/r2.py": "class K:\n    def m(self):\n        return 1\n",
+        }
+    )
+    runner = FakeMutmut(["killed"])
+    assert mutation.run_step(_context(repo, member, runner, base)) == []
+    assert runner.config is not None
+    assert set(_mutmut_option(runner.config, "only_mutate")) == {"src/a/rules/r1.py", "src/a/rules/r2.py"}
+
+
+def test_real_code_whose_mutants_no_test_covers_stays_a_failure(repo: Repo) -> None:
+    base, member = _setup(repo)
+    _change(repo)
+    findings = mutation.run_step(_context(repo, member, FakeMutmut(["no tests"] * 3), base))
+    assert [f.code for f in findings] == ["MU001"]
+
+
+def test_an_unparsable_file_is_left_to_mutmut(repo: Repo) -> None:
+    base, member = _setup(repo)
+    repo.commit({"pkgs/a/src/a/core.py": "def (:\n"})
+    runner = FakeMutmut(["killed"])
+    assert mutation.run_step(_context(repo, member, runner, base)) == []
+    assert runner.config is not None
+    assert _mutmut_option(runner.config, "only_mutate") == ["src/a/core.py"]

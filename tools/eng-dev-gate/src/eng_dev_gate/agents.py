@@ -151,13 +151,22 @@ def _load_unit(root: Path, directory: Path, name: str, path: str) -> Unit | None
 
 
 def units_of(root: Path) -> list[Unit]:
-    """Return the managed outputs: the root's, then each workspace member's, from their ``.gate/agents.yml``.
+    """Return the managed outputs: the root's, then every other one, by path, from their ``.gate/agents.yml``.
+
+    The other units are the workspace members and every tracked ``.gate/agents.yml`` of the repository (a shared
+    package folder that is not itself a member is one); a folder that is no member is named after itself.
 
     Raises:
         UsageError: an ``agents.yml`` is unreadable or invalid, or a path leaves the workspace root.
+        GitError: ``git ls-files`` failed (exit 3).
     """
+    folders = {m.path: (m.name, m.directory) for m in discover_members(root)}
+    for tracked in tracked_files(root):
+        pure = PurePosixPath(tracked)
+        if pure.name == "agents.yml" and pure.parent.name == ".gate" and (folder := pure.parent.parent).parts:
+            folders.setdefault(folder.as_posix(), (folder.name, root / folder))
     found = [_load_unit(root, root, "", ".")]
-    found += [_load_unit(root, m.directory, m.name, m.path) for m in discover_members(root)]
+    found += [_load_unit(root, directory, name, path) for path, (name, directory) in sorted(folders.items())]
     return [u for u in found if u is not None]
 
 
