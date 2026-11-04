@@ -259,7 +259,7 @@ def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
 
 
 def test_identity_and_g3_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC2 (spec 4.5 step 10): AW08 and AW03 in bootstrap mode, also on a spec and plan pull request; GC015 otherwise."""
+    """AC2 (spec 4.5 step 10): AW08 and AW03 in bootstrap mode, spec and plan pull requests too; GC015 otherwise."""
     boot = Repo(tmp_path / "boot")
     base = make_gate_repo(boot)
     docs = _commit_and_check(boot, base, {PLAN_PATH: plan_text() + MORE}, DOCS)

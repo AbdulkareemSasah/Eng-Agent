@@ -1,4 +1,4 @@
-"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8 and 9): base branch, lane, ``none`` reasons, spec and plan pull
+"""``gate-check`` part 2 (spec 4.5 steps 1, 2, 3, 8, 9 and 10): base branch, lane, ``none`` reasons, spec and plan pull
 requests and protected paths. The approvals port is plan task T24, so verification with bootstrap off fails closed.
 """
 
@@ -166,3 +166,13 @@ def protected_findings(paths: Sequence[str], patterns: Sequence[str], config: Ga
     if config.mode is Mode.BOOTSTRAP:
         return [awaiting_finding(config, "AW02", f"CODEOWNERS review is required for {listed}")]
     return [error("GC015", f"the owner's approving review is required for {listed}; {_NOT_VERIFIED}")]
+
+
+def identity_findings(config: GateConfig) -> list[Finding]:
+    """Step 10: AW08 and AW03 in bootstrap mode, else GC015, because the identity and G3 checks are not verified."""
+    if config.mode is Mode.BOOTSTRAP:
+        return [
+            awaiting_finding(config, "AW08", "the identity checks (author and approver logins) are the owner's"),
+            awaiting_finding(config, "AW03", "the G3 approvals of process/01 section 5 are the owner's"),
+        ]
+    return [error("GC015", f"the identity checks and the G3 approvals are required; {_NOT_VERIFIED}")]

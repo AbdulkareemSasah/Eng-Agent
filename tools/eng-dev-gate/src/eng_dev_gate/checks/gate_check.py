@@ -21,6 +21,7 @@ from eng_dev_gate.checks.gate_check_docs import (
     NONE_LINE,
     counted_lines,
     entry_findings,
+    identity_findings,
     is_document,
     none_findings,
     owner_decides,
@@ -230,7 +231,7 @@ def check_pull_request(
         member_dirs: POSIX paths of the workspace members (for the changelog exception of the scope check).
 
     Returns:
-        The findings (GC001 to GC016, AW02, AW06).
+        The findings (GC001 to GC016, AW02, AW03, AW06, AW08).
 
     Raises:
         UsageError: the pull request is from another repository, or CODEOWNERS uses syntax outside the subset.
@@ -249,6 +250,7 @@ def check_pull_request(
         *findings,
         *_judge(pr, config, git, gate_ref, member_dirs, base, changes),
         *protected_findings(paths, patterns, config),
+        *identity_findings(config),
     ]
 
 
@@ -272,6 +274,7 @@ def handle_gate_check(args: argparse.Namespace) -> Status:
         members = [m.path for m in discover_members(root)] if (root / "pyproject.toml").is_file() else []
         findings = check_pull_request(pr, config, SubprocessGit(root), gate_ref, members)
         step = StepResult(name="gate-check", findings=findings)
-    result = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
+    judged = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
+    result: CommandResult = args.gate_context.with_findings(judged)
     render(result, args.format, sys.stdout, os.environ)
     return result.status
