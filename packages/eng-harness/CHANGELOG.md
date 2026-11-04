@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Blocks and workflows: `eng_harness.block` (decorators, `BlockDef`, `WorkflowDef`, immutable `Registry`, code hash, `check_lock`, `write_lock`, `--write-lock`) and the empty `blocks.lock.json` (plan 0001 T5, B-104; spec 0001 AC2 to AC4).
 - Calc framework: `eng_harness.calc` (decorator, registry with the AC1 registration rules, input metadata, trace builder, statuses) and the empty `eng_harness.calcs.REGISTRY`; `calcs/**` added to the R1 modules (plan 0003 T1, B-140).
 - Harness codes and the EngineStop, StepError, RunRefused, RunLocked and JournalIntegrityError families (B-101).
 - Package skeleton: `pyproject.toml` with the gate configuration, workspace member, `__version__`, `py.typed`, README, rendered `AGENTS.md` and risk map (B-100).
