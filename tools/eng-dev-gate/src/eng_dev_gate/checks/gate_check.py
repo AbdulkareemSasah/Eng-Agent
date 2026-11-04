@@ -1,8 +1,6 @@
-"""``gate-check`` part 1 (spec 4.5): body parsing, plan and task, file scope and diff budget.
+"""``gate-check`` (spec 4.5): body parsing, plan and task, file scope and diff budget.
 
-The spec and plan pull-request rule, the lane, the ``none`` reasons, protected paths, the base branch and the
-``awaiting owner`` reports are plan task T14. A ``Plan-Task: none (...)`` line is therefore a usage error here, never
-a pass. The pull-request title and body are data: they are parsed, never executed or interpolated.
+Part 2 is in ``gate_check_docs`` and ``codeowners``. The pull-request title and body are data, never executed.
 """
 
 from __future__ import annotations
@@ -16,7 +14,19 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
-from eng_dev_gate.config import GateConfig, Mode, load_gate_config
+from eng_dev_gate.checks.codeowners import load_patterns
+from eng_dev_gate.checks.gate_check_docs import (
+    NONE_LINE,
+    counted_lines,
+    entry_findings,
+    identity_findings,
+    is_document,
+    none_findings,
+    owner_decides,
+    protected_findings,
+    spec_plan_findings,
+)
+from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest, event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, parse_spec, safe_relative_path
 from eng_dev_gate.gitio import Change, Git, NumstatEntry, PathNotFoundError, SubprocessGit
@@ -29,7 +39,6 @@ LARGEST_FILES_SHOWN = 3  # files named in a GC009 message (presentation only)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _FENCE_CLOSE = re.compile(r" {0,3}(`{3,}|~{3,})[ \t]*")
 _PLAN_TASK = re.compile(r"(\S+)#(T\d+[a-z]*)")
-_NONE = re.compile(r"none \(.+\)")
 _BOOTSTRAP_ITEM = re.compile(r"B-\d+")
 _CLOSES = re.compile(r"Closes #(\d+)")
 _NOTES_FILES = ("CHANGELOG.md", "docs/local-testing.md")  # in scope beside a task file (AC10a, amendment B-096)
@@ -93,15 +102,15 @@ def _work_item(fields: BodyFields, config: GateConfig) -> list[Finding]:
     return [_error("GC003", f"no valid work item line; use {form}")]
 
 
-def _plan_task(fields: BodyFields, config: GateConfig) -> tuple[str, str] | Finding:
-    """Return ``(plan path, task id)`` from the single ``Plan-Task:`` line, else GC001 or GC002."""
+def _plan_task(fields: BodyFields, config: GateConfig) -> tuple[str, str] | str | Finding:
+    """Return ``(plan path, task id)`` or the ``none (<reason>)`` reason from the single line, else GC001, GC002."""
     if not fields.plan_task:
         return _error("GC001", "no `Plan-Task: <plan path>#T<n>` line in the pull request body")
     if len(fields.plan_task) > 1:
         return _error("GC002", f"{len(fields.plan_task)} Plan-Task lines; exactly one is allowed")
     value = fields.plan_task[0][1]
-    if _NONE.fullmatch(value):
-        raise UsageError("Plan-Task `none (<reason>)` is not implemented yet (plan task T14)")
+    if none := NONE_LINE.fullmatch(value):
+        return none[1]
     found = _PLAN_TASK.fullmatch(value)
     if not found or not safe_relative_path(found[1]) or not matches_any(found[1], config.plan_globs):
         return _error("GC002", f"malformed Plan-Task {value!r}; expected `<package>/docs/plans/<file>.md#T<n>`")
@@ -121,9 +130,12 @@ def _read[D: Spec](git: Git, gate_ref: str, path: str, parse: Callable[[str], D]
 
 
 def _status(doc: Spec, path: str, config: GateConfig) -> list[Finding]:
-    """GC006 unless ``approved``; ``draft`` is acceptable in bootstrap mode only (AC8)."""
-    if doc.status == "approved" or config.mode is Mode.BOOTSTRAP:
+    """GC006 unless ``approved``; ``draft`` is acceptable in bootstrap mode only (AC8); AW01 if the owner decides."""
+    if doc.status == "approved":
         return []
+    if config.mode is Mode.BOOTSTRAP:
+        needed = awaiting_finding(config, "AW01", f"{path} is a draft that needs the owner", path)
+        return [needed] if owner_decides(doc) else []
     return [_error("GC006", f"status {doc.status!r} is not acceptable; it must be approved", path)]
 
 
@@ -149,8 +161,7 @@ def _scope(changes: list[Change], task: Task, plan_path: str, member_dirs: Seque
 
 def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
     """GC009 when added plus deleted lines exceed the task limit; tests, generated and spike files are not counted."""
-    exempt = [*config.test_globs, *config.generated_globs, *config.spike_globs]
-    counted = [e for e in entries if not matches_any(e.path, exempt)]
+    counted = counted_lines(entries, config)
     findings = [
         Finding(
             code="GC009",
@@ -175,31 +186,25 @@ def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list
     return findings
 
 
-def check_pull_request(
-    pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str] = ()
-) -> list[Finding]:
-    """Run steps 4 to 7 of spec 4.5 and the body rules; findings accumulate.
-
-    Args:
-        pr: the pull request from the event file.
-        config: the gate configuration (read from the gate root).
-        git: the git port; ``gate_ref`` is the ref the plan and spec are read from.
-        member_dirs: POSIX paths of the workspace members (for the changelog exception of the scope check).
-
-    Returns:
-        The findings (GC001 to GC009).
-
-    Raises:
-        UsageError: the pull request is from another repository, or its Plan-Task is `none (...)` (plan task T14).
-        GitError: git failed (exit 3).
-    """
-    if pr.from_fork:
-        raise UsageError("pull requests from another repository are not supported")
+def _judge(
+    pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str], base: str,
+    changes: list[Change],
+) -> list[Finding]:  # fmt: skip
+    """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and budget (steps 3 to 8)."""
     fields = parse_body(pr.body)
     findings = _work_item(fields, config)
     target = _plan_task(fields, config)
+    entries = git.numstat(base, pr.head_sha)
+    if any(is_document(p, config) for c in changes for p in c.paths):
+        if target != "spec and plan":
+            needed = "a spec and plan pull request needs `Plan-Task: none (spec and plan)`"
+            findings.append(target if isinstance(target, Finding) else _error("GC011", needed))
+        return [*findings, *spec_plan_findings(git, config, changes, pr.head_sha, base)]
     if isinstance(target, Finding):
         return [*findings, target]
+    if isinstance(target, str):
+        paths = [p for c in changes for p in c.paths]
+        return [*findings, *none_findings(target, paths, entries, config)]
     plan_path, task_id = target
     plan = _read(git, gate_ref, plan_path, lambda text: parse_plan(text, config.limits.max_task_lines))
     if isinstance(plan, Finding):
@@ -210,11 +215,45 @@ def check_pull_request(
     task = next((t for t in plan.tasks if t.id == task_id), None)
     if task is None:
         return [*findings, _error("GC007", f"plan {plan_path} defines no task {task_id}", plan_path)]
-    base = git.merge_base(pr.base_sha, pr.head_sha)
     return [
         *findings,
-        *_scope(git.name_status(base, pr.head_sha), task, plan_path, member_dirs),
-        *_budget(git.numstat(base, pr.head_sha), task, config),
+        *_scope(changes, task, plan_path, member_dirs),
+        *_budget(entries, task, config),
+    ]
+
+
+def check_pull_request(
+    pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str] = ()
+) -> list[Finding]:
+    """Run the checks of spec 4.5 and the body rules; findings accumulate.
+
+    Args:
+        pr: the pull request from the event file.
+        config: the gate configuration (read from the gate root).
+        git: the git port; ``gate_ref`` is the ref the plan and spec are read from.
+        member_dirs: POSIX paths of the workspace members (for the changelog exception of the scope check).
+
+    Returns:
+        The findings (GC001 to GC016, AW02, AW03, AW06, AW08).
+
+    Raises:
+        UsageError: the pull request is from another repository, or CODEOWNERS uses syntax outside the subset.
+        GitError: git failed (exit 3).
+    """
+    if pr.from_fork:
+        raise UsageError("pull requests from another repository are not supported")
+    findings, skip = entry_findings(pr, config)
+    if skip:
+        return findings
+    base = git.merge_base(pr.base_sha, pr.head_sha)
+    changes = git.name_status(base, pr.head_sha)
+    paths = [p for c in changes for p in c.paths]
+    patterns = load_patterns(git, (pr.base_sha, pr.head_sha))
+    return [
+        *findings,
+        *_judge(pr, config, git, gate_ref, member_dirs, base, changes),
+        *protected_findings(paths, patterns, config),
+        *identity_findings(config),
     ]
 
 
@@ -226,7 +265,7 @@ def handle_gate_check(args: argparse.Namespace) -> Status:
         GitError: git failed.
     """
     root = Path(args.root)
-    config = load_gate_config(Path(args.gate_root) if args.gate_root else root)
+    config: GateConfig = args.gate_context.config
     path = event_path(args.event, os.environ)
     if path is None:
         raise UsageError("no event file: pass --event or set GITHUB_EVENT_PATH")
@@ -238,6 +277,7 @@ def handle_gate_check(args: argparse.Namespace) -> Status:
         members = [m.path for m in discover_members(root)] if (root / "pyproject.toml").is_file() else []
         findings = check_pull_request(pr, config, SubprocessGit(root), gate_ref, members)
         step = StepResult(name="gate-check", findings=findings)
-    result = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
+    judged = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
+    result: CommandResult = args.gate_context.with_findings(judged)
     render(result, args.format, sys.stdout, os.environ)
     return result.status

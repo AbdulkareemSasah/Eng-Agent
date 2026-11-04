@@ -83,7 +83,7 @@ def test_risk_sets_and_body_line(repo: Repo) -> None:
     ]:
         result, errors = _run(repo, write_event(repo, base, body))
         assert (result.code, set(errors)) == (code, set() if code == 0 else {"RF002"}), body
-    lane = {"head_ref": "lane/12-slug"}
+    lane = "lane/12-slug"
     for body, code, codes in [
         ("Risk: r1\n", 0, set()),
         ("Risk: r1, r3\n", 0, set()),
@@ -91,10 +91,10 @@ def test_risk_sets_and_body_line(repo: Repo) -> None:
         ("", 1, {"RF004"}),
         ("Risk: x\n", 1, {"RF004"}),
     ]:
-        result, errors = _run(repo, write_event(repo, base, body, **lane))
+        result, errors = _run(repo, write_event(repo, base, body, head_ref=lane))
         assert (result.code, set(errors)) == (code, codes), body
     repo.commit({"pkg/src/hot/c.py": "c = 1\n"}, "feat: hot")
-    result, errors = _run(repo, write_event(repo, base, "Risk: r1\n", **lane))
+    result, errors = _run(repo, write_event(repo, base, "Risk: r1\n", head_ref=lane))
     assert (result.code, set(errors)) == (1, {"RF001"})
 
 

@@ -38,7 +38,8 @@ def test_valid_pull_request_passes(repo: Repo) -> None:
     result, errors = gate_check(repo, event)
     assert (result.code, errors) == (0, {})
     data = json.loads(result.out)
-    assert (data["command"], data["mode"], data["status"]) == ("gate-check", "bootstrap", "pass")
+    assert (data["command"], data["mode"], data["status"]) == ("gate-check", "bootstrap", "awaiting-owner")
+    assert [f["code"] for f in data["steps"][0]["findings"]] == ["AW08", "AW03"]  # step 10, never skipped silently
     text = repo.run(["gate-check", "--event", str(event)])
     assert text.code == 0
     assert text.out.splitlines()[0] == "mode: bootstrap"
@@ -96,17 +97,20 @@ def test_work_item_forms_normal_mode(tmp_path: Path, monkeypatch: pytest.MonkeyP
     gate = base_checkout(repo, base, tmp_path / "gate-base", monkeypatch)
     event_main = write_event(repo, base, f"Work-Item: B-001\n{PLAN_TASK}\n", base_ref="main")
     result, errors = gate_check(repo, event_main, gate=gate)
-    assert (result.code, set(errors)) == (1, {"GC003"})
+    assert (result.code, set(errors)) == (1, {"GC003", "GC015"})  # GC015: the identity checks are not verified yet
     event_ok = write_event(repo, base, f"Closes #12\n{PLAN_TASK}\n", base_ref="main", name="ok.json")
     result, errors = gate_check(repo, event_ok, gate=gate)
-    assert (result.code, errors) == (0, {})
+    assert (result.code, set(errors)) == (1, {"GC015"})
 
 
 def test_plan_not_on_gate_branch(repo: Repo) -> None:
     """AC8: a plan or spec missing from the gate branch is GC004; a draft passes in bootstrap mode, GC006 otherwise."""
     base = make_gate_repo(repo)
     new_plan = "pkg/docs/plans/0002-y.md"
-    repo.commit({new_plan: plan_text(), "pkg/src/new.py": "y\n"}, "feat: plan only on the branch")
+    base = repo.commit({new_plan: plan_text()}, "chore: plan only in the base commit, not on the gate branch")
+    repo.commit(
+        {"pkg/src/new.py": "y\n"}, "feat: code"
+    )  # a plan in the diff would make this a spec and plan pull request
     body = f"Work-Item: B-001\nPlan-Task: {new_plan}#T1\n"
     result, errors = gate_check(repo, write_event(repo, base, body))
     assert (result.code, set(errors)) == (1, {"GC004"})
@@ -134,7 +138,7 @@ def test_draft_status_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     gate = base_checkout(normal, base, tmp_path / "gate-base", monkeypatch)
     event = write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main")
     result, errors = gate_check(normal, event, gate=gate)
-    assert (result.code, set(errors)) == (1, {"GC006"})
+    assert (result.code, set(errors)) == (1, {"GC006", "GC015"})
     assert PLAN_PATH in errors["GC006"]
     assert SPEC_PATH in errors["GC006"]
 
@@ -273,7 +277,11 @@ def test_binary_file_counts_zero_with_notice(repo: Repo) -> None:
     result, errors = gate_check(repo, write_event(repo, base, BODY))
     assert (result.code, errors) == (0, {})
     findings = json.loads(result.out)["steps"][0]["findings"]
-    assert [(f["severity"], f["path"]) for f in findings] == [("notice", "pkg/src/blob.bin")]
+    assert [(f["severity"], f["path"]) for f in findings] == [
+        ("notice", "pkg/src/blob.bin"),
+        ("awaiting", None),
+        ("awaiting", None),
+    ]
 
 
 def test_push_event_is_skipped(repo: Repo, tmp_path: Path) -> None:
@@ -286,16 +294,12 @@ def test_push_event_is_skipped(repo: Repo, tmp_path: Path) -> None:
     assert json.loads(result.out)["status"] == "skipped"
 
 
-def test_fork_and_none_are_not_passes(repo: Repo) -> None:
-    """A pull request from another repository and a `none (...)` Plan-Task (checked by T14) exit 2, never 0."""
+def test_fork_is_a_usage_error(repo: Repo) -> None:
+    """A pull request from another repository exits 2, never 0 (`none (...)` reasons are tested in part 2)."""
     base = make_gate_repo(repo)
     repo.commit({"pkg/src/new.py": "y\n"}, "feat: change")
     fork = write_event(repo, base, BODY, head_repo="other/r")
     assert repo.run(["gate-check", "--event", str(fork)]).code == 2
-    none = write_event(repo, base, "Work-Item: B-001\nPlan-Task: none (trivial)\n", name="none.json")
-    result = repo.run(["gate-check", "--event", str(none)])
-    assert result.code == 2
-    assert "not implemented" in result.err
 
 
 def test_gate_ref_option(repo: Repo) -> None:
