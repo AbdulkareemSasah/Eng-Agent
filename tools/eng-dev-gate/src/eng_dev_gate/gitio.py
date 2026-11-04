@@ -86,7 +86,7 @@ class SubprocessGit:
     def _run(self, *args: str) -> str:
         command = [self._executable, "-c", "core.quotepath=off", *args]
         try:
-            done = subprocess.run(  # noqa: S603  (no shell; arguments are a list)
+            done = subprocess.run(  # noqa: S603  # B-057: no shell; the arguments are a list
                 command, cwd=self._cwd, capture_output=True, timeout=GIT_TIMEOUT_SECONDS, check=False
             )
             if done.returncode != 0:
