@@ -123,10 +123,13 @@ def test_new_and_changed_tests_detected(repo: Repo) -> None:
 
 def test_rename_and_delete_in_test_commit(repo: Repo) -> None:
     """A renamed test file is compared with its old content; a deleted one holds no tests."""
-    base = tf_repo(repo, base_files={"pkg/tests/test_gone.py": "def test_gone() -> None: ...\n"})
+    long_test = "def test_one() -> None:\n" + "    assert 1 + 1 == 2\n" * 8
+    base = tf_repo(
+        repo, base_files={BASE_TEST_PATH: long_test, "pkg/tests/test_gone.py": "def test_gone() -> None: ...\n"}
+    )
     repo.git("mv", BASE_TEST_PATH, "pkg/tests/test_b.py")
     repo.git("rm", "-q", "pkg/tests/test_gone.py")
-    repo.commit({"pkg/tests/test_b.py": BASE_TEST + "\n" + NEW_TEST}, "test: rename")
+    repo.commit({"pkg/tests/test_b.py": long_test + "\n" + NEW_TEST}, "test: rename")
     outcome = _evaluate(repo, base)
     assert outcome.findings == []
     assert outcome.selection is not None
@@ -190,7 +193,10 @@ def test_tests_first_files(repo: Repo) -> None:
     # from the event: the plan task is read from the gate branch through the body
     result = repo.run(["--format", "json", "test-first", "--event", str(write_event(repo, base, BODY))])
     assert (result.code, _error_codes(result.out)) == (1, ["TF008"])
-    repo.commit({"pkg/tests/test_b.py": NEW_TEST}, "test: more red")
+    repo.commit({"pkg/tests/test_b.py": NEW_TEST}, "test: a later commit does not satisfy it")
+    assert [f.code for f in _evaluate(repo, base, plan=PLAN_TESTS_FIRST).findings] == ["TF008"]
+    repo.git("reset", "-q", "--hard", base)
+    repo.commit({BASE_TEST_PATH: BASE_TEST + "\n" + NEW_TEST, "pkg/tests/test_b.py": NEW_TEST}, "test: both files")
     assert _evaluate(repo, base, plan=PLAN_TESTS_FIRST).findings == []
 
 
