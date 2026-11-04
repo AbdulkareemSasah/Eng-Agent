@@ -208,11 +208,33 @@ def test_clean_tables_pass(tmp_path: Path) -> None:
         "[tool.pytest.ini_options]\nxfail_strict = false\n",
         "[tool.coverage.run]\nomit = ['src/x.py']\n",
         "[tool.coverage.report]\nfail_under = 1\n",
+        '[tool.pytest]\naddopts = ["-k", "nothing"]\n',
+        '[tool.pytest]\nfilterwarnings = ["ignore"]\n',
+        '[tool.pytest]\nini_options = {}\naddopts = ["-p", "no:cacheprovider"]\n',
+        '[tool.ruff]\nlint = ["E"]\n',
+        f'[tool.ruff.lint]\nselect = {RULES}\nper-file-ignores = "x"\n',
+        '[tool.ruff.lint]\nselect = "E"\n',
+        '[tool.mypy]\nstrict = true\noverrides = [5]\n',
+        '[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\nmodule = 5\nignore_missing_imports = true\n',
+        "[tool.pytest.ini_options]\naddopts = 5\n",
+        "[tool.pytest.ini_options]\nfilterwarnings = [5]\n",
+        "[tool.pytest]\nini_options = 5\n",
+        "[tool.coverage]\nrun = 5\n",
     ],
 )
 def test_weakening_rules(tmp_path: Path, extra: str) -> None:
     """AC49: each setting outside the allowed set is CF003."""
     assert "CF003" in _step_codes(tmp_path, BASE + extra)
+
+
+@pytest.mark.parametrize("table", ["", "[tool.eng-gate]\nprofile = 5\n"])
+def test_own_namespace_override_rejected_without_valid_table(tmp_path: Path, table: str) -> None:
+    """The package's own namespace (from [project]) is protected even when [tool.eng-gate] is missing or invalid."""
+    pyproject = '[project]\nname = "my-pkg"\n' + table
+    pyproject += "[tool.mypy]\nstrict = true\n[[tool.mypy.overrides]]\n"
+    pyproject += 'module = ["my_pkg.x"]\nignore_missing_imports = true\n'
+    findings = _config_step(tmp_path, pyproject)
+    assert any(f.code == "CF003" and "own namespace" in f.message for f in findings)
 
 
 @pytest.mark.parametrize(
