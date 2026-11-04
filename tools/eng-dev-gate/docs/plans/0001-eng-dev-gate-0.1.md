@@ -327,8 +327,11 @@ tasks:
     depends_on: [T16]
   - id: T18
     title: secrets command and the security job
+    # Amendment (B-099, documents only): T18 also edits .gate/gate.yml for the secret-scan allowlist entries its own
+    # step needs on the existing tree (a reviewed false positive is allowlisted by rule, path and fingerprint).
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/secrets.py"
+      - ".gate/gate.yml"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - ".github/workflows/ci.yml"

@@ -501,7 +501,7 @@ workstation, the CI job never uses them:
 | 6 | `forbidden` | package | §4.8 |
 | 7 | `imports` | workspace | §4.10 |
 | 8 | `ratchet` | workspace | §4.9 |
-| 9 | `secrets` | workspace | §4.11 on `<base>..HEAD` (`--base`, default the merge base with `origin/<gate_branch>`) |
+| 9 | `secrets` | workspace | §4.11 on `<merge base with origin/<gate_branch>>..HEAD`; the whole tree when that ref is absent (a local or shallow checkout). A range is chosen on the `secrets` command itself (`--range`); `check` has no `--base` option (amendment B-099) |
 | 10 | `tests` | package | `python -m coverage run --branch` with `-m pytest` on `tests/` and the gate's pytest plugin; coverage JSON; line and branch compared separately with the package's thresholds (CV001, CV002) |
 | 11 | `docs-fresh` | package | Generated documents (`[tool.eng-gate].generated`, GF001, GF002) and `agents drift` for the package |
 | 12 | `licenses` | package | Allowed licenses of the dependency closure (LC001 to LC003) |
