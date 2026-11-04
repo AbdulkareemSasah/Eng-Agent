@@ -3,15 +3,17 @@
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from eng_harness.servers._launcher import JobPolicy, LaunchedProcess, LaunchError, LaunchSpec, PosixLauncher
-from eng_harness.servers._procinfo import PosixProcessInspector
+from eng_harness.servers._procinfo import PosixProcessInspector, ProcessIdentity
 
 _FAKES = Path(__file__).resolve().parents[2] / "fakes" / "proc"
 _TREE = _FAKES / "tree.py"
@@ -121,3 +123,76 @@ def test_stderr_goes_to_file_and_exit_code_is_returned(tmp_path: Path) -> None:
 def test_start_failure_is_typed(tmp_path: Path) -> None:
     with pytest.raises(LaunchError, match="no-such-program"):
         PosixLauncher().start(_spec(tmp_path, JobPolicy.SERVER, argv=[str(tmp_path / "no-such-program")]))
+
+
+class _ScriptedGroup(PosixProcessInspector):
+    """Inspector whose group listing is scripted, and which records which processes it was asked to end."""
+
+    def __init__(self, listings: list[list[ProcessIdentity]]) -> None:
+        super().__init__()
+        self._listings = listings
+        self.terminated: list[ProcessIdentity] = []
+
+    def group_members(self, pgid: int) -> list[ProcessIdentity]:
+        return self._listings.pop(0) if self._listings else []
+
+    def terminate(self, identity: ProcessIdentity) -> bool:
+        self.terminated.append(identity)
+        return True
+
+
+def test_terminate_job_never_signals_again_once_group_seen_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the leader is reaped and the group was seen empty, a reused group number must not be touched (R1)."""
+    stranger = ProcessIdentity(pid=1, started_at="other", exe_name="stranger")
+    inspector = _ScriptedGroup([[], [stranger]])  # the second listing is a new, unrelated group with the same number
+    signalled: list[int] = []
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: signalled.append(pgid))
+    process = PosixLauncher(inspector).start(_spec(tmp_path, JobPolicy.TOOL, argv=[sys.executable, "-c", "pass"]))
+    try:
+        assert process.wait(10) == 0
+        process.terminate_job()  # the group is empty
+        process.terminate_job()  # idempotent: must not look at the group again
+    finally:
+        process.close()
+    assert signalled == []
+    assert inspector.terminated == []
+
+
+def test_terminate_job_after_reaping_ends_members_by_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Once the leader is reaped the group number is no longer reserved: members end by pid and start time."""
+    member = ProcessIdentity(pid=1, started_at="member", exe_name="member")
+    inspector = _ScriptedGroup([[member]])
+    signalled: list[int] = []
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: signalled.append(pgid))
+    process = PosixLauncher(inspector).start(_spec(tmp_path, JobPolicy.TOOL, argv=[sys.executable, "-c", "pass"]))
+    try:
+        assert process.wait(10) == 0
+        process.terminate_job()
+    finally:
+        process.close()
+    assert signalled == []
+    assert inspector.terminated == [member]
+
+
+def test_failed_identity_closes_pipes_and_reaps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    class _NoIdentity(PosixProcessInspector):
+        def identity(self, pid: int) -> ProcessIdentity | None:
+            return None
+
+    created: list[subprocess.Popen[bytes]] = []
+    real_popen = subprocess.Popen
+
+    def spy(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        popen: subprocess.Popen[bytes] = real_popen(*args, **kwargs)
+        created.append(popen)
+        return popen
+
+    monkeypatch.setattr(subprocess, "Popen", spy)
+    with pytest.raises(LaunchError, match="no start time"):
+        PosixLauncher(_NoIdentity()).start(_spec(tmp_path, JobPolicy.SERVER, "--children"))
+    (popen,) = created
+    assert popen.returncode is not None  # killed and reaped
+    assert popen.stdin is not None and popen.stdin.closed
+    assert popen.stdout is not None and popen.stdout.closed
