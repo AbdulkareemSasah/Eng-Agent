@@ -12,6 +12,7 @@ from eng_contract.store import ResultStore
 
 from eng_harness.errors import JournalIntegrityError
 from eng_harness.journal import INLINE_EVENT_BYTES, PAYLOAD_MODELS, EventType, JournalWriter
+from eng_harness.journal._events import StepStarted
 from eng_harness.journal._schema import chain_hash, iter_events
 
 REF = "res_" + "0" * 26
@@ -270,6 +271,8 @@ def test_large_payloads_by_reference(run_dir: Path, store: ResultStore, ids: See
     writer.append(EventType.STEP_STARTED, {**STEP, "args": big})
     writer.close()
     first, second = (e.payload for e in iter_events(_raw(run_dir)))
+    assert isinstance(first, StepStarted)
+    assert isinstance(second, StepStarted)
     assert first.args == exact
     assert first.args_ref is None
     assert second.args is None
