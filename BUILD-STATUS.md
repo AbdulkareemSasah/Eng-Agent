@@ -75,6 +75,76 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-090 | Phase 4 spec: IDEA adapter | sonnet, high | opus, medium | — | queued (wave 2b) |
 | B-091 | Desktop products overlap with Sasaah; ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done (08c2161; merged by the lead, P-9) |
 
+### 3.1 Task details (generated from the workflow task data and the pull requests)
+
+| Id | Plan task | Task | Author (model, effort) | Reviewer (model, effort) | PR | Status |
+|---|---|---|---|---|---|---|
+| B-007 | docs | write the scripts for spikes S-02 and S-04, ready for the owner's local runs | sonnet, medium | opus, low | [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) | done |
+| B-008 | docs | fix stale section references in the design hub, and write ADR-0029 (Proposed) recording the eng-contract 0.1 details in 04 | sonnet, medium | opus, low | [#13](https://github.com/AbdulkareemSasah/Eng-Agent/pull/13) | done |
+| B-010 | T1 | Package skeleton and gate configuration | sonnet, low | opus, medium | [#9](https://github.com/AbdulkareemSasah/Eng-Agent/pull/9) | done |
+| B-011 | T2 | Error codes, retry rules, warnings and ContractError | sonnet, medium | opus, medium | [#17](https://github.com/AbdulkareemSasah/Eng-Agent/pull/17) | done |
+| B-012 | T3 | Canonical JSON (RFC 8785) and payload hash | sonnet, high | opus, medium | [#22](https://github.com/AbdulkareemSasah/Eng-Agent/pull/22) | done |
+| B-013 | T4 | ULID identifiers, clocks and id sources | sonnet, medium | opus, medium | [#28](https://github.com/AbdulkareemSasah/Eng-Agent/pull/28) | done |
+| B-014 | T5 | Units of canonical/1 with cited exact factors and CSI unit systems | sonnet, high | opus, medium | [#33](https://github.com/AbdulkareemSasah/Eng-Agent/pull/33) | done |
+| B-015 | T6 | Quantity and Cited | sonnet, medium | opus, medium | [#35](https://github.com/AbdulkareemSasah/Eng-Agent/pull/35) | open |
+| B-016 | T7 | Provenance, envelopes and result records | sonnet, medium | opus, medium | — | not started or in writing |
+| B-017 | T8 | References, JSON Pointer and resolution rules | sonnet, high | opus, medium | — | not started or in writing |
+| B-018 | T9 | Input-parameter metadata and the validation pipeline | sonnet, high | opus, medium | — | not started or in writing |
+| B-019 | T10 | Verdicts, model issues and calculation traces | sonnet, medium | opus, medium | — | not started or in writing |
+| B-020 | T11 | Kind names, the kind registry and the model.* kinds | sonnet, medium | opus, medium | — | not started or in writing |
+| B-021 | T12 | forces.*, basis.*, verdicts.set and issues.model_check kinds | sonnet, medium | opus, medium | — | not started or in writing |
+| B-022 | T13 | Workspace resolution and location probes (POSIX, Windows, fake) | sonnet, high | opus, medium | — | not started or in writing |
+| B-023 | T14 | Result store, atomic writes, payload split and model state | sonnet, high | opus, medium | — | not started or in writing |
+| B-024 | T15 | MCP mapping helpers | sonnet, low | opus, medium | — | not started or in writing |
+| B-025 | T16 | JSON Schema snapshots, freshness test and 0.1.0 changelog | sonnet, low | opus, medium | — | not started or in writing |
+| B-030 | T1 | Package skeleton, dependency ADR, CLI shell | sonnet, low | opus, low | [#10](https://github.com/AbdulkareemSasah/Eng-Agent/pull/10) | done |
+| B-031 | T2a | Foundations (reporting, git port, workspace discovery, globs, event file) (part A, after the B-056 split) | sonnet, medium | opus, low | [#18](https://github.com/AbdulkareemSasah/Eng-Agent/pull/18) | done |
+| B-032 | T3 | Configuration models, floors and bootstrap mode (root gate.yml) | sonnet, medium | opus, low | [#24](https://github.com/AbdulkareemSasah/Eng-Agent/pull/24) | done |
+| B-033 | T4 | agents render, keys and drift (and re-render of drifting AGENTS.md files) | sonnet, medium | opus, low | [#26](https://github.com/AbdulkareemSasah/Eng-Agent/pull/26) | done |
+| B-034 | T5 | check orchestrator with the lock, format, lint and types steps | sonnet, medium | opus, low | [#27](https://github.com/AbdulkareemSasah/Eng-Agent/pull/27) | done |
+| B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | — | not started or in writing |
+| B-036 | T7 | tests step with separate line and branch coverage and the pytest plugin | sonnet, medium | opus, low | — | not started or in writing |
+| B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | — | not started or in writing |
+| B-038 | T9 | ratchet command and step | sonnet, medium | opus, low | — | not started or in writing |
+| B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | — | not started or in writing |
+| B-040 | T11 | forbidden part 2: FB004, FB005, FB006, FB008 | sonnet, high | opus, low | — | not started or in writing |
+| B-041 | T12 | imports command and step | sonnet, medium | opus, low | — | not started or in writing |
+| B-042 | T13 | gate-check part 1: front matter, body parsing, plan and task, scope and budget | sonnet, high | opus, medium | [#29](https://github.com/AbdulkareemSasah/Eng-Agent/pull/29) | open |
+| B-043 | T14 | gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job | sonnet, high | opus, medium | — | not started or in writing |
+| B-044 | T15 | risk-floor command and job | sonnet, medium | opus, low | — | not started or in writing |
+| B-045 | T16 | test-first part 1: title, exemptions, commit selection, new and changed tests | sonnet, high | opus, medium | — | not started or in writing |
+| B-046 | T17 | test-first part 2: base worktree, runs, classification, isolation, and the test-first job | sonnet, high | opus, medium | — | not started or in writing |
+| B-047 | T18 | secrets command and the security job | sonnet, medium | opus, medium | — | not started or in writing |
+| B-048 | T19 | licenses step and generated-document freshness | sonnet, medium | opus, low | — | not started or in writing |
+| B-049 | T20 | mutation step (backend decision, ADR, dependency) | sonnet, medium | opus, low | — | not started or in writing |
+| B-050 | T21 | workflows lint (WF001 to WF005) | sonnet, medium | opus, low | — | not started or in writing |
+| B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | — | not started or in writing |
+| B-052 | T23 | windows-tests command and the windows job | sonnet, medium | opus, low | — | not started or in writing |
+| B-053 | T24 | approvals port and verification with bootstrap off | sonnet, medium | opus, low | — | not started or in writing |
+| B-054 | T25 | Documentation, changelog 0.1.0 and the self-gate run | sonnet, low | opus, low | — | not started or in writing |
+| B-055 | T26 | Base-commit gate (gate root, provenance, head-run rules); built before T6 | sonnet, high | opus, medium | [#31](https://github.com/AbdulkareemSasah/Eng-Agent/pull/31) | done |
+| B-056 | docs | amend the eng-dev-gate plan: split task T2 into T2a and T2b | sonnet, low | opus, low | [#14](https://github.com/AbdulkareemSasah/Eng-Agent/pull/14) | done |
+| B-057 | T2b | Foundations (reporting, git port, workspace discovery, globs, event file) (part B, after the B-056 split) | sonnet, medium | opus, low | [#19](https://github.com/AbdulkareemSasah/Eng-Agent/pull/19) | done |
+| B-060 | docs | write the eng-harness engine specification and plan, and ADR-0030 (Proposed) amending ADR-0014 | opus, medium | opus, medium | [#12](https://github.com/AbdulkareemSasah/Eng-Agent/pull/12) | done |
+| B-061 | docs | write the eng-harness server and adapter specification and plan, and ADR-0031 and ADR-0032 (Proposed) | opus, medium | opus, medium | [#21](https://github.com/AbdulkareemSasah/Eng-Agent/pull/21) | done |
+| B-062 | docs | write the eng-harness calcs specification and plan | opus, medium | opus, medium | [#20](https://github.com/AbdulkareemSasah/Eng-Agent/pull/20) | done |
+| B-063 | docs | write the eng-harness templates and design-basis specification and plan | sonnet, medium | opus, medium | [#23](https://github.com/AbdulkareemSasah/Eng-Agent/pull/23) | done |
+| B-064 | docs | write the eng-harness decision-layer specification and plan | sonnet, medium | opus, low | [#30](https://github.com/AbdulkareemSasah/Eng-Agent/pull/30) | done |
+| B-065 | docs | write the eng-harness command-line, progress, approval-page and run-report specification and plan | sonnet, high | opus, medium | [#32](https://github.com/AbdulkareemSasah/Eng-Agent/pull/32) | done |
+| B-066 | docs | write the model edit cycle workflow spec, block specification and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-070 | docs | write the structural-codes core framework specification and plan | opus, medium | opus, medium | [#16](https://github.com/AbdulkareemSasah/Eng-Agent/pull/16) | done |
+| B-071 | docs | write the ACI 318-14 isolated-footing clause specifications and plan (draft) | opus, medium | opus, medium | [#34](https://github.com/AbdulkareemSasah/Eng-Agent/pull/34) | open |
+| B-072 | docs | write the SBC 304-2018 overlay specification and plan for the footing checks (draft, with explicit gaps) | opus, medium | opus, medium | — | not started or in writing |
+| B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | — | not started or in writing |
+| B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | — | not started or in writing |
+| B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
+| B-081 | docs | write the SAP2000 coverage check and the specification and plan for SAP2000 through the CSI adapter | sonnet, medium | opus, low | — | not started or in writing |
+| B-082 | docs | write the ACI 318-14 column check clause specifications and plan (draft) | opus, medium | opus, medium | — | not started or in writing |
+| B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
+| B-091 | docs | write the desktop-products overlap analysis and ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done |
+
 ## 4. Decisions by the lead
 
 | Id | Decision | Why |
