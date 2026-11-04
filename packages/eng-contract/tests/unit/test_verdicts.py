@@ -115,7 +115,11 @@ def test_trace_ref_forms() -> None:
 def test_subject() -> None:
     s = Subject.model_validate({"kind": "joint", "id": "1", "station_mm": 0, "case": "D+L"})
     assert (s.station_mm, s.case) == (0.0, "D+L")
-    for bad in ({"kind": "wall", "id": "1"}, {"kind": "joint", "id": ""}, {"kind": "joint", "id": "1", "station_mm": -1}):
+    for bad in (
+        {"kind": "wall", "id": "1"},
+        {"kind": "joint", "id": ""},
+        {"kind": "joint", "id": "1", "station_mm": -1},
+    ):
         with pytest.raises(ValidationError):
             Subject.model_validate(bad)
 

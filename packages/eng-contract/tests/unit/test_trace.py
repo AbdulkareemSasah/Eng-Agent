@@ -5,7 +5,9 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from eng_contract.errors import ErrorCode
 from eng_contract.trace import Trace
+from eng_contract.units import UnitError
 
 _SHA = "a" * 64
 _SRC = "ACI 318-14 Table 21.2.1(b)"
@@ -64,7 +66,6 @@ def test_valid_trace_round_trips() -> None:
         {"status": "MAYBE"},
         {"outputs": ["missing"]},
         {"inputs": [{"name": "1bad", "value": 1}]},
-        {"inputs": [{"name": "Vc", "value": 1, "unit": "furlong"}]},
         {"inputs": [{"name": "Vc", "value": 1, "ref": "no id"}]},
         {"steps": [_step("s", [], [1])]},
         {"steps": [_step("s", [], formula="f" * 1001)]},
@@ -97,3 +98,13 @@ def test_outputs_may_name_steps_and_inputs_only() -> None:
     with pytest.raises(ValidationError):
         Trace.model_validate(_trace(outputs=["phi"]))  # a constant is not an output
     assert Trace.model_validate(_trace(outputs=[])).outputs == []
+
+
+def test_unknown_unit_raises_unit_error() -> None:
+    for over in (
+        {"inputs": [{"name": "Vc", "value": 1, "unit": "furlong"}]},
+        {"steps": [_step("s", [], unit="furlong")]},
+    ):
+        with pytest.raises(UnitError) as info:
+            Trace.model_validate(_trace(outputs=[], **over))
+        assert info.value.detail.code is ErrorCode.UNIT_MISMATCH
