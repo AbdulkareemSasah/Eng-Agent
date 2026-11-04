@@ -50,7 +50,7 @@ def _record(n: int, tool: str, parents: list[int], inputs: list[int]) -> ResultR
     prov = Provenance(
         tool=tool,
         tool_version="1",
-        inputs={f"/i{i}": RefInput(ref=rid(i)) for i in inputs},
+        inputs={f"i{i}": RefInput(ref=rid(i)) for i in inputs},
         started_at="2026-01-01T00:00:00.000Z",
         duration_ms=1,
     )

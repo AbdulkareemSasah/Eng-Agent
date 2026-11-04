@@ -23,7 +23,7 @@ def record(n: int, tool: str, parents: Sequence[int] = (), inputs: Sequence[int]
     provenance = Provenance(
         tool=tool,
         tool_version="1",
-        inputs={f"/in{i}": RefInput(ref=rid(i)) for i in inputs} | {"/lit": LiteralInput(literal=1)},
+        inputs={f"in{i}": RefInput(ref=rid(i)) for i in inputs} | {"lit": LiteralInput(literal=1)},
         started_at="2026-01-01T00:00:00.000Z",
         duration_ms=1,
     )
