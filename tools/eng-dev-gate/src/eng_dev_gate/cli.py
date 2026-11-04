@@ -84,6 +84,23 @@ def _forbidden(args: argparse.Namespace) -> Status:
     return result.status
 
 
+def _workflows(args: argparse.Namespace) -> Status:
+    """``workflows``: the step of that name on the tree under check (no member is involved)."""
+    context: gate_root.GateContext = args.gate_context
+    root = _workspace_root(Path(args.root).resolve())
+    steps = run_check(
+        [step for step in STEPS if step.name == "workflows"],
+        root,
+        context.policy_root,
+        [],
+        SubprocessToolRunner(),
+        False,
+    )
+    result = context.with_findings(CommandResult(command="workflows", mode=context.config.mode.value, steps=steps))
+    render(result, args.format, sys.stdout, os.environ)
+    return result.status
+
+
 def _packages(args: argparse.Namespace) -> Status:
     """List the workspace members ordered by path: names (``--names``), JSON (``--json``) or ``name<TAB>path``.
 
@@ -127,6 +144,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         "forbidden": _forbidden,
         "gate-check": handle_gate_check,
         "packages": _packages,
+        "workflows": _workflows,
         **(handlers or {}),
     }.get(args.command)
     try:
