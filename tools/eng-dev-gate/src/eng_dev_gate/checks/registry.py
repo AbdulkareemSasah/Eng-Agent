@@ -56,6 +56,7 @@ STEPS: tuple[Step, ...] = (
     Step("types", "package", tool_steps.types),
     Step("forbidden", "package", forbidden.run_step),
     Step("ratchet", "root", ratchet.step),
+    Step("secrets", "root", secrets.step),
     Step("tests", "package", tests_step.tests),
     Step("docs-fresh", "package", generated.generated),
     Step("licenses", "package", licenses.licenses),
