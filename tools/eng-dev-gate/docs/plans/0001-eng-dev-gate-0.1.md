@@ -162,11 +162,15 @@ tasks:
     depends_on: [T3, T5]
   - id: T9
     title: ratchet command and step
+    # Amendment (B-038, documents only): T9 also writes the initial baseline of the root .gate/ratchet.json. The
+    # ratchet must start from the suppressions that already exist in the workspace, and the file's format must be
+    # the one this command reads; a protected path, so the change is an awaiting-owner notice in bootstrap mode.
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/ratchet.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - "tools/eng-dev-gate/tests/**"
+      - ".gate/ratchet.json"
     max_changed_lines: 350
     max_sessions: 2
     tests_first:
