@@ -10,6 +10,7 @@ import sys
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -75,8 +76,8 @@ def test_every_unit_is_well_formed() -> None:
         assert u.pi_power in (0, 1)
         assert (u.offset != 0) <= (u.dimension.temperature == 1)
     assert unit("kN.m") is UNITS["kN.m"]
-    with pytest.raises(TypeError):
-        UNITS["x"] = UNITS["m"]  # type: ignore[index]
+    assert isinstance(UNITS, MappingProxyType)
+    assert isinstance(QUANTITY_KINDS, MappingProxyType)
 
 
 def test_named_units_of_the_spec_exist() -> None:
@@ -230,6 +231,8 @@ def test_degrees_and_radians_use_one_float_step() -> None:
     assert math.isclose(convert(90, "deg", "rad"), math.pi / 2, rel_tol=4 * _EPS)
     assert math.isclose(convert(1, "rad", "deg"), 180 / math.pi, rel_tol=4 * _EPS)
     assert convert(30, "deg", "deg") == 30.0
+    with pytest.raises(UnitError):
+        convert_exact(1, "rad", "deg")
     with pytest.raises(UnitError) as info:
         convert_exact(1, "deg", "rad")
     assert "convert" in (info.value.detail.hint or "")
@@ -286,6 +289,8 @@ def test_suffix_lookup() -> None:
         found = kind_for_field(name)
         assert found is not None, name
         assert found is QUANTITY_KINDS[kind], name
+    suffixes = [k.suffix for k in QUANTITY_KINDS.values()]
+    assert not [a for a in suffixes for b in suffixes if a != b and a.endswith(b)]  # at most one suffix matches
     assert kind_for_field("label") is None
     assert kind_for_field("ratio") is None
     assert kind_for_field("width") is None
