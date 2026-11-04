@@ -22,7 +22,7 @@ def run_step(ctx: StepContext) -> list[Finding]:
     Raises:
         UsageError: the policy file is unreadable or invalid, or a source file cannot be read (exit 2).
     """
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    assert ctx.member is not None  # noqa: S101  # B-039: package steps always have a member
     policy = ctx.gate_root / ".gate" / "forbidden.yml"
     try:
         text = policy.read_text(encoding="utf-8")
