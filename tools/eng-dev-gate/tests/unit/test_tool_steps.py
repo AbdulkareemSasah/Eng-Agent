@@ -150,3 +150,32 @@ def test_mypy_uses_the_members_own_table_in_its_directory(tmp_path: Path) -> Non
     ((argv, cwd),) = runner.calls
     assert cwd == ctx.root / "pkgs" / "a"
     assert argv[argv.index("--config-file") + 1] == "pyproject.toml"
+
+
+def _cache_dir(argv: list[str]) -> Path:
+    return Path(argv[argv.index("--cache-dir") + 1])
+
+
+def test_ruff_never_keeps_a_cache_in_the_judged_tree(tmp_path: Path) -> None:
+    """A cache committed to the pull request must not be read, and none is written into its tree (spec 4.16)."""
+    own, own_runner = _context(tmp_path / "own", "[tool.ruff]\nline-length = 90\n", "[tool.ruff]\nline-length = 80\n")
+    base, base_runner = _context(tmp_path / "base", "[tool.ruff]\nline-length = 90\n")
+    for ctx in (own, base):
+        tool_steps.lint(ctx)
+        tool_steps.format_(ctx)
+    for runner in (own_runner, base_runner):
+        assert len(runner.calls) == 2
+        assert all("--no-cache" in argv for argv, _ in runner.calls)
+
+
+def test_mypy_keeps_its_cache_outside_the_judged_tree(tmp_path: Path) -> None:
+    """A forged ``.mypy_cache`` in the pull request could mark a badly typed module as clean (spec 4.16)."""
+    for name, member_table in (("base", ""), ("own", "[tool.mypy]\nstrict = true\n")):
+        ctx, runner = _context(tmp_path / name, "[tool.mypy]\nstrict = true\n", member_table)
+        tool_steps.types(ctx)
+        ((argv, _),) = runner.calls
+        cache = _cache_dir(argv)
+        assert cache.is_absolute()
+        assert not cache.is_relative_to(ctx.root)
+        assert not cache.is_relative_to(ctx.gate_root)
+        assert not cache.exists()  # removed after the run

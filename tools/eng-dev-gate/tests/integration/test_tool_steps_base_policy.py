@@ -114,6 +114,27 @@ def test_base_mypy_paths_apply_to_the_judged_tree(tmp_path: Path) -> None:
     assert result.code == 0, result.out
 
 
+def test_the_steps_leave_no_tool_cache_in_the_judged_tree(tmp_path: Path) -> None:
+    """Tool caches (ruff, mypy) never live in the tree under judgement, where a pull request could forge them."""
+    gate = _tree(tmp_path / "base", BASE_ROOT, {})
+    head = _tree(tmp_path / "head", HEAD_ROOT, {"pkgs/a/tests/test_mod.py": TEST_WITH_ASSERT})
+    result = _judge(gate, head, "format", "lint", "types")
+    assert result.code == 0, result.out
+    assert not list(head.root.rglob(".mypy_cache"))
+    assert not list(head.root.rglob(".ruff_cache"))
+
+
+def test_a_planted_mypy_cache_cannot_hide_a_type_error(tmp_path: Path) -> None:
+    """A cache directory in the pull request is ignored: the type error is still reported."""
+    gate = _tree(tmp_path / "base", BASE_ROOT, {})
+    head = _tree(tmp_path / "head", HEAD_ROOT, {"pkgs/a/src/a/wrong.py": "def f(a: int) -> str:\n    return a\n"})
+    (head.root / ".mypy_cache" / "3.14").mkdir(parents=True)
+    (head.root / ".mypy_cache" / "3.14" / "planted").write_text("not a cache", encoding="utf-8")
+    result = _judge(gate, head, "types")
+    assert result.code == 1
+    assert _statuses(result) == {"types": "fail"}
+
+
 def test_base_mypy_still_fails_a_type_error(tmp_path: Path) -> None:
     gate = _tree(tmp_path / "base", BASE_ROOT, {})
     head = _tree(tmp_path / "head", HEAD_ROOT, {"pkgs/a/src/a/wrong.py": "def f(a: int) -> str:\n    return a\n"})
