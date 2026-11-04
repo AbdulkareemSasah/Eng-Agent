@@ -4,7 +4,7 @@ issue: "B-003"
 spec: packages/eng-contract/docs/specs/0001-eng-contract-0.1.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: r2                 # binding for every pull request of this plan; never below the path risk floor
+risk: [r2, r3]           # binding for every pull request of this plan; never below the path risk floor; r3 from T15 (a development dependency in pyproject.toml and uv.lock, amendment B-345)
 tasks:
   - id: T1
     title: Package skeleton and gate configuration
@@ -290,6 +290,10 @@ tasks:
       - "packages/eng-contract/src/eng_contract/mcp.py"
       - "packages/eng-contract/tests/unit/test_mcp.py"
       - "packages/eng-contract/tests/data/envelopes/**"
+      # Amendment (B-345): AC49a validates output_schema() with the test-only dependencies jsonschema and types-jsonschema
+      # (section 3); they are declared in the implementation commit, never in the first test commit (gate TF003).
+      - "packages/eng-contract/pyproject.toml"
+      - "uv.lock"
     max_changed_lines: 150
     max_sessions: 1
     tests_first:

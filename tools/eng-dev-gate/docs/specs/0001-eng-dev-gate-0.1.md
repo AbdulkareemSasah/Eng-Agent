@@ -115,6 +115,9 @@ risk-floor (§4.6)
   set (RF002); on a lane branch the body line is the recorded risk.
 - AC21. Given a malformed map or an unknown risk class, then RF003 and exit 2.
 - AC21a. Given a `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan` and exactly one body `Risk:` line, then that set is the recorded risk; without one, RF004 (amendment B-336).
+- AC21b. Given a task's `.gate/ratchet.json` change that gate-check accepts in its scope (§4.5 step 6: only the counts of
+  packages that have another changed file in the task's globs), then that file does not raise the floor; the rise is
+  AW05 for the owner (§4.9) (amendment B-345).
 
 test-first (§4.7)
 - AC22. Given a title in Conventional Commits form, when the type is `docs`, `chore`, `ci` or `release`, or every changed
@@ -174,6 +177,10 @@ check (§4.12)
 - AC53a. Given changed R1 or R2 files for which mutmut produces no mutant, then MU003 and the step passes; given mutants that no test covers, then they count as survivors in the MU001 score (not killed, so they lower it) and are not MU002 (amendment B-336).
 - AC54. Given a workspace member without `[tool.eng-gate]` (CF006) or a stale `uv.lock` (ST001 on step `lock`), then the
   check fails.
+- AC54a. Given pull-request context and a pull request that adds a third-party dependency (with its stub distribution)
+  and imports it, then `types` resolves it in the judged environment with the gate's own `mypy`, and `imports` resolves
+  it with the judged environment's distribution map, so neither ST001 nor IM006 is reported for it; head runs use the
+  gate's interpreter (amendment B-345).
 
 agents (§4.13)
 - AC55. Given a template and `.gate/agents.yml`, when rendering, then the output is byte-exact, UTF-8, LF, and equal to the
@@ -382,7 +389,9 @@ both commits and both levels, so an entry can be added but not dropped by the pu
 `risk` of the plan named by `Plan-Task` (loaded from the gate branch; a set: `r1`, `r2` and `r3` can apply together;
 `r0` stands alone); for spec and plan pull requests, the `risk` of the changed documents; for a lane branch, and for a
 `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan`, the `Risk:` line of the body (amendment B-336). The floor must be a subset of the recorded set (RF001 lists both and the paths that raised the floor).
-When a plan is the source, the body `Risk:` line, if present, must be the same set (RF002). A missing recorded risk is
+When a plan is the source, the body `Risk:` line, if present, must be the same set (RF002). A `.gate/ratchet.json`
+change that gate-check accepts in the task's scope (§4.5 step 6) does not raise the floor: such a rise is AW05 for the
+owner (§4.9), not a change of process (AC21b; amendment B-345). A missing recorded risk is
 RF004. The default map of process/01 §6 is the root file's content; the gate has no built-in map, so a missing file is
 exit 2.
 
@@ -490,6 +499,10 @@ with a literal name). A top-level name claimed by a member's `import_names` is a
 | IM005 | The package dependency graph has no cycle | derived |
 | IM006 | A non-standard-library, non-workspace import must belong to a distribution declared by the importer (names resolved with `importlib.metadata.packages_distributions`) | derived; this is also how an undeclared Sasaah module is caught |
 
+In pull-request context (a gate root other than the judged tree, §4.16) IM006 resolves names with the
+`packages_distributions()` map of the judged environment, which `judged_metadata.py` (§4.12, licenses) also writes;
+head runs read the interpreter of the gate (AC54a; amendment B-345).
+
 Layer 2 servers never depend on each other, on layer 3 or on layer 4 (02 §1) follows from IM001 because the layers must
 be strictly lower. The import rules for `product` packages are not defined by 03 §3; only IM002 to IM006 apply to them
 (§11 Q9). An exception in the rules is a code change, not a configuration change.
@@ -541,6 +554,11 @@ table as `--isolated --config key=value` options and runs in the judged tree (a 
 patterns at the gate root), and `mypy` receives the gate root's `pyproject.toml` by absolute path and runs in the
 judged tree. Tool caches never live in the judged tree, where a pull request could forge them: `ruff` runs with
 `--no-cache` and `mypy` with `--cache-dir` set to a fresh temporary directory outside every checkout, removed afterwards.
+In that context the third-party imports of the judged tree resolve against the judged environment, built as for the
+`tests` step: `mypy`, still the gate's own so that a pull request cannot choose its type checker, runs with
+`--python-executable` set to the interpreter of that environment, so the packages and stub distributions of the pull
+request's own `uv.lock` are found; a stale `uv.lock` is ST001 of the step and a missing `uv` an environment fault, as
+for `tests` (AC54a; amendment B-345). Head runs use the interpreter of the gate.
 A member that has its own `[tool.ruff]` or `[tool.mypy]` table is configured by that table, as before.
 
 The `tests` step executes the code under check, so with a gate root other than the judged tree (§4.16) it runs the
@@ -867,14 +885,14 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
-| AC19 to AC21a | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27) |
+| AC19 to AC21b | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27), `::test_in_scope_ratchet_change_does_not_raise_floor` (T33) |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
 | AC23, AC24, AC27 | integration | `test_test_first_run.py::test_red_green`, `::test_passes_at_base_and_fails_at_head`, `::test_base_isolation_and_cleanup` |
 | AC29 to AC37 | unit | `test_forbidden_<rule>.py` (one file per rule: flagged case, permitted neighbour), `test_forbidden_scope.py::test_spikes_tests_and_waivers` |
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
-| AC47 to AC54 (with AC53a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29) |
+| AC47 to AC54 (with AC53a and AC54a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29), `test_tool_steps.py::test_types_resolve_in_judged_environment`, `test_imports.py::test_judged_distribution_map` (T32) |
 | AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_keys_skeleton`, `test_agents_drift.py::test_drift_unmanaged_and_pointer` |
 | AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_gate_action_runs_only_check` (T28), `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
 | AC64 | CI | the CI run of the last task's pull request |

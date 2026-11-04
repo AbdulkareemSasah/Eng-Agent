@@ -6,6 +6,7 @@ A document starts with YAML between two ``---`` lines. Every failure is a :class
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from graphlib import CycleError, TopologicalSorter
 from typing import Annotated, Any, Literal
 
@@ -16,9 +17,9 @@ from eng_dev_gate.results import ExitCode, GateError
 
 Name = Annotated[str, Field(min_length=1)]
 TaskId = Annotated[str, Field(pattern=r"^T\d+[a-z]*$")]  # T<n>; the plan itself uses T2a, T2b
-CriterionId = Annotated[str, Field(pattern=r"^AC\d+[a-z]*$")]  # AC<n>; specs use AC15a
+CriterionId = Annotated[str, Field(pattern=r"^([A-Z]{2,3}-)?AC\d+[a-z]*$")]  # AC<n> or <PFX>-AC<n>; specs use AC15a
 Count = Annotated[StrictInt, Field(gt=0)]
-_CRITERION_LINE = re.compile(r"^(?:[-*]\s+)?(AC\d+[a-z]*)\.(?:\s|$)", re.MULTILINE)
+_CRITERION_LINE = re.compile(r"^(?:[-*]\s+)?(([A-Z]{2,3}-)?AC\d+[a-z]*)\.(?:\s|$)", re.MULTILINE)
 
 
 class FrontMatterError(GateError):
@@ -73,9 +74,14 @@ class Plan(Spec):
     @field_validator("spec")
     @classmethod
     def _spec_path(cls, value: str) -> str:
-        if not safe_relative_path(value):
+        if not safe_relative_path(value.removesuffix("/")):
             raise ValueError("spec must be a workspace-relative POSIX path")
         return value
+
+    @property
+    def spec_is_directory(self) -> bool:
+        """Whether ``spec`` names a directory of clause specs (a path ending in ``/``; AC13a)."""
+        return self.spec.endswith("/")
 
 
 def _front_matter(text: str) -> dict[str, Any]:  # Any: YAML is untyped data at this boundary
@@ -135,8 +141,28 @@ def parse_plan(text: str, max_task_lines: int) -> Plan:
     return plan
 
 
-def uncovered_criteria(plan: Plan, spec_text: str) -> list[str]:
-    """Return the criteria of the spec (``AC<n>.`` at the start of a line) that no task ``covers`` (GC016)."""
+def _criteria(text: str) -> list[str]:
+    """Criterion ids at the start of a line of ``text`` (``AC<n>.`` or ``<PFX>-AC<n>.``), in order."""
+    return [m[0] for m in _CRITERION_LINE.findall(text.replace("\r\n", "\n"))]
+
+
+def uncovered_criteria(plan: Plan, specs: str | Sequence[str], plan_text: str = "") -> list[str]:
+    """Return the criteria that no task ``covers`` (GC016), in the order of the texts.
+
+    Args:
+        plan: the plan; its ``spec`` says whether ``specs`` is one spec or a directory of clause specs.
+        specs: the spec text, or the texts of the clause specs of a directory spec (AC13a).
+        plan_text: the plan file; for a directory spec its own criteria lines count too.
+
+    A spec file contributes its unprefixed ``AC<n>.`` lines. A directory contributes the ``<PFX>-AC<n>.`` lines whose
+    prefix some ``covers`` id of the plan carries, and the plan's own criteria lines.
+    """
     covered = {c for task in plan.tasks for c in task.covers}
-    criteria = dict.fromkeys(_CRITERION_LINE.findall(spec_text.replace("\r\n", "\n")))
-    return [c for c in criteria if c not in covered]
+    prefixes = {c.partition("AC")[0] for c in covered}
+    texts = [specs] if isinstance(specs, str) else list(specs)
+    found = [
+        c for t in texts for c in _criteria(t) if c.partition("AC")[0] in (prefixes if plan.spec_is_directory else {""})
+    ]
+    if plan.spec_is_directory:
+        found += _criteria(plan_text)
+    return [c for c in dict.fromkeys(found) if c not in covered]

@@ -257,35 +257,51 @@ tasks:
     covers: [AC50, AC53, AC57, AC59]
     depends_on: [T12]
   - id: T14
-    title: "Commands run and resume: wiring, generated options, answers file, signals, outcome mapping"
+    title: "Commands run and resume: wiring, generated options, answers file, outcome mapping"
+    # Amendment (B-342, documents only): the original T14 (430 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T14 keeps the run and resume wiring (AC6, AC7, AC8, AC14, AC46); T14b keeps signal
+    # handling, the launch address on the terminal only (AC10, AC61) and the decision layer of amendment B-098
+    # (AC62, AC63).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_options.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
-      - "packages/eng-harness/src/eng_harness/cli/_signals.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
       - "packages/eng-harness/tests/unit/cli/test_options.py"
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py"
-      - "packages/eng-harness/tests/unit/cli/test_signals.py"
-      - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
-      - "packages/eng-harness/tests/workflow/test_launch_address.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
-    max_changed_lines: 430
-    max_sessions: 3
+    max_changed_lines: 310
+    max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_completes_and_writes_report"
       - "packages/eng-harness/tests/replay/test_cli_resume.py::test_no_wait_then_resume"
-      - "packages/eng-harness/tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop"
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
+    covers: [AC6, AC7, AC8, AC14, AC46]
+    depends_on: [T3, T5, T7, T9, T10, T13]
+  - id: T14b
+    title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/_run.py"
+      - "packages/eng-harness/src/eng_harness/cli/_signals.py"
+      - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
+      - "packages/eng-harness/tests/unit/cli/test_signals.py"
+      - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py"
+      - "packages/eng-harness/tests/workflow/test_cli_run.py"
+      - "packages/eng-harness/tests/workflow/test_launch_address.py"
+    max_changed_lines: 120
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop"
       - "packages/eng-harness/tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr"
       - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled"
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime"
-    covers: [AC6, AC7, AC8, AC10, AC14, AC46, AC61, AC62, AC63]
-    depends_on: [T3, T5, T7, T9, T10, T13]
+    covers: [AC10, AC61, AC62, AC63]
+    depends_on: [T14]
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
     files:
@@ -299,7 +315,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_reject_leaves_no_run"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_stale_draft_hash_refused"
     covers: [AC47]
-    depends_on: [T14]
+    depends_on: [T14b]
   - id: T16
     title: "Commands status, stop, report and doctor"
     files:
@@ -318,7 +334,7 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_report_command.py::test_output_rules"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough"
     covers: [AC9, AC11, AC12, AC13]
-    depends_on: [T14]
+    depends_on: [T14b]
   - id: T17
     title: "End-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule"
     files:
@@ -362,8 +378,8 @@ lets the rest stack on them:
   marked results.
 - T11 to T13 build the report from the journal and the store only. T11 folds the data; T12 renders sections and the
   source links; T13 adds the marks, the integrity line, the policy and the atomic write.
-- T14 to T16 wire the commands: run and resume first (they exercise everything), then the basis confirmation inside
-  `run`, then status, stop, report and doctor. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
+- T14 to T16 wire the commands: run and resume first (T14, then T14b for signals, the launch address and the decision
+  layer; they exercise everything), then the basis confirmation inside `run`, then status, stop, report and doctor. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
   environment test, the local testing list and the agent rule.
 
 No new runtime dependency: `http.server`, `argparse`, `subprocess`, `statistics`, `secrets`, `hmac` and `html` from the
@@ -420,13 +436,16 @@ the mandatory source, the sources table, changes and results; snapshot.
 **T13 Report document** (spec §4.6.2). Status banner and marks, integrity line, policy meta, `build_report`,
 `write_report`.
 
-**T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs, decision and page
-ports, signal handling, outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end, launch
-address shown on the controlling terminal only (AC61). Fake-host workflow and replay tests. Amendment B-098: the
-decision layer is built from `[providers.*]` through `load_providers_config` and the `CliDeps` assembler
-(`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings on
-standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines, so the
-budget is 430.
+**T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
+outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
+tests. Budget 310 lines. The original T14 (430 lines) was split by B-342 (D-12).
+
+**T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
+request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
+Amendment B-098: the decision layer is built from `[providers.*]` through `load_providers_config` and the `CliDeps`
+assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings
+on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
+the 120. T15 and T16 follow T14b.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 
@@ -447,9 +466,9 @@ the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
 - Development: none new.
 - Other plans: engine plan T4 (reader), T6 (ports), T9 (runner), T15 (approvals), T18 (progress delivery);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
-  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry; for T14 (B-098),
-  decision plan T10 (the cascade's `runtime_summary()`), engine plan T14 (`decision_runtime` in the header) and
-  provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14 and T15 use
+  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry; for T14b (B-098),
+  decision plan T10 (the cascade's `runtime_summary()`), engine plan T14b (`decision_runtime` in the header) and
+  provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14, T14b and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it.
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`), engine §4.9 (`item_reasons`, the choice
@@ -458,7 +477,7 @@ the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
 ## 4. Verification
 
 Local gate per task as in the engine plan §4; the pull request links its CI run. Review lenses: correctness, Python,
-type design, silent failure, tests; T3, T6, T7, T9, T10 and T15 additionally with the security lens (T10: the answers-file gate; T3 and T14: the launch address) (what an agent, a
+type design, silent failure, tests; T3, T6, T7, T9, T10 and T15 additionally with the security lens (T10: the answers-file gate; T3 and T14b: the launch address) (what an agent, a
 web page in the browser, or a hostile drawing text can do); T8, T11 to T13 additionally against ADR-0026 §3 and the
 rule "built only from the journal and the store". The second-family review and the owner's approvals are
 `awaiting owner` in bootstrap mode.
