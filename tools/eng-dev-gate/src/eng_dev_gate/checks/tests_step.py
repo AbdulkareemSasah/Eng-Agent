@@ -9,7 +9,9 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from eng_dev_gate import judged_run
+from pydantic import BaseModel, ConfigDict, ValidationError
+
+from eng_dev_gate import judged_metadata, judged_run
 from eng_dev_gate.config.package_config import load_package_config
 from eng_dev_gate.pytest_plugin import DESELECTED_EXIT_CODE
 from eng_dev_gate.report import Finding, Severity
@@ -19,7 +21,7 @@ from eng_dev_gate.toolrun import python_module
 if TYPE_CHECKING:
     from eng_dev_gate.checks.registry import StepContext
 
-__all__ = ["DESELECTED_EXIT_CODE", "tests"]
+__all__ = ["DESELECTED_EXIT_CODE", "JudgedEnvironment", "read_judged_environment", "tests"]
 
 OUTPUT_LINES = 20  # last lines of pytest output quoted in ST001; presentation only
 TEST_FAILURE_EXITS = (1, 5)  # pytest: 1 tests failed, 5 no tests collected; other codes are tool faults
@@ -72,19 +74,51 @@ def _judged_command(root: Path, *argv: str) -> list[str]:
     ]
 
 
-def _stale_lock(ctx: StepContext) -> Finding | None:
-    """ST001 when the judged tree's ``uv.lock`` is stale or missing, else ``None``; its tests need that environment.
+def _stale_lock(ctx: StepContext, step: str = "tests") -> Finding | None:
+    """ST001 when the judged tree's ``uv.lock`` is stale or missing, else ``None``; ``step`` needs that environment.
 
-    The ``lock`` step reports the same fact for the workspace; this check keeps the tests step from turning it into an
+    The ``lock`` step reports the same fact for the workspace; this check keeps ``step`` from turning it into an
     environment fault (``uv run --locked`` exits 2) that would hide every other finding of the run.
     """
-    assert ctx.member is not None  # noqa: S101  # B-059: package steps always have a member
     checked = ctx.runner.run(["uv", "lock", "--check", "--project", str(ctx.root)], ctx.root)
     if checked.exit_code == 0:
         return None
     head = " | ".join(checked.output.splitlines()[-OUTPUT_LINES:])
-    message = f"tests: uv.lock of the judged tree is not up to date, so its environment cannot be built: {head}"
-    return Finding(code="ST001", severity=Severity.ERROR, path=ctx.member.path, message=message)
+    message = f"{step}: uv.lock of the judged tree is not up to date, so its environment cannot be built: {head}"
+    return Finding(code="ST001", severity=Severity.ERROR, path=ctx.member.path if ctx.member else None, message=message)
+
+
+class JudgedEnvironment(BaseModel):
+    """What ``judged_metadata.py`` reports from inside the judged tree's environment (spec 4.12)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    executable: str
+    distributions: list[dict[str, object]]
+    packages: dict[str, list[str]]
+
+
+def read_judged_environment(ctx: StepContext, step: str) -> JudgedEnvironment | Finding:
+    """Read the judged tree's environment with the base commit's ``judged_metadata.py``; ST001 when its lock is stale.
+
+    Raises:
+        EnvironmentFaultError: ``uv`` is missing, the run failed or its output is unusable (tool output is validated).
+    """
+    if not _uv_available():
+        raise EnvironmentFaultError(f"{step}: uv is not available; the judged tree's environment is built with uv")
+    if (stale := _stale_lock(ctx, step)) is not None:
+        return stale
+    with tempfile.TemporaryDirectory(prefix="eng-gate-env-") as folder:
+        out = Path(folder) / "metadata.json"
+        command = _judged_command(ctx.root, "-I", str(Path(judged_metadata.__file__).resolve()), str(out))
+        ran = ctx.runner.run(command, Path(folder))  # nothing of the judged tree is on the import path
+        if ran.exit_code != 0:
+            head = " | ".join(ran.output.splitlines()[-OUTPUT_LINES:])
+            raise EnvironmentFaultError(f"{step}: reading the judged environment exited {ran.exit_code}: {head}")
+        try:
+            return JudgedEnvironment.model_validate_json(out.read_text(encoding="utf-8"))
+        except (OSError, ValidationError) as error:
+            raise EnvironmentFaultError(f"{step}: unusable metadata of the judged environment: {error!r}") from error
 
 
 def _coverage_arguments(rcfile: Path, plugin: str, no_cov: str | None) -> list[str]:

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from eng_dev_gate import judged_metadata
-from eng_dev_gate.checks import licenses
+from eng_dev_gate.checks import licenses, tests_step
 from eng_dev_gate.checks.registry import StepContext
 from eng_dev_gate.results import EnvironmentFaultError
 from eng_dev_gate.toolrun import ToolResult
@@ -43,12 +43,17 @@ def _ctx(repo: Repo, gate_root: Path, runner: ScriptedRunner) -> StepContext:
     return StepContext(repo.root, gate_root, member, runner)
 
 
+def _payload(*entries: dict[str, object]) -> str:
+    """The file ``judged_metadata.py`` writes, with these distributions."""
+    return json.dumps({"executable": "python", "distributions": list(entries), "packages": {}})
+
+
 def _entry(name: str, **fields: object) -> dict[str, object]:
     return {"name": name, "expression": "", "license": "", "classifiers": [], "requires": [], **fields}
 
 
 def test_command_runs_the_base_file_in_the_judged_environment(repo: Repo, tmp_path: Path) -> None:
-    runner = ScriptedRunner(json.dumps([_entry("dep", expression="MIT")]))
+    runner = ScriptedRunner(_payload(_entry("dep", expression="MIT")))
     assert licenses.licenses(_ctx(repo, tmp_path, runner)) == []
     command = runner.calls[-1]
     assert command[:3] == ["uv", "run", "--quiet"]
@@ -66,7 +71,7 @@ def test_lock_check_failure_is_st001(repo: Repo, tmp_path: Path) -> None:
 
 
 def test_missing_uv_is_an_environment_fault(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(licenses, "_uv_available", lambda: False)
+    monkeypatch.setattr(tests_step, "_uv_available", lambda: False)
     with pytest.raises(EnvironmentFaultError, match="uv is not available"):
         licenses.licenses(_ctx(repo, tmp_path, ScriptedRunner()))
 
@@ -76,15 +81,15 @@ def test_failed_metadata_run_is_an_environment_fault(repo: Repo, tmp_path: Path)
         licenses.licenses(_ctx(repo, tmp_path, ScriptedRunner(run=1)))
 
 
-@pytest.mark.parametrize("payload", ["not json", '{"name": "dep"}', '[{"name": 1}]'])
+@pytest.mark.parametrize(
+    "payload", ["not json", '{"name": "dep"}', _payload({"name": 1}), '{"executable": "python", "distributions": []}']
+)
 def test_unusable_metadata_is_an_environment_fault(repo: Repo, tmp_path: Path, payload: str) -> None:
     with pytest.raises(EnvironmentFaultError, match="unusable metadata"):
         licenses.licenses(_ctx(repo, tmp_path, ScriptedRunner(payload)))
 
 
 def test_requires_of_the_judged_environment_extend_the_closure(repo: Repo, tmp_path: Path) -> None:
-    payload = json.dumps(
-        [_entry("dep", expression="MIT", requires=["deep"]), _entry("deep", expression="GPL-3.0-only")]
-    )
+    payload = _payload(_entry("dep", expression="MIT", requires=["deep"]), _entry("deep", expression="GPL-3.0-only"))
     findings = licenses.licenses(_ctx(repo, tmp_path, ScriptedRunner(payload)))
     assert [(f.code, f.message.split(":")[0]) for f in findings] == [("LC001", "deep")]
