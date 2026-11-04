@@ -255,13 +255,13 @@ call the port; if so this task is tests, documents and the `engine.decision` req
 (crash while pending) and conformance tests, the p95 test, and the items of §4 in `docs/local-testing.md`. If T14 of
 the engine plan has not merged, this task waits. Amendment B-098: the cascade's `runtime_summary()` (spec §4.12,
 AC43; `_cascade.py` gains the constructor argument and the getter, about 20 lines, which raised the budget from 150 to
-170), tested through the real engine's run header (engine AC69).
+170), tested through the real engine's run header (engine AC69, engine plan T14b).
 
 ## 3. Dependencies
 
 - Runtime: none new (`eng-contract`, `pydantic` from engine plan T1; standard library otherwise). No ADR is needed.
 - Development: none new.
-- Work items: the engine plan (B-060) T2 (errors), T6 (ports and fakes), T7 (ctx types, `BasisView`), T14 (`_decide`),
+- Work items: the engine plan (B-060) T2 (errors), T6 (ports and fakes), T7 (ctx types, `BasisView`), T14 (`_decide`), T14b (`decision_runtime` in the run header, before T10 only),
   T17 (guard) merged before T7 and T10 here; T1 to T6 here need only T1, T2 and T6 of the engine plan. The amendments
   of spec Q1 are made in the engine spec's own pull request before T10. Specs 0006 and 0007 depend on T10.
 
