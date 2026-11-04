@@ -16,7 +16,7 @@ BAD_MODULE = "import os\n\n\ndef f(a: int)->str:\n    return a\n"
 def _check(repo: Repo, *argv: str) -> RunResult:
     argv = (
         "--skip",
-        "tests,secrets,docs-fresh,licenses,workflows",
+        "tests,secrets,docs-fresh,licenses,mutation,workflows",
         *argv,
     )  # covered by test_coverage.py and test_secrets.py
     return repo.run(["--format", "json", "check", *argv], {"check": make_handler(SubprocessToolRunner())})
