@@ -36,9 +36,9 @@ class FakeRunner:
 
 
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
-    # the tests step has its own tests (test_coverage.py); the fake runner here writes no coverage report
+    # the tests and secrets steps have their own tests (test_coverage.py, test_secrets.py)
     return repo.run(
-        ["--format", "json", "check", "--skip", "tests,docs-fresh,licenses,mutation,workflows", *argv],
+        ["--format", "json", "check", "--skip", "tests,secrets,docs-fresh,licenses,mutation,workflows", *argv],
         {"check": make_handler(runner)},
     )
 
@@ -51,8 +51,8 @@ def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
     assert [s.name for s in STEPS] == [
-        "lock", "config", "format", "lint", "types", "forbidden", "ratchet", "tests", "docs-fresh",
-        "licenses", "mutation", "workflows",
+        "lock", "config", "format", "lint", "types", "forbidden", "ratchet", "secrets", "tests",
+        "docs-fresh", "licenses", "mutation", "workflows",
     ]  # fmt: skip
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")

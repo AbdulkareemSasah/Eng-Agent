@@ -22,4 +22,8 @@ limits:  # max_task_lines: process/04 section 4. The others are gate settings pr
   max_file_bytes: 1048576
 license_exceptions: []
 secrets:
-  allow: []
+  allow:
+    # Reviewed false positive: the JOBS table maps the command name "secrets" to the job name "security".
+    - rule: credential-assignment
+      path: tools/eng-dev-gate/src/eng_dev_gate/gate_root.py
+      fingerprint: 10b725ce507c
