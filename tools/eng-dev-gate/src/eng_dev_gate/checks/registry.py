@@ -13,7 +13,9 @@ from eng_dev_gate.checks import (
     generated,
     imports,
     licenses,
+    mutation,
     ratchet,
+    secrets,
     tests_step,
     tool_steps,
     workflows,
@@ -31,12 +33,16 @@ STEP_ORDER: tuple[str, ...] = (
 
 @dataclass(frozen=True)
 class StepContext:
-    """What a step sees: workspace ``root``, ``gate_root`` (policy files), the ``member`` for package steps."""
+    """What a step sees: workspace ``root``, ``gate_root`` (policy files), the ``member`` for package steps.
+
+    ``base`` is the commit that changes are compared with (``mutation``); ``None`` takes it from the event file.
+    """
 
     root: Path
     gate_root: Path
     member: Member | None
     runner: ToolRunner
+    base: str | None = None
 
 
 @dataclass(frozen=True)
@@ -57,8 +63,10 @@ STEPS: tuple[Step, ...] = (
     Step("forbidden", "package", forbidden.run_step),
     Step("imports", "root", lambda ctx: imports.check_workspace(ctx.root)),
     Step("ratchet", "root", ratchet.step),
+    Step("secrets", "root", secrets.step),
     Step("tests", "package", tests_step.tests),
     Step("docs-fresh", "package", generated.generated),
     Step("licenses", "package", licenses.licenses),
+    Step("mutation", "package", mutation.run_step),
     Step("workflows", "root", workflows.workflows),
 )

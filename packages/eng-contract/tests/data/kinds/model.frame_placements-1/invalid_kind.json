@@ -1,0 +1,26 @@
+{
+  "rule": "kind",
+  "payload": {
+    "frames": [
+      {
+        "id": "C1",
+        "kind": "slab",
+        "section": "C400",
+        "i_joint": "J1",
+        "j_joint": null,
+        "i": {
+          "x_mm": 0,
+          "y_mm": 0,
+          "z_mm": 0
+        },
+        "j": {
+          "x_mm": 0,
+          "y_mm": 0,
+          "z_mm": 3000
+        },
+        "story": "S1",
+        "rotation_deg": 0
+      }
+    ]
+  }
+}

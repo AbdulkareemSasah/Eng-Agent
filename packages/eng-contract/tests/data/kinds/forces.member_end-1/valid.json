@@ -1,0 +1,37 @@
+{
+  "sign_convention": "host_local/1",
+  "rows": [
+    {
+      "member": "B1",
+      "case": {
+        "case": "DL",
+        "case_type": "load_pattern",
+        "step": null
+      },
+      "end": "i",
+      "station_mm": 0.0,
+      "P_kN": 0.0,
+      "V2_kN": 12.0,
+      "V3_kN": 0.0,
+      "T_kNm": 0.0,
+      "M2_kNm": 0.0,
+      "M3_kNm": -30.0
+    },
+    {
+      "member": "B1",
+      "case": {
+        "case": "DL",
+        "case_type": "load_pattern",
+        "step": null
+      },
+      "end": null,
+      "station_mm": 1500.0,
+      "P_kN": 0.0,
+      "V2_kN": 12.0,
+      "V3_kN": 0.0,
+      "T_kNm": 0.0,
+      "M2_kNm": 0.0,
+      "M3_kNm": 10.0
+    }
+  ]
+}

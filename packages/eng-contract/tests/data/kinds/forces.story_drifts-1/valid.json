@@ -1,0 +1,32 @@
+{
+  "rows": [
+    {
+      "story": "S1",
+      "case": {
+        "case": "EQX",
+        "case_type": "load_case",
+        "step": "Max"
+      },
+      "direction": "X",
+      "drift_ratio": 0.004,
+      "point": "J5",
+      "x_mm": 0.0,
+      "y_mm": 0.0,
+      "z_mm": 3000.0
+    },
+    {
+      "story": "S2",
+      "case": {
+        "case": "EQX",
+        "case_type": "load_case",
+        "step": "Max"
+      },
+      "direction": "Y",
+      "drift_ratio": 0.0,
+      "point": null,
+      "x_mm": null,
+      "y_mm": null,
+      "z_mm": null
+    }
+  ]
+}

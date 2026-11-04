@@ -256,6 +256,7 @@ tasks:
     covers: [AC6, AC7, AC8, AC9, AC10, AC10a, AC11, AC13]
     depends_on: [T2b, T3]
   - id: T14
+    # Amendment (B-089, documents only): AC10b moves to T14b; with it T14 measured 428 lines against 400 (D-12: split).
     title: "gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job"
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
@@ -275,6 +276,18 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_gate_branch_merge"
     covers: [AC12, AC14, AC15, AC16, AC17, AC18]
     depends_on: [T6, T13]
+  - id: T14b
+    title: "gate-check: the ratchet baseline in a task's scope (AC10b)"
+    # Amendment (B-089, documents only): split from T14 to keep both tasks within the size cap.
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 80
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_ratchet_baseline_in_scope"
+    covers: [AC10b]
+    depends_on: [T14]
   - id: T15
     title: risk-floor command and job
     files:
@@ -325,8 +338,11 @@ tasks:
     depends_on: [T16]
   - id: T18
     title: secrets command and the security job
+    # Amendment (B-099, documents only): T18 also edits .gate/gate.yml for the secret-scan allowlist entries its own
+    # step needs on the existing tree (a reviewed false positive is allowlisted by rule, path and fingerprint).
     files:
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/secrets.py"
+      - ".gate/gate.yml"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/registry.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/cli.py"
       - ".github/workflows/ci.yml"
@@ -445,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:

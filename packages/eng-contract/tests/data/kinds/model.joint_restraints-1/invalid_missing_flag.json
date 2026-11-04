@@ -1,0 +1,24 @@
+{
+  "rule": "Field required",
+  "payload": {
+    "joints": [
+      {
+        "joint": "J1",
+        "ux": true,
+        "uy": true,
+        "uz": true,
+        "rx": false,
+        "ry": false
+      },
+      {
+        "joint": "J2",
+        "ux": true,
+        "uy": true,
+        "uz": true,
+        "rx": true,
+        "ry": false,
+        "rz": false
+      }
+    ]
+  }
+}

@@ -267,11 +267,12 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_options.py"
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py"
       - "packages/eng-harness/tests/unit/cli/test_signals.py"
+      - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/workflow/test_launch_address.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
-    max_changed_lines: 400
+    max_changed_lines: 430
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
@@ -281,7 +282,9 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
       - "packages/eng-harness/tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr"
-    covers: [AC6, AC7, AC8, AC10, AC14, AC46, AC61]
+      - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled"
+      - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime"
+    covers: [AC6, AC7, AC8, AC10, AC14, AC46, AC61, AC62, AC63]
     depends_on: [T3, T5, T7, T9, T10, T13]
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
@@ -419,7 +422,11 @@ the mandatory source, the sources table, changes and results; snapshot.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs, decision and page
 ports, signal handling, outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end, launch
-address shown on the controlling terminal only (AC61). Fake-host workflow and replay tests.
+address shown on the controlling terminal only (AC61). Fake-host workflow and replay tests. Amendment B-098: the
+decision layer is built from `[providers.*]` through `load_providers_config` and the `CliDeps` assembler
+(`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings on
+standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines, so the
+budget is 430.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 
@@ -440,7 +447,9 @@ the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
 - Development: none new.
 - Other plans: engine plan T4 (reader), T6 (ports), T9 (runner), T15 (approvals), T18 (progress delivery);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
-  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry. T14 and T15 use
+  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry; for T14 (B-098),
+  decision plan T10 (the cascade's `runtime_summary()`), engine plan T14 (`decision_runtime` in the header) and
+  provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14 and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it.
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`), engine §4.9 (`item_reasons`, the choice
