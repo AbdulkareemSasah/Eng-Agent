@@ -4,6 +4,9 @@ In pull-request context the ``tests`` step runs ``uv run --project <judged tree>
 file is run as a script by the interpreter of the judged environment, so it imports nothing of the gate except itself
 and loads the pytest plugin of the base commit from the file next to it, under a name of its own. The judged
 environment may contain another ``eng_dev_gate`` (the pull request's own copy); that copy is never used as the plugin.
+
+Invariant: ``pytest_plugin.py`` imports nothing from ``eng_dev_gate`` (a unit test checks it), because inside this
+environment such an import would resolve to the pull request's copy.
 """
 
 from __future__ import annotations

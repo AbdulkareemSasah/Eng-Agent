@@ -52,10 +52,39 @@ def _uv_available() -> bool:
 def _judged_command(root: Path, *argv: str) -> list[str]:
     """The argv that runs ``python argv`` in the environment of the judged tree at ``root``, from its lock file.
 
-    ``--locked`` fails when ``uv.lock`` is stale (the ``lock`` step reports that as ST001); ``--all-packages`` and the
-    ``dev`` group give the members and their test tools, as the setup action does for a push run.
+    ``--locked`` makes uv refuse a stale ``uv.lock`` (``_stale_lock`` judges that before, so uv's exit 2 never reaches
+    the pytest exit codes); ``--all-packages`` and the ``dev`` group give the members and their test tools, as the setup
+    action does for a push run. ``--quiet`` keeps uv's own warnings (an inherited ``VIRTUAL_ENV`` that is not the
+    project's, a deprecated variable) out of the output, where they would fill the excerpt of a fault message.
     """
-    return ["uv", "run", "--project", str(root), "--locked", "--all-packages", "--group", "dev", "python", *argv]
+    return [
+        "uv",
+        "run",
+        "--quiet",
+        "--project",
+        str(root),
+        "--locked",
+        "--all-packages",
+        "--group",
+        "dev",
+        "python",
+        *argv,
+    ]
+
+
+def _stale_lock(ctx: StepContext) -> Finding | None:
+    """ST001 when the judged tree's ``uv.lock`` is stale or missing, else ``None``; its tests need that environment.
+
+    The ``lock`` step reports the same fact for the workspace; this check keeps the tests step from turning it into an
+    environment fault (``uv run --locked`` exits 2) that would hide every other finding of the run.
+    """
+    assert ctx.member is not None  # noqa: S101
+    checked = ctx.runner.run(["uv", "lock", "--check", "--project", str(ctx.root)], ctx.root)
+    if checked.exit_code == 0:
+        return None
+    head = " | ".join(checked.output.splitlines()[-OUTPUT_LINES:])
+    message = f"tests: uv.lock of the judged tree is not up to date, so its environment cannot be built: {head}"
+    return Finding(code="ST001", severity=Severity.ERROR, path=ctx.member.path, message=message)
 
 
 def _coverage_arguments(rcfile: Path, plugin: str, no_cov: str | None) -> list[str]:
@@ -77,6 +106,11 @@ def _coverage_arguments(rcfile: Path, plugin: str, no_cov: str | None) -> list[s
     ]
 
 
+def _judged_environment(ctx: StepContext) -> bool:
+    """True in a pull-request run: the gate root is not the tree under check, so the tree needs its own environment."""
+    return ctx.gate_root.resolve() != ctx.root.resolve()
+
+
 def _run_coverage(ctx: StepContext, member_dir: Path, work: Path) -> tuple[int, str, Path]:
     rcfile = work / "coveragerc"
     rcfile.write_text(
@@ -85,14 +119,12 @@ def _run_coverage(ctx: StepContext, member_dir: Path, work: Path) -> tuple[int, 
     )
     rc = ["--rcfile", str(rcfile)]
     report = work / "coverage.json"
-    if ctx.gate_root.resolve() == ctx.root.resolve():  # head run: the interpreter of the gate is the environment
+    if not _judged_environment(ctx):  # head run: the interpreter of the gate is the environment
         no_cov = "--no-cov" if _pytest_cov_installed() else None
         run = python_module("coverage", *_coverage_arguments(rcfile, "eng_dev_gate.pytest_plugin", no_cov))
         make = python_module("coverage", "json", *rc, "-o", str(report))
         make_cwd = member_dir
     else:  # pull-request run: the gate is the base commit's, the code under test needs the judged tree's environment
-        if not _uv_available():
-            raise EnvironmentFaultError("tests: uv is not available; the judged tree's tests need its uv environment")
         # the script is the base commit's file and loads the base plugin under its own name; the rc file is generated
         # here, so neither the policy nor the plugin comes from the judged tree
         marker = judged_run.NO_COV_MARKER
@@ -126,6 +158,11 @@ def tests(ctx: StepContext) -> list[Finding]:
     assert ctx.member is not None  # noqa: S101 - package steps always have a member
     member = ctx.member
     config = load_package_config(member.directory / "pyproject.toml")
+    if _judged_environment(ctx):
+        if not _uv_available():
+            raise EnvironmentFaultError("tests: uv is not available; the judged tree's tests need its uv environment")
+        if (stale := _stale_lock(ctx)) is not None:
+            return [stale]
     with tempfile.TemporaryDirectory(prefix="eng-gate-cov-") as folder:
         exit_code, output, report = _run_coverage(ctx, member.directory, Path(folder))
         if exit_code == DESELECTED_EXIT_CODE:

@@ -520,7 +520,14 @@ by the gate in a temporary directory outside both checkouts and passed with `--r
 the gate after the run, and `judged_run.py`, a file of the base commit's package, runs `coverage` in that environment
 after loading the base `pytest_plugin.py` as a module of its own name (`-p eng_gate_base_pytest_plugin`), so an
 `eng_dev_gate` installed in the judged environment cannot stand in for it. `coverage json` runs in the same environment
-from a temporary directory. Without `uv` on the path the step is an environment fault (exit 3). A head run (no gate
+from a temporary directory. Without `uv` on the path the step is an environment fault (exit 3). Before the run, the
+step checks `uv lock --check` for the judged tree: a stale or missing `uv.lock` is ST001 of the step (the environment
+cannot be built), not an environment fault, so the other findings of the run are kept; `uv run` is called with `--quiet`
+so that its own warnings (for example an inherited `VIRTUAL_ENV`) do not fill the output. `pytest_plugin.py` imports
+nothing from `eng_dev_gate` (a unit test checks it): inside the judged environment such an import would resolve to the
+pull request's copy. Accepted residual risk: `coverage` and `pytest` themselves come from the judged lock file, so a
+pull request chooses the tools that produce its own report; in-process code of its `conftest.py` could already do the
+same, and the gate-generated rc file, the base plugin and the base thresholds are what bound it. A head run (no gate
 root, push runs, local runs) uses the interpreter of the gate as before.
 
 Floors, from process/05 §2 (a package may set a higher value, never a lower one):
