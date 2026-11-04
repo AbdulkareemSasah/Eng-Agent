@@ -161,3 +161,15 @@ def test_windows_job_only_on_push() -> None:
     assert action["runs"]["using"] == "composite"
     assert "uv run eng-gate windows-tests" in _runs(action)
     assert "github.event" not in _runs(action)
+
+
+def test_gate_action_runs_only_check() -> None:
+    """AC59: the gate action runs ``eng-gate check`` only; the tests step runs each member's tests, not a workspace run."""
+    action = _action("gate")
+    steps = action["runs"]["steps"]
+    assert len(steps) == 1
+    run = steps[0]["run"]
+    assert "eng-gate" in run
+    assert "check --all" in run
+    assert "pytest" not in run
+    assert "pytest" not in str(action["description"])
