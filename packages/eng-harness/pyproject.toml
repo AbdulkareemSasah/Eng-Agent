@@ -9,6 +9,7 @@ dependencies = [
     "eng-contract",
     "mcp>=2.3,<3",
     "pydantic>=2.14,<3",
+    "ruamel-yaml>=0.19,<0.20",
 ]
 
 # Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the

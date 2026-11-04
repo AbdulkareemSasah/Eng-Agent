@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Process transport and MCP client session: `ServerManager` (lazy role start, uncached complete tool list, raw calls with the client backstop, crash detection, restart with re-attach by process id within `max_restarts_per_run`, session epoch, shutdown that leaves host instances) over `ProcessTransport`, which speaks MCP over the pipes of a harness-launched process; `CallEffect` decides `HOST_NOT_CONNECTED`, `TIMEOUT_NO_EFFECT` or `TIMEOUT_UNKNOWN_OUTCOME` for a lost call (plan 0002 T5, B-124; spec 0002 AC8, AC11, AC12). The build check after each start follows in T6b.
+- Strict YAML 1.2 loader `eng_harness.templates._yaml` (`load_strict`, `loads_strict`): refuses duplicate keys, anchors, aliases, tags, non-string keys, non-finite numbers, more than one document, files over 1 MiB and nesting deeper than 8; `ruamel-yaml>=0.19,<0.20` runtime dependency with ADR-0004 (Proposed) (B-156; spec 0004 AC7).
 - Calc-module rules test (imports, purity, module state, FB005 forms), golden data loader and file lint, and the verification record template (plan 0003 T6, B-145; spec 0003 AC3, AC46).
 - Journal event payload models: `eng_harness.journal` (the 21 event types and `PAYLOAD_MODELS`) and the harness result kinds in `eng_harness._kinds` (plan 0001 T3, B-102).
 - Calc framework: `eng_harness.calc` (decorator, registry with the AC1 registration rules, input metadata, trace builder, statuses) and the empty `eng_harness.calcs.REGISTRY`; `calcs/**` added to the R1 modules (plan 0003 T1, B-140).
