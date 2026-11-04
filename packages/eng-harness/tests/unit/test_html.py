@@ -96,6 +96,15 @@ def test_href_is_minted_only_by_the_factory() -> None:
             Href(forged)
 
 
+def test_a_minted_href_cannot_be_reassigned_or_rendered_forged() -> None:
+    minted = href(SafeToken("a"))
+    with pytest.raises(AttributeError):
+        minted.value = '" onclick="x'  # type: ignore[misc]  # B-176: the assignment is the forgery under test
+    object.__setattr__(minted, "_value", '" onclick="x')
+    with pytest.raises(HtmlError):
+        el(Tag.A, Text("go"), href=minted)
+
+
 def test_foreign_node_subclasses_are_refused() -> None:
     class Raw(Node):
         def render(self) -> str:
