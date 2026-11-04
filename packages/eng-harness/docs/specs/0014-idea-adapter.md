@@ -546,8 +546,8 @@ draft for the owner and are not run on real projects until confirmed.
 
 Part of `eng-harness` 0.1.0. New harness kinds and the IDEA allowlist (with its pinned Sasaah commit and fingerprint) are
 versioned with the package; a new Sasaah build is a new allowlist header and new recordings in a minor release. Changes to
-0002 (A1 in §11: `routes` on allowlist entries, `audit_log` on the server section) need an amendment of 0002: plan T1
-implements the code, and the lead amends the text of 0002 in a separate documents-only pull request.
+0002 (A1 in §11: `routes` on allowlist entries, `audit_log` on the server section) are made by the amendment B-085 of
+0002 (its §11 A3, AC40 to AC42): plan 0002 T20 implements the product-neutral code, and plan T1 the IDEA server section on it.
 
 ## 11. Open questions, gaps and additions
 
