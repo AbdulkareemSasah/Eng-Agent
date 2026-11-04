@@ -19,6 +19,7 @@ from eng_contract.envelope import LiteralInput, RefInput
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.quantity import Quantity
 from eng_contract.refs import RecordSource, Ref, RefRule, resolve_ref
+from eng_contract.units import UnitError
 
 if TYPE_CHECKING:
     from eng_contract.params import ParamSpec
@@ -42,14 +43,20 @@ def invalid_from(exc: ValidationError, prefix: str = "") -> ContractError:
     return ContractError(ErrorCode.INVALID_ARGUMENT, first["msg"], field=_field_path(path))
 
 
-def _shape(name: str, info: FieldInfo, value: Any) -> Any:
+def _shape(name: str, info: FieldInfo, value: Any, unit: str | None) -> Any:
     """Validate one value against the field's declared type, as strict JSON (no coercion: `"5"` and `true` are not
-    numbers); the physical bounds and the model's validators are not applied here."""
+    numbers); the physical bounds and the model's validators are not applied here. A quantity with an unknown unit
+    symbol is `UNIT_MISMATCH` naming the field and the parameter's `unit`."""
     declared: Any = Annotated[info.annotation, *info.metadata] if info.metadata else info.annotation
     try:
         return TypeAdapter(declared).validate_json(json.dumps(value), strict=True)
     except ValidationError as exc:
         raise invalid_from(exc, name) from exc
+    except UnitError as exc:
+        expected = {"unit": unit} if unit is not None else None
+        raise ContractError(
+            ErrorCode.UNIT_MISMATCH, exc.detail.message, field=name, expected=expected, received=exc.detail.received
+        ) from exc
     except TypeError as exc:
         raise ContractError(ErrorCode.INVALID_ARGUMENT, f"{name} is not a JSON value", field=name) from exc
 
@@ -96,8 +103,8 @@ def run_pipeline(
             raise ContractError(
                 ErrorCode.INVALID_ARGUMENT,
                 f"unknown input {str(key)[:100]!r}",
-                field=_field_path(key),
-                received=key[:200],
+                field=_field_path(str(key)),
+                received=str(key)[:200],
             )
     for name, info in fields.items():
         if name not in raw and info.is_required():
@@ -114,7 +121,7 @@ def run_pipeline(
                     message = f"{name} is not a well-formed reference"
                     raise ContractError(ErrorCode.INVALID_ARGUMENT, message, field=name) from exc
             else:
-                given[name] = _shape(name, info, value)
+                given[name] = _shape(name, info, value, specs[name].unit)
                 try:
                     inputs[name] = LiteralInput(literal=value)
                 except ValidationError as exc:  # NaN and infinity cannot be recorded, nor are they physical values
@@ -138,7 +145,7 @@ def run_pipeline(
             rule = RefRule(kinds=spec.ref_kinds, unit=spec.unit, stale_ok=spec.stale_ok, field=name)
             resolved = resolve_ref(value, rule, source, current_revision)
             inputs[name] = RefInput(ref=resolved.ref)
-            values[name] = _shape(name, fields[name], resolved.value)
+            values[name] = _shape(name, fields[name], resolved.value, spec.unit)
         else:
             values[name] = value
     # 4. Units: a quantity object must carry the parameter's unit exactly.

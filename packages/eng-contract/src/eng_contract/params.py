@@ -61,7 +61,9 @@ class ParamSpec:
         keep = {k: v for k, v in schema.items() if k in ("title", "description", "default")}
         literal = {k: v for k, v in schema.items() if k not in keep}
         bounds = {"minimum": self.ge, "maximum": self.le, "exclusiveMinimum": self.gt, "exclusiveMaximum": self.lt}
-        literal.update({key: bound for key, bound in bounds.items() if bound is not None})
+        given = {key: bound for key, bound in bounds.items() if bound is not None}
+        # A Quantity is an object: its bounds belong to `value`, where the numeric keywords apply.
+        (literal.setdefault("properties", {}).setdefault("value", {}) if "$ref" in literal else literal).update(given)
         schema.clear()
         schema.update(keep)
         if self.ref_capable:
@@ -197,7 +199,7 @@ def validate_input[M: ParamModel](
 
     Raises:
         ContractError: `INVALID_ARGUMENT` (shape, policy, cross-field rule), `REF_*`, `UNIT_MISMATCH` or
-            `OUT_OF_RANGE`; a quantity literal with an unknown unit symbol raises `UnitError` during the shape step.
+            `OUT_OF_RANGE`, including a quantity literal with an unknown unit symbol (`field` and `expected.unit` set).
     """
     specs = _specs(model_cls)
     values, inputs = run_pipeline(model_cls.model_fields, specs, raw, source, current_revision, policy.require_refs)
