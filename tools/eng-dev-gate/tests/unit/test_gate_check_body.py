@@ -30,3 +30,10 @@ def test_unterminated_fence_hides_the_rest_and_crlf_is_handled() -> None:
     assert parse_body("```\nPlan-Task: a#T1\n").plan_task == []
     assert parse_body("Plan-Task: a#T1\r\nWork-Item: B-2\r\n").work_item == [(2, "B-2")]
     assert parse_body("").plan_task == []
+
+
+def test_closing_fence_may_be_indented_by_at_most_three_spaces() -> None:
+    """CommonMark: four or more leading spaces make a line content of the block, not its closing fence."""
+    body = "```\n    ```\nPlan-Task: still-in-fence#T1\n   ```\nPlan-Task: after#T1\n"
+    assert [v for _, v in parse_body(body).plan_task] == ["after#T1"]
+    assert parse_body("```\n```   \nPlan-Task: after#T1\n").plan_task == [(3, "after#T1")]
