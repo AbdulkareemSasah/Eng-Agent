@@ -1,0 +1,47 @@
+{
+  "rule": "fy_MPa is required",
+  "payload": {
+    "materials": [
+      {
+        "name": "C30",
+        "type": "concrete",
+        "E_MPa": 30000,
+        "nu_ratio": 0.2,
+        "gamma_kN_m3": 25,
+        "fc_MPa": 30,
+        "fy_MPa": null,
+        "fu_MPa": null
+      },
+      {
+        "name": "R",
+        "type": "rebar",
+        "E_MPa": 30000,
+        "nu_ratio": 0.2,
+        "gamma_kN_m3": 25,
+        "fc_MPa": null,
+        "fy_MPa": 400,
+        "fu_MPa": null
+      },
+      {
+        "name": "O",
+        "type": "other",
+        "E_MPa": 30000,
+        "nu_ratio": 0.2,
+        "gamma_kN_m3": 25,
+        "fc_MPa": null,
+        "fy_MPa": null,
+        "fu_MPa": null
+      },
+      {
+        "name": "S",
+        "type": "steel",
+        "E_MPa": 200000,
+        "nu_ratio": 0.3,
+        "gamma_kN_m3": 78,
+        "fc_MPa": null,
+        "fy_MPa": null,
+        "fu_MPa": null
+      }
+    ]
+  }
+}
