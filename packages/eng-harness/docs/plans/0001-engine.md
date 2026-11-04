@@ -37,7 +37,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/errors.py"
       - "packages/eng-harness/tests/unit/test_errors.py"
-    max_changed_lines: 340
+    max_changed_lines: 240
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/test_errors.py::test_engine_stop_is_not_exception"
@@ -509,7 +509,7 @@ containing `@AGENTS.md`; `.gate/risk-map.yml` mapping the `r1_modules` globs to 
 
 **T2 Errors** (spec §6). `HarnessCode`, `EngineStop` (a `BaseException`) and its subclasses, `StepError` and its
 subclasses, `RunRefused`, `RunLocked`, `JournalIntegrityError`. Imports `eng_contract.errors` only.
-Budget amendment (B-101-amend): `max_changed_lines` raised from 150 to 340 because the 19 exception classes, the 18-member `HarnessCode` enum and their docstrings need about 218 lines in `errors.py`, and the measured diff of B-101 against `origin/build/v1` is 333 changed lines (218 + 112 in the test file + 2 in `pyproject.toml` + 1 in `CHANGELOG.md`).
+Budget amendment (B-101-amend): `max_changed_lines` raised from 150 to 240 because the 19 exception classes and the 18-member `HarnessCode` enum with their docstrings measured 221 changed non-test lines in the B-101 writer's run (`errors.py` 218, `pyproject.toml` 2, `CHANGELOG.md` 1), which rounds up to 240.
 
 **T3 Journal writer** (spec §4.4.1 to §4.4.3). Schema and triggers (including the `BEFORE INSERT` triggers that close
 the `REPLACE` path and enforce gap-free `seq`), the 20 event payload models (with the B-068 fields `run_class`,
