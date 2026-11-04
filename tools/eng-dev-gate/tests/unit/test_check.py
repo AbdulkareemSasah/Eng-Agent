@@ -46,7 +46,7 @@ def _statuses(result: RunResult) -> dict[str, str]:
 def test_step_order_and_aggregate(repo: Repo) -> None:
     """AC47: spec order, every step reported, a failing step does not stop the others, exit code is the worst."""
     make_workspace(repo, ["a"])
-    assert [s.name for s in STEPS] == ["lock", "format", "lint", "types"]
+    assert [s.name for s in STEPS] == ["lock", "config", "format", "lint", "types"]
     assert [n for n in STEP_ORDER if n in {s.name for s in STEPS}] == [s.name for s in STEPS]
     assert STEP_ORDER[:5] == ("lock", "config", "format", "lint", "types")
     assert len(STEP_ORDER) == 14
@@ -132,7 +132,7 @@ def test_workspace_selection(repo: Repo) -> None:
     make_workspace(repo, ["a", "b"])
     both = _statuses(_run(repo, FakeRunner()))
     assert list(both) == ["lock", "format:a", "format:b", "lint:a", "lint:b", "types:a", "types:b"]
-    assert list(_statuses(_run(repo, FakeRunner(), "--package", "b"))) == ["lock", "format", "lint", "types"]
+    assert list(_statuses(_run(repo, FakeRunner(), "--package", "b"))) == ["lock", "config", "format", "lint", "types"]
     assert _run(repo, FakeRunner(), "--package", "missing").code == 2
     argv = ["--root", str(repo.root / "pkgs" / "a"), "--format", "json", "check"]
     inside = repo.run(argv, {"check": make_handler(FakeRunner())})
