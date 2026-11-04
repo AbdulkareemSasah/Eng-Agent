@@ -124,7 +124,7 @@ def test_package_without_r_modules_is_not_judged(repo: Repo) -> None:
         (["killed", "killed", "killed", "timeout", "survived"], 80, []),  # 4 of 5 = 80 %, timeouts count as killed
         (["killed", "killed", "killed", "timeout", "survived"], 81, ["MU001"]),
         (["killed", "survived", "no tests", "suspicious", "skipped"], 80, ["MU001"]),  # only killed and timeout count
-        ([], 100, []),  # nothing to mutate
+        (["killed"], 100, []),  # no mutant at all is MU003, see test_zero_mutants_is_nothing_to_mutate
     ],
 )
 def test_score_threshold(repo: Repo, statuses: list[str], minimum: int, expected: list[str]) -> None:
@@ -316,7 +316,8 @@ def test_uncovered_mutants_count_as_survivors(repo: Repo) -> None:
     findings = mutation.run_step(_context(repo, member, stopped, base))
     assert [(f.code, f.severity) for f in findings] == [("MU001", Severity.ERROR)]
     assert "0/3" in findings[0].message
-    unchecked = FakeMutmut(["not checked"] * 3, run_exit=1, run_output=NO_MUTANT)  # real mutmut: stopped before any result
+    # real mutmut stops before it records any result: "not checked"
+    unchecked = FakeMutmut(["not checked"] * 3, run_exit=1, run_output=NO_MUTANT)
     assert [f.code for f in mutation.run_step(_context(repo, member, unchecked, base))] == ["MU001"]
     mixed = FakeMutmut(["killed", "killed", "killed", "killed", "no tests"], run_exit=1, run_output=NO_MUTANT)
     assert mutation.run_step(_context(repo, member, mixed, base)) == []  # 4 of 5 = 80 %
