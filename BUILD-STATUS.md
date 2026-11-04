@@ -80,6 +80,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 - B-085: spec 0002 amendment A1 for the IDEA adapter (routes on allowlist entries, `audit_log` on the server section, one role for all classes, the new issue and host codes), before the IDEA plan (B-090) joins the adapters lane of wave 3.
 - B-098: specs 0005, 0006 and the engine spec read the provider runtime (providers Q7); runs in wave 3's side lane before plan 0009 T10.
 - B-054 (gate T25): after both halves of the gate graph.
+- B-340: plan task T30 for B-027's change (workflow specs in `spec_globs`, with a test), after B-336 merges (same plan and spec files); PR 92 (B-027) is then closed as superseded and B-075 follows.
 - Plans still to join wave 3 when their specs merge: SBC 304-2018 footing checks (B-072), footing workflow (B-075), ACI column checks (B-082, merged), column workflow (B-083), IDEA adapter (B-090).
 
 ### 3.1 Task details (generated from the workflow task data and the pull requests)
@@ -97,13 +98,17 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-016 | T7 | Provenance, envelopes and result records | sonnet, medium | opus, medium | [#55](https://github.com/AbdulkareemSasah/Eng-Agent/pull/55) | done |
 | B-017 | T8 | References, JSON Pointer and resolution rules | sonnet, high | opus, medium | [#64](https://github.com/AbdulkareemSasah/Eng-Agent/pull/64) | done |
 | B-018 | T9 | Input-parameter metadata and the validation pipeline | sonnet, high | opus, medium | [#71](https://github.com/AbdulkareemSasah/Eng-Agent/pull/71) | done |
-| B-019 | T10 | Verdicts, model issues and calculation traces | sonnet, medium | opus, medium | [#77](https://github.com/AbdulkareemSasah/Eng-Agent/pull/77) | open |
-| B-020 | T11 | Kind names, the kind registry and the model.* kinds | sonnet, medium | opus, medium | — | not started or in writing |
-| B-021 | T12 | forces.*, basis.*, verdicts.set and issues.model_check kinds | sonnet, medium | opus, medium | — | not started or in writing |
-| B-022 | T13 | Workspace resolution and location probes (POSIX, Windows, fake) | sonnet, high | opus, medium | — | not started or in writing |
-| B-023 | T14 | Result store, atomic writes, payload split and model state | sonnet, high | opus, medium | — | not started or in writing |
+| B-019 | T10 | Verdicts, model issues and calculation traces | sonnet, medium | opus, medium | [#77](https://github.com/AbdulkareemSasah/Eng-Agent/pull/77) | done |
+| B-020 | T11 | Kind names, the kind registry and the model.* kinds | sonnet, medium | opus, medium | [#84](https://github.com/AbdulkareemSasah/Eng-Agent/pull/84) | done |
+| B-021 | T12 | forces.*, basis.*, verdicts.set and issues.model_check kinds | sonnet, medium | opus, medium | [#86](https://github.com/AbdulkareemSasah/Eng-Agent/pull/86) | done |
+| B-022 | T13 | Workspace resolution and location probes (POSIX, Windows, fake) | sonnet, high | opus, medium | [#89](https://github.com/AbdulkareemSasah/Eng-Agent/pull/89) | done |
+| B-023 | T14 | Result store, atomic writes, payload split and model state | sonnet, high | opus, medium | [#98](https://github.com/AbdulkareemSasah/Eng-Agent/pull/98) | open |
 | B-024 | T15 | MCP mapping helpers | sonnet, low | opus, medium | — | not started or in writing |
 | B-025 | T16 | JSON Schema snapshots, freshness test and 0.1.0 changelog | sonnet, low | opus, medium | — | not started or in writing |
+| B-026 | docs | gate: skeleton packages pass the mutation step, and shared package folders are managed by agents drift | sonnet, high | opus, medium | [#90](https://github.com/AbdulkareemSasah/Eng-Agent/pull/90) | done |
+| B-027 | docs | fix(gate): workflow specs follow the spec rules of gate-check and risk-floor (B-027) | sonnet, low | opus, low | [#92](https://github.com/AbdulkareemSasah/Eng-Agent/pull/92) | open |
+| B-028 | docs | docs(eng-contract): T11 and T14 split within the 400-line task cap (B-028) | sonnet, low | opus, low | [#94](https://github.com/AbdulkareemSasah/Eng-Agent/pull/94) | done |
+| B-029 | docs | build(eng-contract): the Windows CI job runs the location probe tests (B-029) | sonnet, low | opus, low | [#95](https://github.com/AbdulkareemSasah/Eng-Agent/pull/95) | open |
 | B-030 | T1 | Package skeleton, dependency ADR, CLI shell | sonnet, low | opus, low | [#10](https://github.com/AbdulkareemSasah/Eng-Agent/pull/10) | done |
 | B-031 | T2a | Foundations (reporting, git port, workspace discovery, globs, event file) (part A, after the B-056 split) | sonnet, medium | opus, low | [#18](https://github.com/AbdulkareemSasah/Eng-Agent/pull/18) | done |
 | B-032 | T3 | Configuration models, floors and bootstrap mode (root gate.yml) | sonnet, medium | opus, low | [#24](https://github.com/AbdulkareemSasah/Eng-Agent/pull/24) | done |
@@ -116,19 +121,20 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-038a | docs | plan amendment: T9 also writes the root .gate/ratchet.json baseline | haiku, low | opus, low | [#44](https://github.com/AbdulkareemSasah/Eng-Agent/pull/44) | done |
 | B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | [#39](https://github.com/AbdulkareemSasah/Eng-Agent/pull/39) | done |
 | B-040 | T11 | forbidden part 2: FB004, FB005, FB006, FB008 | sonnet, high | opus, low | [#60](https://github.com/AbdulkareemSasah/Eng-Agent/pull/60) | done |
-| B-041 | T12 | imports command and step | sonnet, medium | opus, low | [#74](https://github.com/AbdulkareemSasah/Eng-Agent/pull/74) | open |
+| B-041 | T12 | imports command and step | sonnet, medium | opus, low | [#74](https://github.com/AbdulkareemSasah/Eng-Agent/pull/74) | done |
 | B-042 | T13 | gate-check part 1: front matter, body parsing, plan and task, scope and budget | sonnet, high | opus, medium | [#29](https://github.com/AbdulkareemSasah/Eng-Agent/pull/29) | done |
-| B-043 | T14 | gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job | sonnet, high | opus, medium | [#70](https://github.com/AbdulkareemSasah/Eng-Agent/pull/70) | open |
-| B-044 | T15 | risk-floor command and job | sonnet, medium | opus, low | [#66](https://github.com/AbdulkareemSasah/Eng-Agent/pull/66) | open |
-| B-045 | T16 | test-first part 1: title, exemptions, commit selection, new and changed tests | sonnet, high | opus, medium | [#69](https://github.com/AbdulkareemSasah/Eng-Agent/pull/69) | open |
-| B-046 | T17 | test-first part 2: base worktree, runs, classification, isolation, and the test-first job | sonnet, high | opus, medium | — | not started or in writing |
-| B-047 | T18 | secrets command and the security job | sonnet, medium | opus, medium | [#56](https://github.com/AbdulkareemSasah/Eng-Agent/pull/56) | open |
+| B-043 | T14 | gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job | sonnet, high | opus, medium | [#70](https://github.com/AbdulkareemSasah/Eng-Agent/pull/70) | done |
+| B-043b | T14b | gate-check: the ratchet baseline in a task's scope (AC10b) | sonnet, medium | opus, low | — | not started or in writing |
+| B-044 | T15 | risk-floor command and job | sonnet, medium | opus, low | [#66](https://github.com/AbdulkareemSasah/Eng-Agent/pull/66) | done |
+| B-045 | T16 | test-first part 1: title, exemptions, commit selection, new and changed tests | sonnet, high | opus, medium | [#69](https://github.com/AbdulkareemSasah/Eng-Agent/pull/69) | done |
+| B-046 | T17 | test-first part 2: base worktree, runs, classification, isolation, and the test-first job | sonnet, high | opus, medium | [#85](https://github.com/AbdulkareemSasah/Eng-Agent/pull/85) | done |
+| B-047 | T18 | secrets command and the security job | sonnet, medium | opus, medium | [#56](https://github.com/AbdulkareemSasah/Eng-Agent/pull/56) | done |
 | B-048 | T19 | licenses step and generated-document freshness | sonnet, medium | opus, low | [#50](https://github.com/AbdulkareemSasah/Eng-Agent/pull/50) | done |
-| B-049 | T20 | mutation step (backend decision, ADR, dependency) | sonnet, medium | opus, low | [#62](https://github.com/AbdulkareemSasah/Eng-Agent/pull/62) | open |
+| B-049 | T20 | mutation step (backend decision, ADR, dependency) | sonnet, medium | opus, low | [#62](https://github.com/AbdulkareemSasah/Eng-Agent/pull/62) | done |
 | B-050 | T21 | workflows lint (WF001 to WF005) | sonnet, medium | opus, low | [#65](https://github.com/AbdulkareemSasah/Eng-Agent/pull/65) | done |
-| B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | [#75](https://github.com/AbdulkareemSasah/Eng-Agent/pull/75) | open |
+| B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | [#75](https://github.com/AbdulkareemSasah/Eng-Agent/pull/75) | done |
 | B-052 | T23 | windows-tests command and the windows job | sonnet, medium | opus, low | [#73](https://github.com/AbdulkareemSasah/Eng-Agent/pull/73) | done |
-| B-053 | T24 | approvals port and verification with bootstrap off | sonnet, medium | opus, low | — | not started or in writing |
+| B-053 | T24 | approvals port and verification with bootstrap off | sonnet, medium | opus, low | [#97](https://github.com/AbdulkareemSasah/Eng-Agent/pull/97) | open |
 | B-054 | T25 | Documentation, changelog 0.1.0 and the self-gate run | sonnet, low | opus, low | — | not started or in writing |
 | B-055 | T26 | Base-commit gate (gate root, provenance, head-run rules); built before T6 | sonnet, high | opus, medium | [#31](https://github.com/AbdulkareemSasah/Eng-Agent/pull/31) | done |
 | B-056 | docs | amend the eng-dev-gate plan: split task T2 into T2a and T2b | sonnet, low | opus, low | [#14](https://github.com/AbdulkareemSasah/Eng-Agent/pull/14) | done |
@@ -148,19 +154,30 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | [#36](https://github.com/AbdulkareemSasah/Eng-Agent/pull/36) | done |
 | B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | [#46](https://github.com/AbdulkareemSasah/Eng-Agent/pull/46) | done |
 | B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | [#76](https://github.com/AbdulkareemSasah/Eng-Agent/pull/76) | open |
+| B-076 | T14b | gate-check: the ratchet baseline in a task's scope (AC10b) | sonnet, medium | opus, low | [#93](https://github.com/AbdulkareemSasah/Eng-Agent/pull/93) | done |
+| B-077 | T14b | Model state (create, increment by compare-and-set, promotion record) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-078 | docs | fix(eng-dev-gate): the gate action drops the interim workspace-wide pytest run (B-078) | sonnet, low | opus, low | — | not started or in writing |
+| B-079 | docs | gate: a mutation run that produces no mutant is 'nothing to mutate' | sonnet, medium | opus, medium | — | not started or in writing |
 | B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | [#47](https://github.com/AbdulkareemSasah/Eng-Agent/pull/47) | done |
 | B-081 | docs | write the SAP2000 coverage check and the specification and plan for SAP2000 through the CSI adapter | sonnet, medium | opus, low | [#48](https://github.com/AbdulkareemSasah/Eng-Agent/pull/48) | done |
 | B-082 | docs | write the ACI 318-14 column check clause specifications and plan (draft) | opus, medium | opus, medium | [#61](https://github.com/AbdulkareemSasah/Eng-Agent/pull/61) | done |
-| B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | [#72](https://github.com/AbdulkareemSasah/Eng-Agent/pull/72) | open |
-| B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | [#63](https://github.com/AbdulkareemSasah/Eng-Agent/pull/63) | open |
+| B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | [#72](https://github.com/AbdulkareemSasah/Eng-Agent/pull/72) | done |
+| B-084 | docs | eng-contract follow-ups 2 from the reviews of B-016 and B-017 | sonnet, medium | opus, medium | — | not started or in writing |
+| B-085 | docs | amend spec 0002 with the framework additions the IDEA adapter spec needs (A1) | opus, medium | opus, medium | [#83](https://github.com/AbdulkareemSasah/Eng-Agent/pull/83) | done |
+| B-086 | docs | licenses step reads the judged tree's environment in pull-request mode | sonnet, high | opus, medium | [#80](https://github.com/AbdulkareemSasah/Eng-Agent/pull/80) | done |
+| B-087 | docs | fix(eng-contract): ratchet and imports findings of B-018 on build/v1 (B-087) | sonnet, medium | opus, medium | [#78](https://github.com/AbdulkareemSasah/Eng-Agent/pull/78) | done |
+| B-088 | docs | docs(eng-dev-gate): the ratchet baseline is in a task's scope when it records that task's suppression (B-088) | sonnet, low | opus, low | [#79](https://github.com/AbdulkareemSasah/Eng-Agent/pull/79) | done |
+| B-089 | docs | docs(eng-dev-gate): AC10b moves from T14 to its own task T14b; ratchet-file scope rules (B-089) | sonnet, low | opus, low | [#87](https://github.com/AbdulkareemSasah/Eng-Agent/pull/87) | done |
+| B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | [#63](https://github.com/AbdulkareemSasah/Eng-Agent/pull/63) | done |
 | B-091 | docs | write the desktop-products overlap analysis and ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done |
 | B-092 | docs | fix(eng-dev-gate): give every suppression comment an issue reference and a reason (B-092) | sonnet, low | opus, low | [#52](https://github.com/AbdulkareemSasah/Eng-Agent/pull/52) | done |
 | B-093 | docs | build(eng-contract): pyproject within the gate's config and imports rules (B-093) | sonnet, low | opus, low | [#53](https://github.com/AbdulkareemSasah/Eng-Agent/pull/53) | done |
 | B-094 | docs | docs(eng-dev-gate): T11 also edits the forbidden package's __init__.py (B-094 plan amendment) | sonnet, low | opus, low | [#54](https://github.com/AbdulkareemSasah/Eng-Agent/pull/54) | done |
 | B-095 | docs | eng-contract: follow-ups from the reviews of B-015 and B-069 | sonnet, low | opus, low | — | not started or in writing |
 | B-096 | docs | docs(eng-dev-gate): a task's package changelog and local-testing list are in its scope (B-096) | sonnet, low | opus, low | [#57](https://github.com/AbdulkareemSasah/Eng-Agent/pull/57) | done |
-| B-097 | docs | docs(structural-codes): unbounded inputs with a stated reason; clause specs under docs/clauses (B-097) | sonnet, low | opus, medium | [#58](https://github.com/AbdulkareemSasah/Eng-Agent/pull/58) | open |
-| B-098 | docs | amend specs 0005, 0006 and the engine spec as the providers spec (0009 Q7) requires | opus, medium | opus, medium | — | not started or in writing |
+| B-097 | docs | docs(structural-codes): unbounded inputs with a stated reason; clause specs under docs/clauses (B-097) | sonnet, low | opus, medium | [#58](https://github.com/AbdulkareemSasah/Eng-Agent/pull/58) | done |
+| B-098 | docs | amend specs 0005, 0006 and the engine spec as the providers spec (0009 Q7) requires | opus, medium | opus, medium | [#81](https://github.com/AbdulkareemSasah/Eng-Agent/pull/81) | done |
+| B-099 | docs | fix(gate): r1 checks entry limited to packages; T18 may edit .gate/gate.yml (B-099) | sonnet, low | opus, low | [#68](https://github.com/AbdulkareemSasah/Eng-Agent/pull/68) | done |
 | B-100 | E.T1 | Package skeleton, gate configuration and workspace member | sonnet, low | opus, medium | — | not started or in writing |
 | B-101 | E.T2 | Harness codes, EngineStop and StepError families | sonnet, low | opus, medium | — | not started or in writing |
 | B-102 | E.T3 | Journal schema, append-only writer, hash chain, durability, payloads by reference | sonnet, high | opus, medium | — | not started or in writing |
@@ -198,6 +215,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-136 | S.T17 | Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings | sonnet, high | opus, medium | — | not started or in writing |
 | B-137 | S.T18 | eng-harness doctor | sonnet, medium | opus, medium | — | not started or in writing |
 | B-138 | S.T19 | Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes | sonnet, high | opus, medium | — | not started or in writing |
+| B-139 | S.T20 | Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085) | sonnet, medium | opus, medium | — | not started or in writing |
 | B-140 | C.T1 | Calc decorator, registry, inputs, input metadata, trace builder, statuses and harness codes | sonnet, medium | opus, medium | — | not started or in writing |
 | B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | — | not started or in writing |
 | B-142 | C.T3 | approvals.yaml schema, loader, status resolution and the YAML parser ADR | sonnet, medium | opus, medium | — | not started or in writing |
@@ -299,7 +317,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-249 | A.T5 | Add-frame edit with name from the reply, typed read-back edits, reconciliation by geometry | sonnet, medium | opus, medium | — | not started or in writing |
 | B-250 | A.T6 | Analysis, result readers and design run and results for SAP2000 | sonnet, medium | opus, medium | — | not started or in writing |
 | B-251 | A.T7 | End-to-end block, crash matrix, recorded-reply contract tests and SAP2000 local-testing part | sonnet, medium | opus, medium | — | not started or in writing |
-| B-255 | K.T1 | Core package skeleton, shared folder files, dependency ADR, workspace member | sonnet, low | opus, low | — | not started or in writing |
+| B-255 | K.T1 | Core package skeleton, shared folder files, dependency ADR, workspace member | sonnet, low | opus, low | [#88](https://github.com/AbdulkareemSasah/Eng-Agent/pull/88) | open |
 | B-256 | K.T2 | Errors, check metadata and the check_id rule | sonnet, medium | opus, medium | — | not started or in writing |
 | B-257 | K.T3 | Check inputs, bounded helper and preconditions | sonnet, medium | opus, medium | — | not started or in writing |
 | B-258 | K.T4 | Trace recorder | sonnet, medium | opus, medium | — | not started or in writing |
@@ -322,6 +340,42 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-276 | Q.T7 | Check min_flexural_reinforcement (8.6.1.1) | opus, medium | opus, medium | — | not started or in writing |
 | B-277 | Q.T8 | Check development_length_bottom_bars (25.4.2.3) | opus, medium | opus, medium | — | not started or in writing |
 | B-278 | Q.T9 | Pack assembly, registration, pack-level tests, README usage | sonnet, low | opus, medium | — | not started or in writing |
+| B-280 | G.T1 | Column workflow kinds and request models | sonnet, medium | opus, medium | — | not started or in writing |
+| B-281 | G.T2 | Calc harness.column_select with golden and property tests | opus, medium | opus, medium | — | not started or in writing |
+| B-282 | G.T3 | Calc harness.column_demands (sign, axes, length, layout, not-checked reasons) | opus, medium | opus, medium | — | not started or in writing |
+| B-283 | G.T4 | Calc harness.column_review (members, governing references, changes) | opus, medium | opus, medium | — | not started or in writing |
+| B-284 | G.T5 | Calcs harness.column_section_match and harness.column_change_set | opus, medium | opus, medium | — | not started or in writing |
+| B-285 | G.T6 | Code-pack route in the CalcPort for the three ACI 318-14 column checks | sonnet, medium | opus, medium | — | not started or in writing |
+| B-286 | G.T7 | Calc harness.revit_column_update (plan of Revit type changes by reference) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-287 | G.T8 | Calc harness.revit_column_readback | sonnet, medium | opus, medium | — | not started or in writing |
+| B-288 | G.T9 | Decision points and rules of the column workflow | sonnet, medium | opus, medium | — | not started or in writing |
+| B-289 | G.T10 | Engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-290 | G.T11 | Workflow column_design part 1 - definition, basis fields, scope, review cycle (steps 1 to 10 and 15) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-291 | G.T12 | Workflow column_design part 2 - proposals, rounding and match, decisions, apply, design record (steps 11 to 14) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-292 | G.T13 | Workflow column_revit_update (steps R1 to R9) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-293 | G.T14 | Report renderers, verdict-source audit and the local-testing list | sonnet, medium | opus, medium | — | not started or in writing |
+| B-294 | G.T15 | Replay crash matrix of both workflows | sonnet, medium | opus, medium | — | not started or in writing |
+| B-300 | H.T1 | The IDEA server section on the framework additions of plan 0002 T20 (routes, audit_log flag) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-301 | H.T2 | Synthetic IDEA fake server (test-only), its faults and its schema check | sonnet, medium | opus, medium | — | not started or in writing |
+| B-302 | H.T3 | IDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header | sonnet, medium | opus, medium | — | not started or in writing |
+| B-303 | H.T4 | Error mapping, timeouts and licensing outcomes | sonnet, medium | opus, medium | — | not started or in writing |
+| B-304 | H.T5 | Replies, stub guard, harness kinds and the host-verdict mapping | sonnet, medium | opus, medium | — | not started or in writing |
+| B-305 | H.T6 | Working copy, route preconditions, HostPort methods and gap entries | sonnet, medium | opus, medium | — | not started or in writing |
+| B-306 | H.T7 | Load map (unset), load plan, structure-preserving loading builder, set_loads, read-back and check_model | sonnet, medium | opus, medium | — | not started or in writing |
+| B-307 | H.T8 | Calculation on both routes, host-verdict reads, reconciliation and the stub-refusal workflows | sonnet, medium | opus, medium | — | not started or in writing |
+| B-308 | H.T9 | End-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps | sonnet, medium | opus, medium | — | not started or in writing |
+| B-325 | Y.T1 | Pack skeleton, empty approvals file, workspace member, local-testing section | sonnet, low | opus, medium | — | not started or in writing |
+| B-326 | Y.T2 | Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check | opus, medium | opus, medium | — | not started or in writing |
+| B-327 | Y.T3 | Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage | opus, medium | opus, medium | — | not started or in writing |
+| B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | — | not started or in writing |
+| B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | not started or in writing |
+| B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | not started or in writing |
+| B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | — | not started or in writing |
+| B-334 | Z.T5 | Register the column checks, pack-level tests, changelog and local-testing rows | sonnet, medium | opus, medium | — | not started or in writing |
+| B-336 | docs | docs(eng-dev-gate): risk of none-reason pull requests, zero-mutant runs, and plan tasks T27 to T29 (B-336) | sonnet, low | opus, low | [#100](https://github.com/AbdulkareemSasah/Eng-Agent/pull/100) | open |
+| B-337 | T27 | risk-floor: a none-reason pull request records its risk from the body Risk line | sonnet, medium | opus, medium | — | not started or in writing |
+| B-338 | T28 | gate action: the interim workspace-wide pytest step is removed | sonnet, medium | opus, medium | — | not started or in writing |
+| B-339 | T29 | mutation: a run that produces no mutant passes with MU003 | sonnet, medium | opus, medium | — | not started or in writing |
 
 ## 4. Decisions by the lead
 
