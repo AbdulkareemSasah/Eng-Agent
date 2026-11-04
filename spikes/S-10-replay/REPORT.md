@@ -76,7 +76,7 @@ S-10 check: python 3.14.6 on linux
 RESULT: PASS
 ```
 
-(Time stamps and the work-directory line are omitted; exit code 0; about 16 s wall time.)
+(Time stamps and the work-directory line are omitted; exit code 0; about 16 s wall time. The word "pending" in the last line is literal `check.py` output; it is superseded by "Windows results" below.)
 
 | Finding | Evidence |
 |---|---|
@@ -142,7 +142,7 @@ results are in "Windows results" below.
 | Finding | Evidence |
 |---|---|
 | Mechanism: `CreateJobObjectW`, then `SetInformationJobObject` with `JobObjectExtendedLimitInformation` (class 9) and `LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE (0x2000)`, then `AssignProcessToJobObject`. When the last handle to the job closes, which includes the owning process ending for any reason (exit, crash, termination), Windows terminates every process in the job | documentation; `windows_check.py` cases `assign_after`, `suspended`, `self_assign` (engine exit and kill from outside) assert that the child and both grandchildren are gone; case `none` is the control and asserts that without a job they survive |
-| **The race.** A process becomes a member of the job at assignment. Processes it created *before* that moment are not members and are not killed. A plain `Popen` followed by `AssignProcessToJobObject` leaves a window in which the new process can start grandchildren that then escape. Case `late` makes the window two seconds long on purpose and asserts that the two grandchildren escape (documenting the rule); the loop `race_loop` counts how often a child's first act (starting a grandchild) beats the assignment, and requires zero escapes for the suspended start. The count for the plain start is printed as INFO only: with a slow Python start-up it may be zero, which would not prove safety | documentation; to be measured by `windows_check.py` |
+| **The race.** A process becomes a member of the job at assignment. Processes it created *before* that moment are not members and are not killed. A plain `Popen` followed by `AssignProcessToJobObject` leaves a window in which the new process can start grandchildren that then escape. Case `late` makes the window two seconds long on purpose and asserts that the two grandchildren escape (documenting the rule); the loop `race_loop` counts how often a child's first act (starting a grandchild) beats the assignment, and requires zero escapes for the suspended start. The count for the plain start is printed as INFO only: with a slow Python start-up it may be zero, which would not prove safety | documentation; measured in CI run 41729982994: case `late` 2 of 2 grandchildren escaped, suspended start 0 of 40 (see "Windows results") |
 | **Closing the race.** Three ways exist: (a) create the process suspended (`CREATE_SUSPENDED`), assign it, resume it: no instruction of the new process runs before assignment; (b) the engine assigns *itself* to the job first, and all later children inherit membership (no window, but the job is then shared by all servers and by the engine); (c) a small launcher that is itself in the job before it starts the server. (c) only moves the race: the launcher must be started suspended or be in the job already, so it needs (a) or (b) anyway | `jobobject.popen_in_job` implements (a); case `self_assign` tests (b) |
 | **Nested jobs.** From Windows 8 on, a process may be in a chain of nested jobs; earlier versions allow one job per process. An engine started from a terminal, a CI runner or a scheduler that already uses a job is therefore not a problem on supported Windows versions. Case `nested` puts the engine in an outer job and each server in its own inner job: `TerminateJobObject` on one inner job ends exactly that server's tree and leaves the other, and the engine ending ends the rest | documentation; `windows_check.py` case `nested`. The check prints whether the check process is already in a job |
 | Breakaway: with `JOB_OBJECT_LIMIT_BREAKAWAY_OK`, a child leaves the job only if its creator passes `CREATE_BREAKAWAY_FROM_JOB`; with `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`, every process a job member creates leaves the job automatically. The spike sets neither, so in the spike nothing escapes. The engine needs a choice here (see open risks): silent breakaway lets host programs survive but also lets every helper process a server starts outlive it; `BREAKAWAY_OK` keeps helpers in the job but needs the server to start host programs with the breakaway flag, which is a Sasaah change | documentation |
@@ -188,9 +188,11 @@ From CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/
 |---|---|---|
 | The check process itself | | already inside a job (nested jobs in use) |
 | `none` (no job) | children survive the engine | survive: pass |
-| `assign_after`, engine exit and engine kill | children end | none alive: pass |
-| `suspended`, engine exit and engine kill | children end | none alive: pass |
-| `self_assign`, engine exit and engine kill | children end | none alive: pass |
+| `assign_after`, engine kill | children end | 3 tracked, none alive: pass |
+| `assign_after`, engine exit | children end | 0 tracked, none alive: vacuous, does not prove termination |
+| `suspended`, engine kill | children end | 3 tracked, none alive: pass |
+| `suspended`, engine exit | children end | 0 tracked, none alive: vacuous, does not prove termination |
+| `self_assign`, engine exit and engine kill | children end | 3 tracked in both runs, none alive: pass |
 | `late` assignment | grandchildren started before assignment escape | 2 escaped (2 expected): pass |
 | `nested` | inner job ends its tree; the outer job ends the rest | pass |
 | Suspended start, 40 immediate grandchildren | none escape | 0 of 40: pass |
@@ -198,6 +200,8 @@ From CI run [41729982994](https://github.com/AbdulkareemSasah/Eng-Agent/actions/
 | Part B: the replay scenarios of `check.py` | pass | all pass |
 | Engine overhead, `mixed` policy, write step | under 20 ms at p95 | p50 3.5 ms, p95 7.0 ms; raw append plus fsync p50 2.5 ms |
 | Replay of a paused run | | 1,000 steps in 31 ms; 10,000 steps in 141 ms |
+
+Gap in `windows_check.py`: when no process is tracked the check should fail or retry instead of passing; to be fixed in a separate task.
 
 Not covered: power loss during commits, the host-state check against `model_saved` (11 §5), the working-copy save after
 write steps, `ctx.ask`, `ctx.decide`, `ctx.attempts`, `ctx.read`, and a real `reconcile_operation` of a Sasaah server
@@ -265,12 +269,13 @@ process and thread handles, that adapters address a server as a job, and that re
 
 ## Open risks
 
-- **Windows result pending.** Every Job Object statement is documented but unmeasured. If `windows_check.py` fails on
-  a case (for example `nested`, or the thread scan in `resume_process`), the recommendation changes.
+- **Job Object coverage is incomplete.** Part A passed on the CI runner, but the breakaway case (host programs leaving a
+  server's job) is not yet checked, the engine-exit runs of `assign_after` and `suspended` tracked no process, and there
+  has been no run on a local workstation with antivirus.
 - **Power loss and disk faults** were not tested; the `mixed` policy rests on the SQLite WAL guarantees and the reasoning above.
 - **fsync cost on the owner's machine** is unknown (the Linux virtual disk gives 0.11 ms). Antivirus or a synchronized
   folder on a Windows workstation could make it much larger; the workspace should not be inside a synchronized folder, and the
-  Windows run of `bench.py` must be read before the policy is fixed.
+  CI figure (p50 3.5 ms, p95 7.0 ms) is from a runner disk; a workstation run of `bench.py` must be read before the policy is fixed.
 - **Reconciliation depends on the servers.** The spike's reconciler is a ledger of `op_id` in a fake host. A real
   `reconcile_operation` exists on none of the servers checked here; adapters for servers without one must read model state and
   decide `applied` or `not_applied` from it, which is the weakest part of the design and needs a live test.
