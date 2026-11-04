@@ -230,7 +230,7 @@ class ServerManager:
                 live = _Live(client, launched)
                 task_status.started(live)
                 await live.stop.wait()
-        except (
+        except* (  # also the groups the SDK client raises when the server ends during the handshake
             LaunchError,
             MCPError,
             OSError,
