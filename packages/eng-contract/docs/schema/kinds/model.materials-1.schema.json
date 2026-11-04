@@ -1,0 +1,116 @@
+{
+  "$defs": {
+    "Material": {
+      "additionalProperties": false,
+      "description": "A material; the strengths that its type needs must be present (concrete: fc; rebar, steel: fy).",
+      "properties": {
+        "E_MPa": {
+          "exclusiveMinimum": 0,
+          "title": "E Mpa",
+          "type": "number",
+          "x-eng-unit": "MPa"
+        },
+        "fc_MPa": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fc Mpa",
+          "x-eng-unit": "MPa"
+        },
+        "fu_MPa": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fu Mpa",
+          "x-eng-unit": "MPa"
+        },
+        "fy_MPa": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fy Mpa",
+          "x-eng-unit": "MPa"
+        },
+        "gamma_kN_m3": {
+          "minimum": 0,
+          "title": "Gamma Kn M3",
+          "type": "number",
+          "x-eng-unit": "kN/m3"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "nu_ratio": {
+          "exclusiveMaximum": 0.5,
+          "minimum": 0,
+          "title": "Nu Ratio",
+          "type": "number",
+          "x-eng-unit": "1"
+        },
+        "type": {
+          "$ref": "#/$defs/MaterialType"
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "E_MPa",
+        "nu_ratio",
+        "gamma_kN_m3"
+      ],
+      "title": "Material",
+      "type": "object"
+    },
+    "MaterialType": {
+      "description": "Kind of material.",
+      "enum": [
+        "concrete",
+        "rebar",
+        "steel",
+        "other"
+      ],
+      "title": "MaterialType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.materials/1`.",
+  "properties": {
+    "materials": {
+      "items": {
+        "$ref": "#/$defs/Material"
+      },
+      "title": "Materials",
+      "type": "array"
+    }
+  },
+  "required": [
+    "materials"
+  ],
+  "title": "Materials",
+  "type": "object"
+}

@@ -1,0 +1,48 @@
+{
+  "additionalProperties": false,
+  "description": "Value, unit, source (document, edition, clause, table or page) and an optional note.",
+  "properties": {
+    "note": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Note"
+    },
+    "source": {
+      "maxLength": 500,
+      "minLength": 8,
+      "pattern": "\\S",
+      "title": "Source",
+      "type": "string"
+    },
+    "unit": {
+      "title": "Unit",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "title": "Value"
+    }
+  },
+  "required": [
+    "value",
+    "unit",
+    "source"
+  ],
+  "title": "Cited",
+  "type": "object"
+}

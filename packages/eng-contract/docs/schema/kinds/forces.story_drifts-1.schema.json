@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "CaseRef": {
+      "additionalProperties": false,
+      "description": "A load pattern, case or combination; `step` is the envelope `Max`/`Min` or step number as the host reports it.",
+      "properties": {
+        "case": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Case",
+          "type": "string"
+        },
+        "case_type": {
+          "$ref": "#/$defs/CaseType"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        }
+      },
+      "required": [
+        "case",
+        "case_type"
+      ],
+      "title": "CaseRef",
+      "type": "object"
+    },
+    "CaseType": {
+      "description": "What a `CaseRef` names.",
+      "enum": [
+        "load_pattern",
+        "load_case",
+        "load_combination"
+      ],
+      "title": "CaseType",
+      "type": "string"
+    },
+    "StoryDrift": {
+      "additionalProperties": false,
+      "description": "Drift of one story in one direction; `point` and its coordinates are those of the governing joint.",
+      "properties": {
+        "case": {
+          "$ref": "#/$defs/CaseRef"
+        },
+        "direction": {
+          "enum": [
+            "X",
+            "Y"
+          ],
+          "title": "Direction",
+          "type": "string"
+        },
+        "drift_ratio": {
+          "minimum": 0,
+          "title": "Drift Ratio",
+          "type": "number",
+          "x-eng-unit": "1"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Point"
+        },
+        "story": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Story",
+          "type": "string"
+        },
+        "x_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "X Mm",
+          "x-eng-unit": "mm"
+        },
+        "y_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Y Mm",
+          "x-eng-unit": "mm"
+        },
+        "z_mm": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Z Mm",
+          "x-eng-unit": "mm"
+        }
+      },
+      "required": [
+        "story",
+        "case",
+        "direction",
+        "drift_ratio"
+      ],
+      "title": "StoryDrift",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`forces.story_drifts/1`.",
+  "properties": {
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/StoryDrift"
+      },
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "rows"
+  ],
+  "title": "StoryDrifts",
+  "type": "object"
+}

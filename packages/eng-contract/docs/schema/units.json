@@ -1,0 +1,2706 @@
+{
+  "units": [
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "1"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "GPa"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 1,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "K"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "10000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "304800",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "25400",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "100000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "10000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1250000000/381",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1562500000000/145161",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1953125000000000/55306341",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "5000000000/127",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "25000000000000/16129",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "125000000000000000/2048383",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MN/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "MPa"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1/100",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "381/1250",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "127/5000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1/1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "100",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "10000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1250/381",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1562500/145161",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1953125000/55306341",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "5000/127",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "25000000/16129",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "125000000000/2048383",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "N/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "Pa"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/100",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1/100",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "cm/s2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/10000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 3,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 4,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/100000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "cm4"
+    },
+    {
+      "dimension": {
+        "angle": 1,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/180",
+      "offset": "0",
+      "pi_power": 1,
+      "source": "docs/verification/units.md",
+      "symbol": "deg"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 1,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "5463/20",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "degC"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 1,
+        "time": 0
+      },
+      "factor": "5/9",
+      "offset": "45967/180",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "degF"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "381/1250",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "381/1250",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ft/s2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "145161/1562500",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 3,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "55306341/1953125000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 4,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "21071715921/2441406250000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ft4"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 1
+      },
+      "factor": "3600",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "h"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "127/5000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "127/5000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "in/s2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "16129/25000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 3,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "2048383/125000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 4,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "260144641/625000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "in4"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "10",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1524/5",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "127/5",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "100000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "10000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1250000/381",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1562500000/145161",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1953125000000/55306341",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "5000000/127",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "25000000000/16129",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "125000000000000/2048383",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kN/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kPa"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kg"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/2000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "74726673/25000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "24908891/100000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/200",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/2",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/6096",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "122583125/1161288",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "76614453125/221225364",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/508",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "245166250/16129",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1225831250000/2048383",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kgf/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/200000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "3389544870828501/2500000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1129848290276167/10000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/20000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/200000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/609600000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/185806080",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1112055403815125/7079211648",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/50800000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/1290320",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1112055403815125/4096766",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "kip/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/185806080",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ksf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/1290320",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "ksi"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "45359237/100000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lb"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/200000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "3389544870828501/2500000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1129848290276167/10000000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/20000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/200000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/609600000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/185806080000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/56633693184",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/50800000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/1290320000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/32774128",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/2000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "lbf/mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "m/s2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 3,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 4,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "m4"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 1
+      },
+      "factor": "60",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "min"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 0,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1/1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "mm/s2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/1000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 3,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/1000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "mm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 4,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1/1000000000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "mm4"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/56633693184",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "pcf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/185806080000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "psf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "8896443230521/1290320000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "psi"
+    },
+    {
+      "dimension": {
+        "angle": 1,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "rad"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 0,
+        "temperature": 0,
+        "time": 1
+      },
+      "factor": "1",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "s"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": 0
+      },
+      "factor": "1000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "t"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/2000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf.cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "74726673/25000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf.ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "24908891/100000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf.in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf.m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf.mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "980665",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/cm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "98066500",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/cm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/cm3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "24516625/762",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/ft"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "15322890625/145161",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/ft2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "19153613281250/55306341",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/ft3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "49033250/127",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/in"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "245166250000/16129",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/in2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "1225831250000000/2048383",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/in3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/m"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/m2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "196133/20",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/m3"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": 0,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/mm"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -1,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/mm2"
+    },
+    {
+      "dimension": {
+        "angle": 0,
+        "length": -2,
+        "mass": 1,
+        "temperature": 0,
+        "time": -2
+      },
+      "factor": "9806650000000",
+      "offset": "0",
+      "pi_power": 0,
+      "source": "docs/verification/units.md",
+      "symbol": "tonf/mm3"
+    }
+  ]
+}
