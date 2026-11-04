@@ -11,8 +11,8 @@ import argparse
 import os
 import re
 import sys
-from collections.abc import Callable
-from pathlib import Path
+from collections.abc import Callable, Sequence
+from pathlib import Path, PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,6 +23,7 @@ from eng_dev_gate.gitio import Change, Git, NumstatEntry, PathNotFoundError, Sub
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import CommandResult, Finding, Severity, StepResult, render
 from eng_dev_gate.results import Status, UsageError
+from eng_dev_gate.workspace import discover_members
 
 LARGEST_FILES_SHOWN = 3  # files named in a GC009 message (presentation only)
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
@@ -31,6 +32,7 @@ _PLAN_TASK = re.compile(r"(\S+)#(T\d+[a-z]*)")
 _NONE = re.compile(r"none \(.+\)")
 _BOOTSTRAP_ITEM = re.compile(r"B-\d+")
 _CLOSES = re.compile(r"Closes #(\d+)")
+_NOTES_FILES = ("CHANGELOG.md", "docs/local-testing.md")  # in scope beside a task file (AC10a, amendment B-096)
 
 
 class BodyFields(BaseModel):
@@ -125,10 +127,24 @@ def _status(doc: Spec, path: str, config: GateConfig) -> list[Finding]:
     return [_error("GC006", f"status {doc.status!r} is not acceptable; it must be approved", path)]
 
 
-def _scope(changes: list[Change], task: Task) -> list[Finding]:
-    """GC008 for each changed path (a rename counts both) that matches no glob of the task."""
-    outside = dict.fromkeys(p for change in changes for p in change.paths if not matches_any(p, task.files))
-    return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in outside]
+def _scope(changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str]) -> list[Finding]:
+    """GC008 for each changed path (a rename counts both) outside the task's globs.
+
+    The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
+    scope when another changed file under that directory matches a glob of the task (AC10a).
+    """
+    paths = dict.fromkeys(p for change in changes for p in change.paths)
+    inside = {p for p in paths if matches_any(p, task.files)}
+    plan = PurePosixPath(plan_path)
+    holders = [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
+    for directory in holders:
+        prefix = "" if directory == "." else f"{directory}/"
+        inside |= {
+            f
+            for f in (prefix + n for n in _NOTES_FILES)
+            if f in paths and any(q != f and q.startswith(prefix) and q in inside for q in paths)
+        }
+    return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
 
 
 def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
@@ -159,13 +175,16 @@ def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list
     return findings
 
 
-def check_pull_request(pr: PullRequest, config: GateConfig, git: Git, gate_ref: str) -> list[Finding]:
+def check_pull_request(
+    pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str] = ()
+) -> list[Finding]:
     """Run steps 4 to 7 of spec 4.5 and the body rules; findings accumulate.
 
     Args:
         pr: the pull request from the event file.
         config: the gate configuration (read from the gate root).
         git: the git port; ``gate_ref`` is the ref the plan and spec are read from.
+        member_dirs: POSIX paths of the workspace members (for the changelog exception of the scope check).
 
     Returns:
         The findings (GC001 to GC009).
@@ -194,7 +213,7 @@ def check_pull_request(pr: PullRequest, config: GateConfig, git: Git, gate_ref: 
     base = git.merge_base(pr.base_sha, pr.head_sha)
     return [
         *findings,
-        *_scope(git.name_status(base, pr.head_sha), task),
+        *_scope(git.name_status(base, pr.head_sha), task, plan_path, member_dirs),
         *_budget(git.numstat(base, pr.head_sha), task, config),
     ]
 
@@ -216,7 +235,9 @@ def handle_gate_check(args: argparse.Namespace) -> Status:
         step = StepResult(name="gate-check", skipped_reason="push event")
     else:
         gate_ref = args.gate_ref or f"origin/{config.gate_branch}"
-        step = StepResult(name="gate-check", findings=check_pull_request(pr, config, SubprocessGit(root), gate_ref))
+        members = [m.path for m in discover_members(root)] if (root / "pyproject.toml").is_file() else []
+        findings = check_pull_request(pr, config, SubprocessGit(root), gate_ref, members)
+        step = StepResult(name="gate-check", findings=findings)
     result = CommandResult(command="gate-check", mode=config.mode.value, steps=[step])
     render(result, args.format, sys.stdout, os.environ)
     return result.status
