@@ -246,7 +246,7 @@ tasks:
       - "packages/eng-contract/src/eng_contract/_fs.py"
       - "packages/eng-contract/tests/unit/test_store.py"
       - "packages/eng-contract/tests/unit/test_model_state.py"
-    max_changed_lines: 400
+    max_changed_lines: 500
     max_sessions: 3
     tests_first:
       - "packages/eng-contract/tests/unit/test_store.py::test_put_get_round_trip"
@@ -409,7 +409,10 @@ workspace on a OneDrive folder (including a Files On-Demand sync root) and on a 
 
 **T14 Store** (spec §4.5.3 to §4.5.5). The file-system port and its fake, the atomic write protocol, retries, payload
 split, payload normalization (spec §4.4), hash verification with `canonical.loads` and the wrapping of read errors
-as `StoreIntegrityError`, `ModelStateStore`, and the end-to-end trace-reference test (AC21a).
+as `StoreIntegrityError`, `ModelStateStore`, and the end-to-end trace-reference test (AC21a). Amendment (B-023): the
+`max_changed_lines` budget was raised from 400 to 500 because the measured change (477 lines of code plus 5 lines of
+CHANGELOG and docs, tests excluded) needs the port with its fault-injecting fake, payload verification, id validation
+and cleanup logging that spec §4.4 to §4.5.5 require.
 
 **T15 MCP mapping** (spec §4.11), with `output_schema()` as an object schema (AC49a).
 
