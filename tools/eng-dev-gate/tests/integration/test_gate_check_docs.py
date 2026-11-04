@@ -18,6 +18,7 @@ from support.pullrequest import (
     spec_text,
     write_event,
 )
+from support.approvals import FakeApprovals
 from support.repo import Repo, RunResult
 
 DOCS = "Work-Item: B-001\nPlan-Task: none (spec and plan)\n"
@@ -156,7 +157,7 @@ def test_status_approved(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyP
 
 
 def test_status_approved_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC16: with bootstrap off the approvals port (plan task T24) is not implemented, so verification fails closed."""
+    """AC16: with bootstrap off a document set to approved needs the approvals of process/01 section 5 (GC015)."""
     normal = Repo(tmp_path / "normal")
     draft = {SPEC_PATH: spec_text("draft")}
     base = make_gate_repo(normal, bootstrap=False, plan=plan_text(status="draft"), base_files=draft)
@@ -166,7 +167,54 @@ def test_status_approved_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.
     result, errors = gate_check(normal, event, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC015"})
     assert PLAN_PATH in errors["GC015"]
-    assert "not implemented" in errors["GC015"]
+    assert "approval" in errors["GC015"]
+    assert "not implemented" not in errors["GC015"]  # verified through the port, not failed closed
+
+
+def _head(repo: Repo) -> str:
+    return repo.git("rev-parse", "HEAD").strip()
+
+
+def test_normal_mode_verifies_approvals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, approvals: FakeApprovals
+) -> None:
+    """AC16, AC17, spec 4.5 steps 8 to 10: with bootstrap off the approvals of the port decide; none is awaiting."""
+    plan = plan_text(files=("pkg/src/**", ".github/**"), status="draft")
+    docs = Repo(tmp_path / "docs")
+    base = make_gate_repo(docs, bootstrap=False, plan=plan, base_files={SPEC_PATH: spec_text("draft")})
+    docs.commit({PLAN_PATH: plan_text(status="approved"), SPEC_PATH: spec_text("approved")}, "docs: approve")
+    gate = base_checkout(docs, base, tmp_path / "gate-base", monkeypatch)
+    event = write_event(docs, base, "Closes #1\nPlan-Task: none (spec and plan)\n", base_ref="main")
+    result, errors = gate_check(docs, event, gate=gate)
+    assert (result.code, errors["GC015"].count(SPEC_PATH), errors["GC015"].count(PLAN_PATH)) == (1, 1, 1)
+    approvals.approve("reviewer", _head(docs))  # the reviewer app covers G2 (plan), not G1 of an r1 spec (owner)
+    result, errors = gate_check(docs, event, gate=gate)
+    assert SPEC_PATH in errors["GC015"]
+    assert PLAN_PATH not in errors["GC015"]
+    approvals.approve("owner", _head(docs))
+    result, errors = gate_check(docs, event, gate=gate)
+    assert (result.code, errors) == (0, {})
+    assert approvals.asked == [7, 7, 7]  # one read of the reviews per run, for pull request 7
+    code = Repo(tmp_path / "code")
+    files = {".github/CODEOWNERS": OWNERS, "pkg/src/protected/a.py": "a\n"}
+    base = make_gate_repo(code, bootstrap=False, plan=plan_text(files=("pkg/src/**", ".github/**")), base_files=files)
+    code.commit({"pkg/src/protected/a.py": "b\n"}, "feat: change")
+    gate = base_checkout(code, base, tmp_path / "gate-base-2", monkeypatch)
+    event = write_event(code, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main", name="code.json")
+    approvals.items.clear()
+    approvals.approve("reviewer", _head(code))
+    result, errors = gate_check(code, event, gate=gate)
+    assert (result.code, set(errors)) == (1, {"GC015"})
+    assert "protected" in errors["GC015"]  # owner review of the changed protected path
+    assert "second reviewer family" in errors["GC015"]  # G3 of an r1 plan
+    approvals.approve("owner", _head(code))
+    assert gate_check(code, event, gate=gate)[0].code == 0
+    fork_author = json.loads(event.read_text(encoding="utf-8"))
+    fork_author["pull_request"]["user"]["login"] = "stranger"
+    event.write_text(json.dumps(fork_author), encoding="utf-8")
+    result, errors = gate_check(code, event, gate=gate)
+    assert (result.code, set(errors)) == (1, {"GC015"})
+    assert "stranger" in errors["GC015"]
 
 
 def test_protected_paths_awaiting_owner(repo: Repo) -> None:
@@ -191,7 +239,7 @@ def test_protected_paths_awaiting_owner(repo: Repo) -> None:
 
 
 def test_protected_paths_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC17: with bootstrap off the owner's approving review is required; verification is plan task T24 (GC015)."""
+    """AC17: with bootstrap off the owner's approving review is required; a missing approval is GC015."""
     plan = plan_text(files=("pkg/src/**", ".github/**"))
     normal = Repo(tmp_path / "normal")
     files = {CODEOWNERS: OWNERS, "pkg/src/protected/a.py": "a\n"}
@@ -202,7 +250,8 @@ def test_protected_paths_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.
     result, errors = gate_check(normal, event, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC015"})
     assert "pkg/src/protected/a.py" in errors["GC015"]
-    assert "not implemented" in errors["GC015"]
+    assert "approval" in errors["GC015"]
+    assert "not implemented" not in errors["GC015"]  # verified through the port, not failed closed
 
 
 def test_codeowners_pattern_outside_the_subset_is_a_usage_error(repo: Repo) -> None:
@@ -273,7 +322,8 @@ def test_identity_and_g3_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     result, errors = gate_check(normal, event, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC015"})
     assert "identity" in errors["GC015"]
-    assert "not implemented" in errors["GC015"]
+    assert "approval" in errors["GC015"]
+    assert "not implemented" not in errors["GC015"]  # verified through the port, not failed closed
 
 
 def test_head_run_reports_aw09(repo: Repo) -> None:
