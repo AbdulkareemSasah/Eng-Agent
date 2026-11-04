@@ -9,6 +9,10 @@ from collections.abc import Callable
 from typing import Any, Literal
 
 import pytest
+from pydantic import Field, create_model, model_validator
+
+from eng_contract.envelope import LiteralInput, RefInput
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import (
     ContractDefinitionError,
     InputPolicy,
@@ -17,10 +21,6 @@ from eng_contract.params import (
     eng_param,
     validate_input,
 )
-from pydantic import Field, create_model, model_validator
-
-from eng_contract.envelope import LiteralInput, RefInput
-from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.quantity import Quantity
 from eng_contract.records import ResultRecord
 
@@ -127,7 +127,7 @@ def run(
     policy: InputPolicy | None = None,
     source: MemorySource | None = None,
     revision: Callable[[str], int | None] = untracked,
-) -> ValidatedInput:
+) -> ValidatedInput[Beam]:
     return validate_input(
         Beam,
         raw,
@@ -145,7 +145,8 @@ def fails(raw: dict[str, Any], **kwargs: Any) -> ContractError:
 
 def define(name: str, annotation: type, **meta: Any) -> type[ParamModel]:
     """Define a one-field input model, as a tool author would (the field name decides the unit rules)."""
-    return create_model("Defined", __base__=ParamModel, **{name: (annotation, eng_param(**meta))})
+    definitions: dict[str, Any] = {name: (annotation, eng_param(**meta))}
+    return create_model("Defined", __base__=ParamModel, **definitions)
 
 
 # --- AC39 ------------------------------------------------------------------------------------------------------------
@@ -164,6 +165,7 @@ def define(name: str, annotation: type, **meta: Any) -> type[ParamModel]:
         pytest.param("b_mm", {"unit": "mm", "le": 1.0, "lt": 1.0, "bounds_source": WHY}, id="two-upper-bounds"),
         pytest.param("b_mm", {"unit": "mm", "ge": 5.0, "le": 1.0, "bounds_source": WHY}, id="empty-interval"),
         pytest.param("b_mm", {"unit": "mm", "gt": 5.0, "lt": 5.0, "bounds_source": WHY}, id="empty-open-interval"),
+        pytest.param("b_mm", {"unit": "mm", "ge": 5.0, "lt": 5.0, "bounds_source": WHY}, id="empty-half-open-interval"),
         pytest.param("b_mm", {"unit": "mm", "engineering_quantity": True}, id="engineering-without-ref-capable"),
         pytest.param("b_mm", {"unit": "mm", "stale_ok": True}, id="stale-ok-without-ref-capable"),
         pytest.param("b_mm", {"unit": "mm", "ref_kinds": frozenset({SECTIONS})}, id="kinds-without-ref-capable"),
