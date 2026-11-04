@@ -166,3 +166,21 @@ def test_invalid_map_at_head_and_missing_root_map(repo: Repo, tmp_path: Path) ->
     other.commit({"pkg/src/a.py": "a = 1\n"}, "feat: change")
     missing = other.run(["risk-floor", "--event", str(write_event(other, base, PLAN_TASK))])
     assert (missing.code, "RF003" in missing.err) == (2, True)
+
+
+def test_none_reason_takes_the_body_risk_line(repo: Repo) -> None:
+    """AC21a: a `Plan-Task: none (<reason>)` pull request records the risk of its one body `Risk:` line."""
+    base = make_gate_repo(repo, base_files=MAPS)
+    repo.commit({"pkg/src/a.py": "a = 1\n"}, "chore: release")
+    none = "Plan-Task: none (release)\n"
+    for body, code, codes in [
+        (f"{none}Risk: r1\n", 0, set()),
+        (f"{none}Risk: r1, r3 (release)\n", 0, set()),
+        (f"{none}Risk: r0\n", 1, {"RF001"}),
+        (none, 1, {"RF004"}),
+        (f"{none}Risk: x\n", 1, {"RF004"}),
+        (f"{none}Risk: r1\nRisk: r1\n", 1, {"RF004"}),
+        ("Plan-Task: none (spec and plan)\nRisk: r1\n", 1, {"RF004"}),
+    ]:
+        result, errors = _run(repo, write_event(repo, base, body))
+        assert (result.code, set(errors)) == (code, codes), body

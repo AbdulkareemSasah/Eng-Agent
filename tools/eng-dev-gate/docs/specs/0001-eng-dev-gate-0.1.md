@@ -83,8 +83,19 @@ gate-check (§4.5)
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
   `Plan-Task:` line must be `none (spec and plan)`.
+- AC12a. Given the committed root `.gate/gate.yml`, then its `spec_globs` match `docs/workflows/*.md` under any
+  directory as well as `docs/specs/*.md`, so the documents-only pull request of a workflow spec (process/03, with the
+  spec front matter of §5) is a spec and plan pull request (amendment B-340).
+- AC12b. Given the committed root `.gate/gate.yml`, then its `spec_globs` also match the clause specs
+  `docs/clauses/<pack>/*.md` of a code-pack package (process/03 "Clause spec"; structural-codes spec 0001), so the
+  documents-only pull request of a clause spec is a spec and plan pull request (amendment B-343).
 - AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
   task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
+- AC13a. Given a plan whose `spec:` names a directory (a path ending in `/`) of clause specs, then every `*.md` file
+  directly in it is loaded from the same commit as the plan (the gate branch in §4.5 step 4; the head commit for a spec-and-plan pull request, step 8) and must have valid spec front matter (GC005; no such file: GC004);
+  `covers` ids may carry a prefix (`BP-AC1`); and GC016 lists every criterion that is not covered, among the criteria of
+  each clause spec in the directory whose prefix the plan covers at least once and the criteria that the plan's own
+  text defines (amendment B-343).
 - AC14. Given a branch `lane/<issue>-<slug>`, when the pull request is a draft, then gate-check passes with a notice;
   when it is not a draft or its name is malformed, then GC012.
 - AC15. Given `Plan-Task: none (<reason>)`, when the reason is not in the table of §4.5 or the diff does not fit it,
@@ -103,6 +114,7 @@ risk-floor (§4.6)
 - AC20. Given a recorded risk that is a set of several risks and a body line `Risk:`, then the body must name the same
   set (RF002); on a lane branch the body line is the recorded risk.
 - AC21. Given a malformed map or an unknown risk class, then RF003 and exit 2.
+- AC21a. Given a `Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan` and exactly one body `Risk:` line, then that set is the recorded risk; without one, RF004 (amendment B-336).
 
 test-first (§4.7)
 - AC22. Given a title in Conventional Commits form, when the type is `docs`, `chore`, `ci` or `release`, or every changed
@@ -159,6 +171,7 @@ check (§4.12)
 - AC51. Given a dependency whose license is not allowed, unknown, or excepted without an ADR, then LC001, LC002 or LC003.
 - AC52. Given a generated document whose regeneration differs from the committed bytes, then GF001.
 - AC53. Given a changed R1 or R2 module, then mutation tests run on it and a score below `mutation_min` gives MU001.
+- AC53a. Given changed R1 or R2 files for which mutmut produces no mutant, then MU003 and the step passes; given mutants that no test covers, then they count as survivors in the MU001 score (not killed, so they lower it) and are not MU002 (amendment B-336).
 - AC54. Given a workspace member without `[tool.eng-gate]` (CF006) or a stale `uv.lock` (ST001 on step `lock`), then the
   check fails.
 
@@ -174,7 +187,7 @@ agents (§4.13)
 CI (§4.14)
 - AC59. Given `.github/workflows/ci.yml`, then it defines the nine jobs of process/11 §5 as thin steps that call
   composite actions (from the base checkout in pull-request jobs, §4.14), triggers on pull requests into `build/v1` and `main` and on pushes to `build/v1`, and the
-  `windows` job runs only on pushes.
+  `windows` job runs only on pushes. The gate composite action runs only `eng-gate check`, with no separate workspace-wide pytest step (amendment B-336).
 - AC60. Given workflows and actions, then an action not pinned by a 40-character commit SHA (WF001), a missing top-level
   `permissions` (WF002), an attacker-controlled expression inside a `run:` script (WF003) or the trigger
   `pull_request_target` (WF004) fails; a `ci.yml` whose shape departs from §4.14 (WF005, AC68) fails.
@@ -315,8 +328,9 @@ Checks, in order (all run; findings accumulate):
 
    Any other reason, or a diff that does not fit it, is GC011.
 4. **Plan and spec.** Load `<path>` from the gate branch tip (`git show <gate-ref>:<path>`; `--gate-ref`, default
-   `origin/<gate_branch>`), parse its front matter (§5) and load the spec named by `spec:` the same way. Missing
-   file: GC004. Invalid front matter: GC005. `status` must be `approved`; in bootstrap mode `draft` is accepted
+   `origin/<gate_branch>`), parse its front matter (§5) and load the spec named by `spec:` the same way. A `spec:`
+   that ends in `/` names a directory of clause specs: every `*.md` file directly in it is loaded (`git ls-tree`) and
+   parsed as a spec (AC13a; amendment B-343). Missing file, or a directory without one: GC004. Invalid front matter: GC005. `status` must be `approved`; in bootstrap mode `draft` is accepted
    (AC8, GC006). In bootstrap mode an AW01 notice lists each loaded document that is still a draft and whose risk or
    size requires the owner (process/01 §5).
 5. **Task.** The task id must exist (GC007).
@@ -341,7 +355,14 @@ Checks, in order (all run; findings accumulate):
    the size cap `limits.max_task_lines` (initially 400, "about 400" in process/04 §4) (GC005). A pull request that
    adds or changes `status: approved` fails in bootstrap mode (GC014); with bootstrap off, the approvals of
    process/01 §5 (strictest over the risk set) must exist on the pull request that merged the approving commit,
-   from the logins in `identities`, through `ApprovalSource` (GC015).
+   from the logins in `identities`, through `ApprovalSource` (GC015). Workflow specs (`<package>/docs/workflows/<name>.md`,
+   process/03) carry spec front matter and are specs: the committed `spec_globs` include `**/docs/workflows/*.md`
+   (AC12a; amendment B-340). Clause specs (`<package>/docs/clauses/<pack>/*.md`, process/03 and structural-codes
+   spec 0001) are specs too: the committed `spec_globs` include `**/docs/clauses/*/*.md` (AC12b). For a plan whose
+   spec is a directory of clause specs, the criteria are the `<prefix>-AC<n>.` lines (`<prefix>` two or three capital
+   letters, an optional lowercase suffix after `<n>`) of each clause spec whose prefix the plan's `covers` names at least
+   once, plus the criteria lines of the plan's own text; each must be in some task's `covers` (GC016, AC13a; amendment
+   B-343).
 9. **Protected paths.** Changed files matched by `CODEOWNERS` (`.github/CODEOWNERS` or `CODEOWNERS`; patterns
    follow the gitignore subset `*`, `**`, leading `/`, trailing `/`) give AW02 in bootstrap mode; otherwise an approving
    review by `identities.owner_login` on the head commit is required (GC015). Changes to `tools/eng-dev-gate/**`,
@@ -359,8 +380,8 @@ package directory), read at the base and head commits.
 Floor: the union of the `risk` of every entry with at least one glob matching at least one changed path (the union over
 both commits and both levels, so an entry can be added but not dropped by the pull request itself). Recorded risk: the
 `risk` of the plan named by `Plan-Task` (loaded from the gate branch; a set: `r1`, `r2` and `r3` can apply together;
-`r0` stands alone); for spec and plan pull requests, the `risk` of the changed documents; for a lane branch, the `Risk:`
-line of the body. The floor must be a subset of the recorded set (RF001 lists both and the paths that raised the floor).
+`r0` stands alone); for spec and plan pull requests, the `risk` of the changed documents; for a lane branch, and for a
+`Plan-Task: none (<reason>)` pull request whose reason is not `spec and plan`, the `Risk:` line of the body (amendment B-336). The floor must be a subset of the recorded set (RF001 lists both and the paths that raised the floor).
 When a plan is the source, the body `Risk:` line, if present, must be the same set (RF002). A missing recorded risk is
 RF004. The default map of process/01 §6 is the root file's content; the gate has no built-in map, so a missing file is
 exit 2.
@@ -595,7 +616,9 @@ backend mutates that file and runs the package tests; the score is killed (timeo
 must be at least `mutation_min`. The backend is chosen in the mutation task (§11 Q4); on a platform it does not support,
 the step is reported `skipped` with the reason locally and fails in CI if skipped there. Only changed files that hold at
 least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
-reaches); when none remain the step passes with the notice MU003 (amendment B-026).
+reaches); when none remain the step passes with the notice MU003 (amendment B-026). A run in which mutmut produces no mutant at all (for example a file
+whose only functions are decorated methods or module-level lambdas) also passes with MU003; mutants that exist but
+that no test covers count as survivors in the MU001 score; MU002 stays reserved for a backend fault, exit 3, and is never a judgement on coverage (amendment B-336).
 
 ### 4.13 agents render, keys, drift
 
@@ -772,8 +795,10 @@ max_task_lines, test_run_seconds, max_file_bytes}`, `license_exceptions`, `secre
 
 Spec and plan front matter (YAML between `---` lines at the start of the file): spec `id`, `issue`, `status`, `size`,
 `risk`; plan `id`, `issue`, `spec`, `status`, `size`, `risk`, `tasks`; each task `id` (`T<n>`), `title`, `files`
-(non-empty globs), `max_changed_lines`, `max_sessions` (positive integers), `tests_first`, `covers` (ids `AC<n>`),
-`depends_on`. `risk` is one class or a list of classes (a set; `r0` alone); this extends the templates (§11 Q3).
+(non-empty globs), `max_changed_lines`, `max_sessions` (positive integers), `tests_first`, `covers` (ids `AC<n>`, or
+`<prefix>-AC<n>` for a plan whose `spec` is a directory of clause specs, each with an optional lowercase suffix; AC13a),
+`depends_on`. A plan's `spec` is a workspace-relative POSIX path to a spec file, or to a directory of clause specs ending
+in `/` (amendment B-343). `risk` is one class or a list of classes (a set; `r0` alone); this extends the templates (§11 Q3).
 `status` is `draft` or `approved`; `size` is `trivial`, `small`, `standard` or `large`.
 
 ## 6. Errors
@@ -839,17 +864,19 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
 | AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
-| AC19 to AC21 | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map` |
+| AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
+| AC19 to AC21a | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27) |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
 | AC23, AC24, AC27 | integration | `test_test_first_run.py::test_red_green`, `::test_passes_at_base_and_fails_at_head`, `::test_base_isolation_and_cleanup` |
 | AC29 to AC37 | unit | `test_forbidden_<rule>.py` (one file per rule: flagged case, permitted neighbour), `test_forbidden_scope.py::test_spikes_tests_and_waivers` |
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
-| AC47 to AC54 | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001` |
+| AC47 to AC54 (with AC53a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29) |
 | AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_keys_skeleton`, `test_agents_drift.py::test_drift_unmanaged_and_pointer` |
-| AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
+| AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_gate_action_runs_only_check` (T28), `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
 | AC64 | CI | the CI run of the last task's pull request |
 | AC65 to AC67 | unit and integration | `test_gate_root.py::test_policy_from_gate_root_not_head`, `::test_provenance_rules`, `::test_head_run_in_both_modes` |
 | AC68 | unit | `test_workflows_lint.py::test_ci_shape_base_first` |
