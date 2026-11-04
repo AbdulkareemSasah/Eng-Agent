@@ -541,6 +541,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_clause_spec_directory_plan"
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_plan_with_clause_spec_directory"
+      - "tools/eng-dev-gate/tests/integration/test_gate_check_docs.py::test_plan_with_clause_spec_directory"
       - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_clause_specs_are_specs"
     covers: [AC12b, AC13a]
     depends_on: [T13, T14, T30]

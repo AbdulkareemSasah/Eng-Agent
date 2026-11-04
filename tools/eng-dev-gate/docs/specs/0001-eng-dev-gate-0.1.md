@@ -92,7 +92,7 @@ gate-check (§4.5)
 - AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
   task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
 - AC13a. Given a plan whose `spec:` names a directory (a path ending in `/`) of clause specs, then every `*.md` file
-  directly in it is loaded from the gate branch and must have valid spec front matter (GC005; no such file: GC004);
+  directly in it is loaded from the same commit as the plan (the gate branch in §4.5 step 4; the head commit for a spec-and-plan pull request, step 8) and must have valid spec front matter (GC005; no such file: GC004);
   `covers` ids may carry a prefix (`BP-AC1`); and GC016 lists every criterion that is not covered, among the criteria of
   each clause spec in the directory whose prefix the plan covers at least once and the criteria that the plan's own
   text defines (amendment B-343).
@@ -358,7 +358,7 @@ Checks, in order (all run; findings accumulate):
    from the logins in `identities`, through `ApprovalSource` (GC015). Workflow specs (`<package>/docs/workflows/<name>.md`,
    process/03) carry spec front matter and are specs: the committed `spec_globs` include `**/docs/workflows/*.md`
    (AC12a; amendment B-340). Clause specs (`<package>/docs/clauses/<pack>/*.md`, process/03 and structural-codes
-   spec 0001) are specs too: the committed `spec_globs` include `**/docs/clauses/**/*.md` (AC12b). For a plan whose
+   spec 0001) are specs too: the committed `spec_globs` include `**/docs/clauses/*/*.md` (AC12b). For a plan whose
    spec is a directory of clause specs, the criteria are the `<prefix>-AC<n>.` lines (`<prefix>` two or three capital
    letters, an optional lowercase suffix after `<n>`) of each clause spec whose prefix the plan's `covers` names at least
    once, plus the criteria lines of the plan's own text; each must be in some task's `covers` (GC016, AC13a; amendment
@@ -864,7 +864,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
 | AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
-| AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory` (T31) |
+| AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
 | AC19 to AC21a | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27) |
