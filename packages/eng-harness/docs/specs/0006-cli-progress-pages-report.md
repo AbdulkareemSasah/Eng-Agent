@@ -1,0 +1,758 @@
+---
+id: spec-0006-cli-progress-pages-report
+issue: "B-065"
+status: draft        # draft | approved (approved only by merging this file's own pull request)
+size: large
+risk: [r3]
+---
+
+# Spec 0006: eng-harness command line, terminal progress, approval page and run report
+
+Package: `eng-harness` (import package `eng_harness`) · Author: agent identity (bootstrap mode,
+[ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md) §4) · Date: 2026-11-04
+
+This spec implements the phase 1 interface of [ADR-0027](../../../../design/docs/adr/0027-phase-1-interface.md): the
+command line, live progress in the terminal, the local HTML approval page and the HTML run report. Sources:
+[11](../../../../design/docs/architecture/11-harness-engine.md) §3 (`ctx.approve`) and §11,
+[14](../../../../design/docs/architecture/14-harness-ui.md) §5 and §6 (the part of the deferred UI phase 1 needs),
+[16](../../../../design/docs/architecture/16-security-safety-privacy.md) §4 and §5,
+[13](../../../../design/docs/architecture/13-templates-and-design-basis.md) §4 (basis confirmation),
+[18](../../../../design/docs/architecture/18-first-slice-dxf-to-etabs.md) steps 6, 15, 16, 17 and
+[ADR-0026](../../../../design/docs/adr/0026-project-lane-for-tools.md) §3 (results from unreleased project-lane tools
+are marked). It implements the ports `ApprovalPort`, `InputPort`, `ProgressSink` and `RunControlPort` of the engine
+([spec 0001](0001-engine.md), "engine §n"), the page side of the basis setup of
+[spec 0004](0004-templates-and-basis.md) §4.6, and registers `eng-harness doctor` of
+[spec 0002](0002-servers-and-adapters.md) §4.9. It uses the contract of
+[eng-contract spec 0001](../../../eng-contract/docs/specs/0001-eng-contract-0.1.md) ("contract §n"). It does not repeat
+them. Details the architecture leaves open are marked **[added]** and listed in §11. Session findings from the Sasaah
+baseline design notes (`agent-sessions/_baseline/DESIGN-NOTES.md`, read-only): A7 (the interface was an early
+priority; progress with expected times), A8 (no progress display; a heartbeat) and C8 (the Arabic environment: Hijri
+calendar, cp1256, Arabic paths).
+
+## 1. Problem
+
+In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
+asked "is there progress?" about 40 times in one session, and tests failed on the Hijri calendar, cp1256 consoles and
+Arabic paths. The engine (spec 0001) can run, pause and resume a workflow, but nobody can start it, see it, answer it
+or read what it did. The engineer works through coding agents (ADR-0027), so the approval of a change set must be
+something an agent cannot give. Nothing of this exists yet; the first workflow (spec 0007) and acceptance A7 of 18 §5
+(at most one engineer prompt per cycle besides the change-set approval and the engineer turn) depend on it.
+
+## 2. Reuse research
+
+| Candidate | Finding | Decision |
+|---|---|---|
+| NiceGUI, FastAPI, Flask, Starlette | A web framework and ASGI server for one local page with six routes, no scripts. Deferred to the full UI by ADR-0027; each is a new dependency (A10) | Not used |
+| Standard library `http.server` (`ThreadingHTTPServer`) | Enough for a loopback server with a handful of routes; request size, headers and routing are ours to check (§4.4) | Used |
+| Jinja2 (autoescape) | Autoescape is the main benefit. A new dependency, a package ADR (A10), and a template-injection class of defects; layouts here are fixed tables and forms | Not used (§4.5, Q1) |
+| Standard library `html.escape` with a small builder | Same guarantee through types: only escaped text reaches output (§4.5) | Used |
+| `argparse`, `webbrowser`, `statistics`, `secrets`, `hmac`, `signal` | All needed pieces exist in the standard library | Used |
+| Rich, Textual, `tqdm` | Terminal widgets; progress here is one line per event and one live line | Not used |
+| `eng-harness` engine (spec 0001) | `JournalReader` already gives every view the progress, page and report need (11 §5); `ProgressSink` and the ports are defined | Used; no second source of truth |
+| Contract (`ResultStore`, `Quantity`, `Ref`, kinds) | Results, references and provenance for the report | Used; no logic re-implemented |
+
+No runtime dependency is added: `eng-contract` and `pydantic` only (plus what specs 0002 and 0004 add).
+
+## 3. Acceptance criteria
+
+Test paths are relative to `packages/eng-harness/`. "Fake ports" and "fake-host workflow test" are as in engine §3. The
+page tests use a real server on the loopback interface and `http.client`; no browser runs in CI.
+
+### 3.1 Command line
+
+- AC1. Given `eng-harness --help`, then exactly the commands `run`, `resume`, `status`, `stop`, `report` and `doctor`
+  are listed; `approve`, `reject`, `sign`, and any abbreviation of a command, are usage errors (exit 2); and no option
+  of any command accepts an approval, a rejection, a sign-off or an engineer name. Test:
+  `tests/unit/cli/test_parser.py::test_commands_exact_and_no_approve`.
+- AC2. Given the modules `eng_harness.cli` and `eng_harness.progress`, then neither imports the answer models or the
+  answer-producing functions of `eng_harness.pages`, and only `eng_harness.pages` constructs `ApprovalAnswer`,
+  `InputAnswer` or `BasisSetupAnswer` (static check of imports and names). Test:
+  `tests/rules/test_cli_cannot_answer.py::test_no_answer_construction_outside_pages`.
+- AC3. Given each outcome (§4.2.3), then the process exit code is the one in the table: every `RunStatus`, each stop
+  reason, `RunRefused`, `RunLocked`, `JournalIntegrityError`, an unknown run, a usage error and an unexpected exception.
+  Test: `tests/unit/cli/test_exit_codes.py::test_outcome_mapping`.
+- AC4. Given `harness.toml`, then it is found by `--config`, then `ENG_HARNESS_CONFIG`, then `<workspace>/harness.toml`;
+  the sections `[engine]`, `[progress]`, `[page]` and `[project_lane]` validate (§4.2.4); an unknown key, a wrong type
+  or an out-of-bounds value is a usage error (exit 2) naming the key; the sections of specs 0002 and 0003 pass through.
+  Test: `tests/unit/cli/test_config.py::test_discovery_and_sections`.
+- AC5. Given standard output redirected to a pipe whose default encoding is cp1256, when a message holds Arabic text
+  and a character cp1256 cannot encode, then nothing raises and the bytes are UTF-8; given a console, the encoding is
+  kept and unencodable characters print as backslash escapes. Test:
+  `tests/unit/cli/test_encoding.py::test_redirected_output_is_utf8`.
+- AC6. Given `run` with an unregistered workflow, an input file that is not valid JSON or fails the workflow's input
+  model, a basis with missing required fields, or calcs refused for a production run, then no run folder is created and
+  the exit code is 2 (usage) or 3 (refused) as §4.2.3 states, with the paths or codes listed. Test:
+  `tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run`.
+- AC7. Given a test workflow, fake ports and a confirmed basis, when `run --json` is called and the page client approves
+  the one approval, then the process exits 0, the journal ends with `run_completed`, the report file exists, and
+  standard output is one JSON object with `run_id`, `workflow`, `status`, `exit_code`, `pending`, `escalation` and
+  `report`. Test: `tests/workflow/test_cli_run.py::test_run_completes_and_writes_report`.
+- AC8. Given a workflow that reaches an approval, when `run --no-wait` is called, then the page is not served, the
+  process exits 10 with the pending request titles and the `resume` command (no address, no token), the journal ends
+  with `run_paused`; and a later `resume` without `--no-wait`, answered on the page, completes the run without
+  repeating a write. Test: `tests/replay/test_cli_resume.py::test_no_wait_then_resume`.
+- AC9. Given a live run in a long fake step, when `stop <run_id>` is called, then the run pauses at the next safe point
+  with `run_paused` (reason `stop_requested`), `run` exits 12 and the request file is removed; given a run with no live
+  engine, `stop` exits 0 and says it is not running; given a stop file left behind, `resume` clears it before the
+  engine starts. Test: `tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point`.
+- AC10. Given an interrupt signal, then the first one is a stop request (as AC9) and the second ends the process at
+  once with exit 130; the journal then resumes as after any crash (engine AC30). Test:
+  `tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop`.
+- AC11. Given journals in each state (live, interrupted, paused, needs engineer, completed, failed, altered), when
+  `status` runs, then the table and the JSON show the `RunView` status, the step in progress, the pending requests (kind
+  and title), the escalation, the heartbeat age and the next command to run; an altered journal exits 5 naming the first
+  bad `seq`; an unknown id exits 6; and `status` never writes (journal bytes and modification time unchanged) and never
+  prints an address, a token or a launch code. Test: `tests/unit/cli/test_status.py::test_states_and_read_only`.
+- AC12. Given `report <run_id>`, then `<run>/report/report.html` is written atomically; `--out FILE` refuses an
+  existing file without `--force`; an altered journal gives exit 5 and writes nothing. Test:
+  `tests/unit/cli/test_report_command.py::test_output_rules`.
+- AC13. Given `doctor`, then it calls `eng_harness.doctor.run` of spec 0002 with the options passed through and returns
+  its exit code unchanged. Test: `tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough`.
+- AC14. Given a workflow with an `options_model`, then `run` offers one `--<field-name>` option for each top-level
+  field of type `str`, `int`, `bool`, enum or `Literal`, and offers none for a field that holds a quantity or a nested
+  model: those values come from `--input FILE`, as references or literals (P2). Test:
+  `tests/unit/cli/test_options.py::test_generated_options_exclude_quantities`.
+
+### 3.2 Terminal progress
+
+- AC15. Given the journals of earlier runs of the same workflow in the workspace, then the expected time of a step
+  (kind and name) is the median `duration_ms` of its completed instances in the last `history_runs` runs that ended
+  `COMPLETED`, shown with the minimum, maximum and sample count, and only when the samples reach `min_samples`;
+  otherwise "no estimate". A step that failed or was reconciled contributes nothing. The median lies between the
+  minimum and the maximum for any input. Tests: `tests/unit/progress/test_expected.py::test_median_range_and_min_samples`,
+  `tests/property/test_expected_bounds.py::test_median_within_range`.
+- AC16. Given a fixed event sequence and a fixed clock, then the terminal mode shows one live line (step name, elapsed,
+  expected) and one persistent line per finished step, the plain mode shows persistent lines and heartbeat lines only,
+  and the JSON mode shows one JSON object per line; the text equals the golden files. Test:
+  `tests/golden/test_progress_render.py::test_tty_plain_json`.
+- AC17. Given an open approval or input request, then progress shows "waiting for engineer" with the request title and
+  the time waited, no expected time, and no address or token. Test:
+  `tests/unit/progress/test_render_waiting.py::test_waiting_shows_no_expected_or_url`.
+- AC18. Given a running step and a clock that advances without any journal event, then a heartbeat line is printed and
+  `<run>/heartbeat.json` is rewritten every `heartbeat_s`; given a live engine whose heartbeat file is older than
+  `stale_after_heartbeats` intervals, `status` reports "no heartbeat" with its age. Test:
+  `tests/unit/progress/test_heartbeat.py::test_heartbeat_without_events`.
+- AC19. Given an output stream whose writes block, then `emit` returns within 10 ms, the engine is not delayed, and
+  when the bounded queue is full the oldest lines are dropped and a count is printed later; the journal stays complete.
+  Given a renderer that raises, the sink is detached by the engine (engine AC58) and the run continues. Test:
+  `tests/unit/progress/test_sink.py::test_blocked_stream_does_not_block_engine`.
+- AC20. Given a committed event, then the line is written to the stream in under 200 ms at p95 (11 §10). Test:
+  `tests/perf/test_progress_latency.py::test_event_to_line_p95`.
+- AC21. Given any string taken from data (a model name, a message, a file name), then terminal output holds no
+  C0 or C1 control character, no escape sequence and no bidirectional control character (shown as `<U+XXXX>`). Test:
+  `tests/property/test_text_sanitize.py::test_no_control_sequences`.
+
+### 3.3 Approval page: server and security (16 §4, §5)
+
+- AC22. Given a started page server, then its address is `127.0.0.1` and its port is chosen by the operating system
+  (two servers get different ports); a request to bind any other address raises; and no source line names `0.0.0.0`,
+  `::` or `localhost`. Test: `tests/unit/pages/test_server_bind.py::test_loopback_random_port`.
+- AC23. Given the launch address, then its code opens a session once (cookie `HttpOnly`, `SameSite=Strict`) and
+  redirects; a second use, a wrong code and a request without the cookie each get 403 with no run data; session and
+  launch values have at least 256 bits of randomness and are compared with `hmac.compare_digest`. Test:
+  `tests/unit/pages/test_session_token.py::test_launch_code_once`.
+- AC24. Given a request whose `Host` is not exactly `127.0.0.1:<port>` (a DNS-rebinding name, `localhost`, another
+  port), or a POST whose `Origin` is missing or not `http://127.0.0.1:<port>`, or whose `Sec-Fetch-Site` is not
+  `same-origin`, then it is refused (421 or 403) before any handler runs. Test:
+  `tests/unit/pages/test_request_checks.py::test_host_origin_fetch_metadata`.
+- AC25. Given a POST whose CSRF token is missing, wrong, or issued for another request id, another preview hash or
+  another session, then it is refused (403) and the port and the journal are untouched. Test:
+  `tests/unit/pages/test_request_checks.py::test_csrf_bound_to_request_and_hash`.
+- AC26. Given every screen and error page, then each response carries the headers of §4.4.2 (the exact
+  Content-Security-Policy included) and the markup holds no `script` element, no event-handler attribute, no `style`
+  attribute, no `iframe`, `object`, `embed`, `link` or `img`, and no URL that is not a relative path of this server.
+  Test: `tests/unit/pages/test_headers_and_markup.py::test_csp_and_no_active_content`.
+- AC27. Given the route table of §4.4.3, then any other path is 404, any other method 405, a body over `max_body_bytes`
+  413, a content type other than `application/x-www-form-urlencoded` 415, and an unknown or repeated form field 400.
+  Test: `tests/unit/pages/test_routes.py::test_route_table_and_limits`.
+- AC28. Given `max_failed_requests` refused requests (token, Host, Origin, CSRF), then the server answers 503 to every
+  request and prints a warning; given the run function returns, the server and its threads stop and the port is free.
+  Tests: `tests/unit/pages/test_lockdown.py::test_failed_requests_lock_server`,
+  `::test_shutdown_releases_port`.
+
+### 3.4 Approval flow (11 §3, 18 step 6)
+
+- AC29. Given an open `CHANGE_SET` request, when the engineer approves on the page, then the engine receives an
+  `ApprovalAnswer` whose `shown_sha256` equals the request's and journals `approval_resolved` (`by` =
+  `engineer:<name>`); given a form whose hash differs from the open request, then 409 and the request is shown again.
+  Test: `tests/workflow/test_page_approval.py::test_answer_bound_to_hash`.
+- AC30. Given two simultaneous answers to one request, then exactly one is accepted, the other gets 409, and the
+  journal holds one `approval_resolved`. Test: `tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins`.
+- AC31. Given an answer, then: a rejection needs a reason of 1 to 500 characters after trimming; each rejected item
+  needs its own reason; an approval that rejects every item is refused ("use reject"); an item id not in the request
+  is refused; and every refusal re-renders the screen with the message and records nothing. Test:
+  `tests/unit/pages/test_answer_validation.py::test_reasons_and_items`.
+- AC32. Given the answer models, then they hold only `request_id`, `shown_sha256`, `decision` or `choices` (option
+  ids), `rejected_items`, `item_reasons`, `reason`, `by`, `acknowledged_unreleased` and `confirmed_sections`; they have
+  no member that carries an engineering value, and extra members are refused. Test:
+  `tests/unit/pages/test_answer_models.py::test_answers_carry_no_values`.
+- AC33. Given a three-item change set in which item 2 is rejected on the page, then the journal records
+  `rejected_items = [item 2]` with its reason, the writes of items 1 and 3 proceed, and the write of item 2 raises
+  `BlockRuleViolation` (engine AC56). Test: `tests/workflow/test_page_approval.py::test_per_item_reject_end_to_end`.
+- AC34. Given an approved change set whose model changed (the fake host is edited) after the answer and before the first
+  write, then `ApprovalVoid` is raised before the write (engine AC55), nothing is written, and the page shows the
+  request as voided with the engine's message. Test: `tests/workflow/test_page_approval.py::test_void_after_model_change`.
+- AC35. Given a run waiting at an approval whose process is killed, when it is resumed, then the same request id with
+  the same preview hash is shown again, an answer completes the run, and no `approval_resolved` exists for the killed
+  wait. Test: `tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume`.
+- AC36. Given `answer(wait=True)` and a stop request, then it returns `None` within 1 second; given `wait=False` and no
+  answer, it returns `None` at once. Test: `tests/unit/pages/test_wait.py::test_stop_ends_wait`.
+- AC37. Given an accepted POST, then the page shows "recorded" only after the sink has seen the matching
+  `approval_resolved` event, and shows "received, not yet recorded" with a link to `/` after `ack_timeout_s`. Test:
+  `tests/workflow/test_page_approval.py::test_page_confirms_after_commit`.
+- AC38. Given several open requests (parallel children), then `/` lists them in `seq` order and each is answered on its
+  own page. Test: `tests/unit/pages/test_index.py::test_multiple_open_requests`.
+- AC39. Given the engineer name, then it is 1 to 100 characters without control characters, defaults to
+  `[engine] engineer` when set, is remembered for the session, and is never taken from the operating system account
+  (the test makes `getpass.getuser` raise). Test:
+  `tests/unit/pages/test_answer_validation.py::test_name_rules_and_no_os_account`.
+
+### 3.5 Screens
+
+- AC40. Given a `CHANGE_SET` request with a difference report, then the screen shows the title, the items with their
+  labels and referenced values, the differences from the last revision as a table, the binding (model id, revision,
+  fingerprint and file hash, shortened) and the short preview hash, one reject box per item, and the buttons Approve and
+  Reject; it matches the snapshot. Test: `tests/golden/test_screens.py::test_change_set_screen`.
+- AC41. Given `PROMOTION` and `INFO` requests, then the screens show the target and the backup by base name, the hash of
+  the original and of the working copy, and the same buttons; they match the snapshots. Test:
+  `tests/golden/test_screens.py::test_promotion_and_info_screens`.
+- AC42. Given a `SIGN_OFF` request, then the screen shows the report of the run so far (marked DRAFT) at `/report`, the
+  verdict counts, each verdict that is not `PASS` or `NOT_APPLICABLE` as an exception with its own reason field, and
+  the engineer name; signing is refused unless every exception has a reason; and when results depend on unreleased
+  tools (§4.6.3) the screen lists them and signing is refused without the acknowledgement. Test:
+  `tests/workflow/test_signoff.py::test_signoff_rules`.
+- AC43. Given the engineer-turn request of the edit cycle (18 step 15) with the options `accept`, `more_edits` and
+  `hand_edit`, then the screen shows exactly three buttons with the catalog labels, the `hand_edit` label tells the
+  engineer to save in the host program first, and one press is one answer that carries only the option id. Test:
+  `tests/unit/pages/test_choice_screen.py::test_engineer_turn_three_options`.
+- AC44. Given a batched decision with N questions, then the screen is one form with one option group and its labeled
+  evidence per question and one Submit; an answer with a question left open or an option outside the question is
+  refused; the answer carries N option ids. Test:
+  `tests/unit/pages/test_choice_screen.py::test_batched_decisions_one_submit`.
+- AC45. Given the engine's own requests (`engine.in_flight`, `engine.host_state`, `engine.escalation`), then they are
+  choice screens showing the reason and the evidence, and they can be answered only there. Test:
+  `tests/unit/pages/test_choice_screen.py::test_engine_requests_choices`.
+- AC46. Given a `ctx.ask` request, then the page shows its fields (name, type, unit, bounds) read-only with the text
+  "provide the answers with `resume --answers FILE`"; given such a file, the engine validates it (engine AC61) and
+  journals `input_provided` with `by` = `engineer:<name>`; a file for a request that is not an input request, or an
+  answer for an unknown request id, is refused. Test:
+  `tests/workflow/test_cli_answers.py::test_form_request_answers_file`.
+- AC47. Given a basis draft with every required field present, when `run` is called, then the page shows the sections
+  and rows of the `BasisSetupView` (value, unit, source, citation, state, bounds, banners); a confirmable section has a
+  box, a section with a missing row has none; confirming all sections with a name freezes the basis (spec 0004) and
+  starts the run; rejecting with a reason ends with exit 3, no run folder and no stored basis. The answer and the
+  setup log `<workspace>/setups/<setup_id>.json` hold `by`, `at`, `draft_sha256` and the section names, never a value.
+  Tests: `tests/workflow/test_cli_basis.py::test_basis_confirmation_flow`, `::test_reject_leaves_no_run`.
+
+### 3.6 Untrusted text
+
+- AC48. Given adversarial strings (markup, quotes, `javascript:` text, `</style>`, bidirectional overrides, escape
+  sequences, NUL, a 10 MB string, Arabic text mixed with digits) in every text field of the journal, of result
+  payloads and of previews, then on every screen and in the report the text appears only escaped, inside a labeled
+  field, wrapped in `<bdi dir="auto">`, with bidirectional controls shown as `<U+XXXX>`, truncated at
+  `display_max_chars` with the original length stated; parsing the output finds only allowlisted tags and attributes
+  and text nodes equal to the escaped input. Test: `tests/property/test_untrusted_text.py::test_every_screen_and_report_escape`.
+- AC49. Given the HTML builder, then an attribute accepts only a `SafeToken` (`[A-Za-z0-9_.-]{1,64}`) or an enumerated
+  value, a data string is never placed in an attribute, a URL, a class name, an id or a style, and passing one raises.
+  Test: `tests/unit/test_html.py::test_attributes_accept_only_tokens`.
+
+### 3.7 Run report (ADR-0027 §1, 14 §6, ADR-0026 §3)
+
+- AC50. Given `build_report(reader, store, marks, clock, version)`, then it reads nothing else (the module imports no
+  file or process module and a test with every other file made unreadable passes) and the same inputs give the same
+  bytes. Test: `tests/unit/report/test_build_report.py::test_inputs_only_and_deterministic`.
+- AC51. Given a fixture run (two revisions, a change set with a rejected item, verdicts, decisions, a resume), then the
+  report holds the sections of §4.6.1 and matches the snapshot. Test:
+  `tests/golden/test_report.py::test_report_snapshot`.
+- AC52. Given any report, then every value cell (class `v`) holds a link to a row of the sources table (result id and
+  pointer, kind, producer and version, or the basis `source` string with its confirmation) and the link target exists.
+  Test: `tests/unit/report/test_sources.py::test_every_value_has_source`.
+- AC53. Given a run without `signed_off`, then the report carries the mark DRAFT (banner, title prefix, watermark);
+  given `signed_off`, the banner shows the name and time and the unsigned mark is gone; given `run_completed.draft`
+  true, "DRAFT SOURCES" stays after signing; given a run that is not terminal, "INCOMPLETE" shows with its status.
+  Test: `tests/unit/report/test_draft_mark.py::test_draft_signed_and_sources`.
+- AC54. Given release marks that name a tool, then every result produced by it, and every result with such a result
+  among its ancestors (through `parents` and provenance inputs), carries the mark in every place it appears, the
+  banner counts them, and the sign-off screen lists the same set; a result with no such ancestor carries none; a
+  lineage deeper than `lineage_depth_limit` is marked and flagged "lineage incomplete". Tests:
+  `tests/property/test_release_marks.py::test_marked_set_is_closure`,
+  `tests/unit/report/test_release_marks.py::test_marks_everywhere`.
+- AC55. Given change-set approvals, then the changes section shows per approval the items with accepted or rejected
+  state and reason, the binding, the applied steps and their read-back results, the differences (engineer changes
+  included), and the list of model revisions with fingerprints and base file names. Test:
+  `tests/unit/report/test_changes.py::test_changes_decisions_revisions`.
+- AC56. Given the events of a run, then the timings section gives for each step its start and duration, the time the
+  engineer waited (the sum of `approval_resolved.at - approval_requested.at` and the same for inputs), the machine
+  time (the sum of completed step durations) and the number of resumes; the sums equal the sums over the fixture. Test:
+  `tests/unit/report/test_timings.py::test_wait_and_run_times`.
+- AC57. Given an altered journal, then no report is built (`JournalIntegrityError`); given a live engine, the report
+  states "run in progress as of seq N". Test: `tests/unit/report/test_build_report.py::test_tampered_refused_live_banner`.
+- AC58. Given any output (progress, page, report, setup log, JSON), then dates read `YYYY-MM-DD HH:MM:SS UTC` in the
+  Gregorian calendar, digits are ASCII and the decimal separator is a point, whatever the locale or calendar; no
+  module of this spec imports `locale` or uses a locale-dependent time directive. On Windows the same holds with an
+  Arabic workspace path, a cp1256 console and the `ar-SA` culture. Tests:
+  `tests/rules/test_culture_invariant.py::test_no_locale_calls`,
+  `tests/windows/test_arabic_environment.py::test_arabic_workspace_and_cp1256`.
+- AC59. Given a report or setup log, then the file is UTF-8 without a byte order mark, with LF line endings, declares
+  `<meta charset="utf-8">`, is written to a temporary name and renamed, and Arabic text round-trips. Test:
+  `tests/unit/report/test_write.py::test_utf8_lf_atomic`.
+- AC60. Given the modules of this spec, then they import only the standard library, `eng_contract`, `pydantic` and the
+  modules of this package (specs 0002 to 0005 where they own the type). Test:
+  `tests/rules/test_imports.py::test_third_party_imports_limited`.
+
+## 4. Design
+
+### 4.1 Package layout and public API
+
+`packages/eng-harness/src/eng_harness/`, extending engine §4.1.1. New public modules go in
+`[tool.eng-gate] public_modules`; block and rule code may import none of them (engine §4.1.2).
+
+| Module | Public names | Who may import |
+|---|---|---|
+| `eng_harness.cli` | `main(argv, *, deps) -> int`, `ExitCode`, `CliDeps`, `HarnessConfig`, `ConfigError` | the entry point, tests |
+| `eng_harness.progress` | `ExpectedTimes`, `ProgressRenderer`, `TerminalProgress` (the `ProgressSink`), `Heartbeat`, `Liveness`, `read_liveness` | `cli`, tests |
+| `eng_harness.pages` | `PageServer`, `PageApprovalPort`, `PageInputPort`, `PageBasisSetupPort`, `Screen` | `cli`, tests |
+| `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError` | `cli`, `pages` (sign-off screen), tests |
+
+Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_html.py` (§4.5), `cli/_parser.py`,
+`_exit.py`, `_config.py`, `_encoding.py`, `_options.py`, `_run.py`, `_status.py`, `_signals.py`, `_control.py`,
+`_wiring.py`; `progress/_expected.py`, `_render.py`, `_sink.py`, `_heartbeat.py`; `pages/_security.py`, `_server.py`,
+`_routes.py`, `_answers.py`, `_ports.py`, `_wait.py`, `_screens_approval.py`, `_screens_choice.py`,
+`_screens_basis.py`, `_labels.py` (the label catalog), `_css.py`; `report/_lineage.py`, `_model.py`, `_sections.py`, `_document.py`, `_write.py`. The
+`pages/` folder holds the path-risk floor r3 (`.gate/risk-map.yml`), which is why this spec's plan is r3 throughout.
+The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
+takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, browser opener), so every test
+runs without a host, a browser or the real clock.
+
+### 4.2 Command line
+
+#### 4.2.1 Commands
+
+Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract §4.5.1), `--config FILE`.
+
+| Command | Purpose and options |
+|---|---|
+| `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), generated `--<field>` options (AC14), and the shared options below |
+| `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers a pending `ctx.ask` (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one input request is pending; and the shared options |
+| `status [<run_id>]` | Without an id: the 20 most recent runs. With an id: AC11. `--json`. Read-only |
+| `stop <run_id>` | Ask a live run to pause at the next safe point (`--wait SECONDS` waits for it to end) |
+| `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force` |
+| `doctor` | Spec 0002 §4.9 (`--json`, `--show-paths`) |
+
+Shared options of `run` and `resume`: `--no-wait` (never wait for an answer: exit 10 at the first open request),
+`--wait-timeout SECONDS` (default: wait until answered or stopped), `--no-browser` (print the launch address instead of
+opening it, §4.4.4), `--progress {auto,tty,plain,json,off}` (default `auto`: `tty` on a terminal, else `plain`),
+`--json` (the final result as one JSON object on standard output; progress goes to standard error), `--no-report`.
+
+**There is no approve command, no option that answers a request, and no file that approves.** Approval, rejection,
+per-item rejection and sign-off exist only on the page (ADR-0027 §2). An agent that runs a workflow can start, resume,
+stop and inspect it, and read the report; it cannot give the answer (AC1, AC2). Input values for `ctx.ask` and the
+basis values arrive as files, because they are data; their confirmation by the engineer happens at the change-set
+approval and on the basis screen (Q3).
+
+Rule for coding agents, recorded in the package `AGENTS.md` (plan T17): run `run` and `resume` in the background and
+follow them with `status`, or use `--no-wait` and tell the engineer to resume; never read or relay the launch address
+or open the page; the approval is the engineer's.
+
+#### 4.2.2 Flow of `run`
+
+1. Resolve the workspace and configuration; build the registry and ports from `CliDeps`; find the workflow
+   (`RunRefused`-like refusal otherwise).
+2. Validate the input file against the workflow's input model, without creating anything (engine AC16).
+3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
+   `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
+   basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
+4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3.
+5. Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for AC37), `FileRunControl`
+   as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start `Engine.start`.
+6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
+
+`resume` is steps 1, 5 and 6 with `Engine.resume`; it clears a stale stop file first. The page server starts lazily at
+the first `present` (never when `--no-wait` is given or no request opens) and stops when the process returns.
+
+#### 4.2.3 Exit codes
+
+| Code | Name | When |
+|---|---|---|
+| 0 | `OK` | Run completed; `status`, `stop`, `report` succeeded |
+| 1 | `RUN_FAILED` | The run ended `FAILED`; `doctor` reported a failed check (spec 0002 AC37) |
+| 2 | `USAGE` | Usage or configuration error; invalid input file |
+| 3 | `REFUSED` | `RunRefused` (`BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`), unknown workflow, calcs refused, basis rejected on the page |
+| 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`) |
+| 5 | `JOURNAL_INTEGRITY` | `JournalIntegrityError` |
+| 6 | `NOT_FOUND` | No such run |
+| 10 | `AWAITING_ENGINEER` | Paused at an open approval or input, or basis confirmation pending with `--no-wait` |
+| 11 | `NEEDS_ENGINEER` | Escalated (`NEEDS_ENGINEER`): the page shows the choices |
+| 12 | `STOPPED` | Paused by a stop request |
+| 70 | `INTERNAL` | Unexpected exception; the message names an error id; the journal is intact and resumable |
+| 130 | `INTERRUPTED` | Second interrupt |
+
+#### 4.2.4 Configuration
+
+`harness.toml` sections owned here. All are software settings (not engineering values); unknown keys are refused.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `[engine] default_mode` | enum | `work_on_copy` | Permission mode (11 §7) |
+| `[engine] engineer` | str, 1 to 100 | unset | Name proposed on the page; never an operating-system account |
+| `[engine]` limits | int ≥ 1 | engine §4.10 | `EngineSettings` fields |
+| `[progress] heartbeat_s` | int ≥ 1 | 10 | Heartbeat interval |
+| `[progress] stale_after_heartbeats` | int ≥ 2 | 3 | Heartbeat age after which `status` says "no heartbeat" |
+| `[progress] history_runs` | int ≥ 1 | 20 | Earlier runs read for expected times |
+| `[progress] min_samples` | int ≥ 1 | 3 | Samples needed for an estimate |
+| `[progress] queue_lines` | int ≥ 1 | 1000 | Bounded output queue |
+| `[page] open_browser` | bool | true | Open the launch address in the default browser |
+| `[page] max_body_bytes` | int | 32768 | POST body limit |
+| `[page] max_failed_requests` | int | 20 | Lockdown threshold (AC28) |
+| `[page] ack_timeout_s` | int | 10 | AC37 |
+| `[page] display_max_chars` | int | 500 | Truncation of untrusted text (AC48) |
+| `[project_lane.<tool>] record` | str | none | A tool not yet released (ADR-0026 §3); `record` names its gap report or session record (Q5) |
+
+### 4.3 Terminal progress (ADR-0027 §1, 11 §10, notes A7 and A8)
+
+**Sink.** `TerminalProgress.emit(event)` formats the event (microseconds, no I/O) and puts the text on a bounded queue
+that a writer thread drains to standard error; when the queue is full the oldest line is dropped and counted. `emit`
+therefore never blocks, whatever the consumer does (an agent that stops reading its pipe must not stall a run). The
+journal stays complete; a dropped line is a display loss only (engine §4.10).
+
+**Display.** From the events: the current step (path, name, kind; at most three running steps are shown with "+N more"),
+its elapsed time, its expected time, and the run's elapsed time. `terminal` mode keeps one live line, rewritten with a
+carriage return and an erase sequence, plus a persistent line for each finished step, decision, approval, input,
+`model_saved`, escalation and run event. `plain` mode prints persistent lines and heartbeat lines only. `json` mode
+prints `{"at", "event", "path", "name", "elapsed_ms", "expected_ms"}` per line. Durations read `MM:SS`, or `H:MM:SS`
+from one hour, by integer arithmetic. Data-derived text goes through `sanitize_terminal` (AC21).
+
+**Expected time.** `ExpectedTimes.build(workspace, workflow, settings)` reads, read-only through `JournalReader`, the
+last `history_runs` runs of the workflow that ended `COMPLETED`, and keys durations by `(kind, name)` (for tool steps the
+tool name). Inserted and housekeeping steps are included under their names. The estimate is the median
+(`statistics.median`) with minimum, maximum and count, shown only from `min_samples` samples:
+`expected ~02:10 (01:05 to 04:40, 7 earlier runs)`. Otherwise `no estimate`. The same workflow on a larger model takes
+longer, which is why the range is always shown. The index is built once before the engine starts; display lookups are
+dictionary reads.
+
+**Heartbeat.** An asyncio task in the run process (not a thread, so a stalled event loop stops it) wakes every
+`heartbeat_s`, prints `heartbeat: <step> still running, <elapsed>, <expected>, journal seq N`, and rewrites
+`<run>/heartbeat.json` (`pid`, `at`, `step`, `step_started_at`, `seq`) by temporary file and rename. The file is
+process information, not a journal event: the journal has one writer and is not the place for liveness. `status` combines
+`journal.is_locked`, the file and its age (`read_liveness`): locked and fresh is "running"; locked and older than
+`stale_after_heartbeats` intervals is "no heartbeat, possibly stuck"; not locked is the `RunView` status
+(`INTERRUPTED` for a non-terminal run). Nothing here terminates a worker; silence handling of servers belongs to
+spec 0002 (timeouts, Job Objects).
+
+**Waiting.** An open request shows `waiting for engineer: <title>, <elapsed waiting>` and no expected time. The launch
+address is not printed unless `--no-browser` is given (§4.4.4).
+
+### 4.4 The approval page
+
+One `PageServer` per `run` or `resume` process serves the run's open requests. It lives only while that process lives;
+the durable parts of a wait are the journaled request and the replay (§4.4.5).
+
+#### 4.4.1 Server
+
+- `ThreadingHTTPServer` bound to `("127.0.0.1", 0)`; after binding the address is checked to be `127.0.0.1`. HTTP/1.0
+  style (`Connection: close`), a socket timeout per request, daemon threads.
+- On start the server draws a launch code, a session secret and a CSRF key (`secrets.token_urlsafe(32)` each). The
+  launch address is `http://127.0.0.1:<port>/launch?code=<code>`. `GET /launch` with the right code, once, sets the
+  session cookie (`HttpOnly; SameSite=Strict; Path=/`; no `Secure` because the origin is plain HTTP on loopback) and
+  redirects to `/`. A second use is 403.
+- Handler threads never touch the engine directly. They validate a request, then pass the result to the engine's event
+  loop with `loop.call_soon_threadsafe` and wait for the matching future.
+
+#### 4.4.2 Checks and headers
+
+Every request, in this order, before any handler: `Host` equals `127.0.0.1:<port>`; for POST, `Origin` equals
+`http://127.0.0.1:<port>` and `Sec-Fetch-Site`, when present, is `same-origin`; the session cookie matches (except for
+`/launch`); for POST, the CSRF token matches. A failure counts toward `max_failed_requests`. The CSRF token is
+`HMAC-SHA256(csrf_key, request_id + "\n" + shown_sha256 + "\n" + session_id)`, rendered into the form, so a token is
+valid for one request, one preview and one session.
+
+Every response, errors included:
+
+```
+Content-Security-Policy: default-src 'none'; style-src 'sha256-<hash of the one style element>'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+Cache-Control: no-store
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+X-Frame-Options: DENY
+Content-Type: text/html; charset=utf-8
+```
+
+The page has one inline `style` element (its hash is in the policy) and no script, so there is no JavaScript to
+attack, no external font, image or stylesheet, and nothing is fetched from another host (16 §5). Index pages refresh
+with `<meta http-equiv="refresh">`; forms do not. The access log omits query strings and cookies.
+
+#### 4.4.3 Routes
+
+| Method and path | Purpose |
+|---|---|
+| `GET /launch?code=` | Open the session |
+| `GET /` | Run status and the open requests, in `seq` order |
+| `GET /request/<request_id>` | One approval or input request |
+| `GET /setup/<setup_id>` | The basis confirmation screen |
+| `GET /report` | The report of the run so far, built on each request (§4.6) |
+| `POST /answer/<request_id>` | An answer |
+| `POST /setup/<setup_id>` | A basis confirmation or rejection |
+
+Ids match `[A-Za-z0-9_-]{1,64}` and name a request that exists. Nothing else exists: the page can approve, reject (with a
+reason), reject single items, sign and choose among given options. It cannot edit a value (ADR-0027 pre-mortem).
+
+#### 4.4.4 Opening the page
+
+By default the process opens the launch address with `webbrowser.open` and prints only "approval page opened in your
+browser" (the address is not in the terminal, so an agent that reads the terminal does not receive it). If opening
+fails, or with `--no-browser`, the address is printed to standard error for the engineer. After the first launch the
+cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. A same-user process that can read the
+engineer's terminal or memory is outside this protection (Q2).
+
+#### 4.4.5 How the run waits, and the approval binding
+
+1. `ctx.approve` (engine §4.9) journals `approval_requested` (FULL) with the preview reference, `shown_sha256`, the
+   binding and the items, then calls `ApprovalPort.present(request)`. The page registers the request with its view and
+   renders from the stored `harness.approval_preview/1` result after checking that its hash equals `shown_sha256`
+   (else the screen says the preview is damaged and offers no button).
+2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file every
+   second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
+   (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
+3. A POST that passes §4.4.2 and the answer checks (below) is turned into an `ApprovalAnswer` and handed to the waiting
+   `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
+   `approval_resolved` event, FULL durability. There is no answer file in the run folder, so nothing else can place an
+   answer there (the `inbox/` folder that engine §4.4.1 reserves stays unused, Q4).
+4. The page answers the browser only when the sink has seen the matching `approval_resolved` event (AC37).
+5. If the process dies at any point before the journal write, the answer is lost and the request is shown again after
+   `resume`, with the same request id and the same hash (engine AC36); the engineer answers again. If it dies after, the
+   journal holds the answer. The wait is durable because the request is journaled and replay re-presents it.
+
+Answer checks, after the server's own: the request is open in this run; `shown_sha256` equals the request's; no
+`approval_resolved` exists and none is being processed (a per-request lock); rejected item ids are items of the request;
+a reason of 1 to 500 characters exists for a rejection and for each rejected item; an approval is not issued with every
+item rejected; the engineer name is valid (AC31, AC39). The engine then checks again (engine AC54); the page never
+decides alone.
+
+The binding to the model state is the engine's: the page shows it, and the engine re-reads the model just before the
+first write under the approval and voids the approval on a mismatch (engine §4.9, AC34). Approval of a change set is
+single use and ends at the first `check_model` of a bound model.
+
+#### 4.4.6 Screens
+
+| Screen | Request | Content and answers |
+|---|---|---|
+| Change set (18 step 6) | `CHANGE_SET` | Title; items (label, referenced values with their sources); differences from the last revision as a table (`diff_ref`), engineer changes marked; binding table; preview hash; per-item reject boxes with a reason field each; Approve; Reject with a reason |
+| Promotion (18 step 16) | `PROMOTION` | Target and backup by base name; hash of the original and the working copy's `origin_sha256`; Approve; Reject |
+| Info | `INFO` | The text; Acknowledge (approve) or Reject |
+| Sign-off (18 step 17) | `SIGN_OFF` | Link to `/report`; verdict counts; each exception (a verdict whose status is not `PASS` or `NOT_APPLICABLE`) with an accept box and a written reason; the unreleased-tool list with an acknowledgement box when it is not empty; the engineer name; Sign; Reject |
+| Engineer turn (18 step 15) | choice request | Three buttons: accept this revision, ask for more edits, I edited by hand: continue. One press, one option id |
+| Batched decisions (11 §3 `decide_many`) | choice request, N questions | One form: per question the prompt, labeled evidence, one option group; one Submit |
+| Engine requests | `engine.in_flight`, `engine.host_state`, `engine.escalation` | The reason, the evidence references, the choices of engine §4.5 (`applied`, `not_applied`, `abandon`; `accept`, `restore`, `abandon`) |
+| Input | `block` input request | The fields read-only (name, type, unit, bounds) and the instruction to use `resume --answers FILE` |
+| Basis confirmation (13 §4) | `BasisSetupView` | §4.4.7 |
+
+A choice request is an `InputRequest` whose fields model is a set of enumerated fields. The page reads its JSON Schema:
+a property with an `enum` is a question (its `title` is the prompt and its enum values the options, with labels from the
+package's label catalog `pages/_labels`, never from data); a property marked `x-eng-evidence` is a bounded, labeled,
+read-only text. The answer carries option ids only (AC32). The alignment of this convention with engine §4.9 and with
+the engineer tier of spec 0005 is Q6.
+
+An exception on the sign-off screen is accepted with its own reason; the reasons travel as `item_reasons` of the answer
+(14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8). Sign-off is refused by the page
+when an exception has no reason, and the engine appends `signed_off` for the approved `SIGN_OFF` request (engine §4.9).
+
+#### 4.4.7 Basis confirmation
+
+Before a run exists (spec 0004 §4.6), `PageBasisSetupPort.present(view)` registers the `BasisSetupView` and
+`answer(setup_id, wait=...)` returns a `BasisSetupAnswer`. The screen shows the banners (`draft_template`,
+`synthetic_template`), then each section with its rows: label, value, unit, source, citation, state, bounds. A
+confirmable section has a confirm box; a section with a missing required row has none and the draft is not offered
+(step 3 of §4.2.2 exits earlier). Values are not editable. Confirm needs all boxes and a name; Reject needs a reason.
+The answer holds `setup_id`, `draft_sha256`, the confirmed section names, `by` and `at` (from the injected clock), or
+the rejection; the page appends a record to `<workspace>/setups/<setup_id>.json` (spec 0004 Q5). In-process only: a
+`--no-wait` run does not serve it (exit 10, nothing stored), and an interrupted setup starts again with the same
+command (a new draft hash if the files changed).
+
+### 4.5 HTML, escaping and the templating choice
+
+**Choice: the standard library, no template engine (Q1).** Jinja2 would give autoescape, but it is a new runtime
+dependency (A10, a package ADR), has its own expression language and a history of sandbox escapes, and these pages are
+fixed tables and forms. The same guarantee is obtained by construction in `_html.py`:
+
+- Text is `Text` (escaped with `html.escape(..., quote=True)` after `sanitize_html`) or `Trusted` (a constant written in
+  this package, created only inside `_html.py` and the label catalog). The builder accepts nothing else, and a
+  `str` where a node is expected is a type error (`mypy --strict`) and a runtime error.
+- Untrusted data enters only through `field(label, value)`: a fixed label from the catalog and the value as
+  `<bdi dir="auto">escaped text</bdi>`, truncated at `display_max_chars` with "(N characters)", with bidirectional
+  controls replaced by `<U+XXXX>` and control characters removed. `<bdi>` keeps Arabic or mixed text from reordering
+  the text around it.
+- Attributes accept `SafeToken` (`[A-Za-z0-9_.-]{1,64}`) or enumerated values only; hrefs are built from route
+  constants and validated ids (AC49).
+- One shared style sheet (`pages/_css.py`), embedded once per document; its SHA-256 goes into the policy.
+
+Page language is English in phase 1 (`lang="en"`, `dir="ltr"`); data in any script is displayed correctly. Arabic
+labels and right-to-left layout belong to the full UI ADR (Q9).
+
+### 4.6 The run report
+
+#### 4.6.1 Content
+
+`build_report(reader: JournalReader, store: ResultStore, marks: ReleaseMarks, clock, version) -> str` returns one
+self-contained HTML document built from the journal and the result store only (11 §5: what the engineer reads is what
+happened). Sections:
+
+1. **Status**: run id, workflow, block name, version and code hash, mode, engine and contract versions, template and
+   design basis (name, version, hash; who confirmed each value and when, from the `engineer:<name>@<time>` source of its basis field), start
+   and end, status, the marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial run, unreleased tools), and the integrity line:
+   event count and the last `chain_sha256`.
+2. **Changes**: model revisions (`model_saved`: role, revision, fingerprint, base file name); per `CHANGE_SET` approval
+   the items with state and reasons, the binding, the applied steps with read-back results, and the differences
+   including engineer changes; promotion and its backup.
+3. **Results summary**: verdict counts and governing ratios, failing members, model-check results, analysis messages
+   and drift summaries, by registered renderers (below).
+4. **Sources**: the table every value cell links to (AC52): result id and pointer, kind, producer and version, creation
+   time, parents; for basis fields the `source`, citation and confirmation; engineer inputs with `entered_by` and time.
+5. **Decisions**: `decision_made` (point, options, choice, deciding tier, confidence), approvals and inputs (request,
+   kind, decision, who, when, reasons), escalations and reconciliations.
+6. **Timings**: per step start and duration, engineer waiting time against machine time, resumes (AC56).
+7. **Run events**: resumes, host starts and instances left open (from the journal events).
+
+A registry maps result kinds to section renderers (`verdicts.set/1`, `issues.model_check/1`, `forces.story_drifts/1`,
+`basis.*`, `harness.approval_preview/1`); the kinds of specs 0002, 0003 and 0007 register theirs. A kind with no
+renderer is shown by a generic renderer: a bounded table of labeled escaped cells (at most 200 rows and depth 4, with
+"N more" and the result id). The report never recomputes an engineering value: it shows stored values and their
+units. Source of every value: a value cell is built only through `value_cell(value, source)`, and `source` is required
+(AC52).
+
+#### 4.6.2 DRAFT, completeness
+
+Outputs are DRAFT until the engineer signs (14 §6): the banner, the `<title>` prefix and a print watermark show DRAFT
+until `signed_off` is in the journal, then the name and time of the signing. `run_completed.draft` true (draft calcs or
+templates, 10 §4) keeps "DRAFT SOURCES" after signing. A run that is not terminal shows "INCOMPLETE: <status>" and, with
+a live engine, "run in progress as of seq N". The report is derived, rewritten whenever asked, never appended to the
+journal, and written to `<run>/report/report.html` (AC12, AC59). The document carries
+`<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-…'">` and no script.
+
+#### 4.6.3 Unreleased project-lane tools (ADR-0026 §3)
+
+`ReleaseMarks` maps tool names to the record of their project-lane branch (from `[project_lane.<tool>]`; Q5).
+`unreleased_dependencies(reader, store, marks)` returns the marked results: every result whose producer tool is in the
+map, and every result with such a result among its ancestors, following `ResultRecord.parents` and the references in
+`provenance.inputs` breadth-first to `lineage_depth_limit` (default 50). A result beyond the limit is marked and
+flagged. A step that called a marked tool is marked in the timings. The mark text is "Depends on unreleased tool
+`<tool>` (record `<record>`)". The same function feeds the report banner and the sign-off screen, which requires the
+acknowledgement (AC42, AC54), so the engineer signs knowing which results came from an unreleased tool.
+
+### 4.7 Text, dates and numbers
+
+`_text.py` is the only place that formats: `format_duration_ms` (integer arithmetic), `format_timestamp` (slicing a
+contract `Timestamp` into `YYYY-MM-DD HH:MM:SS UTC`), `format_number` (`format(x, ".6g")`-style with an explicit
+specification, ASCII digits), `sanitize_terminal`, `sanitize_html`, `truncate`. Nothing in this spec imports `locale`
+or calls `strftime`, `%c`, `%x`, `%X`, `%A`, `%B`, `%p` or the `n` format type (AC58); `datetime` is used only to parse
+and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`; the standard streams are reconfigured at
+start (AC5): redirected streams to UTF-8, a console keeps its encoding with `errors="backslashreplace"`. Paths are
+`pathlib.Path` values and are never encoded by hand, so Arabic folder names work; messages show base names unless a
+path is needed to act (the report path).
+
+### 4.8 Concurrency
+
+The engine loop, the writer thread of the sink and the page handler threads are the only threads. Page state (open
+requests, accepted flags) is guarded by one lock; the engine loop is entered only through `call_soon_threadsafe`. The
+heartbeat task runs on the engine loop.
+
+## 5. Inputs and outputs
+
+| Name | Type | Unit | Bounds | Ref-capable | Source |
+|---|---|---|---|---|---|
+| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref` | engineer or agent |
+| `--basis` file | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
+| `--answers` file | JSON | per request fields | the request's model | no | engineer or agent |
+| Page form fields | `application/x-www-form-urlencoded` | none | §4.4.3; reasons 1 to 500; name 1 to 100; body at most `max_body_bytes` | no | engineer; carry decisions and option ids, never engineering values |
+| Final result (`--json`) | JSON object | none | AC7 | no | the process |
+| Report | HTML, UTF-8 | none | one document | no | journal and store |
+| `heartbeat.json`, stop file, setup log | JSON | none | small | no | the process, `stop`, the page |
+
+## 6. Errors
+
+| Condition | Code | Exit |
+|---|---|---|
+| Usage, configuration, input file invalid | `INVALID_ARGUMENT` | 2 |
+| Basis incomplete or rejected, server check failed, calcs refused, unknown workflow | `BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`, `CALC_NOT_APPROVED`, `CALC_WITHDRAWN` (engine §6, spec 0003) | 3 |
+| Another process holds the run | `RUN_LOCKED` | 4 |
+| Journal altered | `JOURNAL_INTEGRITY` | 5 |
+| Unknown run | `REF_NOT_FOUND` | 6 |
+| Page request refused | HTTP 400, 403, 404, 405, 409, 413, 415, 421, 503 (no run data in the body) | — |
+
+## 7. Non-goals
+
+- Any graphical application, a model view, live websocket updates, a results browser, a template editor, settings
+  screens (ADR-0027 §3, 14 §3 target screens); NiceGUI and spike S-09.
+- Editing values on the page; approval by command line, by file, by environment variable or by the agent chat.
+- User accounts, authentication of the engineer's identity beyond the session and the typed name, remote access, TLS,
+  a page that outlives its run process.
+- Arabic interface strings and right-to-left layout (data in Arabic is displayed correctly, §4.5); PDF reports (14 §6).
+- Recomputing or reinterpreting any engineering value; the report shows stored values only.
+- Server silence handling and worker termination (spec 0002); the workflow's own screens and options (spec 0007).
+
+## 8. Risks
+
+| Risk | Class | Mitigation |
+|---|---|---|
+| An agent approves its own change set | R1 (model writes) | No approve command or file; answers only from the page process after session, Host, Origin, CSRF and hash checks; the launch address is not printed by default; static test AC2. Residual risk: a same-user process (Q2) |
+| A page for one request answers another, or an old page answers a new preview | R1 | CSRF token bound to request, hash and session; hash compared by page and engine; single use; engine void check (AC25, AC29, AC30, AC34) |
+| Untrusted text (drawing, model, file) becomes markup or terminal control | R1 | Escaping by construction, labeled `<bdi>` fields, strict CSP, no script, sanitized terminal text (AC21, AC26, AC48, AC49) |
+| DNS rebinding or a cross-site form post reaches the loopback server | R1 | Exact `Host`, `Origin`, `Sec-Fetch-Site`, `SameSite=Strict`, random port, lockdown (AC22 to AC28) |
+| Results of an unreleased tool are signed unnoticed | R1 | Marks in report, timings and sign-off screen; acknowledgement required (AC42, AC54) |
+| The report differs from what happened | R1 | Built only from journal and store; deterministic; integrity line; refuses an altered journal (AC50, AC57) |
+| A blocked output pipe stalls the run | R2 | Queue and writer thread; drop and count (AC19) |
+| Expected times mislead on a larger model | R2 | Range and sample count always shown; no estimate below `min_samples` |
+| Locale, calendar or code page breaks output | R2 | One formatting module, static rule, Windows test with Arabic path and cp1256 (AC5, AC58) |
+| The page grows into an unplanned interface | R2 | Route table fixed (AC27); no value inputs; requests to edit values go to the full UI ADR |
+| Browser behavior (CSP, bidi rendering, form handling) differs from the tests | R2 | Local test on the owner's browser (`docs/local-testing.md`) |
+
+## 9. Test strategy
+
+| Criteria | Layer | Location |
+|---|---|---|
+| AC1, AC3 to AC6, AC10 to AC14 | Unit | `tests/unit/cli/` |
+| AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
+| AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
+| AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
+| AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
+| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
+| AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
+| AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
+| AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
+| AC43 to AC45 | Unit | `tests/unit/pages/` |
+| AC20 | Performance | `tests/perf/` |
+| AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
+
+No engineering value is computed here, so there are no golden engineering tests. Tests use the contract's `FixedClock`
+and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
+(process/05 §2); mutation score at least 80% on `pages/_security.py`, `pages/_answers.py`, `pages/_ports.py`,
+`_html.py`, `_text.py` and `report/_lineage.py`. Browser-level checks need the owner's machine
+(`docs/local-testing.md`).
+
+## 10. Version impact
+
+Adds the commands, the four public modules and the file formats of §5 to `eng-harness` 0.1.0 (new package). The
+`approval_resolved` payload gains `item_reasons` and `ApprovalAnswer` the same member (engine amendment, Q8): a minor
+change to the journal schema that the reader must read with and without. The JSON result of §4.2.1 and the exit codes
+are public interface: a change is minor or major with a changelog entry.
+
+## 11. Open questions, gaps and additions
+
+| Id | Question or gap | Owner | Recommendation |
+|---|---|---|---|
+| Q1 | Templating: Jinja2 with autoescape and a package ADR, or the standard library | Owner | Standard library (§4.5): no dependency, escaping by construction, tested by property; revisit if the full UI needs a template engine |
+| Q2 | A same-user process, such as a coding agent, could read the engineer's terminal when `--no-browser` prints the launch address, or drive the loopback server itself. 16 §5 asks for the token, not for protection from the user's own processes | Owner | Accept for v1: the address is not printed by default, the agent rule (§4.2.1) forbids it, and every write still needs the change-set approval. A stronger factor (a separate operating-system account, Windows Hello) is a later ADR |
+| Q3 | Values given to `ctx.ask` by `--answers` and basis values are files an agent may write; only basis values are confirmed on a page | Owner | Accept: asked values reach a model only through a later change-set approval; revisit if a workflow writes asked values without one |
+| Q4 | Engine §4.4.1 reserves `inbox/` for answers and its Q10 accepts the answer inbox; here the page runs in the engine's process and answers stay in memory, so nothing in the run folder can carry an answer | Owner | Remove `inbox/` from engine §4.4.1 at its next amendment; a file would let any local process answer |
+| Q5 | How the report learns that a tool is unreleased: the journal does not record it | Owner | `[project_lane]` in `harness.toml` now (the report states the list it used); better: spec 0002's tool descriptor carries `release` and the engine records `unreleased_tools` in `run_started`, so a later configuration change cannot unmark a result |
+| Q6 | The convention for choice and evidence fields (enumerated properties, `x-eng-evidence`) and how the engineer-tier decisions of spec 0005 reach `InputPort`; spec 0005 is not merged | Owner | Align with spec 0005 and engine §4.9 when 0005 merges; the page needs only enumerated properties and bounded text |
+| Q7 | Default `--run-class`: `production` refuses calcs that are not `approved`; `trial` runs draft calcs with `draft: true` (spec 0003) | Owner | `production` by default, `trial` explicit; a refusal is the safe failure |
+| Q8 | 14 §6 asks that each accepted exception has a written reason; engine `ApprovalAnswer` and `approval_resolved` carry one `reason` | Owner | Add `item_reasons` (item id to reason) to both; per-item rejection reasons use it too (AC31, AC42) |
+| Q9 | Arabic interface text and right-to-left layout in phase 1 | Owner | English labels now; Arabic and RTL with the full UI ADR (14 §2, spike S-09); data in any script is already shown bidi-safe |
+| Q10 | The wait for an answer has no time limit by default | Owner | Unlimited until answered or stopped; `--wait-timeout` for scripts. A paused run costs nothing and resumes by replay |
+| Q11 | Defaults of the software settings in §4.2.4 (heartbeat 10 s, three intervals, 20 runs, three samples, 32 KiB, 20 failures, 10 s) are chosen here, not measured | Owner | Accept; tune after the first local runs (expected-time accuracy and heartbeat noise need real runs) |
+| Q12 | The sign-off exceptions are verdicts other than `PASS` and `NOT_APPLICABLE`; 14 §6 says "every verdict is `PASS`" | Owner | `NOT_APPLICABLE` needs no reason; `FAIL`, `NEEDS_ENGINEER` and `ERROR` do |
+| Q13 | Extra `doctor` checks that belong to this spec: the page can bind to `127.0.0.1`, a browser can be opened, the console encoding, the locale and calendar | Owner (spec 0002) | Add them to the doctor of spec 0002 through an extension point; until then they are exercised by AC22 and AC58 |
+| Q14 | Engine §4.9 lists `ApprovalKind` `CHANGE_SET`, `PROMOTION`, `SIGN_OFF`, `INFO`, while 18 step 15 calls the engineer turn "approve" | Owner | The engineer turn is a choice request (§4.4.6), not an approval kind: it binds no model state and writes nothing. Spec 0007 states its options |
+| G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |
