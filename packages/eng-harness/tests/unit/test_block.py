@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from pydantic import BaseModel
@@ -78,9 +78,9 @@ def test_registration_rules() -> None:
     for bad_name in ("Upper", "1abc", "has-dash", "", "a b"):
         with pytest.raises(RegistryError, match="name"):
             block(name=bad_name, version=1)(good)
-    for bad_version in (0, -1, 10000, True):
+    for bad_version in (0, -1, 10000, True, "5"):
         with pytest.raises(RegistryError, match="version"):
-            block(name="ok_name", version=bad_version)(good)
+            block(name="ok_name", version=cast(Any, bad_version))(good)
 
     first = block(name="same", version=1)(good)
     second = block(name="same", version=2)(good)
@@ -314,3 +314,29 @@ def test_main_writes_the_lock(
     err = capsys.readouterr().err
     assert "eng_harness.block" in err
     assert "--write-lock" in err
+
+
+def test_unresolvable_annotations(tmp_path: Path) -> None:
+    """An unresolvable ctx annotation is fine; an unresolvable input annotation is a RegistryError."""
+    source = (
+        "from typing import TYPE_CHECKING\n"
+        "from pydantic import BaseModel\n"
+        "from eng_harness.block import block\n"
+        "if TYPE_CHECKING:\n"
+        "    from nowhere import Ctx, Missing\n"
+        "class I(BaseModel):\n"
+        "    v: int\n"
+        "@block(name='ok_ctx', version=1)\n"
+        "async def ok(ctx: 'Ctx', inp: I) -> I:\n"
+        "    return inp\n"
+        "def bad() -> None:\n"
+        "    @block(name='bad_in', version=1)\n"
+        "    async def x(ctx: 'Ctx', inp: 'Missing') -> I:\n"
+        "        return I(v=1)\n"
+    )
+    path = tmp_path / "unresolved_mod.py"
+    path.write_text(source, encoding="utf-8")
+    module = _load(path, "unresolved_mod")
+    assert module.ok.name == "ok_ctx"
+    with pytest.raises(RegistryError, match="input"):
+        module.bad()
