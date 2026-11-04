@@ -94,9 +94,10 @@ Building the basis
   `BasisDraft.pending` and is absent from `fields`; nothing is defaulted. Test:
   `tests/unit/test_basis_build.py::test_precedence_and_pending`.
 - AC15. Given the built draft, then `source` is `template:<name>@<version>` of the template that defines the final
-  value (the ancestor when inherited), `engineer:<name>@<Timestamp>` with the timestamp from the injected `Clock`, or
-  `model:<RefString>`; `citation` is copied from the entry for `template:*` sources and null otherwise; `confirmed` is
-  false for every field. Test: `test_basis_build.py::test_sources_and_citations`.
+  value (the ancestor when inherited), `model:<RefString>`, or, for a value from the engineer's values file, no `source` yet (the draft row shows
+  `origin: values-file:<name>`, which is not stored); `freeze` sets `engineer:<answer.by>@<answer.at>` from the confirming
+  answer (AC22), never from the file's name or the build clock; `citation` is copied from the entry for `template:*` sources and null otherwise; `confirmed` is
+  false for every field. Test: `test_basis_build.py::test_sources_and_citations`; the freeze-time stamp is tested under AC22.
 - AC16. Given a detected value that differs from the template's value for the same path, then the draft carries the
   detected value with source `model:*` and a `detected_differs` warning that holds both values. Test:
   `test_basis_build.py::test_detected_differs_warning`.
@@ -120,8 +121,9 @@ Declaration by the workflow
 Confirmation, freeze and storage
 - AC22. Given a `BasisSetupAnswer` whose `draft_sha256` differs from the draft, or that confirms a section with a
   pending required field, or that confirms no section, then `freeze` raises `BasisNotConfirmed` (reason
-  `draft_changed`, `section_incomplete` or `nothing_confirmed`) and stores nothing. Test:
-  `tests/contract/test_basis_freeze.py::test_refusals`.
+  `draft_changed`, `section_incomplete` or `nothing_confirmed`) and stores nothing. Given a valid answer, then each
+  values-file field is stored with `source` `engineer:<answer.by>@<answer.at>`. Tests:
+  `tests/contract/test_basis_freeze.py::test_refusals` and `::test_engineer_source_from_answer`.
 - AC23. Given a draft with a required field still missing or a field in an unconfirmed section, when frozen, then
   `BasisIncomplete` lists the paths (the same list as `DesignBasis.missing`) and stores nothing. Test:
   `test_basis_freeze.py::test_incomplete_lists_paths`.
@@ -153,7 +155,7 @@ Integration
 
 Shipped content
 - AC29. Given the template folder shipped with the package, then it holds no entry with a `value` (structure and asks
-  only), every shipped file loads, its resolved hash equals the pinned value in `tests/golden/`, and no shipped file is
+  only), every shipped file loads, its resolved hash equals the pinned value in `tests/data/golden/shipped_templates.json` (the protected golden path), and no shipped file is
   `synthetic`. Test: `tests/golden/test_shipped_templates.py::test_shipped_templates_pinned`.
 - AC30. Given any template, a draft built from it, a frozen basis and a load, then for random trees the round trip
   `entries -> fields -> payload -> load` keeps every path, value, unit, source and citation, and an inheritance chain
@@ -222,10 +224,10 @@ section is optional and may be empty. Only these keys exist (AC3).
    from the values file of the command line `--basis <file>`, 11 §3), then the detected value (`DetectedValue`: `path`,
    `value`, `unit`, `ref`), then the template's resolved entry.
 3. Validate each value against its `FieldSpec` and, for template values, the entry (AC17).
-4. Set `source` and `citation` (AC15), `confirmed: false`, then compute `pending` (required paths without a value) and
+4. Set `source` and `citation` (AC15; values-file values stay without `source` until freeze), `confirmed: false`, then compute `pending` (required paths without a value) and
    `sha256` (contract canonical JSON of `{template, fields, pending, warnings}`).
 
-The engineer's values file is data, so an agent may write it; protection comes from the confirmation step: values show
+The engineer's values file is data, so an agent may write it, which is why its values carry no engineer source until a person confirms them and `freeze` stamps the confirming engineer (§4.6); protection comes from the confirmation step: values show
 with their source on the page and become `confirmed` only through the page (ADR-0027 §2). The file cannot set
 `confirmed` (AC17). Conversion between units is never done here: the caller converts detected values with
 `eng_contract.units` before passing them, and a non-canonical unit is refused.
@@ -280,7 +282,7 @@ class BasisSetupPort(Protocol):
   `by` (engineer name), `at` (`Timestamp`), or `rejected` (reason, 1 to 500 characters). No member carries a value.
 - A reject leaves no run and no stored basis; the engineer edits the values file and a new draft (a new hash) is shown.
 - `freeze(draft, answer, store, clock) -> FrozenBasis` (`ref`, `result_id`, `payload_sha256`) checks the answer against
-  the draft (AC22), sets `confirmed: true` on the fields of the confirmed sections, requires
+  the draft (AC22), sets `confirmed: true` on the fields of the confirmed sections and `source` `engineer:<answer.by>@<answer.at>` on those that came from the values file, requires
   `DesignBasis.missing(required)` to be empty and every present field to be confirmed (AC23), writes the result through
   the contract `ResultStore` and returns the reference for `RunRequest.basis_ref`. Confirmation is per run: it is never
   read from earlier runs (AC20).
@@ -392,4 +394,4 @@ New public modules in `eng-harness`: minor. No contract change in this spec; Q1 
 | Q6. Template and basis errors have no contract code | Owner | `INVALID_ARGUMENT` plus a `reason` key now (as engine Q7); a `HarnessCode` family only if the engine needs to branch on them |
 | Q7. `WorkflowDef` carries `required_basis` (paths) only | Owner (engine) | Add `basis_fields: tuple[FieldSpec, ...]` to `WorkflowDef` in spec 0007's plan and derive `required_basis`; this spec's check (AC21) then becomes trivial |
 | Q8. Whether v1 should ship any engineering values | Owner | No. Ship `blank` only; the owner supplies values with citations by pull request when wanted |
-| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | Taken from the values file's `engineer` member, which spec 0006's settings may default; never from the operating system account |
+| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `engineer` member is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |

@@ -140,7 +140,7 @@ tasks:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/src/eng_harness/templates/shipped/blank-0.1.0.template.yaml"
       - "packages/eng-harness/tests/golden/test_shipped_templates.py"
-      - "packages/eng-harness/tests/golden/shipped_templates.json"
+      - "packages/eng-harness/tests/data/golden/shipped_templates.json"
     max_changed_lines: 120
     max_sessions: 2
     tests_first:
@@ -176,9 +176,9 @@ other packages.
 
 Cross-plan dependencies, which `depends_on` cannot express: T1 needs engine T1 (skeleton) and the merged
 `eng-contract` 0.1.0 (plan B-003); T8 needs engine T6 (ports) and contract T12 and T14 (kinds, result store); T9 needs
-the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T4 and T5 start
-only after the contract path-rule question (spec Q1) is decided, since suffixed names such as `fc_MPa` do not pass the
-0.1 basis path rule.
+the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4 and T5
+start only after the contract path-rule question (spec Q1) is decided, since template keys follow the contract path-segment
+rule and suffixed names such as `fc_MPa` do not pass the 0.1 basis path rule.
 
 ## 2. Tasks
 
