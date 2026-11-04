@@ -38,7 +38,8 @@ class FakeRunner:
 def _run(repo: Repo, runner: FakeRunner, *argv: str) -> RunResult:
     # the tests and secrets steps have their own tests (test_coverage.py, test_secrets.py)
     return repo.run(
-        ["--format", "json", "check", "--skip", "tests,secrets,docs-fresh,licenses", *argv], {"check": make_handler(runner)}
+        ["--format", "json", "check", "--skip", "tests,secrets,docs-fresh,licenses", *argv],
+        {"check": make_handler(runner)},
     )
 
 

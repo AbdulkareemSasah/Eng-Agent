@@ -60,7 +60,8 @@ def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], 
     """Parse ``git log -p -U0 --cc`` into added lines per (commit, path), and the (commit, path) pairs of binary files.
 
     The hunk header counts decide where a hunk ends, so an added line that reads like a header is still data. In a
-    merge's combined diff each line has one marker column per parent; a line without ``-`` is in the result.
+    merge's combined diff each line has one marker column per parent: a line is in parent i unless column i is ``+``,
+    and in the result unless some column is ``-``.
     """
     added: dict[tuple[str, str], list[tuple[int, str]]] = {}
     binary: set[tuple[str, str]] = set()
@@ -68,11 +69,16 @@ def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], 
     old_left: list[int] = []
     new_left = line = 0
     for raw in log.split("\n"):
-        if new_left or any(old_left):
-            marks = raw[: len(old_left)]
-            if "-" in marks:
-                old_left = [n - 1 if mark == "-" else n for n, mark in zip(old_left, marks, strict=True)]
-            else:
+        marks = raw[: len(old_left)]
+        if (
+            (new_left or any(old_left))
+            and not raw.startswith("\\")
+            and (len(marks) < len(old_left) or set(marks) - set(" +-"))
+        ):
+            old_left, new_left = [], 0  # not a hunk line: the hunk ended early, so read this line as a header
+        if (new_left or any(old_left)) and not raw.startswith("\\"):  # "\ No newline at end of file" is not a line
+            old_left = [n if mark == "+" else n - 1 for n, mark in zip(old_left, marks, strict=True)]
+            if "-" not in marks:  # the line is in the result
                 if "+" in marks:
                     added.setdefault((commit, path), []).append((line, raw[len(old_left) :]))
                 new_left -= 1
