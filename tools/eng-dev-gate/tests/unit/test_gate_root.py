@@ -68,3 +68,17 @@ def test_provenance_error_is_cf009_and_exit_1() -> None:
 
 def test_running_package_is_the_imported_package() -> None:
     assert gate_root.running_package() == Path(eng_dev_gate.__file__).resolve().parent
+
+
+def test_resolve_for_reads_the_policy_of_the_workspace_root_from_a_subdirectory(tmp_path: Path) -> None:
+    """`eng-gate --root <member> check` judges the workspace: the policy is the workspace root's gate.yml, not CF007."""
+    (tmp_path / ".gate").mkdir()
+    (tmp_path / ".gate" / "gate.yml").write_text(GATE_YML, encoding="utf-8")
+    member = tmp_path / "pkgs" / "a"
+    member.mkdir(parents=True)
+    args = argparse.Namespace(command="check", agents_command=None, gate_root=None, root=str(member), event=None)
+    context = gate_root.resolve_for(args, {})
+    assert context is not None
+    assert context.root == tmp_path
+    assert context.policy_root == tmp_path
+    assert context.config.mode.value == "bootstrap"
