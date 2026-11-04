@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from support.repo import Repo
+
+POLICY_FILE = Path(__file__).resolve().parents[4] / ".gate" / "forbidden.yml"  # the committed policy of this workspace
+POLICY_TEXT = POLICY_FILE.read_text(encoding="utf-8")
 
 GATE_YML = """bootstrap:
   enabled: true
@@ -40,11 +45,16 @@ def root_pyproject(members: list[str]) -> str:
     )
 
 
-def member_pyproject(name: str) -> str:
-    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name), with its gate table."""
+def member_pyproject(name: str, gate_table: bool = True) -> str:
+    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name).
+
+    ``gate_table`` appends a default ``[tool.eng-gate]`` table; pass False when the caller appends its own.
+    """
+    head = f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
+    if not gate_table:
+        return head
     return (
-        f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
-        f'[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["{name}"]\n'
+        head + f'[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["{name}"]\n'
         "coverage_line = 95\ncoverage_branch = 90\n"
     )
 
@@ -54,6 +64,7 @@ def make_workspace(repo: Repo, names: list[str], module: str = CLEAN_MODULE) -> 
     files = {
         "pyproject.toml": root_pyproject([f"pkgs/{n}" for n in names]),
         ".gate/gate.yml": GATE_YML,
+        ".gate/forbidden.yml": POLICY_TEXT,
     }
     for name in names:
         files[f"pkgs/{name}/pyproject.toml"] = member_pyproject(name)

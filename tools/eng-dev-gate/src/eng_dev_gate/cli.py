@@ -8,13 +8,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 
 from eng_dev_gate import __version__, agents, gate_root
-from eng_dev_gate.checks.check import make_handler
-from eng_dev_gate.report import AWAITING_TITLE, escape_data
+from eng_dev_gate.checks import licenses
+from eng_dev_gate.checks.check import _select_members, _workspace_root, make_handler, run_check
+from eng_dev_gate.checks.gate_check import handle_gate_check
+from eng_dev_gate.checks.registry import STEPS
+from eng_dev_gate.report import AWAITING_TITLE, CommandResult, escape_data, render
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
+from eng_dev_gate.toolrun import SubprocessToolRunner
 from eng_dev_gate.workspace import discover_members
 
 Handler = Callable[[argparse.Namespace], Status]
@@ -36,13 +42,20 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "gate-check":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
         if name == "packages":
             shape = child.add_mutually_exclusive_group()
             shape.add_argument("--names", action="store_true", help="print the project names, one per line")
             shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
-        if name == "check":
+        if name == "licenses":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
+        if name in ("check", "forbidden"):
+            child.add_argument("--package", default=None, help="check this workspace member")
+            child.add_argument("--all", action="store_true", help="check every member")
+        if name == "check":
             child.add_argument("--only", action="append", default=[], help="run only these steps (comma list)")
             child.add_argument("--skip", action="append", default=[], help="skip these steps (comma list)")
             child.add_argument("--fail-fast", action="store_true", help="stop after the first failing step")
@@ -54,6 +67,21 @@ def _report_error(message: str, output_format: str) -> None:
         sys.stderr.write(json.dumps({"status": "error", "message": message}) + "\n")
     else:
         sys.stderr.write(f"eng-gate: {message}\n")
+
+
+def _forbidden(args: argparse.Namespace) -> Status:
+    """``forbidden``: the step of that name on the selected members, with the policy of the gate context."""
+    context: gate_root.GateContext = args.gate_context
+    start = Path(args.root).resolve()
+    root = _workspace_root(start)
+    members = _select_members(discover_members(root), start, root, args)
+    steps = run_check(
+        [step for step in STEPS if step.name == "forbidden"],
+        root, context.policy_root, members, SubprocessToolRunner(), fail_fast=False,
+    )  # fmt: skip
+    result = context.with_findings(CommandResult(command="forbidden", mode=context.config.mode.value, steps=steps))
+    render(result, args.format, sys.stdout, os.environ)
+    return result.status
 
 
 def _packages(args: argparse.Namespace) -> Status:
@@ -94,7 +122,13 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = {"agents": agents.handle, "packages": _packages, **(handlers or {})}.get(args.command)
+    handler = {
+        "agents": agents.handle,
+        "forbidden": _forbidden,
+        "gate-check": handle_gate_check,
+        "packages": _packages,
+        **(handlers or {}),
+    }.get(args.command)
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")
@@ -107,4 +141,4 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
 
 def run() -> None:
     """Console-script entry point: exit the process with the code of :func:`main`."""
-    raise SystemExit(main(sys.argv[1:], {"check": make_handler()}))
+    raise SystemExit(main(sys.argv[1:], {"check": make_handler(), "licenses": licenses.make_handler()}))

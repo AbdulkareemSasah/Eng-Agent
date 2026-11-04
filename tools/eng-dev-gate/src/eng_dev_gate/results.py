@@ -17,7 +17,7 @@ class ExitCode(IntEnum):
 class Status(StrEnum):
     """Status of a check: fail if any error, else awaiting-owner if any awaiting finding, else pass."""
 
-    PASS = "pass"  # noqa: S105
+    PASS = "pass"  # noqa: S105  # B-030: a status name, not a password
     FAIL = "fail"
     AWAITING_OWNER = "awaiting-owner"
     SKIPPED = "skipped"
