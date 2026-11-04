@@ -25,7 +25,7 @@ def _entry(module: str = "a.gen", path: str = "OUT.md") -> str:
 
 def _context(repo: Repo, committed: bytes | None, entry: str | None = None) -> StepContext:
     make_workspace(repo, ["a"])
-    repo.write({"pkgs/a/pyproject.toml": member_pyproject("a") + TABLE + (entry or _entry())})
+    repo.write({"pkgs/a/pyproject.toml": member_pyproject("a", gate_table=False) + TABLE + (entry or _entry())})
     repo.write({"pkgs/a/a/__init__.py": "", "pkgs/a/a/gen.py": GENERATOR})
     if committed is not None:
         (repo.root / "pkgs/a/OUT.md").write_bytes(committed)
