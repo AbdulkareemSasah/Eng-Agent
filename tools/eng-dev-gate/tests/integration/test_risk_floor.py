@@ -184,3 +184,26 @@ def test_none_reason_takes_the_body_risk_line(repo: Repo) -> None:
     ]:
         result, errors = _run(repo, write_event(repo, base, body))
         assert (result.code, set(errors)) == (code, codes), body
+
+
+def test_in_scope_ratchet_change_does_not_raise_floor(repo: Repo) -> None:
+    """AC21b: a ratchet change that gate-check accepts in scope adds nothing to the floor; any other still does."""
+    maps = {
+        **MAPS,
+        ".gate/risk-map.yml": ROOT_MAP + "- paths: ['.gate/ratchet.json']\n  risk: r3\n",
+        "lib/pyproject.toml": "[project]\nname = 'lib'\nversion = '0'\n",
+        "pyproject.toml": "[tool.uv.workspace]\nmembers = ['lib', 'pkg']\n",
+    }
+
+    def ratchet(**counts: int) -> str:
+        return json.dumps({"version": 1, "counts": {k: {"noqa": v} for k, v in counts.items()}}) + "\n"
+
+    base = make_gate_repo(repo, base_files={**maps, ".gate/ratchet.json": ratchet(pkg=0, lib=0)}, plan=_plan("r1"))
+    body = f"{PLAN_TASK}\nRisk: r1\n"
+    for counts, code, codes in [(ratchet(pkg=1, lib=0), 0, set()), (ratchet(pkg=1, lib=1), 1, {"RF001"})]:
+        repo.git("checkout", "-q", "-B", "feat/x", base)
+        repo.commit({"pkg/src/a.py": "a = 1\n", ".gate/ratchet.json": counts}, "feat: change")
+        result, errors = _run(repo, write_event(repo, base, body))
+        assert (result.code, set(errors)) == (code, codes), counts
+        if codes:
+            assert ".gate/ratchet.json" in errors["RF001"]
