@@ -3,7 +3,6 @@
 import json
 import os
 import signal
-import subprocess
 import sys
 import time
 from collections.abc import Iterator
@@ -62,7 +61,7 @@ def test_group_terminated(tmp_path: Path, cleanup: list[int]) -> None:
         assert process.started_at == identity.started_at
         assert {m.pid for m in process.job_members()} == {pids["server"], pids["child"]}  # host: own session
         process.terminate_job()
-        assert process.wait(timeout=10) == -signal.SIGKILL
+        assert process.wait(10) == -signal.SIGKILL
         assert process.job_members() == []
         for name in ("server", "child"):
             assert not _alive(inspector, pids[name])
@@ -73,28 +72,23 @@ def test_group_terminated(tmp_path: Path, cleanup: list[int]) -> None:
 
 def test_server_exits_when_engine_killed(tmp_path: Path, cleanup: list[int]) -> None:
     inspector = PosixProcessInspector()
-    engine = subprocess.Popen(
-        [sys.executable, str(_FAKES / "engine.py"), str(tmp_path / "server.stderr.log")],
-        stdout=subprocess.PIPE,
-        stdin=subprocess.DEVNULL,
+    engine = PosixLauncher().start(
+        _spec(tmp_path, JobPolicy.TOOL, argv=[sys.executable, str(_FAKES / "engine.py"), str(tmp_path / "s.log")])
     )
     try:
-        assert engine.stdout is not None
         server_pid = int(engine.stdout.readline())
         cleanup.append(server_pid)
         assert _alive(inspector, server_pid)
-        engine.kill()
-        engine.wait(timeout=10)
+        engine.terminate_job()  # the engine's group only: the server has a session of its own
+        engine.wait(10)
         for _ in range(200):  # the server ends on stdin end-of-file; poll for up to 10 s
             if not _alive(inspector, server_pid):
                 break
             time.sleep(0.05)
         assert not _alive(inspector, server_pid)
     finally:
-        engine.kill()
-        engine.wait(timeout=10)
-        if engine.stdout is not None:
-            engine.stdout.close()
+        engine.terminate_job()
+        engine.close()
 
 
 def test_tool_timeout_kills_group(tmp_path: Path, cleanup: list[int]) -> None:
@@ -103,9 +97,9 @@ def test_tool_timeout_kills_group(tmp_path: Path, cleanup: list[int]) -> None:
     pids = _announced(process)
     cleanup.extend(pids.values())
     try:
-        assert process.wait(timeout=0.2) is None  # the step's timeout elapsed with the tool still running
+        assert process.wait(0.2) is None  # the step's timeout elapsed with the tool still running
         process.terminate_job()
-        assert process.wait(timeout=10) == -signal.SIGKILL
+        assert process.wait(10) == -signal.SIGKILL
         assert not _alive(inspector, pids["server"])
         assert not _alive(inspector, pids["child"])
         process.terminate_job()  # idempotent once the group is gone
@@ -117,7 +111,7 @@ def test_stderr_goes_to_file_and_exit_code_is_returned(tmp_path: Path) -> None:
     code = "import sys; sys.stderr.write('boom'); sys.exit(3)"
     process = PosixLauncher().start(_spec(tmp_path, JobPolicy.SERVER, argv=[sys.executable, "-c", code]))
     try:
-        assert process.wait(timeout=10) == 3
+        assert process.wait(10) == 3
     finally:
         process.close()
         process.close()  # idempotent

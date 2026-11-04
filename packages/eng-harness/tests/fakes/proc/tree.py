@@ -7,20 +7,28 @@ end-of-file and exits, as the synthetic fakes of spec section 4.3.1 do when the 
 
 import json
 import os
-import subprocess
 import sys
+import time
 
-_SLEEP = [sys.executable, "-c", "import time; time.sleep(120)"]
+
+def _sleeper(new_session: bool) -> int:
+    """Fork a process that closes its standard streams and sleeps; return its pid."""
+    pid = os.fork()
+    if pid == 0:
+        if new_session:
+            os.setsid()
+        os.closerange(0, 3)
+        time.sleep(120)
+        os._exit(0)
+    return pid
 
 
 def main() -> None:
     """Start the requested stand-ins, announce the pids, then wait for end-of-file on stdin."""
     pids = {"server": os.getpid()}
     if "--children" in sys.argv[1:]:
-        pids["child"] = subprocess.Popen(_SLEEP, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL).pid
-        pids["host"] = subprocess.Popen(
-            _SLEEP, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, start_new_session=True
-        ).pid
+        pids["child"] = _sleeper(new_session=False)
+        pids["host"] = _sleeper(new_session=True)
     sys.stdout.write(json.dumps(pids) + "\n")
     sys.stdout.flush()
     sys.stdin.buffer.read()
