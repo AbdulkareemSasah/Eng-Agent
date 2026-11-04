@@ -2,8 +2,8 @@
 
 In pull-request context the ``licenses`` step runs ``uv run --project <judged tree> ... python -I judged_metadata.py
 <output file>``: this file is run as a script by the interpreter of the judged environment, so it imports nothing of the
-gate (a unit test checks it) and prints nothing; it writes the fields the license policy needs to the output file. The
-policy is evaluated by the gate, never here. A head run calls ``collect`` in the gate's own interpreter.
+gate (a unit test checks it) and prints nothing; it writes the fields the license policy needs, the interpreter and the
+module map to the output file. The policies are evaluated by the gate, never here. A head run calls ``collect``.
 """
 
 from __future__ import annotations
@@ -11,10 +11,10 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Sequence
-from importlib.metadata import distributions
+from importlib.metadata import distributions, packages_distributions
 from pathlib import Path
 
-__all__ = ["collect", "main"]
+__all__ = ["collect", "main", "module_map"]
 
 
 def collect(path: Sequence[str] | None = None) -> list[dict[str, object]]:
@@ -39,9 +39,15 @@ def collect(path: Sequence[str] | None = None) -> list[dict[str, object]]:
     return found
 
 
+def module_map() -> dict[str, list[str]]:
+    """Return ``packages_distributions()`` without nameless distributions (module name to distribution names)."""
+    return {top: [name for name in names if name] for top, names in packages_distributions().items()}
+
+
 def main(argv: Sequence[str]) -> int:
-    """Write ``collect()`` as JSON to the file named by ``argv[0]``."""
-    Path(argv[0]).write_text(json.dumps(collect()), encoding="utf-8")
+    """Write ``executable``, ``distributions`` (``collect()``) and ``packages`` (``module_map()``) to ``argv[0]``."""
+    report = {"executable": sys.executable, "distributions": collect(), "packages": module_map()}
+    Path(argv[0]).write_text(json.dumps(report), encoding="utf-8")
     return 0
 
 

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.toolrun import SubprocessToolRunner
+from support.judged_tree import MISTYPED_USE, USES_DEPENDENCY, make_gate_root, make_judged_tree, stubbed_dependency
 from support.repo import Repo, RunResult
 from support.toy import make_workspace
 
@@ -65,3 +67,36 @@ def test_stale_lock_is_st001(repo: Repo) -> None:
     (step,) = json.loads(stale.out)["steps"]
     assert step["name"] == "lock"
     assert step["findings"][0]["code"] == "ST001"
+
+
+def _judge_types(gate: Repo, head: Repo) -> tuple[int, list[tuple[str, str]], str]:
+    argv = ["--gate-root", str(gate.root), "--format", "json", "check", "--only", "types"]
+    result = head.run(argv, {"check": make_handler(SubprocessToolRunner())})
+    assert result.out, f"no report (exit {result.code}): {result.err[:600]}"
+    (step,) = json.loads(result.out)["steps"]
+    return result.code, [(f["code"], f["message"]) for f in step["findings"]], step["status"]
+
+
+def test_types_resolve_in_judged_environment(tmp_path: Path) -> None:
+    """AC54a: a dependency and its stub distribution that only the judged lock file installs resolve in ``types``."""
+    gate = make_gate_root(tmp_path / "base")
+    head = make_judged_tree(tmp_path / "head", extra_files=stubbed_dependency(USES_DEPENDENCY))
+    assert _judge_types(gate, head) == (0, [], "pass")
+
+
+def test_types_still_report_errors_against_the_judged_stubs(tmp_path: Path) -> None:
+    """The stubs of the judged environment are used: ``f`` returns ``int``, so assigning it to ``str`` fails."""
+    gate = make_gate_root(tmp_path / "base")
+    head = make_judged_tree(tmp_path / "head", extra_files=stubbed_dependency(MISTYPED_USE))
+    code, findings, status = _judge_types(gate, head)
+    assert (code, status, [c for c, _ in findings]) == (1, "fail", ["ST001"])
+    assert "Incompatible types in assignment" in findings[0][1]
+
+
+def test_types_with_a_stale_lock_is_st001_of_the_step(tmp_path: Path) -> None:
+    """A requirement the lock file lacks cannot be installed: ST001 of ``types``, not an environment fault."""
+    gate, head = make_gate_root(tmp_path / "base"), make_judged_tree(tmp_path / "head")
+    head.commit({"pkgs/a/pyproject.toml": stubbed_dependency("")["pyproject.toml"]}, "chore: stale")
+    code, findings, status = _judge_types(gate, head)
+    assert (code, [c for c, _ in findings], status) == (1, ["ST001"], "fail")
+    assert findings[0][1].startswith("types: uv.lock of the judged tree is not up to date")

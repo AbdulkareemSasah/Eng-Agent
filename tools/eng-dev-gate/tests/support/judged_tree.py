@@ -69,3 +69,38 @@ def make_gate_root(root: Path) -> Repo:
     gate = make_repo(root)
     gate.commit({"pyproject.toml": GATE_ROOT_PYPROJECT, ".gate/gate.yml": GATE_YML})
     return gate
+
+
+STUB_BUILD = '[build-system]\nrequires = ["uv_build>=0.11.32,<0.12"]\nbuild-backend = "uv_build"\n'
+USES_DEPENDENCY = (
+    '"""Uses the dependency."""\n\nimport depmod\n\n\n'
+    'def total() -> int:\n    """Return 1."""\n    return depmod.f(1)\n'
+)
+MISTYPED_USE = '"""Uses the dependency wrongly."""\n\nimport depmod\n\nTEXT: str = depmod.f(1)\n'
+
+
+def stubbed_dependency(use: str) -> dict[str, str]:
+    """Member-relative files that make the member use an untyped dependency and its stub distribution.
+
+    ``dep-dist`` provides the module ``depmod`` (``def f(a)`` without annotations); ``types-dep-dist`` provides the
+    stubs ``depmod-stubs`` (``def f(a: int) -> int``), as ``types-jsonschema`` does for ``jsonschema``. Both are path
+    dependencies of the member, so only the judged tree's own lock file installs them. ``use`` is the source of
+    ``src/a/uses.py``.
+    """
+
+    def project(name: str, module: str) -> str:
+        return (
+            f'[project]\nname = "{name}"\nversion = "1.0"\nrequires-python = ">=3.14"\nlicense = "MIT"\n'
+            f'dependencies = []\n{STUB_BUILD}[tool.uv.build-backend]\nmodule-name = "{module}"\n'
+        )
+
+    member = member_pyproject().replace("dependencies = []", 'dependencies = ["dep-dist", "types-dep-dist"]')
+    sources = '[tool.uv.sources]\ndep-dist = { path = "vendor/dep" }\ntypes-dep-dist = { path = "vendor/types" }\n'
+    return {
+        "pyproject.toml": member + sources,
+        "vendor/dep/pyproject.toml": project("dep-dist", "depmod"),
+        "vendor/dep/src/depmod/__init__.py": "def f(a):\n    return 1\n",
+        "vendor/types/pyproject.toml": project("types-dep-dist", "depmod-stubs"),
+        "vendor/types/src/depmod-stubs/__init__.pyi": "def f(a: int) -> int: ...\n",
+        "src/a/uses.py": use,
+    }
