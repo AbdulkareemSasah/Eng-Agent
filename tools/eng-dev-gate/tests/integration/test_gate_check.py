@@ -1,0 +1,249 @@
+"""Integration tests of ``gate-check`` part 1 (spec 4.5 steps 3 to 7; AC6 to AC11)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+from support.pullrequest import (
+    BODY,
+    PLAN_PATH,
+    PLAN_TASK,
+    SPEC_PATH,
+    gate_check,
+    make_gate_repo,
+    plan_text,
+    spec_text,
+    write_event,
+)
+from support.repo import Repo
+
+DECOYS = (
+    "```\nPlan-Task: pkg/docs/plans/0001-x.md#T9\nPlan-Task: none (trivial)\n```\n"
+    "<!--\nPlan-Task: pkg/docs/plans/0001-x.md#T8\n-->\n<!-- Work-Item: B-999 -->\n"
+)
+
+
+def _change(repo: Repo, base: str, body: str = BODY, files: dict[str, str] | None = None) -> Path:
+    repo.commit(files or {"pkg/src/new.py": "y = 2\n"}, "feat: change")
+    return write_event(repo, base, body)
+
+
+def test_valid_pull_request_passes(repo: Repo) -> None:
+    """AC6: one Plan-Task and one work item (decoys in fences and comments ignored), plan and spec on the gate."""
+    base = make_gate_repo(repo)
+    event = _change(repo, base, f"## Summary\n{BODY}\n{DECOYS}")
+    result, errors = gate_check(repo, event)
+    assert (result.code, errors) == (0, {})
+    data = json.loads(result.out)
+    assert (data["command"], data["mode"], data["status"]) == ("gate-check", "bootstrap", "pass")
+    text = repo.run(["gate-check", "--event", str(event)])
+    assert text.code == 0
+    assert text.out.splitlines()[0] == "mode: bootstrap"
+
+
+def test_event_from_environment(repo: Repo, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without --event the event file is named by GITHUB_EVENT_PATH; with neither, exit 2."""
+    base = make_gate_repo(repo)
+    event = _change(repo, base)
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    assert repo.run(["gate-check"]).code == 2
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    assert repo.run(["gate-check"]).code == 0
+
+
+@pytest.mark.parametrize(
+    ("body", "code"),
+    [
+        ("Work-Item: B-001\n", "GC001"),
+        (f"Work-Item: B-001\n{DECOYS}", "GC001"),
+        (f"Work-Item: B-001\n{PLAN_TASK}\n{PLAN_TASK}\n", "GC002"),
+        ("Work-Item: B-001\nPlan-Task: pkg/docs/plans/0001-x.md\n", "GC002"),
+        ("Work-Item: B-001\nPlan-Task: pkg/docs/plans/0001-x.md#T\n", "GC002"),
+        ("Work-Item: B-001\nPlan-Task: pkg/docs/other/0001-x.md#T1\n", "GC002"),
+        ("Work-Item: B-001\nPlan-Task: pkg/docs/plans/../plans/0001-x.md#T1\n", "GC002"),
+        ("Work-Item: B-001\nPlan-Task: /pkg/docs/plans/0001-x.md#T1\n", "GC002"),
+        ("Work-Item: B-001\nplan-task: pkg/docs/plans/0001-x.md#T1\n", "GC001"),
+        ("Work-Item: B-001\n  Plan-Task: pkg/docs/plans/0001-x.md#T1\n", "GC001"),
+        (f"{PLAN_TASK}\n", "GC003"),
+        (f"Work-Item: 12\n{PLAN_TASK}\n", "GC003"),
+        (f"Work-Item: B-1x\n{PLAN_TASK}\n", "GC003"),
+        (f"```\nWork-Item: B-001\n```\n{PLAN_TASK}\n", "GC003"),
+    ],
+)
+def test_plan_task_line_errors(repo: Repo, body: str, code: str) -> None:
+    """AC7: a missing, duplicate or malformed Plan-Task line, or a missing work item, gives GC001, GC002 or GC003."""
+    base = make_gate_repo(repo)
+    result, errors = gate_check(repo, _change(repo, base, body))
+    assert result.code == 1
+    assert set(errors) == {code}
+
+
+def test_work_item_forms_by_mode(repo: Repo) -> None:
+    """`Closes #n` is accepted in both modes; `Work-Item: B-n` only in bootstrap mode (spec 4.5 body table)."""
+    boot = make_gate_repo(repo)
+    event = _change(repo, boot, f"Closes #12\n{PLAN_TASK}\n")
+    assert gate_check(repo, event)[0].code == 0
+
+
+def test_work_item_forms_normal_mode(tmp_path: Path) -> None:
+    """With bootstrap off only `Closes #n` is a work item; the gate branch is main."""
+    repo = Repo(tmp_path / "normal")
+    base = make_gate_repo(repo, bootstrap=False)
+    repo.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    event_main = write_event(repo, base, f"Work-Item: B-001\n{PLAN_TASK}\n", base_ref="main")
+    result, errors = gate_check(repo, event_main)
+    assert (result.code, set(errors)) == (1, {"GC003"})
+    event_ok = write_event(repo, base, f"Closes #12\n{PLAN_TASK}\n", base_ref="main", name="ok.json")
+    result, errors = gate_check(repo, event_ok)
+    assert (result.code, errors) == (0, {})
+
+
+def test_plan_not_on_gate_branch(repo: Repo) -> None:
+    """AC8: a plan or spec missing from the gate branch is GC004; a draft passes in bootstrap mode, GC006 otherwise."""
+    base = make_gate_repo(repo)
+    new_plan = "pkg/docs/plans/0002-y.md"
+    repo.commit({new_plan: plan_text(), "pkg/src/new.py": "y\n"}, "feat: plan only on the branch")
+    body = f"Work-Item: B-001\nPlan-Task: {new_plan}#T1\n"
+    result, errors = gate_check(repo, write_event(repo, base, body))
+    assert (result.code, set(errors)) == (1, {"GC004"})
+    assert new_plan in errors["GC004"]
+    # the spec named by the plan is missing from the gate branch
+    repo2 = Repo(repo.root.parent / "r2")
+    base2 = make_gate_repo(repo2, plan=plan_text(spec="pkg/docs/specs/9999-none.md"))
+    repo2.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    result, errors = gate_check(repo2, write_event(repo2, base2, BODY, name="e2.json"))
+    assert set(errors) == {"GC004"}
+    assert "9999-none" in errors["GC004"]
+
+
+def test_draft_status_by_mode(tmp_path: Path) -> None:
+    """AC8: `status: draft` passes in bootstrap mode (plan and spec) and is GC006 with bootstrap off."""
+    boot = Repo(tmp_path / "boot")
+    base = make_gate_repo(boot, plan=plan_text(status="draft"), base_files={SPEC_PATH: spec_text("draft")})
+    boot.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    assert gate_check(boot, write_event(boot, base, BODY))[0].code == 0
+    normal = Repo(tmp_path / "normal")
+    base = make_gate_repo(
+        normal, bootstrap=False, plan=plan_text(status="draft"), base_files={SPEC_PATH: spec_text("draft")}
+    )
+    normal.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    result, errors = gate_check(normal, write_event(normal, base, BODY, base_ref="main"))
+    assert (result.code, set(errors)) == (1, {"GC006"})
+    assert PLAN_PATH in errors["GC006"]
+    assert SPEC_PATH in errors["GC006"]
+
+
+def test_invalid_front_matter_is_gc005(repo: Repo) -> None:
+    """AC13 at the command: a plan whose front matter is invalid is GC005 and names the problem."""
+    base = make_gate_repo(repo, plan=plan_text().replace("status: approved", "status: maybe"))
+    result, errors = gate_check(repo, _change(repo, base))
+    assert (result.code, set(errors)) == (1, {"GC005"})
+    assert "status" in errors["GC005"]
+
+
+def test_unknown_task(repo: Repo) -> None:
+    """AC9: a task id that the plan does not define is GC007."""
+    base = make_gate_repo(repo)
+    body = f"Work-Item: B-001\nPlan-Task: {PLAN_PATH}#T9\n"
+    result, errors = gate_check(repo, _change(repo, base, body))
+    assert (result.code, set(errors)) == (1, {"GC007"})
+    assert "T9" in errors["GC007"]
+
+
+def test_file_outside_globs_including_rename(repo: Repo) -> None:
+    """AC10: each changed path that matches no glob of the task is GC008; a rename counts both paths."""
+    base = make_gate_repo(repo, base_files={"pkg/other/old.py": "a = 1\nb = 2\nc = 3\nd = 4\n"})
+    repo.rename("pkg/other/old.py", "pkg/src/moved.py")  # old path is outside T1's globs
+    repo.commit({"pkg/src/ok.py": "ok\n", "pkg/elsewhere.py": "z\n"}, "feat: more")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    flagged = json.loads(result.out)["steps"][0]["findings"]
+    assert sorted(f["path"] for f in flagged if f["code"] == "GC008") == ["pkg/elsewhere.py", "pkg/other/old.py"]
+
+
+def test_rename_into_outside_path(repo: Repo) -> None:
+    """AC10: the new path of a rename that leaves the task's globs is flagged as well."""
+    base = make_gate_repo(repo)
+    repo.rename("pkg/src/keep.py", "pkg/outside/keep.py")
+    result, _ = gate_check(repo, write_event(repo, base, BODY))
+    paths = [f["path"] for f in json.loads(result.out)["steps"][0]["findings"] if f["code"] == "GC008"]
+    assert paths == ["pkg/outside/keep.py"]
+
+
+def _lines(n: int) -> str:
+    return "".join(f"v{i} = {i}\n" for i in range(n))
+
+
+def test_budget_counting(repo: Repo) -> None:
+    """AC11: additions plus deletions count, except tests, generated and spike files; over the limit is GC009."""
+    plan = plan_text(files=("pkg/**", "uv.lock", "spikes/**"), max_changed_lines=10)
+    base = make_gate_repo(repo, plan=plan, base_files={"pkg/src/keep.py": "a\nb\nc\n"})
+    repo.commit(
+        {
+            "pkg/src/keep.py": "a\nB\nc\n",  # 1 added + 1 deleted = 2
+            "pkg/src/a.py": _lines(3),  # 3
+            "pkg/src/b.py": _lines(5),  # 5 -> 10 in total, the limit
+            "pkg/tests/test_x.py": _lines(50),
+            "pkg/src/test_y.py": _lines(50),
+            "uv.lock": _lines(50),
+            "spikes/s.py": _lines(50),
+        },
+        "feat: change",
+    )
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, errors) == (0, {})
+    repo.commit({"pkg/src/c.py": "one\n"}, "feat: one more line")
+    result, errors = gate_check(repo, write_event(repo, base, BODY, name="e2.json"))
+    assert (result.code, set(errors)) == (1, {"GC009"})
+    message = errors["GC009"]
+    assert "11" in message
+    assert message.index("pkg/src/b.py") < message.index("pkg/src/a.py")  # largest files are named, largest first
+    assert "uv.lock" not in message
+    assert "pkg/tests/test_x.py" not in message
+
+
+def test_binary_file_counts_zero_with_notice(repo: Repo) -> None:
+    """AC11: a binary file counts zero lines and gives a notice, not an error."""
+    base = make_gate_repo(repo)
+    (repo.root / "pkg/src").mkdir(parents=True, exist_ok=True)
+    (repo.root / "pkg/src/blob.bin").write_bytes(bytes(range(256)) * 20)
+    repo.git("add", "-A")
+    repo.git("commit", "-q", "-m", "feat: blob")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, errors) == (0, {})
+    findings = json.loads(result.out)["steps"][0]["findings"]
+    assert [(f["severity"], f["path"]) for f in findings] == [("notice", "pkg/src/blob.bin")]
+
+
+def test_push_event_is_skipped(repo: Repo, tmp_path: Path) -> None:
+    """A push event exits 0 as skipped (spec 4.5)."""
+    make_gate_repo(repo)
+    event = tmp_path / "push.json"
+    event.write_text(json.dumps({"ref": "refs/heads/build/v1", "after": "a" * 40}), encoding="utf-8")
+    result = repo.run(["--format", "json", "gate-check", "--event", str(event)])
+    assert result.code == 0
+    assert json.loads(result.out)["status"] == "skipped"
+
+
+def test_fork_and_none_are_not_passes(repo: Repo) -> None:
+    """A pull request from another repository and a `none (...)` Plan-Task (checked by T14) exit 2, never 0."""
+    base = make_gate_repo(repo)
+    repo.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    fork = write_event(repo, base, BODY, head_repo="other/r")
+    assert repo.run(["gate-check", "--event", str(fork)]).code == 2
+    none = write_event(repo, base, "Work-Item: B-001\nPlan-Task: none (trivial)\n", name="none.json")
+    result = repo.run(["gate-check", "--event", str(none)])
+    assert result.code == 2
+    assert "not implemented" in result.err
+
+
+def test_gate_ref_option(repo: Repo) -> None:
+    """--gate-ref names the ref the plan and spec are read from."""
+    base = make_gate_repo(repo)
+    repo.git("update-ref", "refs/heads/elsewhere", base)
+    repo.git("update-ref", "-d", "refs/remotes/origin/build/v1")
+    event = _change(repo, base)
+    assert repo.run(["gate-check", "--event", str(event)]).code == 3  # default ref origin/build/v1 does not resolve
+    assert repo.run(["gate-check", "--event", str(event), "--gate-ref", "elsewhere"]).code == 0
