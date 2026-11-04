@@ -26,7 +26,6 @@ from eng_dev_gate.checks.gate_check_docs import (
     protected_findings,
     spec_plan_findings,
 )
-from eng_dev_gate.checks.ratchet import RATCHET_FILE, RatchetFile
 from eng_dev_gate.config import GateConfig, Mode, awaiting_finding
 from eng_dev_gate.event import PullRequest, event_path, read_event
 from eng_dev_gate.frontmatter import FrontMatterError, Spec, Task, parse_plan, parse_spec, safe_relative_path
@@ -140,31 +139,14 @@ def _status(doc: Spec, path: str, config: GateConfig) -> list[Finding]:
     return [_error("GC006", f"status {doc.status!r} is not acceptable; it must be approved", path)]
 
 
-def _ratchet_packages(git: Git, base: str, head: str) -> set[str] | None:
-    """Package directories whose recorded counts differ between ``base`` and ``head``; None if a file is invalid."""
-    counts = []
-    for ref in (base, head):
-        try:
-            counts.append(RatchetFile.model_validate_json(git.show(ref, RATCHET_FILE)).counts)
-        except PathNotFoundError:
-            counts.append({})  # a missing baseline records nothing
-        except ValueError:  # pydantic's ValidationError is a ValueError
-            return None
-    return {p for p in counts[0].keys() | counts[1].keys() if counts[0].get(p) != counts[1].get(p)}
-
-
-def _scope(
-    changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
-) -> list[Finding]:
+def _scope(changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str]) -> list[Finding]:
     """GC008 for each changed path (a rename counts both) outside the task's globs.
 
     The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
-    scope when another changed file under that directory matches a glob of the task (AC10a); so is the ratchet
-    baseline when every package whose counts it changes has such a file (AC10b).
+    scope when another changed file under that directory matches a glob of the task (AC10a).
     """
     paths = dict.fromkeys(p for change in changes for p in change.paths)
     inside = {p for p in paths if matches_any(p, task.files)}
-    anchors = set(inside)
     plan = PurePosixPath(plan_path)
     holders = [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
     for directory in holders:
@@ -174,9 +156,6 @@ def _scope(
             for f in (prefix + n for n in _NOTES_FILES)
             if f in paths and any(q != f and q.startswith(prefix) and q in inside for q in paths)
         }
-    packages = _ratchet_packages(git, base, head) if RATCHET_FILE in paths else None
-    if packages is not None and all(any(a.startswith(f"{p}/") for a in anchors) for p in packages):
-        inside.add(RATCHET_FILE)
     return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
 
 
@@ -238,7 +217,7 @@ def _judge(
         return [*findings, _error("GC007", f"plan {plan_path} defines no task {task_id}", plan_path)]
     return [
         *findings,
-        *_scope(changes, task, plan_path, member_dirs, git, base, pr.head_sha),
+        *_scope(changes, task, plan_path, member_dirs),
         *_budget(entries, task, config),
     ]
 
