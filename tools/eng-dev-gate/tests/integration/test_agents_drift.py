@@ -109,3 +109,46 @@ def test_committed_agents_files_equal_their_rendering() -> None:
     for unit in units:
         committed = (root / unit.output).read_bytes().decode("utf-8")
         assert render_unit(root, unit) == committed, unit.output
+
+
+def _shared_folder(repo: Repo) -> None:
+    """A shared package folder (not a workspace member) with its own agents.yml, beside a member below it."""
+    _clean_repo(repo)
+    version = template_version(TEMPLATE)
+    values = {"name": "shared", "template-version": version}
+    repo.commit(
+        {
+            "pyproject.toml": '[tool.uv.workspace]\nmembers = ["pkg", "shared/core"]\n',
+            "shared/.gate/agents.yml": yaml.safe_dump(
+                {"template": "../t/template.md", "output": "AGENTS.md", "values": values}
+            ),
+            "shared/AGENTS.md": f"# shared\n\nbody {version}\n",
+            "shared/CLAUDE.md": "@AGENTS.md\n",
+            "shared/core/pyproject.toml": '[project]\nname = "core"\n',
+        }
+    )
+
+
+def test_shared_package_folder_is_a_unit(repo: Repo) -> None:
+    """B-026: a tracked agents.yml outside the root and the members manages its AGENTS.md (no AG005)."""
+    _shared_folder(repo)
+    assert [(u.name, u.path, u.output) for u in units_of(repo.root)] == [
+        ("", ".", "AGENTS.md"),
+        ("pkg", "pkg", "pkg/AGENTS.md"),
+        ("shared", "shared", "shared/AGENTS.md"),
+    ]
+    assert _findings(repo) == []
+    (repo.root / "shared/AGENTS.md").write_text("# edited\n", encoding="utf-8")
+    assert [(f["code"], f["path"]) for f in _findings(repo)] == [("AG004", "shared/AGENTS.md")]
+    assert repo.run(["agents", "render", "--package", "shared"]).code == 0
+    assert _findings(repo) == []
+
+
+def test_shared_package_folder_output_stays_inside_the_root(repo: Repo) -> None:
+    _shared_folder(repo)
+    config = yaml.safe_load((repo.root / "shared/.gate/agents.yml").read_text(encoding="utf-8"))
+    config["output"] = "../../AGENTS.md"
+    repo.commit({"shared/.gate/agents.yml": yaml.safe_dump(config)})
+    result = repo.run(["agents", "drift"])
+    assert result.code == 2
+    assert "outside the workspace root" in result.err + result.out
