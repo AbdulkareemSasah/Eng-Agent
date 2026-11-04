@@ -312,6 +312,9 @@ No logic beyond validation.
 run-class refusal) and its use by `HarnessCalcPort`; the three `structural-codes` workspace packages as dependencies.
 Tests use a small test pack built with `Registry.of` in `tests/unit/calcs/fixtures/code_pack/`, so the task does not wait
 for the ACI pack. Starts only after the documents pull request that amends engine §4.8 and calcs §4.12 (spec Q10).
+Spec 0013 §4.5 defines the same route (spec C3): if plan 0013 T6 has merged when T2 starts, T2 adds the footing ids,
+the `items` argument and its tests to that route (the dependencies are then already in place), and the lead records
+which by a plan amendment; otherwise T2 builds the route with both workflows' ids and plan 0013 T6 extends it.
 
 **T3 Subjects** (spec §4.4.1). Creates `calcs/footing/`, the registration test shared by the calc tasks, and the first
 verification record (from the spec 0003 template).

@@ -77,7 +77,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   the check state, provenance `tool: "structural_codes"`, the pack version and the check's `content_sha256`, and returns
   a summary of counts only. Test: `tests/unit/calcs/test_code_pack_route.py::test_batch_stored_as_verdict_set`.
 - AC4. Given a draft check, then a `trial` run evaluates it and a `production` run refuses it with `CalcRefused`
-  (calcs §4.12, CF AC25); given an unknown check id, then `NOT_FOUND` before any evaluation; given a literal where a
+  (calcs §4.12, CF AC25); given an unknown check id or one outside the route's allowlist (§4.3), then `NOT_FOUND` before any evaluation; given a literal where a
   reference is required, then `INVALID_ARGUMENT`. Tests: `::test_production_refuses_draft`, `::test_unknown_id`,
   `::test_literal_refused`.
 - AC5. Given `design.code_pack = sbc304_2018`, when the workflow runs, then every check id is resolved with
@@ -234,12 +234,16 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 ### 4.3 The code-pack route of the CalcPort **[added]**
 
-Engine §4.8 lets `CalcPort` serve "spec 0003 and code packs"; no spec defines the second. `CodePackRoute` (in
-`_calc/_code_packs.py`) is consulted by `HarnessCalcPort` for an id that is not a harness calc (harness ids start with
-`harness.`):
+Engine §4.8 lets `CalcPort` serve "spec 0003 and code packs". [Spec 0013](0013-column-workflow.md) §4.5 defines the
+same route for the column checks (a fixed allowlist, `run(check_id, {"batch": <reference to an item list>})`). There is
+one route in `_calc/_code_packs.py`, built by whichever task merges first (plan 0013 T6 or this plan's T2); the other
+adds its ids and tests (C3). This workflow adds to it: the six ACI footing ids and, for `sbc304_2018`, the ids
+`check_id_for` gives for them (resolved when the registry is built, SBC Q1) in the allowlist; the inline `items`
+argument below, beside `batch`; and `NotImplementedGap` as a verdict. `CodePackRoute` is consulted by
+`HarnessCalcPort` for an id that is not a harness calc (harness ids start with `harness.`):
 
 1. `describe(check_id)`: looks the id up in the `Registry` the run was built with (packs discovered once at engine
-   construction, CF §4.6); `CalcInfo` with the check's version, `content_sha256`, state, `basis_fields` (the basis paths
+   construction, CF §4.6; an id outside the allowlist is `NOT_FOUND`); `CalcInfo` with the check's version, `content_sha256`, state, `basis_fields` (the basis paths
    its input model declares as sources) and `ref_rules` (no `stale_ok`).
 2. `run(check_id, {"items": [{"subject": Subject, "inputs": {name: Ref}}]})`: refuses by run class as calcs §4.12
    (production needs `approved`), calls `evaluate_batch(check_id, items, mode, registry, source=store,
@@ -518,7 +522,7 @@ code-pack route (additive to engine §4.8).
 | Q8 | Service and factored cases are asked each run, not stored in the basis | Owner | Accept; a template may later hold name patterns |
 | Q9 | The Sasaah tool embeds engineering values (load factors 1.2 and 1.6, subgrade modulus as a multiple of the bearing pressure, a spacing cap, an equilibrium tolerance) and implements ACI 318-19 | Owner | Not adopted (as OQ-G14); none of its values appears here; no tool result is compared with a code-pack result |
 | Q10 | The code-pack route (§4.3) amends specs 0001 and 0003 | Owner | Accept; amend both in a documents pull request before plan task T2 |
-| Q11 | `eng-harness` depends on three workspace packages of `structural-codes` | Owner | No ADR (no third-party code; 03 §2 allows it from phase 2) |
+| Q11 | `eng-harness` depends on three workspace packages of `structural-codes` | Owner | No ADR (no third-party code; 03 §2 allows it from phase 2); spec 0013 Q12 asks the same and plan 0013 T6 lists `docs/adr/0004-workspace-code-packs.md`: one answer for both |
 | Q12 | New basis paths (`design.*`, `seismic.*`, `foundation.*` sizing, `reinforcement.*`, `safe.*`) | Owner | Adopt with spec 0004's template schema, with the clause-spec paths (ACI plan Q2) |
 | Q13 | Engineer dimensions outside the basis bounds are kept and flagged, not refused | Owner | Accept: the engineer decides; the report shows the flag |
 | Q14 | `foundation.min_depth` is the engineer's value; the code minimum effective depth is not checked (ACI plan Q13) | Owner | Add the check to the pack later |
@@ -535,6 +539,7 @@ code-pack route (additive to engine §4.8).
 | A1 | **[added]** Kinds of §4.2; the code-pack route; calcs of §4.4 and §4.9; option `reduce_bar_spacing`; basis paths of §4.7; `footing_review` | Owner | Accept with this spec |
 | C1 | Conflict: 12 §2 lists four options; flexure and minimum-steel failures need a fifth | Owner | Amend 12 §2's example when accepted |
 | C2 | Conflict: engine §4.8 says the `CalcPort` serves code packs; calcs §4.12 defines harness calcs only | Owner | §4.3 and Q10 |
+| C3 | Conflict: spec 0013 §4.5 (merged first) defines the code-pack route with a fixed allowlist and a `batch` reference; §4.3 here used a registry lookup and inline `items` | Owner | One route (§4.3): the allowlist holds both workflows' ids, `run` takes `items` or `batch`; the first of plan 0013 T6 and plan T2 builds it, the other extends it |
 
 ## 12. Needs local test
 
