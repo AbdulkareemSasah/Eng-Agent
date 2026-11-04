@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -525,6 +525,25 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_workflow_specs_are_specs"
     covers: [AC12a]
     depends_on: [T3, T14]
+  - id: T31
+    title: "plans whose spec is a directory of clause specs; prefixed criteria; clause specs in spec_globs"
+    # Amendment (B-343, documents only): the structural-codes plans 0002 and 0004 name the clause-spec directory
+    # docs/clauses/aci318_14/ and cover prefixed criteria (BP-AC1, PK-AC1); the gate rejected both (GC005).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/frontmatter.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check_docs.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/gitio.py"
+      - ".gate/gate.yml"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 160
+    max_sessions: 2
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_clause_spec_directory_plan"
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_plan_with_clause_spec_directory"
+      - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_clause_specs_are_specs"
+    covers: [AC12b, AC13a]
+    depends_on: [T13, T14, T30]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
