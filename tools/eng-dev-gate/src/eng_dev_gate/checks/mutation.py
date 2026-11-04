@@ -143,8 +143,12 @@ def run_step(ctx: StepContext) -> list[Finding]:
         # the pytest addopts of the member (coverage thresholds, plugins) are switched off for the mutated runs
         roots = "".join(f"\n    {root}" for root in sorted({module.split("/")[0] for module in modules}))
         listed = "".join(f"\n    {module}" for module in modules)
+        # mutmut copies only the source, tests/, setup.cfg, pyproject.toml and lock files: the rest is listed (AC53b)
+        skip = {"src", "tests", "setup.cfg", "pyproject.toml", *_IGNORED}
+        extra = "".join(f"\n    {entry}" for entry in sorted(p.name for p in copy.iterdir() if p.name not in skip))
         (copy / "setup.cfg").write_text(
-            f"[mutmut]\nsource_paths={roots}\nonly_mutate={listed}\npytest_add_cli_args=\n    -o\n    addopts=\n"
+            f"[mutmut]\nsource_paths={roots}\nonly_mutate={listed}\nalso_copy={extra}\n"
+            "pytest_add_cli_args=\n    -o\n    addopts=\n"
             "pytest_add_cli_args_test_selection=\n    tests/\n",
             encoding="utf-8",
         )

@@ -195,6 +195,24 @@ def test_whole_source_tree_is_copied_and_the_member_addopts_are_off(repo: Repo) 
     assert _mutmut_option(runner.config, "pytest_add_cli_args") == ["-o", "addopts="]
 
 
+def test_package_files_are_copied(repo: Repo) -> None:
+    """AC53b: the member's other top-level entries are listed under also_copy (B-370)."""
+    base, member = _setup(repo)
+    repo.commit(
+        {
+            "pkgs/a/README.md": "# a\n",
+            "pkgs/a/LICENSE": "text\n",
+            "pkgs/a/docs/guide.md": "guide\n",
+            "pkgs/a/tests/test_a.py": "def test_a() -> None:\n    pass\n",
+        }
+    )
+    _change(repo)
+    runner = FakeMutmut(["killed"])
+    mutation.run_step(_context(repo, member, runner, base))
+    assert runner.config is not None
+    assert _mutmut_option(runner.config, "also_copy") == ["LICENSE", "README.md", "docs"]
+
+
 def test_fault_message_keeps_the_readable_tail_of_the_output(repo: Repo) -> None:
     frames = "".join(f"\r\u280b Generating mutants {i}" for i in range(400))
     base, member = _setup(repo)
