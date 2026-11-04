@@ -96,8 +96,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-015 | T6 | Quantity and Cited | sonnet, medium | opus, medium | [#35](https://github.com/AbdulkareemSasah/Eng-Agent/pull/35) | done |
 | B-016 | T7 | Provenance, envelopes and result records | sonnet, medium | opus, medium | [#55](https://github.com/AbdulkareemSasah/Eng-Agent/pull/55) | done |
 | B-017 | T8 | References, JSON Pointer and resolution rules | sonnet, high | opus, medium | [#64](https://github.com/AbdulkareemSasah/Eng-Agent/pull/64) | done |
-| B-018 | T9 | Input-parameter metadata and the validation pipeline | sonnet, high | opus, medium | — | not started or in writing |
-| B-019 | T10 | Verdicts, model issues and calculation traces | sonnet, medium | opus, medium | — | not started or in writing |
+| B-018 | T9 | Input-parameter metadata and the validation pipeline | sonnet, high | opus, medium | [#71](https://github.com/AbdulkareemSasah/Eng-Agent/pull/71) | done |
+| B-019 | T10 | Verdicts, model issues and calculation traces | sonnet, medium | opus, medium | [#77](https://github.com/AbdulkareemSasah/Eng-Agent/pull/77) | open |
 | B-020 | T11 | Kind names, the kind registry and the model.* kinds | sonnet, medium | opus, medium | — | not started or in writing |
 | B-021 | T12 | forces.*, basis.*, verdicts.set and issues.model_check kinds | sonnet, medium | opus, medium | — | not started or in writing |
 | B-022 | T13 | Workspace resolution and location probes (POSIX, Windows, fake) | sonnet, high | opus, medium | — | not started or in writing |
@@ -111,23 +111,23 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-034 | T5 | check orchestrator with the lock, format, lint and types steps | sonnet, medium | opus, low | [#27](https://github.com/AbdulkareemSasah/Eng-Agent/pull/27) | done |
 | B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | [#37](https://github.com/AbdulkareemSasah/Eng-Agent/pull/37) | done |
 | B-036 | T7 | tests step with separate line and branch coverage and the pytest plugin | sonnet, medium | opus, low | [#41](https://github.com/AbdulkareemSasah/Eng-Agent/pull/41) | done |
-| B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | [#40](https://github.com/AbdulkareemSasah/Eng-Agent/pull/40) | open |
-| B-038 | T9 | ratchet command and step | sonnet, medium | opus, low | [#44](https://github.com/AbdulkareemSasah/Eng-Agent/pull/44) | done |
+| B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | [#40](https://github.com/AbdulkareemSasah/Eng-Agent/pull/40) | done |
+| B-038 | T9 | ratchet command and step | sonnet, medium | opus, low | [#59](https://github.com/AbdulkareemSasah/Eng-Agent/pull/59) | done |
 | B-038a | docs | plan amendment: T9 also writes the root .gate/ratchet.json baseline | haiku, low | opus, low | [#44](https://github.com/AbdulkareemSasah/Eng-Agent/pull/44) | done |
 | B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | [#39](https://github.com/AbdulkareemSasah/Eng-Agent/pull/39) | done |
 | B-040 | T11 | forbidden part 2: FB004, FB005, FB006, FB008 | sonnet, high | opus, low | [#60](https://github.com/AbdulkareemSasah/Eng-Agent/pull/60) | done |
-| B-041 | T12 | imports command and step | sonnet, medium | opus, low | — | not started or in writing |
+| B-041 | T12 | imports command and step | sonnet, medium | opus, low | [#74](https://github.com/AbdulkareemSasah/Eng-Agent/pull/74) | open |
 | B-042 | T13 | gate-check part 1: front matter, body parsing, plan and task, scope and budget | sonnet, high | opus, medium | [#29](https://github.com/AbdulkareemSasah/Eng-Agent/pull/29) | done |
-| B-043 | T14 | gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job | sonnet, high | opus, medium | — | not started or in writing |
+| B-043 | T14 | gate-check part 2: spec and plan pull requests, lane, reasons, protected paths, and the gate-check job | sonnet, high | opus, medium | [#70](https://github.com/AbdulkareemSasah/Eng-Agent/pull/70) | open |
 | B-044 | T15 | risk-floor command and job | sonnet, medium | opus, low | [#66](https://github.com/AbdulkareemSasah/Eng-Agent/pull/66) | open |
-| B-045 | T16 | test-first part 1: title, exemptions, commit selection, new and changed tests | sonnet, high | opus, medium | — | not started or in writing |
+| B-045 | T16 | test-first part 1: title, exemptions, commit selection, new and changed tests | sonnet, high | opus, medium | [#69](https://github.com/AbdulkareemSasah/Eng-Agent/pull/69) | open |
 | B-046 | T17 | test-first part 2: base worktree, runs, classification, isolation, and the test-first job | sonnet, high | opus, medium | — | not started or in writing |
 | B-047 | T18 | secrets command and the security job | sonnet, medium | opus, medium | [#56](https://github.com/AbdulkareemSasah/Eng-Agent/pull/56) | open |
 | B-048 | T19 | licenses step and generated-document freshness | sonnet, medium | opus, low | [#50](https://github.com/AbdulkareemSasah/Eng-Agent/pull/50) | done |
 | B-049 | T20 | mutation step (backend decision, ADR, dependency) | sonnet, medium | opus, low | [#62](https://github.com/AbdulkareemSasah/Eng-Agent/pull/62) | open |
-| B-050 | T21 | workflows lint (WF001 to WF005) | sonnet, medium | opus, low | [#65](https://github.com/AbdulkareemSasah/Eng-Agent/pull/65) | open |
-| B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | — | not started or in writing |
-| B-052 | T23 | windows-tests command and the windows job | sonnet, medium | opus, low | — | not started or in writing |
+| B-050 | T21 | workflows lint (WF001 to WF005) | sonnet, medium | opus, low | [#65](https://github.com/AbdulkareemSasah/Eng-Agent/pull/65) | done |
+| B-051 | T22 | reviewer prompts, review command and the ci-review job | sonnet, medium | opus, low | [#75](https://github.com/AbdulkareemSasah/Eng-Agent/pull/75) | open |
+| B-052 | T23 | windows-tests command and the windows job | sonnet, medium | opus, low | [#73](https://github.com/AbdulkareemSasah/Eng-Agent/pull/73) | done |
 | B-053 | T24 | approvals port and verification with bootstrap off | sonnet, medium | opus, low | — | not started or in writing |
 | B-054 | T25 | Documentation, changelog 0.1.0 and the self-gate run | sonnet, low | opus, low | — | not started or in writing |
 | B-055 | T26 | Base-commit gate (gate root, provenance, head-run rules); built before T6 | sonnet, high | opus, medium | [#31](https://github.com/AbdulkareemSasah/Eng-Agent/pull/31) | done |
@@ -144,18 +144,18 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-069 | docs | amend the eng-contract spec: the Quantity comparison key uses the shortest round-trip decimal | sonnet, low | opus, medium | [#49](https://github.com/AbdulkareemSasah/Eng-Agent/pull/49) | done |
 | B-070 | docs | write the structural-codes core framework specification and plan | opus, medium | opus, medium | [#16](https://github.com/AbdulkareemSasah/Eng-Agent/pull/16) | done |
 | B-071 | docs | write the ACI 318-14 isolated-footing clause specifications and plan (draft) | opus, medium | opus, medium | [#34](https://github.com/AbdulkareemSasah/Eng-Agent/pull/34) | done |
-| B-072 | docs | write the SBC 304-2018 overlay specification and plan for the footing checks (draft, with explicit gaps) | opus, medium | opus, medium | [#67](https://github.com/AbdulkareemSasah/Eng-Agent/pull/67) | open |
+| B-072 | docs | write the SBC 304-2018 overlay specification and plan for the footing checks (draft, with explicit gaps) | opus, medium | opus, medium | [#67](https://github.com/AbdulkareemSasah/Eng-Agent/pull/67) | done |
 | B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | [#36](https://github.com/AbdulkareemSasah/Eng-Agent/pull/36) | done |
 | B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | [#46](https://github.com/AbdulkareemSasah/Eng-Agent/pull/46) | done |
-| B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | [#76](https://github.com/AbdulkareemSasah/Eng-Agent/pull/76) | open |
 | B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | [#47](https://github.com/AbdulkareemSasah/Eng-Agent/pull/47) | done |
 | B-081 | docs | write the SAP2000 coverage check and the specification and plan for SAP2000 through the CSI adapter | sonnet, medium | opus, low | [#48](https://github.com/AbdulkareemSasah/Eng-Agent/pull/48) | done |
 | B-082 | docs | write the ACI 318-14 column check clause specifications and plan (draft) | opus, medium | opus, medium | [#61](https://github.com/AbdulkareemSasah/Eng-Agent/pull/61) | done |
-| B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | [#72](https://github.com/AbdulkareemSasah/Eng-Agent/pull/72) | open |
 | B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | [#63](https://github.com/AbdulkareemSasah/Eng-Agent/pull/63) | open |
 | B-091 | docs | write the desktop-products overlap analysis and ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done |
 | B-092 | docs | fix(eng-dev-gate): give every suppression comment an issue reference and a reason (B-092) | sonnet, low | opus, low | [#52](https://github.com/AbdulkareemSasah/Eng-Agent/pull/52) | done |
-| B-093 | docs | build(eng-contract): pyproject within the gate's config and imports rules (B-093) | sonnet, low | opus, low | [#53](https://github.com/AbdulkareemSasah/Eng-Agent/pull/53) | open |
+| B-093 | docs | build(eng-contract): pyproject within the gate's config and imports rules (B-093) | sonnet, low | opus, low | [#53](https://github.com/AbdulkareemSasah/Eng-Agent/pull/53) | done |
 | B-094 | docs | docs(eng-dev-gate): T11 also edits the forbidden package's __init__.py (B-094 plan amendment) | sonnet, low | opus, low | [#54](https://github.com/AbdulkareemSasah/Eng-Agent/pull/54) | done |
 | B-095 | docs | eng-contract: follow-ups from the reviews of B-015 and B-069 | sonnet, low | opus, low | — | not started or in writing |
 | B-096 | docs | docs(eng-dev-gate): a task's package changelog and local-testing list are in its scope (B-096) | sonnet, low | opus, low | [#57](https://github.com/AbdulkareemSasah/Eng-Agent/pull/57) | done |
