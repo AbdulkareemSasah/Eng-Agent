@@ -236,13 +236,13 @@ with their source on the page and become `confirmed` only through the page (ADR-
 
 ```python
 class FieldSpec(BaseModel, frozen=True, extra="forbid"):
-    path: BasisPath                       # contract field-path rule, e.g. "limits.drift_ratio"
+    path: BasisPath  # contract field-path rule, e.g. "limits.drift_ratio"
     kind: Literal["quantity", "count", "choice", "text"]
-    label: str                            # shown on the page, max 120
+    label: str  # shown on the page, max 120
     required: bool = True
-    unit: str | None = None               # quantity: canonical unit of the path suffix; otherwise None
+    unit: str | None = None  # quantity: canonical unit of the path suffix; otherwise None
     choices: tuple[str, ...] | None = None  # choice: two or more
-    min: Cited | None = None              # quantity or count; each bound has its own source
+    min: Cited | None = None  # quantity or count; each bound has its own source
     max: Cited | None = None
 ```
 
@@ -271,7 +271,7 @@ so it is not an engine `ApprovalPort` request).
 ```python
 class BasisSetupPort(Protocol):
     def present(self, view: BasisSetupView) -> None: ...
-    def answer(self, setup_id: str, *, wait: bool) -> BasisSetupAnswer | None: ...   # None: no answer yet
+    def answer(self, setup_id: str, *, wait: bool) -> BasisSetupAnswer | None: ...  # None: no answer yet
 ```
 
 - `BasisSetupView` (frozen): `setup_id` (ULID), `draft_sha256`, `workflow`, `template` (name, version, sha256, chain,
