@@ -53,7 +53,10 @@ Proposed). Closes spike gap S12-G3 (owner queue OQ-A3).
 - When accepted: 04 §8.1 lists `model_unlocked` and `server_owned_instance`; 11 §9 replaces "`HOST_LOCKED`
   (`model_locked` from the Sasaah CSI server) is shown to the engineer, never retried" with a reference to this ADR;
   11 §7 adds the action `unlock` to "always ask"; `eng-contract` gains the two values (minor version, its JSON
-  Schema snapshot regenerated); the engine spec (eng-harness spec 0001 §4.7) adds `unlock` to its always-ask list.
+  Schema snapshot regenerated); the engine spec (eng-harness spec 0001 §4.7) adds the action `unlock` to its
+  action-based always-ask rules (today: action `delete` and saves over an original). Its per-workflow tool-name entry
+  `always_ask=("csi_unlock_model",)` in the edit-cycle example already asks for the same tool, matches the new rule and
+  stays.
 - The edit cycle can run more than one cycle. Until acceptance it stops at the first edit after an analysis with
   `HOST_LOCKED`, which is safe but makes the second cycle a manual unlock by the engineer.
 - A workflow that unlocks must re-run the analysis before it reads results; the stale results are not readable by

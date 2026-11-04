@@ -118,9 +118,13 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `tests/unit/servers/test_hostlock.py::test_stale_and_pid_reuse`.
 - AC15. Given instances this run launched (journaled `host_started`) and an instance it attached to, when
   `close_started` runs, then only launched instances whose pid and start time still match are closed: through
-  `csi_exit` on the launching session, else, for an instance launched hidden, by terminating the process; a visible
-  instance that cannot be exited gracefully is left running and reported; the attached instance is never closed.
-  Test: `tests/workflow/servers/test_guard.py::test_close_only_started`.
+  `csi_exit` when the launching role holds launch ownership and `csi_status` names the instance as the current
+  target, else, for an instance launched hidden, by terminating the process; a visible instance that cannot be exited
+  gracefully is left running and reported; the attached instance is never closed. Given a `timeout` on the launching
+  role (synthetic fault, a read included) after `csi_launch`, then no `csi_exit` is sent and the fallback applies;
+  and `restore` after such a timeout sends no `csi_open_model` to the old instance but launches a new hidden instance
+  and opens the file there. Tests: `tests/workflow/servers/test_guard.py::test_close_only_started`,
+  `::test_close_after_timeout_falls_back`, `tests/workflow/adapters/test_csi_session_ops.py::test_restore_after_timeout`.
 
 ### 3.5 Adapter framework
 
@@ -149,8 +153,11 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   step on that host runs, then `read_units` reports the mismatch and the engine stops with `PRECONDITION_FAILED`
   (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`.
 - AC23. Given a write in flight, when reconciled, then the adapter reads the object's state and answers `applied`,
-  `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result. Test:
-  `tests/workflow/adapters/test_reconcile.py::test_outcomes_per_tool` (parametrized over the write tools).
+  `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result; given an analysis or design
+  in flight with no proof of end of the abandoned call (v1), then the answer is `unknown` whatever the host answers,
+  and the adapter sends no re-run. Tests:
+  `tests/workflow/adapters/test_reconcile.py::test_outcomes_per_tool` (parametrized over the write tools),
+  `::test_long_tools_unknown_without_proof_of_end`.
 - AC24. Given a successful write, when the engine's `check_model` runs, then every written item is read back and
   compared; a mismatch (including a thickness written in the wrong units, the x1000 case) is an `error` issue
   `READBACK_MISMATCH`, and a read-back that is not available is `READBACK_UNAVAILABLE` (error). Test:
@@ -373,7 +380,7 @@ item 8). `ServerCheck.build` is `"<commit[:12]>+<exe sha256[:12]>"`, also used a
 - **Restart**: before the next call to that role, if fewer than `max_restarts_per_run` restarts were made: terminate
   the old job, start the role again, run the build check, then `csi_attach` with the bound instance's `pid` and
   `product` (S-12: attached instances are `launched: false`, so `csi_open_model`, `csi_new_model` and `csi_exit` are
-  refused afterwards; the guard and `restore` account for it). The epoch increases. Beyond the limit: the call fails
+  refused afterwards; launch ownership ends, §4.4.2). The epoch increases. Beyond the limit: the call fails
   `HOST_NOT_CONNECTED` and the engine escalates. Restarting a role never touches another role or a host instance.
 - **Reconnect** (11 §6 item 9): `no_target` or `target_disconnected` on a read → `csi_attach` by pid once on the same
   role, epoch increases, then the read is retried by the engine (retry rule `always`). The engine reads units before
@@ -414,11 +421,21 @@ item 8). `ServerCheck.build` is `"<commit[:12]>+<exe sha256[:12]>"`, also used a
   (Sasaah's own pid detection is the same diff and can pick another session's new instance, `CsiSession.cs:282-300`.)
   The identity (`pid`, `started_at`, program, `visible`) goes to `HostPort.started_instances`, which the engine
   journals as `host_started` (engine §4.6 item 10).
+- **Launch ownership.** The Sasaah server treats an instance as its own (`launched: true`) only in the session that
+  ran `csi_launch`; any server `timeout` invalidates the cached session, and the next call re-attaches with `launched:
+  false` (S-12 §5, `ComThread.cs:125-133`, `CsiSession.cs:66-83, 194`), without a restart. The adapter therefore keeps,
+  per role, a session counter increased on every `timeout`, client backstop, crash, reconnect or restart of that role
+  (reads included), and records at `csi_launch` the role and its counter. The role **holds launch ownership** of the
+  instance only while that counter is unchanged. Tools with `confirm = "owned"` (`csi_open_model`, `csi_exit`,
+  `csi_delete_load_combo`) are sent only under launch ownership.
 - **Closing** (`close_started(host_key, instances)`, at run end only): for each instance whose pid and start time
-  still match: `csi_exit(confirm=true)` through the role session that launched it, if that session is alive and was
-  not restarted; otherwise, if the instance was launched with `visible: false`, `ProcessInspector.terminate`;
-  otherwise it is left running and listed in `run_dir/hosts/left_open.json` for the run report (0006). An instance
-  whose identity no longer matches is ignored. Instances the run did not start are never closed. Idempotent.
+  still match: if the launching role holds launch ownership, the adapter reads `csi_status` and, only when the
+  session's current target is that instance (pid), sends `csi_exit(confirm=true)` (the tool has no `target` parameter
+  and acts on the current target, S-12 inventory). In every other case (ownership lost, another current target, or
+  `csi_exit` refused with `not_launched_by_server`, timed out or failed) the fallback applies: an instance launched
+  with `visible: false` is terminated through `ProcessInspector.terminate` (identity re-checked); a visible one is left
+  running and listed in `run_dir/hosts/left_open.json` for the run report (0006). An instance whose identity no
+  longer matches is ignored. Instances the run did not start are never closed. Idempotent.
 - **Helpers**: children of job members that are not host executables are recorded with their identity at each
   observation and terminated at server stop if they still match (ADR-0030 decision 8 trade-off).
 
@@ -526,7 +543,10 @@ Before sending a write, the adapter appends `{op_id, tool, args_sha256, target, 
 `run_dir/adapter/ops.jsonl` (flushed and `fsync`ed), where `pre_image_ref` points to the last model-state read of the
 object (the adapter's state cache, refreshed by `check_model` and `model_state`). `reconcile(tool, args, op_id)`
 first waits for the host to answer `csi_model_info` within the `call` class (a timeout → `unknown`), then reads the
-object with the tool's read-back helper and decides:
+object with the tool's read-back helper and decides as below. An answer from the new worker does not show that the
+abandoned host call has ended (S-12 §5: the abandoned worker "keeps whatever host call it was in"), so for the long
+tools the adapter also needs **proof of end** of the abandoned call; no proof mechanism is specified in v1 (gap H-G7,
+with S-02, §12), so `proof_of_end` is `False` until one is accepted, and the analysis and design rows give `unknown`.
 
 | Tool kind | `applied` | `not_applied` | `partial` / `unknown` |
 |---|---|---|---|
@@ -536,16 +556,19 @@ object with the tool's read-back helper and decides:
 | `csi_delete_load_combo` | absent | present | — |
 | `csi_save_model` | the file exists and its hash differs from the pre-save hash | the file is unchanged and the model is dirty | otherwise `unknown` |
 | `csi_unlock_model` | `locked` false | `locked` true | — |
-| `csi_run_analysis`, `csi_design_run` | — | the host answers and units match: a re-run recomputes the same results, so the step runs again (§11 Q4) | the host does not answer: `unknown` |
+| `csi_run_analysis` | proof of end, and `csi_model_info.locked` changed from false (pre-image) to true; `csi_analysis_status` codes are stored as evidence, not decoded | proof of end, and `locked` still false | anything else (no proof of end, `locked` unreadable): `unknown` |
+| `csi_design_run` | — (the model is already locked; no readable state shows that a design ran) | — | always `unknown` |
 
 The evidence (reads, the Sasaah audit-log lines for the op, if any) is stored as a result and referenced from the
-`Reconciliation`. A read-back that is not available for the tool gives `unknown` (the engineer decides, engine §4.5.3).
+`Reconciliation`. A re-run of an analysis or design after `unknown` is never decided by the adapter: it is the
+engineer's explicit retry decision, journaled by the engine (engine §4.5.3), and it is sent only after proof of end
+(§11 Q4). A read-back that is not available for the tool gives `unknown` (the engineer decides, engine §4.5.3).
 
 #### 4.5.8 Host preconditions, read-back and check after write
 
 - Before a write: the model is bound and its instance locked; units were verified in this epoch; for `owned` tools
-  the role session launched the instance and was not restarted (else the interim `CONFLICT` or, after ADR-0031,
-  `server_owned_instance`).
+  the role holds launch ownership (§4.4.2), else the call is not sent and fails with the interim `CONFLICT` or, after
+  ADR-0031, `PRECONDITION_FAILED` (`server_owned_instance`).
 - `HostPort.check_model(model_key)` (engine invariant 1): reads back every item written since the last check with the
   read-back helpers, compares with the requested state, and returns `issues.model_check/1` with `READBACK_MISMATCH`
   or `READBACK_UNAVAILABLE` (error), plus the integrity checks that need no tolerance: frames or areas whose section is
@@ -569,7 +592,7 @@ The evidence (reads, the Sasaah audit-log lines for the op, if any) is stored as
 | `check_model`, `save` | §4.5.8 |
 | `read_units` | §4.5.4 |
 | `working_copy(model_key, folder)` | copy the model file into `folder` (hash before and after the copy must match), launch a hidden instance on the `main` role if the host has none for this run, lock it, `csi_open_model(copy, confirm=true)`, record expected units, identity `derived_from` the original (ADR-0032); returns `<model_key>@copy` |
-| `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching session is alive and not restarted, else launch a new hidden instance (reported by `started_instances`) and open it there |
+| `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new hidden instance (reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
 | `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image, read-back helpers, true for every `write`, §4.5.7 |
@@ -633,7 +656,9 @@ they are confirmed at the first local run (OQ-G10).
 
 #### 4.6.4 Model-state reader and fingerprint
 
-`model_state` reads (all with `units` tokens where the tool takes them, every list with `limit` 2000):
+`model_state` reads (all with `units` tokens where the tool takes them; every list tool with `limit` 2000 and every
+`csi_db_table_read` with `row_limit` 2000, the inventory's parameter names). `csi_db_table_read` has no `units`
+parameter: its values are in the present units, read and labelled as in §4.5.4:
 
 | Kind | Source |
 |---|---|
@@ -697,12 +722,15 @@ tools.
 
 `RecordMode` wraps the `ProcessTransport` of a session: every `tools/list`, `tools/call` request and the matching
 reply (and the `initialize` result) is written to `acceptance/recordings/<adapter>-<build>/<seq>-<tool>.json`
-(process/05 §4). Sanitizing before writing: absolute paths inside the run folder become `<run>/<relative>`, any other
-absolute path becomes `<path>/<base name>`; the user name (from the environment) and the home folder become `<user>`
+(process/05 §4). Sanitizing before writing: model and file base names (in paths and in values such as
+`csi_model_info.model_path` and host messages that quote them) are replaced by stable placeholders per recording
+session, numbered in order of first appearance and keeping the extension (`<model-1>.EDB`, `<file-2>.dxf`); the
+mapping is kept only in the run folder, never in the recording or the repository. Absolute paths inside the run folder
+become `<run>/<relative with placeholders>`, any other absolute path becomes `<path>/<placeholder>`; the user name (from the environment) and the home folder become `<user>`
 and `<home>`; reads of `Project Information` are dropped entirely (S-04 practice). A `manifest.json` lists every
 file with its SHA-256, the adapter, the build string, the tool fingerprint of the recorded `tools/list`, and the
-harness version. The owner reviews recordings for client or project names in host messages before committing them
-(free text cannot be sanitized mechanically). Record mode is a `harness.toml` switch for live runs and is used by the
+harness version. The owner still reviews recordings for client or project names in other free text before committing
+them (free text cannot be sanitized mechanically). Record mode is a `harness.toml` switch for live runs and is used by the
 record scripts in `acceptance/scripts/` (owner only).
 
 #### 4.8.2 Recorded-reply fake and contract tests
@@ -721,7 +749,9 @@ S-12 inventory's names and input schemas (a contract test keeps it equal to the 
 model (stories, grids, points, frames, areas, sections, materials, patterns, combinations, loads, restraints, units,
 `locked`, file path), answers in the Sasaah reply shape (one JSON text block; `isError` with `{code, message,
 data}`), and implements the S-12 behaviors the adapter relies on: per-call `units` set and restore, `model_locked`
-after analysis, `not_launched_by_server` after attach, `truncated` at `limit`, `com_worker_recycled`. Faults are set
+after analysis, `not_launched_by_server` after attach and after any `timeout` (a timeout invalidates the session; the
+next call re-attaches with `launched: false`), `csi_exit` acting on the current target, `truncated` at `limit` and
+`row_limit`, `com_worker_recycled`. Faults are set
 by a control file named in its environment: `timeout_before_apply`, `timeout_after_apply`, `crash_during_call`,
 `units_left_changed`, `slow_analysis`. A recording replaces a synthetic fixture per operation: the fake-fidelity test
 (AC34) compares the synthetic reply with the recorded one and a mismatch is fixed in the fake first. A synthetic
@@ -829,7 +859,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | Q1 | ADR-0031: `model_locked` as `PRECONDITION_FAILED` (`model_unlocked`), `server_owned_instance`, unlock under approval, `unlock` always-ask (engine spec 0001 §4.7 needs the same addition) | Owner | Accept; until then the interim mapping holds and the cycle stops at the second cycle's first edit |
 | Q2 | Timeout topology: a dedicated `long` role attached to the `main` role's instance (OQ-Q21), or one role with the analysis timeout | Owner | Dedicated role; fall back to `single` only if the local test shows a second server cannot attach to a server-launched instance |
 | Q3 | MCP protocol mode with the Sasaah servers (C# SDK 1.1.0): `legacy` (initialize handshake) or `auto` (probe, then fall back) | Owner | `legacy`, so recordings are deterministic; configurable |
-| Q4 | Analysis and design reconcile as `not_applied` (re-run) once the host answers, because re-running recomputes the same results | Owner | Accept; the re-run is journaled as a new attempt; if S-02 shows a re-run can differ (for example after a partial run), switch to `unknown` |
+| Q4 | Analysis and design in flight at a timeout reconcile as `unknown` in v1, because an answer from the new worker does not show that the abandoned host call ended (S-12 §5); a re-run is the engineer's journaled retry decision, sent only after proof of end | Owner | Accept; once S-02 gives a proof-of-end mechanism (H-G7), `csi_run_analysis` decides `applied` or `not_applied` from `locked` as in §4.5.7 |
 | Q5 | ADR-0032: harness-side identity by content and path hash | Owner | Accept; ask Sasaah for a typed `csi_set_project_info` (S12-G6) |
 | Q6 | Silent breakaway lets server helpers escape; the guard terminates recorded helpers | Owner | Accept; ask Sasaah to start hosts with `CREATE_BREAKAWAY_FROM_JOB`, then switch to `BREAKAWAY_OK` |
 | Q7 | A launched instance that cannot be exited gracefully and was visible is left running | Owner | Accept: an engineer may be using a visible instance; the run report lists it |
@@ -839,6 +869,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G4 | The 06 §7 `check_model` list beyond tolerance-free checks | Owner | Later minor; duplicates need a basis tolerance |
 | H-G5 | `model.frame_placements/1` `kind` cannot be read from `csi_list_frames` | Owner | Read design orientation through `csi_frame_details` after a local check of its reply |
 | H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
+| H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | C1 | Conflict: 11 §9 says analysis may be "started and then followed through `csi_analysis_status`"; S-12 §5 shows the call is synchronous | Owner | This spec follows S-12; amend 11 §9 and 18 step 11 (S-12 "Consequences") |
@@ -853,7 +884,10 @@ survives the server job's closure (silent breakaway); (2) a second server (`long
 server-launched instance; (3) the live `tools/list` fingerprint against the allowlist's (replace the S-12 value with
 a recording); (4) `serverInfo` the Sasaah server reports; (5) every table key of §4.6.2 and §4.6.4 and their reply
 fields; (6) the reply fields of every list tool mapped in §4.6.4; (7) a server `timeout` during a write and during an
-analysis, the units afterwards, and each reconciliation rule of §4.5.7 (with S-02); (8) fingerprint stability and the
+analysis, the units afterwards, each reconciliation rule of §4.5.7, `locked` after a completed analysis, and a
+proof-of-end mechanism for an abandoned analysis call (H-G7, with S-02); (7a) after a `timeout` on a role, that the
+next call re-attaches with `launched: false` and `csi_exit` is refused, and what `csi_status` reports as the current
+target; (8) fingerprint stability and the
 blind spots of the read set (S-04); (9) `close_started` closing a hidden launched instance and leaving a visible one;
 (10) the host-instance lock across two engine processes; (11) `dxf-prep/prepare` and `etabs-model/build` through the
 adapter, including the configuration rewrite and the build-artifact hash; (12) `eng-harness doctor` on the owner's

@@ -141,6 +141,7 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_hostlock.py::test_second_driver_refused"
       - "packages/eng-harness/tests/unit/servers/test_hostlock.py::test_stale_and_pid_reuse"
       - "packages/eng-harness/tests/workflow/servers/test_guard.py::test_close_only_started"
+      - "packages/eng-harness/tests/workflow/servers/test_guard.py::test_close_after_timeout_falls_back"
     covers: [AC13, AC14, AC15]
     depends_on: [T6]
   - id: T8
@@ -196,7 +197,8 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/adapters/test_identity.py::test_resolution_rules"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py::test_working_copy_restore_save"
-    covers: [AC30]
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py::test_restore_after_timeout"
+    covers: [AC15, AC30]
     depends_on: [T7, T9]
   - id: T11
     title: CSI model-state reader, model kinds, fingerprint and units read
@@ -266,6 +268,7 @@ tasks:
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py::test_outcomes_per_tool"
+      - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py::test_long_tools_unknown_without_proof_of_end"
     covers: [AC23]
     depends_on: [T13]
   - id: T15
@@ -393,7 +396,9 @@ constant cites its header and Win32 page. The breakaway test is the case ADR-003
 
 **T4 Synthetic CSI fake** (§4.8.3). Test code only (counts as tests for the budget): the server built with the SDK's
 server API, `schemas.json` copied from the S-12 inventory for the allowlisted tools and the session tools, the
-in-memory model, Sasaah reply shapes, faults from a control file. Its contract test keeps the schemas equal to the
+in-memory model, Sasaah reply shapes, faults from a control file, and the session behaviors of §4.8.3 (a
+`timeout` invalidates the session and the next call re-attaches with `launched: false`; `csi_exit` acts on the
+current target). Its contract test keeps the schemas equal to the
 inventory; a packaging test proves `tests/` is not in the wheel.
 
 **T5 Session** (§4.3.2, §4.3.3, §4.3.5). `ProcessTransport`, roles, `Client(mode, cache=None)`, per-call backstop
@@ -404,7 +409,8 @@ refusal, the CSI allowlist header pinned to the S-12 commit and the fingerprint 
 check and `ServerCheck`; the workflow test stops a run through the engine's preflight.
 
 **T7 Lock and guard** (§4.4). OS locks in the machine-level lock folder, holder records, stale handling; launched
-instance identification by snapshot diff; `close_started` rules; helper tracking.
+instance identification by snapshot diff; launch ownership per role session counter; `close_started` rules with
+the `csi_status` current-target check and the fallback; helper tracking.
 
 **T8 Framework** (§4.5.2, §4.5.3, §4.5.7 ledger). `validate_input` with `require_refs`, conversion by token,
 explicit target, envelopes within the limits, provenance, the write ledger with `fsync`, `ToolPort.describe` and
@@ -414,7 +420,8 @@ explicit target, envelopes within the limits, provenance, the write ledger with 
 backstop rules, wedged state and epochs; `model_locked` interim mapping (`HOST_LOCKED`) per ADR-0031 decision 5.
 
 **T10 Identity and session operations** (§4.5.9, ADR-0032). The identity store, launch and open of a working copy,
-save with hash and identity update, restore, `locate`, `model_files`.
+save with hash and identity update, restore (a new hidden instance when launch ownership is lost), `locate`,
+`model_files`.
 
 **T11 Model state** (§4.6.4). The read set, the six model kinds and the status, the fingerprint, `LIMIT_EXCEEDED` on
 truncation, outside-edit detection, `read_units`; the units-trap workflow test with the synthetic fault.
@@ -426,12 +433,15 @@ tolerance.
 **T13 Analysis and design** (§4.6.1 steps 11 to 13). Long-role routing, analysis status, design run and results, the
 three force kinds, analysis messages.
 
-**T14 Reconciliation** (§4.5.7). The per-tool rules with pre-images and evidence, `read_back`, `preview`.
+**T14 Reconciliation** (§4.5.7). The per-tool rules with pre-images and evidence, `read_back`, `preview`;
+analysis and design reconcile `unknown` while no proof of end exists (gap H-G7).
 
 **T15 ADR-0031 switch.** Blocked until the owner accepts ADR-0031 and `eng-contract` releases `model_unlocked` and
 `server_owned_instance`. Then: the new mappings, `csi_unlock_model` on the allowlist with action `unlock`, and the
 interim test replaced, because the accepted ADR changes the specified behavior (a spec change, not a test changed to
-pass). The engine's always-ask list gains `unlock` in the engine plan, not here.
+pass). The engine's action-based always-ask list (engine spec 0001 §4.7: action `delete`, saves over an original)
+gains the action `unlock` in the engine plan, not here; the edit-cycle workflow's existing tool-name entry
+`always_ask=("csi_unlock_model",)` matches it and stays.
 
 **T16 Command-line tools** (§4.7). Tool jobs, attempt folders, hashed inputs and outputs, the configuration rewrite,
 build-artifact pins, exit-code mapping, reconciliation by completion record; a Python stand-in for the scripts.

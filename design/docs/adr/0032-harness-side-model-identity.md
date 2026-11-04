@@ -3,8 +3,8 @@
 Status: Proposed · Date: 2026-11-03 · Deciders: owner (pending); proposed by the agent identity with the eng-harness
 server and adapter spec
 
-Amends [04](../architecture/04-tool-contract.md) §3.3 and [06](../architecture/06-csi-servers.md) §6 (both
-Proposed). Closes spike gap S12-G6 (owner queue OQ-A4).
+Amends [04](../architecture/04-tool-contract.md) §3.3 (Proposed) and [06](../architecture/06-csi-servers.md) §6
+(superseded as a build plan by ADR-0024; its rules remain the target). Closes spike gap S12-G6 (owner queue OQ-A4).
 
 ## Context
 
