@@ -13,6 +13,7 @@ from typing import Any, Literal, Union, get_args, get_origin
 
 from eng_contract.cited import Cited
 from eng_contract.params import ContractDefinitionError, ParamModel, ParamSpec, eng_param
+from eng_contract.verdicts import Verdict
 from pydantic import Field
 
 from structural_codes.errors import CheckDefinitionError
@@ -22,7 +23,9 @@ __all__ = ["CheckInputs", "bounded", "check_inputs_definition", "unbounded"]
 # The bounds of the reserved `ratio_limit`: above zero, at most the contract default (04-tool-contract section 5.1).
 _ZERO = Cited(value=0, unit="1", source="04-tool-contract section 5.1: ratio_limit is greater than zero")
 _CONTRACT_DEFAULT = Cited(
-    value=1.0, unit="1", source="04-tool-contract section 5.1: ratio_limit does not exceed the contract default"
+    value=Verdict.model_fields["ratio_limit"].default,
+    unit="1",
+    source="04-tool-contract section 5.1: ratio_limit does not exceed the contract default",
 )
 _BOUND_KEYS = ("ge", "gt", "le", "lt")
 
@@ -47,14 +50,14 @@ def bounded(
     `kwargs` go to `eng_param` (`unit`, `ref_capable`, a default, ...).
 
     Raises:
-        CheckDefinitionError: no bound given, or a cited unit that differs from `unit`.
+        CheckDefinitionError: no bound given, or a cited unit that differs from `unit` (a missing `unit` is none).
     """
     given = {key: c for key, c in {"ge": ge, "gt": gt, "le": le, "lt": lt}.items() if c is not None}
     if not given:
         raise CheckDefinitionError("bounded() needs at least one cited bound")
     for key, c in given.items():
-        if kwargs.get("unit") is not None and c.unit != kwargs["unit"]:
-            raise CheckDefinitionError(f"bound {key} has unit {c.unit!r}, the field has {kwargs['unit']!r}")
+        if c.unit != kwargs.get("unit"):
+            raise CheckDefinitionError(f"bound {key} has unit {c.unit!r}, the field has {kwargs.get('unit')!r}")
     source = "; ".join(dict.fromkeys(c.source for c in given.values()))
     fields: dict[str, Any] = {key: float(c.value) for key, c in given.items()}
     return eng_param(**kwargs, bounds_source=source, **fields)
@@ -68,11 +71,12 @@ def unbounded(*, reason: str, **kwargs: Any) -> Any:
     """
     if not reason.strip():
         raise CheckDefinitionError("unbounded() needs a non-blank reason")
-    base = eng_param(**kwargs).json_schema_extra
-    assert isinstance(base, ParamSpec)  # noqa: S101  # B-257: eng_param always sets a ParamSpec
-    copied: dict[str, Any] = {f.name: getattr(base, f.name) for f in dataclasses.fields(ParamSpec)}
-    spec = _UnboundedSpec(**copied, reason=reason)
-    return Field(kwargs.get("default", ...), json_schema_extra=spec)
+    given = [key for key in (*_BOUND_KEYS, "bounds_source") if key in kwargs]
+    if given:
+        raise CheckDefinitionError(f"unbounded() takes no bounds, got {', '.join(given)}")
+    default = kwargs.pop("default", ...)
+    kwargs["ref_kinds"] = frozenset(kwargs.get("ref_kinds", ()))
+    return Field(default, json_schema_extra=_UnboundedSpec(**kwargs, reason=reason))
 
 
 def _scalar(annotation: Any) -> tuple[bool, bool]:
