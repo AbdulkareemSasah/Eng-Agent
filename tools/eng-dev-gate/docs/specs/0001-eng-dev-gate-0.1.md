@@ -93,6 +93,9 @@ gate-check (§4.5)
 - AC12b. Given the committed root `.gate/gate.yml`, then its `spec_globs` also match the clause specs
   `docs/clauses/<pack>/*.md` of a code-pack package (process/03 "Clause spec"; structural-codes spec 0001), so the
   documents-only pull request of a clause spec is a spec and plan pull request (amendment B-343).
+- AC12c. Given the committed root `.gate/gate.yml`, then its `generated_globs` also match the JSON Schema snapshots
+  `docs/schema/**` of a package (written by the package's schema exporter and checked fresh by its snapshot test), so
+  they do not count toward a task's diff budget (§4.5 step 7); they stay in the task's file scope (amendment B-359).
 - AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
   task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
 - AC13a. Given a plan whose `spec:` names a directory (a path ending in `/`) of clause specs, then every `*.md` file
@@ -898,6 +901,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
 | AC6 to AC11 (with AC10a, AC10b and AC10c), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules`, `test_gate_check.py::test_empty_test_package_marker_in_scope` (T36) |
 | AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
+| AC12c | unit | `test_config.py::test_root_gate_yml_schema_snapshots_are_generated` (T35) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
 | AC19 to AC21b | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27), `::test_in_scope_ratchet_change_does_not_raise_floor` (T33) |

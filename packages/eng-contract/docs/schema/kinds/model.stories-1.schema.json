@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "Story": {
+      "additionalProperties": false,
+      "description": "One story; `similar_to` names another story of the list.",
+      "properties": {
+        "elevation_mm": {
+          "title": "Elevation Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "height_mm": {
+          "exclusiveMinimum": 0,
+          "title": "Height Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "master_story": {
+          "title": "Master Story",
+          "type": "boolean"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "similar_to": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Similar To"
+        }
+      },
+      "required": [
+        "name",
+        "elevation_mm",
+        "height_mm",
+        "master_story"
+      ],
+      "title": "Story",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.stories/1`: stories from the bottom up, with strictly increasing elevations above the base.",
+  "properties": {
+    "base_elevation_mm": {
+      "title": "Base Elevation Mm",
+      "type": "number",
+      "x-eng-unit": "mm"
+    },
+    "stories": {
+      "items": {
+        "$ref": "#/$defs/Story"
+      },
+      "title": "Stories",
+      "type": "array"
+    }
+  },
+  "required": [
+    "base_elevation_mm",
+    "stories"
+  ],
+  "title": "Stories",
+  "type": "object"
+}

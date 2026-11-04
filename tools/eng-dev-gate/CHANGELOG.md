@@ -1,6 +1,13 @@
 # Changelog
 
+## 0.1.0
+
+First version (tag `eng-dev-gate-v0.1.0` after the owner's approval; nothing is published to a package index). It
+contains every entry listed below; README documents every command with an example (B-054, plan task T25, AC64).
+
 ## Unreleased
+
+- Root `.gate/gate.yml`: `generated_globs` gains `**/docs/schema/**`, so JSON Schema snapshots no longer count toward the task diff budget (B-360, plan task T35, AC12c).
 
 - `test-first`: for a package that the pull request adds, the base run blocks the package's import names (read from the head's `[tool.eng-gate] import_names`) with a meta-path finder of the base pytest plugin, so an editable install of the head cannot make a first-commit test pass at the base (TF004); the names are blocked before conftest.py files load (a conftest.py that imports one makes the base run red); a name that still resolves is TF011. `judged_run.py` gains the modes `pytest` and `probe` (B-357, plan task T34, AC27a).
 - Fix: in pull-request context the `types` step runs the gate's own mypy with `--python-executable` set to the interpreter of the judged environment, and the `imports` step resolves IM006 with the judged environment's module map, so a dependency and its stub distribution added by the pull request no longer fail with `import-untyped` or IM006; `judged_metadata.py` now writes the interpreter, the distributions and the module map in one JSON object, which the `licenses` step reads as well; a stale `uv.lock` is ST001 of the step, a missing `uv` an environment fault; the `imports` step is a function of the whole step context; head runs are unchanged (B-347, plan task T32, AC54a).

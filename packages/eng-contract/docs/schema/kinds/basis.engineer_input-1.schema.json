@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "EngineerValue": {
+      "additionalProperties": false,
+      "description": "A value the engineer entered in answer to a step.",
+      "properties": {
+        "entered_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "title": "Entered At",
+          "type": "string"
+        },
+        "entered_by": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Entered By",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "entered_by",
+        "entered_at"
+      ],
+      "title": "EngineerValue",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "description": "`basis.engineer_input/1`: `step` is the step path that asked.",
+  "properties": {
+    "fields": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EngineerValue"
+      },
+      "propertyNames": {
+        "maxLength": 200,
+        "minLength": 1
+      },
+      "title": "Fields",
+      "type": "object"
+    },
+    "step": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Step",
+      "type": "string"
+    }
+  },
+  "required": [
+    "step",
+    "fields"
+  ],
+  "title": "EngineerInput",
+  "type": "object"
+}

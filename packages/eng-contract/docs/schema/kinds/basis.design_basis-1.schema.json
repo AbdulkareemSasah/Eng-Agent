@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "BasisField": {
+      "additionalProperties": false,
+      "description": "One basis value with its provenance; a template value cites the standard that gives it.",
+      "properties": {
+        "citation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Citation"
+        },
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unit"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "source",
+        "confirmed",
+        "citation"
+      ],
+      "title": "BasisField",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "TemplateRef": {
+      "additionalProperties": false,
+      "description": "The template the basis was started from.",
+      "properties": {
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "sha256"
+      ],
+      "title": "TemplateRef",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`basis.design_basis/1`: fields keyed by dotted path.",
+  "properties": {
+    "fields": {
+      "patternProperties": {
+        "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$": {
+          "$ref": "#/$defs/BasisField"
+        }
+      },
+      "title": "Fields",
+      "type": "object"
+    },
+    "template": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TemplateRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "template",
+    "fields"
+  ],
+  "title": "DesignBasis",
+  "type": "object"
+}
