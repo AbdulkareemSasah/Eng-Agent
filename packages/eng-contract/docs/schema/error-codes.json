@@ -1,0 +1,92 @@
+{
+  "codes": [
+    {
+      "code": "CONFIRMATION_REQUIRED",
+      "retry": "never"
+    },
+    {
+      "code": "CONFLICT",
+      "retry": "never"
+    },
+    {
+      "code": "HOST_BUSY",
+      "retry": "always"
+    },
+    {
+      "code": "HOST_ERROR",
+      "retry": "depends"
+    },
+    {
+      "code": "HOST_LOCKED",
+      "retry": "never"
+    },
+    {
+      "code": "HOST_NOT_CONNECTED",
+      "retry": "always"
+    },
+    {
+      "code": "HOST_WEDGED",
+      "retry": "after_wedge_clears"
+    },
+    {
+      "code": "INTERNAL",
+      "retry": "never"
+    },
+    {
+      "code": "INVALID_ARGUMENT",
+      "retry": "never"
+    },
+    {
+      "code": "LIMIT_EXCEEDED",
+      "retry": "never"
+    },
+    {
+      "code": "NOT_FOUND",
+      "retry": "never"
+    },
+    {
+      "code": "NOT_SUPPORTED_BY_VERSION",
+      "retry": "never"
+    },
+    {
+      "code": "OUT_OF_RANGE",
+      "retry": "never"
+    },
+    {
+      "code": "PRECONDITION_FAILED",
+      "retry": "never"
+    },
+    {
+      "code": "REF_KIND_MISMATCH",
+      "retry": "never"
+    },
+    {
+      "code": "REF_NOT_FOUND",
+      "retry": "never"
+    },
+    {
+      "code": "REF_POINTER_INVALID",
+      "retry": "never"
+    },
+    {
+      "code": "REF_STALE",
+      "retry": "never"
+    },
+    {
+      "code": "REF_UNIT_MISMATCH",
+      "retry": "never"
+    },
+    {
+      "code": "TIMEOUT_NO_EFFECT",
+      "retry": "always"
+    },
+    {
+      "code": "TIMEOUT_UNKNOWN_OUTCOME",
+      "retry": "reconcile_first"
+    },
+    {
+      "code": "UNIT_MISMATCH",
+      "retry": "never"
+    }
+  ]
+}

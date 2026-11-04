@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0
+
+First version (tag `eng-dev-gate-v0.1.0` after the owner's approval; nothing is published to a package index). It
+contains every entry listed below; README documents every command with an example (B-054, plan task T25, AC64).
+
 ## Unreleased
 
 - Root `.gate/gate.yml`: `generated_globs` gains `**/docs/schema/**`, so JSON Schema snapshots no longer count toward the task diff budget (B-360, plan task T35, AC12c).

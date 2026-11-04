@@ -1,0 +1,67 @@
+{
+  "$defs": {
+    "JointRestraint": {
+      "additionalProperties": false,
+      "description": "Restrained degrees of freedom of one joint (true = restrained).",
+      "properties": {
+        "joint": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Joint",
+          "type": "string"
+        },
+        "rx": {
+          "title": "Rx",
+          "type": "boolean"
+        },
+        "ry": {
+          "title": "Ry",
+          "type": "boolean"
+        },
+        "rz": {
+          "title": "Rz",
+          "type": "boolean"
+        },
+        "ux": {
+          "title": "Ux",
+          "type": "boolean"
+        },
+        "uy": {
+          "title": "Uy",
+          "type": "boolean"
+        },
+        "uz": {
+          "title": "Uz",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "joint",
+        "ux",
+        "uy",
+        "uz",
+        "rx",
+        "ry",
+        "rz"
+      ],
+      "title": "JointRestraint",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.joint_restraints/1`.",
+  "properties": {
+    "joints": {
+      "items": {
+        "$ref": "#/$defs/JointRestraint"
+      },
+      "title": "Joints",
+      "type": "array"
+    }
+  },
+  "required": [
+    "joints"
+  ],
+  "title": "JointRestraints",
+  "type": "object"
+}

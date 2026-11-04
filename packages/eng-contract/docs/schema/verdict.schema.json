@@ -1,0 +1,229 @@
+{
+  "$defs": {
+    "Quantity": {
+      "additionalProperties": false,
+      "description": "A finite value in a unit; frozen, hashable, with physical equality and same-dimension ordering.\n\nEquality and ordering compare exact fractions of the coherent SI value (spec 4.8 rule 4). A float enters the\nfraction as its shortest round-trip decimal (the number as written, so 25.4 mm equals 1 in). Between units with\ndifferent powers of pi (`deg` against `rad`) the single float64 step `sifloat` is compared instead; equality\nacross powers of pi is therefore not transitive at the last bit, and canonical stored data never mixes them.\n`sifloat` saturates to infinity beyond the float64 range, which only coarsens the hash and the cross-pi\ncomparison there.",
+      "properties": {
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "unit"
+      ],
+      "title": "Quantity",
+      "type": "object"
+    },
+    "Subject": {
+      "additionalProperties": false,
+      "description": "The object a verdict or issue is about; `station_mm` is the position along it, `case` the governing case.",
+      "properties": {
+        "case": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Case"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/SubjectKind"
+        },
+        "station_mm": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Station Mm"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "SubjectKind": {
+      "description": "Kind of the checked object; new values are additive.",
+      "enum": [
+        "joint",
+        "frame",
+        "area",
+        "link",
+        "story",
+        "grid_line",
+        "section",
+        "material",
+        "load_pattern",
+        "load_combination",
+        "footing",
+        "model"
+      ],
+      "title": "SubjectKind",
+      "type": "string"
+    },
+    "VerdictSource": {
+      "description": "Who produced the verdict.",
+      "enum": [
+        "code_pack",
+        "host"
+      ],
+      "title": "VerdictSource",
+      "type": "string"
+    },
+    "VerdictStatus": {
+      "description": "Outcome of a check; each member's value is its own name.",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NOT_APPLICABLE",
+        "NEEDS_ENGINEER",
+        "ERROR"
+      ],
+      "title": "VerdictStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One check result; `ratio` is computed by the producer (demand / capacity) and is not recomputed here.",
+  "properties": {
+    "assumptions": {
+      "items": {
+        "maxLength": 500,
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "capacity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Quantity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "check_id": {
+      "maxLength": 200,
+      "title": "Check Id",
+      "type": "string"
+    },
+    "clause": {
+      "anyOf": [
+        {
+          "maxLength": 100,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Clause"
+    },
+    "code": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Code",
+      "type": "string"
+    },
+    "demand": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Quantity"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "governing": {
+      "default": false,
+      "title": "Governing",
+      "type": "boolean"
+    },
+    "ratio": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ratio"
+    },
+    "ratio_limit": {
+      "default": 1.0,
+      "exclusiveMinimum": 0,
+      "title": "Ratio Limit",
+      "type": "number"
+    },
+    "source": {
+      "$ref": "#/$defs/VerdictSource"
+    },
+    "status": {
+      "$ref": "#/$defs/VerdictStatus"
+    },
+    "subject": {
+      "$ref": "#/$defs/Subject"
+    },
+    "trace_ref": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#[\\s\\S]*)?$",
+          "type": "string"
+        },
+        {
+          "pattern": "^#/traces/(0|[1-9][0-9]*)$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Trace Ref"
+    }
+  },
+  "required": [
+    "source",
+    "check_id",
+    "code",
+    "subject",
+    "status"
+  ],
+  "title": "Verdict",
+  "type": "object"
+}
