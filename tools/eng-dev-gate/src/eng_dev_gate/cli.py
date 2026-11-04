@@ -11,7 +11,7 @@ import json
 import sys
 from collections.abc import Callable, Mapping, Sequence
 
-from eng_dev_gate import __version__
+from eng_dev_gate import __version__, agents
 from eng_dev_gate.checks.gate_check import handle_gate_check
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
 
@@ -31,10 +31,12 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--format", choices=("text", "json"), default="text")
     sub = parser.add_subparsers(dest="command", required=True)
     for name in COMMANDS:
-        command = sub.add_parser(name, help=f"{name} command")
-        if name == "gate-check":
-            command.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
-            command.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
+        child = sub.add_parser(name, help=f"{name} command")
+        if name == "agents":
+            agents.add_arguments(child)
+        elif name == "gate-check":
+            child.add_argument("--event", default=None, help="GitHub event file (default: GITHUB_EVENT_PATH)")
+            child.add_argument("--gate-ref", default=None, help="ref of the plans and specs (default: origin/<gate>)")
     return parser
 
 
@@ -64,7 +66,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = {"gate-check": handle_gate_check, **(handlers or {})}.get(args.command)
+    handler = {"agents": agents.handle, "gate-check": handle_gate_check, **(handlers or {})}.get(args.command)
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")

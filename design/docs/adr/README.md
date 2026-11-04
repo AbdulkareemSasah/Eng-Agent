@@ -39,3 +39,4 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0030](0030-replay-by-step-path-and-reconciliation.md) | Replay by step path, in-flight reconciliation, durability policy, one engine per run, one Job Object per server with host programs outside it (amends ADR-0014) | Proposed |
 | [0031](0031-model-locked-after-analysis.md) | `model_locked` after analysis is `PRECONDITION_FAILED` (`model_unlocked`), not `HOST_LOCKED`; an approved unlock step; precondition `server_owned_instance` (amends 04 §8.1, 11 §7 and §9) | Proposed |
 | [0032](0032-harness-side-model-identity.md) | A harness-side model identity in the workspace when the host cannot stamp one (amends 04 §3.3, 06 §6) | Proposed |
+| [0033](0033-desktop-products-in-sasaah.md) | The desktop products stay in Sasaah during v1; nothing is built under `products/` | Proposed |
