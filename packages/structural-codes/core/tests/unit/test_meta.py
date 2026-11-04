@@ -83,6 +83,21 @@ def test_metadata_fields(name: str) -> None:
         _meta(**{name: _MISSING})
 
 
+def test_error_message_names_model_and_fields() -> None:
+    with pytest.raises(CheckDefinitionError) as one:
+        _meta(code=_MISSING)
+    assert str(one.value).startswith("invalid CheckMeta: code: ")
+    with pytest.raises(CheckDefinitionError) as two:
+        _meta(edition=_MISSING, code=_MISSING)
+    assert str(two.value).startswith("invalid CheckMeta: code, edition: ")
+    with pytest.raises(CheckDefinitionError) as model_level:
+        _meta(clauses=())
+    assert str(model_level.value).startswith("invalid CheckMeta: model: ")
+    with pytest.raises(CheckDefinitionError) as nested:
+        _meta(gaps=({"id": "bad", "clause": "1", "reason": "r"},))
+    assert str(nested.value).startswith("invalid GapDecl: id: ")
+
+
 def test_metadata_field_values() -> None:
     with pytest.raises(CheckDefinitionError):
         _meta(members=set())
@@ -181,7 +196,7 @@ def test_gap_declarations() -> None:
 def test_metadata_is_frozen_and_error_chained() -> None:
     m = _meta()
     with pytest.raises(Exception, match="frozen"):
-        m.title = "other"  # type: ignore[misc]  # B-256: the test proves the model is frozen
+        m.title = "other"
     with pytest.raises(CheckDefinitionError) as info:
         _meta(code=_MISSING)
     assert info.value.__cause__ is not None  # the pydantic error stays reachable
