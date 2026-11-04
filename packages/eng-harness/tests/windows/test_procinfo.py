@@ -1,7 +1,8 @@
 """Windows process inspector (plan 0002 T3; spec 0002 AC7, section 4.3.1).
 
 The rules run on every platform over a fake kernel32 (the tests before the platform check); the tests against the real
-Windows API are defined only on Windows (marker `windows`) and run in the Windows CI job.
+Windows API are defined only on Windows (marker `windows`). They have not run on Windows yet and are an owner local
+test.
 """
 
 import os

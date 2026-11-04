@@ -1,9 +1,9 @@
 """Windows launcher and Job Objects (plan 0002 T3; spec 0002 AC5, AC6, section 4.3.1).
 
 The launcher logic runs on every platform over a fake kernel32 (the tests before the platform check). The tests that
-start real processes in real jobs are defined only on Windows (marker `windows`) and run in the Windows CI job; each
-tracks the processes it created and proves they exist before it asserts that they ended (S-10 report, "Windows
-results": its engine-exit runs tracked no process and so proved nothing).
+start real processes in real jobs are defined only on Windows (marker `windows`); they have not run on Windows yet and
+are an owner local test. Each tracks the processes it created and proves they exist before it asserts that they ended
+(S-10 report, "Windows results": its engine-exit runs tracked no process and so proved nothing).
 """
 
 import os
