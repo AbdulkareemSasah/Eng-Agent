@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+import pytest
 from eng_dev_gate.checks.forbidden.engine import ForbiddenConfig, Rule, Unit, scan_file, scan_member
 from eng_dev_gate.checks.forbidden.rules_a import RULES_A
 from eng_dev_gate.config import load_gate_config
 from eng_dev_gate.report import Finding, Severity
+from eng_dev_gate.results import UsageError
 from eng_dev_gate.workspace import Member
 from support.forbidden import lines, policy, scan
 from support.repo import Repo
@@ -89,6 +91,17 @@ def test_scope_selects_tests_for_a_tests_rule(repo: Repo) -> None:
         "pkgs/a/conftest.py", "pkgs/a/src/a/conftest.py", "pkgs/a/tests/sub/test_deep.py", "pkgs/a/tests/test_mod.py",
     ]  # fmt: skip
     assert by_code["FB902"] == ["pkgs/a/src/a/conftest.py", "pkgs/a/src/a/mod.py"]
+
+
+def test_unreadable_source_is_a_usage_error(repo: Repo) -> None:
+    member = _workspace(repo)
+    (repo.root / "pkgs" / "a" / "src" / "a" / "folder.py").mkdir()  # a directory that looks like a source file
+    with pytest.raises(UsageError):
+        scan_member(repo.root, member, policy(), RULES_A, [])
+
+
+def test_calls_without_a_dotted_name_are_ignored() -> None:
+    assert scan("make()(1)\nf(**options)\nitems[0](2)\nx = (lambda: 1)()\n") == []
 
 
 def test_scan_of_text_has_no_waiver() -> None:
