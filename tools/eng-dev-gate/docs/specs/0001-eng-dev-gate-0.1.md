@@ -220,7 +220,7 @@ src/eng_dev_gate/
   event.py  frontmatter.py               GitHub event file, spec/plan models
   checks/                                gate_check, risk_floor, test_first, ratchet, forbidden/, imports,
                                          secrets, licenses, generated, mutation, workflows, review
-  agents.py  toolrun.py  pytest_plugin.py
+  agents.py  toolrun.py  pytest_plugin.py  judged_run.py
   prompts/                               pinned reviewer prompts and their hash manifest
 actions/<name>/action.yml                composite actions used by the root workflow
 ```
@@ -511,6 +511,24 @@ patterns at the gate root), and `mypy` receives the gate root's `pyproject.toml`
 judged tree. Tool caches never live in the judged tree, where a pull request could forge them: `ruff` runs with
 `--no-cache` and `mypy` with `--cache-dir` set to a fresh temporary directory outside every checkout, removed afterwards.
 A member that has its own `[tool.ruff]` or `[tool.mypy]` table is configured by that table, as before.
+
+The `tests` step executes the code under check, so with a gate root other than the judged tree (§4.16) it runs the
+tests of each member in an environment built from the judged tree and its own `uv.lock`, not in the interpreter of the
+gate (which holds the gate and its dependencies only): `uv run --project <judged tree> --locked --all-packages --group
+dev python ...`, in the member directory. Policy and plugin still come from the base: the coverage rc file is generated
+by the gate in a temporary directory outside both checkouts and passed with `--rcfile`, the thresholds are applied by
+the gate after the run, and `judged_run.py`, a file of the base commit's package, runs `coverage` in that environment
+after loading the base `pytest_plugin.py` as a module of its own name (`-p eng_gate_base_pytest_plugin`), so an
+`eng_dev_gate` installed in the judged environment cannot stand in for it. `coverage json` runs in the same environment
+from a temporary directory. Without `uv` on the path the step is an environment fault (exit 3). Before the run, the
+step checks `uv lock --check` for the judged tree: a stale or missing `uv.lock` is ST001 of the step (the environment
+cannot be built), not an environment fault, so the other findings of the run are kept; `uv run` is called with `--quiet`
+so that its own warnings (for example an inherited `VIRTUAL_ENV`) do not fill the output. `pytest_plugin.py` imports
+nothing from `eng_dev_gate` (a unit test checks it): inside the judged environment such an import would resolve to the
+pull request's copy. Accepted residual risk: `coverage` and `pytest` themselves come from the judged lock file, so a
+pull request chooses the tools that produce its own report; in-process code of its `conftest.py` could already do the
+same, and the gate-generated rc file, the base plugin and the base thresholds are what bound it. A head run (no gate
+root, push runs, local runs) uses the interpreter of the gate as before.
 
 Floors, from process/05 §2 (a package may set a higher value, never a lower one):
 

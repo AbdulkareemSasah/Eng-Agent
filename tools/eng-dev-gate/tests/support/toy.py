@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from support.repo import Repo
+
+POLICY_FILE = Path(__file__).resolve().parents[4] / ".gate" / "forbidden.yml"  # the committed policy of this workspace
+POLICY_TEXT = POLICY_FILE.read_text(encoding="utf-8")
 
 GATE_YML = """bootstrap:
   enabled: true
@@ -50,6 +55,7 @@ def make_workspace(repo: Repo, names: list[str], module: str = CLEAN_MODULE) -> 
     files = {
         "pyproject.toml": root_pyproject([f"pkgs/{n}" for n in names]),
         ".gate/gate.yml": GATE_YML,
+        ".gate/forbidden.yml": POLICY_TEXT,
     }
     for name in names:
         files[f"pkgs/{name}/pyproject.toml"] = member_pyproject(name)
