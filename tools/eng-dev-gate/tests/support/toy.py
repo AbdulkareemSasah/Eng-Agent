@@ -45,11 +45,16 @@ def root_pyproject(members: list[str]) -> str:
     )
 
 
-def member_pyproject(name: str) -> str:
-    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name)."""
+def member_pyproject(name: str, *, gate_table: bool = True) -> str:
+    """Return the ``pyproject.toml`` of a toy member (``name`` is also its import name).
+
+    ``gate_table=False`` leaves out ``[tool.eng-gate]`` for tests that write their own.
+    """
+    head = f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
+    if not gate_table:
+        return head
     return (
-        f'[project]\nname = "{name}"\nversion = "0.1.0"\nrequires-python = ">=3.14"\ndependencies = []\n'
-        f'[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["{name}"]\n'
+        head + f'[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["{name}"]\n'
         "coverage_line = 95\ncoverage_branch = 90\n"
     )
 
