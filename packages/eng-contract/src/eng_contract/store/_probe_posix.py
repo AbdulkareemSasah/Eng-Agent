@@ -1,7 +1,6 @@
-"""POSIX location probe for development and Linux CI (spec 4.5.2).
+"""POSIX location probe for development and Linux CI (spec 4.5.2): classifies from `/proc/self/mountinfo`.
 
-Purpose: classify a folder from the mounts listed in `/proc/self/mountinfo`. Units: none.
-Errors: none raised; an unreadable mount table gives `LOCAL` (spec 4.5.2: POSIX is not a deployment platform).
+Units: none. Errors: none raised; an unreadable mount table gives `LOCAL` (logged), as the spec states.
 """
 
 import logging

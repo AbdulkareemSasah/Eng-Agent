@@ -1,7 +1,6 @@
-"""Workspace resolution and the location-probe port (spec 4.5.1, 4.5.2).
+"""Workspace resolution and the location-probe port (spec 4.5.1, 4.5.2); units: none.
 
-Purpose: find the folder that holds results and model state, and refuse a folder that is not plainly local.
-Units: none. Errors: `LocalWorkspaceError` (`PRECONDITION_FAILED`, `precondition: local_workspace`).
+Errors: `LocalWorkspaceError` (`PRECONDITION_FAILED`, `precondition: local_workspace`) for a folder that is not local.
 """
 
 import importlib
@@ -30,7 +29,6 @@ class LocationProbe(Protocol):
 
     def classify(self, path: Path) -> LocationClass:
         """Return the class of `path`; never `LOCAL` when the class could not be determined."""
-        ...
 
 
 class FakeLocationProbe:
@@ -48,17 +46,14 @@ class FakeLocationProbe:
         return self._classes[max(matches, key=lambda prefix: len(prefix.parts))] if matches else self._default
 
 
+_LOCAL = Precondition.local_workspace
+
+
 class LocalWorkspaceError(ContractError):
     """The workspace is not configured, not absolute, not creatable or not local (`PRECONDITION_FAILED`)."""
 
     def __init__(self, message: str, hint: str, received: str | None = None) -> None:
-        super().__init__(
-            ErrorCode.PRECONDITION_FAILED,
-            message,
-            precondition=Precondition.local_workspace,
-            hint=hint,
-            received=received,
-        )
+        super().__init__(ErrorCode.PRECONDITION_FAILED, message, precondition=_LOCAL, hint=hint, received=received)
 
 
 class Workspace(BaseModel):

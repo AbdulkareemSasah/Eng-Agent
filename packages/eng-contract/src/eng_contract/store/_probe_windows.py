@@ -1,8 +1,7 @@
-"""Windows location probe (spec 4.5.2): rules over the small `WinApi` port; `ctypes` only, importable on every OS.
+"""Windows location probe (spec 4.5.2): the rules over a `WinApi` port, importable on every OS (`ctypes` only).
 
-Units: none. Errors: none raised; any query that fails gives `UNKNOWN`, never `LOCAL`.
-The numeric constants are software constants of the Windows SDK headers (`winbase.h`, `winnt.h`, `winerror.h`) and the
-Win32 pages "GetDriveTypeW", "File Attribute Constants", "CfGetSyncRootInfoByPath" and "System Error Codes".
+Units: none. Errors: none raised; a failed query gives `UNKNOWN`, never `LOCAL`. The constants are software constants
+of the SDK headers `winbase.h`, `winnt.h` and `winerror.h` and the Win32 pages named in the comments.
 """
 
 import os
@@ -13,21 +12,11 @@ from typing import Protocol
 
 from eng_contract.store._workspace import LocationClass
 
-DRIVE_FIXED, DRIVE_REMOTE, DRIVE_RAMDISK = 3, 4, 6  # winbase.h; the other values (0, 1, 2, 5) are not local disks
-INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF  # fileapi.h, returned by GetFileAttributesW on failure
-FILE_ATTRIBUTE_PINNED = 0x00080000  # winnt.h
-FILE_ATTRIBUTE_UNPINNED = 0x00100000  # winnt.h
-FILE_ATTRIBUTE_RECALL_ON_OPEN = 0x00040000  # winnt.h
-FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000  # winnt.h
-_CLOUD_ATTRIBUTES = (
-    FILE_ATTRIBUTE_PINNED
-    | FILE_ATTRIBUTE_UNPINNED
-    | FILE_ATTRIBUTE_RECALL_ON_OPEN
-    | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS
-)
-S_OK = 0  # winerror.h
-ERROR_MORE_DATA = 234  # winerror.h, "System Error Codes"
-ERROR_CLOUD_FILE_NOT_UNDER_SYNC_ROOT = 390  # winerror.h, "System Error Codes"
+DRIVE_FIXED, DRIVE_REMOTE, DRIVE_RAMDISK = 3, 4, 6  # winbase.h; 0, 1, 2 and 5 are not local disks
+INVALID_FILE_ATTRIBUTES = 0xFFFFFFFF  # fileapi.h, GetFileAttributesW failure
+# winnt.h: FILE_ATTRIBUTE_PINNED, _UNPINNED, _RECALL_ON_OPEN and _RECALL_ON_DATA_ACCESS
+_CLOUD_ATTRIBUTES = 0x00080000 | 0x00100000 | 0x00040000 | 0x00400000
+S_OK, ERROR_MORE_DATA, ERROR_CLOUD_FILE_NOT_UNDER_SYNC_ROOT = 0, 234, 390  # winerror.h, "System Error Codes"
 _ONEDRIVE_VARIABLES = ("OneDrive", "OneDriveCommercial", "OneDriveConsumer")
 
 
@@ -41,15 +30,12 @@ class WinApi(Protocol):
 
     def drive_type(self, root: str) -> int:
         """`GetDriveTypeW(root)`."""
-        ...
 
     def file_attributes(self, path: str) -> int:
         """`GetFileAttributesW(path)`; `INVALID_FILE_ATTRIBUTES` when the call fails."""
-        ...
 
     def sync_root_status(self, path: str) -> int | None:
         """`CfGetSyncRootInfoByPath` HRESULT as unsigned; `None` when `cldapi.dll` or its export is missing."""
-        ...
 
 
 class WindowsProbe:
@@ -62,9 +48,7 @@ class WindowsProbe:
     def classify(self, path: PurePath) -> LocationClass:
         """Classify `path` (a folder); a failed query gives `UNKNOWN`, never `LOCAL`."""
         text = str(PureWindowsPath(path))
-        if text.upper().startswith("\\\\?\\UNC\\") or (
-            text.startswith("\\\\") and not text.startswith(("\\\\?\\", "\\\\.\\"))
-        ):
+        if text.upper().startswith("\\\\?\\UNC\\") or (text.startswith("\\\\") and text[2:3] not in ("?", ".")):
             return LocationClass.NETWORK
         local = PureWindowsPath(text.removeprefix("\\\\?\\"))
         drive = self._api.drive_type(local.drive + "\\")
@@ -92,20 +76,12 @@ if sys.platform == "win32":
     import ctypes
     from ctypes import wintypes
 
-    class _SyncRootBasicInfo(ctypes.Structure):
-        """`CF_SYNC_ROOT_BASIC_INFO` (cfapi.h): the buffer of `CF_SYNC_ROOT_INFO_BASIC` (class 0)."""
-
-        _fields_ = (("SyncRootFileId", ctypes.c_int64),)
-
     class CtypesWinApi:
         """The real `WinApi` over `kernel32.dll` and `cldapi.dll`; its tests carry the `windows` marker."""
 
         def __init__(self) -> None:
             self._kernel32 = ctypes.WinDLL("kernel32")
-            self._kernel32.GetDriveTypeW.argtypes = [wintypes.LPCWSTR]
-            self._kernel32.GetDriveTypeW.restype = wintypes.UINT
-            self._kernel32.GetFileAttributesW.argtypes = [wintypes.LPCWSTR]
-            self._kernel32.GetFileAttributesW.restype = wintypes.DWORD
+            self._kernel32.GetFileAttributesW.restype = wintypes.DWORD  # 0xFFFFFFFF must not read as -1
 
         def drive_type(self, root: str) -> int:
             """`GetDriveTypeW(root)`."""
@@ -121,9 +97,7 @@ if sys.platform == "win32":
                 query = ctypes.WinDLL("cldapi").CfGetSyncRootInfoByPath
             except OSError, AttributeError:
                 return None  # the Cloud Files API is absent: no sync root can exist (spec 4.5.2 rule 5)
-            query.argtypes = [wintypes.LPCWSTR, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p]
-            query.restype = ctypes.c_int32
-            info, returned = _SyncRootBasicInfo(), wintypes.DWORD()
+            info, returned = ctypes.c_int64(), wintypes.DWORD()  # CF_SYNC_ROOT_BASIC_INFO (cfapi.h) is one int64
             result = query(path, 0, ctypes.byref(info), ctypes.sizeof(info), ctypes.byref(returned))
             return int(result) & 0xFFFFFFFF
 
