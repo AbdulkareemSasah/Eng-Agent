@@ -21,7 +21,10 @@ Facts checked on 2026-11-04 on Linux with Python 3.14 (versions as resolved by u
 Use **mutmut**, as a runtime dependency (`mutmut>=3.8.1`, pinned by `uv.lock`). The gate writes the mutmut
 configuration (`setup.cfg`) into a temporary copy of the package, listing only the changed R1 and R2 modules, and
 refuses a `[tool.mutmut]` table in the package, so a package cannot choose what is mutated. The score is (killed +
-timeout) over all mutants.
+timeout) over all mutants. The copy holds the whole source tree (the mutants are complete packages, so they shadow the
+editable installation of the member), the pytest `addopts` of the package are switched off for the mutated runs, and in
+a pull-request run mutmut runs in the environment uv builds from the judged tree (`uv run --project <tree> --locked`),
+so mutmut must be in that tree's lock file (it is, through this package) and the member's tests find their dependencies.
 
 On Windows the step reports MU002 as a notice locally and raises an environment fault (exit 3) when `CI` is set, so
 mutation runs on Linux CI only (spec 4.12, Q4 fallback). Windows support was not run on Windows here: the statement

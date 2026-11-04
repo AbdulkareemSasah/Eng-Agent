@@ -12,10 +12,12 @@ from collections import Counter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from eng_dev_gate.checks.tests_step import _judged_command, _judged_environment, _stale_lock, _uv_available
 from eng_dev_gate.config.floors import MUTATION_FLOOR
+from eng_dev_gate.config.gate_config import load_gate_config
 from eng_dev_gate.config.package_config import PackageConfig, load_package_config
 from eng_dev_gate.event import event_path, read_event
-from eng_dev_gate.gitio import Change, SubprocessGit
+from eng_dev_gate.gitio import Change, GitError, SubprocessGit
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.results import EnvironmentFaultError, UsageError
@@ -26,6 +28,8 @@ if TYPE_CHECKING:
 
 _RESULT = re.compile(r"^\s+\S+: (.+)$")  # a line of ``mutmut results --all true``: "    <mutant>: <status>"
 _KILLED = ("killed", "timeout")  # spec 4.12: the score counts timeouts as killed
+_SPINNER = re.compile(r"^[\u2800-\u28ff]")  # the braille frames of the progress display of mutmut
+_TAIL_LINES = 8  # lines of mutmut output quoted in MU002; presentation only
 _IGNORED = (".git", "mutants", ".venv", "__pycache__", ".mypy_cache", ".pytest_cache", ".ruff_cache")
 
 
@@ -58,7 +62,26 @@ def _event_base() -> str | None:
 
 
 def _fault(tool: str, code: int, output: str) -> EnvironmentFaultError:
-    return EnvironmentFaultError(f"MU002 mutation: {tool} exited {code}: {output[:500]}")
+    """MU002 with the last readable lines of ``output``: carriage-return spinner frames are dropped first."""
+    lines = [line.strip() for line in re.split(r"[\r\n]+", output)]
+    kept = [line for line in lines if line and not _SPINNER.match(line)]
+    return EnvironmentFaultError(f"MU002 mutation: {tool} exited {code}: {' | '.join(kept[-_TAIL_LINES:])}")
+
+
+def _default_base(ctx: StepContext) -> str | None:
+    """Merge base of ``HEAD`` with ``origin/<gate_branch>``, or ``None`` when that branch is not known locally."""
+    git = SubprocessGit(ctx.root)
+    try:
+        return git.merge_base(f"origin/{load_gate_config(ctx.gate_root).gate_branch}", "HEAD")
+    except GitError:
+        return None
+
+
+def _mutmut(ctx: StepContext, *args: str) -> list[str]:
+    """The argv of ``mutmut args``: in the judged tree's environment when the gate root is another tree (spec 4.12)."""
+    if _judged_environment(ctx):
+        return _judged_command(ctx.root, "-m", "mutmut", *args)
+    return python_module("mutmut", *args)
 
 
 def run_step(ctx: StepContext) -> list[Finding]:
@@ -77,9 +100,9 @@ def run_step(ctx: StepContext) -> list[Finding]:
     config = load_package_config(member.directory / "pyproject.toml")
     if not (config.r1_modules or config.r2_modules):
         return []
-    base = ctx.base or _event_base()
+    base = ctx.base or _event_base() or _default_base(ctx)
     if base is None:
-        return _notice(member.path, "no base commit (pass --base or run in a pull request)")
+        return _notice(member.path, "no base commit (pass --base, run in a pull request or fetch origin/<gate branch>)")
     git = SubprocessGit(ctx.root)
     modules = changed_modules(config, member.path, git.name_status(git.merge_base(base, "HEAD"), "HEAD"))
     if not modules:
@@ -91,17 +114,27 @@ def run_step(ctx: StepContext) -> list[Finding]:
     pyproject = member.directory / "pyproject.toml"
     if "mutmut" in tomllib.loads(pyproject.read_text(encoding="utf-8")).get("tool", {}):
         raise UsageError(f"{pyproject}: [tool.mutmut] is not allowed; the gate configures mutation")
+    if _judged_environment(ctx):
+        if not _uv_available():
+            raise EnvironmentFaultError("MU002 mutation: uv is not available; the judged tree needs its environment")
+        if (stale := _stale_lock(ctx)) is not None:
+            return [stale]
     with tempfile.TemporaryDirectory(prefix="eng-gate-mut-") as work:
         copy = Path(work) / "member"
         shutil.copytree(member.directory, copy, ignore=shutil.ignore_patterns(*_IGNORED))
+        # the whole source tree is copied so that the mutants form complete packages and shadow an installed member;
+        # the pytest addopts of the member (coverage thresholds, plugins) are switched off for the mutated runs
+        roots = "".join(f"\n    {root}" for root in sorted({module.split("/")[0] for module in modules}))
         listed = "".join(f"\n    {module}" for module in modules)
         (copy / "setup.cfg").write_text(
-            f"[mutmut]\nsource_paths={listed}\npytest_add_cli_args_test_selection=\n    tests/\n", encoding="utf-8"
+            f"[mutmut]\nsource_paths={roots}\nonly_mutate={listed}\npytest_add_cli_args=\n    -o\n    addopts=\n"
+            "pytest_add_cli_args_test_selection=\n    tests/\n",
+            encoding="utf-8",
         )
-        ran = ctx.runner.run(python_module("mutmut", "run"), copy)
+        ran = ctx.runner.run(_mutmut(ctx, "run"), copy)
         if ran.exit_code != 0:
             raise _fault("mutmut run", ran.exit_code, ran.output)
-        listing = ctx.runner.run(python_module("mutmut", "results", "--all", "true"), copy)
+        listing = ctx.runner.run(_mutmut(ctx, "results", "--all", "true"), copy)
         if listing.exit_code != 0:
             raise _fault("mutmut results", listing.exit_code, listing.output)
     counts = parse_results(listing.output)
