@@ -170,7 +170,7 @@ def licenses(ctx: StepContext) -> list[Finding]:
         UsageError: a ``pyproject.toml`` is unreadable (exit 2).
         ConfigError: ``.gate/gate.yml`` of the gate root is invalid (exit 2).
     """
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    assert ctx.member is not None  # noqa: S101  # B-048: package steps always have a member
     exceptions = {_normalize(e.distribution): e for e in load_gate_config(ctx.gate_root).license_exceptions}
     members = {_normalize(m.name) for m in discover_members(ctx.root)}
     installed = {
