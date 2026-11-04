@@ -34,7 +34,7 @@ def _run(ctx: StepContext, site: Path, monkeypatch: pytest.MonkeyPatch) -> list[
 
 
 def _codes(findings: list[Finding]) -> list[tuple[str, str]]:
-    return [(f.code, f.message.split()[0]) for f in findings]
+    return [(f.code, f.message.split(":")[0]) for f in findings]
 
 
 def test_allowed_unknown_exception(repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -82,7 +82,13 @@ def test_exception_for_another_license_does_not_apply(
         (["License: GPL-3.0-only"], False),
         (["Classifier: License :: OSI Approved :: MIT License"], True),
         ([GPL_CLASSIFIER], False),
-        (["Classifier: License :: OSI Approved :: BSD License", "Classifier: License :: OSI Approved :: MIT License"], True),
+        (
+            [
+                "Classifier: License :: OSI Approved :: BSD License",
+                "Classifier: License :: OSI Approved :: MIT License",
+            ],
+            True,
+        ),
         (["Classifier: License :: OSI Approved :: MIT License", GPL_CLASSIFIER], False),
         (["License-Expression: MIT", GPL_CLASSIFIER], True),
     ],

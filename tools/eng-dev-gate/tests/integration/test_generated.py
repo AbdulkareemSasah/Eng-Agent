@@ -12,7 +12,8 @@ from support.repo import Repo
 from support.toy import make_workspace, member_pyproject
 
 TABLE = (
-    '[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["a"]\ncoverage_line = 95\ncoverage_branch = 90\n'
+    '[tool.eng-gate]\nprofile = "tool"\nlayer = "tool"\nimport_names = ["a"]\n'
+    "coverage_line = 95\ncoverage_branch = 90\n"
 )
 GENERATOR = 'import sys\nsys.stdout.write("line one\\nargs=" + ",".join(sys.argv[1:]) + "\\n")\n'
 RENDERED = "line one\nargs=x,y\n"
