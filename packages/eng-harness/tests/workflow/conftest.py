@@ -35,12 +35,15 @@ def make_config(control: Path) -> ConfigFactory:
         call_timeout_s: int = 30,
         client_grace_s: int = 5,
         shutdown_grace_s: int = 5,
+        command: str = sys.executable,
+        audit_log: bool = True,
         env: dict[str, str] | None = None,
     ) -> ServersConfig:
         server = ServerConfig.model_validate(
             {
                 "adapter": "synthetic-csi",
-                "command": sys.executable,
+                "command": command,
+                "audit_log": audit_log,
                 "args": [str(script)],
                 "env": {"SASAAH_CSI_FAKE_CONTROL": str(control), **(env or {})},
                 "client_grace_s": client_grace_s,

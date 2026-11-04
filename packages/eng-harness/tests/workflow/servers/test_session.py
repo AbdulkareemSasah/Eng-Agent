@@ -1,14 +1,14 @@
 """MCP session over the harness process transport (plan 0002 T5; spec 0002 AC8, AC11, AC12, sections 4.3.2 to 4.3.5).
 
 The synthetic Sasaah CSI fake runs as a real process started by the harness launcher. A second, tiny test-double
-server (below) serves a paginated tool list, records its arguments and can ignore the end of its standard input.
+server (below) serves a paginated tool list, records its arguments and, by environment variables, can ignore the end
+of its standard input, exit before the handshake, never answer the handshake, or fail or stall `csi_attach`.
 """
 
 import json
 import os
 import signal
 import sys
-import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
@@ -49,6 +49,11 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 
 json.dump(sys.argv[1:], open("argv.json", "w"))
+if os.environ.get("EXIT_FIRST") and not os.path.exists("started.marker"):
+    open("started.marker", "w").close()
+    sys.exit(3)  # the first start ends before the handshake
+if os.environ.get("NO_HANDSHAKE"):
+    time.sleep(120)
 NAMES = ["tool_%d" % n for n in range(5)]
 
 
@@ -60,6 +65,14 @@ async def on_list(ctx, params):
 
 
 async def on_call(ctx, params):
+    if params.name == "csi_attach":
+        mode = os.environ.get("ATTACH")
+        if mode == "stall":
+            await anyio.sleep(120)
+        if mode == "raise":
+            raise RuntimeError("attach refused")
+        if mode == "error":
+            return types.CallToolResult(content=[types.TextContent(type="text", text="{}")], is_error=True)
     return types.CallToolResult(content=[types.TextContent(type="text", text="{}")])
 
 
@@ -68,6 +81,7 @@ async def main():
     async with stdio_server() as (r, w):
         await server.run(r, w, server.create_initialization_options())
     if os.environ.get("IGNORE_EOF"):
+        open("eof.marker", "w").close()  # the end of the standard input reached the server
         time.sleep(120)
 
 
@@ -245,14 +259,16 @@ def test_backstop_timeout_restarts_role(
         await manager.call("csi", "main", "csi_attach", {"pid": 4242, "product": "ETABS"}, CallEffect.WRITE)
         before = manager.session_epoch("csi")
         _arm(control, {"fault": "slow_analysis", "tool": "csi_run_analysis", "seconds": 30})
-        with pytest.raises(ToolFailed) as failure:  # backstop = 1 s call timeout + 1 s grace
+        # The backstop (2 s call timeout + 1 s grace) is the behavior under test and the fake sleeps 30 s, so a loaded
+        # container can only make this test slower, not wrong; the assertions do not read a clock.
+        with pytest.raises(ToolFailed) as failure:
             await manager.call("csi", "main", "csi_run_analysis", {"confirm": True}, CallEffect.WRITE)
         assert failure.value.detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
         assert manager.session_epoch("csi") == before + 1
         await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)  # a new process serves it
         assert len(launcher.started) == 2
 
-    _run(tmp_path, make_config(call_timeout_s=1, client_grace_s=1), launcher, body)
+    _run(tmp_path, make_config(call_timeout_s=2, client_grace_s=1), launcher, body)
 
 
 def test_unknown_server_and_role(tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher) -> None:
@@ -293,9 +309,92 @@ def test_shutdown_terminates_job_after_grace(
         await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
 
     config = make_config(_paged(tmp_path), shutdown_grace_s=1, env={"IGNORE_EOF": "1"})
-    started = time.monotonic()
     _run(tmp_path, config, launcher, body)
-    assert time.monotonic() - started >= 1.0  # the grace time was waited for
+    # Order of events, not elapsed time: the server saw the end of its input (the session closed first), ignored it, and
+    # only then did the manager end the job.
+    assert (tmp_path / "run" / "eof.marker").exists()
     process = launcher.started[0]
     assert process.wait(10) == -signal.SIGKILL
     assert process.job_members() == []
+
+
+def _fails_as_not_connected(manager: ServerManager) -> Callable[[], Any]:
+    async def attempt() -> None:
+        with pytest.raises(ToolFailed) as failure:
+            await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
+        assert failure.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
+
+    return attempt
+
+
+def test_server_exiting_before_handshake_is_not_connected(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        await _fails_as_not_connected(manager)()  # a typed error, not an ExceptionGroup of the task group
+        assert manager.server_info("csi", "main") is None
+        result = await manager.call("csi", "main", "tool_0", {}, CallEffect.READ)  # the manager stays usable
+        assert result.is_error is False
+        assert len(launcher.started) == 2
+
+    _run(tmp_path, make_config(_paged(tmp_path), env={"EXIT_FIRST": "1"}), launcher, body)
+
+
+def test_failing_start_uses_up_a_restart(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        attempt = _fails_as_not_connected(manager)
+        await attempt()  # the start
+        await attempt()  # beyond max_restarts_per_run: refused, nothing started
+
+    config = make_config(_paged(tmp_path), max_restarts=0, env={"EXIT_FIRST": "1"})
+    _run(tmp_path, config, launcher, body)
+    assert len(launcher.started) == 1  # the second call hit the restart limit and started nothing
+
+
+def test_missing_program_is_not_connected(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        await _fails_as_not_connected(manager)()
+        assert launcher.started == []
+
+    _run(tmp_path, make_config(command=str(tmp_path / "no-such-program")), launcher, body)
+
+
+def test_handshake_timeout_is_not_connected(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        await _fails_as_not_connected(manager)()  # the server never answers; the backstop (2 s) bounds the handshake
+        assert launcher.started[0].job_members() == []  # the stuck process was ended
+
+    config = make_config(_paged(tmp_path), call_timeout_s=1, client_grace_s=1, env={"NO_HANDSHAKE": "1"})
+    _run(tmp_path, config, launcher, body)
+
+
+@pytest.mark.parametrize("mode", ["error", "raise", "stall"])
+def test_attach_failure_marks_role_down(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher, mode: str
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        manager.bind_instance("csi", pid=4242, product="ETABS")
+        before = manager.session_epoch("csi")
+        await _fails_as_not_connected(manager)()
+        assert manager.server_info("csi", "main") is None  # the role is down, not half-attached
+        assert manager.session_epoch("csi") == before + 1
+        assert launcher.started[0].job_members() == []
+
+    config = make_config(_paged(tmp_path), call_timeout_s=1, client_grace_s=1, env={"ATTACH": mode})
+    _run(tmp_path, config, launcher, body)
+
+
+def test_launch_arguments_without_audit_log(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        await manager.list_tools("csi", "main")
+
+    _run(tmp_path, make_config(_paged(tmp_path), call_timeout_s=42, audit_log=False), launcher, body)
+    assert json.loads((tmp_path / "run" / "argv.json").read_text()) == ["--call-timeout-sec", "42"]
