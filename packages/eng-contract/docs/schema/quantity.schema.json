@@ -1,0 +1,20 @@
+{
+  "additionalProperties": false,
+  "description": "A finite value in a unit; frozen, hashable, with physical equality and same-dimension ordering.\n\nEquality and ordering compare exact fractions of the coherent SI value (spec 4.8 rule 4). A float enters the\nfraction as its shortest round-trip decimal (the number as written, so 25.4 mm equals 1 in). Between units with\ndifferent powers of pi (`deg` against `rad`) the single float64 step `sifloat` is compared instead; equality\nacross powers of pi is therefore not transitive at the last bit, and canonical stored data never mixes them.\n`sifloat` saturates to infinity beyond the float64 range, which only coarsens the hash and the cross-pi\ncomparison there.",
+  "properties": {
+    "unit": {
+      "title": "Unit",
+      "type": "string"
+    },
+    "value": {
+      "title": "Value",
+      "type": "number"
+    }
+  },
+  "required": [
+    "value",
+    "unit"
+  ],
+  "title": "Quantity",
+  "type": "object"
+}

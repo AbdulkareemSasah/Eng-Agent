@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "Frame": {
+      "additionalProperties": false,
+      "description": "A frame member between points `i` and `j` (which must differ).",
+      "properties": {
+        "i": {
+          "$ref": "#/$defs/Point3"
+        },
+        "i_joint": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "I Joint"
+        },
+        "id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "j": {
+          "$ref": "#/$defs/Point3"
+        },
+        "j_joint": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "J Joint"
+        },
+        "kind": {
+          "$ref": "#/$defs/FrameKind"
+        },
+        "rotation_deg": {
+          "title": "Rotation Deg",
+          "type": "number",
+          "x-eng-unit": "deg"
+        },
+        "section": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Section",
+          "type": "string"
+        },
+        "story": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Story"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "section",
+        "i",
+        "j",
+        "rotation_deg"
+      ],
+      "title": "Frame",
+      "type": "object"
+    },
+    "FrameKind": {
+      "description": "Role of a frame member.",
+      "enum": [
+        "column",
+        "beam",
+        "brace",
+        "other"
+      ],
+      "title": "FrameKind",
+      "type": "string"
+    },
+    "Point3": {
+      "additionalProperties": false,
+      "description": "A point in model global coordinates, millimetres.",
+      "properties": {
+        "x_mm": {
+          "title": "X Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "y_mm": {
+          "title": "Y Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        },
+        "z_mm": {
+          "title": "Z Mm",
+          "type": "number",
+          "x-eng-unit": "mm"
+        }
+      },
+      "required": [
+        "x_mm",
+        "y_mm",
+        "z_mm"
+      ],
+      "title": "Point3",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`model.frame_placements/1`.",
+  "properties": {
+    "frames": {
+      "items": {
+        "$ref": "#/$defs/Frame"
+      },
+      "title": "Frames",
+      "type": "array"
+    }
+  },
+  "required": [
+    "frames"
+  ],
+  "title": "FramePlacements",
+  "type": "object"
+}
