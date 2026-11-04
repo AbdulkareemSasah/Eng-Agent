@@ -1,0 +1,179 @@
+{
+  "$defs": {
+    "ErrorCode": {
+      "description": "The 22 error codes of 04 section 8.1.",
+      "enum": [
+        "INVALID_ARGUMENT",
+        "OUT_OF_RANGE",
+        "UNIT_MISMATCH",
+        "REF_NOT_FOUND",
+        "REF_POINTER_INVALID",
+        "REF_KIND_MISMATCH",
+        "REF_UNIT_MISMATCH",
+        "REF_STALE",
+        "NOT_FOUND",
+        "CONFLICT",
+        "PRECONDITION_FAILED",
+        "CONFIRMATION_REQUIRED",
+        "LIMIT_EXCEEDED",
+        "HOST_NOT_CONNECTED",
+        "HOST_BUSY",
+        "HOST_WEDGED",
+        "HOST_LOCKED",
+        "HOST_ERROR",
+        "TIMEOUT_NO_EFFECT",
+        "TIMEOUT_UNKNOWN_OUTCOME",
+        "NOT_SUPPORTED_BY_VERSION",
+        "INTERNAL"
+      ],
+      "title": "ErrorCode",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "Precondition": {
+      "description": "State named by `PRECONDITION_FAILED` (04 section 8.1).",
+      "enum": [
+        "model_saved",
+        "model_open",
+        "analysis_current",
+        "units_verified",
+        "local_workspace"
+      ],
+      "title": "Precondition",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Error of a failure envelope (spec 4.2.3). Validation enforces the retry and code-specific rules.",
+  "properties": {
+    "code": {
+      "$ref": "#/$defs/ErrorCode"
+    },
+    "expected": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected"
+    },
+    "field": {
+      "anyOf": [
+        {
+          "maxLength": 512,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*|\\[(0|[1-9][0-9]*)\\])*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Field"
+    },
+    "hint": {
+      "anyOf": [
+        {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Hint"
+    },
+    "host_code": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Host Code"
+    },
+    "host_method": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Host Method"
+    },
+    "incident_id": {
+      "anyOf": [
+        {
+          "maxLength": 64,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Incident Id"
+    },
+    "message": {
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Message",
+      "type": "string"
+    },
+    "op_id": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Op Id"
+    },
+    "precondition": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Precondition"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "received": {
+      "$ref": "#/$defs/JsonValue",
+      "default": null
+    },
+    "retryable": {
+      "title": "Retryable",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "code",
+    "message",
+    "retryable"
+  ],
+  "title": "ErrorDetail",
+  "type": "object"
+}

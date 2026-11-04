@@ -9,6 +9,7 @@
     - "src/eng_harness/engine/_modes.py"
     - "src/eng_harness/engine/_promote.py"
     - "src/eng_harness/engine/_replay.py"
+    - "src/eng_harness/calcs/**"
   risk: r1
 - paths:
     - "src/eng_harness/journal/**"
