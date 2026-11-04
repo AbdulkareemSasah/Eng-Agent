@@ -1,14 +1,12 @@
 """Server roles, MCP sessions, crash detection, restart and shutdown (plan 0002 T5; spec 0002 sections 4.3.2 to 4.3.5).
 
-`ServerManager` starts each role (one server process) lazily before its first call, keeps one MCP `Client` per role
-and maps the loss of a session to the contract codes of spec section 4.5.6. The build check of section 4.3.4 follows
-in plan task T6b; it will run after every start in `_start`.
-
-Errors: every failure to reach the host is a `ToolFailed` with a contract code; an unknown server or role is a
-`KeyError` (a programming error, not a host condition).
+`ServerManager` starts each role (one server process) lazily, keeps one MCP `Client` per role and maps a lost session
+to the contract codes of spec section 4.5.6 (`ToolFailed`; an unknown server or role is a `KeyError`). The build check
+of section 4.3.4 follows in plan task T6b and runs after every start.
 """
 
 import logging
+from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -47,12 +45,6 @@ class CallEffect(StrEnum):
     WRITE = "write"  # write, analysis, design, save or unlock
 
 
-@dataclass(frozen=True)
-class _Instance:
-    pid: int
-    product: str
-
-
 @dataclass
 class _Live:
     """A running role: its client and process, and the task that owns both (so that entry and exit share a task)."""
@@ -70,8 +62,7 @@ class _Role:
     config: ServerConfig
     role: RoleConfig
     live: _Live | None = None
-    started_before: bool = False
-    restarts: int = 0
+    starts: int = 0  # processes started so far; every start after the first is a restart
     lock: anyio.Lock = field(default_factory=anyio.Lock)
 
     @property
@@ -94,13 +85,7 @@ class ServerManager:
     """
 
     def __init__(self, config: ServersConfig, run_dir: Path, *, launcher: ProcessLauncher | None = None) -> None:
-        """Prepare roles; nothing is started before the first call.
-
-        Args:
-            config: The server sections of `harness.toml`.
-            run_dir: The run folder: the working folder of the servers, with logs under `servers/`.
-            launcher: Starts the processes (default: the POSIX launcher; the engine wiring passes the platform's).
-        """
+        """Prepare roles from `config`; servers run in the run folder `run_dir`, logging under `servers/`."""
         self._run_dir = run_dir
         self._launcher = launcher or PosixLauncher()
         self._roles = {
@@ -108,12 +93,11 @@ class ServerManager:
             for name, server in config.servers.items()
             for role, role_config in server.roles.items()
         }
-        self._epochs: dict[str, int] = {}
-        self._bound: dict[str, _Instance] = {}
+        self._epochs: defaultdict[str, int] = defaultdict(int)
+        self._bound: dict[str, tuple[int, str]] = {}  # host key -> (pid, product) of the bound instance
         self._group: anyio.abc.TaskGroup  # opened by `__aenter__`, which needs the running event loop
 
     async def __aenter__(self) -> Self:
-        """Open the task group that owns the role tasks."""
         self._group = anyio.create_task_group()
         await self._group.__aenter__()
         return self
@@ -121,7 +105,6 @@ class ServerManager:
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
     ) -> None:
-        """Close every session; the role tasks stop their processes in parallel."""
         for role in self._roles.values():
             if role.live is not None:
                 role.live.stop.set()
@@ -129,19 +112,16 @@ class ServerManager:
 
     def session_epoch(self, host_key: str) -> int:
         """Return the counter that increases whenever a session to the host is lost or re-established."""
-        return self._epochs.get(host_key, 0)
+        return self._epochs[host_key]
 
     def bind_instance(self, host_key: str, *, pid: int, product: str) -> None:
         """Record the instance a restarted or later-started role re-attaches to by process id."""
-        self._bound[host_key] = _Instance(pid, product)
+        self._bound[host_key] = (pid, product)
 
     def server_info(self, server: str, role: str) -> types.Implementation | None:
         """Return what the running role reported in the handshake, or None when it is not running."""
-        live = self._role(server, role).live
+        live = self._roles[server, role].live
         return None if live is None else live.client.server_info
-
-    def _role(self, server: str, role: str) -> _Role:
-        return self._roles[server, role]
 
     async def list_tools(self, server: str, role: str) -> list[types.Tool]:
         """Read the complete tool list, every page, never from a cache."""
@@ -158,7 +138,7 @@ class ServerManager:
                         return tools
             raise _fail(ErrorCode.HOST_ERROR, f"{server} lists more than {_MAX_LIST_PAGES} pages of tools")
 
-        return await self._request(self._role(server, role), CallEffect.READ, "tools/list", read)
+        return await self._request(self._roles[server, role], CallEffect.READ, "tools/list", read)
 
     async def call(
         self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
@@ -166,15 +146,14 @@ class ServerManager:
         """Call `tool` on a role and return the raw reply (an error reply of the host is returned, not raised).
 
         Raises:
-            ToolFailed: `HOST_NOT_CONNECTED` when the role is down and cannot be restarted, or died during a read;
-                `TIMEOUT_NO_EFFECT` when a read exceeded the client backstop; `TIMEOUT_UNKNOWN_OUTCOME` when a write
-                (analysis, design, save, unlock) died or exceeded the backstop; `HOST_ERROR` on a protocol error.
+            ToolFailed: `HOST_NOT_CONNECTED` (role down for good, or died during a read), `TIMEOUT_NO_EFFECT` (a read
+                hit the backstop), `TIMEOUT_UNKNOWN_OUTCOME` (a write died or hit the backstop), `HOST_ERROR`.
         """
 
         async def send(client: Client, backstop_s: float) -> types.CallToolResult:
             return await client.call_tool(tool, dict(arguments), read_timeout_seconds=backstop_s)
 
-        return await self._request(self._role(server, role), effect, tool, send)
+        return await self._request(self._roles[server, role], effect, tool, send)
 
     async def _request[T](
         self, role: _Role, effect: CallEffect, tool: str, send: Callable[[Client, float], Awaitable[T]]
@@ -201,22 +180,18 @@ class ServerManager:
                 await self._lose(role, role.live)  # it exited between calls
             if role.live is not None:
                 return role.live
-            restart = role.started_before
-            if restart:
-                if role.restarts >= role.config.max_restarts_per_run:
-                    raise _fail(
-                        ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} is down: restart limit reached"
-                    )
-                role.restarts += 1
+            if role.starts > role.config.max_restarts_per_run:
+                raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name}: restart limit reached")
+            role.starts += 1  # counted before the start, so a start that fails still uses up a restart
             live = await self._start(role)
-            role.live, role.started_before = live, True
+            role.live = live
             try:
                 await self._attach(role, live)
             except ToolFailed:
                 await self._lose(role, live)
                 raise
-            if restart:
-                self._epochs[role.config.host_key] = self.session_epoch(role.config.host_key) + 1
+            if role.starts > 1:
+                self._epochs[role.config.host_key] += 1
             return live
 
     def _spec(self, role: _Role) -> LaunchSpec:
@@ -230,16 +205,15 @@ class ServerManager:
         return LaunchSpec(argv=argv, env=env, cwd=self._run_dir, stderr_path=stderr, job=JobPolicy.SERVER)
 
     async def _start(self, role: _Role) -> _Live:
+        started: _Live | Exception
         try:
-            with anyio.fail_after(role.backstop_s):
-                started: _Live | Exception = await self._group.start(self._serve, role)
+            with anyio.fail_after(role.backstop_s):  # also bounds the handshake
+                started = await self._group.start(self._serve, role)
         except TimeoutError as error:
-            raise _fail(
-                ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} did not answer the handshake"
-            ) from error
+            started = error
         if isinstance(started, Exception):
             raise _fail(
-                ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} cannot be started: {started}"
+                ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} cannot start: {started!r}"
             ) from started
         return started
 
@@ -249,7 +223,6 @@ class ServerManager:
         """Own one role's process and client until `stop` is set (entry and exit of the client share this task)."""
         self._run_dir.joinpath("servers").mkdir(parents=True, exist_ok=True)
         launched: LaunchedProcess | None = None
-        announced = False
         live: _Live | None = None
         try:
             launched = self._launcher.start(self._spec(role))
@@ -257,7 +230,6 @@ class ServerManager:
             async with Client(transport, mode=role.config.mcp_mode, cache=None, read_timeout_seconds=None) as client:
                 live = _Live(client, launched)
                 task_status.started(live)
-                announced = True
                 await live.stop.wait()
         except (
             LaunchError,
@@ -267,7 +239,7 @@ class ServerManager:
             anyio.BrokenResourceError,
             anyio.ClosedResourceError,
         ) as error:
-            if announced:  # a failure while closing is logged; the role is gone either way
+            if live is not None:  # a failure while closing is logged; the role is gone either way
                 logger.warning("%s/%s failed while closing: %s", role.server, role.name, error)
             else:
                 task_status.started(error)  # reported to the caller of `_start`
@@ -280,16 +252,16 @@ class ServerManager:
 
     async def _attach(self, role: _Role, live: _Live) -> None:
         """Attach a (re)started role to the bound instance by process id (spec section 4.3.5); no-op when none."""
-        bound = self._bound.get(role.config.host_key)
-        if bound is None:
+        if (bound := self._bound.get(role.config.host_key)) is None:
             return
+        pid, product = bound
         try:
             with anyio.fail_after(role.backstop_s):
-                result = await live.client.call_tool(_ATTACH_TOOL, {"pid": bound.pid, "product": bound.product})
+                result = await live.client.call_tool(_ATTACH_TOOL, {"pid": pid, "product": product})
         except (TimeoutError, MCPError) as error:
             raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} cannot attach: {error}") from error
         if result.is_error:
-            raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} cannot attach to pid {bound.pid}")
+            raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}/{role.name} cannot attach to pid {pid}")
 
     async def _lose(self, role: _Role, live: _Live) -> None:
         """End a dead or stale session: end its job at once, close it, and increase the epoch (idempotent)."""
@@ -299,5 +271,4 @@ class ServerManager:
         live.launched.terminate_job()
         live.stop.set()
         await live.finished.wait()
-        key = role.config.host_key
-        self._epochs[key] = self.session_epoch(key) + 1
+        self._epochs[role.config.host_key] += 1

@@ -1,8 +1,7 @@
 """MCP transport over a launched server process (plan 0002 T5; spec 0002 section 4.3.3).
 
-The SDK's `stdio_client` is not used: it spawns the process itself, and on Windows it assigns its own job after the
-spawn (spec section 11 C3). `ProcessTransport` instead speaks newline-delimited JSON-RPC over the pipes of a process
-that the harness launcher has already started in its job, so the job policy stays the harness's.
+Not the SDK's `stdio_client`, which spawns the process itself and, on Windows, assigns its own job after the spawn
+(spec section 11 C3): this speaks newline-delimited JSON-RPC over the pipes of a process the harness launched.
 """
 
 import contextlib
@@ -37,11 +36,10 @@ def _write_all(pipe: IO[bytes], data: bytes) -> None:
 
 
 def _parse(line: bytes) -> SessionMessage | Exception:
-    """Parse one stdout line; a line that is not a JSON-RPC message is passed on as a value, as the SDK does."""
+    """Parse one stdout line; a bad line is passed on as a value for the session to surface, as the SDK does."""
     try:
         return SessionMessage(types.jsonrpc_message_adapter.validate_json(line, by_name=False))
     except ValueError as error:
-        logger.warning("server wrote a line that is not a JSON-RPC message: %s", error)
         return error
 
 
@@ -60,13 +58,11 @@ class ProcessTransport(AbstractAsyncContextManager[TransportStreams]):
         self._context = self._open()
 
     async def __aenter__(self) -> TransportStreams:
-        """Start the pipe workers and return the (read, write) streams."""
         return await self._context.__aenter__()
 
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
     ) -> None:
-        """Stop the process and release the pipes."""
         await self._context.__aexit__(exc_type, exc, tb)
 
     @asynccontextmanager
