@@ -11,7 +11,9 @@ coverage.xml
 htmlcov/
 dist/
 build/
+!tools/eng-dev-gate/actions/build/
 *.egg-info/
 .eng/
 runs/
 .claude/worktrees/
+.gate-base/

@@ -102,11 +102,11 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-032 | T3 | Configuration models, floors and bootstrap mode (root gate.yml) | sonnet, medium | opus, low | [#24](https://github.com/AbdulkareemSasah/Eng-Agent/pull/24) | done |
 | B-033 | T4 | agents render, keys and drift (and re-render of drifting AGENTS.md files) | sonnet, medium | opus, low | [#26](https://github.com/AbdulkareemSasah/Eng-Agent/pull/26) | done |
 | B-034 | T5 | check orchestrator with the lock, format, lint and types steps | sonnet, medium | opus, low | [#27](https://github.com/AbdulkareemSasah/Eng-Agent/pull/27) | done |
-| B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | — | not started or in writing |
+| B-035 | T6 | CI part 1: setup action and the gate, agents-drift and build jobs | sonnet, high | opus, low | [#37](https://github.com/AbdulkareemSasah/Eng-Agent/pull/37) | open |
 | B-036 | T7 | tests step with separate line and branch coverage and the pytest plugin | sonnet, medium | opus, low | — | not started or in writing |
 | B-037 | T8 | config step (weakening rules, override files, rerun plugins, member table) | sonnet, medium | opus, low | — | not started or in writing |
 | B-038 | T9 | ratchet command and step | sonnet, medium | opus, low | — | not started or in writing |
-| B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | — | not started or in writing |
+| B-039 | T10 | forbidden part 1: engine, scope, FB001, FB002, FB003, FB007 | sonnet, high | opus, low | [#39](https://github.com/AbdulkareemSasah/Eng-Agent/pull/39) | open |
 | B-040 | T11 | forbidden part 2: FB004, FB005, FB006, FB008 | sonnet, high | opus, low | — | not started or in writing |
 | B-041 | T12 | imports command and step | sonnet, medium | opus, low | — | not started or in writing |
 | B-042 | T13 | gate-check part 1: front matter, body parsing, plan and task, scope and budget | sonnet, high | opus, medium | [#29](https://github.com/AbdulkareemSasah/Eng-Agent/pull/29) | open |
@@ -132,10 +132,11 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-064 | docs | write the eng-harness decision-layer specification and plan | sonnet, medium | opus, low | [#30](https://github.com/AbdulkareemSasah/Eng-Agent/pull/30) | done |
 | B-065 | docs | write the eng-harness command-line, progress, approval-page and run-report specification and plan | sonnet, high | opus, medium | [#32](https://github.com/AbdulkareemSasah/Eng-Agent/pull/32) | done |
 | B-066 | docs | write the model edit cycle workflow spec, block specification and plan | opus, medium | opus, medium | — | not started or in writing |
+| B-068 | docs | amend the engine spec as specs 0003 (Q11), 0005 (Q1) and 0006 (§11) require | opus, medium | opus, medium | — | not started or in writing |
 | B-070 | docs | write the structural-codes core framework specification and plan | opus, medium | opus, medium | [#16](https://github.com/AbdulkareemSasah/Eng-Agent/pull/16) | done |
 | B-071 | docs | write the ACI 318-14 isolated-footing clause specifications and plan (draft) | opus, medium | opus, medium | [#34](https://github.com/AbdulkareemSasah/Eng-Agent/pull/34) | open |
 | B-072 | docs | write the SBC 304-2018 overlay specification and plan for the footing checks (draft, with explicit gaps) | opus, medium | opus, medium | — | not started or in writing |
-| B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | — | not started or in writing |
+| B-073 | docs | write the specification and plan for SAFE through the CSI adapter | sonnet, high | opus, medium | [#36](https://github.com/AbdulkareemSasah/Eng-Agent/pull/36) | open |
 | B-074 | docs | write the provider-layer specification and plan (Jev decision-model tier in shadow mode, language-model tier with PydanticAI) | sonnet, high | opus, medium | — | not started or in writing |
 | B-075 | docs | write the design_isolated_footing block and footing workflow specifications and plan | opus, medium | opus, medium | — | not started or in writing |
 | B-080 | docs | write the sasaah-revit-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
@@ -144,6 +145,92 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-083 | docs | write the column workflow specification (design columns in ETABS, update Revit by reference) and plan | opus, medium | opus, medium | — | not started or in writing |
 | B-090 | docs | write the sasaah-idea-mcp adapter specification and plan | sonnet, high | opus, medium | — | not started or in writing |
 | B-091 | docs | write the desktop-products overlap analysis and ADR-0033 (Proposed) | sonnet, medium | opus, low | [#15](https://github.com/AbdulkareemSasah/Eng-Agent/pull/15) | done |
+| B-100 | E.T1 | Package skeleton, gate configuration and workspace member | sonnet, low | opus, medium | — | not started or in writing |
+| B-101 | E.T2 | Harness codes, EngineStop and StepError families | sonnet, low | opus, medium | — | not started or in writing |
+| B-102 | E.T3 | Journal schema, append-only writer, hash chain, durability, payloads by reference | sonnet, high | opus, medium | — | not started or in writing |
+| B-103 | E.T4 | Journal reader API and views | sonnet, medium | opus, medium | — | not started or in writing |
+| B-104 | E.T5 | Blocks, workflows, registry, code hash and the block lock file | sonnet, medium | opus, medium | — | not started or in writing |
+| B-105 | E.T6 | Ports, port data types and in-memory fakes | sonnet, medium | opus, medium | — | not started or in writing |
+| B-106 | E.T7 | ctx types, basis view and the result codec | sonnet, medium | opus, medium | — | not started or in writing |
+| B-107 | E.T8 | Step paths, scopes, op_id, overlap detection, parallel and attempts scopes | sonnet, high | opus, medium | — | not started or in writing |
+| B-108 | E.T9 | Engine start and resume, run lock, run header, replay index and divergence | sonnet, xhigh | opus, medium | — | not started or in writing |
+| B-109 | E.T10 | ctx implementation of tool, read, calc, block, parallel, attempts, escalate | sonnet, high | opus, medium | — | not started or in writing |
+| B-110 | E.T11 | In-flight reconciliation and the host-state check before live execution | sonnet, xhigh | opus, medium | — | not started or in writing |
+| B-111 | E.T12 | Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis) | sonnet, high | opus, medium | — | not started or in writing |
+| B-112 | E.T13 | Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases) | sonnet, high | opus, medium | — | not started or in writing |
+| B-113 | E.T14 | ctx.decide, ctx.decide_many and ctx.ask (invariant 4) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-114 | E.T15 | Approvals (binding, single use, re-check before the write, items, pause and re-presentation) | sonnet, high | opus, medium | — | not started or in writing |
+| B-115 | E.T16 | Permission modes, always-ask list, working copies and file-copy promotion | sonnet, high | opus, medium | — | not started or in writing |
+| B-116 | E.T17 | Runtime guard for block and rule code, and the block-module rules test | sonnet, medium | opus, medium | — | not started or in writing |
+| B-117 | E.T18 | Resource limits, progress sink and the overhead benchmark | sonnet, medium | opus, medium | — | not started or in writing |
+| B-118 | E.T19 | Crash-matrix replay suite with a worker process | sonnet, high | opus, medium | — | not started or in writing |
+| B-120 | S.T1 | MCP SDK dependency ADR, harness.toml server and tool sections | sonnet, medium | opus, medium | — | not started or in writing |
+| B-121 | S.T2 | Process launcher and inspector ports, POSIX implementation | sonnet, high | opus, medium | — | not started or in writing |
+| B-122 | S.T3 | Windows launcher, per-server Job Objects with breakaway, Windows process inspector | sonnet, xhigh | opus, medium | — | not started or in writing |
+| B-123 | S.T4 | Synthetic Sasaah CSI fake server (test-only) and its schema check | sonnet, medium | opus, medium | — | not started or in writing |
+| B-124 | S.T5 | Process transport, MCP client session, crash detection, restart and shutdown | sonnet, high | opus, medium | — | not started or in writing |
+| B-125 | S.T6 | Tool descriptors, allowlist data with escape-hatch refusal, build check and fingerprint | sonnet, high | opus, medium | — | not started or in writing |
+| B-126 | S.T7 | Machine-level host-instance lock and process guard | sonnet, high | opus, medium | — | not started or in writing |
+| B-127 | S.T8 | Adapter framework - arguments and references, envelopes, write ledger, ToolPort describe and call | sonnet, high | opus, medium | — | not started or in writing |
+| B-128 | S.T9 | Error and timeout mapping, the CSI error table (interim model_locked) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-129 | S.T10 | Harness-side model identity (ADR-0032), CSI session operations, HostPort file and instance methods | sonnet, high | opus, medium | — | not started or in writing |
+| B-130 | S.T11 | CSI model-state reader, model kinds, fingerprint and units read | sonnet, high | opus, medium | — | not started or in writing |
+| B-131 | S.T12 | CSI edit kinds, read-back helpers and check_model | sonnet, high | opus, medium | — | not started or in writing |
+| B-132 | S.T13 | CSI analysis, design and results through the long role | sonnet, high | opus, medium | — | not started or in writing |
+| B-133 | S.T14 | Reconciliation by reading model state, preview and read_back | sonnet, high | opus, medium | — | not started or in writing |
+| B-135 | S.T16 | Command-line tool adapter (dxf-prep, etabs-model build) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-136 | S.T17 | Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings | sonnet, high | opus, medium | — | not started or in writing |
+| B-137 | S.T18 | eng-harness doctor | sonnet, medium | opus, medium | — | not started or in writing |
+| B-138 | S.T19 | Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes | sonnet, high | opus, medium | — | not started or in writing |
+| B-140 | C.T1 | Calc decorator, registry, inputs, input metadata, trace builder, statuses and harness codes | sonnet, medium | opus, medium | — | not started or in writing |
+| B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | — | not started or in writing |
+| B-142 | C.T3 | approvals.yaml schema, loader, status resolution and the YAML parser ADR | sonnet, medium | opus, medium | — | not started or in writing |
+| B-143 | C.T4 | Calc kinds and their registration | sonnet, medium | opus, medium | — | not started or in writing |
+| B-144 | C.T5 | HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test | sonnet, medium | opus, medium | — | not started or in writing |
+| B-145 | C.T6 | Calc-module rules test, golden data loader and golden file lint, verification record template | sonnet, low | opus, medium | — | not started or in writing |
+| B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | sonnet, high | opus, medium | — | not started or in writing |
+| B-147 | C.T8 | Calc 2, difference report, with the tolerance-comparison helper | sonnet, high | opus, medium | — | not started or in writing |
+| B-148 | C.T9 | Calc 3, read-back check | sonnet, high | opus, medium | — | not started or in writing |
+| B-149 | C.T10 | Calc 4, design results summary | sonnet, high | opus, medium | — | not started or in writing |
+| B-150 | C.T11 | Calc 5, section size rounding | sonnet, high | opus, medium | — | not started or in writing |
+| B-151 | C.T12 | Calc 6, element count and position comparison | sonnet, high | opus, medium | — | not started or in writing |
+| B-155 | B.T1 | Template model, entries, citations, canonical units and bounds | sonnet, medium | opus, medium | — | not started or in writing |
+| B-156 | B.T2 | Strict YAML 1.2 loader and the YAML dependency | sonnet, high | opus, medium | — | not started or in writing |
+| B-157 | B.T3 | Inheritance, merge rules, ask paths and the resolved content hash | sonnet, medium | opus, medium | — | not started or in writing |
+| B-158 | B.T4 | Template repository (shipped and user folders) and check_template | sonnet, medium | opus, medium | — | not started or in writing |
+| B-159 | B.T5 | FieldSpec and the workflow declaration rules | sonnet, medium | opus, medium | — | not started or in writing |
+| B-160 | B.T6 | Basis draft: precedence, sources, citations, pending list and draft hash | sonnet, medium | opus, medium | — | not started or in writing |
+| B-161 | B.T7 | Setup view, answer model and BasisSetupPort | sonnet, medium | opus, medium | — | not started or in writing |
+| B-162 | B.T8 | Freeze, storage as basis.design_basis/1 and StoreBasisPort | sonnet, medium | opus, medium | — | not started or in writing |
+| B-163 | B.T9 | Shipped blank template, package data and golden pin | sonnet, low | opus, medium | — | not started or in writing |
+| B-164 | B.T10 | Property tests and the fake-host workflow with replay | sonnet, medium | opus, medium | — | not started or in writing |
+| B-165 | D.T1 | Types, policy, settings, public modules | sonnet, medium | opus, low | — | not started or in writing |
+| B-166 | D.T2 | Decision points, state field rules, point registry and lock | sonnet, medium | opus, low | — | not started or in writing |
+| B-167 | D.T3 | Redaction check (by construction and at runtime) | sonnet, high | opus, medium | — | not started or in writing |
+| B-168 | D.T4 | Rule definitions, restricted basis view, registry, lock and review table | sonnet, medium | opus, medium | — | not started or in writing |
+| B-169 | D.T5 | Provider interfaces, suggestion and port models, fake providers | sonnet, medium | opus, low | — | not started or in writing |
+| B-170 | D.T6 | Label store, pending store, override and opt-in export | sonnet, medium | opus, low | — | not started or in writing |
+| B-171 | D.T7 | Cascade core (validation, tier 1, engineer tier, pending, record) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-172 | D.T8 | Tiers 2 and 3, shadow mode, timeouts, policy switches, local_only | sonnet, high | opus, medium | — | not started or in writing |
+| B-173 | D.T9 | decide_many batching and one batched screen | sonnet, medium | opus, low | — | not started or in writing |
+| B-174 | D.T10 | Engine wiring, workflow, replay, conformance and performance tests, local-testing notes | sonnet, medium | opus, low | — | not started or in writing |
+| B-175 | I.T1 | Text, date and number formatting and sanitizing | sonnet, low | opus, low | — | not started or in writing |
+| B-176 | I.T2 | HTML builder: escaping by construction, safe tokens, labeled untrusted fields, style hash | sonnet, high | opus, medium | — | not started or in writing |
+| B-177 | I.T3 | Command line shell: parser, exit codes, configuration, output encoding, launch-address opener, entry point | sonnet, medium | opus, low | — | not started or in writing |
+| B-178 | I.T4 | Expected times from earlier journals and the progress renderer | sonnet, medium | opus, low | — | not started or in writing |
+| B-179 | I.T5 | Non-blocking progress sink, heartbeat task and liveness reader | sonnet, high | opus, low | — | not started or in writing |
+| B-180 | I.T6 | Page server: loopback bind, launch code and session, Host, Origin and CSRF checks, headers, routes, lockdown | sonnet, xhigh | opus, medium | — | not started or in writing |
+| B-181 | I.T7 | Answer models and checks, approval and input ports, durable wait, stop-file run control | sonnet, high | opus, medium | — | not started or in writing |
+| B-182 | I.T8 | Report package skeleton, release marks and lineage closure | sonnet, low | opus, low | — | not started or in writing |
+| B-183 | I.T9 | Approval screens: change set, promotion, info and sign-off | sonnet, medium | opus, medium | — | not started or in writing |
+| B-184 | I.T10 | Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate | sonnet, medium | opus, medium | — | not started or in writing |
+| B-185 | I.T11 | Report model: fold the journal and the store; timings, waiting and machine time | sonnet, medium | opus, low | — | not started or in writing |
+| B-186 | I.T12 | Report sections: changes, results, sources, decisions; renderer registry; value cells with sources | sonnet, medium | opus, low | — | not started or in writing |
+| B-187 | I.T13 | Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write | sonnet, medium | opus, low | — | not started or in writing |
+| B-188 | I.T14 | Commands run and resume: wiring, generated options, answers file, signals, outcome mapping | sonnet, high | opus, medium | — | not started or in writing |
+| B-189 | I.T15 | Basis confirmation screen, setup log and its place in run | sonnet, medium | opus, low | — | not started or in writing |
+| B-190 | I.T16 | Commands status, stop, report and doctor | sonnet, medium | opus, low | — | not started or in writing |
+| B-191 | I.T17 | End-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule | sonnet, medium | opus, medium | — | not started or in writing |
 
 ## 4. Decisions by the lead
 
@@ -172,6 +259,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | P-4 | The root workspace glob broke `uv sync` once a package folder held only docs (CI red on #3 and #4) | Fixed by B-009 (D-10) |
 | P-5 | The harness flagged the merge of B-009 as possible self-approval: the lead wrote that 3-line fix, an independent subagent reviewed it, and the merge step merged it. In bootstrap mode every pull request is opened and merged under the owner's GitHub account (no separate identities yet, OQ-2) | Lead-written changes are kept to integration fixes; the owner may re-review [#8](https://github.com/AbdulkareemSasah/Eng-Agent/pull/8) |
 | P-7 | The harness flagged the merge of B-007 as "merge without review": the subagent review (APPROVE, recorded in the PR body) is not a GitHub review, because every account action is the owner's in bootstrap mode | Reviews stay recorded in the PR body (D-6); the owner can audit [#11](https://github.com/AbdulkareemSasah/Eng-Agent/pull/11) |
+| P-10 | The container restarted at about 02:00 UTC and stopped wave 2b; agents in flight were lost (six open PRs, two pushed branches without PRs, writers without pushes) | Relaunched as wave 2c from the state on GitHub: merged tasks marked done, open PRs resume at review, pushed branches resume in open-PR mode, the rest restart; stale worktrees removed |
 | P-9 | The merge step of B-091 declined to merge because GitHub showed no GitHub review | The lead merged after CI passed on the conflict-resolved head; merge prompts now say a missing GitHub review is expected in bootstrap mode |
 | P-8 | Wave 2 stopped early on three blockers: B-010 CI (the skeleton ran mypy on an empty folder; B-030 fixed it first, leaving B-010 in conflict), B-031 over budget (573 of 380 lines), B-060 one open MEDIUM after three rounds | Relaunched as wave 2b: conflict resolution for B-010, the T2 split (D-12), a fourth fix round for B-060 |
 | P-6 | The merge step merged B-005 after only the Dependabot check had reported, before the CI job appeared; the content was validated by the next push run on `build/v1` (green) | The merge step now requires a pull-request workflow run for the exact head commit to succeed |
