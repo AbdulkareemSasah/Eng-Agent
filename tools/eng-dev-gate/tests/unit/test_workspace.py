@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
+import pytest
 from support.repo import Repo
 
 GATE_YML = (
@@ -51,3 +53,19 @@ def test_packages_names_and_json_exclude_each_other(repo: Repo) -> None:
     both = repo.run(["packages", "--names", "--json"])
     assert both.code == 2
     assert "not allowed with" in both.err
+
+
+def test_packages_in_a_head_run_keeps_stdout_to_the_names(
+    repo: Repo, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """AW09 (the base has no build action) goes to stderr as a notice; stdout stays the list the build job reads."""
+    _workspace(repo, {"tools/only": "only-tool"})
+    base = repo.git("rev-parse", "HEAD").strip()
+    ref = {"ref": "build/v1", "sha": base, "repo": {"full_name": "o/r"}}
+    pull_request = {"number": 7, "title": "t", "body": "b", "draft": False, "user": {"login": "agent"}}
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": {**pull_request, "base": ref, "head": ref}}), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    result = repo.run(["packages", "--names"])
+    assert (result.code, result.out) == (0, "only-tool\n")
+    assert result.err.startswith("::notice title=awaiting owner::AW09")

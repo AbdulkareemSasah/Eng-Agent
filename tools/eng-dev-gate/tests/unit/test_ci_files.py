@@ -22,25 +22,25 @@ PR_JOBS = ("gate", "agents-drift", "build")  # the jobs of T6 that run on pull r
 GATE_ROOT_RUN = 'uv run --project "$GATE_ROOT" --package eng-dev-gate eng-gate --root . --gate-root "$GATE_ROOT"'
 
 
-def _load(path: str) -> dict[str, Any]:
+def _load(path: str) -> dict[Any, Any]:
     loaded = yaml.safe_load((ROOT / path).read_text(encoding="utf-8"))
     assert isinstance(loaded, dict)
     return loaded
 
 
-def _workflow() -> dict[str, Any]:
+def _workflow() -> dict[Any, Any]:
     return _load(".github/workflows/ci.yml")
 
 
-def _action(name: str) -> dict[str, Any]:
+def _action(name: str) -> dict[Any, Any]:
     return _load(f"{ACTIONS}/{name}/action.yml")
 
 
-def _runs(action: dict[str, Any]) -> str:
+def _runs(action: dict[Any, Any]) -> str:
     return "\n".join(step["run"] for step in action["runs"]["steps"] if "run" in step)
 
 
-def _all_steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
+def _all_steps(workflow: dict[Any, Any]) -> list[dict[str, Any]]:
     return [step for job in workflow["jobs"].values() for step in job["steps"]]
 
 
@@ -49,7 +49,9 @@ def test_jobs_triggers_and_local_actions() -> None:
     workflow = _workflow()
     assert set(workflow["jobs"]) == {*PR_JOBS, "windows"}
     assert set(workflow["jobs"]) <= NINE_JOBS
-    triggers = workflow.get("on", workflow.get(True))  # PyYAML (YAML 1.1) reads the key `on` as True
+    triggers: dict[str, Any] = (
+        workflow["on"] if "on" in workflow else workflow[True]
+    )  # PyYAML (YAML 1.1) reads the key `on` as True
     assert set(triggers) == {"pull_request", "push"}
     assert triggers["pull_request"]["branches"] == ["build/v1", "main"]
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "edited", "ready_for_review"]
@@ -81,7 +83,7 @@ def test_pr_jobs_base_first_steps() -> None:
             "ref": "${{ github.event.pull_request.base.sha }}", "path": ".gate-base", "persist-credentials": False,
         }  # fmt: skip
         assert base["if"] == "github.event_name == 'pull_request'"
-        expected = []
+        expected: list[tuple[str, str, dict[str, str] | None]] = []
         for action in ("setup", name):
             guard = f"hashFiles('.gate-base/{ACTIONS}/{action}/action.yml')"
             expected.append((f"./.gate-base/{ACTIONS}/{action}", f"{guard} != ''", {"gate-root": ".gate-base"}))

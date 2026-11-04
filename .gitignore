@@ -15,3 +15,4 @@ build/
 .eng/
 runs/
 .claude/worktrees/
+.gate-base/
