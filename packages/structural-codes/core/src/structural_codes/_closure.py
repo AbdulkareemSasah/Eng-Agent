@@ -2,8 +2,9 @@
 
 Purpose: find every module a check can reach through `import` statements, from the source text alone. Nothing is
 imported or executed: modules are located with `importlib` finders and read as text, then parsed with `ast`.
-Errors: `CheckDefinitionError` for a dynamic import (`importlib`, `__import__`), an import that cannot be resolved,
-a source that cannot be read or parsed, or a relative import above the top-level package.
+Errors: `CheckDefinitionError` for a dynamic import (`importlib`, `__import__`) in a module of a checked top-level
+package, an import that cannot be resolved, a source that cannot be read or parsed, or a relative import above the
+top-level package.
 """
 
 import ast
@@ -57,8 +58,11 @@ def _source(name: str) -> str | None:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _imports(name: str, text: str, is_package: bool) -> tuple[list[str], list[str]]:
-    """Return the modules a source must import and the dotted names that are submodules only if they exist."""
+def _imports(name: str, text: str, is_package: bool, checked: bool) -> tuple[list[str], list[str]]:
+    """Return the modules a source must import and the dotted names that are submodules only if they exist.
+
+    `checked` turns a dynamic import (`importlib`, `__import__`) in this source into an error.
+    """
     try:
         tree = ast.parse(text)
     except SyntaxError as exc:
@@ -72,12 +76,12 @@ def _imports(name: str, text: str, is_package: bool) -> tuple[list[str], list[st
             base = _absolute(name, is_package, node)
             required.append(base)
             optional.extend(f"{base}.{alias.name}" for alias in node.names)
-        elif isinstance(node, ast.Call) and "__import__" in (
+        elif checked and isinstance(node, ast.Call) and "__import__" in (
             getattr(node.func, "id", None),
             getattr(node.func, "attr", None),
         ):
             raise CheckDefinitionError(f"module {name!r} calls __import__")
-    for target in required:
+    for target in required if checked else ():
         if target.partition(".")[0] == "importlib":
             raise CheckDefinitionError(f"module {name!r} imports importlib ({target})")
     return required, optional
@@ -94,12 +98,14 @@ def _absolute(name: str, is_package: bool, node: ast.ImportFrom) -> str:
     return ".".join([*package, node.module] if node.module else package)
 
 
-def import_closure(start: str, tops: frozenset[str]) -> dict[str, str]:
+def import_closure(start: str, tops: frozenset[str], checked: frozenset[str]) -> dict[str, str]:
     """Return `{dotted name: LF-normalized source}` of `start` and of every module it imports, sorted by name.
 
     Only modules whose top-level package is in `tops` are followed (`start` itself is always included); the parent
     packages of an included module are included too, because importing the module runs their `__init__`. Imports
-    inside functions and under `TYPE_CHECKING` count as well (conservative).
+    inside functions and under `TYPE_CHECKING` count as well (conservative). A dynamic import is an error only in a
+    module whose top-level package is in `checked` (the check's pack); the other packages in `tops` are hashed but
+    exempt, because their own gates govern them (spec 4.7).
 
     Raises:
         CheckDefinitionError: see the module docstring.
@@ -116,7 +122,7 @@ def import_closure(start: str, tops: frozenset[str]) -> dict[str, str]:
         if text is None:
             continue
         found[name] = text
-        required, optional = _imports(name, text, is_package(name))
+        required, optional = _imports(name, text, is_package(name), name.partition(".")[0] in checked)
         parents = [".".join(name.split(".")[:n]) for n in range(1, name.count(".") + 1)]
         pending.extend(p for p in parents if p.partition(".")[0] in tops)
         pending.extend(t for t in required if t.partition(".")[0] in tops)

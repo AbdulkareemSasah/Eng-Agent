@@ -3,7 +3,7 @@
 Purpose: one SHA-256 over everything that decides a verdict: the sources of the static import closure (the check's
 pack, `structural_codes`, `eng_contract`), the metadata, the input schema and the preconditions. An approval is bound
 to this hash, so changing any of them withdraws the approval. Units: none.
-Errors: `CheckDefinitionError` for a dynamic import in the closure (AC22), an unresolvable or unreadable import, or a
+Errors: `CheckDefinitionError` for a dynamic import in a module of the check's pack (AC22), an unresolvable or unreadable import, or a
 malformed `base`; `CanonicalJsonError` if a document value is not canonical JSON.
 """
 
@@ -28,7 +28,9 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 def _closure(check: Check) -> dict[str, str]:
     """The import closure of the check's module over its pack, `structural_codes` and `eng_contract`."""
-    return import_closure(check.module, frozenset({check.meta.pack, "structural_codes", "eng_contract"}))
+    return import_closure(
+        check.module, frozenset({check.meta.pack, "structural_codes", "eng_contract"}), frozenset({check.meta.pack})
+    )
 
 
 def _document(check: Check, base: str | None) -> dict[str, Any]:
