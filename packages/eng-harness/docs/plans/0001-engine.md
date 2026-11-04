@@ -541,7 +541,7 @@ plan.
 
 **T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
 re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
-`acknowledged_unreleased` (required for an approving sign-off when `unreleased_tools` is recorded), `signed_off`, pause
+`acknowledged_unreleased` (journaled as given; the page decides when it is required, spec §4.9), `signed_off`, pause
 and the
 `except Exception` test.
 

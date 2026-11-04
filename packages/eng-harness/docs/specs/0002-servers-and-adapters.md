@@ -222,8 +222,10 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   Tests: `tests/unit/test_doctor.py::test_checks_and_output`, `tests/windows/test_doctor.py::test_integrity_level`.
 - AC38. Given an allowlist or `[cli_tools.*]` entry with `release = "unreleased"` and a `release_record`, then
   `ToolPort.unreleased_tools()` returns it with its record; an `unreleased` entry without a record, or a record on a
-  `released` entry, is refused at load; with no such entry the mapping is empty. Test:
-  `tests/unit/adapters/test_allowlist.py::test_release_marks`.
+  `released` entry, is refused at load; with no such entry the mapping is empty. Tests:
+  `tests/unit/adapters/test_allowlist.py::test_release_marks`,
+  `tests/unit/servers/test_config.py::test_cli_tools_release_marks`,
+  `tests/unit/adapters/test_toolport.py::test_unreleased_tools`.
 - AC39. Given `doctor.run(..., extra_checks=[provider])` where the provider returns checks (as spec 0006 does for the
   page binding, browser opening, console encoding, locale and calendar, its Q13), then those checks appear in the
   table and the JSON after the checks of §4.9, a `fail` among them gives exit 1, and a provider that raises gives one

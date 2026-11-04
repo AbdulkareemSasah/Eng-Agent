@@ -335,11 +335,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 
 - AC54. Given an answer whose `shown_sha256` differs from the request, a second answer to a resolved request, an
   approval answer to an input request, an `item_reasons` key that is not an item of the request, or a rejected item
-  without an `item_reasons` entry, or an approving `SIGN_OFF` answer with `acknowledged_unreleased` false in a run
-  whose recorded `unreleased_tools` is not empty, then each is refused, journaled as nothing, and the request stays
-  open (the first is presented again); an accepted answer's `item_reasons` and `acknowledged_unreleased` are journaled
-  in `approval_resolved` and `item_reasons` is returned in `Approval.item_reasons`. Test:
-  `tests/unit/test_approvals.py::test_binding_and_single_use`.
+  without an `item_reasons` entry, then each is refused, journaled as nothing, and the request stays open (the first
+  is presented again); an accepted answer's `item_reasons` and `acknowledged_unreleased` are journaled as given in
+  `approval_resolved` (the engine does not judge the flag) and `item_reasons` is returned in `Approval.item_reasons`.
+  Test: `tests/unit/test_approvals.py::test_binding_and_single_use`.
 - AC55. Given an approved change set, when the bound model's revision or fingerprint changed before the first write
   under it, then `ApprovalVoid` is raised before the write and the port is not called. Test:
   `tests/unit/test_approvals.py::test_recheck_before_write`.
@@ -880,10 +879,11 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
   (item id to reason: required for each rejected item, optional for an accepted one such as an accepted sign-off
   exception, spec 0006 §4.4.6; every key an item of the request; each reason 1 to 500 characters after trimming, the
   bound of spec 0006 AC31), `acknowledged_unreleased` (`bool`, default false; spec 0006 AC32, §4.6.3), `reason`,
-  `by`). An approving `SIGN_OFF` answer needs `acknowledged_unreleased` true when the run's recorded
-  `unreleased_tools` (§4.4.2) is not empty; `approval_resolved` journals the flag. A violation is refused like a hash
-  mismatch (AC54). The page's `confirmed_sections` belong to the setup form's answer (spec 0006 §4.4) and never reach
-  the engine.
+  `by`). The engine journals `acknowledged_unreleased` in `approval_resolved` as given and does not judge it:
+  whether the box is shown and required depends on which results rest on an unreleased tool, which the page decides
+  (spec 0006 §4.4.6, §4.6.3, AC42); refusing it here on the recorded mapping alone would block a sign-off whenever an
+  unreleased tool sits in the allowlist but this run never called it. The page's `confirmed_sections` belong to the
+  setup form's answer (spec 0006 §4.4) and never reach the engine.
 - `Approval` (`request_id`, `approved`, `rejected_items`, `item_reasons`, `reason`, `accepts(item_id) -> bool`). A rejected approval
   returns `approved: false` to the block (the block decides); `ApprovalRejected` is raised only for the engine's own
   inserted approvals.
@@ -1061,6 +1061,6 @@ them.
 | Q18 | Spec 0003 Q11: invariant 3 builds each calc argument's `RefRule` from `CalcInfo.ref_rules`, `stale_ok` false for a path not listed; `decide` and `approve` keep the default rule. This departs from 11 §6 invariant 3 as spec 0003 Q13 states | Owner | Accept (§4.6, AC39); the hub amendment is spec 0003 Q13 |
 | Q19 | Spec 0005 Q1: `eng_harness.decisions.types` in the block allow-list; `DecisionRequest` and `DecisionCall`; kind `engine.decision`; `rule_guard` and `sensitive_values` from the engine; `Rule` and `DecisionPolicy` are the decision layer's types. The channel for `sensitive_values` is **[added]** (`DecisionCall.sensitive_values`, from the journal's `model_bound.file_names`, `model_saved.origin_file_names` and `model_saved.file_name`); it covers every model the run touches, read-only models and working-copy originals included, as spec 0005 §4.3 asks. The four port types have one owner, `eng_harness.decisions.interfaces` (§4.8); `DecisionRequest` is a frozen dataclass, not a Pydantic model (§4.3.2) | Owner | Accept (§4.1.2, §4.3.2, §4.8, §4.9.1, AC66); spec 0005 §4.5 and decision plan T5 add `DecisionCall.sensitive_values` at their next amendment, and decision plan §3 adds engine T7 before its T5 (`BasisView`) |
 | Q20 | Spec 0006 Q6: the `x-eng-input` marker (`data`, `choice`) and the choice convention; the engine refuses a schema it built without a marker | Owner | Accept (§4.9.1, AC67) |
-| Q21 | Spec 0006 Q8: `item_reasons` in `ApprovalAnswer`, `Approval` and `approval_resolved`, required for each rejected item; and `acknowledged_unreleased` (spec 0006 AC32) in `ApprovalAnswer` and `approval_resolved`, which the engine also requires for an approving sign-off when unreleased tools are recorded **[added]** | Owner | Accept (§4.9, AC54) |
+| Q21 | Spec 0006 Q8: `item_reasons` in `ApprovalAnswer`, `Approval` and `approval_resolved`, required for each rejected item; and `acknowledged_unreleased` (spec 0006 AC32) in `ApprovalAnswer` and `approval_resolved`, journaled as given; the requirement stays with the page (spec 0006 §4.6.3, AC42), because the engine's recorded mapping lists allowlisted tools the run may never call | Owner | Accept (§4.9, AC54) |
 | Q22 | Spec 0006 Q4: remove `inbox/` from the run folder; a file there would let any local process answer | Owner | Accept (§4.4.1) |
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |

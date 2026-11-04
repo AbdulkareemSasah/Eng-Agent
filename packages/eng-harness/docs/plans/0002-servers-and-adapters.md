@@ -103,6 +103,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
+      - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/_descriptors.py"
@@ -110,11 +111,12 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/csi/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"
+      - "packages/eng-harness/tests/unit/servers/test_config.py"
       - "packages/eng-harness/tests/unit/adapters/__init__.py"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
-    max_changed_lines: 400
+    max_changed_lines: 430
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_fingerprint_definition"
@@ -122,6 +124,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_entries_complete"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_escape_hatches_refused"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_release_marks"
+      - "packages/eng-harness/tests/unit/servers/test_config.py::test_cli_tools_release_marks"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_against_inventory"
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
@@ -158,13 +161,14 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_toolport.py"
       - "packages/eng-harness/tests/unit/adapters/test_args.py"
       - "packages/eng-harness/tests/unit/adapters/test_envelope.py"
-    max_changed_lines: 400
+    max_changed_lines: 430
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/adapters/test_toolport.py::test_not_allowlisted"
+      - "packages/eng-harness/tests/unit/adapters/test_toolport.py::test_unreleased_tools"
       - "packages/eng-harness/tests/unit/adapters/test_args.py::test_refs_resolved_converted_recorded"
       - "packages/eng-harness/tests/unit/adapters/test_envelope.py::test_limits_and_provenance"
-    covers: [AC17, AC18, AC19]
+    covers: [AC17, AC18, AC19, AC38]
     depends_on: [T6]
   - id: T9
     title: Error and timeout mapping, the CSI error table (interim model_locked)
@@ -373,7 +377,7 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6, T7), `_toolport.py` (T8, T9, T14, T16), `_hostport.py` (T10, T11,
-T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17). Parallel tasks
+T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -408,7 +412,11 @@ timeouts, crash detection, restart with re-attach, shutdown. Uses the synthetic 
 
 **T6 Allowlist and build check** (§4.3.4, §4.5.1). Descriptors, the TOML allowlist with the deny list and pattern
 refusal, the CSI allowlist header pinned to the S-12 commit and the fingerprint computed from the inventory, the build
-check and `ServerCheck`; the workflow test stops a run through the engine's preflight. The `release` and `release_record` keys and the mapping that `ToolPort.unreleased_tools()` returns once the ToolPort is built (AC38, B-068).
+check and `ServerCheck`; the workflow test stops a run through the engine's preflight. AC38's load side (B-068): the
+`release` and `release_record` keys on allowlist entries (in `_allowlist.py`) and on `[cli_tools.*]` entries (in T1's
+`servers/_config.py`, so T6 also owns that file and `test_config.py`), the `{name: release_record}` mapping each
+exposes, and the load-time refusals; the budget rose from 400 to 430 lines with this. T8 adds the
+`ToolPort.unreleased_tools()` side.
 
 **T7 Lock and guard** (§4.4). OS locks in the machine-level lock folder, holder records, stale handling; launched
 instance identification by snapshot diff; launch ownership per role session counter; `close_started` rules with
@@ -416,7 +424,8 @@ the `csi_status` current-target check and the fallback; helper tracking.
 
 **T8 Framework** (§4.5.2, §4.5.3, §4.5.7 ledger). `validate_input` with `require_refs`, conversion by token,
 explicit target, envelopes within the limits, provenance, the write ledger with `fsync`, `ToolPort.describe` and
-`call`; harness kinds registered in `_kinds.py`.
+`call`; harness kinds registered in `_kinds.py`; `ToolPort.unreleased_tools()` over T6's two mappings (AC38's port
+side, `test_toolport.py::test_unreleased_tools`; the budget rose from 400 to 430 lines with it, B-068).
 
 **T9 Errors and timeouts** (§4.5.5, §4.5.6). The mapping table as data with Sasaah source lines, the timeout and
 backstop rules, wedged state and epochs; `model_locked` interim mapping (`HOST_LOCKED`) per ADR-0031 decision 5.
