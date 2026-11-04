@@ -117,7 +117,8 @@ def config(ctx: StepContext) -> list[Finding]:
         CF001 (invalid or unreadable table), CF002 (below the floor), CF003 (weakening tool setting), CF004
         (override file), CF005 (rerun plugin installed), CF006 (no table); never raises for these.
     """
-    assert ctx.member is not None  # noqa: S101 - package steps always have a member
+    if ctx.member is None:
+        raise ValueError("the config step runs per package and needs a member")
     path = f"{ctx.member.path}/pyproject.toml"
 
     def error(code: str, message: str) -> Finding:
