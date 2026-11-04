@@ -202,7 +202,10 @@ tasks:
     depends_on: [T3, T5]
   - id: T11
     title: "forbidden part 2: FB004, FB005, FB006, FB008"
+    # Amendment (B-094, documents only): T11 also edits the package __init__.py, where the step's rule tuple is
+    # assembled (T10 put RULES = RULES_A there for a later task to extend); without it the new rules are never run.
     files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/__init__.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/rules_b.py"
       - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/engine.py"
       - ".gate/forbidden.yml"
