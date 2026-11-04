@@ -31,6 +31,10 @@ are made here and listed in §11 (Q17 to Q23): the run class and `CalcRefused` (
 unreleased-tool record (§4.4.2), and the removal of `inbox/` (§4.4.1). New criteria are AC65 to AC68.
 The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.interfaces`, §4.8).
 
+**Amendment B-098.** Spec 0009 (Q7) asked that the run header record the decision runtime: `DecisionPort` gains
+`runtime_summary()` (§4.8), `run_started` and `run_resumed` gain `decision_runtime` (§4.4.2), and `RunView` shows it
+(§4.4.5). It is listed in §11 (Q24); the new criterion is AC69.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -159,6 +163,12 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   reader's `RunView.unreleased_tools` is the union over `run_started` and every `run_resumed`, and `RunView.run_class`
   is the recorded class. Tests: `tests/unit/test_runner.py::test_unreleased_tools_recorded`,
   `tests/unit/test_journal_reader.py::test_run_class_and_unreleased_tools`.
+- AC69. Given a DecisionPort whose `runtime_summary()` returns a JSON object, then `run_started` records it in
+  `decision_runtime` (`{}` when the object is empty); when the object differs at a resume, then `run_resumed` records
+  the new one, and only then; the reader's `RunView.decision_runtime` is the last recorded object; the engine reads no
+  field of it and calls `runtime_summary()` once at start and once per resume, before the event is appended. Tests:
+  `tests/unit/test_runner.py::test_decision_runtime_recorded`,
+  `tests/unit/test_journal_reader.py::test_decision_runtime_view`.
 - AC17. Given a design basis, then `ctx.basis.ref(path)` is the reference of contract §4.10.2
   (`res_<id>#/fields/<path>/value`), `ctx.basis.quantity(path)` is a `Quantity`, and a path the workflow did not
   declare in `required_basis` raises `BlockRuleViolation`. Test: `tests/unit/test_ctx_basis.py::test_basis_view`.
@@ -600,7 +610,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 
 | Event | Payload | Durability |
 |---|---|---|
-| `run_started` | Run header: `run_id`, `workflow`, `block {name, version, code_sha256}`, `input_ref`, `input_sha256`, `basis_ref`, `mode`, `run_class` (`trial`, `production`), `engine_version`, `contract_version`, `settings_sha256`, `servers` (ServerCheck list), `always_ask`, `unreleased_tools` (tool name to record, from `ToolPort.unreleased_tools()`; empty when none) | FULL |
+| `run_started` | Run header: `run_id`, `workflow`, `block {name, version, code_sha256}`, `input_ref`, `input_sha256`, `basis_ref`, `mode`, `run_class` (`trial`, `production`), `engine_version`, `contract_version`, `settings_sha256`, `servers` (ServerCheck list), `always_ask`, `unreleased_tools` (tool name to record, from `ToolPort.unreleased_tools()`; empty when none), `decision_runtime` (the JSON object from `DecisionPort.runtime_summary()`, recorded as given and opaque to the engine: spec 0009's `DecisionRuntime.summary`, providers and released points without endpoints or keys; empty when none) | FULL |
 | `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
 | `step_completed` | `result` (`ref`, `summary`, `warnings`, `complete`) or the block output ref, `duration_ms`, `calc {id, version, content_sha256, status}` (calc steps) | NORMAL |
 | `step_failed` | `error` (contract `ErrorDetail`, or `{harness_code, message}`), `retryable`, `duration_ms` | NORMAL |
@@ -616,7 +626,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `check_enforced` | `invariant` (1 to 10), `model_key` or `host_key`, `outcome` (`pass`, `fail`), `ref` | NORMAL |
 | `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` and `origin_file_names` (base names of the original's files; working copies) | FULL |
 | `run_paused` | `reason` (`awaiting_approval`, `awaiting_input`, `stop_requested`), `request_ids` | NORMAL |
-| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq`, `unreleased_tools` (only when it differs from the last recorded mapping) | NORMAL |
+| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq`, `unreleased_tools` (only when it differs from the last recorded mapping), `decision_runtime` (only when it differs from the last recorded object) | NORMAL |
 | `run_escalated` | `reason` (`replay_divergence`, `needs_reconciliation`, `host_state_mismatch`, `units_mismatch`, `attempts_exhausted`, `block_escalation`, `block_rule_violation`, `unhandled_error`), `detail`, `evidence`, `request_id` | NORMAL |
 | `run_completed` | `output_ref`, `output_sha256`, `draft` | FULL |
 | `run_failed` | `reason` (`abandoned`), `by` | FULL |
@@ -654,7 +664,7 @@ an engine is live (it tries the lock and releases it at once).
 | `header() -> RunHeader` | The `run_started` payload |
 | `events(after_seq: int = 0) -> list[Event]` | Events in `seq` order; `Event` = `seq`, `type`, `path`, `attempt`, `at`, typed `payload` |
 | `follow(after_seq: int) -> list[Event]` | Same as `events`, for polling by the progress display |
-| `run() -> RunView` | `run_id`, `workflow`, `mode`, `status` (`RUNNING`, `INTERRUPTED` when the last event is not run-level terminal or paused and no engine holds the lock, `PAUSED`, `NEEDS_ENGINEER`, `COMPLETED`, `FAILED`), `started_at`, `ended_at`, `draft`, `pending` (request ids), `escalation`, `run_class`, `unreleased_tools` (union of the run's recorded mappings, AC68) |
+| `run() -> RunView` | `run_id`, `workflow`, `mode`, `status` (`RUNNING`, `INTERRUPTED` when the last event is not run-level terminal or paused and no engine holds the lock, `PAUSED`, `NEEDS_ENGINEER`, `COMPLETED`, `FAILED`), `started_at`, `ended_at`, `draft`, `pending` (request ids), `escalation`, `run_class`, `unreleased_tools` (union of the run's recorded mappings, AC68), `decision_runtime` (the last recorded object, AC69) |
 | `steps() -> list[StepView]` | One per path and attempt: `path`, `kind`, `name`, `status` (`running`, `completed`, `failed`, `reconciled`, `rerun`), `started_at`, `ended_at`, `duration_ms`, `result_ref`, `error`, `inserted: bool` |
 | `requests() -> list[RequestView]` | Approvals and inputs with their resolution, for the approval page: an approval by its `approval_resolved`, a `block` input by its `input_provided`, an `engine.decision` input by the first `decision_made` whose `request_id` names it (a batch is answered all or nothing, spec 0005 §4.8) |
 | `models() -> list[ModelSavedView]` | `model_saved` history per model, for the report and the host-state check |
@@ -827,7 +837,7 @@ lead decision D-5) and a shared conformance test (AC57). All results from host t
 | `HostPort` | `preflight(min_builds) -> list[ServerCheck]`; `acquire(host_key) -> HostLease`; `release(lease)`; `session_epoch(host_key) -> int`; `locate(model_key) -> HostInstance \| None`; `model_state(model_key, instance_id) -> HostModelState`; `check_model(model_key) -> Envelope` (`issues.model_check/1`); `save(model_key, role) -> SavedModel`; `read_units(model_key, instance_id) -> UnitsState`; `working_copy(model_key, folder) -> ModelKey`; `restore(model_key, saved) -> HostInstance`; `model_files(model_key) -> tuple[Path, ...]`; `started_instances(host_key) -> list[HostInstance]`; `close_started(host_key, instances: Sequence[HostInstance]) -> None` | Spec 0002 (server processes, Job Objects, host-instance locks, process start times) |
 | `CalcPort` | `run_class: RunClass` (read-only, set at construction); `describe(calc_id) -> CalcInfo` (`id`, `version`, `content_sha256`, `status`, `engineering_params`, `basis_fields` (the basis paths the calc reads), `ref_rules` (field path to contract `RefRule`)); `run(calc_id, args) -> Envelope` (may raise `CalcRefused`, §6) | Spec 0003 and code packs |
 | `BasisPort` | `load(basis_ref) -> LoadedBasis` (`result_id`, `basis`: the `basis.design_basis/1` payload model) | Spec 0004 |
-| `DecisionPort` | `decide(call: DecisionCall) -> DecisionAnswer \| PendingAnswer`; `decide_many(calls: Sequence[DecisionCall]) -> list[DecisionAnswer \| PendingAnswer]` (§4.9.1) | Spec 0005 |
+| `DecisionPort` | `decide(call: DecisionCall) -> DecisionAnswer \| PendingAnswer`; `decide_many(calls: Sequence[DecisionCall]) -> list[DecisionAnswer \| PendingAnswer]` (§4.9.1); `runtime_summary() -> Mapping[str, JsonValue]` (synchronous, no I/O: the summary of the providers and released points the port was built with, for the run header, AC69; empty when it has none) | Spec 0005 |
 | `ApprovalPort` | `present(request: ApprovalRequest) -> None`; `answer(request_id, *, wait: bool) -> ApprovalAnswer \| None` (`None`: no answer; the engine pauses) | Spec 0006 |
 | `InputPort` | `present(request: InputRequest) -> None`; `answer(request_id, *, wait: bool) -> InputAnswer \| None` | Spec 0006 |
 | `ProgressSink` | `emit(event: Event) -> None` (synchronous, must not block) | Spec 0006 |
@@ -1012,7 +1022,7 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC68 | Unit | `tests/unit/` |
+| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
 | AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
@@ -1034,7 +1044,8 @@ B-068 fields (`run_class`, `unreleased_tools`, `item_reasons`, `acknowledged_unr
 `model_bound.file_names`, `model_saved.origin_file_names`, the kind `engine.decision`) are part of version 1, because
 no journal exists yet; `item_reasons`, `unreleased_tools`, `file_names` and `origin_file_names` default to empty,
 `acknowledged_unreleased` to false and `request_id` to `null`, so a reader also accepts a payload written without
-them.
+them. The B-098 field `decision_runtime` (`run_started`, `run_resumed`) is part of version 1 on the same grounds and
+defaults to empty.
 
 ## 11. Open questions, gaps and additions
 
@@ -1064,3 +1075,4 @@ them.
 | Q21 | Spec 0006 Q8: `item_reasons` in `ApprovalAnswer`, `Approval` and `approval_resolved`, required for each rejected item; and `acknowledged_unreleased` (spec 0006 AC32) in `ApprovalAnswer` and `approval_resolved`, journaled as given; the requirement stays with the page (spec 0006 §4.6.3, AC42), because the engine's recorded mapping lists allowlisted tools the run may never call | Owner | Accept (§4.9, AC54) |
 | Q22 | Spec 0006 Q4: remove `inbox/` from the run folder; a file there would let any local process answer | Owner | Accept (§4.4.1) |
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
+| Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |

@@ -29,6 +29,11 @@ baseline design notes (`agent-sessions/_baseline/DESIGN-NOTES.md`, read-only): A
 priority; progress with expected times), A8 (no progress display; a heartbeat) and C8 (the Arabic environment: Hijri
 calendar, cp1256, Arabic paths).
 
+**Amendment B-098.** The provider-layer spec ([spec 0009](0009-providers.md) Q7) asked that this spec read the
+`[providers.*]` tables of `harness.toml` and call `assemble_decision_runtime` when it builds the engine's decision layer,
+and that the run header record the runtime's summary. Both are made here (§4.2.2, §4.2.4, AC4, AC62, AC63) and listed in
+§11 (Q15, Q16); the header field itself is engine AC69.
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -75,7 +80,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   Test: `tests/unit/cli/test_exit_codes.py::test_outcome_mapping`.
 - AC4. Given `harness.toml`, then it is found by `--config`, then `ENG_HARNESS_CONFIG`, then `<workspace>/harness.toml`;
   the sections `[engine]`, `[progress]`, `[page]` and `[project_lane]` validate (§4.2.4); an unknown key, a wrong type
-  or an out-of-bounds value is a usage error (exit 2) naming the key; the sections of specs 0002 and 0003 pass through.
+  or an out-of-bounds value is a usage error (exit 2) naming the key; the sections of specs 0002, 0003 and 0009
+  (`[providers.*]`, validated by AC62) pass through.
   Test: `tests/unit/cli/test_config.py::test_discovery_and_sections`.
 - AC5. Given standard output redirected to a pipe whose default encoding is cp1256, when a message holds Arabic text
   and a character cp1256 cannot encode, then nothing raises and the bytes are UTF-8; given a console, the encoding is
@@ -114,6 +120,20 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   field of type `str`, `int`, `bool`, enum or `Literal`, and offers none for a field that holds a quantity or a nested
   model: those values come from `--input FILE`, as references or literals (P2). Test:
   `tests/unit/cli/test_options.py::test_generated_options_exclude_quantities`.
+- AC62. Given `run` or `resume` and a `harness.toml`, then the `[providers.*]` tables are read once with
+  `load_providers_config` (spec 0009 §4.2) in step 1 of §4.2.2, and a table that spec 0009 refuses (its AC1 to AC4) is
+  a usage error (exit 2) naming the key, with no run folder, no journal event and no credential-store access; then
+  `assemble_decision_runtime` (spec 0009 §4.1, §4.10) is called exactly once, in step 5 of §4.2.2, before
+  `Engine.start` or `Engine.resume`, also when no `[providers.*]` table exists, and the `DecisionPort` given to the
+  engine is the cascade of spec 0005 built from the returned runtime (its providers, its verified releases and its
+  summary); the runtime's build warnings and release findings are printed to standard error as warnings and are not an
+  error. Test: `tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled` (with
+  `CliDeps` holding a recording assembler).
+- AC63. Given a run started through `run` with a runtime whose summary is a known JSON object, then the journal's
+  `run_started.decision_runtime` equals that object; given a `resume` after the summary changed (another
+  `model_version`), then `run_resumed.decision_runtime` holds the new object; and no journal byte, standard-output or
+  standard-error line holds a `base_url`, a `key_ref` or a key. Test:
+  `tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime`.
 
 ### 3.2 Terminal progress
 
@@ -344,7 +364,8 @@ Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_htm
 `_screens_basis.py`, `_labels.py` (the label catalog), `_css.py`; `report/_lineage.py`, `_model.py`, `_sections.py`, `_document.py`, `_write.py`. The
 `pages/` folder holds the path-risk floor r3 (`.gate/risk-map.yml`), which is why this spec's plan is r3 throughout.
 The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
-takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener), so every test
+takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener, decision-runtime
+assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
 runs without a host, a browser or the real clock.
 
 ### 4.2 Command line
@@ -385,15 +406,20 @@ or open the page; the approval is the engineer's. The rule is generated into the
 
 #### 4.2.2 Flow of `run`
 
-1. Resolve the workspace and configuration; build the registry and ports from `CliDeps`; find the workflow
-   (`RunRefused`-like refusal otherwise).
+1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
+   §4.2, AC62); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16).
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
    `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
 4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3.
-5. Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for AC37), `FileRunControl`
-   as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start `Engine.start`.
+5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
+   `DecisionSettings` (spec 0005 §4.3; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
+   standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
+   as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
+   AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
+   AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
+   `Engine.start`.
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
 `resume` is steps 1, 5 and 6 with `Engine.resume`; it clears a stale stop file first. The page server starts lazily at
@@ -435,6 +461,7 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 | `[page] max_failed_requests` | int | 20 | Lockdown threshold (AC28) |
 | `[page] ack_timeout_s` | int | 10 | AC37 |
 | `[page] display_max_chars` | int | 500 | Truncation of untrusted text (AC48) |
+| `[providers.decision]`, `[providers.llm]` | tables | absent (no providers, phase 1 behavior) | Owned by spec 0009 §4.2, not by this spec: passed to `load_providers_config`, whose refusal is a usage error naming the key (AC62); no key for a secret exists |
 | `[project_lane.<tool>] record` | str | none | A tool not yet released (ADR-0026 §3); `record` names its gap report or session record (Q5) |
 
 ### 4.3 Terminal progress (ADR-0027 §1, 11 §10, notes A7 and A8)
@@ -762,12 +789,12 @@ heartbeat task runs on the engine loop.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener) | Unit | `tests/unit/cli/` |
+| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62 | Unit | `tests/unit/cli/` |
 | AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
 | AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
-| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream) | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
+| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
 | AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
@@ -786,7 +813,9 @@ and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Covera
 Adds the commands, the four public modules and the file formats of §5 to `eng-harness` 0.1.0 (new package). The
 `approval_resolved` payload gains `item_reasons` and `ApprovalAnswer` the same member (engine amendment, Q8): a minor
 change to the journal schema that the reader must read with and without. The marker `x-eng-input` on input requests (Q6) is a second engine amendment; a request without it is read as a choice. The JSON result of §4.2.1 and the exit codes
-are public interface: a change is minor or major with a changelog entry.
+are public interface: a change is minor or major with a changelog entry. Amendment B-098: `harness.toml` passes
+`[providers.*]` to spec 0009, `CliDeps` gains the decision-runtime assembler, and the run header gains
+`decision_runtime` (engine AC69), all additive.
 
 ## 11. Open questions, gaps and additions
 
@@ -806,4 +835,6 @@ are public interface: a change is minor or major with a changelog entry.
 | Q12 | The sign-off exceptions are verdicts other than `PASS` and `NOT_APPLICABLE`; 14 §6 says "every verdict is `PASS`" | Owner | `NOT_APPLICABLE` needs no reason; `FAIL`, `NEEDS_ENGINEER` and `ERROR` do |
 | Q13 | Extra `doctor` checks that belong to this spec: the page can bind to `127.0.0.1`, a browser can be opened, the console encoding, the locale and calendar | Owner (spec 0002) | Add them to the doctor of spec 0002 through an extension point; until then they are exercised by AC22 and AC58 |
 | Q14 | Engine §4.9 lists `ApprovalKind` `CHANGE_SET`, `PROMOTION`, `SIGN_OFF`, `INFO`, while 18 step 15 calls the engineer turn "approve" | Owner | The engineer turn is a choice request (§4.4.6), not an approval kind: it binds no model state and writes nothing. Spec 0007 states its options |
+| Q15 | Spec 0005 §4.3 and spec 0009 §4.2 say this spec reads `DecisionSettings` (`local_only`, `sensitive_values`, `export_enabled`, `shadow_released.<point>` and the limits) from `harness.toml`, but no document names its section or its keys' types and bounds, and §4.2.4 had no entry for it | Owner | Name the section `[decisions]` (keys the fields of spec 0005 §4.3, `shadow_released.<point>` as a sub-table) in an amendment of spec 0005 §4.3, which owns the type; this spec then passes it through like `[providers.*]`. Until then T14 builds `DecisionSettings` with its defaults (`local_only` false, no release), which is the phase 1 behavior |
+| Q16 | Amendment B-098 (spec 0009 Q7). (a) Spec 0009 names `assemble_decision_runtime` and its result (providers, verified releases, summary) but not its arguments; §4.2.2 step 5 reads them as the `ProvidersConfig`, the `DecisionSettings`, the workspace and the point policies of `verify_releases` **[added]**. (b) Release findings (spec 0009 §4.10: "findings go to the run report as warnings") reach standard error only, because the report reads the journal and the store only (§4.6.1) and the summary of spec 0009 AC29 does not hold them. (c) The report's Status section does not yet show `decision_runtime` | Owner | (a) Fix the signature in plan 0009 T10 to these inputs. (b) Add the dropped releases (`point`, `reason`) to the summary in an amendment of spec 0009 AC29, so they are journaled with it. (c) Show the providers and released points of `RunHeader.decision_runtime` in the Status section at the next amendment of §4.6.1 (report plan T13) |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

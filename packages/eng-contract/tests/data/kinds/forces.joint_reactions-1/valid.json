@@ -1,0 +1,19 @@
+{
+  "axes": "global",
+  "rows": [
+    {
+      "joint": "J1",
+      "case": {
+        "case": "DL",
+        "case_type": "load_pattern",
+        "step": null
+      },
+      "FX_kN": 1.5,
+      "FY_kN": 0.0,
+      "FZ_kN": 250.0,
+      "MX_kNm": 0.0,
+      "MY_kNm": 3.2,
+      "MZ_kNm": 0.0
+    }
+  ]
+}
