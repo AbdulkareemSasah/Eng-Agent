@@ -6,9 +6,9 @@ The documents are synthetic: every value is a placeholder, not an engineering va
 from pathlib import Path
 
 import pytest
-from eng_harness.templates._yaml import MAX_BYTES, MAX_DEPTH, load_strict, loads_strict
 
 from eng_harness.templates import TemplateInvalid
+from eng_harness.templates._yaml import MAX_BYTES, MAX_DEPTH, load_strict, loads_strict
 
 MIB = 1024 * 1024
 
