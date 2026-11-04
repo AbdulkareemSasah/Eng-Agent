@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from eng_dev_gate.checks.check import make_handler
+from eng_dev_gate.checks.secrets import _parse_log
 from eng_dev_gate.toolrun import SubprocessToolRunner
 from support.repo import Repo, RunResult
 from support.toy import GATE_YML, make_workspace
@@ -170,6 +171,16 @@ def test_hunk_lines_that_look_like_headers(repo: Repo) -> None:
     repo.commit({"a.txt": f"++ b/fake\n@@ -1 +1 @@\n{GITHUB_TOKEN}\n"})
     result = repo.run(["--format", "json", "secrets", "--range", f"{base}..HEAD"])
     assert [(f["path"], f["line"]) for f in _findings(result)] == [("a.txt", 3)]
+
+
+def test_combined_hunk_with_wrong_header_counts_keeps_its_last_added_line() -> None:
+    """Git's combined-diff counts are unreliable at -U0: the hunk lasts while lines carry one marker per parent."""
+    log = "\n".join(
+        ["@@commit abc", "diff --cc f.txt", "index 1..2", "--- a/f.txt", "+++ b/f.txt",
+         "@@@ -1,1 -1,1 +1,0 @@@", " +first", "+ last", "diff --cc g.txt", "+++ b/g.txt"]
+    )  # fmt: skip
+    added, _ = _parse_log(log)
+    assert added[("abc", "f.txt")] == [(1, "first"), (2, "last")]
 
 
 def test_skipped_files_are_sc002(repo: Repo) -> None:

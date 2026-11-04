@@ -59,24 +59,24 @@ def _clean_path(raw: str) -> str:
 def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], set[tuple[str, str]]]:
     """Parse ``git log -p -U0 --cc`` into added lines per (commit, path), and the (commit, path) pairs of binary files.
 
-    The hunk header counts decide where a hunk ends, so an added line that reads like a header is still data. In a
-    merge's combined diff each line has one marker column per parent: a line is in parent i unless column i is ``+``,
-    and in the result unless some column is ``-``.
+    The hunk header counts decide where a single-parent hunk ends, so an added line that reads like a header is still
+    data. In a merge's combined diff each line has one marker column per parent: a line is in parent i unless column i
+    is ``+``, and in the result unless some column is ``-``. Git's counts are unreliable there at ``-U0``, so a combined
+    hunk lasts while lines keep the shape of N marker characters from `` +-``; headers never do.
     """
     added: dict[tuple[str, str], list[tuple[int, str]]] = {}
     binary: set[tuple[str, str]] = set()
     commit = path = ""
     old_left: list[int] = []
     new_left = line = 0
+    combined = False
     for raw in log.split("\n"):
         marks = raw[: len(old_left)]
-        if (
-            (new_left or any(old_left))
-            and not raw.startswith("\\")
-            and (len(marks) < len(old_left) or set(marks) - set(" +-"))
-        ):
-            old_left, new_left = [], 0  # not a hunk line: the hunk ended early, so read this line as a header
-        if (new_left or any(old_left)) and not raw.startswith("\\"):  # "\ No newline at end of file" is not a line
+        in_hunk = combined or bool(new_left) or any(old_left)
+        if in_hunk and not raw.startswith("\\") and (len(marks) < len(old_left) or set(marks) - set(" +-")):
+            old_left, new_left, combined = [], 0, False  # not a hunk line: read this line as a header
+            in_hunk = False
+        if in_hunk and not raw.startswith("\\"):  # "\ No newline at end of file" is not a line
             old_left = [n if mark == "+" else n - 1 for n, mark in zip(old_left, marks, strict=True)]
             if "-" not in marks:  # the line is in the result
                 if "+" in marks:
@@ -95,6 +95,7 @@ def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], 
             ]  # no count: one
             line = int(match.group(3))
             new_left = 1 if match.group(4) is None else int(match.group(4))
+            combined = len(old_left) > 1
     return added, binary
 
 
