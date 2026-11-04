@@ -71,6 +71,20 @@ def test_collection_error_counts_as_failing(repo: Repo) -> None:
     assert (result.code, status, errors) == (0, "pass", {})
 
 
+def test_parametrized_test_is_red_when_one_case_fails(repo: Repo) -> None:
+    """A changed parametrized test is red at the base when a case fails there (the added case), green when all pass."""
+    head = "import pytest\nfrom fixpkg import VALUE\n\n\n@pytest.mark.parametrize('v', {cases})\n"
+    head += "def test_value_at_least(v: int) -> None:\n    assert VALUE >= v\n"
+    base = tf_repo(repo, base_files={"pkg/tests/test_p.py": head.format(cases="[1]")})
+    repo.commit({"pkg/tests/test_p.py": head.format(cases="[1, 2]")}, "test: add a case")
+    repo.commit(GREEN, "feat: green")
+    result, status, errors = tf_run(repo, base, "feat: x")
+    assert (result.code, status, errors) == (0, "pass", {})
+    repo.git("reset", "-q", "--hard", "HEAD~1")  # without the implementation the added case still fails at the head
+    result, _, errors = tf_run(repo, base, "feat: x")
+    assert (result.code, list(errors)) == (1, ["TF005"])
+
+
 def test_passes_at_base_and_fails_at_head(repo: Repo) -> None:
     """AC24: a test that passes (or is skipped) on the merge base is TF004; one that is not green at the head, TF005."""
     base = tf_repo(repo)
