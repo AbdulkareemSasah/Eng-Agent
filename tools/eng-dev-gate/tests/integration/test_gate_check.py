@@ -190,7 +190,7 @@ NOTES = "# notes\n"
 
 def _scope_repo(repo: Repo, globs: tuple[str, ...] = ("pkg/src/**", "lib/src/**")) -> str:
     """Plan package ``pkg`` and workspace members ``lib`` and ``pkg``; task globs ``globs``."""
-    return make_gate_repo(repo, base_files=WORKSPACE, plan=plan_text(files=("pkg/src/**",)))
+    return make_gate_repo(repo, base_files=WORKSPACE, plan=plan_text(files=globs))
 
 
 def _gc008_paths(out: str) -> list[str]:
