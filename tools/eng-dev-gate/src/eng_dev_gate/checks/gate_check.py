@@ -172,6 +172,21 @@ def _ratchet_in_scope(git: Git, base: str, head: str, anchors: set[str]) -> bool
     )
 
 
+def _test_markers(changes: list[Change], member_dirs: Sequence[str], git: Git, head: str, inside: set[str]) -> set[str]:
+    """Empty ``__init__.py`` files added or modified under a member's ``tests/`` beside an in-scope file (AC10c)."""
+    markers: set[str] = set()
+    for change in changes:
+        path = PurePosixPath(change.path)
+        if change.status not in ("A", "M") or path.name != "__init__.py":
+            continue
+        if not any(change.path.startswith("tests/" if d == "." else f"{d}/tests/") for d in member_dirs):
+            continue
+        beside = any(q != change.path and PurePosixPath(q).parent == path.parent for q in inside)
+        if beside and git.show(head, change.path) == "":
+            markers.add(change.path)
+    return markers
+
+
 def accepted_paths(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
 ) -> tuple[list[str], set[str]]:
@@ -195,6 +210,7 @@ def accepted_paths(
         }
     if RATCHET_FILE in paths and _ratchet_in_scope(git, base, head, anchors):
         inside.add(RATCHET_FILE)
+    inside |= _test_markers(changes, member_dirs, git, head, anchors)
     return list(paths), inside
 
 
