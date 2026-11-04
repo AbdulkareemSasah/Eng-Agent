@@ -15,3 +15,4 @@
 - Text, date and number formatting and sanitizing: `eng_harness._text` and its culture-invariance rule test (B-175).
 - HTML builder: `eng_harness._html` (text escaped by construction, safe tokens, labeled untrusted `<bdi>` fields, style element with its SHA-256 policy source) and the shared style sheet `eng_harness.pages._css` (B-176).
 - Report package skeleton: `eng_harness.report` with `ReleaseMarks`, `ReportError` and `unreleased_dependencies` (breadth-first lineage closure over `parents` and provenance inputs, depth limit) (B-182).
+- Command line shell: `eng_harness.cli` with `main`, parser of the six commands (no approve command), exit codes, `harness.toml` sections, output encoding, `eng-harness` script and `python -m eng_harness` (B-177).
