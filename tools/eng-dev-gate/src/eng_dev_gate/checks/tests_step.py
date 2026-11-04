@@ -54,6 +54,7 @@ def _run_coverage(runner: ToolRunner, member_dir: Path, work: Path) -> tuple[int
         "pyproject.toml",
         "-p",
         "eng_dev_gate.pytest_plugin",
+        "--no-cov",  # a member's own pytest-cov addopts would otherwise take over measurement from this run
         "tests",
     )
     outcome = runner.run(run, member_dir)
