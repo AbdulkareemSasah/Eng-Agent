@@ -42,7 +42,7 @@ RULES: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
         ("personal-path", rf"[A-Za-z]:\\Users\\{_NAME}|/home/{_NAME}/|/Users/{_NAME}/"),
     )
 )  # fmt: skip
-_HUNK = re.compile(r"^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_HUNK = re.compile(r"^(@@+) ((?:-\d+(?:,\d+)? )+)\+(\d+)(?:,(\d+))? \1")  # "@@" per file, "@@@" and more per merge
 _BINARY = re.compile(r"^Binary files .* and b/(.+) differ$")
 
 
@@ -57,22 +57,26 @@ def _clean_path(raw: str) -> str:
 
 
 def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], set[tuple[str, str]]]:
-    """Parse ``git log -p -U0`` into added lines per (commit, path), and the (commit, path) pairs of binary files.
+    """Parse ``git log -p -U0 --cc`` into added lines per (commit, path), and the (commit, path) pairs of binary files.
 
-    The hunk header counts decide where a hunk ends, so an added line that reads like a header is still data.
+    The hunk header counts decide where a hunk ends, so an added line that reads like a header is still data. In a
+    merge's combined diff each line has one marker column per parent; a line without ``-`` is in the result.
     """
     added: dict[tuple[str, str], list[tuple[int, str]]] = {}
     binary: set[tuple[str, str]] = set()
     commit = path = ""
-    old_left = new_left = line = 0
+    old_left: list[int] = []
+    new_left = line = 0
     for raw in log.split("\n"):
-        if old_left or new_left:
-            if raw.startswith("+"):
-                added.setdefault((commit, path), []).append((line, raw[1:]))
+        if new_left or any(old_left):
+            marks = raw[: len(old_left)]
+            if "-" in marks:
+                old_left = [n - 1 if mark == "-" else n for n, mark in zip(old_left, marks, strict=True)]
+            else:
+                if "+" in marks:
+                    added.setdefault((commit, path), []).append((line, raw[len(old_left) :]))
                 new_left -= 1
                 line += 1
-            elif raw.startswith("-"):
-                old_left -= 1
         elif raw.startswith(COMMIT_MARK):
             commit = raw.removeprefix(COMMIT_MARK)
         elif raw.startswith("+++ "):
@@ -80,9 +84,11 @@ def _parse_log(log: str) -> tuple[dict[tuple[str, str], list[tuple[int, str]]], 
         elif match := _BINARY.match(raw):
             binary.add((commit, _clean_path(match.group(1))))
         elif match := _HUNK.match(raw):
-            old_left = 1 if match.group(1) is None else int(match.group(1))  # a missing count means one line
-            line = int(match.group(2))
-            new_left = 1 if match.group(3) is None else int(match.group(3))
+            old_left = [
+                1 if c == "" else int(c) for c in re.findall(r"-\d+(?:,(\d*))?", match.group(2))
+            ]  # no count: one
+            line = int(match.group(3))
+            new_left = 1 if match.group(4) is None else int(match.group(4))
     return added, binary
 
 
@@ -111,7 +117,7 @@ def _git(runner: ToolRunner, root: Path, *args: str) -> str:
 
 
 def scan_range(runner: ToolRunner, root: Path, config: GateConfig, revisions: str) -> list[Finding]:
-    """Scan the added lines of every non-merge commit in ``revisions`` (``<base>..<head>``).
+    """Scan the added lines of every commit in ``revisions`` (``<base>..<head>``).
 
     Raises:
         UsageError: ``revisions`` is not of the form ``a..b`` or starts with ``-``.
@@ -119,7 +125,7 @@ def scan_range(runner: ToolRunner, root: Path, config: GateConfig, revisions: st
     """
     if ".." not in revisions or revisions.startswith("-"):
         raise UsageError(f"--range expects <base>..<head>, got {revisions!r}")
-    log = _git(runner, root, "log", "-p", "-U0", "--no-merges", "--no-color", "--no-ext-diff",
+    log = _git(runner, root, "log", "-p", "-U0", "--cc", "--no-color", "--no-ext-diff",
                f"--format={COMMIT_MARK}%H", revisions, "--")  # fmt: skip
     allowed = {(a.rule, a.path, a.fingerprint) for a in config.secrets.allow}
     added, binary = _parse_log(log)

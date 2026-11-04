@@ -127,11 +127,8 @@ def _merge_with_resolution(repo: Repo, resolved: str) -> str:
     repo.commit({"conf.txt": "a\nside\nz\n"}, "feat: side")
     repo.git("checkout", "-q", "main")
     repo.commit({"conf.txt": "a\nmain\nz\n"}, "feat: main")
-    merge = subprocess.run(  # noqa: S603  # B-047: no shell; fixed arguments
-        ["git", "merge", "--no-edit", "side"],  # noqa: S607  # B-047: git from PATH
-        cwd=repo.root, env=repo._env, capture_output=True, check=False,  # noqa: SLF001  # B-047: fixture environment
-    )
-    assert merge.returncode == 1  # a conflict
+    with pytest.raises(subprocess.CalledProcessError):  # the merge stops on a conflict
+        repo.git("merge", "--no-edit", "side")
     repo.commit({"conf.txt": f"a\n{resolved}\nz\n"}, "merge: resolve")
     return base
 
