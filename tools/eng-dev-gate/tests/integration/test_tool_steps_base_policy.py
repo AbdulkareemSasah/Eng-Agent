@@ -12,12 +12,13 @@ from pathlib import Path
 
 from eng_dev_gate.checks.check import make_handler
 from eng_dev_gate.toolrun import SubprocessToolRunner
+from support.judged_tree import lock
 from support.repo import Repo, RunResult, make_repo
 from support.toy import GATE_YML, member_pyproject
 
 BASE_ROOT = (
     '[project]\nname = "toy-root"\nversion = "0"\nrequires-python = ">=3.14"\ndependencies = []\n'
-    '[tool.uv]\npackage = false\n[tool.uv.workspace]\nmembers = ["pkgs/a"]\n'
+    '[tool.uv]\npackage = false\n[tool.uv.workspace]\nmembers = ["pkgs/a"]\n[dependency-groups]\ndev = []\n'
     '[tool.ruff]\ntarget-version = "py314"\nline-length = 120\nextend-exclude = ["pkgs/a/src/a/excluded.py"]\n'
     '[tool.ruff.lint]\nselect = ["E", "F", "I", "S"]\n'
     '[tool.ruff.lint.per-file-ignores]\n"**/tests/**" = ["S101"]\n'
@@ -47,6 +48,8 @@ def _tree(root: Path, root_pyproject: str, files: dict[str, str]) -> Repo:
             **files,
         }
     )
+    lock(root)  # ``types`` builds the judged environment from the lock file (AC54a)
+    tree.commit({}, "chore: lock")
     return tree
 
 

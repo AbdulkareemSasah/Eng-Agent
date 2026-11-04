@@ -61,7 +61,7 @@ STEPS: tuple[Step, ...] = (
     Step("lint", "package", tool_steps.lint),
     Step("types", "package", tool_steps.types),
     Step("forbidden", "package", forbidden.run_step),
-    Step("imports", "root", lambda ctx: imports.check_workspace(ctx.root)),
+    Step("imports", "root", imports.step),
     Step("ratchet", "root", ratchet.step),
     Step("secrets", "root", secrets.step),
     Step("tests", "package", tests_step.tests),
