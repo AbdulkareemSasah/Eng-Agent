@@ -26,8 +26,9 @@ def test_readme_has_no_skeleton_status() -> None:
 
 def test_readme_documents_exit_codes_and_diagnostics() -> None:
     text = _readme()
+    assert re.search(r"^## Exit codes\s*$", text, re.M)  # a dedicated section, not a passing mention
     for code in ("0", "1", "2", "3"):
-        assert re.search(rf"\b{code}\b", text)
+        assert re.search(rf"^\|\s*{code}\s*\|", text, re.M)  # one table row per exit code
     assert "awaiting owner" in text
 
 
