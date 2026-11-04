@@ -13,7 +13,9 @@ from collections.abc import Callable, Mapping, Sequence
 
 from eng_dev_gate import __version__, agents, gate_root
 from eng_dev_gate.checks.check import make_handler
+from eng_dev_gate.report import AWAITING_TITLE, escape_data
 from eng_dev_gate.results import ExitCode, GateError, Status, UsageError, exit_code_for
+from eng_dev_gate.workspace import discover_members
 
 Handler = Callable[[argparse.Namespace], Status]
 
@@ -34,6 +36,10 @@ def _parser() -> argparse.ArgumentParser:
         child = sub.add_parser(name, help=f"{name} command")
         if name == "agents":
             agents.add_arguments(child)
+        if name == "packages":
+            shape = child.add_mutually_exclusive_group()
+            shape.add_argument("--names", action="store_true", help="print the project names, one per line")
+            shape.add_argument("--json", action="store_true", help="print a JSON list of name and path")
         if name == "check":
             child.add_argument("--package", default=None, help="check this workspace member")
             child.add_argument("--all", action="store_true", help="check every member")
@@ -48,6 +54,25 @@ def _report_error(message: str, output_format: str) -> None:
         sys.stderr.write(json.dumps({"status": "error", "message": message}) + "\n")
     else:
         sys.stderr.write(f"eng-gate: {message}\n")
+
+
+def _packages(args: argparse.Namespace) -> Status:
+    """List the workspace members ordered by path: names (``--names``), JSON (``--json``) or ``name<TAB>path``.
+
+    Standard output holds only the list, because the ``build`` job reads it; an AW09 notice goes to standard error.
+
+    Raises:
+        UsageError: the workspace root has no ``[tool.uv.workspace]`` table or a member is invalid (exit 2).
+    """
+    context = args.gate_context
+    members = discover_members(context.root)
+    for finding in context.findings:
+        sys.stderr.write(f"::notice title={AWAITING_TITLE}::{escape_data(finding.text())}\n")
+    if args.json:
+        sys.stdout.write(json.dumps([{"name": m.name, "path": m.path} for m in members]) + "\n")
+    else:
+        sys.stdout.writelines(f"{m.name}\n" if args.names else f"{m.name}\t{m.path}\n" for m in members)
+    return Status.PASS
 
 
 def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> int:
@@ -69,7 +94,7 @@ def main(argv: Sequence[str], handlers: Mapping[str, Handler] | None = None) -> 
         _report_error(str(error), output_format)
         return int(ExitCode.USAGE)
     output_format = args.format
-    handler = {"agents": agents.handle, **(handlers or {})}.get(args.command)
+    handler = {"agents": agents.handle, "packages": _packages, **(handlers or {})}.get(args.command)
     try:
         if handler is None:
             raise UsageError(f"command {args.command!r} is not implemented yet")
