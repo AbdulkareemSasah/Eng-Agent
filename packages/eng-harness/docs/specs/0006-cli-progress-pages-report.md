@@ -46,7 +46,7 @@ something an agent cannot give. Nothing of this exists yet; the first workflow (
 | Standard library `http.server` (`ThreadingHTTPServer`) | Enough for a loopback server with a handful of routes; request size, headers and routing are ours to check (§4.4) | Used |
 | Jinja2 (autoescape) | Autoescape is the main benefit. A new dependency, a package ADR (A10), and a template-injection class of defects; layouts here are fixed tables and forms | Not used (§4.5, Q1) |
 | Standard library `html.escape` with a small builder | Same guarantee through types: only escaped text reaches output (§4.5) | Used |
-| `argparse`, `webbrowser`, `statistics`, `secrets`, `hmac`, `signal` | All needed pieces exist in the standard library | Used |
+| `argparse`, `statistics`, `secrets`, `hmac`, `signal`, `subprocess`, `os.startfile` | All needed pieces exist in the standard library. `webbrowser` is not used: it honours the `BROWSER` environment variable, which would let the caller of `run` choose the program that receives the launch address (§4.4.4) | Used |
 | Rich, Textual, `tqdm` | Terminal widgets; progress here is one line per event and one live line | Not used |
 | `eng-harness` engine (spec 0001) | `JournalReader` already gives every view the progress, page and report need (11 §5); `ProgressSink` and the ports are defined | Used; no second source of truth |
 | Contract (`ResultStore`, `Quantity`, `Ref`, kinds) | Results, references and provenance for the report | Used; no logic re-implemented |
@@ -65,8 +65,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   of any command accepts an approval, a rejection, a sign-off or an engineer name. Test:
   `tests/unit/cli/test_parser.py::test_commands_exact_and_no_approve`.
 - AC2. Given the modules `eng_harness.cli` and `eng_harness.progress`, then neither imports the answer models or the
-  answer-producing functions of `eng_harness.pages`, and only `eng_harness.pages` constructs `ApprovalAnswer`,
-  `InputAnswer` or `BasisSetupAnswer` (static check of imports and names). Test:
+  answer-producing functions of `eng_harness.pages`, with one named exception: `cli` may import
+  `pages.accept_answers_file` (§4.2.1, AC46), which refuses everything but data inputs; and only `eng_harness.pages`
+  constructs `ApprovalAnswer`, `InputAnswer` or `BasisSetupAnswer` (static check of imports and names against an
+  allowlist of exactly that one function). Test:
   `tests/rules/test_cli_cannot_answer.py::test_no_answer_construction_outside_pages`.
 - AC3. Given each outcome (§4.2.3), then the process exit code is the one in the table: every `RunStatus`, each stop
   reason, `RunRefused`, `RunLocked`, `JournalIntegrityError`, an unknown run, a usage error and an unexpected exception.
@@ -147,17 +149,21 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 - AC22. Given a started page server, then its address is `127.0.0.1` and its port is chosen by the operating system
   (two servers get different ports); a request to bind any other address raises; and no source line names `0.0.0.0`,
   `::` or `localhost`. Test: `tests/unit/pages/test_server_bind.py::test_loopback_random_port`.
-- AC23. Given the launch address, then its code opens a session once (cookie `HttpOnly`, `SameSite=Strict`) and
+- AC23. Given the launch address, then its code opens a session once (cookie `eh_<port>_session`, `HttpOnly`,
+  `SameSite=Strict`; the name carries the port so that two servers on one host do not overwrite each other) and
   redirects; a second use, a wrong code and a request without the cookie each get 403 with no run data; session and
   launch values have at least 256 bits of randomness and are compared with `hmac.compare_digest`. Test:
   `tests/unit/pages/test_session_token.py::test_launch_code_once`.
 - AC24. Given a request whose `Host` is not exactly `127.0.0.1:<port>` (a DNS-rebinding name, `localhost`, another
-  port), or a POST whose `Origin` is missing or not `http://127.0.0.1:<port>`, or whose `Sec-Fetch-Site` is not
-  `same-origin`, then it is refused (421 or 403) before any handler runs. Test:
+  port), or a POST whose `Origin` is missing or not `http://127.0.0.1:<port>`, or whose `Sec-Fetch-Site` is present and not
+  `same-origin`, then it is refused (421 or 403) before any handler runs; a POST with the right `Origin` and no
+  `Sec-Fetch-Site` header (an older browser) passes this check. Test:
   `tests/unit/pages/test_request_checks.py::test_host_origin_fetch_metadata`.
-- AC25. Given a POST whose CSRF token is missing, wrong, or issued for another request id, another preview hash or
-  another session, then it is refused (403) and the port and the journal are untouched. Test:
-  `tests/unit/pages/test_request_checks.py::test_csrf_bound_to_request_and_hash`.
+- AC25. Given a POST whose CSRF token is missing, wrong, or issued for another route kind, another request or setup
+  id, another bound hash (the preview hash of an approval, the fields-schema hash of an input or choice request, the
+  draft hash of a basis setup) or another session, then it is refused (403) and the port and the journal are
+  untouched; this holds for each of the three kinds of POST (§4.4.2). Test:
+  `tests/unit/pages/test_request_checks.py::test_csrf_bound_to_request_and_hash` (parametrized over the three kinds).
 - AC26. Given every screen and error page, then each response carries the headers of §4.4.2 (the exact
   Content-Security-Policy included) and the markup holds no `script` element, no event-handler attribute, no `style`
   attribute, no `iframe`, `object`, `embed`, `link` or `img`, and no URL that is not a relative path of this server.
@@ -167,8 +173,17 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   Test: `tests/unit/pages/test_routes.py::test_route_table_and_limits`.
 - AC28. Given `max_failed_requests` refused requests (token, Host, Origin, CSRF), then the server answers 503 to every
   request and prints a warning; given the run function returns, the server and its threads stop and the port is free.
-  Tests: `tests/unit/pages/test_lockdown.py::test_failed_requests_lock_server`,
+    Tests: `tests/unit/pages/test_lockdown.py::test_failed_requests_lock_server`,
   `::test_shutdown_releases_port`.
+- AC61. Given a run that serves the page, then the launch address is opened by an opener that ignores the `BROWSER`
+  environment variable (the child process environment has it removed) and is never written to standard output,
+  standard error, a log, `status` output or the journal: when the opener fails, or with `--no-browser`, it is written
+  only to the controlling terminal (`/dev/tty`, `CONOUT$`), and when there is none the process says that the address
+  cannot be shown and that the run should be started from a terminal or with `--no-wait`. Tests:
+  `tests/unit/cli/test_opener.py::test_browser_variable_ignored`,
+  `tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr` (stderr redirected, opener failing,
+  no controlling terminal: the code appears on neither stream).
+
 
 ### 3.4 Approval flow (11 §3, 18 step 6)
 
@@ -230,19 +245,26 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   refused; the answer carries N option ids. Test:
   `tests/unit/pages/test_choice_screen.py::test_batched_decisions_one_submit`.
 - AC45. Given the engine's own requests (`engine.in_flight`, `engine.host_state`, `engine.escalation`), then they are
-  choice screens showing the reason and the evidence, and they can be answered only there. Test:
+  choice screens showing the reason and the evidence, and they can be answered only there (the file path refuses them, AC46). Test:
   `tests/unit/pages/test_choice_screen.py::test_engine_requests_choices`.
-- AC46. Given a `ctx.ask` request, then the page shows its fields (name, type, unit, bounds) read-only with the text
-  "provide the answers with `resume --answers FILE`"; given such a file, the engine validates it (engine AC61) and
-  journals `input_provided` with `by` = `engineer:<name>`; a file for a request that is not an input request, or an
-  answer for an unknown request id, is refused. Test:
-  `tests/workflow/test_cli_answers.py::test_form_request_answers_file`.
+- AC46. Given a `ctx.ask` data request (schema marker `x-eng-input: data`, §4.4.6), then the page shows its fields
+  (name, type, unit, bounds) read-only with the text "provide the answers with `resume --answers FILE`"; given such a
+  file, `pages.accept_answers_file` builds the `InputAnswer`, the engine validates it (engine AC61) and journals
+  `input_provided` with `by` = `engineer:<name>`. The file path refuses, with exit 2 and nothing journaled: an answer for
+  an unknown request id; a request that is not of kind `block`; any request whose id starts with `engine.`
+  (`engine.in_flight`, `engine.host_state`, `engine.escalation`); and every request whose schema does not carry
+  `x-eng-input: data`, which includes the engineer turn and batched decisions (choice requests, marker `choice` or no
+  marker). Tests: `tests/workflow/test_cli_answers.py::test_form_request_answers_file`,
+  `tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests` (an answers file for
+  the engineer turn, a batched decision and `engine.in_flight` is refused and the journal bytes are unchanged).
 - AC47. Given a basis draft with every required field present, when `run` is called, then the page shows the sections
   and rows of the `BasisSetupView` (value, unit, source, citation, state, bounds, banners); a confirmable section has a
   box, a section with a missing row has none; confirming all sections with a name freezes the basis (spec 0004) and
-  starts the run; rejecting with a reason ends with exit 3, no run folder and no stored basis. The answer and the
+  starts the run; an answer whose `draft_sha256` is not that of the draft currently shown is refused (409) before
+  `freeze`; rejecting with a reason ends with exit 3, no run folder and no stored basis. The answer and the
   setup log `<workspace>/setups/<setup_id>.json` hold `by`, `at`, `draft_sha256` and the section names, never a value.
-  Tests: `tests/workflow/test_cli_basis.py::test_basis_confirmation_flow`, `::test_reject_leaves_no_run`.
+    Tests: `tests/workflow/test_cli_basis.py::test_basis_confirmation_flow`, `::test_reject_leaves_no_run`,
+  `::test_stale_draft_hash_refused`.
 
 ### 3.6 Untrusted text
 
@@ -311,17 +333,18 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 |---|---|---|
 | `eng_harness.cli` | `main(argv, *, deps) -> int`, `ExitCode`, `CliDeps`, `HarnessConfig`, `ConfigError` | the entry point, tests |
 | `eng_harness.progress` | `ExpectedTimes`, `ProgressRenderer`, `TerminalProgress` (the `ProgressSink`), `Heartbeat`, `Liveness`, `read_liveness` | `cli`, tests |
-| `eng_harness.pages` | `PageServer`, `PageApprovalPort`, `PageInputPort`, `PageBasisSetupPort`, `Screen` | `cli`, tests |
+| `eng_harness.pages` | `PageServer`, `PageApprovalPort`, `PageInputPort`, `PageBasisSetupPort`, `Screen`, `accept_answers_file` | `cli` (only `PageServer`, the ports and `accept_answers_file`, AC2), tests |
 | `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError` | `cli`, `pages` (sign-off screen), tests |
 
 Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_html.py` (§4.5), `cli/_parser.py`,
-`_exit.py`, `_config.py`, `_encoding.py`, `_options.py`, `_run.py`, `_status.py`, `_signals.py`, `_control.py`,
-`_wiring.py`; `progress/_expected.py`, `_render.py`, `_sink.py`, `_heartbeat.py`; `pages/_security.py`, `_server.py`,
-`_routes.py`, `_answers.py`, `_ports.py`, `_wait.py`, `_screens_approval.py`, `_screens_choice.py`,
+`_exit.py`, `_config.py`, `_encoding.py`, `_opener.py` (launch-address opener and terminal writer, §4.4.4), `_options.py`,
+`_run.py`, `_status.py`, `_stop.py` (the `stop` command), `_signals.py`, `_control.py` (the stop-file protocol,
+`FileRunControl`), `_wiring.py`; `progress/_expected.py`, `_render.py`, `_sink.py`, `_heartbeat.py`; `pages/_security.py`, `_server.py`,
+`_routes.py`, `_answers.py` (answer models, `ApprovalSubmission`, checks), `_answers_file.py` (`accept_answers_file`), `_ports.py`, `_wait.py`, `_screens_approval.py`, `_screens_choice.py`,
 `_screens_basis.py`, `_labels.py` (the label catalog), `_css.py`; `report/_lineage.py`, `_model.py`, `_sections.py`, `_document.py`, `_write.py`. The
 `pages/` folder holds the path-risk floor r3 (`.gate/risk-map.yml`), which is why this spec's plan is r3 throughout.
 The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
-takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, browser opener), so every test
+takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener), so every test
 runs without a host, a browser or the real clock.
 
 ### 4.2 Command line
@@ -333,26 +356,32 @@ Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract
 | Command | Purpose and options |
 |---|---|
 | `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), generated `--<field>` options (AC14), and the shared options below |
-| `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers a pending `ctx.ask` (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one input request is pending; and the shared options |
+| `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers pending `ctx.ask` data requests only (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one data request is pending; and the shared options |
 | `status [<run_id>]` | Without an id: the 20 most recent runs. With an id: AC11. `--json`. Read-only |
 | `stop <run_id>` | Ask a live run to pause at the next safe point (`--wait SECONDS` waits for it to end) |
 | `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force` |
 | `doctor` | Spec 0002 §4.9 (`--json`, `--show-paths`) |
 
 Shared options of `run` and `resume`: `--no-wait` (never wait for an answer: exit 10 at the first open request),
-`--wait-timeout SECONDS` (default: wait until answered or stopped), `--no-browser` (print the launch address instead of
-opening it, §4.4.4), `--progress {auto,tty,plain,json,off}` (default `auto`: `tty` on a terminal, else `plain`),
+`--wait-timeout SECONDS` (default: wait until answered or stopped), `--no-browser` (do not open the page; show the launch address on the
+controlling terminal only, §4.4.4), `--progress {auto,tty,plain,json,off}` (default `auto`: `tty` on a terminal, else `plain`),
 `--json` (the final result as one JSON object on standard output; progress goes to standard error), `--no-report`.
 
 **There is no approve command, no option that answers a request, and no file that approves.** Approval, rejection,
 per-item rejection and sign-off exist only on the page (ADR-0027 §2). An agent that runs a workflow can start, resume,
-stop and inspect it, and read the report; it cannot give the answer (AC1, AC2). Input values for `ctx.ask` and the
+stop and inspect it, and read the report; it cannot give the answer (AC1, AC2). Input values for `ctx.ask` data requests and the
 basis values arrive as files, because they are data; their confirmation by the engineer happens at the change-set
-approval and on the basis screen (Q3).
+approval and on the basis screen (Q3). **`--answers` cannot decide anything.** `resume` turns the file into an
+`InputAnswer` only through `pages.accept_answers_file(request, payload, by)`, which accepts a request only if it is of
+kind `block`, its id does not start with `engine.`, and its schema carries the marker `x-eng-input: data` (the marker
+`ctx.ask` sets and the choice helpers never set, §4.4.6). The engineer turn, batched decisions and the engine's own
+requests are choices and can only be answered on the page; any other request is refused with exit 2 and nothing is
+journaled (AC46).
 
 Rule for coding agents, recorded in the package `AGENTS.md` (plan T17): run `run` and `resume` in the background and
 follow them with `status`, or use `--no-wait` and tell the engineer to resume; never read or relay the launch address
-or open the page; the approval is the engineer's.
+or open the page; the approval is the engineer's. The rule is generated into the package
+`AGENTS.md` from `packages/eng-harness/.gate/agents.yml`.
 
 #### 4.2.2 Flow of `run`
 
@@ -439,8 +468,8 @@ process information, not a journal event: the journal has one writer and is not 
 (`INTERRUPTED` for a non-terminal run). Nothing here terminates a worker; silence handling of servers belongs to
 spec 0002 (timeouts, Job Objects).
 
-**Waiting.** An open request shows `waiting for engineer: <title>, <elapsed waiting>` and no expected time. The launch
-address is not printed unless `--no-browser` is given (§4.4.4).
+**Waiting.** An open request shows `waiting for engineer: <title>, <elapsed waiting>` and no expected time. The
+launch address is never part of progress output (§4.4.4).
 
 ### 4.4 The approval page
 
@@ -453,18 +482,30 @@ the durable parts of a wait are the journaled request and the replay (§4.4.5).
   style (`Connection: close`), a socket timeout per request, daemon threads.
 - On start the server draws a launch code, a session secret and a CSRF key (`secrets.token_urlsafe(32)` each). The
   launch address is `http://127.0.0.1:<port>/launch?code=<code>`. `GET /launch` with the right code, once, sets the
-  session cookie (`HttpOnly; SameSite=Strict; Path=/`; no `Secure` because the origin is plain HTTP on loopback) and
-  redirects to `/`. A second use is 403.
+  session cookie `eh_<port>_session` (`HttpOnly; SameSite=Strict; Path=/`; no `Secure` because the origin is plain
+  HTTP on loopback) and redirects to `/`. Browsers scope cookies by host and not by port, so the name carries the port:
+  two servers on `127.0.0.1` (two runs being resumed) do not overwrite each other's cookie. The server accepts only
+  the cookie of its own name. A second use is 403.
 - Handler threads never touch the engine directly. They validate a request, then pass the result to the engine's event
   loop with `loop.call_soon_threadsafe` and wait for the matching future.
 
 #### 4.4.2 Checks and headers
 
-Every request, in this order, before any handler: `Host` equals `127.0.0.1:<port>`; for POST, `Origin` equals
-`http://127.0.0.1:<port>` and `Sec-Fetch-Site`, when present, is `same-origin`; the session cookie matches (except for
-`/launch`); for POST, the CSRF token matches. A failure counts toward `max_failed_requests`. The CSRF token is
-`HMAC-SHA256(csrf_key, request_id + "\n" + shown_sha256 + "\n" + session_id)`, rendered into the form, so a token is
-valid for one request, one preview and one session.
+Every request, in this order, before any handler: `Host` equals `127.0.0.1:<port>`; for POST, `Origin` is required and equals
+`http://127.0.0.1:<port>`, and `Sec-Fetch-Site`, when present, is `same-origin` (when absent the `Origin` check alone
+decides); the session cookie matches (except for `/launch`); for POST, the CSRF token matches. A failure counts toward
+`max_failed_requests`. The CSRF token is `HMAC-SHA256(csrf_key, route + "\n" + subject_id + "\n" + bound_sha256 + "\n"
++ session_id)`, rendered into the form, with these inputs per POST route:
+
+| POST | `route` | `subject_id` | `bound_sha256` |
+|---|---|---|---|
+| `/answer/<request_id>`, approval request | `approval` | `request_id` | the request's `shown_sha256` |
+| `/answer/<request_id>`, input or choice request | `choice` | `request_id` | the request's `fields_schema_sha256` (the journaled schema, which holds the options and the evidence shown) |
+| `/setup/<setup_id>` | `setup` | `setup_id` | the `draft_sha256` of the draft rendered |
+
+A token is therefore valid for one route kind, one request or setup, one rendered content and one session. The handler
+also compares the answer's own hash member (`shown_sha256`; `draft_sha256` for a setup) with the current one and
+answers 409 on a difference, before the engine or `freeze` is called.
 
 Every response, errors included:
 
@@ -500,11 +541,15 @@ reason), reject single items, sign and choose among given options. It cannot edi
 
 #### 4.4.4 Opening the page
 
-By default the process opens the launch address with `webbrowser.open` and prints only "approval page opened in your
-browser" (the address is not in the terminal, so an agent that reads the terminal does not receive it). If opening
-fails, or with `--no-browser`, the address is printed to standard error for the engineer. After the first launch the
-cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. A same-user process that can read the
-engineer's terminal or memory is outside this protection (Q2).
+The process opens the launch address with the opener in `CliDeps` (`cli/_opener.py`), not with `webbrowser`, which
+honours `BROWSER`: the default opener is `os.startfile` on Windows, `open` on macOS and `xdg-open` elsewhere, run with
+`BROWSER` removed from the child environment. It prints only "approval page opened in your browser". The address is
+**never written to standard output or standard error**, because a coding agent that runs `eng-harness run` reads both.
+If opening fails, or with `--no-browser`, the address is written only to the controlling terminal (`/dev/tty`, or
+`CONOUT$` on Windows). When there is no controlling terminal the process prints "the launch address cannot be shown
+here; run from a terminal, or use --no-wait and resume later", and the page cannot be reached (AC61). After the first
+launch the cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. This does not protect against a
+process of the same user that has the terminal, reads the opener's command line or drives the server itself (Q2).
 
 #### 4.4.5 How the run waits, and the approval binding
 
@@ -515,8 +560,8 @@ engineer's terminal or memory is outside this protection (Q2).
 2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file every
    second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
    (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
-3. A POST that passes §4.4.2 and the answer checks (below) is turned into an `ApprovalAnswer` and handed to the waiting
-   `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
+3. A POST that passes §4.4.2 and the answer checks (below) is parsed into an `ApprovalSubmission` (the validated form),
+   turned into an `ApprovalAnswer` (an `InputAnswer` for a choice) and handed to the waiting `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
    `approval_resolved` event, FULL durability. There is no answer file in the run folder, so nothing else can place an
    answer there (the `inbox/` folder that engine §4.4.1 reserves stays unused, Q4).
 4. The page answers the browser only when the sink has seen the matching `approval_resolved` event (AC37).
@@ -524,7 +569,8 @@ engineer's terminal or memory is outside this protection (Q2).
    `resume`, with the same request id and the same hash (engine AC36); the engineer answers again. If it dies after, the
    journal holds the answer. The wait is durable because the request is journaled and replay re-presents it.
 
-Answer checks, after the server's own: the request is open in this run; `shown_sha256` equals the request's; no
+Answer checks, after the server's own: the request is open in this run; `shown_sha256` equals the request's (for an
+input or choice request, its `fields_schema_sha256`); no
 `approval_resolved` exists and none is being processed (a per-request lock); rejected item ids are items of the request;
 a reason of 1 to 500 characters exists for a rejection and for each rejected item; an approval is not issued with every
 item rejected; the engineer name is valid (AC31, AC39). The engine then checks again (engine AC54); the page never
@@ -545,14 +591,18 @@ single use and ends at the first `check_model` of a bound model.
 | Engineer turn (18 step 15) | choice request | Three buttons: accept this revision, ask for more edits, I edited by hand: continue. One press, one option id |
 | Batched decisions (11 §3 `decide_many`) | choice request, N questions | One form: per question the prompt, labeled evidence, one option group; one Submit |
 | Engine requests | `engine.in_flight`, `engine.host_state`, `engine.escalation` | The reason, the evidence references, the choices of engine §4.5 (`applied`, `not_applied`, `abandon`; `accept`, `restore`, `abandon`) |
-| Input | `block` input request | The fields read-only (name, type, unit, bounds) and the instruction to use `resume --answers FILE` |
+| Input | `block` data request (`x-eng-input: data`) | The fields read-only (name, type, unit, bounds) and the instruction to use `resume --answers FILE` |
 | Basis confirmation (13 §4) | `BasisSetupView` | §4.4.7 |
 
-A choice request is an `InputRequest` whose fields model is a set of enumerated fields. The page reads its JSON Schema:
-a property with an `enum` is a question (its `title` is the prompt and its enum values the options, with labels from the
-package's label catalog `pages/_labels`, never from data); a property marked `x-eng-evidence` is a bounded, labeled,
-read-only text. The answer carries option ids only (AC32). The alignment of this convention with engine §4.9 and with
-the engineer tier of spec 0005 is Q6.
+An input request carries a marker in its JSON Schema, `x-eng-input`, with the value `data` (set by `ctx.ask`: values
+for the workflow) or `choice` (set by the engine's choice helpers `decide` and `decide_many`, by the engineer turn, and
+by the engine's own `engine.*` requests: an answer decides what happens). **A schema with no marker is a choice**
+(fail-safe). The marker, not the presence of `enum` properties, decides what may be answered by file (§4.2.1, AC46).
+The page renders a choice request from its schema: a property with an `enum` is a question (its `title` is the prompt
+and its enum values the options, with labels from the package's label catalog `pages/_labels`, never from data); a
+property marked `x-eng-evidence` is a bounded, labeled, read-only text. The answer carries option ids only (AC32). The
+marker, and the engine refusing a request whose schema has `enum` properties but declares neither `data` nor `choice`,
+are an amendment of engine §4.9; the alignment with the engineer tier of spec 0005 is Q6.
 
 An exception on the sign-off screen is accepted with its own reason; the reasons travel as `item_reasons` of the answer
 (14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8). Sign-off is refused by the page
@@ -565,7 +615,8 @@ Before a run exists (spec 0004 §4.6), `PageBasisSetupPort.present(view)` regist
 `synthetic_template`), then each section with its rows: label, value, unit, source, citation, state, bounds. A
 confirmable section has a confirm box; a section with a missing required row has none and the draft is not offered
 (step 3 of §4.2.2 exits earlier). Values are not editable. Confirm needs all boxes and a name; Reject needs a reason.
-The answer holds `setup_id`, `draft_sha256`, the confirmed section names, `by` and `at` (from the injected clock), or
+The screen is rendered from one draft and the form carries its `draft_sha256`; the answer is refused (409) if the
+hash is not that of the current draft, before `freeze` (AC47, §4.4.2). The answer holds `setup_id`, `draft_sha256`, the confirmed section names, `by` and `at` (from the injected clock), or
 the rejection; the page appends a record to `<workspace>/setups/<setup_id>.json` (spec 0004 Q5). In-process only: a
 `--no-wait` run does not serve it (exit 10, nothing stored), and an interrupted setup starts again with the same
 command (a new draft hash if the files changed).
@@ -695,7 +746,7 @@ heartbeat task runs on the engine loop.
 
 | Risk | Class | Mitigation |
 |---|---|---|
-| An agent approves its own change set | R1 (model writes) | No approve command or file; answers only from the page process after session, Host, Origin, CSRF and hash checks; the launch address is not printed by default; static test AC2. Residual risk: a same-user process (Q2) |
+| An agent approves its own change set | R1 (model writes) | No approve command or file; answers only from the page process after session, Host, Origin, CSRF and hash checks; the launch address is opened by an opener that ignores `BROWSER` and is never written to standard output or error, only to the controlling terminal; `--answers` cannot answer choices or engine requests (AC46); static test AC2. Residual risk: a same-user process (Q2) |
 | A page for one request answers another, or an old page answers a new preview | R1 | CSRF token bound to request, hash and session; hash compared by page and engine; single use; engine void check (AC25, AC29, AC30, AC34) |
 | Untrusted text (drawing, model, file) becomes markup or terminal control | R1 | Escaping by construction, labeled `<bdi>` fields, strict CSP, no script, sanitized terminal text (AC21, AC26, AC48, AC49) |
 | DNS rebinding or a cross-site form post reaches the loopback server | R1 | Exact `Host`, `Origin`, `Sec-Fetch-Site`, `SameSite=Strict`, random port, lockdown (AC22 to AC28) |
@@ -711,16 +762,16 @@ heartbeat task runs on the engine loop.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3 to AC6, AC10 to AC14 | Unit | `tests/unit/cli/` |
+| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener) | Unit | `tests/unit/cli/` |
 | AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
 | AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
-| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
+| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream) | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
 | AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
-| AC43 to AC45 | Unit | `tests/unit/pages/` |
+| AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
@@ -734,7 +785,7 @@ and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Covera
 
 Adds the commands, the four public modules and the file formats of §5 to `eng-harness` 0.1.0 (new package). The
 `approval_resolved` payload gains `item_reasons` and `ApprovalAnswer` the same member (engine amendment, Q8): a minor
-change to the journal schema that the reader must read with and without. The JSON result of §4.2.1 and the exit codes
+change to the journal schema that the reader must read with and without. The marker `x-eng-input` on input requests (Q6) is a second engine amendment; a request without it is read as a choice. The JSON result of §4.2.1 and the exit codes
 are public interface: a change is minor or major with a changelog entry.
 
 ## 11. Open questions, gaps and additions
@@ -742,11 +793,11 @@ are public interface: a change is minor or major with a changelog entry.
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
 | Q1 | Templating: Jinja2 with autoescape and a package ADR, or the standard library | Owner | Standard library (§4.5): no dependency, escaping by construction, tested by property; revisit if the full UI needs a template engine |
-| Q2 | A same-user process, such as a coding agent, could read the engineer's terminal when `--no-browser` prints the launch address, or drive the loopback server itself. 16 §5 asks for the token, not for protection from the user's own processes | Owner | Accept for v1: the address is not printed by default, the agent rule (§4.2.1) forbids it, and every write still needs the change-set approval. A stronger factor (a separate operating-system account, Windows Hello) is a later ADR |
+| Q2 | A coding agent that itself runs `eng-harness run` is a same-user process and has these routes to the launch address: (1) the `BROWSER` environment variable, which `webbrowser.open` honours, so the agent can name a program that captures the address; (2) standard error, where an address printed after a failed open (typical in a headless agent environment) would be read; (3) `--no-browser`. Beyond the address, Host, Origin and Sec-Fetch-Site are forgeable by a plain HTTP client, and the opener's command line is visible in the process list. 16 §5 asks for the token, not for protection from the user's own processes | Owner | Accept the residual risk for v1 with these mitigations (§4.4.4, AC61): an own opener that drops `BROWSER`; the address is written only to the controlling terminal, never to standard output or error, so (2) and (3) yield nothing without a terminal; the agent rule (§4.2.1); every write still needs the change-set approval, and `--answers` cannot answer choices. Not closed: an agent with a controlling terminal, or reading the process list. A stronger factor (a separate operating-system account, Windows Hello) is a later ADR |
 | Q3 | Values given to `ctx.ask` by `--answers` and basis values are files an agent may write; only basis values are confirmed on a page | Owner | Accept: asked values reach a model only through a later change-set approval; revisit if a workflow writes asked values without one |
 | Q4 | Engine §4.4.1 reserves `inbox/` for answers and its Q10 accepts the answer inbox; here the page runs in the engine's process and answers stay in memory, so nothing in the run folder can carry an answer | Owner | Remove `inbox/` from engine §4.4.1 at its next amendment; a file would let any local process answer |
 | Q5 | How the report learns that a tool is unreleased: the journal does not record it | Owner | `[project_lane]` in `harness.toml` now (the report states the list it used); better: spec 0002's tool descriptor carries `release` and the engine records `unreleased_tools` in `run_started`, so a later configuration change cannot unmark a result |
-| Q6 | The convention for choice and evidence fields (enumerated properties, `x-eng-evidence`) and how the engineer-tier decisions of spec 0005 reach `InputPort`; spec 0005 is not merged | Owner | Align with spec 0005 and engine §4.9 when 0005 merges; the page needs only enumerated properties and bounded text |
+| Q6 | The convention for choice and evidence fields (enumerated properties, `x-eng-evidence`), the marker `x-eng-input` (`data` or `choice`, unmarked is a choice, §4.4.6) and how the engineer-tier decisions of spec 0005 reach `InputPort`; spec 0005 is not merged | Owner | Add the marker to engine §4.9 (`ctx.ask` sets `data`; the choice helpers and `engine.*` set `choice`) and align with spec 0005 when it merges; the page needs the marker, enumerated properties and bounded text |
 | Q7 | Default `--run-class`: `production` refuses calcs that are not `approved`; `trial` runs draft calcs with `draft: true` (spec 0003) | Owner | `production` by default, `trial` explicit; a refusal is the safe failure |
 | Q8 | 14 §6 asks that each accepted exception has a written reason; engine `ApprovalAnswer` and `approval_resolved` carry one `reason` | Owner | Add `item_reasons` (item id to reason) to both; per-item rejection reasons use it too (AC31, AC42) |
 | Q9 | Arabic interface text and right-to-left layout in phase 1 | Owner | English labels now; Arabic and RTL with the full UI ADR (14 §2, spike S-09); data in any script is already shown bidi-safe |

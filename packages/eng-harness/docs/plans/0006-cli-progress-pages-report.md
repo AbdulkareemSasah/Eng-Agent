@@ -36,7 +36,7 @@ tasks:
     covers: [AC49]
     depends_on: [T1]
   - id: T3
-    title: "Command line shell: parser, exit codes, configuration, output encoding, entry point"
+    title: "Command line shell: parser, exit codes, configuration, output encoding, launch-address opener, entry point"
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -46,22 +46,25 @@ tasks:
       - "packages/eng-harness/src/eng_harness/cli/_exit.py"
       - "packages/eng-harness/src/eng_harness/cli/_config.py"
       - "packages/eng-harness/src/eng_harness/cli/_encoding.py"
+      - "packages/eng-harness/src/eng_harness/cli/_opener.py"
+      - "packages/eng-harness/tests/unit/cli/test_opener.py"
       - "packages/eng-harness/tests/unit/cli/test_parser.py"
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"
       - "packages/eng-harness/tests/unit/cli/test_config.py"
       - "packages/eng-harness/tests/unit/cli/test_encoding.py"
       - "packages/eng-harness/tests/rules/test_cli_cannot_answer.py"
       - "packages/eng-harness/tests/rules/test_imports.py"
-    max_changed_lines: 380
+    max_changed_lines: 400
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_parser.py::test_commands_exact_and_no_approve"
+      - "packages/eng-harness/tests/unit/cli/test_opener.py::test_browser_variable_ignored"
       - "packages/eng-harness/tests/rules/test_cli_cannot_answer.py::test_no_answer_construction_outside_pages"
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py::test_outcome_mapping"
       - "packages/eng-harness/tests/unit/cli/test_config.py::test_discovery_and_sections"
       - "packages/eng-harness/tests/unit/cli/test_encoding.py::test_redirected_output_is_utf8"
       - "packages/eng-harness/tests/rules/test_imports.py::test_third_party_imports_limited"
-    covers: [AC1, AC2, AC3, AC4, AC5, AC60]
+    covers: [AC1, AC2, AC3, AC4, AC5, AC60, AC61]
     depends_on: [T1]
   - id: T4
     title: "Expected times from earlier journals and the progress renderer"
@@ -189,18 +192,21 @@ tasks:
     covers: [AC40, AC41, AC42]
     depends_on: [T2, T7, T8]
   - id: T10
-    title: "Choice screens (engineer turn, batched decisions, engine requests) and the read-only input screen"
+    title: "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate"
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_screens_choice.py"
+      - "packages/eng-harness/src/eng_harness/pages/_answers_file.py"
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py"
-    max_changed_lines: 330
+      - "packages/eng-harness/tests/unit/pages/test_answers_file.py"
+    max_changed_lines: 370
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py::test_engineer_turn_three_options"
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py::test_batched_decisions_one_submit"
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py::test_engine_requests_choices"
-    covers: [AC43, AC44, AC45]
+      - "packages/eng-harness/tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests"
+    covers: [AC43, AC44, AC45, AC46]
     depends_on: [T2, T7]
   - id: T11
     title: "Report model: fold the journal and the store; timings, waiting and machine time"
@@ -263,8 +269,9 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_signals.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
+      - "packages/eng-harness/tests/workflow/test_launch_address.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
-    max_changed_lines: 390
+    max_changed_lines: 400
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
@@ -273,7 +280,8 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop"
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
-    covers: [AC6, AC7, AC8, AC10, AC14, AC46]
+      - "packages/eng-harness/tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr"
+    covers: [AC6, AC7, AC8, AC10, AC14, AC46, AC61]
     depends_on: [T3, T5, T7, T9, T10, T13]
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
@@ -286,6 +294,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_basis_confirmation_flow"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_reject_leaves_no_run"
+      - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_stale_draft_hash_refused"
     covers: [AC47]
     depends_on: [T14]
   - id: T16
@@ -354,7 +363,7 @@ lets the rest stack on them:
   `run`, then status, stop, report and doctor. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
   environment test, the local testing list and the agent rule.
 
-No new runtime dependency: `http.server`, `argparse`, `webbrowser`, `statistics`, `secrets`, `hmac` and `html` from the
+No new runtime dependency: `http.server`, `argparse`, `subprocess`, `statistics`, `secrets`, `hmac` and `html` from the
 standard library (spec §2, Q1). Reuse: `JournalReader`, the ports and `Event` from engine T4 and T6; `ResultStore`
 and `Quantity` from the contract; `BasisSetupPort` from plan 0004 T7; `eng_harness.doctor.run` from plan 0002 T18.
 
@@ -367,8 +376,9 @@ time directives.
 **T2 HTML builder** (spec §4.5). `Text`, `Trusted`, `SafeToken`, `field(label, value)` with `<bdi dir="auto">`,
 element builder, style element and its SHA-256 for the policy. Property tests on escaping.
 
-**T3 Shell** (spec §4.1, §4.2.1, §4.2.3, §4.2.4). `main(argv, deps)`, six subcommands registered as stubs that call
-into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream encoding setup; `[project.scripts]`,
+**T3 Shell** (spec §4.1, §4.2.1, §4.2.3, §4.2.4, §4.4.4). `main(argv, deps)`, six subcommands registered as stubs that
+call into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream encoding setup, the launch-address
+opener of `CliDeps` (platform opener with `BROWSER` removed; writer to the controlling terminal only); `[project.scripts]`,
 `__main__`, `public_modules`. The rules tests for AC2 and AC60 start here and tighten as modules appear.
 
 **T4 Progress display** (spec §4.3). `ExpectedTimes.build` (read-only journals, median, range, sample floor) and
@@ -377,11 +387,12 @@ into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream enc
 **T5 Sink and heartbeat** (spec §4.3). The bounded queue and writer thread, `TerminalProgress.emit`, the heartbeat
 task and `heartbeat.json`, `read_liveness`, and the 200 ms latency test.
 
-**T6 Server and security** (spec §4.4.1 to §4.4.3). `PageServer`, launch code, session cookie, CSRF token, Host,
+**T6 Server and security** (spec §4.4.1 to §4.4.3). `PageServer`, launch code, session cookie `eh_<port>_session`, CSRF
+token with the per-route inputs of spec §4.4.2 (approval, choice, setup; the test is parametrized over the three), Host,
 Origin and Fetch Metadata checks, headers, route table with limits, lockdown, shutdown. `tests/helpers/page_client.py`
 is the loopback client used by all page tests. Security lens review.
 
-**T7 Answers and ports** (spec §4.4.5). `ApprovalSubmission` and the answer models (no value members), the checks,
+**T7 Answers and ports** (spec §4.4.5). `ApprovalSubmission` and the answer models in `pages/_answers.py` (no value members), the checks,
 `PageApprovalPort` and `PageInputPort` (present, awaitable answer, `wait=False`, stop, timeout), the per-request lock,
 acknowledgement after the sink sees `approval_resolved`, `FileRunControl` (stop file). Security lens review.
 
@@ -393,7 +404,9 @@ with an independent reachability oracle on random graphs.
 acknowledgement rules; `_labels.py` catalog; snapshots.
 
 **T10 Choice screens** (spec §4.4.6). Choice sets from the request's JSON Schema (engineer turn, batched decisions,
-engine requests) and the read-only input screen.
+engine requests) and the read-only input screen; `pages.accept_answers_file`, the only way a file becomes an
+`InputAnswer`: it accepts a `block` request with `x-eng-input: data` and refuses `engine.*`, choice and unmarked
+requests.
 
 **T11 Report model** (spec §4.6.1 sections 5 to 7). Folding `JournalReader` views and store records into a
 `ReportModel`; waiting and machine time. A shared fixture run (`tests/fixtures/report_run.py`) is reused by T12 and T13.
@@ -405,11 +418,13 @@ the mandatory source, the sources table, changes and results; snapshot.
 `write_report`.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs, decision and page
-ports, signal handling, outcome mapping, `--answers`, report at the end. Fake-host workflow and replay tests.
+ports, signal handling, outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end, launch
+address shown on the controlling terminal only (AC61). Fake-host workflow and replay tests.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 
-**T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the stop file writer and waiter,
+**T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the `stop` command in
+`cli/_stop.py` (it writes and waits on the stop file whose protocol lives in `cli/_control.py`, T7),
 the report command, the doctor pass-through.
 
 **T17 End to end** (spec §3.4, §3.6, §3.7). Per-item rejection and void flows through the page, the killed-wait replay,
@@ -429,12 +444,12 @@ the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it.
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`), engine §4.9 (`item_reasons`, the choice
-  convention), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here.
+  convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here.
 
 ## 4. Verification
 
 Local gate per task as in the engine plan §4; the pull request links its CI run. Review lenses: correctness, Python,
-type design, silent failure, tests; T3, T6, T7, T9, T10 and T15 additionally with the security lens (what an agent, a
+type design, silent failure, tests; T3, T6, T7, T9, T10 and T15 additionally with the security lens (T10: the answers-file gate; T3 and T14: the launch address) (what an agent, a
 web page in the browser, or a hostile drawing text can do); T8, T11 to T13 additionally against ADR-0026 §3 and the
 rule "built only from the journal and the store". The second-family review and the owner's approvals are
 `awaiting owner` in bootstrap mode.
