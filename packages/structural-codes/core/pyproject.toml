@@ -34,7 +34,7 @@ select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "R
 "tests/**" = ["S101"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers --strict-config"
+addopts = "-ra --strict-markers --strict-config --import-mode=importlib"
 testpaths = ["tests"]
 markers = [
     "windows: needs Windows; runs in the Windows CI job",
