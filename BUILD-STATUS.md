@@ -223,7 +223,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-138 | S.T19 | Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes | sonnet, high | opus, medium | — | not started or in writing |
 | B-139 | S.T20 | Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085) | sonnet, medium | opus, medium | — | not started or in writing |
 | B-140 | C.T1 | Calc decorator, registry, inputs, input metadata, trace builder, statuses and harness codes | sonnet, medium | opus, medium | [#141](https://github.com/AbdulkareemSasah/Eng-Agent/pull/141) | done (3a39971) |
-| B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | — | not started or in writing |
+| B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | [#147](https://github.com/AbdulkareemSasah/Eng-Agent/pull/147) | open |
 | B-142 | C.T3 | approvals.yaml schema, loader, status resolution and the YAML parser ADR | sonnet, medium | opus, medium | — | not started or in writing |
 | B-143 | C.T4 | Calc kinds and their registration | sonnet, medium | opus, medium | — | not started or in writing |
 | B-144 | C.T5 | HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test | sonnet, medium | opus, medium | — | not started or in writing |
@@ -405,7 +405,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-362 | I.T3b | Launch-address opener: platform opener with BROWSER removed, address to the controlling terminal only | sonnet, medium | opus, low | — | not started or in writing |
 | B-363 | docs | docs(eng-dev-gate): an empty test package marker is in scope next to an in-scope test file, plan task T36 (B-363) | sonnet, low | opus, low | [#140](https://github.com/AbdulkareemSasah/Eng-Agent/pull/140) | done (5ddd0d5) |
 | B-364 | T36 | gate-check scope: an empty test package marker next to an in-scope test file | sonnet, medium | opus, medium | [#143](https://github.com/AbdulkareemSasah/Eng-Agent/pull/143) | open |
-| B-366 | docs | docs(eng-harness): split engine plan T3 into T3 (event models, kinds) and T3b (schema, writer) (B-366) | lead | opus, low | [#144](https://github.com/AbdulkareemSasah/Eng-Agent/pull/144) | open |
+| B-366 | docs | docs(eng-harness): split engine plan T3 into T3 (event models, kinds) and T3b (schema, writer) (B-366) | lead | opus, low | [#144](https://github.com/AbdulkareemSasah/Eng-Agent/pull/144) | done (44a303e) |
 | B-367 | E.T3b | Journal schema, append-only writer, hash chain, durability, payloads by reference | sonnet, high | opus, medium | — | not started or in writing |
 
 ## 4. Decisions by the lead
