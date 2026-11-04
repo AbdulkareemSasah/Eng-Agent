@@ -6,14 +6,18 @@ Expected paths, delays and limits come from the spec text, not from the implemen
 import copy
 import gzip
 import json
+import logging
+import stat
+import sys
 from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, field_validator
 
-from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem
+from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem, write_atomic
 from eng_contract.canonical import canonical_json, payload_sha256
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError, ErrorCode
@@ -36,7 +40,31 @@ class Note(BaseModel):
     level: int = 1
 
 
-KINDS = NEUTRAL_KINDS.extend({"test.note/1": Note})
+class Rich(BaseModel):
+    """Test kind whose dump differs between Python and JSON mode, by alias, and with a null."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=False)
+
+    when: datetime
+    odd_name: int = Field(alias="odd-name")
+    maybe: str | None = None
+    items: list[int] = []
+
+
+class Huge(BaseModel):
+    """Test kind whose validation message is longer than an error field may be."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    v: int
+
+    @field_validator("v")
+    @classmethod
+    def _always_fails(cls, value: int) -> int:
+        raise ValueError("x" * 3000)
+
+
+KINDS = NEUTRAL_KINDS.extend({"test.note/1": Note, "test.rich/1": Rich, "test.huge/1": Huge})
 PRODUCER = Provenance.model_validate(
     {
         "tool": "harness",
@@ -358,3 +386,173 @@ def test_unremovable_temporary_file_is_logged_not_hidden(tmp_path: Path, caplog:
         _store(tmp_path, fs).put("test.note/1", {"text": "x"}, PRODUCER)
     assert isinstance(info.value.__cause__, FileExistsError)  # the write failure, not the cleanup failure
     assert "temporary file not removed" in caplog.text
+
+
+# --- details of errors, files and logs (the stored bytes and fields are part of the contract) ---
+
+
+def test_stored_payload_is_json_mode_by_alias_with_nulls(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    record = store.put("test.rich/1", {"when": "2026-01-02T03:04:05Z", "odd-name": 7}, PRODUCER)
+    expected = {"when": "2026-01-02T03:04:05Z", "odd-name": 7, "maybe": None, "items": []}
+    assert record.payload == expected  # JSON types, the alias as key, the null kept
+    assert store.payload(record.result_id) == expected
+    assert record.payload_sha256 == payload_sha256(expected)
+
+
+def test_invalid_payload_hint_names_the_path(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    with pytest.raises(ContractError) as info:
+        store.put("test.rich/1", {"when": "2026-01-02T03:04:05Z", "odd-name": 7, "items": [1, "a"]}, PRODUCER)
+    detail = info.value.detail
+    assert detail.message == "payload is not a valid test.rich/1"
+    assert detail.hint is not None
+    assert detail.hint.startswith("items.1: ")
+    with pytest.raises(ContractError) as long:
+        store.put("test.huge/1", {"v": 1}, PRODUCER)
+    assert long.value.detail.hint is not None
+    assert len(long.value.detail.hint) == 2000
+
+
+def test_missing_parent_is_reported_with_its_id(tmp_path: Path) -> None:
+    missing = _next_id(b"other")
+    with pytest.raises(ContractError) as info:
+        _store(tmp_path).put("test.note/1", {"text": "c"}, PRODUCER, parents=[missing])
+    assert info.value.detail.message == "parent result not found"
+    assert info.value.detail.received == missing
+
+
+def test_missing_result_is_reported_with_its_id(tmp_path: Path) -> None:
+    missing = _next_id()
+    with pytest.raises(ContractError) as info:
+        _store(tmp_path).get(missing)
+    assert info.value.detail.message == f"no result {missing}"
+    assert info.value.detail.received == missing
+
+
+def test_split_payload_bytes_follow_the_spec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("eng_contract.store._results.PAYLOAD_SPLIT_BYTES", 10)
+    record = _store(tmp_path).put("test.note/1", {"text": "x" * 500}, PRODUCER)
+    gz = _final(tmp_path, record.result_id).with_name(f"{record.result_id}.payload.json.gz")
+    # spec 4.5.4 step 1: gzip with mtime=0 and compression level 6
+    assert gz.read_bytes() == gzip.compress(canonical_json({"text": "x" * 500, "level": 1}), compresslevel=6, mtime=0)
+
+
+@pytest.mark.parametrize("failure", [PermissionError("locked"), FileExistsError("taken")])
+def test_split_payload_file_commit_is_retried_and_fails_with_an_incident(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: OSError
+) -> None:
+    monkeypatch.setattr("eng_contract.store._results.PAYLOAD_SPLIT_BYTES", 10)
+    fs = FakeFileSystem()
+    fs.commit_errors = [failure]
+    delays: list[float] = []
+    store = _store(tmp_path, fs, delays.append)
+    if isinstance(failure, PermissionError):
+        record = store.put("test.note/1", {"text": "x" * 50}, PRODUCER)
+        assert delays == [0.05]  # the payload file is retried with the injected sleep
+        assert store.payload(record.result_id) == {"text": "x" * 50, "level": 1}
+    else:
+        with pytest.raises(StoreWriteError) as info:
+            store.put("test.note/1", {"text": "x" * 50}, PRODUCER)
+        assert info.value.detail.incident_id
+        assert delays == []
+
+
+def test_integrity_messages_name_the_defect(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _store(tmp_path)
+    first = store.put("test.note/1", {"text": "a"}, PRODUCER)
+    second = store.put("test.note/1", {"text": "b"}, PRODUCER)
+    _final(tmp_path, second.result_id).write_bytes(_final(tmp_path, first.result_id).read_bytes())
+    assert "another result id" in _integrity(store, second.result_id).detail.message
+    monkeypatch.setattr("eng_contract.store._results.PAYLOAD_SPLIT_BYTES", 10)
+    split = store.put("test.note/1", {"text": "x" * 100}, PRODUCER)
+    gz = _final(tmp_path, split.result_id).with_name(f"{split.result_id}.payload.json.gz")
+    gz.write_bytes(gzip.compress(b"[1]"))
+    assert "not an object" in _integrity(store, split.result_id).detail.message
+    gz.write_bytes(gzip.compress(canonical_json({"text": "z", "level": 1})))
+    assert "differs from payload_sha256" in _integrity(store, split.result_id).detail.message
+
+
+def test_store_errors_are_capped_at_the_message_limit(tmp_path: Path) -> None:
+    fs = FakeFileSystem()
+    fs.commit_errors = [FileExistsError("e" * 3000)]
+    with pytest.raises(StoreWriteError) as info:
+        _store(tmp_path, fs).put("test.note/1", {"text": "x"}, PRODUCER)
+    assert len(info.value.detail.message) == 2000
+
+
+def test_fake_filesystem_reports_paths_and_failures(tmp_path: Path) -> None:
+    fs = FakeFileSystem()
+    assert fs.commit_errors == []
+    assert fs.read_errors == []
+    fs.write_new(tmp_path / "a", b"1")
+    with pytest.raises(FileExistsError) as exists:
+        fs.write_new(tmp_path / "a", b"2")
+    assert str(exists.value) == str(tmp_path / "a")
+    with pytest.raises(FileNotFoundError) as missing:
+        fs.read(tmp_path / "none")
+    assert str(missing.value) == str(tmp_path / "none")
+    fs.write_new(tmp_path / "b", b"2")
+    with pytest.raises(FileExistsError) as taken:
+        fs.commit(tmp_path / "b", tmp_path / "a")
+    assert str(taken.value) == str(tmp_path / "a")
+    fs.remove(tmp_path / "none")  # a missing file is not an error
+    fs.partial_write = 3
+    with pytest.raises(OSError, match="disk full"):
+        fs.write_new(tmp_path / "c", b"123456")
+    assert fs.read(tmp_path / "c") == b"123"  # the partial file stays
+
+
+def test_fake_filesystem_replace_overwrites_and_injects_errors(tmp_path: Path) -> None:
+    fs = FakeFileSystem()
+    fs.write_new(tmp_path / "a", b"old")
+    fs.write_new(tmp_path / "t", b"new")
+    fs.commit_errors = [PermissionError("locked"), PermissionError("again")]
+    with pytest.raises(PermissionError, match="locked"):
+        fs.replace(tmp_path / "t", tmp_path / "a")
+    assert [str(e) for e in fs.commit_errors] == ["again"]  # one error per call, in order
+    fs.commit_errors = []
+    fs.replace(tmp_path / "t", tmp_path / "a")
+    assert fs.files == {tmp_path / "a": b"new"}
+
+
+def test_write_atomic_replace_and_temporary_name(tmp_path: Path) -> None:
+    class Spy(FakeFileSystem):
+        def __init__(self) -> None:
+            super().__init__()
+            self.temporaries: list[Path] = []
+
+        def write_new(self, path: Path, data: bytes) -> None:
+            self.temporaries.append(path)
+            super().write_new(path, data)
+
+    fs = Spy()
+    final = tmp_path / "state.json"
+    fs.files[final] = b"old"
+    write_atomic(fs, final, b"new", _ids(), lambda _s: None, replace=True)
+    assert fs.files == {final: b"new"}
+    suffix = fs.temporaries[0].name.removeprefix("state.json.").removesuffix(".tmp")
+    assert len(suffix) == 16  # 8 random bytes in hexadecimal
+    assert int(suffix, 16) >= 0
+
+
+def test_unremovable_temporary_file_log_record(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    class Stuck(FakeFileSystem):
+        def remove(self, path: Path) -> None:
+            raise PermissionError("locked")
+
+    fs = Stuck()
+    fs.commit_errors = [FileExistsError("taken")]
+    with caplog.at_level(logging.WARNING, logger="eng_contract._fs"), pytest.raises(StoreWriteError):
+        _store(tmp_path, fs).put("test.note/1", {"text": "x"}, PRODUCER)
+    (record,) = [r for r in caplog.records if r.name == "eng_contract._fs"]
+    assert record.levelno == logging.WARNING
+    assert record.getMessage() == "temporary file not removed"
+    assert getattr(record, "file", "").endswith(".tmp")
+    assert record.exc_info is not None
+
+
+def test_real_filesystem_new_files_are_private(tmp_path: Path) -> None:
+    RealFileSystem().write_new(tmp_path / "a.tmp", b"1")
+    if sys.platform != "win32":  # Windows has no POSIX permission bits
+        assert stat.S_IMODE((tmp_path / "a.tmp").stat().st_mode) == 0o600
