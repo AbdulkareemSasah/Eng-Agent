@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 import pytest
-from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem
 from pydantic import ValidationError
 
+from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem
 from eng_contract.canonical import canonical_json
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource, new_model_id
@@ -22,7 +22,7 @@ SHA = "c" * 64
 
 def _store(root: Path, fs: FileSystem | None = None) -> ModelStateStore:
     ws = Workspace(root=root, classification=LocationClass.LOCAL)
-    return ModelStateStore(ws, FixedClock(1_767_323_045_678, 1000), fs)
+    return ModelStateStore(ws, FixedClock(1_767_323_045_678, 1000), fs, lambda _s: None)
 
 
 def _file(root: Path, model_id: str = MODEL) -> Path:

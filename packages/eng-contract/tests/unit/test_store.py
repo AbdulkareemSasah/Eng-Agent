@@ -11,9 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem
 from pydantic import BaseModel, ConfigDict, JsonValue
 
+from eng_contract._fs import FakeFileSystem, FileSystem, RealFileSystem
 from eng_contract.canonical import canonical_json, payload_sha256
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError, ErrorCode
@@ -97,7 +97,8 @@ def test_get_of_a_missing_or_malformed_id(tmp_path: Path) -> None:
     with pytest.raises(ContractError) as missing:
         store.get(_next_id())
     assert missing.value.detail.code is ErrorCode.REF_NOT_FOUND
-    for bad in ("../../etc/passwd", "res_short", "mdl_" + _next_id()[4:], ""):
+    year_11000 = "res_7" + "Z" * 25  # well formed, but its time is beyond year 9999
+    for bad in ("../../etc/passwd", "res_short", "mdl_" + _next_id()[4:], "", year_11000):
         with pytest.raises(ContractError) as info:
             store.get(bad)
         assert info.value.detail.code is ErrorCode.INVALID_ARGUMENT
@@ -269,13 +270,14 @@ def test_unreadable_record_is_integrity_error(tmp_path: Path) -> None:
 def test_payload_validated_against_kind(tmp_path: Path) -> None:
     fs = FakeFileSystem()
     store = _store(tmp_path, fs)
-    for kind, payload in (
+    cases: list[tuple[str, dict[str, JsonValue]]] = [
         ("test.note/1", {"text": 5}),  # wrong type
         ("test.note/1", {"text": "a", "surplus": 1}),  # extra field
         ("verdicts.set/1", {}),  # required fields missing
         ("test.unknown/1", {"text": "a"}),  # not registered
         ("test.note", {"text": "a"}),  # not a kind name
-    ):
+    ]
+    for kind, payload in cases:
         with pytest.raises(ContractError) as info:
             store.put(kind, payload, PRODUCER)
         assert info.value.detail.code is ErrorCode.INVALID_ARGUMENT
@@ -343,3 +345,16 @@ def test_real_filesystem_write_is_exclusive(tmp_path: Path) -> None:
     with pytest.raises(FileExistsError):
         fs.write_new(tmp_path / "a.tmp", b"2")
     assert fs.read(tmp_path / "a.tmp") == b"1"
+
+
+def test_unremovable_temporary_file_is_logged_not_hidden(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    class StuckFileSystem(FakeFileSystem):
+        def remove(self, path: Path) -> None:
+            raise PermissionError("locked")
+
+    fs = StuckFileSystem()
+    fs.commit_errors = [FileExistsError("taken")]
+    with pytest.raises(StoreWriteError) as info:
+        _store(tmp_path, fs).put("test.note/1", {"text": "x"}, PRODUCER)
+    assert isinstance(info.value.__cause__, FileExistsError)  # the write failure, not the cleanup failure
+    assert "temporary file not removed" in caplog.text
