@@ -49,8 +49,8 @@ class Repo:
 
     def git(self, *args: str) -> str:
         """Run ``git`` in the repository and return stdout; raises on a non-zero exit."""
-        done = subprocess.run(  # noqa: S603
-            ["git", *args],  # noqa: S607
+        done = subprocess.run(  # noqa: S603  # B-031: no shell; the arguments are a list
+            ["git", *args],  # noqa: S607  # B-031: git from PATH
             cwd=self.root,
             env=self._env,
             capture_output=True,
