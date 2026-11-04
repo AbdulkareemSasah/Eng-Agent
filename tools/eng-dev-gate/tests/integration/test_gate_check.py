@@ -11,6 +11,7 @@ from support.pullrequest import (
     PLAN_PATH,
     PLAN_TASK,
     SPEC_PATH,
+    base_checkout,
     gate_check,
     make_gate_repo,
     plan_text,
@@ -87,16 +88,17 @@ def test_work_item_forms_by_mode(repo: Repo) -> None:
     assert gate_check(repo, event)[0].code == 0
 
 
-def test_work_item_forms_normal_mode(tmp_path: Path) -> None:
+def test_work_item_forms_normal_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """With bootstrap off only `Closes #n` is a work item; the gate branch is main."""
     repo = Repo(tmp_path / "normal")
     base = make_gate_repo(repo, bootstrap=False)
     repo.commit({"pkg/src/new.py": "y\n"}, "feat: change")
+    gate = base_checkout(repo, base, tmp_path / "gate-base", monkeypatch)
     event_main = write_event(repo, base, f"Work-Item: B-001\n{PLAN_TASK}\n", base_ref="main")
-    result, errors = gate_check(repo, event_main)
+    result, errors = gate_check(repo, event_main, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC003"})
     event_ok = write_event(repo, base, f"Closes #12\n{PLAN_TASK}\n", base_ref="main", name="ok.json")
-    result, errors = gate_check(repo, event_ok)
+    result, errors = gate_check(repo, event_ok, gate=gate)
     assert (result.code, errors) == (0, {})
 
 
@@ -118,7 +120,7 @@ def test_plan_not_on_gate_branch(repo: Repo) -> None:
     assert "9999-none" in errors["GC004"]
 
 
-def test_draft_status_by_mode(tmp_path: Path) -> None:
+def test_draft_status_by_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """AC8: `status: draft` passes in bootstrap mode (plan and spec) and is GC006 with bootstrap off."""
     boot = Repo(tmp_path / "boot")
     base = make_gate_repo(boot, plan=plan_text(status="draft"), base_files={SPEC_PATH: spec_text("draft")})
@@ -129,7 +131,9 @@ def test_draft_status_by_mode(tmp_path: Path) -> None:
         normal, bootstrap=False, plan=plan_text(status="draft"), base_files={SPEC_PATH: spec_text("draft")}
     )
     normal.commit({"pkg/src/new.py": "y\n"}, "feat: change")
-    result, errors = gate_check(normal, write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main"))
+    gate = base_checkout(normal, base, tmp_path / "gate-base", monkeypatch)
+    event = write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main")
+    result, errors = gate_check(normal, event, gate=gate)
     assert (result.code, set(errors)) == (1, {"GC006"})
     assert PLAN_PATH in errors["GC006"]
     assert SPEC_PATH in errors["GC006"]

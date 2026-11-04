@@ -10,7 +10,12 @@ import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
+import pytest
+from eng_dev_gate import gate_root
+
 from support.repo import Repo, RunResult
+
+PACKAGE_DIR = "tools/eng-dev-gate/src/eng_dev_gate"
 
 PLAN_PATH = "pkg/docs/plans/0001-x.md"
 SPEC_PATH = "pkg/docs/specs/0001-x.md"
@@ -91,9 +96,20 @@ def write_event(
     return path
 
 
-def gate_check(repo: Repo, event: Path, *extra: str) -> tuple[RunResult, dict[str, str]]:
+def base_checkout(repo: Repo, base: str, where: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Check out ``base`` into ``where`` (the gate root of spec 4.16) and make it the running package's home.
+
+    With bootstrap off a head run is CF009, so a normal-mode pull request is judged from this checkout.
+    """
+    repo.git("worktree", "add", "-q", "--detach", str(where), base)
+    monkeypatch.setattr(gate_root, "running_package", lambda: where / PACKAGE_DIR)
+    return where
+
+
+def gate_check(repo: Repo, event: Path, *extra: str, gate: Path | None = None) -> tuple[RunResult, dict[str, str]]:
     """Run ``gate-check`` with JSON output; return the result and ``{code: "path message" lines}`` of the errors."""
-    result = repo.run(["--format", "json", "gate-check", "--event", str(event), *extra])
+    root_args = ["--gate-root", str(gate)] if gate else []
+    result = repo.run([*root_args, "--format", "json", "gate-check", "--event", str(event), *extra])
     errors: dict[str, str] = {}
     if result.out:
         data = json.loads(result.out)
