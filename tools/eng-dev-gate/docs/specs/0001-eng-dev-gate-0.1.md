@@ -185,6 +185,7 @@ check (§4.12)
 - AC52. Given a generated document whose regeneration differs from the committed bytes, then GF001.
 - AC53. Given a changed R1 or R2 module, then mutation tests run on it and a score below `mutation_min` gives MU001.
 - AC53a. Given changed R1 or R2 files for which mutmut produces no mutant, then MU003 and the step passes; given mutants that no test covers, then they count as survivors in the MU001 score (not killed, so they lower it) and are not MU002 (amendment B-336).
+- AC53b. Given a member with files and folders at its top level other than `src/` and `tests/` (for example the `README.md` its build reads), then the mutated test runs see them: the gate lists each of them under mutmut's `also_copy`, except the folders the copy ignores (`.git`, `.venv`, caches, `mutants`) (amendment B-370).
 - AC54. Given a workspace member without `[tool.eng-gate]` (CF006) or a stale `uv.lock` (ST001 on step `lock`), then the
   check fails.
 - AC54a. Given pull-request context and a pull request that adds a third-party dependency (with its stub distribution)
@@ -654,7 +655,7 @@ the step is reported `skipped` with the reason locally and fails in CI if skippe
 least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
 reaches); when none remain the step passes with the notice MU003 (amendment B-026). A run in which mutmut produces no mutant at all (for example a file
 whose only functions are decorated methods or module-level lambdas) also passes with MU003; mutants that exist but
-that no test covers count as survivors in the MU001 score; MU002 stays reserved for a backend fault, exit 3, and is never a judgement on coverage (amendment B-336).
+that no test covers count as survivors in the MU001 score; MU002 stays reserved for a backend fault, exit 3, and is never a judgement on coverage (amendment B-336). The gate runs the backend in a copy of the member; mutmut copies only the source, `tests/`, `setup.cfg`, `pyproject.toml` and lock files into its own working folder, so the gate also lists every other top-level file and folder of the member under `also_copy`, and a test that builds the package or reads the package's own files runs as in the tests step (AC53b, amendment B-370). Files outside the member are not in the copy; a member's tests do not read them (BUILD-STATUS OQ-Q39).
 
 ### 4.13 agents render, keys, drift
 
@@ -911,7 +912,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
-| AC47 to AC54 (with AC53a and AC54a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29), `test_tool_steps.py::test_types_resolve_in_judged_environment`, `test_imports.py::test_judged_distribution_map` (T32) |
+| AC47 to AC54 (with AC53a, AC53b and AC54a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29), `test_tool_steps.py::test_types_resolve_in_judged_environment`, `test_imports.py::test_judged_distribution_map` (T32), `test_mutation.py::test_package_files_are_copied` (T37) |
 | AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_keys_skeleton`, `test_agents_drift.py::test_drift_unmanaged_and_pointer` |
 | AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_gate_action_runs_only_check` (T28), `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
 | AC64 | CI | the CI run of the last task's pull request |
