@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from eng_dev_gate.checks import ratchet, tool_steps
+from eng_dev_gate.checks import ratchet, tests_step, tool_steps
 from eng_dev_gate.report import Finding
 from eng_dev_gate.toolrun import ToolRunner
 from eng_dev_gate.workspace import Member
@@ -44,4 +44,5 @@ STEPS: tuple[Step, ...] = (
     Step("lint", "package", tool_steps.lint),
     Step("types", "package", tool_steps.types),
     Step("ratchet", "root", ratchet.step),
+    Step("tests", "package", tests_step.tests),
 )
