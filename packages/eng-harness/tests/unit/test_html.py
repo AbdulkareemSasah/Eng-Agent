@@ -14,6 +14,7 @@ import pytest
 from eng_harness._html import (
     Href,
     HtmlError,
+    Node,
     SafeToken,
     Tag,
     Text,
@@ -89,6 +90,28 @@ def test_urls_are_built_from_validated_segments_only() -> None:
         href(smuggled)
 
 
+def test_href_is_minted_only_by_the_factory() -> None:
+    for forged in ('" onclick="x', "javascript:alert(1)", "/answer/x"):
+        with pytest.raises(HtmlError):
+            Href(forged)
+
+
+def test_foreign_node_subclasses_are_refused() -> None:
+    class Raw(Node):
+        def render(self) -> str:
+            return "<script>x</script>"
+
+    class LoudText(Text):
+        def render(self) -> str:
+            return "<script>y</script>"
+
+    for foreign in (Raw(), LoudText("a")):
+        with pytest.raises(HtmlError):
+            el(Tag.DIV, foreign)
+        with pytest.raises(HtmlError):
+            document(foreign, [], stylesheet("p{}"))
+
+
 def test_elements_accept_only_tags_and_nodes() -> None:
     tag: Any = "script"
     with pytest.raises(HtmlError):
@@ -133,8 +156,8 @@ def test_field_labels_and_wraps_untrusted_value() -> None:
         '<span class="field"><span class="label">Drawing</span> '
         '<bdi dir="auto">&lt;img src=x onerror=&quot;y&quot;&gt;</bdi></span>'
     )
-    mixed = field(trusted("Name"), "عمود C12 ٣٠ ٤٠")
-    assert '<bdi dir="auto">عمود C12 ٣٠ ٤٠</bdi>' in mixed.render()
+    mixed = field(trusted("Name"), "عمود C12 ٣٠\u00d7٤٠")
+    assert '<bdi dir="auto">عمود C12 ٣٠\u00d7٤٠</bdi>' in mixed.render()
     assert "&lt;U+202E&gt;" in field(trusted("Name"), "a\u202eb").render()
     assert "&lt;U+0000&gt;" in field(trusted("Name"), "a\x00b").render()
 
