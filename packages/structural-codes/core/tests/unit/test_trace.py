@@ -1,6 +1,7 @@
 """Tests of the trace recorder (plan 0001 T4; spec 0001 section 4.5; AC4b, AC8, AC9, AC10)."""
 
 import math
+from typing import Any
 
 import pytest
 from eng_contract.cited import Cited
@@ -24,15 +25,15 @@ _SYNTH = "synthetic"
 
 class _Inputs(CheckInputs):
     width_mm: float = bounded(ge=_LOW, le=_HIGH, unit="mm")
-    reaction_kN: float = unbounded(reason="signed reaction; no physical bound", unit="kN")  # noqa: N815  # B-258: unit suffix of EC 4.7.2
+    reaction: float = unbounded(reason="signed reaction; no physical bound", unit="kN")
     flag: bool = False
 
 
 def _recorder(*, width: float = 10.0, ref: bool = False) -> TraceRecorder:
-    model = _Inputs(width_mm=width, reaction_kN=-3.0)
+    model = _Inputs(width_mm=width, reaction=-3.0)
     provenance = {
         "width_mm": RefInput(ref=_REF) if ref else LiteralInput(literal=width),
-        "reaction_kN": LiteralInput(literal=-3.0),
+        "reaction": LiteralInput(literal=-3.0),
     }
     return TraceRecorder(
         ValidatedInput(model, provenance),
@@ -69,8 +70,9 @@ def test_recording_rules() -> None:
     for bad in (math.nan, math.inf, -math.inf):
         with pytest.raises(TraceValueError, match="bad_value"):
             t.step("bad_value", bad, unit=None, formula="x", source=_SYNTH, uses=[])
+    not_a_number: Any = "a"
     with pytest.raises(TraceValueError, match="text"):
-        t.step("text", "a", unit=None, formula="x", source=_SYNTH, uses=[])  # type: ignore[arg-type]  # B-258: wrong type on purpose
+        t.step("text", not_a_number, unit=None, formula="x", source=_SYNTH, uses=[])
     # A rejected step leaves nothing behind: the name is free again.
     t.step("bad_value", 1.0, unit=None, formula="x", source=_SYNTH, uses=[])
     with pytest.raises(CheckDefinitionError, match="no numeric value"):
@@ -96,12 +98,12 @@ def test_inputs_and_contract_shape() -> None:
     assert trace.outputs == ["area_mm2"]
     assert trace.status is VerdictStatus.PASS
     by_name = {i.name: (i.value, i.unit, i.ref) for i in trace.inputs}
-    assert list(by_name) == ["ratio_limit", "width_mm", "reaction_kN", "flag"]
+    assert list(by_name) == ["ratio_limit", "width_mm", "reaction", "flag"]
     assert by_name["width_mm"] == (10.0, "mm", _REF)
-    assert by_name["reaction_kN"] == (-3.0, "kN", None)
+    assert by_name["reaction"] == (-3.0, "kN", None)
     assert by_name["ratio_limit"] == (None, "1", None)
     assert by_name["flag"] == (False, None, None)
-    assert trace.messages == ["reaction_kN: unbounded (signed reaction; no physical bound)", "a note"]
+    assert trace.messages == ["reaction: unbounded (signed reaction; no physical bound)", "a note"]
 
     with pytest.raises(CheckDefinitionError, match="outputs"):
         t.to_trace(outputs=["missing"], status=None)
@@ -138,4 +140,4 @@ def test_step_units() -> None:
 
 def test_unbounded_reason_message() -> None:
     trace = _recorder().to_trace(outputs=[], status=None)
-    assert trace.messages == ["reaction_kN: unbounded (signed reaction; no physical bound)"]
+    assert trace.messages == ["reaction: unbounded (signed reaction; no physical bound)"]
