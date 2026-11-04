@@ -1,22 +1,28 @@
 """The ``licenses`` step (spec 4.12): allowed licenses of the dependency closure (LC001 to LC003).
 
-The closure is read from ``importlib.metadata`` of the active environment, starting at the package's runtime
-dependencies and dependency groups. Allowed (process/04 section 7): MIT, BSD, Apache-2.0, ISC, PSF, MPL-2.0.
+The closure is read from ``importlib.metadata``, starting at the package's runtime dependencies and dependency
+groups: of the gate's interpreter in a head run, of the environment built from the judged tree in pull-request context
+(B-086, ``judged_metadata.py``; the policy is evaluated here either way). Allowed (process/04 section 7): MIT, BSD,
+Apache-2.0, ISC, PSF, MPL-2.0.
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import tempfile
 import tomllib
-from importlib.metadata import Distribution, distributions
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
+
+from eng_dev_gate import judged_metadata
+from eng_dev_gate.checks.tests_step import _judged_command, _judged_environment, _uv_available
 from eng_dev_gate.config import load_gate_config
 from eng_dev_gate.config.gate_config import LicenseException
 from eng_dev_gate.report import Finding, Severity
-from eng_dev_gate.results import Status, UsageError
+from eng_dev_gate.results import EnvironmentFaultError, Status, UsageError
 from eng_dev_gate.toolrun import ToolRunner
 from eng_dev_gate.workspace import discover_members
 
@@ -39,6 +45,22 @@ ALIASES = {
 _NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _TOKEN = re.compile(r"\(|\)|[^\s()]+")
 MAX_FIELD_LENGTH = 100  # a longer ``License`` field is license text, not a name; presentation limit
+OUTPUT_LINES = 20  # last lines of uv output quoted in a message; presentation only
+
+
+class Installed(BaseModel):
+    """License-relevant metadata of one installed distribution (the shape ``judged_metadata.collect`` returns)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    expression: str
+    license: str
+    classifiers: list[str]
+    requires: list[str]
+
+
+_INSTALLED = TypeAdapter(list[Installed])
 
 
 def _normalize(name: str) -> str:
@@ -92,16 +114,15 @@ class _Expression:
         return ALIASES.get(name, name) in ALLOWED
 
 
-def _declared(dist: Distribution) -> tuple[str, bool] | None:
+def _declared(dist: Installed) -> tuple[str, bool] | None:
     """Return the license text and whether it is allowed (expression, then ``License`` field, then classifiers)."""
-    meta = dist.metadata
-    expression = (meta.get("License-Expression") or "").strip()
+    expression = dist.expression.strip()
     if expression:
         return expression, _Expression(expression).allowed()
-    text = (meta.get("License") or "").strip()
+    text = dist.license.strip()
     if text and text.upper() != "UNKNOWN" and "\n" not in text and len(text) <= MAX_FIELD_LENGTH:
         return text, _Expression(ALIASES.get(text.lower(), text)).allowed()
-    names = [c.rsplit("::", 1)[-1].strip() for c in meta.get_all("Classifier") or [] if c.startswith("License ::")]
+    names = [c.rsplit("::", 1)[-1].strip() for c in dist.classifiers if c.startswith("License ::")]
     if names:
         return "; ".join(names), all(ALIASES.get(n.lower(), n.lower()) in ALLOWED for n in names)
     return None
@@ -143,7 +164,7 @@ def _finding(code: str, path: str, message: str) -> Finding:
 
 
 def _judge(
-    name: str, dist: Distribution | None, exceptions: dict[str, LicenseException], root: Path, path: str
+    name: str, dist: Installed | None, exceptions: dict[str, LicenseException], root: Path, path: str
 ) -> Finding | None:
     declared = _declared(dist) if dist else None
     if declared is None:
@@ -161,27 +182,67 @@ def _judge(
     return None
 
 
+def _stale_lock(ctx: StepContext, path: str) -> Finding | None:
+    """ST001 at ``path`` when the judged tree's ``uv.lock`` is stale or missing (``uv run --locked`` would fail)."""
+    checked = ctx.runner.run(["uv", "lock", "--check", "--project", str(ctx.root)], ctx.root)
+    if checked.exit_code == 0:
+        return None
+    head = " | ".join(checked.output.splitlines()[-OUTPUT_LINES:])
+    message = f"licenses: uv.lock of the judged tree is not up to date, so its environment cannot be built: {head}"
+    return _finding("ST001", path, message)
+
+
+def _judged_installed(ctx: StepContext) -> list[Installed]:
+    """Read the installed distributions inside the judged tree's environment with the base commit's reader.
+
+    Raises:
+        EnvironmentFaultError: the run failed or wrote unusable output (tool output is validated, never trusted).
+    """
+    with tempfile.TemporaryDirectory(prefix="eng-gate-lic-") as folder:
+        out = Path(folder) / "metadata.json"
+        command = _judged_command(ctx.root, "-I", str(Path(judged_metadata.__file__).resolve()), str(out))
+        ran = ctx.runner.run(command, Path(folder))  # nothing of the judged tree is on the import path
+        if ran.exit_code != 0:
+            head = " | ".join(ran.output.splitlines()[-OUTPUT_LINES:])
+            raise EnvironmentFaultError(f"licenses: reading the judged environment exited {ran.exit_code}: {head}")
+        try:
+            return _INSTALLED.validate_json(out.read_text(encoding="utf-8"))
+        except (OSError, ValidationError) as error:
+            raise EnvironmentFaultError(f"licenses: unusable metadata of the judged environment: {error!r}") from error
+
+
 def licenses(ctx: StepContext) -> list[Finding]:
     """Check every distribution of the dependency closure of the member; workspace members are not checked.
 
     A requirement guarded by an environment marker is followed only when it is installed; an extra is not followed.
+    With a gate root other than the judged tree the installed distributions are those of the judged tree's own
+    environment (spec 4.12); a stale ``uv.lock`` there is ST001 of the step.
 
     Raises:
         UsageError: a ``pyproject.toml`` is unreadable (exit 2).
         ConfigError: ``.gate/gate.yml`` of the gate root is invalid (exit 2).
+        EnvironmentFaultError: ``uv`` is missing, or the judged environment cannot be read (exit 3).
     """
     assert ctx.member is not None  # noqa: S101  # B-048: package steps always have a member
     exceptions = {_normalize(e.distribution): e for e in load_gate_config(ctx.gate_root).license_exceptions}
     members = {_normalize(m.name) for m in discover_members(ctx.root)}
-    installed = {
-        _normalize(d.metadata["Name"]): d for d in (distributions(path=SEARCH_PATH) if SEARCH_PATH else distributions())
-    }
+    if _judged_environment(ctx):
+        if not _uv_available():
+            raise EnvironmentFaultError(
+                "licenses: uv is not available; the judged tree's closure needs its environment"
+            )
+        if (stale := _stale_lock(ctx, ctx.member.path)) is not None:
+            return [stale]
+        installed = _judged_installed(ctx)
+    else:
+        installed = _INSTALLED.validate_python(judged_metadata.collect(SEARCH_PATH))
+    by_name = {_normalize(d.name): d for d in installed}
     queue = [r for r in map(_split, _requirements(ctx.member.directory)) if r]
     seen: set[str] = set()
     findings: list[Finding] = []
     while queue:
         name, guarded = queue.pop(0)
-        dist = installed.get(name)
+        dist = by_name.get(name)
         if name in seen or name in members or (guarded and dist is None):
             continue
         seen.add(name)

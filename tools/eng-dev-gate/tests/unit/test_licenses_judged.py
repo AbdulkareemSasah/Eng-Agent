@@ -38,6 +38,8 @@ def _ctx(repo: Repo, gate_root: Path, runner: ScriptedRunner) -> StepContext:
     pyproject = member_pyproject("a").replace("dependencies = []", 'dependencies = ["dep"]')
     repo.write({"pkgs/a/pyproject.toml": pyproject, ".gate/gate.yml": GATE_YML})
     member = next(m for m in discover_members(repo.root) if m.name == "a")
+    (gate_root / ".gate").mkdir()
+    (gate_root / ".gate" / "gate.yml").write_text(GATE_YML, encoding="utf-8")
     return StepContext(repo.root, gate_root, member, runner)
 
 
@@ -81,6 +83,8 @@ def test_unusable_metadata_is_an_environment_fault(repo: Repo, tmp_path: Path, p
 
 
 def test_requires_of_the_judged_environment_extend_the_closure(repo: Repo, tmp_path: Path) -> None:
-    payload = json.dumps([_entry("dep", expression="MIT", requires=["deep"]), _entry("deep", expression="GPL-3.0-only")])
+    payload = json.dumps(
+        [_entry("dep", expression="MIT", requires=["deep"]), _entry("deep", expression="GPL-3.0-only")]
+    )
     findings = licenses.licenses(_ctx(repo, tmp_path, ScriptedRunner(payload)))
     assert [(f.code, f.message.split(":")[0]) for f in findings] == [("LC001", "deep")]
