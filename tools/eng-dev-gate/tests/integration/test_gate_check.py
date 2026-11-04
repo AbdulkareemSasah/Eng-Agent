@@ -129,7 +129,7 @@ def test_draft_status_by_mode(tmp_path: Path) -> None:
         normal, bootstrap=False, plan=plan_text(status="draft"), base_files={SPEC_PATH: spec_text("draft")}
     )
     normal.commit({"pkg/src/new.py": "y\n"}, "feat: change")
-    result, errors = gate_check(normal, write_event(normal, base, BODY, base_ref="main"))
+    result, errors = gate_check(normal, write_event(normal, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main"))
     assert (result.code, set(errors)) == (1, {"GC006"})
     assert PLAN_PATH in errors["GC006"]
     assert SPEC_PATH in errors["GC006"]

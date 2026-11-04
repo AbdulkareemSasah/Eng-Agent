@@ -92,7 +92,7 @@ def write_event(
 
 
 def gate_check(repo: Repo, event: Path, *extra: str) -> tuple[RunResult, dict[str, str]]:
-    """Run ``gate-check`` with JSON output; return the result and ``{code: message}`` of the error findings."""
+    """Run ``gate-check`` with JSON output; return the result and ``{code: "path message" lines}`` of the errors."""
     result = repo.run(["--format", "json", "gate-check", "--event", str(event), *extra])
     errors: dict[str, str] = {}
     if result.out:
@@ -100,5 +100,7 @@ def gate_check(repo: Repo, event: Path, *extra: str) -> tuple[RunResult, dict[st
         for step in data["steps"]:
             for finding in step["findings"]:
                 if finding["severity"] == "error":
-                    errors[finding["code"]] = errors.get(finding["code"], "") + finding["message"] + "\n"
+                    errors[finding["code"]] = (
+                        errors.get(finding["code"], "") + f"{finding['path'] or ''} {finding['message']}\n"
+                    )
     return result, errors
