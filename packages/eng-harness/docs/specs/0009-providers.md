@@ -431,14 +431,20 @@ next tier and the engineer is the retry policy. The status code and any response
 `JevProvider` implements `DecisionProvider` (`choose`, `yes_no`, `score`, `batch`) over a `JevFormat`:
 
 ```python
-class HttpCall(BaseModel):      # frozen: method, path, JSON body; no headers, so no key can be placed here
+class HttpCall(BaseModel):  # frozen: method, path, JSON body; no headers, so no key can be placed here
     ...
 
+
 class JevFormat(Protocol):
-    revision: int               # mapping revision, part of info.version
+    revision: int  # mapping revision, part of info.version
     supports_batch: bool
-    def build(self, op: Literal["choose", "yes_no", "score", "batch"], requests: Sequence[ProviderRequest]) -> HttpCall: ...
-    def parse(self, op: ..., requests: Sequence[ProviderRequest], body: JsonValue) -> list[ChoiceAnswer | YesNoAnswer | Mapping[str, float] | ProviderFailure]: ...
+
+    def build(
+        self, op: Literal["choose", "yes_no", "score", "batch"], requests: Sequence[ProviderRequest]
+    ) -> HttpCall: ...
+    def parse(
+        self, op: ..., requests: Sequence[ProviderRequest], body: JsonValue
+    ) -> list[ChoiceAnswer | YesNoAnswer | Mapping[str, float] | ProviderFailure]: ...
 ```
 
 `_jev_format.py` is the only module that knows the wire format of a backend: paths, field names, how options and the

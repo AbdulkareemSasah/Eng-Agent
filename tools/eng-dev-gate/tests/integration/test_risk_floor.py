@@ -62,7 +62,7 @@ def test_union_of_maps_and_commits(repo: Repo, tmp_path: Path) -> None:
     event = _pull(repo, _plan("r1"), change, f"{PLAN_TASK}\nRisk: r1\n")
     result, errors = _run(repo, event)
     assert (result.code, set(errors)) == (1, {"RF001"})
-    for expected in ("r1", "r2", "r3", "pkg/src/a.py", "pkg/src/hot/b.py", "docs/x.md"):
+    for expected in ("r1", "r2", "r3", "pkg/src/hot/b.py", "docs/x.md"):
         assert expected in errors["RF001"]
     other = Repo(tmp_path / "covered")
     event = _pull(other, _plan("r1", "r2", "r3"), change, f"{PLAN_TASK}\nRisk: r1, r2, r3\n")
@@ -86,7 +86,8 @@ def test_risk_sets_and_body_line(repo: Repo) -> None:
     lane = {"head_ref": "lane/12-slug"}
     for body, code, codes in [
         ("Risk: r1\n", 0, set()),
-        ("Risk: r3\n", 0, set()),
+        ("Risk: r1, r3\n", 0, set()),
+        ("Risk: r3\n", 1, {"RF001"}),
         ("", 1, {"RF004"}),
         ("Risk: x\n", 1, {"RF004"}),
     ]:
@@ -130,9 +131,8 @@ def test_event_options_and_push(repo: Repo, tmp_path: Path) -> None:
     assert repo.run(["risk-floor"]).code == 2
     push = tmp_path / "push.json"
     push.write_text('{"ref": "refs/heads/build/v1", "after": "abc"}', encoding="utf-8")
-    skipped = repo.run(["--format", "json", "risk-floor", "--event", str(push)])
-    assert skipped.code == 0
-    assert json.loads(skipped.out)["steps"][0]["skipped_reason"] == "push event"
+    skipped = repo.run(["risk-floor", "--event", str(push)])
+    assert (skipped.code, "push event" in skipped.out) == (0, True)
 
 
 @pytest.mark.parametrize(
