@@ -96,7 +96,7 @@ def test_pin_permissions_injection_trigger(repo: Repo) -> None:
         "    - uses: actions/setup-python@v5\n"
         "    - run: echo ${{ github.event.pull_request.title }}\n"
     )
-    findings = _lint(repo, {".github/workflows/x.yml": bad, f"{ACTIONS}/extra/action.yml": action})
+    findings = _lint(repo, {CI: _ci(), ".github/workflows/x.yml": bad, f"{ACTIONS}/extra/action.yml": action})
     workflow = ".github/workflows/x.yml"
     assert _summary(findings) == [
         ("WF002", workflow, None), ("WF004", workflow, None), ("WF001", workflow, 5), ("WF001", workflow, 7),
@@ -110,14 +110,15 @@ def test_pin_permissions_injection_trigger(repo: Repo) -> None:
         "      - name: ${{ github.event.pull_request.title }}\n"
         "        env: {TITLE: '${{ github.event.pull_request.title }}'}\n        run: echo ok\n"
     )
-    assert _lint(repo, {".github/workflows/x.yml": clean}) == []
+    again = _lint(repo, {CI: _ci(), ".github/workflows/x.yml": clean})
+    assert [f for f in again if f.path == workflow] == []
 
 
 @pytest.mark.parametrize("trigger", ["pull_request_target", "[push, pull_request_target]", "{pull_request_target: {}}"])
 def test_pull_request_target_in_every_form(repo: Repo, trigger: str) -> None:
     """AC60: WF004 for the trigger as a string, a list or a mapping."""
     text = f"permissions: {{contents: read}}\non: {trigger}\njobs: {{}}\n"
-    assert [f.code for f in _lint(repo, {".github/workflows/t.yml": text})] == ["WF004"]
+    assert [f.code for f in _lint(repo, {CI: _ci(), ".github/workflows/t.yml": text})] == ["WF004"]
 
 
 def test_ci_shape_base_first(repo: Repo) -> None:
@@ -138,9 +139,9 @@ def test_ci_shape_violations(repo: Repo) -> None:
         "windows missing": _ci().replace(WINDOWS_JOB, ""),
         "no base checkout": _ci(gate=gate.replace("path: .gate-base", "path: elsewhere")),
         "base ref is the head": _ci(gate=gate.replace(BASE_REF, HEAD_REF)),
-        "base checkout unguarded": _ci(gate=gate.replace("      - if: github.event_name == 'pull_request'\n", "      - ")),
+        "base checkout unguarded": _ci(gate=gate.replace("if: github.event_name == 'pull_request'", "name: base")),
         "head checkout without ref": _ci(gate=gate.replace(f'ref: "{HEAD_REF}", ', "")),
-        "unguarded base variant": _ci(gate=gate.replace(f"      - if: {_guard('gate')} != ''\n", "      - ")),
+        "unguarded base variant": _ci(gate=gate.replace(f"if: {_guard('gate')} != ''", "name: x")),
         "guard flipped": _ci(gate=gate.replace(_guard("gate") + " ==", _guard("gate") + " !=")),
         "base variant without gate-root": _ci(gate=gate.replace("        with: {gate-root: .gate-base}\n", "", 1)),
         "foreign local action": _ci(gate=gate + foreign),
@@ -150,7 +151,8 @@ def test_ci_shape_violations(repo: Repo) -> None:
     }  # fmt: skip
     for label, text in cases.items():
         findings = _lint(repo, {CI: text})
-        assert findings and {f.code for f in findings} == {"WF005"}, label
+        assert findings, label
+        assert {f.code for f in findings} == {"WF005"}, label
         assert {f.path for f in findings} == {CI}, label
 
 
