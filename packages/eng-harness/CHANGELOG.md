@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- Journal schema with append-only and gap-free `seq` triggers, the hash-chained append-only writer with per-event durability, and large step arguments stored by reference as `harness.journal_blob/1`: `eng_harness.journal` `JournalWriter` (plan 0001 T3b, B-367; spec 0001 AC20 to AC22, AC24, AC26).
+- Shipped `blank-0.1.0` template (`status: draft`, no value, empty `ask_each_run` because the spec 0007 section 4.8 paths do not meet the suffix and canonical-unit rule of spec 0004 and the contract; a spec amendment is pending) as package data (included in the wheel by the build backend) and the golden pin of its resolved hash in `tests/data/golden/shipped_templates.json` (B-163; spec 0004 AC29).
 - Basis field declaration: `eng_harness.basis` with `FieldSpec`, `BasisInvalid` and `check_declaration` (kind, unit, choices and bounds rules; `required_basis` must equal the required paths) (B-159; spec 0004 AC21).
-
 - Template repository and checker: `TemplateRepository` (shipped and user folders, `TemplateAmbiguous`, synthetic refusal unless `allow_synthetic`), `load_template`, and `check_template` with `TemplateReport` listing every error and warning without raising; `resolve` and its types exported from `eng_harness.templates` (B-158; spec 0004 AC12, AC13).
 - Process transport and MCP client session: `ServerManager` (lazy role start, uncached complete tool list, raw calls with the client backstop, crash detection, restart with re-attach by process id within `max_restarts_per_run`, session epoch, shutdown that leaves host instances) over `ProcessTransport`, which speaks MCP over the pipes of a harness-launched process; `CallEffect` decides `HOST_NOT_CONNECTED`, `TIMEOUT_NO_EFFECT` or `TIMEOUT_UNKNOWN_OUTCOME` for a lost call (plan 0002 T5, B-124; spec 0002 AC8, AC11, AC12). The build check after each start follows in T6b.
 - Template inheritance: `eng_harness.templates._resolve.resolve` follows `meta.extends` (exact pin, depth at most 8, cycles refused), merges per the spec rules, refuses an ask path that is repeated or has a value, and computes the resolved `sha256` over the chain and the canonical model (B-157; spec 0004 AC8 to AC11).
@@ -20,5 +21,6 @@
 - Template model: `Template`, `Meta`, `Entry`, `Bounds`, `AskItem` and `TemplateInvalid` with citation, canonical-unit, finiteness and bounds rules (B-155; spec 0004 AC1 to AC6).
 - Text, date and number formatting and sanitizing: `eng_harness._text` and its culture-invariance rule test (B-175).
 - HTML builder: `eng_harness._html` (text escaped by construction, safe tokens, labeled untrusted `<bdi>` fields, style element with its SHA-256 policy source) and the shared style sheet `eng_harness.pages._css` (B-176).
+- Page server: `eng_harness.pages` binds the loopback interface on an operating-system port and checks launch code, session cookie, Host, Origin, Fetch Metadata and CSRF token, with the security headers, a fixed route table, request limits, lockdown and shutdown (B-180).
 - Report package skeleton: `eng_harness.report` with `ReleaseMarks`, `ReportError` and `unreleased_dependencies` (breadth-first lineage closure over `parents` and provenance inputs, depth limit) (B-182).
 - Command line shell: `eng_harness.cli` with `main`, parser of the six commands (no approve command), exit codes, `harness.toml` sections, output encoding, `eng-harness` script and `python -m eng_harness` (B-177).
