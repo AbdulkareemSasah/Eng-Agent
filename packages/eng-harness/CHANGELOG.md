@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Edit-cycle kinds and change-set model: `eng_harness.kinds.edit_cycle` (`harness.change_set_check/1`, `harness.analysis_summary/1`, `harness.csi_name_lists/1`) registered in `eng_harness._kinds`, and `ChangeSetDraft`, `ChangeSetRequest`, `ChangeSetSettings` in `eng_harness.workflows.model_edit_cycle` (plan 0007 T1, B-195; spec 0007 AC3). `ChangeSetSettings.max_items` defaults to 100, a software setting for the owner to confirm.
 - Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
 - Basis draft: `build_draft`, `BasisDraft`, `EngineerValues`, `DetectedValue` in `eng_harness.basis` (precedence engineer, detected, template; sources and citations with the defining ancestor; `detected_differs` warning; pending list; `unused` template paths; draft `sha256`; the values file cannot set `confirmed`) (B-160; spec 0004 AC14 to AC20).
 - Calc kinds part 1: `eng_harness.kinds.calcs` (`CalcMeta`, `harness.model_fingerprint/1`, `harness.model_diff/1`, `harness.expected_effects/1`) registered in `eng_harness._kinds`; `kinds/**` added to the R2 modules (plan 0003 T4, B-143; spec 0003 AC47).

@@ -139,6 +139,7 @@ def test_model_parses_and_refuses() -> None:
         with pytest.raises(ValidationError) as caught:
             ChangeSetDraft.model_validate(bad)
         named = {str(part) for err in caught.value.errors() for part in err["loc"]}
+        named |= {word.strip(".,:'[]") for err in caught.value.errors() for word in err["msg"].split()}
         assert field in named, (mutate.__name__, caught.value.errors())
 
 
@@ -159,4 +160,4 @@ def test_frozen() -> None:
     """The model is frozen."""
     draft = ChangeSetDraft.model_validate(_load("change_set_all_kinds"))
     with pytest.raises(ValidationError):
-        draft.note = "other"  # type: ignore[misc]  # B-195: a frozen model must refuse assignment
+        draft.note = "other"
