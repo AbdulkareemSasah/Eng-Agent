@@ -15,7 +15,7 @@ from structural_codes import evaluate
 from structural_codes.check import Check
 from structural_codes.content_hash import content_hash
 from structural_codes.errors import CheckDefinitionError
-from structural_codes.overlay import Added, Inherited, InheritedCheck, Overlay, Overridden, Removed
+from structural_codes.overlay import Inherited, InheritedCheck, Overlay, Removed
 from structural_codes.pack import Pack, Registry
 
 # B-264: the module names are split only because gate rule IM006 reports the fixture packs under tests/fixtures/*/src
@@ -144,7 +144,9 @@ def test_inherited_evaluation(packs: _Packs) -> None:
     assert derived.meta.clauses == ("S4.1",)
     assert derived.meta.title == base.meta.title
     assert derived.meta.assumptions == base.meta.assumptions
-    assert derived.preconditions == base.preconditions
+    assert [(p.id, p.outcome, p.clause, p.description) for p in derived.preconditions] == [
+        (p.id, p.outcome, p.clause, p.description) for p in base.preconditions
+    ]
     assert derived.inputs is base.inputs
 
     result = evaluate(derived.meta.check_id, _inputs(), subject=_S1, registry=registry)
