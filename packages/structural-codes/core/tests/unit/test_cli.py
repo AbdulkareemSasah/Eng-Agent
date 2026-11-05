@@ -53,15 +53,16 @@ class _Env:
         self,
         name: str = "synthbase",
         *,
+        pack: str = "synthbase",
         modules: str = _ALL_SRC,
         case_text: str | None = None,
         entry: str | None = None,
     ) -> Path:
-        """Build a pack project root named after `name` (`entry` replaces the entry-point line)."""
+        """Build a pack project root in folder `name` for pack `pack` (`entry` replaces the entry-point line)."""
         root = self.tmp / f"root_{name}"
         cases = root / "tests" / "data" / "golden" / "verification"
         cases.mkdir(parents=True)
-        entry_line = f'{name} = "{name}:PACK"' if entry is None else entry
+        entry_line = f'{pack} = "{pack}:PACK"' if entry is None else entry
         lines = ["[project]", 'name = "x"', '[project.entry-points."structural_codes.packs"]', entry_line]
         lines += ["[tool.eng-gate]", modules]
         (root / "pyproject.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -98,7 +99,7 @@ def test_verify_exit_codes(env: _Env) -> None:
     assert any(line.startswith("synthbase.4_1.two_pre not verified") for line in lines)  # no case file: not a failure
 
     failing = _CASES.read_text(encoding="utf-8").replace("value: 0.5,", "value: 0.9,")
-    code, out, err = env.run("verify", "--pack", str(env.root("failing", case_text=failing, entry='synthbase = "x:P"')))
+    code, out, err = env.run("verify", "--pack", str(env.root("failing", case_text=failing)))
     assert (code, err) == (1, "")
     assert re.search(rf"^{re.escape(_SIZED)} not verified pass=1 fail=1", out, re.MULTILINE)
 
@@ -138,7 +139,7 @@ def test_hash_prints_each_check(env: _Env) -> None:
 
 def test_overlay_includes_inherited(env: _Env) -> None:
     env.register(env.base, env.over)
-    root = env.root("synthover")
+    root = env.root("synthover", pack="synthover")
     code, out, err = env.run("verify", "--pack", str(root))
     assert (code, err) == (0, "")
     assert all(line.startswith("synthover.") for line in out.splitlines())
