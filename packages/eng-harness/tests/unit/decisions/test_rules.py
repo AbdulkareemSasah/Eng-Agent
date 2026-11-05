@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import inspect
 import json
+import pkgutil
 import types
 from collections.abc import Callable
 from enum import StrEnum
@@ -326,13 +327,13 @@ def test_missing_rule_tests(tmp_path: Path) -> None:
 
 
 def test_discover_collects_sorted_unique_rules(monkeypatch: pytest.MonkeyPatch) -> None:
-    package = types.ModuleType("eng_harness.rules")
+    package: Any = types.ModuleType("eng_harness.rules")
     package.__path__ = ["unused"]
-    package.first = reads_undeclared  # type: ignore[attr-defined]  # B-168: a stand-in package attribute
-    package.noise = 5  # type: ignore[attr-defined]  # B-168: a non-rule value is ignored
-    sub = types.ModuleType("eng_harness.rules.sub")
-    sub.again = reads_undeclared  # type: ignore[attr-defined]  # B-168: the same rule twice is one rule
-    sub.other = bearing_only  # type: ignore[attr-defined]  # B-168: a second rule
+    package.first = reads_undeclared
+    package.noise = 5
+    sub: Any = types.ModuleType("eng_harness.rules.sub")
+    sub.again = reads_undeclared
+    sub.other = bearing_only
     modules = {"eng_harness.rules": package, "eng_harness.rules.sub": sub}
     seen: list[tuple[object, str]] = []
 
@@ -340,9 +341,9 @@ def test_discover_collects_sorted_unique_rules(monkeypatch: pytest.MonkeyPatch) 
         seen.append((path, prefix))
         return [types.SimpleNamespace(name="eng_harness.rules.sub")]
 
-    monkeypatch.setattr(_rules.importlib.util, "find_spec", lambda name: object())
-    monkeypatch.setattr(_rules.importlib, "import_module", lambda name: modules[name])
-    monkeypatch.setattr(_rules.pkgutil, "walk_packages", walk)
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(importlib, "import_module", lambda name: modules[name])
+    monkeypatch.setattr(pkgutil, "walk_packages", walk)
     found = discover()
     assert [r.id for r in found.rules] == ["fixture_point.bearing_only", "fixture_point.reads_undeclared"]
     assert seen == [(["unused"], "eng_harness.rules.")]
