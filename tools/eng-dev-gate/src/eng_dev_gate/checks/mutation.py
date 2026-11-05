@@ -22,7 +22,7 @@ from eng_dev_gate.gitio import Change, GitError, SubprocessGit
 from eng_dev_gate.globs import matches_any
 from eng_dev_gate.report import Finding, Severity
 from eng_dev_gate.results import EnvironmentFaultError, UsageError
-from eng_dev_gate.toolrun import python_module
+from eng_dev_gate.toolrun import ToolTimeoutError, python_module
 
 if TYPE_CHECKING:
     from eng_dev_gate.checks.registry import StepContext
@@ -152,7 +152,13 @@ def run_step(ctx: StepContext) -> list[Finding]:
             "pytest_add_cli_args_test_selection=\n    tests/\n",
             encoding="utf-8",
         )
-        ran = ctx.runner.run(_mutmut(ctx, "run"), copy)
+        limit = load_gate_config(ctx.gate_root).limits.mutation_run_seconds
+        try:
+            ran = ctx.runner.run(_mutmut(ctx, "run"), copy, timeout_seconds=limit)
+        except ToolTimeoutError as error:
+            raise EnvironmentFaultError(
+                f"MU002 mutation: mutmut run timed out after {limit} s (limits.mutation_run_seconds)"
+            ) from error
         listing = ctx.runner.run(_mutmut(ctx, "results", "--all", "true"), copy)
         counts = parse_results(listing.output) if listing.exit_code == 0 else None
         stopped = ran.exit_code == 0 or _NO_MUTANT in ran.output  # mutmut ended without a fault of its own
