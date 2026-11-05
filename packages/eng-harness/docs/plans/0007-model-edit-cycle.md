@@ -110,6 +110,9 @@ tasks:
     depends_on: [T3]
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
+    # Amendment (B-415, documents only): the CSI ToolInfo implements saves_new_file (true for as_new_revision and
+    # csi_open_revision) and both results carry summary saved_file (name, sha256), spec §4.10; the base default
+    # (false) comes with T6, whichever of the two merges first.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -129,6 +132,8 @@ tasks:
     depends_on: [T1b]
   - id: T6
     title: Engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields)
+    # Amendment (B-415, documents only): the engine spec text is engine spec 0001 §4.2, §4.6 "Tool saves", §4.7,
+    # §4.8, §4.9 and rules EC1 to EC6 (§3.9, covered by spec AC33); ports.py gains ToolInfo.saves_new_file, _ctx_impl.py only the calls into the hooks.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.block, eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -136,8 +141,16 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_modes.py"
       - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
       - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
+      - "packages/eng-harness/src/eng_harness/ports.py"  # ToolInfo.saves_new_file, engine §4.8 (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # calls into the copy-on-open and tool-save hooks (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # resumed tool save: compared with its result's provenance.host, saved_file mismatch, engine §4.6 "At a resume" (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
-    max_changed_lines: 200
+    # Amendment (B-415 review fix, documents only): block.py imports FieldSpec from eng_harness.basis._fields (engine
+    # §4.1.2), and the gate also runs tests/rules/test_decision_imports.py::test_types_module_is_block_safe unchanged.
+    # Amendment (B-415 review fix, documents only): _hoststate.py and _runner.py added for EC2's resume cases (both
+    # extended from plan 0001 T11c, split from T11b by B-427); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
+    max_changed_lines: 300
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode"
@@ -360,7 +373,16 @@ tools only, checked by plan 0002's allowlist contract test); fake extensions.
 `model_saved` for tool steps with action `save`; a save passed `under=` an approval is re-checked and continues the
 approval's write chain (with the engine's `p~post.save` results), and a save to a new file gets no
 `approve_each_write` preview (spec Q3); an approval resolved by the mode never satisfies an always-ask step.
-Starts only after the engine spec amendment is merged.
+Starts only after the engine spec amendment is merged. Amendment B-415: that amendment is work item B-415 (engine spec
+§4.2, §4.6 "Tool saves", §4.7, §4.8 `ToolInfo.saves_new_file`, §4.9; rules EC1 to EC6 of its §3.9, one per test of
+this task, which add no engine criterion: spec AC33 covers them;
+§11 Q30 to Q34). It adds `ports.py` (`saves_new_file`, default false) and `engine/_ctx_impl.py` (only the calls into
+the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
+save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11c, split from T11b by B-427) to this task's
+files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
+Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
+package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
+`tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
 
 **T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules
 (`edit_cycle_readback_result.pass`, `edit_cycle_analysis_messages.clean`; the point names `edit_cycle_readback_result`,
@@ -448,7 +470,7 @@ uninterrupted run.
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes); the engine spec amendment (B-415, documents pull request) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
 | T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment (owner question OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
