@@ -101,40 +101,67 @@ def test_file_validation(registry: CalcRegistry, tmp_path: Path) -> None:
     assert loaded.approvals[0].version == 3
     assert loaded.withdrawn[0].content_sha256 == "any"
 
-    def reason(path: Path) -> str:
+    def failure(path: Path) -> tuple[str, str]:
         with pytest.raises(ApprovalsError) as caught:
             load_approvals(path, registry)
-        return caught.value.reason
+        assert caught.value.file == path.name
+        return caught.value.reason, caught.value.path
+
+    def bad(text: str, where: str, reason: str = "schema_invalid") -> None:
+        assert failure(_write(tmp_path, text)) == (reason, where), text
 
     for field in ("approver", "date", "verification_record", "pull_request"):  # AC9: a required field is missing
         lines = [ln for ln in good.splitlines(keepends=True) if f" {field}:" not in ln]
-        assert reason(_write(tmp_path, "".join(lines))) == "schema_invalid", field
-    schema_invalid = {
-        "bad hash": good.replace(digest, "xyz"),
-        "bad date": good.replace("2026-01-31", "2026-13-40"),
-        "record outside folder": good.replace("docs/verification/calcs/", "docs/other/"),
-        "record escapes folder": good.replace("calcs/harness", "calcs/../harness"),
-        "extra key": good + "    note: x\n",
-        "duplicate entry": good + good,
-        "zero version": good.replace("version: 3", "version: 0"),
-        "empty approver": good.replace("approver: owner", "approver: ''"),
-    }
-    for name, text in schema_invalid.items():
-        assert reason(_write(tmp_path, text)) == "schema_invalid", name
-    assert reason(_write(tmp_path, good.replace("harness.fixture_sum", "harness.nope"))) == "unknown_calc"
-    assert reason(_write(tmp_path, "[]", WITHDRAWN.format(digest="any").replace(CALC_ID, "harness.x"))) == (
-        "unknown_calc"
-    )
-    assert reason(_write(tmp_path, good + "    approver: other\n")) == "yaml_invalid"  # duplicate key
-    assert reason(_write(tmp_path, "[]", WITHDRAWN.format(digest="all"))) == "schema_invalid"
+        bad("".join(lines), f"approvals[0].{field}")
+    bad(good.replace(digest, "xyz"), "approvals[0].content_sha256")
+    bad(good.replace("2026-01-31", "2026-13-40"), "approvals[0].date")
+    bad(good.replace("2026-01-31", "2026-1-31"), "approvals[0].date")
+    bad(good.replace("docs/verification/calcs/", "docs/other/"), "approvals[0].verification_record")
+    bad(good.replace("calcs/harness", "calcs/../harness"), "approvals[0].verification_record")
+    bad(good + "    note: x\n", "approvals[0].note")
+    bad(good + good, "")
+    bad(good.replace("version: 3", "version: 0"), "approvals[0].version")
+    bad(good.replace("version: 3", "version: 10000"), "approvals[0].version")
+    bad(good.replace("pull_request: 12", "pull_request: 0"), "approvals[0].pull_request")
+    bad(good.replace("approver: owner", "approver: ''"), "approvals[0].approver")
+    bad(good.replace("approver: owner", "approver: '   '"), "approvals[0].approver")
+    bad(good.replace("approver: owner", "approver: 123"), "approvals[0].approver")  # strict: no int to str
+    bad(good.replace("harness.fixture_sum", "harness.nope"), "approvals[0].calc_id", "unknown_calc")
+    assert failure(_write(tmp_path, good + "    approver: other\n"))[0] == "yaml_invalid"  # duplicate key
+    # an accepted boundary: version 9999
+    assert load_approvals(_write(tmp_path, good.replace("version: 3", "version: 9999")), registry).approvals[0].version
+    withdrawn = WITHDRAWN.format(digest="any")
+
+    def bad_withdrawn(text: str, where: str, reason: str = "schema_invalid") -> None:
+        assert failure(_write(tmp_path, "[]", text)) == (reason, where), text
+
+    bad_withdrawn(withdrawn.replace(CALC_ID, "harness.x"), "withdrawn[0].calc_id", "unknown_calc")
+    bad_withdrawn(WITHDRAWN.format(digest="all"), "withdrawn[0].content_sha256")
+    bad_withdrawn(withdrawn.replace("Wrong clause", "'  '"), "withdrawn[0].reason")
+    bad_withdrawn(withdrawn.replace("Rerun every result of this calc", "'  '"), "withdrawn[0].advisory")
+    bad_withdrawn(withdrawn.replace("Wrong clause", "5"), "withdrawn[0].reason")
+    bad_withdrawn(withdrawn.replace("2026-02-01", "2026-2-1"), "withdrawn[0].date")
     # whole-file rules: schema number, extra top-level key, tags, anchors, missing file, wrong root
-    assert reason(_write(tmp_path, head="schema: 2\n")) == "schema_invalid"
-    assert reason(_write(tmp_path, head="schema: 1\nextra: 1\n")) == "schema_invalid"
-    assert reason(_write(tmp_path, head="")) == "schema_invalid"
-    assert reason(_write(tmp_path, head="schema: !!int 1\n")) == "yaml_invalid"
-    assert reason(_write(tmp_path, head="schema: &a 1\n")) == "yaml_invalid"
+    assert failure(_write(tmp_path, head="schema: 2\n")) == ("schema_invalid", "schema")
+    assert failure(_write(tmp_path, head="schema: 1\nextra: 1\n")) == ("schema_invalid", "extra")
+    assert failure(_write(tmp_path, head="")) == ("schema_invalid", "schema")
+    assert failure(_write(tmp_path, head="schema: !!int 1\n"))[0] == "yaml_invalid"
+    assert failure(_write(tmp_path, head="schema: &a 1\n"))[0] == "yaml_invalid"
     root_list = tmp_path / "list.yaml"
     root_list.write_text("- 1\n", encoding="utf-8")
-    assert reason(root_list) == "schema_invalid"
-    assert reason(tmp_path / "missing.yaml") == "not_found"
+    assert failure(root_list) == ("schema_invalid", "")
+    assert failure(tmp_path / "missing.yaml")[0] == "not_found"
     assert _approvals.APPROVALS_PATH.name == "approvals.yaml"
+
+
+def test_check_approvals_reports_unregistered_calcs(registry: CalcRegistry, tmp_path: Path) -> None:
+    text = APPROVAL.format(digest=OTHER_HASH).replace(CALC_ID, "harness.gone")
+    loaded = load_approvals(_write(tmp_path, text), {"harness.gone"})
+    assert [(f.kind, f.calc_id) for f in check_approvals(registry, loaded)] == [("unknown_calc", "harness.gone")]
+
+
+def test_error_message_names_reason_and_path() -> None:
+    assert str(ApprovalsError("schema_invalid", "approvals[0].date", "a.yaml")) == (
+        "approvals invalid: schema_invalid at approvals[0].date"
+    )
+    assert str(ApprovalsError("schema_invalid", "")) == "approvals invalid: schema_invalid at <root>"

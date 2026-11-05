@@ -2,6 +2,7 @@
 
 import importlib.util
 import sys
+import warnings
 from pathlib import Path
 from types import ModuleType
 
@@ -151,4 +152,7 @@ def test_shipped_calcs_are_draft() -> None:
     shipped = load_approvals(APPROVALS_PATH, REGISTRY)
     assert shipped.schema_version == 1
     assert [calc_id for calc_id in REGISTRY if REGISTRY[calc_id].verification != "draft"] == []
-    assert not any(finding.kind == "unknown_calc" for finding in check_approvals(REGISTRY, shipped))
+    findings = check_approvals(REGISTRY, shipped)
+    assert not any(finding.kind == "unknown_calc" for finding in findings)
+    for finding in findings:  # spec 0003 4.5: stale entries are reported, not failed
+        warnings.warn(f"stale approval for {finding.calc_id}", stacklevel=1)
