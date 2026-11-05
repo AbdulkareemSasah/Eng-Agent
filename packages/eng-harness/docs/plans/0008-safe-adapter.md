@@ -11,6 +11,8 @@ tasks:
     # build check takes the server's product); pre-start grep of the shared modules for ETABS-only names, each hit a
     # lead plan amendment adding the file here before T1 starts, no lint exclusions (section 2)
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
+    # Amendment (B-413, documents only): test_build_mismatch_stops_run is written later, in plan 0002 T19; the
+    # test_session.py glob and the workflow conftest.py stay to adapt the session-level build-check tests of 0002 T6b to the per-product header.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -26,7 +28,8 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_products.py"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # adapts 0002 T6b's session-level build-check tests to the per-product header (B-413)
+      - "packages/eng-harness/tests/workflow/conftest.py"  # the fixture's build pins, where they read the allowlist header (B-413)
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -52,6 +55,8 @@ tasks:
   - id: T3
     # Amendment (B-418, documents only): T3 holds the SG-1 to SG-9 ids and messages in _gaps.py but wires only SG-1 (AC8)
     title: SAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries
+    # Amendment (B-413, documents only): test_safe_build_mismatch_stops_run (AC4's stop, engine AC44) moves to plan 0002
+    # T19, which adds build_ports and runs the real engine, so T3 does not wait for engine plan 0001 T13.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -66,7 +71,6 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_safe_isolation.py"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_gaps.py"
       - "packages/eng-harness/tests/workflow/servers/test_guard.py"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py"
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -74,7 +78,6 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_escape_hatches_refused_for_safe"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_safe_against_inventory"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_safe_fingerprint_from_inventory"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_session_ops.py::test_working_copy_fdb"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_isolation.py::test_epochs_independent"
       - "packages/eng-harness/tests/workflow/adapters/test_safe_gaps.py::test_new_model_gap"
@@ -180,6 +183,8 @@ tasks:
     depends_on: [T6]
   - id: T8
     title: Recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list
+    # Amendment (B-413, documents only): runs the real engine, so it waits for plan 0002 T19 and engine plan 0001 T13,
+    # T15, T16 and T19; the SAFE engine stop of AC4 is not here (no source file of T8 makes it fail at the base): plan 0002 T19.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
@@ -255,17 +260,21 @@ and T3 also waits for 0002 T15 or drops `csi_unlock_model`, T8 for 0002 T17). Be
 for `ETABS` or `.EDB`. Every hit is reported to the lead before T1 starts, and the lead adds that file to T1's files by
 a plan amendment, so that T1 makes it ask the profile; T1 starts only when the grep finds no hit outside T1's files.
 `test_no_product_branches_in_shared` carries no exclusions: no later task lists `test_products.py`, and `_state.py`,
-`_replies.py` and `_edits.py` are in no other task of this plan, so an exclusion could never be removed in scope. The two existing 0002 tests that read the pinned fingerprint
-(`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`, `test_session.py::test_build_mismatch_stops_run`) are in
-T1's files: they change only in how they read the header (the ETABS entry of `[fingerprint]`), never in the value they
-expect, and they are the regression proof that the ETABS fingerprint is unchanged.
+`_replies.py` and `_edits.py` are in no other task of this plan, so an exclusion could never be removed in scope. The existing 0002 test that reads the pinned fingerprint
+(`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`) is in T1's files: it changes only in how it reads the
+header (the ETABS entry of `[fingerprint]`), never in the value it expects, and it is the regression proof that the
+ETABS fingerprint is unchanged. The ETABS engine-stop test `test_session.py::test_build_mismatch_stops_run` does not
+exist yet when T1 starts: plan 0002 T19 writes it, through the allowlist loader, after the engine tasks it needs (B-413).
+The session-level build-check tests of plan 0002 T6b (`test_session.py`, with the pins of `tests/workflow/conftest.py`)
+build the check from the allowlist header, so `test_session.py` and `tests/workflow/conftest.py` are in T1's files to
+adapt them to the per-product header in the same way, never in what they expect (B-413).
 
 **T2 Fake** (spec §4.1 and 0002 §4.8.3). Test code only: the fake gains a `product` setting; SAFE mode has points, slab
 areas, sections, materials, patterns, combinations, joint loads, the area-spring tables, the result tables with
 configurable row counts and truncation, `csi_new_model` returning `unsupported_by_version`, and the faults of 0002 plus
 `present_units_mm`. Its tool list stays the S-12 schemas; the contract test checks the SAFE entries.
 
-**T3 Allowlist and session** (spec §4.2, §4.8). SAFE entries (`csi_status`, `csi_launch`, `csi_attach`, `csi_exit`,
+**T3 Allowlist and session** (spec §4.2, §4.8). The SAFE engine-stop test of AC4 is plan 0002 T19's (B-413). SAFE entries (`csi_status`, `csi_launch`, `csi_attach`, `csi_exit`,
 `csi_open_model`, `csi_save_model`, `csi_model_info`, `csi_list_points`, `csi_list_areas`, `csi_list_frames`,
 `csi_list_grids`, `csi_list_area_sections`, `csi_list_materials`, `csi_list_load_patterns`, `csi_list_load_cases`,
 `csi_list_load_combos`, `csi_db_table_read`, `csi_db_table_fields`, `csi_set_point_load`, `csi_add_load_pattern`,
@@ -297,8 +306,8 @@ slab design. T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their regi
 B-418). AC25's parametrized cases include SG-8, which T6 already raises and which is green at T7's base; this is
 acceptable because the test-first gate counts the test red while any case fails.
 
-**T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the crash matrix at
-each write step, the recorded-reply contract tests (skipped with a reason until the owner commits SAFE recordings), the
+**T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the
+crash matrix at each write step, the recorded-reply contract tests (skipped with a reason until the owner commits SAFE recordings), the
 record script gaining a SAFE scenario, and the SAFE part of `docs/local-testing.md` (spec §12 L1 to L15).
 
 **T9 Slab design (blocked).** Starts only after the owner has run L5 and L11 and committed recordings of the result tables
@@ -312,7 +321,12 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 - Runtime: none new (`mcp`, `eng-contract`, `pydantic` as in plan 0002). Development: none new.
 - Work items: plan 0002 T1 (config), T6 and T6b (allowlist, build check), T7 (guard), T8 to T10 (framework, errors, session
   operations), T11 to T14 (state, edits, analysis, reconciliation) before T1 of this plan; T15 (ADR-0031 switch) before the
-  `csi_unlock_model` SAFE entry; T17 (record mode) before T8 of this plan. Engine plan 0001 as for plan 0002.
+  `csi_unlock_model` SAFE entry; T17 (record mode) and T19 (port wiring and the ETABS engine stops) before T8 of this plan.
+  Engine plan 0001: T8 of this plan runs the real engine and waits for engine 0001 T13, T15, T16 and T19 (T13 brings in
+  T9 to T12), as plan 0002 T19 does; no other task of this plan runs the real engine (B-413). Plan 0002 T19 in turn waits
+  for T3 of this plan, because it writes the SAFE engine stop of AC4 (`test_session.py::test_safe_build_mismatch_stops_run`)
+  next to the ETABS one, where `build_ports` makes it fail at the merge base (B-413). No cycle: T1 to T3 of this plan wait
+  only for plan 0002 T1 to T14 (0002 T15 only for T3's conditional `csi_unlock_model` entry).
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
   kinds and gaps defined here.
 - Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented). Q8 (whether a candidate-mapped soil-pressure result may feed a verdict) is for the footing-workflow spec and does not affect T1 to T9.
@@ -333,6 +347,6 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 ## 5. Rollback
 
 Each task is one squash-merged pull request into `build/v1`; reverting it removes it and its dependants. T1 changes the
-allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite (with the two tests
+allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite (with the tests
 T1 adapts) is its regression test. Nothing here writes to a host program in CI. A wrong field key is fixed forward in the data file; a SAFE
 build the allowlist was not tested with is refused by the build check rather than run.
