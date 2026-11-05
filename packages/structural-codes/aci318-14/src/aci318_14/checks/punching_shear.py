@@ -28,11 +28,11 @@ __all__ = ["PERIMETER_INSIDE", "PunchingShearInputs", "punching_shear"]
 
 _TABLE = "ACI 318-14 Table 22.6.5.2"
 _LOCAL = {
-    "c_a": Cited(value=0.33, unit="1", source=f"{_TABLE} (a), coefficient in MPa^0.5"),
-    "c_b": Cited(value=0.17, unit="1", source=f"{_TABLE} (b), coefficient in MPa^0.5"),
-    "c_b2": Cited(value=2, unit="1", source=f"{_TABLE} (b), the term 2/beta"),
-    "c_c": Cited(value=0.083, unit="1", source=f"{_TABLE} (c), coefficient in MPa^0.5"),
-    "c_c2": Cited(value=2, unit="1", source=f"{_TABLE} (c), the term 2 + alphas*d/bo"),
+    "c_a": Cited(value=0.33, unit="1", source="ACI 318-14 Table 22.6.5.2 (a), coefficient in MPa^0.5"),
+    "c_b": Cited(value=0.17, unit="1", source="ACI 318-14 Table 22.6.5.2 (b), coefficient in MPa^0.5"),
+    "c_b2": Cited(value=2, unit="1", source="ACI 318-14 Table 22.6.5.2 (b), the term 2/beta"),
+    "c_c": Cited(value=0.083, unit="1", source="ACI 318-14 Table 22.6.5.2 (c), coefficient in MPa^0.5"),
+    "c_c2": Cited(value=2, unit="1", source="ACI 318-14 Table 22.6.5.2 (c), the term 2 + alphas*d/bo"),
     "alphas": Cited(value=40, unit="1", source="ACI 318-14 22.6.5.3 (interior columns)"),
     "c_perim": Cited(value=2, unit="1", source="Geometry: perimeter of a rectangle, 2*(b1 + b2)"),
 }

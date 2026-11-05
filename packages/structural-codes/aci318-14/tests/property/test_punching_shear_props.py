@@ -31,7 +31,7 @@ def _result(inputs: dict[str, Any]) -> tuple[float, float, dict[str, float]]:
     assert v.status in (VerdictStatus.PASS, VerdictStatus.FAIL)
     assert v.demand is not None
     assert v.capacity is not None
-    return v.demand.value, v.capacity.value, {s.name: s.value for s in payload.traces[0].steps}
+    return v.demand.value, v.capacity.value, {s.name: float(s.value) for s in payload.traces[0].steps}
 
 
 @st.composite
