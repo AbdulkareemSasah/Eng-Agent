@@ -20,7 +20,7 @@ test_globs: []
 generated_globs: []
 spike_globs: []
 agents: {unmanaged_ok: ["design/**"]}
-limits: {diff_lines: 4, max_task_lines: 400, test_run_seconds: 600, max_file_bytes: 1048576}
+limits: {diff_lines: 4, max_task_lines: 400, test_run_seconds: 600, max_file_bytes: 1048576, mutation_run_seconds: 7200}
 license_exceptions: []
 secrets: {allow: []}
 """

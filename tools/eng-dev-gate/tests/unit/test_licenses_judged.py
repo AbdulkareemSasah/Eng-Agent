@@ -24,7 +24,7 @@ class ScriptedRunner:
         self.payload, self.lock, self.run_code = payload, lock, run
         self.calls: list[list[str]] = []
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append(list(argv))
         if "lock" in argv:
             return ToolResult(exit_code=self.lock, output="lock output")
