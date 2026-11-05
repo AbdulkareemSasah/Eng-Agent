@@ -138,8 +138,10 @@ tasks:
       - "packages/eng-harness/src/eng_harness/ports.py"  # ToolInfo.saves_new_file, engine §4.8 (amendment B-415)
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # calls into the copy-on-open and tool-save hooks (amendment B-415)
       - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # resumed tool save: compared with its result's provenance.host, saved_file mismatch, engine §4.6 "At a resume" (amendment B-415)
-      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 9 (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
+    # Amendment (B-415 review fix, documents only): block.py imports FieldSpec from eng_harness.basis._fields (engine
+    # §4.1.2), and the gate also runs tests/rules/test_decision_imports.py::test_types_module_is_block_safe unchanged.
     # Amendment (B-415 review fix, documents only): _hoststate.py and _runner.py added for EC2's resume cases (both
     # extended from plan 0001 T11b); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
     max_changed_lines: 300
@@ -352,6 +354,9 @@ this task, which add no engine criterion: spec AC33 covers them;
 the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
 save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11b) to this task's
 files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
+Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
+package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
+`tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
 
 **T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules (`rb.pass`,
 `am.clean`) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review.

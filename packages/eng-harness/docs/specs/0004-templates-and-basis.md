@@ -175,8 +175,9 @@ Import rules: `eng_harness.templates` and `eng_harness.basis` import `eng_contra
 (`basis` imports `templates`); neither imports the engine's internals (only `eng_harness.ports` and `eng_harness.ctx`
 types). Both are pure: they read files, make no network call, start no process (engine invariants on block code do not
 apply, but the engine's runtime guard is not needed because no block module imports these modules directly). Amendment
-B-415 (draft): `eng_harness.block` re-exports `FieldSpec`, so loading it loads `eng_harness.basis` indirectly; engine
-§4.1.2 accepts this and states why the block import rules and the runtime guard still hold.
+B-415 (draft; review fix): `eng_harness.block` exports `FieldSpec` by importing it from `basis._fields`, which
+therefore keeps importing only the standard library, `eng_contract` and `pydantic` (no `eng_harness` module), so that
+spec 0005 AC42 holds; engine §4.1.2 states why the block import rules and the runtime guard still hold.
 
 ### 4.2 Template schema (13 §2)
 

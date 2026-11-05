@@ -399,8 +399,9 @@ journaled proof that nothing changed).
 - `restore_previous` (D-2) runs `csi_open_revision` on this cycle's latest `P[k]`, never on `R[k-1]`: it checks that
   the snapshot's file hash equals the `saved_file.sha256` of the step 7 result that made it (equal to that step's
   `model_saved.file_sha256`), copies it to a new working file, opens that file on the bound
-  instance without saving `W` (action `open`, `model_bound`, `model_saved` role `revision`), and the new file becomes
-  `W`. The writes of the failed apply are gone and the engineer's changes stay (AC34). A snapshot whose hash differs
+  instance without saving `W` (action `open`; the engine journals `model_saved` role `revision` naming the new working
+  file, engine §4.6 "Tool saves"; no `model_bound`, the model stays bound to its instance; review fix B-415), and the
+  new file becomes `W`. The writes of the failed apply are gone and the engineer's changes stay (AC34). A snapshot whose hash differs
   (someone saved over it) gives `CONFLICT`: nothing is opened and the run escalates; the engineer decides.
 - The accepted revision that step 16 promotes is `W` as saved at step 10 of the accepted cycle (or by a later engineer
   save, which the promotion binding shows).

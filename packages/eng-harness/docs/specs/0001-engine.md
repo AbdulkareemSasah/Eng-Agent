@@ -423,7 +423,8 @@ them; each states the cases its test checks.
   the required paths or that repeats a path, then `RegistryError` at definition; given both with the same paths in
   another order, then the definition is accepted and `required_basis` is the derived tuple (the verdict of spec
   0004's `check_declaration`, AC21); given no `basis_fields`, then `basis_fields` is `()` and `required_basis` is as
-  passed (`()` when not passed); `eng_harness.block.FieldSpec` is `eng_harness.basis.FieldSpec`. Test:
+  passed (`()` when not passed); `eng_harness.block.FieldSpec` is `eng_harness.basis.FieldSpec`, and spec 0005 AC42 still holds (its test
+  `tests/rules/test_decision_imports.py::test_types_module_is_block_safe` passes unchanged, §4.1.2). Test:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_required_basis_from_fields`.
 - EC5 (saves under an approval, §4.9). Given an approval, a tool save passed `under=` it and then writes under it,
   then the save is re-checked against the binding like a first write (`ApprovalVoid` before the save on a mismatch,
@@ -449,7 +450,7 @@ module has a leading underscore (contract §4.1 convention, 03 §3 rule 2).
 | Module | Public names | Who may import |
 |---|---|---|
 | `eng_harness` | `__version__` | anyone |
-| `eng_harness.block` | `block`, `workflow`, `BlockDef`, `WorkflowDef`, `Registry`, `RegistryError`, `check_lock`, `LockFinding`; `FieldSpec` (re-exported from `eng_harness.basis`, amendment B-415) | block code, engine, CLI |
+| `eng_harness.block` | `block`, `workflow`, `BlockDef`, `WorkflowDef`, `Registry`, `RegistryError`, `check_lock`, `LockFinding`; `FieldSpec` (the object `eng_harness.basis` exports, imported from `eng_harness.basis._fields`, amendment B-415) | block code, engine, CLI |
 | `eng_harness.ctx` | `Ctx` (Protocol), `ToolResult`, `ReadResult`, `CalcResult`, `Decision`, `DecisionRequest`, `Answered`, `Approval`, `ApprovalKind`, `Preview`, `PreviewItem`, `Attempt`, `BasisView`, `BasisCount`, `ModelHandle`, `Promotion`, `ArgValue` | block code |
 | `eng_harness.errors` | `HarnessCode`, `EngineStop` and subclasses, `StepError` and subclasses (§6) | block code (the `StepError` family only), engine |
 | `eng_harness.ports` | the ports and data types of §4.8 | engine, later specs' implementations, tests |
@@ -479,20 +480,22 @@ modules (`rule_modules`: `src/eng_harness/rules/**`) may import only: `eng_harne
 types and the ctx API only, never I/O. Enforced by the block-module rules test (AC19) and by the gate's FB004 and FB005
 ([eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §4.8).
 
-**Indirect import through `FieldSpec` (amendment B-415, draft).** `eng_harness.block` re-exports `FieldSpec` from
-`eng_harness.basis` (§4.2), so loading `eng_harness.block` also loads `eng_harness.basis` and, through it,
-`eng_harness.templates`, `eng_harness.ports` and `eng_harness.journal` (spec 0004 §4.1). This is accepted, and the
-rules above still hold, for three reasons. (1) The rules govern what a block or rule module names in its own import
-statements; AC19, FB004 and FB005 check those statements, and `eng_harness.basis`, `eng_harness.ports` and
-`eng_harness.journal` stay refused there. The re-export gives block code one new name, `FieldSpec`, a frozen data
-model with no I/O method. (2) Invariant 1's runtime guard (§4.6) acts on the operations block code performs while it
-runs, not on which modules are loaded; loading a module performs no file, process, socket or database operation from
-block code, and the guard's `import` audit event still refuses an import made while block code runs. (3) Block
-modules run only inside an engine process, which has already loaded the ports and the journal. The alternative, a
-`FieldSpec` in a module that imports only `eng_contract` and `pydantic`, which both `eng_harness.block` and
-`eng_harness.basis` import, moves merged spec 0004 code; it is listed for the owner (Q26) and not taken in v1. No
-import cycle arises: none of `eng_harness.basis`, `eng_harness.templates`, `eng_harness.ports` and
-`eng_harness.journal` imports `eng_harness.block`.
+**Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix).** `eng_harness.block` exports
+`FieldSpec` (§4.2) by importing it from `eng_harness.basis._fields`, never from the package `eng_harness.basis`. That
+module imports only the standard library, `eng_contract` and `pydantic` (spec 0004 §4.1) and must keep doing so, so
+the import statements reachable from `eng_harness.block` gain no `eng_harness.basis` package, `eng_harness.templates`,
+`eng_harness.ports` or `eng_harness.journal`. This keeps spec 0005 AC42: its test
+`tests/rules/test_decision_imports.py::test_types_module_is_block_safe` follows the imports of
+`eng_harness.decisions.types` through `decisions/_rules.py` into `eng_harness.block`, and an import of the
+`eng_harness.basis` package there would reach `ports` and `journal` through `basis/_port.py` (an import inside a
+function would be found as well). The import of a private module is allowed because both modules are in
+`eng_harness`: 03 §3 rule 2 forbids importing another package's internal modules, and spec 0005's
+`decisions/_rules.py` already imports private names of `eng_harness.block`. The rules above still hold: block code
+gains one name, `FieldSpec`, a frozen data model with no I/O method, and still may not import `eng_harness.basis`.
+When Python loads `eng_harness.basis._fields` it also runs the package `eng_harness/basis/__init__.py`; that is a
+run-time load, not an import statement of block code, and Invariant 1's guard (§4.6) acts on the operations block
+code performs, not on which modules are loaded. No import cycle arises: `eng_harness.basis._fields` imports no
+`eng_harness` module. T6 of plan 0007 runs the AC42 test unchanged (EC4).
 
 ### 4.2 Blocks, workflows and the registry
 
@@ -517,9 +520,9 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   §4.10.2), `min_server_builds` (server name to an opaque build string compared by the HostPort, spec 0002),
   `always_ask` (tool names) and `options_model` (the command-line setup form, spec 0006; default `None`).
 - **Basis fields and copy on open (amendment B-415, spec 0004 Q7, spec 0007 Q2).** `WorkflowDef` also has
-  `basis_fields: tuple[FieldSpec, ...]` (default `()`; `FieldSpec` is spec 0004 §4.5's, re-exported by
-  `eng_harness.block` so that block modules, which may not import `eng_harness.basis` (§4.1.2), can declare them;
-  the indirect import this causes is accepted in §4.1.2) and
+  `basis_fields: tuple[FieldSpec, ...]` (default `()`; `FieldSpec` is spec 0004 §4.5's, exported by
+  `eng_harness.block` (imported from `eng_harness.basis._fields`, §4.1.2) so that block modules, which may not import
+  `eng_harness.basis`, can declare them) and
   `copy_on_open: bool` (default `False`, §4.7). The `workflow(...)` parameter `required_basis` defaults to `None`
   (it is `()` on build/v1), so that the engine can tell a `required_basis` passed beside `basis_fields` from one not
   passed; `WorkflowDef.required_basis` stays a tuple. When `basis_fields` is not empty, `workflow(...)` derives
@@ -800,6 +803,9 @@ input, append `run_started`; call the root block.
    since the last save is gone, so a reconciler could report `not_applied` for an edit that is only gone from memory);
    step 8 resolves it.
 8. Host-state check (§4.5.4) for every model the run wrote; a lost model is a mismatch.
+   8a. (Amendment B-415.) For each tool save reconciled `applied` (or journaled without its `model_saved`) whose
+   model passed the check, append its `model_saved` from the check's read (§4.6 "Tool saves", EC2). This appends to
+   the journal and calls no port, so the port order AC62 tests is unchanged.
 9. Call the root block from the start with the replay index.
 
 Reconciliation therefore never runs without the preflight, a lease, a loaded model and verified units on its host; a
@@ -926,7 +932,7 @@ before the host-state check, so that an engineer change made while the run was p
   `saved_file`, a `saved_file.sha256` that differs from the live `file_sha256` is also a mismatch (reason
   `host_state_mismatch`, handled by the engineer's choice as §4.5.4 states).
 - When that check passes for the model, the engine appends the `model_saved` (role `revision`) before the root block
-  is called (§4.5.1 step 9): `model_id` and `revision` from the result's `provenance.host`; `fingerprint` and
+  is called (§4.5.1 step 8a): `model_id` and `revision` from the result's `provenance.host`; `fingerprint` and
   `file_sha256` from the check's own `@resume<n>.model_state.<model_key>` read, which matched; `file_name` as for a
   live save. When the check stops the run, none is appended: `accept` journals its own `baseline` save, `restore`
   cuts the step (it runs again live), and `abandon` ends the run.
@@ -962,7 +968,8 @@ again.
   Exception (amendment B-415, spec 0007 Q3): a tool step with action `save` whose `ToolInfo.saves_new_file(args)` is
   true and whose `ToolInfo.overwrites_original(args)` is false gets no `p~pre.approve` preview: it changes no model
   content and writes no existing file. An in-place tool save and every other write keep their preview, and a save
-  over an original stays always-ask (EC6).
+  over an original stays always-ask (EC6). **[added: 11 §7 says every write step in `approve_each_write` shows its
+  dry-run change set; its row needs the matching amendment, which goes to the owner queue (Q28)]**
 - **`autonomous_logged`.** Writes run directly; a `ctx.approve` of kind `INFO` or `CHANGE_SET` is resolved by the mode
   (`approval_resolved`, `by: "mode:autonomous_logged"`) **[added: 11 §3 says approval behavior depends on the mode]**.
 - **Always ask, in every mode.** Approval kinds `PROMOTION` and `SIGN_OFF`; tools with `ToolInfo.action` `delete`; a
@@ -1277,8 +1284,8 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
 | Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |
 | Q25 | Spec 0010 Q10 and C2: code-pack checks reach the `CalcPort` through the one code-pack route (`_calc/_code_packs.py`, spec 0010 §4.3, spec 0013 §4.5), consulted for ids that do not start with `harness.`; an id outside its allowlist is `NOT_FOUND`; the run class applies as to calcs | Owner | Accept (§4.8, amendment B-405; draft until the owner approves) |
-| Q26 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, re-exported by `eng_harness.block`), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). The re-export loads `eng_harness.basis` (and through it the ports and the journal) wherever `eng_harness.block` is loaded; §4.1.2 accepts this. Owner choice: keep that, or later move `FieldSpec` to a module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code; recommended only if a block-module process ever runs without the engine) |
+| Q26 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which imports it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
 | Q27 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
-| Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6) |
+| Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
 | Q29 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
 | Q30 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
