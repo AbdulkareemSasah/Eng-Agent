@@ -77,8 +77,8 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   entries leaves the ETABS fingerprint unchanged; a SAFE server is checked against the SAFE fingerprint and a mismatch
   stops the run before any write (engine AC44). Tests: `tests/unit/servers/test_buildcheck.py::test_fingerprint_per_product`,
   `tests/contract/test_csi_allowlist.py::test_safe_fingerprint_from_inventory`,
-  `tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run` (the stop; it runs the real engine, plan
-  task T8; amendment B-413).
+  `tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run` (the stop; it runs the real engine and
+  needs `build_ports`, so it is written in plan 0002 task T19, which waits for plan task T3; amendment B-413).
 - AC5. Given an ETABS server and a SAFE server in one run and a timeout injected on the ETABS server, then
   `session_epoch` of the ETABS host key increases and that of the SAFE host key does not; launch ownership, wedge state
   and the pending reconciliation of one product never mark the other. Test:

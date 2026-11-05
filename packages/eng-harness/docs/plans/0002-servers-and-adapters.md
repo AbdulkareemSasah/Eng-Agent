@@ -426,6 +426,8 @@ tasks:
     # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16 and T19;
     # it also takes the two engine stops left out of T6b and T11 (AC9's engine clause, AC22), which fail at its base
     # because build_ports does not exist there yet.
+    # Amendment (B-413, documents only): also takes the SAFE engine stop test_safe_build_mismatch_stops_run (spec 0008
+    # AC4's stop) from plan 0008 T3 and T8, failing at its base for the same reason; it waits for plan 0008 T3.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -434,7 +436,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
       - "packages/eng-harness/tests/workflow/test_build_ports.py"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # test_build_mismatch_stops_run (from T6b, B-413)
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b) and the SAFE stop (from plan 0008), B-413
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
     max_changed_lines: 200
@@ -444,6 +446,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
     covers: [AC9, AC22, AC36, AC41]
     depends_on: [T17, T18, T20]
@@ -604,9 +607,14 @@ case is tested in `test_build_ports.py` with a synthetic routed allowlist (test 
 cycle has no route (AC41). The two engine stops moved out of T6b and T11 (B-413):
 `test_session.py::test_build_mismatch_stops_run`, a mismatched build stops the run before any write (AC9's engine
 clause, engine AC44); `test_units_after_timeout.py::test_units_trap`, the synthetic fault `units_left_changed` makes the
-engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). Both read the pinned
-fingerprint and the units through the allowlist loader and the ports, so they hold whether or not plan 0008 T1 (the
-per-product `[fingerprint]` header) has landed first.
+engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). The SAFE engine
+stop of spec 0008 AC4 (`test_session.py::test_safe_build_mismatch_stops_run`, a SAFE server whose build does not match
+the SAFE fingerprint stops the run before any write) is also T19's (B-413): plan 0008 has no later task that adds a
+source file the stop needs, so there it would pass at its merge base (test-first TF004). All three need `build_ports`
+from `src/eng_harness/adapters/__init__.py`, which this task adds, so they fail at its base. They read the pinned
+fingerprints and the units through the allowlist loader and the ports. T19 starts after plan 0008 T3 (the SAFE server
+section and per-product `[fingerprint]` header of 0008 T1, the SAFE fake mode of 0008 T2, the pinned SAFE fingerprint
+of 0008 T3).
 
 **T20 Framework additions for the IDEA adapter** (AC40 to AC42, spec §11 A3, B-085). `audit_log` on the server
 section (default true) and the argv builder `servers/_launch_args.py`, wired into `_session.py`, so the CSI argv stays
@@ -623,7 +631,9 @@ they are used (plan 0014 T5, T7, T8).
 - Work items: the engine plan's ([0001-engine](0001-engine.md)) T1 (package skeleton) before this plan's T1; its T6
   (ports, port data types and fakes) before T8; its run loop, invariants and replay tasks before the workflow and
   replay tests that run the real engine: T19 waits for engine 0001 T13, T15, T16 and T19 (T13 brings in T9 to
-  T12; B-413). No earlier task of this plan runs the real engine. `eng-contract`
+  T12; B-413). No earlier task of this plan runs the real engine. T19 also waits for plan
+  [0008-safe-adapter](0008-safe-adapter.md) T3 (and so its T1 and T2), because it writes the SAFE engine stop of spec
+  0008 AC4 (B-413). `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
 
 ## 4. Verification
