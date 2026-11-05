@@ -52,8 +52,7 @@ class Quantity(BaseModel):
     __neg__ = __pos__ = __abs__ = __round__ = _refuse
     __float__ = __int__ = __index__ = __bool__ = _refuse
 
-    # Spec 4.8 rule 4 says Fraction(value), which would make AC35 false; the shortest round-trip decimal is used
-    # instead (owner queue: amend the spec rule and AC36).
+    # Spec 4.8 rule 4 (amended by B-069): the shortest round-trip decimal enters the fraction.
     def _key(self) -> tuple[Dimension, Fraction, int]:
         u = UNITS[self.unit]
         return u.dimension, Fraction(repr(self.value)) * u.factor + u.offset, u.pi_power
