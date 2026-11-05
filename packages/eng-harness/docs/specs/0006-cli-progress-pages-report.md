@@ -868,23 +868,34 @@ heartbeat task runs on the engine loop.
 | AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
-| AC7, AC9, AC19 (engine half, plan T17), AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
-| AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
+| AC7, AC9, AC19 (engine half, plan T17), AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client; a task built before the engine it needs uses the staged-engine stand-in below, and plan T17 or T17c re-checks it with the real engine) | `tests/workflow/` |
+| AC8 (staged engine, re-checked in plan T17c), AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
-Staged engine (B-412): a workflow test whose task is built before the engine it needs has merged drives the port
-under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds the
-events to the sink) or with a fake engine from `CliDeps`; this holds for AC29 and AC37 (plan T7) and AC9 (plan T16).
-Plan T17 waits for the real engine with approvals (engine plan T15) and progress delivery (engine plan T18) and
-re-checks those criteria, and the engine half of AC19, with the real engine:
+Staged engine (B-412): a workflow or replay test whose task is built before the engine it needs has merged drives the
+port under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds
+the events to the sink) or with a fake engine from `CliDeps`. This holds for every such criterion: AC29 and AC37 (plan
+T7), AC42 (plan T9), AC7, AC8, AC46 and AC64 (plan T14), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
+T16). AC33, AC34 and AC35 are built only in plan T17, with the real engine. Plans T17 and T17c wait for the real engine
+with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery (engine plan
+T18). They re-check each staged criterion, and the engine half of AC19, with the real engine. Plan T17:
 `tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point` (AC9),
 `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (AC19),
 `tests/workflow/test_page_approval.py::test_answer_bound_to_hash_real_engine` (AC29) and
-`::test_page_confirms_after_commit_real_engine` (AC37).
+`::test_page_confirms_after_commit_real_engine` (AC37). Plan T17c:
+`tests/workflow/test_cli_run.py::test_run_completes_and_writes_report_real_engine` (AC7),
+`tests/replay/test_cli_resume.py::test_no_wait_then_resume_real_engine` (AC8),
+`tests/workflow/test_signoff.py::test_signoff_rules_real_engine` (AC42),
+`tests/workflow/test_cli_answers.py::test_form_request_answers_file_real_engine` (AC46),
+`tests/workflow/test_cli_basis.py::test_basis_confirmation_flow_real_engine` (AC47),
+`tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr_real_engine` (AC61),
+`tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime_real_engine` (AC63) and
+`tests/workflow/test_cli_answers.py::test_run_answers_first_data_request_real_engine` (AC64). The unit criteria
+(AC6, AC62 and the others of the unit rows) need no engine: their collaborators are recorders by design.
 
 No engineering value is computed here, so there are no golden engineering tests. Tests use the contract's `FixedClock`
 and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
