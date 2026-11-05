@@ -1,0 +1,128 @@
+# Case file of aci318_14.25_4_2_3.development_length_bottom_bars (clause spec §8; plan 0002 T8). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (0.001 mm on lengths, 1e-6 on ratios), with rel_tol 0 so that the absolute tolerance alone applies.
+# The unitless sf uses 0.001, tighter than the rounding of §8. X and Y bars are equal, so the two verdicts tie and the
+# first (X) is governing. The spec's BD-2 and BD-3 hold two inputs each; they are split into lettered cases here, with
+# the at-limit companions (fc = 17 MPa, fy = 550 MPa) and the second coating of the UNCOATED precondition.
+format: structural-codes-verification/1
+check_id: aci318_14.25_4_2_3.development_length_bottom_bars
+program_comparison:
+  not_available: "the host programs used by the footing workflow do not report development length of footing bars (plan 0002 §6 Q11)"
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4 steps 1 to 7, common inputs of §8, confinement at its limit"}
+    subject: {kind: footing, id: F1}
+    inputs: &common
+      Lx_mm: 2500
+      Ly_mm: 2500
+      cx_mm: 400
+      cy_mm: 400
+      db_x_mm: 16
+      db_y_mm: 16
+      s_x_mm: 200
+      s_y_mm: 200
+      cover_x_mm: 75
+      cover_y_mm: 75
+      end_cover_mm: 75
+      fc_MPa: 28
+      fy_MPa: 420
+      concrete_class: normalweight
+      coating: uncoated
+    expected:
+      status: PASS
+      values:
+        la_x_mm: {value: 975, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        la_y_mm: {value: 975, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        cb_x_mm: {value: 83, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        conf_x_ratio: {value: 2.5, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        ld_x_mm: {value: 461.803865, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ld_y_mm: {value: 461.803865, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.473645, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        demand: {value: 461.803865, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        capacity: {value: 975, unit: mm, abs_tol: 0.001, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 4, spacing governs cb: db = 25, cover = 50, s = 100"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, db_x_mm: 25, db_y_mm: 25, cover_x_mm: 50, cover_y_mm: 50, s_x_mm: 100, s_y_mm: 100}
+    expected:
+      status: PASS
+      values:
+        cb_x_mm: {value: 50, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        conf_x_ratio: {value: 2.0, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        ld_x_mm: {value: 901.960674, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ld_y_mm: {value: 901.960674, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.925088, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 6 floor ld_min: db = 10, cover = 75, s = 200"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, db_x_mm: 10, db_y_mm: 10}
+    expected:
+      status: PASS
+      values:
+        ld_eq_x_mm: {value: 288.627416, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ld_x_mm: {value: 300, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.307692, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-4
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 2 cap on sqrt(fc): HC-2 with fc = 80 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs:
+      {<<: *common, db_x_mm: 25, db_y_mm: 25, cover_x_mm: 50, cover_y_mm: 50, s_x_mm: 100, s_y_mm: 100, fc_MPa: 80}
+    expected:
+      status: PASS
+      values:
+        sf: {value: 8.3, unit: "1", abs_tol: 0.001, rel_tol: 0}
+        ld_x_mm: {value: 575.027382, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.589772, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1
+    kind: boundary
+    covers: [ANCHORAGE_POSITIVE]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, end_cover_mm: 1050}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.a
+    kind: boundary
+    covers: [UNCOATED, G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, coating: epoxy}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.b
+    kind: boundary
+    covers: [UNCOATED, G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, coating: zinc_epoxy_dual}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.c
+    kind: boundary
+    covers: [NORMALWEIGHT, G-1]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, concrete_class: lightweight}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.a
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 16}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.b
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 17}
+    expected: {status: PASS}
+  - id: BD-3.c
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.d
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 550}
+    expected: {status: PASS}
+review: null
