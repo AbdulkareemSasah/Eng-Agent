@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Progress display: `eng_harness.progress` with `ExpectedTimes.build` (read-only journals, median, range and sample floor), `estimate` and `ProgressRenderer` for terminal, plain and JSON modes, with golden snapshots; the sink, heartbeat task and JSON-mode heartbeat follow in T5 (plan 0006 T4, B-178; spec 0006 AC15 to AC17).
+
 - Freeze and storage: `freeze` (answer checked against the draft, `engineer:<by>@<at>` stamped from the answer, `basis.design_basis/1` stored with every field confirmed), `FrozenBasis`, `StoreBasisPort` (engine `BasisPort` over the contract `ResultStore`), `BasisNotConfirmed` and `BasisIncomplete` in `eng_harness.basis` (plan 0004 T8, B-162; spec 0004 AC22 to AC25).
 - Step paths and scopes: `engine/_steps.py` (path grammar and validation, inserted and housekeeping paths, `op_id`, scope counter with overlap detection, `step`, `block_step`, `parallel` with the error choice by class rank and lowest index, and the attempts iterator) (plan 0001 T8, B-107; spec 0001 AC5 to AC8).
 - Basis setup interface: `BasisSetupView`, `BasisSetupAnswer` (confirmed sections or a rejection, no member that carries a value, extra members refused), `BasisSetupPort` and `build_setup_view` in `eng_harness.basis` (plan 0004 T7, B-161; spec 0004 AC26, AC27).

@@ -80,4 +80,7 @@ def test_heartbeat_line() -> None:
     for event in _events()[:4]:
         renderer.feed(event)
     line = renderer.heartbeat_line(START_MS + 35_000, 4)
-    assert line == "heartbeat: analyze still running, 00:30, expected ~00:50 (00:40 to 01:10, 3 earlier runs), journal seq 4\n"
+    assert (
+        line
+        == "heartbeat: analyze still running, 00:30, expected ~00:50 (00:40 to 01:10, 3 earlier runs), journal seq 4\n"
+    )
