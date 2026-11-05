@@ -25,3 +25,6 @@ Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 Plan 0004 (templates and basis; completed by T9). Nothing here runs in CI:
 1. The owner fills a values file and uses the spec 0006 approval page on a real template.
 2. The owner writes a template by hand in the user folder on Windows and checks the path, the encoding and the line endings.
+
+Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
+15. `eng_harness.cli._opener.open_address` opens the launch address in the default browser on Windows (`os.startfile`), macOS and Linux with `BROWSER` set to a capture program (it must not run), and `write_to_terminal` reaches the controlling terminal (`CONOUT$`, `/dev/tty`); with no terminal it returns False and nothing is printed on stdout or stderr.
