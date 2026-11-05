@@ -110,8 +110,9 @@ label, so it comes first after the skeleton and its tests pin that no unconfirme
 Reuse: the core overlay entries (`Overridden`, `Inherited`), `NotImplementedGap` and the lifecycle (CF §4.4, §4.8,
 §4.11); the base input models from `aci318_14`. Nothing is copied from the ACI pack.
 
-Start condition: core plan 0001 T10 (overlay), T11 (lifecycle), T12 (command line) and T14a (public modules declared;
-amendment B-385) merged; ACI plan 0002 T1 (shared
+Start condition: core plan 0001 T10 (overlay), T11 (lifecycle), T12 (command line), T14a (public modules declared;
+amendment B-385) and T14b (`structural_codes.lifecycle` in public_modules, without which
+`tests/unit/test_pack.py::test_all_draft` fails IM002; amendment B-419) merged; ACI plan 0002 T1 (shared
 folder files) before T1, and plan 0002 T9 (ACI pack registered) before T2. T4 needs ACI plan 0004 T5 (column checks
 registered); until then those three checks get the missing-row default `G-0` (SP AC3), so plan 0004 T5 never breaks
 this pack. Ordering: SP AC1 compares the module with the CM §3 rows of every *registered* base check, so the rows T2
