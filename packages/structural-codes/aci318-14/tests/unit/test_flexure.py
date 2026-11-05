@@ -232,46 +232,51 @@ _ROW_INPUTS: dict[str, Any] = {
     "As_x_mm2": 3000.0,
     "As_y_mm2": 2500.0,
 }
-_ROW_NAMES = ("beta1_ratio", "a_x_mm", "c_x_mm", "eps_t_x_ratio", "Mn_x_kNm", "phiMn_x_kNm", "a_y_mm", "c_y_mm")
-_ROW_NAMES += ("eps_t_y_ratio", "Mn_y_kNm", "phiMn_y_kNm")
-_ROW_TOL = (_RATIO, _MM, _MM, _RATIO, _M_KNM, _M_KNM, _MM, _MM, _RATIO, _M_KNM, _M_KNM)
+_ROW_QUANTITIES: tuple[tuple[str, float], ...] = (("a_{}_mm", _MM), ("c_{}_mm", _MM), ("eps_t_{}_ratio", _RATIO))
+_ROW_QUANTITIES += (("Mn_{}_kNm", _M_KNM), ("phiMn_{}_kNm", _M_KNM))
 
 
 @pytest.mark.parametrize(
-    ("fc", "values", "ratios"),
+    ("fc", "beta1", "x_row", "y_row"),
     [
         (
             25.0,
-            (0.85, 19.764706, 23.252595, 0.061509, 617.548235, 555.793412)
-            + (24.705882, 29.065744, 0.043446, 459.529412, 413.576471),
-            (0.489390, 1.157787),
+            0.85,
+            (19.764706, 23.252595, 0.061509, 617.548235, 555.793412, 0.489390),
+            (24.705882, 29.065744, 0.043446, 459.529412, 413.576471, 1.157787),
         ),
         (
             40.0,
-            (0.764286, 12.352941, 16.162727, 0.089806, 622.217647, 559.995882)
-            + (15.441176, 20.203408, 0.063820, 464.393382, 417.954044),
-            (0.485718, 1.145660),
+            0.764286,
+            (12.352941, 16.162727, 0.089806, 622.217647, 559.995882, 0.485718),
+            (15.441176, 20.203408, 0.063820, 464.393382, 417.954044, 1.145660),
         ),
         (
             60.0,
-            (0.65, 8.235294, 12.669683, 0.115393, 624.811765, 562.330588)
-            + (10.294118, 15.837104, 0.082243, 467.095588, 420.386029),
-            (0.483701, 1.139032),
+            0.65,
+            (8.235294, 12.669683, 0.115393, 624.811765, 562.330588, 0.483701),
+            (10.294118, 15.837104, 0.082243, 467.095588, 420.386029, 1.139032),
         ),
     ],
 )
-def test_every_quantity_in_each_beta1_row(fc: float, values: tuple[float, ...], ratios: tuple[float, float]) -> None:
-    """Rows fc <= 28, between and >= 55 of Table 22.2.2.4.3: a, c, eps_t, Mn, phiMn and the ratio, X and Y (§4)."""
+def test_every_quantity_in_each_beta1_row(
+    fc: float, beta1: float, x_row: tuple[float, ...], y_row: tuple[float, ...]
+) -> None:
+    """Rows fc <= 28, between and >= 55 of Table 22.2.2.4.3: a, c, eps_t, Mn, phiMn and the ratio, X and Y (§4).
+
+    Each row tuple is (a, c, eps_t, Mn, phiMn, ratio) of its direction.
+    """
     payload = run(fc_MPa=fc, **_ROW_INPUTS)
     found = steps(payload)
-    for name, value, tol in zip(_ROW_NAMES, values, _ROW_TOL, strict=True):
-        assert found[name] == pytest.approx(value, abs=tol), name
+    assert found["beta1_ratio"] == pytest.approx(beta1, abs=_RATIO)
     x, y = payload.verdicts
-    assert x.demand is not None
-    assert y.demand is not None
-    assert x.demand.value == pytest.approx(272.0, abs=_M_KNM)
-    assert y.demand.value == pytest.approx(478.833333, abs=_M_KNM)
-    assert (x.ratio, y.ratio) == (pytest.approx(ratios[0], abs=_RATIO), pytest.approx(ratios[1], abs=_RATIO))
+    demands = {"x": 272.0, "y": 478.833333}
+    for s, row, verdict in (("x", x_row, x), ("y", y_row, y)):
+        for (name, tol), value in zip(_ROW_QUANTITIES, row[:-1], strict=True):
+            assert found[name.format(s)] == pytest.approx(value, abs=tol), name.format(s)
+        assert verdict.demand is not None
+        assert verdict.demand.value == pytest.approx(demands[s], abs=_M_KNM), s
+        assert verdict.ratio == pytest.approx(row[-1], abs=_RATIO), s
     assert [x.status, y.status] == [VerdictStatus.PASS, VerdictStatus.FAIL]
 
 
