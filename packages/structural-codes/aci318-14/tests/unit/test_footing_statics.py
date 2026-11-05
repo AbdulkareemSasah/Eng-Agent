@@ -272,6 +272,17 @@ def test_rectangular_statics(
         ("R1-MX", {"MX_kNm": -100.0}, (262.5, 385.777778), (240.0, 395.2)),
         # MY only: X as R1; Y is uniform, Vu_y = 2.0*0.7*250, Mu_y = 2.0*250*1.2^2/2.
         ("R1-MY", {"MY_kNm": -150.0}, (327.46875, 350.0), (292.8, 360.0)),
+        # R2 (e = 500 mm, MX = MY = 0): the integrals read the base moments of FS S2, Mbx = -50 and Mby = -100 kN.m
+        # (one-way and flexure specs §4 step 3), not the raw reaction moments, which are zero here.
+        # Vu_x = 3.0*0.35*(250 + 100*0.825/2.0); Vu_y = 2.0*0.7*(250 + 50*1.15/4.5);
+        # Mu_x = 3.0*(250*0.8^2/2 + (100/2.0)*0.234667); Mu_y = 2.0*(250*1.2^2/2 + (50/4.5)*0.792), where
+        # 0.234667 and 0.792 m^3 are the integrals of x*(x - c/2) from the face to the edge.
+        (
+            "R2",
+            {"FX_kN": 200.0, "FY_kN": -100.0, "reaction_height_mm": 500.0},
+            (305.8125, 367.888889),
+            (275.2, 377.6),
+        ),
     ],
 )
 def test_rectangular_integrals(
