@@ -423,7 +423,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-380 | C.T4b | Calc kinds part 2 (design summary, section size, placement comparison, readback check payloads) | sonnet, high | opus, medium | [#187](https://github.com/AbdulkareemSasah/Eng-Agent/pull/187) | done (e7d5912) |
 | B-381 | docs | Codes core plan T14a: declare the existing public modules before the packs need them | lead | opus, low | [#190](https://github.com/AbdulkareemSasah/Eng-Agent/pull/190) | done (f7a4dd3) |
 | B-382 | K.T14a | Public API declaration of the public modules that exist (packs import them) | sonnet, low | opus, low | [#192](https://github.com/AbdulkareemSasah/Eng-Agent/pull/192) | done (a4e1ce3) |
-| B-383 | docs | Gate spec AC53c and plan T38: the mutation backend run is bounded by limits.mutation_run_seconds | lead | opus, low | [#195](https://github.com/AbdulkareemSasah/Eng-Agent/pull/195) | open |
+| B-383 | docs | Gate spec AC53c and plan T38: the mutation backend run is bounded by limits.mutation_run_seconds | lead | opus, low | [#195](https://github.com/AbdulkareemSasah/Eng-Agent/pull/195) | done (d41a872) |
 | B-384 | T38 | mutation step: the backend run is bounded by limits.mutation_run_seconds, not by the bound of one tool call | sonnet, medium | opus, medium | — | not started or in writing |
 | B-385 | docs | Codes core T13 golden test renamed (duplicate basename); pack plans start after core T14a | lead | opus, low | [#196](https://github.com/AbdulkareemSasah/Eng-Agent/pull/196) | done (0aea788) |
 | B-386 | docs | Model edit cycle T1 split into T1a (kinds) and T1b (change-set model) | lead | opus, low | [#197](https://github.com/AbdulkareemSasah/Eng-Agent/pull/197) | open |
@@ -432,7 +432,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-389 | S.T3b | Process listings leave out processes the engine may not open; close() documented as ending a Windows job | sonnet, medium | opus, medium | — | not started or in writing |
 | B-390 | docs | Engine spec 4.8: synchronous and asynchronous port methods and the port shapes T6 settled | lead | opus, low | [#199](https://github.com/AbdulkareemSasah/Eng-Agent/pull/199) | open |
 | B-391 | docs | eng-contract follow-ups as spec text and plan tasks T17 (B-095) and T18 (B-084) | lead | opus, low | [#200](https://github.com/AbdulkareemSasah/Eng-Agent/pull/200) | open |
-| B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | — | not started or in writing |
+| B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | [#203](https://github.com/AbdulkareemSasah/Eng-Agent/pull/203) | open |
 | B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | — | not started or in writing |
 | B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-395 | X.T4 | Calcs harness.footing_plan_size and harness.footing_resize | sonnet, high | opus, medium + verifiers | — | not started or in writing |
