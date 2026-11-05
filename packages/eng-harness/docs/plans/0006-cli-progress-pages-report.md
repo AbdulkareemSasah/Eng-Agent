@@ -156,6 +156,7 @@ tasks:
     # Amendment (B-412, documents only): pages/__init__.py added; stop-file protocol of spec 4.4.8; dispatch mapping with refusal fallback; report callable; engine stand-in in workflow tests.
     # Amendment (B-412 fourth review, documents only): tests/helpers/engine_standin.py added (the shared engine stand-in that T9 imports).
     # Amendment (B-412 fifth review, documents only): the page ports take the stop check by injection (pages may not import cli).
+    # Amendment (B-412 ninth review, documents only): paragraph no longer lists FileRunControl as T7 work (it is T7b's).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli, eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -223,6 +224,7 @@ tasks:
     # Amendment (B-412, documents only): pages/_ports.py added to register the four screens in the PageApp dispatch; the AC42 test injects a stub report callable.
     # Amendment (B-412 third review, documents only): the AC42 workflow test uses the test-local engine stand-in of T7; T17c re-checks AC42 with the real engine.
     # Amendment (B-412 fourth review, documents only): the stand-in is imported from tests/helpers/engine_standin.py (T7's file), not duplicated.
+    # Amendment (B-412 ninth review, documents only): the page ports gain a marks (ReleaseMarks) parameter for the sign-off screen; T14 binds it.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -336,6 +338,7 @@ tasks:
     # Amendment (B-412 fifth review, documents only): the engine factory takes the full port set; its default maps only the fields the merged EnginePorts holds (T16b completes it); the page ports' stop check bound to FileRunControl.
     # Amendment (B-412 seventh review, documents only): run-id cell behind the page ports' stop check and report (spec 4.4.8) and its test; calc-port factory field; AC9 in covers; budget 360 -> 390.
     # Amendment (B-412 eighth review, documents only): depends on T7b (cli/_control.py); port builder takes the run folder from the cell; calc-port factory arguments fixed; ExpectedTimes index; budget 390 -> 400.
+    # Amendment (B-412 ninth review, documents only): resume removes a stale stop file at the start of the command (spec 4.4.8); ReleaseMarks from [project_lane.*] built in _wiring.py; paragraph budget text fixed to 400.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -374,6 +377,7 @@ tasks:
     # Amendment (B-412 fifth review, documents only): the cascade goes into the factory's port set; the merged EnginePorts has no decision field yet, so T16b carries it to the real engine.
     # Amendment (B-412 sixth review, documents only): the cascade builder is the CliDeps field decision_port_factory (default None, plan 0005 T7 and T10 not merged); test_decision_wiring.py injects a recorder; T18 binds it.
     # Amendment (B-412 eighth review, documents only): the first interrupt reads the run-id cell; empty cell or missing run folder ends the process (exit 130); budget 120 -> 135.
+    # Amendment (B-412 ninth review, documents only): decision_assembler call arguments fixed; the point policies of step 5 are supplied inside its default (T18).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -451,6 +455,7 @@ tasks:
     # Amendment (B-412 fifth review, documents only): new; waits for engine plan T14, T14b and T18 (EnginePorts gains the decision, progress and run-control fields); the one non-test task that completes cli/_wiring.py for them.
     # Amendment (B-412 seventh review, documents only): the fan-out isolates each sink; run_started fills the run-id cell of T14; second test node; budget 100 -> 130.
     # Amendment (B-412 eighth review, documents only): starts the heartbeat task (spec 4.3) with its run folder from the run-id cell; third test node; AC18 in covers; budget 130 -> 150.
+    # Amendment (B-412 ninth review, documents only): AC19 in covers (the fan-out path of spec AC19, test_failing_sink_detached_alone); spec AC9, AC18, AC37 and section 9 name its nodes.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
@@ -463,7 +468,7 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_production_wiring.py::test_engine_ports_carry_stop_progress_and_cascade"
       - "packages/eng-harness/tests/unit/cli/test_production_wiring.py::test_failing_sink_detached_alone"
       - "packages/eng-harness/tests/unit/cli/test_production_wiring.py::test_heartbeat_follows_run_id_cell"
-    covers: [AC9, AC18, AC37, AC62]
+    covers: [AC9, AC18, AC19, AC37, AC62]
     depends_on: [T14b, T16]
   - id: T17
     title: "End-to-end approval, replay and untrusted-text tests; Arabic environment; real-engine re-checks"
@@ -623,7 +628,7 @@ is the loopback client used by all page tests. Security lens review.
 
 **T7 Answers and ports** (spec §4.4.5). `ApprovalSubmission` and the answer models in `pages/_answers.py` (no value members), the checks,
 `PageApprovalPort` and `PageInputPort` (present, awaitable answer, `wait=False`, stop, timeout), the per-request lock,
-acknowledgement after the sink sees `approval_resolved`, `FileRunControl` (stop file). Security lens review.
+acknowledgement after the sink sees `approval_resolved` (`FileRunControl` moved to T7b, see (2)). Security lens review.
 Amendment B-412: (1) T7 exports `PageApprovalPort` and `PageInputPort` from `pages/__init__.py`. (2) The stop-file
 protocol of spec §4.4.8 is T7b's (amendment B-412 eighth review: it moved out of T7, whose estimate with it passed the
 400-line cap); T7's wait only polls the injected `stop_requested` callable. (3)
@@ -665,7 +670,8 @@ with an independent reachability oracle on random graphs.
 **T9 Approval screens** (spec §4.4.6). Change set, promotion, info and sign-off with the exception and
 acknowledgement rules; `_labels.py` catalog; snapshots. Amendment B-412: T9 registers the `CHANGE_SET`, `PROMOTION`,
 `INFO` and `SIGN_OFF` builders in the dispatch mapping of `pages/_ports.py` (T7); the AC42 test injects a stub
-`report` callable. Amendment B-412 third review: `test_signoff_rules` opens the `SIGN_OFF` request through the
+`report` callable. The page ports gain a `marks: ReleaseMarks` parameter for the sign-off screen, which T14 binds
+(amendment B-412 ninth review). Amendment B-412 third review: `test_signoff_rules` opens the `SIGN_OFF` request through the
 test-local engine stand-in of T7, imported from `tests/helpers/engine_standin.py` (engine approvals, engine plan T15, are not merged when T9 is built); T17c re-checks
 AC42 with the real engine.
 
@@ -696,22 +702,26 @@ per section, an estimate, not a measurement).
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
-tests. Budget 360 lines (340 before the B-412 review). The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
+tests. Budget 400 lines (340 before the B-412 reviews; see the amendments below). The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
 FILE` (AC64): the object is checked in step 2 and the page `InputPort` is wrapped in `_wiring.py` so that the first data
 request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340). Amendment
 B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
 `resume` handlers there. Its fields include the engine factory, bound at once to the merged `eng_harness.engine.Engine`
 (engine plan T9 and T9b), and the workflow-registry field (default `None`; T18 binds it to the registry of
 `workflows/__init__.py` once plan 0010 T9 merges, which plan 0010 T9 relies on) (amendment B-412 fourth review); `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
-and store, and their stop check to `FileRunControl`. Amendment B-412 fifth review: the engine-factory field takes the
+and store, and their stop check to `FileRunControl`; it builds `ReleaseMarks` from the configuration's
+`[project_lane.<tool>]` tables for `build_report` and the page ports (amendment B-412 ninth review). Amendment B-412 fifth review: the engine-factory field takes the
 full port set that `_wiring.py` builds (the six ports of the merged `EnginePorts`, plus the `DecisionPort`, the
 `ProgressSink` and the `RunControlPort` of spec §4.2.2 step 5), so a fake engine from `CliDeps` sees all of them; the
 default factory maps into `EnginePorts` only the fields the merged `EnginePorts` holds (engine plan T9: tool, host,
 calc, basis, approvals, inputs). Until T16b, `_wiring.py` therefore builds the merged `EnginePorts` only, and the
 decision, progress and run-control ports do not reach the real engine; T18, which makes `run` and `resume` available
 with the default `CliDeps()`, follows T16b, so production never runs without them. T14 also owns the stop-file removals of spec §4.4.8 in `cli/_run.py`: the run process removes `stop.json`
-when `Engine.start` or `Engine.resume` returns while the file exists, and `resume` removes a stale one before
-`Engine.resume`; `test_stop_file_removed_on_return_and_before_resume` checks both with a fake engine from `CliDeps`
+when `Engine.start` or `Engine.resume` returns while the file exists, and `resume` removes a stale one at the start
+of the command, before step 1 and before `cli/_signals.py` installs its handler, never just before `Engine.resume`
+(amendment B-412 ninth review, spec §4.4.8), so a file the first interrupt writes during step 1 or step 5 is kept;
+`test_stop_file_removed_on_return_and_before_resume` checks both with a fake engine from `CliDeps`, including a stop
+file written after the stale-file removal, which the fake engine must still see
 (about 20 lines, hence 340 to 360). AC9 is covered by T16 (the stop command) and by T14 (these removals).
 Amendment B-412 seventh review: (a) the page ports' `stop_requested` and `report` need the run id, which for `run`
 exists only once `Engine.start` has created it; `_wiring.py` binds both through the run-id cell of spec §4.4.8,
@@ -744,7 +754,7 @@ assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `D
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
 the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
 `cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they default to `None` (the
-decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18 binds the defaults once plan 0009 T1 and T10 have merged. The
+decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18 binds the defaults once plan 0009 T1 and T10 have merged. `_wiring.py` calls the assembler as `decision_assembler(providers_config, decision_settings, workspace)`; the point policies of step 5 (spec Q16) are supplied inside its default (T18), as the collaborator map of §3 states (amendment B-412 ninth review). The
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`. Amendment B-412 eighth review:
 `cli/_signals.py` reads the run-id cell of T14; while the cell is empty or the run folder does not exist yet (steps 1
 to 4 of spec §4.2.2, the basis screen included, or the start of `Engine.start`), the first interrupt ends the process
@@ -945,6 +955,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Basis screen port `PageBasisSetupPort` and the `setup` kind (step 3, §4.4.7) | none (`pages/_ports.py`) | not applicable | T15 |
 | Calc preflight (step 4) | none: `preflight` of the calc port built by `calc_port_factory` | T18 (through `calc_port_factory`) | plan 0003 T5 |
 | Decision-runtime assembler `assemble_decision_runtime` and `DecisionSettings` from the configuration (step 5) | T14b (`decision_assembler`) | T18 | plan 0009 T10; `DecisionSettings` merged (`decisions/_policy.py`) |
+| Point policies for the release check of `assemble_decision_runtime`: a mapping from each point name to its `DecisionPolicy` (step 5; spec 0009 AC42; spec Q16; amendment B-412 ninth review) | none: supplied inside the `decision_assembler` default, which `cli/_wiring.py` calls as `decision_assembler(providers_config, decision_settings, workspace)` (as the calc registry is supplied inside the `calc_port_factory` default) | T18 (through `decision_assembler`) | workflow code `policies/` (spec 0005 §4.3 and section 5); no task creates the mapping yet, and plan 0009 T10 fixes the assembler's arguments under spec Q16 (owner queue) |
 | Cascade as the `DecisionPort` (step 5) | T14b (`decision_port_factory`) | T18 | plan 0005 T7 (`Cascade`) and T10 (engine wiring); reaches the real `EnginePorts` in T16b (engine plan T14) |
 | `ExpectedTimes` index, built once before the engine starts (spec §4.3; amendment B-412 eighth review) | none (`cli/_wiring.py`, T14) | not applicable | merged (`progress/_expected.py`, T4) |
 | `TerminalProgress` as the `ProgressSink` (step 5) | none (built by `cli/_wiring.py`, T14, with the `ExpectedTimes` index) | not applicable | T5; reaches the real `EnginePorts` in T16b (engine plan T18) |
@@ -959,6 +970,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Page ports' stop check `stop_requested` (§4.4.5 step 2) | none (injected into the page ports, T7) | bound to `FileRunControl` through the run-id cell by T14 (`cli/_wiring.py`) | T7 |
 | Page ports' `report` callable (§4.4.3 `GET /report`) | none (injected into the page ports, T7) | bound to `build_report` through the run-id cell by T14 (`cli/_wiring.py`) | T13 (`build_report`) |
 | Engine factory (step 5) | T14 | T14 | merged (engine plan T9 and T9b); the full port mapping by T16b |
+| `ReleaseMarks` from the `[project_lane.<tool>]` tables of the configuration (spec §4.6.3, Q5; amendment B-412 ninth review) | none (built in `cli/_wiring.py`, T14, from the merged `HarnessConfig.project_lane`) | not applicable | merged (`report/_lineage.py`, T8; `cli/_config.py`, T3); passed by T14 to `build_report` (step 6 and the page ports' `report` callable) and to the page ports for the sign-off screen (AC42, AC54), whose `marks` parameter T9 adds in `pages/_ports.py` |
 | Report at the end (step 6) | none | not applicable | T13 (`build_report`, `write_report`), called by T14 |
 | Outcome to exit code (step 6, §4.2.3) | none (`cli/_run.py`, T14) | not applicable | merged (`cli/_exit.py`, T3) |
 | Stop-file removals (§4.4.8) | none (`cli/_run.py`) | not applicable | T14 |
