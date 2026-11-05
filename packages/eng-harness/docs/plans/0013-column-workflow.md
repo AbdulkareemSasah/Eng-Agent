@@ -432,7 +432,7 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
 - Runtime: no new third-party package. T6 makes `eng-harness` depend on the workspace packages `structural-codes` and
   `aci318-14` (the layering of CF §1); whether an internal workspace dependency needs a package ADR is spec Q12, and T6
   waits for that answer or writes the ADR. Development: none new.
-- Before T1: plan 0003 T4 (kind registration) and plan 0007 T1 (edit-cycle kinds).
+- Before T1: plan 0003 T4 (kind registration) and plan 0007 T1a (edit-cycle kinds; T1 was split, amendment B-386).
 - Before T2 to T5, T7, T8: plan 0003 T1 to T6 (calc framework, golden infrastructure); T5 also needs plan 0003 T11
   (`harness.section_round`); T7 and T8 need plan 0011 T6 (Revit kinds and role map) and T12 (`harness.frame_element_map`).
 - Before T6: plan 0003 T5 (`HarnessCalcPort`); structural-codes core plan 0001 T8 (`evaluate_batch`) and T11 (lifecycle
