@@ -1,0 +1,9 @@
+{"at": "2026-01-01T00:00:00.000Z", "event": "run_started", "path": null, "name": "w", "elapsed_ms": 0, "expected_ms": null}
+{"at": "2026-01-01T00:00:00.000Z", "event": "step_started", "path": "0", "name": "read_model", "elapsed_ms": 0, "expected_ms": null}
+{"at": "2026-01-01T00:00:05.000Z", "event": "step_completed", "path": "0", "name": "read_model", "elapsed_ms": 5000, "expected_ms": null}
+{"at": "2026-01-01T00:00:05.000Z", "event": "step_started", "path": "1", "name": "analyze", "elapsed_ms": 0, "expected_ms": 50000}
+{"at": "2026-01-01T00:00:20.000Z", "event": "approval_requested", "path": null, "name": "Apply change", "elapsed_ms": 0, "expected_ms": null}
+{"at": "2026-01-01T00:00:50.000Z", "event": "approval_resolved", "path": null, "name": "Apply change", "elapsed_ms": 30000, "expected_ms": null}
+{"at": "2026-01-01T00:01:05.000Z", "event": "step_completed", "path": "1", "name": "analyze", "elapsed_ms": 60000, "expected_ms": 50000}
+{"at": "2026-01-01T00:01:05.000Z", "event": "model_saved", "path": null, "name": "a.edb", "elapsed_ms": null, "expected_ms": null}
+{"at": "2026-01-01T00:01:10.000Z", "event": "run_completed", "path": null, "name": "w", "elapsed_ms": 70000, "expected_ms": null}
