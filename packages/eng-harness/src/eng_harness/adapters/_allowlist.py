@@ -19,6 +19,7 @@ __all__ = ["Allowlist", "AllowlistError", "load_allowlist"]
 _DENY = re.compile(
     r"csi_(run_script|db_tables_apply|invoke|object_(add|delete|set|get))|idea_run_script|compile_and_run"
     r"|revit_send_code_to_revit|dev_hot_(run|unload)|run_baked_tool|batch_execute|run_synapse_command"
+    r"|revit_(accept|dismiss)_bake_suggestion|revit_list_bake_suggestions"
 )
 _MARKERS = ("script", "invoke", "eval", "tables_apply")
 _Commit = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
