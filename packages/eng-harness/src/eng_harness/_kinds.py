@@ -30,4 +30,4 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.approval_preview/1": ApprovalPreview,
     }
 ).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS)
-"""The neutral kinds, the four harness kinds, calc kinds (0003 4.6 to 4.11), footing kinds (0010 4.2) and edit-cycle kinds."""
+"""The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2) and edit-cycle kinds."""
