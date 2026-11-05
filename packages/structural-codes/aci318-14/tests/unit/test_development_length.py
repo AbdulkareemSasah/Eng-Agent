@@ -59,6 +59,7 @@ def run(subject: Subject = FOOTING, **changes: Any) -> VerdictSet:
     ("changes", "precondition", "gap"),
     [
         ({"end_cover_mm": 1050.0}, "ANCHORAGE_POSITIVE", None),
+        ({"cx_mm": 2350.0}, "ANCHORAGE_POSITIVE", None),
         ({"cy_mm": 2350.0}, "ANCHORAGE_POSITIVE", None),
         ({"coating": "epoxy"}, "UNCOATED", "G-2"),
         ({"coating": "zinc_epoxy_dual"}, "UNCOATED", "G-2"),
@@ -71,7 +72,8 @@ def run(subject: Subject = FOOTING, **changes: Any) -> VerdictSet:
 def test_preconditions(changes: dict[str, Any], precondition: str, gap: str | None) -> None:
     """BD-1 to BD-3: one NEEDS_ENGINEER verdict naming the precondition (and its gap); the body does not run (DL-AC2).
 
-    `cy = 2350 mm` leaves `la_y = 1250 - 1175 - 75 = 0` with `la_x > 0`: one direction alone fails the precondition.
+    `cx = 2350 mm` leaves `la_x = 1250 - 1175 - 75 = 0` with `la_y = 975 > 0`, and `cy = 2350 mm` the mirror case:
+    either direction alone fails the precondition.
     """
     payload = run(**changes)
     assert len(payload.verdicts) == 1
