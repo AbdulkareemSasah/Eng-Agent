@@ -1,5 +1,6 @@
 """HarnessCalcPort: describe, run, preflight, run class, limits and storage (plan 0003 T5; spec 0003 AC11 to AC18)."""
 
+import dataclasses
 import importlib.util
 import sys
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import Any
 
 import pytest
 from eng_contract.envelope import FailureEnvelope, Provenance, RefInput, SuccessEnvelope
-from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.errors import ContractError, ErrorCode, WarningCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import ResultStore
 from pydantic import JsonValue
@@ -21,6 +22,7 @@ from eng_harness.errors import CalcRefused, HarnessCode
 from eng_harness.ports import RunClass
 
 HASH = "cd" * 32
+VERIFIED_ID = "harness.port_verified"
 _PATH = Path(__file__).resolve().parents[2] / "data" / "calcs" / "port_calcs.py"
 APPROVAL = {
     "calc_id": "harness.port_sum",
@@ -68,7 +70,14 @@ class Rig:
     """A port over a store that counts `put` calls."""
 
     def __init__(
-        self, fx: ModuleType, tmp_path: Path, run_class: RunClass, *, approvals: ApprovalsFile, max_items: int
+        self,
+        fx: ModuleType,
+        tmp_path: Path,
+        run_class: RunClass,
+        *,
+        approvals: ApprovalsFile,
+        max_items: int,
+        basis_fields: dict[str, list[str]] | None = None,
     ):
         from eng_contract.store import LocationClass, Workspace
 
@@ -79,9 +88,17 @@ class Rig:
         self.store = _CountingStore(
             Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), kinds, self.ids, clock
         )
-        registry = CalcRegistry(kinds, [fx.port_sum], hasher=lambda _: HASH)
+        verified = dataclasses.replace(fx.port_sum, id=VERIFIED_ID, verification="verified")
+        registry = CalcRegistry(kinds, [fx.port_sum, verified], hasher=lambda _: HASH)
         self.port = HarnessCalcPort(
-            registry, approvals, self.store, CalcSettings(max_items=max_items), run_class, clock, self.ids
+            registry,
+            approvals,
+            self.store,
+            CalcSettings(max_items=max_items),
+            run_class,
+            clock,
+            self.ids,
+            basis_fields=basis_fields,
         )
 
     def source(self, value: dict[str, JsonValue], kind: str | None = None) -> str:
@@ -106,11 +123,12 @@ def make(
     approved: bool = False,
     withdrawn: bool = False,
     max_items: int = 100,
+    basis_fields: dict[str, list[str]] | None = None,
 ) -> Rig:
     approvals = ApprovalsFile.model_validate(
         {"schema": 1, "approvals": [APPROVAL] if approved else [], "withdrawn": [WITHDRAWN] if withdrawn else []}
     )
-    return Rig(fx, tmp_path, run_class, approvals=approvals, max_items=max_items)
+    return Rig(fx, tmp_path, run_class, approvals=approvals, max_items=max_items, basis_fields=basis_fields)
 
 
 def run(rig: Rig, **extra: Any) -> SuccessEnvelope | FailureEnvelope:
@@ -129,6 +147,8 @@ def test_describe(fx: ModuleType, tmp_path: Path) -> None:
     assert info.ref_rules["span_mm"].unit == "mm"
     assert [p for p, r in info.ref_rules.items() if r.stale_ok] == ["older_mm"]
     assert info.basis_fields == ()
+    with_basis = make(fx, tmp_path / "b", basis_fields={"harness.port_sum": ["tolerances.length_mm"]})
+    assert with_basis.port.describe("harness.port_sum").basis_fields == ("tolerances.length_mm",)
     assert make(fx, tmp_path / "a", approved=True).port.describe("harness.port_sum").status is CalcStatus.APPROVED
     with pytest.raises(ContractError) as caught:
         rig.port.describe("harness.nope")
@@ -168,6 +188,17 @@ def test_item_limit(fx: ModuleType, tmp_path: Path) -> None:
     assert rig.store.puts == before
 
 
+def test_item_limit_at_limit_runs(fx: ModuleType, tmp_path: Path) -> None:
+    rig = make(fx, tmp_path, max_items=4)
+    rid = rig.source({"span_mm": 1.0, "rows": [1.0, 2.0, 3.0, 4.0]})
+    before = rig.store.puts
+    out = rig.port.run(
+        "harness.port_sum", {"span_mm": {"$ref": f"{rid}#/value/span_mm"}, "rows": {"$ref": f"{rid}#/value/rows"}}
+    )
+    assert isinstance(out, SuccessEnvelope)
+    assert rig.store.puts == before + 1
+
+
 def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path)
     args = rig.args(offset=2.5, whole=False)
@@ -179,6 +210,7 @@ def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     record = rig.store.get(out.result_id)
     assert record.kind == fx.OUTPUT_KIND
     assert record.complete is False
+    assert [w.code for w in out.warnings] == [WarningCode.PARTIAL_DATA]
     assert record.parents == [rid]
     assert record.producer.tool == "harness"
     assert record.producer.tool_version == __version__
@@ -189,6 +221,34 @@ def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     trace = payload["trace"]
     assert isinstance(trace, dict)
     assert trace["content_sha256"] == HASH
+
+
+def test_complete_payload_gives_complete_record(fx: ModuleType, tmp_path: Path) -> None:
+    rig = make(fx, tmp_path)
+    out = run(rig, whole=True)
+    assert isinstance(out, SuccessEnvelope)
+    assert rig.store.get(out.result_id).complete is True
+    assert out.warnings == []
+
+
+def test_verified_calc_is_not_approved(fx: ModuleType, tmp_path: Path) -> None:
+    prod = make(fx, tmp_path / "p", RunClass.PRODUCTION)
+    assert [(r.calc_id, r.status, r.code) for r in prod.port.preflight([VERIFIED_ID])] == [
+        (VERIFIED_ID, CalcStatus.VERIFIED, HarnessCode.CALC_NOT_APPROVED)
+    ]
+    args = prod.args()
+    args.pop("_rid")
+    before = prod.store.puts
+    with pytest.raises(CalcRefused) as caught:
+        prod.port.run(VERIFIED_ID, args)
+    assert caught.value.code is HarnessCode.CALC_NOT_APPROVED
+    assert prod.store.puts == before
+    trial = make(fx, tmp_path / "t")
+    args = trial.args()
+    args.pop("_rid")
+    out = trial.port.run(VERIFIED_ID, args)
+    assert isinstance(out, SuccessEnvelope)
+    assert trial.store.payload(out.result_id)["draft"] is True
 
 
 def test_production_and_withdrawn_refusal(fx: ModuleType, tmp_path: Path) -> None:
