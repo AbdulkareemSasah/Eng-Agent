@@ -179,7 +179,7 @@ tasks:
 Implements [spec 0004](../specs/0004-templates-and-basis.md) in two layers: `eng_harness.templates` (T1 to T4: schema,
 strict loading, inheritance, repository), then `eng_harness.basis` (T5 to T8: field declaration, draft, page
 interface, freeze and storage), then shipped content and cross-cutting tests (T9, T10). Risky parts first: the schema
-and unit rules (T1) carry the most R1 risk; the YAML dependency (T2) needs an ADR before it starts. Reuse: the contract
+and unit rules (T1) carry the most R1 risk; the YAML dependency (T2) is added with its ADR, written in T2 with status Proposed (B-374). Reuse: the contract
 supplies `Cited`, units, `Timestamp`, `ResultStore`, the `basis.design_basis/1` kind and `DesignBasis.missing`; the
 engine supplies `BasisPort`, `ctx.basis` and the invariant that refuses an incomplete basis. Nothing is copied from
 other packages.
@@ -194,7 +194,7 @@ rule and suffixed names such as `fc_MPa` do not pass the 0.1 basis path rule.
 
 **T1 Template model.** Pydantic models for `Template`, `Meta`, `Entry`, `Bounds`, `AskItem`; citation, canonical-unit,
 finiteness and bounds rules; synthetic fixtures. No YAML yet (tests build models from dictionaries).
-**T2 Strict YAML loader.** Adds the parser dependency (needs the ADR of spec Q2) and the loader that refuses
+**T2 Strict YAML loader.** Adds the parser dependency with the ADR of spec Q2 (written here, status Proposed; B-374) and the loader that refuses
 duplicates, aliases, tags and oversize files; touches `pyproject.toml` and `uv.lock`.
 **T3 Inheritance and identity.** `extends`, merge rules, the ask-path rule and the resolved content hash.
 **T4 Repository and `check_template`.** Shipped and user folders, ambiguity, synthetic refusal, the all-errors report.
@@ -212,7 +212,7 @@ every workflow path has a fake-host and a replay test).
 ## 3. Dependencies
 
 - Runtime: `eng-contract` and `pydantic` (already in the engine plan). New: one YAML parser, proposed `ruamel.yaml`,
-  only after an ADR approves it (A10; spec Q2). If the ADR is refused, T2 changes to JSON templates by a plan amendment.
+  with an ADR (A10; spec Q2) written in T2 as Proposed; the owner accepts it before `build/v1` reaches `main` (B-374). If the ADR is refused, T2 changes to JSON templates by a plan amendment.
 - Development: none new (`hypothesis`, `pytest`, `mypy`, `ruff` are in the workspace group).
 
 ## 4. Verification
