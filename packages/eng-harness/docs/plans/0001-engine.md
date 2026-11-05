@@ -286,7 +286,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
-    covers: [AC34, AC63, AC64]
+    covers: [AC34, AC63, AC64]  # AC64 shared with T13, which completes the first-use ordering (B-427)
     depends_on: [T11b]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
@@ -339,7 +339,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_host_lease_and_close"
       - "packages/eng-harness/tests/replay/test_resume.py::test_close_started_after_resume"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation"
-    covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62]
+    covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62, AC64]  # AC64 shared with T11c: the first-use ordering (B-427)
     depends_on: [T11c, T12]  # T11c, not T11b, since the B-427 split
   - id: T14
     title: ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4)
@@ -642,7 +642,7 @@ are in flight), reconciliation before the block runs, `step_rerun` for a read in
 `engine.in_flight` request built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), with the
 empty-summary result when the adapter has no read-back. It builds the part of the resume fold and of `Resume` that
 reconciliation uses (in-flight steps, the rerun index, the `engine.in_flight` request); the host-state part of the
-fold is T11c's. Budget 300 lines (about 233 of `_inflight.py` and its share of `_runner.py`; the original T11b
+fold is T11c's. Budget 300 lines (about 229 of `_inflight.py` and its share of `_runner.py`; the original T11b
 measured 516 and was split by B-427, D-12).
 
 **T11c Host-state check before live execution** (spec §4.5.4; AC34, AC63, AC64). The instance binding (`model_bound`
@@ -654,7 +654,8 @@ built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), th
 and `lacking` (the writes a reopened model lacks), and `ResumeIndex` and `Resume` with the restore cut (a rerun as a
 new attempt, reason `restored`), the `@resume<n>.model_state` and units reads, the `host_state_mismatch` and
 `units_mismatch` stops and the `engine.host_state` request. The first-use binding is a seam in `_hoststate.py` that
-T13 moves before `step_started`. Budget 320 lines (`_hoststate.py`, about 51 of `_inflight.py` and its share of
+T13 moves before `step_started`: T11c's AC64 test asserts the instance naming and the reopened case, and T13 completes
+the before-`step_started` part. Budget 320 lines (`_hoststate.py`, about 51 of `_inflight.py` and its share of
 `_runner.py`; B-427, D-12).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
@@ -671,7 +672,9 @@ decision B-427 (spec §11 Q29): T13 owns the `PRECONDITION_FAILED` refusal (cond
 `None` before a step, and moves the seam in its `_ctx_impl.py` so the `first_use` `model_bound` lands before that
 step's `step_started`; its resume step 6 reads units for every model key the journal addressed (T11c runs it for the
 models the run wrote, as built by B-349). Both changes edit T11c's `_hoststate.py` (T13 replaces its first-use binding
-seam and widens `locate_models`) and its `tests/replay/test_host_state.py`, which are in T13's files.
+seam and widens `locate_models`) and its `tests/replay/test_host_state.py`, which are in T13's files; T13 extends
+`test_host_state.py::test_reopened_in_new_instance` to assert `model_bound` before `step_started` (AC64, shared with
+T11c).
 
 **T14 Decisions** (spec §4.3.2, §4.6 item 4). `decide` and `decide_many` over the ports; option and answer validation;
 `decision_made`; engineer-tier pauses; the `DecisionPort` protocol in `ports.py` over the types of

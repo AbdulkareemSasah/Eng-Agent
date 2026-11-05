@@ -39,6 +39,9 @@ The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.i
 route of spec 0010 §4.3 and spec 0013 §4.5, named in §4.8 ("Code-pack checks"). It is listed in §11 (Q25); it adds no
 criterion here (the route's criteria are spec 0010 AC3, AC4 and spec 0013 AC13).
 
+**Amendment B-427.** The B-349 writer's questions are listed in §11 (Q26 to Q29) as draft decisions; AC34 is amended to
+match; it adds no criterion.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
