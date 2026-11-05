@@ -30,7 +30,7 @@ HOST = {
     "process_started_at": "2026-01-01T00:00:01.000Z",
     "program": "p",
 }
-ESCALATION = {"reason": "needs_reconciliation", "detail": "d", "evidence": [], "request_id": None}
+ESCALATION: dict[str, Any] = {"reason": "needs_reconciliation", "detail": "d", "evidence": [], "request_id": None}
 RECONCILED = {"op_id": "op1", "outcome": "applied", "decided_by": "engineer:x", "evidence": []}
 STARTED = {"kind": "tool", "name": "t", "args": {}, "args_sha256": SHA, "effect": "read"}
 INPUT = {"request_id": "in1", "kind": "block", "title": "t", "fields_schema_sha256": SHA}
