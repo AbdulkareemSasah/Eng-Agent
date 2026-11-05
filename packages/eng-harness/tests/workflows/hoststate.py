@@ -1,9 +1,11 @@
-"""Helpers of the in-flight replay tests (plan 0001 T11b; spec 0001 AC31, AC32).
+"""Helpers of the in-flight and host-state replay tests (plan 0001 T11b, T11c; spec 0001 AC31 to AC34, AC63, AC64).
 
-Test doubles, never shipped. The stop point of these tests (a write cut off between its start and its end) is not
-reachable through the public API, so `forge` writes the journal of such a run by hand, event by event, and the test
-resumes it with a real engine. `ScriptedHost` is the rig's fake host with a log of its reconciler calls and a reconciler
-that can be absent or fail, and a read-back that can answer, fail or raise. No clock, network or host program.
+Test doubles, never shipped. The stop points of these tests (a write cut off between its start and its end, a host that
+lost its models, a model reopened in another instance) are not reachable through the public API, so `forge` writes the
+journal of such a run by hand, event by event, and the test resumes it with a real engine. `ScriptedHost` is the rig's
+fake host with a log of the calls that name a model or an instance, a reconciler that can be absent or fail, a
+read-back that can answer, fail or raise, and a `restore` whose units can be made to differ. No clock, network or host
+program.
 """
 
 import asyncio
@@ -20,12 +22,21 @@ from pydantic import JsonValue
 
 from eng_harness.block import BlockDef
 from eng_harness.journal import Event, EventType, JournalWriter
-from eng_harness.ports import HostInstance, InputAnswer, InputRequest, Reconciliation
+from eng_harness.ports import (
+    HostInstance,
+    HostModelState,
+    InputAnswer,
+    InputRequest,
+    Reconciliation,
+    SavedModel,
+    UnitsState,
+)
 from workflows.rig import Host, Rig, make_rig
 
 T = EventType
 AT = "2026-01-01T00:10:00.000Z"
 INSTANCE = HostInstance(instance_id="csi-1", pid=4242, process_started_at=AT, program="csi")
+REOPENED = HostInstance(instance_id="csi-2", pid=4243, process_started_at=AT, program="csi")
 REF = "res_" + "1" * 26
 OP = "op_" + "a" * 32  # the op_id of a forged write: the engine takes it from the journal as it is
 Forged = tuple[EventType, str | None, int | None, dict[str, Any]]
@@ -33,16 +44,18 @@ Forged = tuple[EventType, str | None, int | None, dict[str, Any]]
 
 
 class ScriptedHost(Host):
-    """The rig's fake host with a log of reconciler calls, a reconciler that can be absent or fail and a read-back."""
+    """The rig's fake host with a call log, an optional reconciler and a `restore` with scripted units."""
 
     def __init__(self, ids: SeededIdSource, clock: FixedClock, runs_dir: Path) -> None:
-        """Serve the rig's tools; `calls` gets (method, op id, None) for each reconciler call."""
+        """Serve the rig's tools; `calls` gets (method, key, instance id) for the calls that name a model."""
         super().__init__(ids, clock, runs_dir)
         self.calls: list[tuple[str, str, str | None]] = []
         self.unsupported: set[str] = set()
         self.reconcile_error: ContractError | None = None
-        self.reconciled_args: list[Mapping[str, JsonValue]] = []
+        self.restored_units: UnitsState | None = None
+        self.in_place = False
         self.read_back_reply: ENVELOPE | ContractError | None = None  # None: the adapter has no read-back
+        self.reconciled_args: list[Mapping[str, JsonValue]] = []
 
     def supports_reconcile(self, tool: str) -> bool:
         """False for the tools in `unsupported`, else as the fake host."""
@@ -61,6 +74,43 @@ class ScriptedHost(Host):
         if isinstance(self.read_back_reply, ContractError):
             raise self.read_back_reply
         return self.read_back_reply
+
+    async def call(self, tool: str, args: Mapping[str, JsonValue], *, op_id: str, model: str | None) -> Any:
+        """Log the call, then behave as the rig's host."""
+        self.calls.append(("call", tool, model))
+        return await super().call(tool, args, op_id=op_id, model=model)
+
+    async def locate(self, model_key: str) -> HostInstance | None:
+        """Log the call, then behave as the fake host."""
+        self.calls.append(("locate", model_key, None))
+        return await super().locate(model_key)
+
+    async def read_units(self, model_key: str, instance_id: str) -> UnitsState:
+        """Log the call with the instance it names, then behave as the fake host."""
+        self.calls.append(("read_units", model_key, instance_id))
+        return await super().read_units(model_key, instance_id)
+
+    async def model_state(self, model_key: str, instance_id: str) -> HostModelState:
+        """Log the call with the instance it names, then behave as the fake host."""
+        self.calls.append(("model_state", model_key, instance_id))
+        return await super().model_state(model_key, instance_id)
+
+    async def restore(self, model_key: str, saved: SavedModel) -> HostInstance:
+        """Log the call; the units of the restored model are `restored_units` when set."""
+        self.calls.append(("restore", model_key, None))
+        if self.in_place:  # the instance that holds the model still runs: the saved state returns in it
+            self.models[model_key] = HostModelState(
+                loaded=True,
+                model_id=saved.model_id,
+                revision=saved.revision,
+                fingerprint=saved.fingerprint,
+                file_sha256=saved.file_sha256,
+            )
+            return next(i for group in self.instances.values() for i in group if i.instance_id == self.bound[model_key])
+        instance = await super().restore(model_key, saved)
+        if self.restored_units is not None:
+            self.units[model_key] = self.restored_units
+        return instance
 
 
 def scripted_rig(root: Path) -> tuple[Rig, ScriptedHost]:
@@ -99,6 +149,12 @@ def bound(model: str, instance: HostInstance, reason: str = "first_use") -> Forg
     return T.MODEL_BOUND, None, None, body | {"file_names": [f"{model}.edb"]}
 
 
+def saved(rig: Rig, model: str, role: str = "working_copy") -> Forged:
+    """The `model_saved` event for the model as the host holds it now (the host saves it)."""
+    model_saved = asyncio.run(rig.host.save(model, role))
+    return T.MODEL_SAVED, None, None, {"model_key": model, **model_saved.model_dump(mode="json"), "role": role}
+
+
 def forge(rig: Rig, workflow: BlockDef[Any, Any], *events: Forged) -> str:
     """A run folder with the header of a run of `workflow` and then `events`; the run's id."""
     run_id = rig.forge(workflow)
@@ -114,10 +170,12 @@ def resume(rig: Rig, workflow: BlockDef[Any, Any], run_id: str) -> Any:
     return asyncio.run(rig.engine(workflow).resume(run_id))
 
 
-def trace(rig: Rig, run_id: str, after: int = 0) -> list[tuple[str, str | None, int | None]]:
-    """(type, path, attempt) of the events after the first `after`."""
+def trace(
+    rig: Rig, run_id: str, after: int = 0, *, housekeeping: bool = False
+) -> list[tuple[str, str | None, int | None]]:
+    """(type, path, attempt) of the events after the first `after`; the `@resume` steps only when asked for."""
     events: Sequence[Event] = rig.events(run_id)[after:]
-    return [(e.type.value, e.path, e.attempt) for e in events]
+    return [(e.type.value, e.path, e.attempt) for e in events if housekeeping or not (e.path or "").startswith("@")]
 
 
 def answer(asked: InputRequest, choice: str, question: str, *, by: str = "engineer:test") -> InputAnswer:
