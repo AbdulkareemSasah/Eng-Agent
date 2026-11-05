@@ -44,8 +44,9 @@ cycle; they are made here and listed in §11 (Q26 to Q30): `WorkflowDef.basis_fi
 derived, and `WorkflowDef.copy_on_open` (§4.2, §4.7); `model_saved` journaled for tool saves (§4.6 "Tool saves");
 `ToolInfo.saves_new_file` (§4.8); a save passed `under=` an approval re-checked and chained like a write, with the
 engine's `p~post.save` results in the chain (§4.9); no `approve_each_write` preview for a save to a new file (§4.7);
-and an approval resolved by the mode never satisfying an always-ask step (§4.7). New criteria are AC70 to AC75,
-built by plan 0007 T6. Every rule is draft until the owner approves it (bootstrap mode).
+and an approval resolved by the mode never satisfying an always-ask step (§4.7). The rules are EC1 to EC6 of §3.9;
+they add no criterion here: their criterion is spec 0007 AC33, built by plan 0007 T6. Every rule is draft until the
+owner approves it (bootstrap mode).
 
 ## 1. Problem
 
@@ -382,42 +383,56 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   engine overhead per step is below 20 ms at p95 (11 §10), measured as S-10 measured it. Test:
   `tests/perf/test_overhead.py::test_engine_overhead_p95` (also run in the Windows CI job).
 
-### 3.9 Edit-cycle amendments (amendment B-415; spec 0007 Q2, Q3, Q5; spec 0004 Q7)
+### 3.9 Edit-cycle rules (amendment B-415; spec 0007 Q2, Q3, Q5; spec 0004 Q7)
 
-- AC70. Given a workflow with `copy_on_open = True`, when a tool with action `open` opens a model key for the first
-  time in the run, then in each of the three modes the inserted step `p~post.working_copy.<model_key>` runs right
-  after the open step and before any other step on that model, `model_saved` (role `working_copy`, `origin_sha256`
-  and `origin_file_names` of the opened file) is journaled, and every later step addressed to the model goes to the
-  copy; a later `open` of the same model key takes no copy and leaves `origin_sha256` unchanged; in `work_on_copy` no
-  second copy is taken before the first write; a workflow without `copy_on_open` behaves as §4.7 states for its mode.
-  Test: `tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode`.
-- AC71. Given a tool step with action `save` (or any tool whose `ToolInfo.saves_new_file(args)` is true) that
-  completed, or was reconciled `applied`, then `model_saved` (role `revision`) is journaled before the next step: for
-  an in-place save with the working file's base name and its `HostPort.model_state` fingerprint and file hash; for a
-  save to a new file with the summary's `saved_file.name` and `saved_file.sha256`; given a new-file save whose
-  `saved_file.sha256` differs from the model's file hash after the save, or a result without `provenance.host` or
-  (new file) without `saved_file`, then `ModelIntegrityError` and no `model_saved`. Test:
+These rules add no criterion to this spec, as Q25 for B-405 adds none: their criterion is spec 0007 AC33, built by
+plan 0007 T6, which owns the tests named below. They are labelled EC1 to EC6 so that the engine sections can cite
+them; each states the cases its test checks.
+
+- EC1 (copy on open, §4.7). Given a workflow with `copy_on_open = True`, when a tool with action `open` opens a model
+  key for the first time in the run, then in each of the three modes the inserted step
+  `p~post.working_copy.<model_key>` runs right after the open step and before any other step on that model,
+  `model_saved` (role `working_copy`, `origin_sha256` and `origin_file_names` of the opened file) is journaled, and
+  every later step addressed to the model goes to the copy; a later `open` of the same model key takes no copy and
+  leaves `origin_sha256` unchanged; in `work_on_copy` no second copy is taken before the first write; a workflow
+  without `copy_on_open` behaves as §4.7 states for its mode. Test:
+  `tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode`.
+- EC2 (tool saves, §4.6 "Tool saves"). Given a tool step with action `save` (or any tool whose
+  `ToolInfo.saves_new_file(args)` is true) that completed live, then `model_saved` (role `revision`) is journaled
+  before the next step: for an in-place save with the working file's base name and its `HostPort.model_state`
+  fingerprint and file hash; for a save to a new file with the summary's `saved_file.name` and `saved_file.sha256`;
+  given a live new-file save whose `saved_file.sha256` differs from the model's file hash after the save, or a result
+  without `provenance.host` or (new file) without `saved_file`, then `ModelIntegrityError` and no `model_saved`.
+  Given such a save reconciled `applied` at a resume (§4.5.3), then no model state is read and no `model_saved` is
+  appended during reconciliation (§4.5.1 step 7); the host-state check compares the live state with the reconciled
+  result's `provenance.host`; a host change made while the run was paused is still `host_state_mismatch`; when the
+  check passes, `model_saved` is appended from the check's own read before the root block is called, and a reconciled
+  new-file save without `saved_file` appends none and raises nothing. Test:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_tool_save_journals_revision`.
-- AC72. Given a step on the always-ask list (§4.7) passed `under=` an approval resolved `by: "mode:<mode>"`, then the
-  engine still inserts its always-ask approval, which no mode resolves; given the same step `under=` an accepted
-  approval resolved `by: "engineer:<name>"` that accepts the step's `item`, then no approval is inserted. Test:
+- EC3 (always-ask under mode approvals, §4.7). Given a step on the always-ask list passed `under=` an approval
+  resolved `by: "mode:<mode>"`, then the engine still inserts its always-ask approval, which no mode resolves; given
+  the same step `under=` an accepted approval resolved `by: "engineer:<name>"` that accepts the step's `item`, then no
+  approval is inserted. Test:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_mode_resolved_approval_not_always_ask`.
-- AC73. Given `workflow(..., basis_fields=(...))`, then `WorkflowDef.required_basis` is the paths of the fields with
-  `required` true, in declaration order; given `basis_fields` with a repeated path, or both `basis_fields` and a
-  `required_basis` that differs from the derived paths, then `RegistryError` at definition; given no `basis_fields`,
-  then `basis_fields` is `()` and `required_basis` is as passed. Test:
+- EC4 (basis fields, §4.2). Given `workflow(..., basis_fields=(...))` with no `required_basis`, then
+  `WorkflowDef.required_basis` is the paths of the fields with `required` true, in declaration order; given
+  `basis_fields` with a repeated path, or both `basis_fields` and a `required_basis` whose set of paths differs from
+  the required paths or that repeats a path, then `RegistryError` at definition; given both with the same paths in
+  another order, then the definition is accepted and `required_basis` is the derived tuple (the verdict of spec
+  0004's `check_declaration`, AC21); given no `basis_fields`, then `basis_fields` is `()` and `required_basis` is as
+  passed (`()` when not passed); `eng_harness.block.FieldSpec` is `eng_harness.basis.FieldSpec`. Test:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_required_basis_from_fields`.
-- AC74. Given an approval, a tool save passed `under=` it and then writes under it, then the save is re-checked
-  against the binding like a first write (`ApprovalVoid` before the save on a mismatch, the port not called), and
-  the next write under the approval passes its re-check when the model's state equals the save's `model_saved`; in
-  `work_on_copy`, each engine `p~post.save` after a step under the approval likewise becomes the expected state, so
-  a later write under it is not voided by that save; given a change to the model between two steps under the
-  approval, then `ApprovalVoid` before the next one. Test:
+- EC5 (saves under an approval, §4.9). Given an approval, a tool save passed `under=` it and then writes under it,
+  then the save is re-checked against the binding like a first write (`ApprovalVoid` before the save on a mismatch,
+  the port not called), and the next write under the approval passes its re-check when the model's state equals the
+  save's `model_saved`; in `work_on_copy`, each engine `p~post.save` after a step under the approval likewise becomes
+  the expected state, so a later write under it is not voided by that save; given a change to the model between two
+  steps under the approval, then `ApprovalVoid` before the next one. Test:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_save_under_approval_keeps_chain`.
-- AC75. Given `approve_each_write`, then a tool step with action `save` whose `ToolInfo.saves_new_file(args)` is
-  true and `ToolInfo.overwrites_original(args)` false gets no `p~pre.approve` preview, while an in-place tool save
-  and every other write still get one, and a save over an original is still always asked. Test:
-  `tests/unit/test_engine_edit_cycle_amendments.py::test_revision_save_no_write_preview`.
+- EC6 (no preview for a revision save, §4.7). Given `approve_each_write`, then a tool step with action `save` whose
+  `ToolInfo.saves_new_file(args)` is true and `ToolInfo.overwrites_original(args)` false gets no `p~pre.approve`
+  preview, while an in-place tool save and every other write still get one, and a save over an original is still
+  always asked. Test: `tests/unit/test_engine_edit_cycle_amendments.py::test_revision_save_no_write_preview`.
 
 ## 4. Design
 
@@ -461,6 +476,21 @@ modules (`rule_modules`: `src/eng_harness/rules/**`) may import only: `eng_harne
 types and the ctx API only, never I/O. Enforced by the block-module rules test (AC19) and by the gate's FB004 and FB005
 ([eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §4.8).
 
+**Indirect import through `FieldSpec` (amendment B-415, draft).** `eng_harness.block` re-exports `FieldSpec` from
+`eng_harness.basis` (§4.2), so loading `eng_harness.block` also loads `eng_harness.basis` and, through it,
+`eng_harness.templates`, `eng_harness.ports` and `eng_harness.journal` (spec 0004 §4.1). This is accepted, and the
+rules above still hold, for three reasons. (1) The rules govern what a block or rule module names in its own import
+statements; AC19, FB004 and FB005 check those statements, and `eng_harness.basis`, `eng_harness.ports` and
+`eng_harness.journal` stay refused there. The re-export gives block code one new name, `FieldSpec`, a frozen data
+model with no I/O method. (2) Invariant 1's runtime guard (§4.6) acts on the operations block code performs while it
+runs, not on which modules are loaded; loading a module performs no file, process, socket or database operation from
+block code, and the guard's `import` audit event still refuses an import made while block code runs. (3) Block
+modules run only inside an engine process, which has already loaded the ports and the journal. The alternative, a
+`FieldSpec` in a module that imports only `eng_contract` and `pydantic`, which both `eng_harness.block` and
+`eng_harness.basis` import, moves merged spec 0004 code; it is listed for the owner (Q26) and not taken in v1. No
+import cycle arises: none of `eng_harness.basis`, `eng_harness.templates`, `eng_harness.ports` and
+`eng_harness.journal` imports `eng_harness.block`.
+
 ### 4.2 Blocks, workflows and the registry
 
 ```python
@@ -485,13 +515,19 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   `always_ask` (tool names) and `options_model` (the command-line setup form, spec 0006; default `None`).
 - **Basis fields and copy on open (amendment B-415, spec 0004 Q7, spec 0007 Q2).** `WorkflowDef` also has
   `basis_fields: tuple[FieldSpec, ...]` (default `()`; `FieldSpec` is spec 0004 §4.5's, re-exported by
-  `eng_harness.block` so that block modules, which may not import `eng_harness.basis` (§4.1.2), can declare them) and
-  `copy_on_open: bool` (default `False`, §4.7). When `basis_fields` is not empty, `workflow(...)` derives
-  `required_basis` as the paths of the fields whose `required` is true, in declaration order; a repeated path, or a
-  `required_basis` passed beside `basis_fields` that differs from the derived tuple, is `RegistryError` at definition
-  (spec 0004's `check_declaration` gives the same verdict; `RegistryError` carries its reason). Invariant 5 reads
-  `required_basis` as before. With `basis_fields` empty, `required_basis` is as passed (the workflows of earlier
-  specs keep working). Neither member changes `code_sha256` rules; both are recorded through the block's code hash.
+  `eng_harness.block` so that block modules, which may not import `eng_harness.basis` (§4.1.2), can declare them;
+  the indirect import this causes is accepted in §4.1.2) and
+  `copy_on_open: bool` (default `False`, §4.7). The `workflow(...)` parameter `required_basis` defaults to `None`
+  (it is `()` on build/v1), so that the engine can tell a `required_basis` passed beside `basis_fields` from one not
+  passed; `WorkflowDef.required_basis` stays a tuple. When `basis_fields` is not empty, `workflow(...)` derives
+  `required_basis` as the paths of the fields whose `required` is true, in declaration order. A repeated path in
+  `basis_fields` is `RegistryError` at definition. A `required_basis` passed beside `basis_fields` is compared as
+  sets, as spec 0004's `check_declaration` compares them (AC21): it must hold the same paths as the derived tuple,
+  with no path repeated, in any order; otherwise `RegistryError` at definition (carrying the `check_declaration`
+  reason, `field_invalid` or `declaration_mismatch`). When it passes, `WorkflowDef.required_basis` is the derived
+  tuple, so both verdicts agree for every declaration (EC4). Invariant 5 reads `required_basis` as before. With
+  `basis_fields` empty, `required_basis` is as passed, or `()` when not passed (the workflows of earlier specs keep
+  working). Neither member changes `code_sha256` rules; both are recorded through the block's code hash.
 - The decorators only build the definition; they never register globally (no global mutable state, process/04 §5).
   `Registry(blocks: Iterable[BlockDef])` is immutable; `Registry.with_(...)` returns a new one. Rules of AC2; a
   workflow is also a block (`WorkflowDef` is a `BlockDef`).
@@ -862,7 +898,7 @@ the step's model key (`ToolInfo.model_param`) with role `revision`:
 
 - `model_id` and `revision` from the result's `provenance.host` (contract §4.2.2);
 - `fingerprint` and `file_sha256` from `HostPort.model_state(model_key, instance_id)` of the bound instance, read
-  right after the step;
+  right after the step (a live save only; a save reconciled `applied` follows "At a resume" below);
 - `file_name`: for an in-place save, the base name of the first path of `HostPort.model_files(model_key)`; for a save
   to a new file (`saves_new_file(args)` true), the base name in the result summary's `saved_file.name`, and the
   engine checks that the summary's `saved_file.sha256` equals the `file_sha256` just read (the new file is a verified
@@ -870,7 +906,27 @@ the step's model key (`ToolInfo.model_param`) with role `revision`:
 
 A result without `provenance.host`, a new-file save whose summary has no `saved_file` (name and SHA-256 hex digest),
 or a `saved_file.sha256` that differs from the model's file hash raises `ModelIntegrityError` (a `StepError`) and no
-`model_saved` is appended; the host-state check (§4.5.4) then still compares with the earlier save (AC71). The new
+`model_saved` is appended; the host-state check (§4.5.4) then still compares with the earlier save (EC2).
+
+At a resume, a tool save reconciled `applied` (§4.5.3), or one whose `step_completed` is journaled without the
+`model_saved` that should follow it (the process stopped between the two), is never journaled from a live read made
+before the host-state check, so that an engineer change made while the run was paused still shows as a mismatch:
+
+- During reconciliation (§4.5.1 step 7) the engine reads no model state and appends no `model_saved` for it.
+- The host-state check (§4.5.1 step 8, §4.5.4) treats it as a write reconciled `applied`: it compares the live state
+  with the revision and fingerprint of the result's `provenance.host`. For a new-file save whose result has
+  `saved_file`, a `saved_file.sha256` that differs from the live `file_sha256` is also a mismatch (reason
+  `host_state_mismatch`, handled by the engineer's choice as §4.5.4 states).
+- When that check passes for the model, the engine appends the `model_saved` (role `revision`) before the root block
+  is called (§4.5.1 step 9): `model_id` and `revision` from the result's `provenance.host`; `fingerprint` and
+  `file_sha256` from the check's own `@resume<n>.model_state.<model_key>` read, which matched; `file_name` as for a
+  live save. When the check stops the run, none is appended: `accept` journals its own `baseline` save, `restore`
+  cuts the step (it runs again live), and `abandon` ends the run.
+- A result without `provenance.host`, or a new-file save whose result has no `saved_file` (for example an engineer's
+  `applied` with no adapter read-back, which completes with an empty summary, §4.5.3), raises nothing at resume (no
+  block could handle it there): the host-state check compares as above where it can (with the last `model_saved` when
+  there is no `provenance.host`), no `model_saved` is appended, and the next step under an approval expects the
+  revision of the reconciled result as after a write (§4.9). The new
 `model_saved` is the model's last save for the host-state check, for invariant 7 (a later analysis still gets its
 own `pre_analysis` save) and for the report. On replay the event is part of the recorded sequence and is not appended
 again.
@@ -892,13 +948,13 @@ again.
   of §4.8 follows the open as before). A later `open` of the same model key in the run (spec 0007's
   `csi_open_revision`) takes no working copy and does not change the `origin_sha256` that promotion compares (§4.7
   "Promotion"); its new working file is recorded by "Tool saves" (§4.6). Without `copy_on_open`, the working copy is
-  taken as each mode states (AC70).
+  taken as each mode states (EC1).
 - **`approve_each_write`.** Before each write, the inserted step `p~pre.approve` presents `ToolPort.preview(tool,
   args)` as a `CHANGE_SET` approval; a rejection raises `ApprovalRejected` (a `StepError`) and the write is not called.
   Exception (amendment B-415, spec 0007 Q3): a tool step with action `save` whose `ToolInfo.saves_new_file(args)` is
   true and whose `ToolInfo.overwrites_original(args)` is false gets no `p~pre.approve` preview: it changes no model
   content and writes no existing file. An in-place tool save and every other write keep their preview, and a save
-  over an original stays always-ask (AC75).
+  over an original stays always-ask (EC6).
 - **`autonomous_logged`.** Writes run directly; a `ctx.approve` of kind `INFO` or `CHANGE_SET` is resolved by the mode
   (`approval_resolved`, `by: "mode:autonomous_logged"`) **[added: 11 §3 says approval behavior depends on the mode]**.
 - **Always ask, in every mode.** Approval kinds `PROMOTION` and `SIGN_OFF`; tools with `ToolInfo.action` `delete`; a
@@ -908,7 +964,7 @@ again.
   `approval_resolved.by` is `engineer:<name>`, it is approved and it accepts the step's `item` (§4.9); an approval
   resolved by the mode (`by: "mode:<mode>"`, for example a `CHANGE_SET` in `autonomous_logged`) never does. For such a
   step the engine inserts its always-ask approval as if no `under=` were passed; no mode resolves an inserted
-  always-ask approval, and its rejection raises `ApprovalRejected` (AC72). The `under=` approval still applies its
+  always-ask approval, and its rejection raises `ApprovalRejected` (EC3). The `under=` approval still applies its
   re-check and items to the step (§4.9).
 - **Promotion** (`ctx.promote`, always an approval of kind `PROMOTION`):
   - Before anything else, `_promote` checks the `approval` argument: it must be of kind `PROMOTION`, approved, bound
@@ -1029,9 +1085,10 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
   `HostPort.model_state` with the binding (revision, fingerprint, and `file_sha256` where the binding has it), and as a
   later step it must find the expected state. After each step under the approval the expected state of the next step
   under it is updated: after a write, the revision the write produced; after a tool save, the revision, fingerprint
-  and file hash of its `model_saved`; and after each engine `p~post.save` that follows a step under the approval
+  and file hash of its `model_saved` (or, for a reconciled save for which none was appended, §4.6 "Tool saves", the
+  revision of its result, as after a write); and after each engine `p~post.save` that follows a step under the approval
   (`work_on_copy`, §4.5.4), the revision, fingerprint and file hash of that `model_saved`. A save therefore never voids
-  the approval it runs under, while any other change between two steps under it still does (AC74). A save passed
+  the approval it runs under, while any other change between two steps under it still does (EC5). A save passed
   `under=` an approval also obeys its items (`item=`) and expiry, as a write does.
 - **Expiry and items.** An approval authorizes writes until the first `check_model` on a bound model or the return of
   the scope that requested it; later use is `BlockRuleViolation`. A write passed `item=` of a rejected item is
@@ -1115,7 +1172,7 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 | `RunLocked` | `Exception` | `RUN_LOCKED` | §4.4.4 |
 | `JournalIntegrityError` | `Exception` | `JOURNAL_INTEGRITY` | §4.4.1 |
 | `ToolFailed` | `StepError` | the contract `ErrorDetail.code` | Failure envelope |
-| `ModelIntegrityError` | `StepError` | `MODEL_INTEGRITY` | Invariant 1 |
+| `ModelIntegrityError` | `StepError` | `MODEL_INTEGRITY` | Invariant 1; §4.6 "Tool saves" |
 | `DecisionInvalid` | `StepError` | `DECISION_INVALID` | Invariant 4 |
 | `ApprovalRejected` | `StepError` | `APPROVAL_REJECTED` | §4.7 inserted approvals |
 | `ApprovalVoid` | `StepError` | `APPROVAL_VOID` | §4.9 |
@@ -1154,7 +1211,7 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69, AC70 to AC75 (real engine, fake ports, real SQLite, as plan 0007 T6 lists them) | Unit | `tests/unit/` |
+| AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
 | AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
@@ -1212,8 +1269,8 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
 | Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |
 | Q25 | Spec 0010 Q10 and C2: code-pack checks reach the `CalcPort` through the one code-pack route (`_calc/_code_packs.py`, spec 0010 §4.3, spec 0013 §4.5), consulted for ids that do not start with `harness.`; an id outside its allowlist is `NOT_FOUND`; the run class applies as to calcs | Owner | Accept (§4.8, amendment B-405; draft until the owner approves) |
-| Q26 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, re-exported by `eng_harness.block`), `required_basis` derived from it, a differing explicit `required_basis` refused (§4.2, AC73) |
-| Q27 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, AC70). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
-| Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", AC71); a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, AC74); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, AC75) |
-| Q29 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, AC72) |
+| Q26 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, re-exported by `eng_harness.block`), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). The re-export loads `eng_harness.basis` (and through it the ports and the journal) wherever `eng_harness.block` is loaded; §4.1.2 accepts this. Owner choice: keep that, or later move `FieldSpec` to a module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code; recommended only if a block-module process ever runs without the engine) |
+| Q27 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
+| Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6) |
+| Q29 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
 | Q30 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |

@@ -174,7 +174,9 @@ Shipped content
 Import rules: `eng_harness.templates` and `eng_harness.basis` import `eng_contract` and each other in one direction only
 (`basis` imports `templates`); neither imports the engine's internals (only `eng_harness.ports` and `eng_harness.ctx`
 types). Both are pure: they read files, make no network call, start no process (engine invariants on block code do not
-apply, but the engine's runtime guard is not needed because no block imports these modules).
+apply, but the engine's runtime guard is not needed because no block module imports these modules directly). Amendment
+B-415 (draft): `eng_harness.block` re-exports `FieldSpec`, so loading it loads `eng_harness.basis` indirectly; engine
+§4.1.2 accepts this and states why the block import rules and the runtime guard still hold.
 
 ### 4.2 Template schema (13 §2)
 
@@ -247,7 +249,7 @@ class FieldSpec(BaseModel, frozen=True, extra="forbid"):
 ```
 
 A workflow module exposes `basis_fields: tuple[FieldSpec, ...]`; its `WorkflowDef.required_basis` must equal the
-required paths (AC21; Q7 proposes making the engine derive it). `ctx.basis.quantity` reads a `quantity` field,
+required paths (AC21; Q7 proposes making the engine derive it; engine text: engine §4.2, rule EC4 (amendment B-415, draft)). `ctx.basis.quantity` reads a `quantity` field,
 `count` a `count` field (an integer, including the `attempts.<name>` fields of engine Q1), `choice` a `choice` field.
 
 Fields the model edit cycle is expected to need (proposal for spec 0007, which owns the final list; **no values**):
@@ -392,6 +394,6 @@ New public modules in `eng-harness`: minor. No contract change in this spec; Q1 
 | Q4. `basis.design_basis/1` has no `draft` flag, so a frozen basis cannot show that its template was draft | Owner (contract) | Add `draft: bool` in contract 0.2 (as `verdicts.set/1` has); until then only the page banner and the run report show it |
 | Q5. Who confirmed, and when, is not stored in the payload (`confirmed` is a bool) | Owner | Record `by` and `at` in the setup answer kept by spec 0006's page log; add `confirmed_by` and `confirmed_at` to the kind in contract 0.2 if the owner wants it in the result |
 | Q6. Template and basis errors have no contract code | Owner | `INVALID_ARGUMENT` plus a `reason` key now (as engine Q7); a `HarnessCode` family only if the engine needs to branch on them |
-| Q7. `WorkflowDef` carries `required_basis` (paths) only | Owner (engine) | Add `basis_fields: tuple[FieldSpec, ...]` to `WorkflowDef` in spec 0007's plan and derive `required_basis`; this spec's check (AC21) then becomes trivial. Engine text written by amendment B-415 (engine §4.2, AC73, Q26; built by plan 0007 T6; draft until the owner approves) |
+| Q7. `WorkflowDef` carries `required_basis` (paths) only | Owner (engine) | Add `basis_fields: tuple[FieldSpec, ...]` to `WorkflowDef` in spec 0007's plan and derive `required_basis`; this spec's check (AC21) then becomes trivial. Engine text written by amendment B-415 (engine §4.2, rule EC4, Q26; built by plan 0007 T6; draft until the owner approves) |
 | Q8. Whether v1 should ship any engineering values | Owner | No. Ship `blank` only; the owner supplies values with citations by pull request when wanted |
 | Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `engineer` member is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |
