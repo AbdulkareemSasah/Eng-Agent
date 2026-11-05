@@ -64,9 +64,7 @@ def _tools() -> list[ToolInfo]:
 def _host() -> FakeHost:
     clock = FixedClock(1_767_225_600_000, 1)
     host = FakeHost(_tools(), SeededIdSource(b"ports", clock), clock, unreleased={"model/write": "docs/gap.md"})
-    instance = HostInstance(
-        instance_id="i1", pid=7, process_started_at="2026-01-01T00:00:00.000Z", program="h"
-    )
+    instance = HostInstance(instance_id="i1", pid=7, process_started_at="2026-01-01T00:00:00.000Z", program="h")
     host.add_model("m", instance)
     return host
 
@@ -90,7 +88,8 @@ def _check_tool_port(port: ToolPort, host: FakeHost) -> None:
         asyncio.run(port.describe("csi_run_script"))
     assert unknown.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert port.unreleased_tools() == {"model/write": "docs/gap.md"}
-    assert port.supports_reconcile("model/write") and not port.supports_reconcile("model/read")
+    assert port.supports_reconcile("model/write")
+    assert not port.supports_reconcile("model/read")
     assert asyncio.run(port.read_back("model/read", {})) is None
 
     # a success is recorded with its op_id; a write raises the revision and changes the fingerprint
@@ -98,14 +97,17 @@ def _check_tool_port(port: ToolPort, host: FakeHost) -> None:
     result = asyncio.run(port.call("model/write", {"x": 1}, op_id=OP, model="m"))
     assert result.ok
     after = asyncio.run(host.model_state("m", "i1"))
-    assert before.revision is not None and after.revision == before.revision + 1
+    assert before.revision is not None
+    assert after.revision == before.revision + 1
     assert after.fingerprint != before.fingerprint
     assert [(e.tool, e.op_id, e.model) for e in host.ledger] == [("model/write", OP, "m")]
     assert asyncio.run(port.reconcile("model/write", {"x": 1}, OP)) == Reconciliation(outcome="applied")
     assert asyncio.run(port.reconcile("model/write", {"x": 1}, "op_" + "2" * 32)).outcome == "not_applied"
 
     # scripted outcomes: failure envelopes of the contract codes, and a raise; each call stays in the ledger
-    host.script("model/read", failure(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME), failure(ErrorCode.HOST_WEDGED), Raise(OSError("x")))
+    host.script(
+        "model/read", failure(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME), failure(ErrorCode.HOST_WEDGED), Raise(OSError("x"))
+    )
     codes = []
     for _ in range(2):
         reply = asyncio.run(port.call("model/read", {}, op_id=OP, model=None))
@@ -120,7 +122,8 @@ def _check_tool_port(port: ToolPort, host: FakeHost) -> None:
 
 def _check_host_port(port: HostPort, host: FakeHost) -> None:
     checks = asyncio.run(port.preflight({"srv": "1"}))
-    assert [c.server for c in checks] == ["srv"] and all(c.ok for c in checks)
+    assert [c.server for c in checks] == ["srv"]
+    assert all(c.ok for c in checks)
 
     lease = asyncio.run(port.acquire("h"))
     with pytest.raises(ContractError) as held:
@@ -130,11 +133,13 @@ def _check_host_port(port: HostPort, host: FakeHost) -> None:
     asyncio.run(port.release(asyncio.run(port.acquire("h"))))
 
     instance = asyncio.run(port.locate("m"))
-    assert instance is not None and instance.instance_id == "i1"
+    assert instance is not None
+    assert instance.instance_id == "i1"
     assert asyncio.run(port.locate("unknown")) is None
     assert not asyncio.run(port.model_state("m", "other")).loaded
     units = asyncio.run(port.read_units("m", "i1"))
-    assert units.loaded and units.ok
+    assert units.loaded
+    assert units.ok
     assert not asyncio.run(port.read_units("m", "other")).loaded
     assert asyncio.run(port.check_model("m")).ok
     assert port.model_files("m") == (Path("m.edb"),)
@@ -142,7 +147,8 @@ def _check_host_port(port: HostPort, host: FakeHost) -> None:
     saved = asyncio.run(port.save("m", "revision"))
     assert saved.revision == 1
     copy_key = asyncio.run(port.working_copy("m", Path("work")))
-    assert copy_key == "m@copy" and asyncio.run(port.model_state(copy_key, "i1")).loaded
+    assert copy_key == "m@copy"
+    assert asyncio.run(port.model_state(copy_key, "i1")).loaded
 
     # a host crash: models reported not loaded, session epoch increased, units not loaded
     epoch = port.session_epoch("h")
@@ -154,7 +160,9 @@ def _check_host_port(port: HostPort, host: FakeHost) -> None:
 
     restored = asyncio.run(port.restore("m", saved))
     state = asyncio.run(port.model_state("m", restored.instance_id))
-    assert state.loaded and state.revision == saved.revision and state.fingerprint == saved.fingerprint
+    assert state.loaded
+    assert state.revision == saved.revision
+    assert state.fingerprint == saved.fingerprint
     started = asyncio.run(port.started_instances("h"))
     assert restored in started
     asyncio.run(port.close_started("h", [restored]))
@@ -218,14 +226,22 @@ def _check_dialog_ports() -> None:
 def _check_sink_and_control() -> None:
     sink = RecordingProgressSink()
     progress: ProgressSink = sink
-    event = Event(1, EventType.RUN_PAUSED, None, None, "2026-01-01T00:00:00.000Z", RunPaused(reason="stop_requested", request_ids=[]))
+    event = Event(
+        1,
+        EventType.RUN_PAUSED,
+        None,
+        None,
+        "2026-01-01T00:00:00.000Z",
+        RunPaused(reason="stop_requested", request_ids=[]),
+    )
     progress.emit(event)
     assert sink.events == [event]
     control = FakeRunControl()
     port: RunControlPort = control
     assert not port.stop_requested("r1")
     control.stopped.add("r1")
-    assert port.stop_requested("r1") and not port.stop_requested("r2")
+    assert port.stop_requested("r1")
+    assert not port.stop_requested("r2")
 
 
 def test_data_types_enforce_spec_rules() -> None:
@@ -236,18 +252,20 @@ def test_data_types_enforce_spec_rules() -> None:
         HostModelState(loaded=True)
     with pytest.raises(ValidationError):
         UnitsState(loaded=False, ok=False, present=None, expected="u")
-    base = {"request_id": "i", "shown_sha256": SHA, "by": "engineer:a"}
     with pytest.raises(ValidationError):
-        InputAnswer(**base)
+        InputAnswer(request_id="i", shown_sha256=SHA, by="engineer:a")
     with pytest.raises(ValidationError):
-        InputAnswer(**base, values={}, choices={})
+        InputAnswer(request_id="i", shown_sha256=SHA, by="engineer:a", values={}, choices={})
     with pytest.raises(ValidationError):  # a rejected item needs a reason
-        ApprovalAnswer(request_id="a", shown_sha256=SHA, decision="reject", rejected_items=["x"], by="engineer:a")
+        ApprovalAnswer(request_id="a", shown_sha256=SHA, decision="reject", rejected_items=("x",), by="engineer:a")
     with pytest.raises(ValidationError):  # a reason is 1 to 500 characters after trimming
         ApprovalAnswer(
-            request_id="a", shown_sha256=SHA, decision="reject", rejected_items=["x"], item_reasons={"x": "  "},
+            request_id="a", shown_sha256=SHA, decision="reject", rejected_items=("x",), item_reasons={"x": "  "},
             by="engineer:a",
         )  # fmt: skip
-    assert ApprovalAnswer(request_id="a", shown_sha256=SHA, decision="approve", by="engineer:a").acknowledged_unreleased is False
+    assert (
+        ApprovalAnswer(request_id="a", shown_sha256=SHA, decision="approve", by="engineer:a").acknowledged_unreleased
+        is False
+    )
     assert SavedModel.model_fields.keys() >= {"model_id", "revision", "fingerprint", "file_sha256", "file_name"}
     assert [c.value for c in RunClass] == ["trial", "production"]
