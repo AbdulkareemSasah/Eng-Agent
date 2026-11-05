@@ -1,0 +1,132 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.readback_check",
+    "status": "draft",
+    "version": 1
+  },
+  "complete": true,
+  "diff": {
+    "after": {
+      "covered": [
+        "model.frame_placements/1"
+      ],
+      "model_id": "mdl_00000000000000000000000000",
+      "model_revision": 4
+    },
+    "before": {
+      "covered": [
+        "model.frame_placements/1"
+      ],
+      "model_id": "mdl_00000000000000000000000000",
+      "model_revision": 3
+    },
+    "changes": [
+      {
+        "after": null,
+        "before": null,
+        "change": "changed",
+        "key": [
+          "F1"
+        ],
+        "properties": [
+          {
+            "after": "C40",
+            "before": "C30",
+            "pointer": "/section",
+            "quantity_kind": null,
+            "rule": "D4",
+            "tolerance": null,
+            "unit": null
+          }
+        ],
+        "section": "model.frame_placements/1"
+      },
+      {
+        "after": null,
+        "before": {
+          "id": "F2"
+        },
+        "change": "removed",
+        "key": [
+          "F2"
+        ],
+        "properties": [],
+        "section": "model.frame_placements/1"
+      }
+    ],
+    "complete": true,
+    "counts": {
+      "model.frame_placements/1": {
+        "added": 0,
+        "ambiguous": 0,
+        "changed": 1,
+        "removed": 1,
+        "unchanged": 5,
+        "within_tolerance": 1
+      }
+    },
+    "identical": false,
+    "not_compared": [],
+    "tolerances": {
+      "length": {
+        "ref": "res_00000000000000000000000009#/fields/compare.length",
+        "unit": "mm",
+        "value": 1.0
+      }
+    },
+    "within_tolerance": [
+      {
+        "after": 0.5,
+        "before": 0.0,
+        "key": [
+          "F3"
+        ],
+        "pointer": "/i/x_mm",
+        "quantity_kind": "length",
+        "rule": "D3",
+        "section": "model.frame_placements/1",
+        "tolerance": 1.0,
+        "unit": "mm"
+      }
+    ]
+  },
+  "draft": true,
+  "items": [
+    {
+      "expected": "C40",
+      "item_id": "i1",
+      "read": "C40",
+      "result": "match",
+      "rule": "R2",
+      "tolerance": null
+    },
+    {
+      "expected": 0.2,
+      "item_id": "i2",
+      "read": 200,
+      "result": "mismatch",
+      "rule": "R2",
+      "tolerance": 1.0
+    }
+  ],
+  "status": "FAIL",
+  "trace": {
+    "calc_id": "harness.readback_check",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  },
+  "unexpected": [
+    {
+      "key": [
+        "F7"
+      ],
+      "pointer": "/section",
+      "section": "model.frame_placements/1"
+    }
+  ]
+}

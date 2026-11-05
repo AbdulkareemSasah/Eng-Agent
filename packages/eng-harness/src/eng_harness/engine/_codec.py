@@ -27,7 +27,7 @@ def _rebuild(value: object) -> SummaryValue:
     if isinstance(value, list):
         return [_rebuild(item) for item in value]
     if not isinstance(value, dict):
-        return value  # type: ignore[return-value]  # B-106: a JSON scalar after the canonical round trip
+        return cast(SummaryValue, value)  # a JSON scalar after the canonical round trip
     unit = value.get("unit")
     if _is_number(value.get("value")) and isinstance(unit, str) and unit in UNITS:
         labels = {k: v for k, v in value.items() if k not in _QUANTITY_KEYS}
