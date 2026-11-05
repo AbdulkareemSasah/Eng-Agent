@@ -17,6 +17,13 @@ import pytest
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from pydantic import BaseModel, JsonValue, ValidationError
+from workflows.ctx_flows import flow
+from workflows.rig import make_rig, request
+
+from eng_harness.engine import RunStatus
 from eng_harness.engine._inputs import (
     MARKER,
     Evidence,
@@ -26,15 +33,8 @@ from eng_harness.engine._inputs import (
     check_answer,
     choice_schema,
     data_schema,
+    escalation_request,
 )
-from hypothesis import given, settings
-from hypothesis import strategies as st
-from pydantic import BaseModel, JsonValue, ValidationError
-from workflows.ctx_flows import flow
-from workflows.rig import make_rig, request
-
-from eng_harness.engine import RunStatus
-from eng_harness.engine._runner import escalation_request
 from eng_harness.journal import _events as ev
 from eng_harness.ports import InputAnswer, InputRequest
 
