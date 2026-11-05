@@ -444,13 +444,13 @@ uninterrupted run.
 | Task | Needs merged |
 |---|---|
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
-| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment of spec Q12 (a), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it (owner queue, no work item yet) |
+| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment of spec Q12 (a) (owner question OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it (owner queue, no work item yet) |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes); the engine spec amendment (B-415, documents pull request) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
-| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment (owner question OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
