@@ -116,8 +116,9 @@ def test_pack_and_overlay_declarations(packs: _Packs) -> None:
         replace(over, base=None)  # overlay without base
     with pytest.raises(CheckDefinitionError, match="base"):
         Overlay(base="other", clause_map={}, entries=()).resolve(over, packs.base)  # names another base
+    wrong_type: Any = ("not an entry",)
     with pytest.raises(CheckDefinitionError, match="entries"):
-        Overlay(base="synthbase", clause_map={}, entries=("not an entry",))  # type: ignore[arg-type]  # B-264: wrong type on purpose
+        Overlay(base="synthbase", clause_map={}, entries=wrong_type)
     third = Pack(
         name="third",
         code="Third",
