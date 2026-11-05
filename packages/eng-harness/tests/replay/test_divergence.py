@@ -177,17 +177,21 @@ def test_lookup_compares_kind_name_arguments_and_child() -> None:
     assert ReplayIndex(events).lookup(*same) == Recorded(
         1, ev.StepResult(ref=REF, summary={"v": 1}, warnings=[], complete=True)
     )
-    for other in (("0", "read", "t", D1), ("0", "tool", "u", D1), ("0", "tool", "t", "f" * 64)):
+    differing = (
+        (("0", "read", "t", D1), "kind"), (("0", "tool", "u", D1), "name"), (("0", "tool", "t", "f" * 64), "arguments"),
+        (("0", "read", "u", D1), "kind, name"),  # every differing part is named, in this order
+    )  # fmt: skip
+    for other, parts in differing:
         with pytest.raises(ReplayDivergence) as raised:
             ReplayIndex(events).lookup(*other)
         assert raised.value.code is HarnessCode.REPLAY_DIVERGENCE
-        assert "step 0" in raised.value.message
+        assert raised.value.message == f"step 0 differs from the journal in its {parts}"
     # a block step is identified by the child's name and version, not by its code hash
     assert ReplayIndex(events).lookup("1", "block", "c", D1, ("c", "1")) is not None
     for wrong in (("c", "2"), ("d", "1"), None):
-        with pytest.raises(ReplayDivergence):
+        with pytest.raises(ReplayDivergence, match=r"in its child$"):
             ReplayIndex(events).lookup("1", "block", "c", D1, wrong)
-    with pytest.raises(ReplayDivergence):  # a child where the journal has none
+    with pytest.raises(ReplayDivergence, match=r"in its child$"):  # a child where the journal has none
         ReplayIndex(events).lookup("0", "tool", "t", D1, ("c", "1"))
 
 
@@ -229,6 +233,17 @@ def test_recorded_outcomes() -> None:
     assert ReplayIndex([_begin(1, "0"), _failed(2, "0", retryable=False)]).lookup(*call) == Recorded(1, error)
 
 
+def test_stops_name_the_step_and_the_reason() -> None:
+    call = ("7", "tool", "t", D1)
+    with pytest.raises(NeedsReconciliation) as in_flight:
+        ReplayIndex([_begin(1, "7")]).lookup(*call)
+    assert in_flight.value.message == "step 7 was in flight when the run stopped"
+    unresolved = [_begin(1, "7"), _reconciled(2, "7", 1, "applied", with_result=False)]
+    with pytest.raises(NeedsReconciliation) as closed:
+        ReplayIndex(unresolved).lookup(*call)
+    assert closed.value.message == "step 7 was closed without a result"
+
+
 def test_unrecorded_and_unreplayed_paths() -> None:
     events = [
         _begin(1, "0"), _done(2, "0"),
@@ -259,5 +274,6 @@ def test_finish_names_the_unvisited_paths() -> None:
 
 
 def test_step_event_without_a_start_is_a_damaged_journal() -> None:
-    with pytest.raises(JournalIntegrityError):
+    with pytest.raises(JournalIntegrityError) as raised:
         ReplayIndex([_done(1, "0")])
+    assert raised.value.message == "step event seq 1 has no step_started"
