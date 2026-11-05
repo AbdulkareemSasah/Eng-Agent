@@ -207,6 +207,7 @@ def hold_lock(run_dir: Path) -> Iterator[BaseProcess]:
     here, there = context.Pipe()
     holder = context.Process(target=_hold, args=(str(run_dir), there))
     holder.start()
+    there.close()  # so that `here.recv()` fails, instead of waiting for ever, when the holder dies before it holds
     try:
         assert here.recv() == "held"
         yield holder
