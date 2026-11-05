@@ -16,7 +16,18 @@ from structural_codes.verification import CaseFile, verify_check
 from aci318_14.checks.punching_shear import punching_shear
 
 CASES = Path(__file__).parents[1] / "data" / "golden" / "verification" / "aci318_14.22_6_5_2.punching_shear.yaml"
-CASE_IDS = ("HC-1", "HC-2", "HC-3", "BD-1.a", "BD-1.b", "BD-2.a", "BD-2.b", *(f"BD-3.{x}" for x in "abcde"))
+CASE_IDS = (
+    "HC-1",
+    "HC-2",
+    "HC-3",
+    "BD-1.a",
+    "BD-1.b",
+    "BD-1.c",
+    "BD-1.d",
+    "BD-2.a",
+    "BD-2.b",
+    *(f"BD-3.{x}" for x in "abcde"),
+)
 
 
 def test_hand_checks() -> None:

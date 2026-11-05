@@ -85,6 +85,27 @@ cases:
       values:
         Vu_kN: {value: 0, unit: kN, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 0, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  # BD-1.c: cx + d > Lx while cy + d <= Ly; the X limit is tested independently of Y.
+  - id: BD-1.c
+    kind: boundary
+    covers: [PERIMETER_INSIDE, G-3]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, Lx_mm: 1200, Ly_mm: 3000, cx_mm: 900, cy_mm: 300}
+    expected: {status: NEEDS_ENGINEER}
+  # BD-1.d: cx + d = Lx only (clause spec §4): A = 4.2e6 mm2, b1*b2 = 1400*800 mm2, beta = 3, (b) governs.
+  - id: BD-1.d
+    kind: boundary
+    covers: [PERIMETER_INSIDE]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, Lx_mm: 1400, Ly_mm: 3000, cx_mm: 900, cy_mm: 300}
+    expected:
+      status: PASS
+      values:
+        bo_mm: {value: 4400, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        Vu_kN: {value: 1246.666667, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        vu_MPa: {value: 0.566667, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        phivc_MPa: {value: 1.124444, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        ratio: {value: 0.503953, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-2.a
     kind: boundary
     covers: [G-4]

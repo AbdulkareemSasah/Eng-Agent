@@ -50,6 +50,8 @@ def run(subject: Subject = FOOTING, **changes: Any) -> VerdictSet:
     [
         ({"d_mm": 2200.0}, "PERIMETER_INSIDE", "G-3"),
         ({"Ly_mm": 800.0}, "PERIMETER_INSIDE", "G-3"),
+        ({"Lx_mm": 1200.0, "Ly_mm": 3000.0, "cx_mm": 900.0, "cy_mm": 300.0}, "PERIMETER_INSIDE", "G-3"),
+        ({"Lx_mm": 3000.0, "Ly_mm": 1200.0, "cx_mm": 300.0, "cy_mm": 900.0}, "PERIMETER_INSIDE", "G-3"),
         ({"concrete_class": "sand_lightweight"}, "NORMALWEIGHT", "G-1"),
         ({"concrete_class": "lightweight"}, "NORMALWEIGHT", "G-1"),
         ({"fc_MPa": 16.0}, "FC_MIN", None),
@@ -79,6 +81,28 @@ def test_limits_give_normal_verdicts() -> None:
     assert verdict.ratio == pytest.approx(0.0, abs=_RATIO)
     steps = {s.name: s.value for s in edge.traces[0].steps}
     assert steps["Vu_kN"] == pytest.approx(0.0, abs=_V_KN)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"Lx_mm": 1400.0, "Ly_mm": 3000.0, "cx_mm": 900.0, "cy_mm": 300.0},
+        {"Lx_mm": 3000.0, "Ly_mm": 1400.0, "cx_mm": 300.0, "cy_mm": 900.0},
+    ],
+)
+def test_one_direction_at_the_limit(changes: dict[str, Any]) -> None:
+    """E-1 in one direction only: `c + d = L` along the long column side, the other well inside; the body runs.
+
+    Hand values (clause spec §4): b1*b2 = 1400*800 mm2, A = 4.2e6 mm2, Vu = 1700*(4.2e6 - 1.12e6)/4.2e6 kN,
+    bo = 4400 mm, vu = Vu/(bo*d), beta = 3 so expression (b) governs as in HC-2: phivc = 1.124444 MPa.
+    """
+    payload = run(**changes)
+    (verdict,) = payload.verdicts
+    assert verdict.status is VerdictStatus.PASS
+    assert verdict.ratio == pytest.approx(0.503953, abs=_RATIO)
+    steps = {s.name: s.value for s in payload.traces[0].steps}
+    assert steps["Vu_kN"] == pytest.approx(1246.666667, abs=_V_KN)
+    assert steps["vu_MPa"] == pytest.approx(0.566667, abs=_STRESS)
 
 
 @pytest.mark.parametrize(
