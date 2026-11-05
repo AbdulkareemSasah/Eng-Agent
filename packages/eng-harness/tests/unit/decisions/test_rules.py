@@ -1,6 +1,8 @@
 """Rule definitions, restricted basis view, registry, lock and review table (plan 0005 T4; spec 0005 AC9 to AC13)."""
 
 import hashlib
+import importlib
+import inspect
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -10,8 +12,6 @@ import pytest
 from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from pydantic import BaseModel, ConfigDict
-from rules.fixtures import fixture_rules
-from rules.fixtures.fixture_rules import POINT, Action, FixtureState, bearing_only, reads_undeclared
 
 from eng_harness.block import LockFinding
 from eng_harness.ctx import BasisView
@@ -27,6 +27,13 @@ from eng_harness.decisions._rules import (
 )
 from eng_harness.decisions.types import DecisionDefinitionError, Pick, RuleBasis, rule
 from eng_harness.errors import BlockRuleViolation
+
+fixture_rules = importlib.import_module("rules.fixtures.fixture_rules")  # tests/rules/fixtures, a namespace package
+POINT: str = fixture_rules.POINT
+Action: Any = fixture_rules.Action
+FixtureState: Any = fixture_rules.FixtureState
+bearing_only: Rule = fixture_rules.bearing_only
+reads_undeclared: Rule = fixture_rules.reads_undeclared
 
 RESULT = "res_01ARZ3NDEKTSV4RRFFQ69G5FAV"
 GOOD: dict[str, Any] = {
@@ -46,15 +53,15 @@ def _view(declared: tuple[str, ...] = ("limits.bearing_ratio", "limits.other_rat
     return BasisView(RESULT, basis, declared)
 
 
-def _fn(state: FixtureState, basis: RuleBasis) -> Pick[Action] | None:
+def _fn(state: BaseModel, basis: RuleBasis) -> Pick[Any] | None:
     return None
 
 
-async def _async_fn(state: FixtureState, basis: RuleBasis) -> None:
+async def _async_fn(state: BaseModel, basis: RuleBasis) -> None:
     return None
 
 
-def _generator_fn(state: FixtureState, basis: RuleBasis) -> Any:
+def _generator_fn(state: BaseModel, basis: RuleBasis) -> Any:
     yield 1
 
 
@@ -62,15 +69,15 @@ def _plain_state_fn(state: int, basis: RuleBasis) -> None:
     return None
 
 
-def _no_annotation_fn(state, basis):  # type: ignore[no-untyped-def]  # B-168: the missing annotation is the case
+def _any_state_fn(state: Any, basis: RuleBasis) -> None:
     return None
 
 
-def _one_param_fn(state: FixtureState) -> None:
+def _one_param_fn(state: BaseModel) -> None:
     return None
 
 
-def _no_source_fn(state: FixtureState, basis: RuleBasis) -> None:
+def _no_source_fn(state: BaseModel, basis: RuleBasis) -> None:
     return None
 
 
@@ -92,13 +99,13 @@ def _make(fn: Callable[..., object] = _fn, **overrides: object) -> Rule:
         (_fn, {"version": True}),
         (_fn, {"rationale": ""}),
         (_fn, {"rationale": "Limit of 5 mm."}),
-        (_fn, {"rationale": "Arabic digit ٥."}),
+        (_fn, {"rationale": f"Arabic digit {chr(0x665)}."}),
         (_fn, {"thresholds": ("bearing",)}),
         (_fn, {"thresholds": ("Limits.Bearing",)}),
         (_async_fn, {}),
         (_generator_fn, {}),
         (_plain_state_fn, {}),
-        (_no_annotation_fn, {}),
+        (_any_state_fn, {}),
         (_one_param_fn, {}),
         (_no_source_fn, {}),
     ],
@@ -115,7 +122,7 @@ def test_registration_accepts_a_good_rule_and_registry_rules() -> None:
         1,
         POINT,
         ("limits.bearing_ratio",),
-        FixtureState,
+        BaseModel,
     )
     assert _make(thresholds=()).thresholds == ()
     point = decision_point(name=POINT, version=1, title="Fixture point", options=Action, state=FixtureState)(object)
@@ -123,7 +130,8 @@ def test_registration_accepts_a_good_rule_and_registry_rules() -> None:
     assert [r.id for r in registry.rules] == ["fixture_point.bearing_only", "fixture_point.reads_undeclared"]
     assert registry.get("fixture_point.bearing_only") is bearing_only
     assert registry.get("fixture_point.nothing") is None
-    assert len(registry.with_(made).rules) == 3
+    assert len(RuleRegistry([bearing_only]).with_(made).rules) == 2
+    assert registry.with_().points is registry.points
     with pytest.raises(DecisionDefinitionError, match="duplicate"):
         RuleRegistry([bearing_only, bearing_only])
     with pytest.raises(DecisionDefinitionError, match="no decision point"):
@@ -135,7 +143,7 @@ def test_registration_accepts_a_good_rule_and_registry_rules() -> None:
 
 
 def test_code_hash_is_stable() -> None:
-    source = Path(fixture_rules.__file__).read_bytes().decode("utf-8").replace("\r\n", "\n")
+    source = Path(inspect.getfile(fixture_rules)).read_bytes().decode("utf-8").replace("\r\n", "\n")
     expected = hashlib.sha256(source.encode("utf-8")).hexdigest()
     assert bearing_only.code_sha256 == expected
     assert reads_undeclared.code_sha256 == expected  # one module, one hash
@@ -182,7 +190,7 @@ def test_rule_basis_is_restricted() -> None:
     state = FixtureState(bearing_ratio=Quantity(0.6, "1"), bearing_fails=True)
     assert bearing_only.fn(state, basis) == Pick(Action.ENLARGE)
     assert bearing_only.fn(state.model_copy(update={"bearing_fails": False}), basis) is None
-    with pytest.raises(BlockRuleViolation, match="limits.other_ratio"):
+    with pytest.raises(BlockRuleViolation, match=r"limits\.other_ratio"):
         reads_undeclared.fn(state, RuleBasis(_view(), reads_undeclared.thresholds))
     for read in (basis.quantity, basis.count):
         with pytest.raises(BlockRuleViolation, match="thresholds"):
@@ -210,3 +218,22 @@ def test_review_table() -> None:
     assert [r.approval for r in approved] == ["approved", "draft"]
     stale = registry.review_table({"fixture_point.bearing_only": "0" * 64})  # bound to the hash: a stale one is draft
     assert [r.approval for r in stale] == ["draft", "draft"]
+
+
+def test_write_lock_command_writes_both_and_refuses_a_bump(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from eng_harness.decisions import __main__ as command
+    from eng_harness.decisions import _points
+
+    points_lock, rules_lock = tmp_path / "decisions.lock.json", tmp_path / "rules.lock.json"
+    monkeypatch.setattr(_points, "LOCK_PATH", points_lock)
+    monkeypatch.setattr(_rules, "RULES_LOCK_PATH", rules_lock)
+    assert command.main(["--write-lock"]) == 0
+    assert json.loads(points_lock.read_text(encoding="utf-8")) == []
+    assert json.loads(rules_lock.read_text(encoding="utf-8")) == []
+    monkeypatch.setattr(_rules, "discover", lambda: RuleRegistry([bearing_only]))
+    stale = [{"id": bearing_only.id, "version": 1, "code_sha256": "0" * 64}]
+    rules_lock.write_text(json.dumps(stale), encoding="utf-8")
+    points_lock.write_text("[]\n", encoding="utf-8")
+    with pytest.raises(DecisionDefinitionError, match="VERSION_BUMP_REQUIRED"):
+        command.main(["--write-lock"])
+    assert json.loads(rules_lock.read_text(encoding="utf-8")) == stale  # refused: neither lock written

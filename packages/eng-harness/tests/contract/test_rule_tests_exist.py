@@ -1,11 +1,11 @@
 """Every rule has a typical and a boundary test (plan 0005 T4; spec 0005 AC12, process/10 section 4)."""
 
+import importlib
 from pathlib import Path
 
-from rules.fixtures.fixture_rules import bearing_only
+from eng_harness.decisions._rules import Rule, RuleRegistry, RuleTestFinding, discover, missing_rule_tests
 
-from eng_harness.decisions._rules import RuleRegistry, RuleTestFinding, discover, missing_rule_tests
-
+bearing_only: Rule = importlib.import_module("rules.fixtures.fixture_rules").bearing_only
 RULE_TESTS = Path(__file__).resolve().parents[1] / "rules"
 
 

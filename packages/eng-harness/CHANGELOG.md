@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decision rules: `Rule`, `rule`, `RuleBasis` (basis reads limited to a rule's `thresholds`), `RuleRegistry` with `review_table()`, `discover()`, `missing_rule_tests()`, `rules.lock.json` with its check and writer in `decisions/_rules.py`; `python -m eng_harness.decisions --write-lock` now writes both locks and refuses, writing neither, a changed hash under an unchanged version; `Pick` is bound to `StrEnum | int` so `Pick[Action]` type-checks; `Rationale` moved to `_rules.py` and stays importable from `decisions.types` (plan 0005 T4, B-168; spec 0005 AC9 to AC13, AC42).
 - Progress display: `eng_harness.progress` with `ExpectedTimes.build` (read-only journals, median, range and sample floor), `estimate` and `ProgressRenderer` for terminal, plain and JSON modes, with golden snapshots; the sink, heartbeat task and JSON-mode heartbeat follow in T5 (plan 0006 T4, B-178; spec 0006 AC15 to AC17).
 
 - Decision points: `DecisionPoint`, `decision_point`, `Refs`, `PointRegistry` (state field rules of AC2, `schema_sha256`), `check_state_size`, `check_lock`, `write_lock` and `discover()` in `decisions/_points.py`, the empty `decisions.lock.json` and `python -m eng_harness.decisions --write-lock`; `Label` and `DecisionDefinitionError` now live in `_points.py` and stay importable from `decisions.types` (plan 0005 T2, B-166; spec 0005 AC1 to AC4).
