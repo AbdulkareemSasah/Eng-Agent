@@ -6,6 +6,7 @@ of its standard input, exit before the handshake, never answer the handshake, or
 """
 
 import json
+import logging
 import os
 import signal
 import sys
@@ -21,7 +22,7 @@ from eng_contract.errors import ErrorCode
 from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig
-from eng_harness.servers._buildcheck import BuildExpectation
+from eng_harness.servers._buildcheck import BuildExpectation, tool_list_fingerprint
 from eng_harness.servers._launcher import JobPolicy, LaunchedProcess, LaunchSpec, PosixLauncher
 from eng_harness.servers._procinfo import PosixProcessInspector
 
@@ -490,6 +491,23 @@ def test_preflight_over_the_csi_fake(tmp_path: Path, make_config: ConfigFactory,
         assert check.fingerprint == check.expected_fingerprint == csi_allowlist().tool_fingerprint
 
     _run(tmp_path, config, launcher, body, _checks())
+
+
+def test_preflight_records_the_full_tool_list_fingerprint(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Spec 0002 4.3.4 item 4: the fingerprint of every listed tool is recorded for diagnosis."""
+    config = make_config()
+    logged: list[str] = []
+
+    async def body(manager: ServerManager) -> None:
+        await manager.preflight({})
+        listed = await manager.list_tools("csi", "main")
+        logged.append(tool_list_fingerprint({tool.name: tool.input_schema for tool in listed}))
+
+    with caplog.at_level(logging.INFO, logger="eng_harness.servers._session"):
+        _run(tmp_path, config, launcher, body, _checks())
+    assert any(logged[0] in record.getMessage() for record in caplog.records)
 
 
 def test_preflight_reports_each_failure(
