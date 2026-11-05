@@ -149,7 +149,7 @@ def test_hc1_values_and_trace() -> None:
         "beta1_lo": (0.65, "ACI 318-14 Table 22.2.2.4.3"),
         "fy_max": (550.0, "ACI 318-14 Table 20.2.2.4(a)"),
         "fc_min": (17.0, "ACI 318-14 Table 19.2.1.1"),
-        "k_kNm": (1.0e-6, "SI prefixes"),
+        "k_kilo_milli": (1.0e-6, "SI prefixes"),  # spec §5 k_kNm; its suffix would fix kN.m (core AC10)
     }
     for name, (value, source) in expected.items():
         assert cited[name].value == pytest.approx(value), name
