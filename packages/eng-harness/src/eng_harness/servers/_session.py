@@ -23,7 +23,7 @@ from mcp.client.stdio import get_default_environment
 
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ServerCheck
-from eng_harness.servers._buildcheck import BuildExpectation, Observed, check_build
+from eng_harness.servers._buildcheck import BuildExpectation, Observed, check_build, tool_list_fingerprint
 from eng_harness.servers._config import RoleConfig, ServerConfig, ServersConfig
 from eng_harness.servers._launcher import (
     JobPolicy,
@@ -201,7 +201,9 @@ class ServerManager:
         except (TimeoutError, MCPError, OSError, ValueError) as error:
             return self._unchecked(role, f"the build cannot be read: {error}")
         seen = Observed(exe, client.server_info, {t.name: t.input_schema for t in tools}, status)
-        logger.info("%s/%s serverInfo %s", role.server, role.name, seen.server_info)
+        logger.info(
+            "%s/%s %s, tool list %s", role.server, role.name, seen.server_info, tool_list_fingerprint(seen.tools)
+        )
         return check_build(role.server, role.config.build, expected, seen, self._min_builds.get(role.server, ""))
 
     async def call(
