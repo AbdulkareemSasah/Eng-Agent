@@ -157,6 +157,7 @@ def test_batch(registry: Registry) -> None:
     for fault, name in (
         ("overflow", "OverflowError"),
         ("domain", "ValueError"),
+        ("log", "ValueError"),  # math.log(0) of an int: "expected a positive input" (no ", got ...") in Python 3.14
         ("nan", "TraceValueError"),
     ):
         one = evaluate(_SIZED, _inputs(fault=fault), subject=_S1, registry=registry)
@@ -168,6 +169,10 @@ def test_batch(registry: Registry) -> None:
     # A ValueError that is not a math-domain error is a defect in the body and propagates (AC28).
     with pytest.raises(ValueError, match="synthetic non-math failure"):
         evaluate(_SIZED, _inputs(fault="value"), subject=_S1, registry=registry)
+
+    # An explicit `raise ValueError` is a defect even when its message reads like a math-domain error.
+    with pytest.raises(ValueError, match="math domain error"):
+        evaluate(_SIZED, _inputs(fault="feigned"), subject=_S1, registry=registry)
 
     # Any other exception propagates.
     with pytest.raises(RuntimeError, match="synthetic unexpected failure"):
