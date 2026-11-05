@@ -150,7 +150,7 @@ tasks:
     depends_on: []
   - id: T7
     title: Decision points and rules of the edit cycle
-    # Amendment (B-417, documents only): found by spec 0005 discovery (decisions._points.discover() over eng_harness.workflows, decisions._rules.discover() over eng_harness.rules), so no decisions/ file changes; rule tests move to tests/rules/test_edit_cycle.py (spec 0005 AC12); the two phase-1 tests of tests/unit/decisions/test_points.py are isolated from the shipped package.
+    # Amendment (B-417, documents only): found by spec 0005 discovery (decisions._points.discover() over eng_harness.workflows, decisions._rules.discover() over eng_harness.rules), so no decisions/ file changes; rule tests move to tests/rules/test_edit_cycle.py (spec 0005 AC12); the two phase-1 tests of tests/unit/decisions/test_points.py and two of tests/unit/decisions/test_rules.py are isolated from the shipped package; point and rule names follow spec 0005 AC1 and AC9.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -161,6 +161,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
       - "packages/eng-harness/tests/rules/test_edit_cycle.py"
       - "packages/eng-harness/tests/unit/decisions/test_points.py"  # isolates the two phase-1 discovery tests from the shipped points (amendment B-417)
+      - "packages/eng-harness/tests/unit/decisions/test_rules.py"  # isolates two phase-1 discovery tests from the shipped rules and points (amendment B-417)
     max_changed_lines: 260
     max_sessions: 2
     tests_first:
@@ -361,8 +362,10 @@ approval's write chain (with the engine's `p~post.save` results), and a save to 
 `approve_each_write` preview (spec Q3); an approval resolved by the mode never satisfies an always-ask step.
 Starts only after the engine spec amendment is merged.
 
-**T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules (`rb.pass`,
-`am.clean`) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review. Amendment
+**T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules
+(`edit_cycle_readback_result.pass`, `edit_cycle_analysis_messages.clean`; the point names `edit_cycle_readback_result`,
+`edit_cycle_analysis_messages` and `edit_cycle_engineer_turn` pass spec 0005 AC1, which allows no dot, and each rule id
+starts with its point name, spec 0005 AC9; amendment B-417) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review. Amendment
 (B-417): the points and rules are found by the discovery of spec 0005 (amendment B-411): `decisions._points.discover()`
 imports every module under `eng_harness.workflows`, so the module-level `DecisionPoint` objects of
 `workflows/model_edit_cycle/_points.py` enter the real point registry, and `decisions._rules.discover()` imports every
@@ -380,8 +383,16 @@ against the real package: `test_discover_is_empty_without_workflows` asserts `di
 empty lock. The task therefore lists that file and rewrites both tests so that they no longer depend on the shipped
 package, keeping what each checks: the first monkeypatches `importlib.util.find_spec` to report `eng_harness.workflows`
 absent and still expects an empty registry (the "empty when the package is absent" branch of spec 0005 §4.2), and the
-second monkeypatches `_points.discover` to return an empty `PointRegistry` and still expects an empty lock. That the real
-discovery finds the three points is checked by `tests/contract/test_decision_lock.py` against the regenerated lock.
+second monkeypatches `_points.discover` to return an empty `PointRegistry` and still expects an empty lock. For the same reason
+two merged tests of `tests/unit/decisions/test_rules.py` (plan 0005 T4) would fail once the two rules exist:
+`test_discover_is_empty_without_rules_package` asserts `discover().rules == ()`, and
+`test_write_lock_command_writes_both_and_refuses_a_bump` runs `command.main(["--write-lock"])`, which writes
+`_points.discover()` and `_rules.discover()`, and expects both locks empty. The task lists that file too and rewrites
+both tests the same way, keeping their expectations: the first monkeypatches `importlib.util.find_spec` to report
+`eng_harness.rules` absent and still expects an empty registry (spec 0005 §4.4), and the second monkeypatches
+`_points.discover` and `_rules.discover` to return empty registries before the first write and still expects both
+locks empty. That the real discovery finds the three points and the two rules is checked by
+`tests/contract/test_decision_lock.py` and `tests/contract/test_rule_lock.py` against the regenerated locks.
 
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the

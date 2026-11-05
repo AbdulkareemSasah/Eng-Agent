@@ -155,8 +155,9 @@ defines its method; values are synthetic and say so.
 - AC18. Given each rule of §4.6, then a typical case and a boundary case (equality with its basis threshold where it
   has one) give the stated option, and states outside the rule give `None`. Test:
   `tests/rules/test_edit_cycle.py::test_pass_typical`, `::test_pass_boundary`, `::test_clean_typical`,
-  `::test_clean_boundary` (spec 0005 AC12 names: the rule module `rules/edit_cycle.py`, the rule ids `rb.pass` and
-  `am.clean`; amendment B-417).
+  `::test_clean_boundary` (spec 0005 AC12 names: the rule module `rules/edit_cycle.py`, the rule ids
+  `edit_cycle_readback_result.pass` and `edit_cycle_analysis_messages.clean`, each prefixed with its point name as
+  spec 0005 AC9 requires, the point names matching spec 0005 AC1, which allows no dot; amendment B-417).
 - AC19. Given the engineer turn, then it is a choice request with the three options of §4.6 even in
   `autonomous_logged`; `accept` goes to step 16, `more_edits` asks for a change set in the next cycle, and `hand_edit`
   starts the next cycle with an empty change set, no step 6 approval and a saved revision. Test:
@@ -394,7 +395,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
 | 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", ...), ctx.tool("csi_design_results", ...))` (reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
 | 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; `ctx.calc("harness.host_design_verdicts", ...)`, `ctx.calc("harness.design_summary", {"verdicts", "frames", "previous": <cycle k-1>, "basis"})` | Invariant 3 |
-| 15 | `ctx.decide("edit_cycle.engineer_turn", EngineerTurn, TurnState(...), rules=(), policy=require_engineer)` | Invariant 4; the choice is on the page only (spec 0006 AC46) |
+| 15 | `ctx.decide("edit_cycle_engineer_turn", EngineerTurn, TurnState(...), rules=(), policy=require_engineer)` | Invariant 4; the choice is on the page only (spec 0006 AC46) |
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
@@ -433,14 +434,14 @@ statuses, booleans and labels only; no rule holds a number (thresholds are in th
 
 | Point | Options | State | Rules, in order | Policy |
 |---|---|---|---|---|
-| `edit_cycle.readback_result` (D-2) | `continue`, `restore_previous`, `stop_cycle` | readback status, counts of mismatch, missing, unexpected and not-read items as booleans (`has_mismatch`, ...), reason (`readback`, `model_changed_during_apply`), refs | `rb.pass`: status `PASS` and reason `readback` → `continue` | `require_engineer=True` after the rules; `model=False`, `llm=False` |
-| `edit_cycle.analysis_messages` (D-3) | `continue`, `stop_cycle` | `has_errors`, `has_unclassified`, drift status, refs | `am.clean`: not `has_errors`, not `has_unclassified` → `continue` | same |
-| `edit_cycle.engineer_turn` (D-6) | `accept`, `more_edits`, `hand_edit` | readback, analysis and design statuses, counts as labels, refs to the summaries and the difference report | none | `require_engineer=True` |
+| `edit_cycle_readback_result` (D-2) | `continue`, `restore_previous`, `stop_cycle` | readback status, counts of mismatch, missing, unexpected and not-read items as booleans (`has_mismatch`, ...), reason (`readback`, `model_changed_during_apply`), refs | `edit_cycle_readback_result.pass`: status `PASS` and reason `readback` → `continue` | `require_engineer=True` after the rules; `model=False`, `llm=False` |
+| `edit_cycle_analysis_messages` (D-3) | `continue`, `stop_cycle` | `has_errors`, `has_unclassified`, drift status, refs | `edit_cycle_analysis_messages.clean`: not `has_errors`, not `has_unclassified` → `continue` | same |
+| `edit_cycle_engineer_turn` (D-6) | `accept`, `more_edits`, `hand_edit` | readback, analysis and design statuses, counts as labels, refs to the summaries and the difference report | none | `require_engineer=True` |
 
 D-2 and D-3 are never open at the same time: D-2 is asked before analysis and an open D-2 means analysis does not
 run (AC17), so no batching is needed. D-2 reaches the engineer only on a read-back failure, a failure path of §4.9;
 on a normal path at most D-3 reaches the engineer, so A7 holds there. Until EC-G3 is resolved every analysis
-message is `unclassified`, so `am.clean` sends D-3 to the engineer whenever the host reports any message, as real
+message is `unclassified`, so `edit_cycle_analysis_messages.clean` sends D-3 to the engineer whenever the host reports any message, as real
 analyses usually do; D-3 is then the cycle's one prompt and any further request in that cycle exceeds A7 (Q10). D-1 (WS §5) is the attempts loop of step 5 and D-5 the loop of §4.5; neither is a decision point. D-4 is
 the engine's in-flight request (engine §4.5.3), not a workflow point. `stop_cycle` skips to the engineer turn of the
 same cycle with the summaries available so far; `restore_previous` runs `ctx.tool("csi_open_revision", {"model": m,
@@ -500,7 +501,9 @@ letters, which the contract's `basis.design_basis/1` path rule does not allow ye
 holding those eight paths (four `compare.*`, four `bounds.*`) cannot be frozen until the contract path rule is amended (Q12). The `compare.*` and
 `checks.readback_relative_tolerance` names also appear, without suffixes, in specs 0002 §4.5.8, 0003 §4.4, 0008, 0010,
 0011, 0013 and 0014 and in plans 0011, 0013 and 0014, and `limits.ratio_limit` (renamed `limits.ratio_limit_ratio`)
-appears in specs 0004 (its field proposal for this spec), 0010 and 0013; the calcs and the adapter read the paths of
+appears in specs 0004 (its field proposal for this spec), 0010 and 0013, in structural-codes plan 0002 (its Q2 list
+of design-basis field paths) and in the structural-codes clause document `aci318_14.13_3_1_1` (bearing pressure,
+service); the calcs and the adapter read the paths of
 this table, and those documents are renamed to match (Q12).
 
 Spec 0004's proposed `modeling.merge_tolerance_mm`, `modeling.snap_tolerance_mm` and
@@ -527,7 +530,7 @@ repeated step 6 approval (after `ApprovalVoid` or `restore_previous`), a re-aske
 (`engine.in_flight`, `engine.host_state`, `engine.escalation`), a separately asked always-ask approval and a D-2 or D-3
 screen each count; one batched screen counts once. Steps 16 and 17 are once per run, outside the cycle, and are not
 counted. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC15, AC19, AC21 and AC22.
-In those fake-host scenarios the fake returns no analysis messages, so D-3 resolves by `am.clean` and no request is
+In those fake-host scenarios the fake returns no analysis messages, so D-3 resolves by `edit_cycle_analysis_messages.clean` and no request is
 counted; one added scenario has the fake return messages, which are `unclassified` (EC-G3), and shows D-3 as that
 cycle's one prompt. Interruption, failure and escalation paths (resume after a stop with its `engine.host_state`
 request, approval void, read-back failure and restore, timeout, change-set re-asks and exhaustion, cycle limit: AC13,
@@ -633,8 +636,8 @@ start at version 1 with lock entries.
 | Q11 | The A3 audit and the A7 prompt count (AC25, AC26) are functions, and spec 0006 AC1 allows six commands only (`LOCAL-TESTING.md` open point 7) | Owner | Decided by amendment B-354: the read-only module entry point `python -m eng_harness.report` with `audit-sources` and `count-prompts` (AC35), as spec 0009 exposes `python -m eng_harness.providers` (its Q6); no seventh command |
 | Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
-| Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `am.clean` (an unknown message must not pass silently) |
-| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule is lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio` | Owner | (a) Amend the contract path rule to the `FieldPath` name rule in a contract minor version, as spec 0004 Q1 recommends, before plan 0007 T2 and T8; (b), (c) and (d) a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, before plan 0003 T8 and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
+| Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `edit_cycle_analysis_messages.clean` (an unknown message must not pass silently) |
+| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule is lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) Amend the contract path rule to the `FieldPath` name rule in a contract minor version, as spec 0004 Q1 recommends, before plan 0007 T2 and T8; (b), (c) and (d) a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it; all before plan 0003 T8 and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
 | Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
