@@ -210,8 +210,9 @@ assembly (T9), which registers the pack and runs the pack-level tests. Each task
 
 Start condition: core plan 0001 tasks T1 (shared folder files), T6 (checks and registry), T8 (runner) and T14a (the
 public modules declared, without which every import of `structural_codes` from the pack fails IM002; amendment B-385)
-are merged before T2; T9 (verification) before T3 to T8 (their case files are run through `verify_check`); T11 and T12
-(lifecycle, command line) before T9. T1 needs core T1 only. T9 also needs the clause-spec folder settled (§6 Q12):
+are merged before T2; T9 (verification) before T3 to T8 (their case files are run through `verify_check`); T11, T12 and T14b
+(lifecycle, command line, and `structural_codes.lifecycle` in public_modules, without which
+`tests/unit/test_pack.py::test_all_draft` fails IM002; amendment B-419) before T9. T1 needs core T1 only. T9 also needs the clause-spec folder settled (§6 Q12):
 CF §4.1 and §4.2 amended to `docs/clauses/<pack>/`, or these clause specs moved to the folder the core resolves, so
 that PK-AC3 finds every `CheckMeta.spec` file.
 
@@ -268,7 +269,8 @@ of each clause spec.
   every check is refused with `CheckNotUsable` (CF AC25). Test: `tests/unit/test_pack.py::test_all_draft`.
 - PK-AC7. Given the hand-check inputs, when evaluated in two subprocesses with `PYTHONHASHSEED` 0 and 1, then the
   canonical JSON of the payloads is byte-identical. Test: `tests/replay/test_pack_determinism.py::test_identical_across_hash_seeds`.
-- PK-AC8. Given the pack, when `python -m structural_codes verify --pack aci318_14` runs, then it exits 0, every hand
+- PK-AC8. Given the pack, when `python -m structural_codes verify --pack P` runs with `P` the pack project root
+  `packages/structural-codes/aci318-14/` (CF §4.9.3, amendment B-419), then it exits 0, every hand
   check passes, program comparisons are `pending` (needs local test) and every check is reported not `verified`
   (worked example missing, G-WE). Test: `tests/unit/test_verify_cli.py::test_verify_reports_unverified`.
 - PK-AC9. Given the package, when the gate runs, then line coverage ≥ 95%, branch ≥ 90%, mutation ≥ 80% on the R1

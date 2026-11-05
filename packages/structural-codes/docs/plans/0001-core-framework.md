@@ -193,6 +193,7 @@ tasks:
     depends_on: [T9, T10]
   - id: T12
     title: Command line (verify and hash)
+    # Amendment (B-419, documents only): `--pack P` is the pack project root (spec 4.9.3); an overlay pack's check set includes its inherited checks (verify_check per check, not verify_pack); test_cli.py builds its pack roots in tmp_path, so no fixture file is committed.
     files:
       - "packages/structural-codes/core/src/structural_codes/__main__.py"
       - "packages/structural-codes/core/src/structural_codes/_cli.py"
@@ -236,20 +237,35 @@ tasks:
       - "packages/structural-codes/core/tests/unit/test_package.py::test_public_modules_declared"
     covers: [AC38]
     depends_on: [T10]
+  - id: T14b
+    title: Declare structural_codes.lifecycle public (pack tests import it)
+    # Amendment (B-419, documents only): new task; the packs' test_all_draft tests import structural_codes.lifecycle (IM002) before T14 can land.
+    files:
+      - "packages/structural-codes/core/pyproject.toml"
+      - "packages/structural-codes/core/CHANGELOG.md"
+      - "packages/structural-codes/core/tests/unit/test_package.py"
+    max_changed_lines: 20
+    max_sessions: 1
+    tests_first:
+      - "packages/structural-codes/core/tests/unit/test_package.py::test_lifecycle_declared"
+    covers: [AC38]
+    depends_on: [T11]
   - id: T14
     title: Public API declaration, package-level checks, README usage
+    # Amendment (B-419, documents only): adds __init__.py (completes __all__); test_no_engineering_constants leaves tests_first (passes at the base); depends on T14b.
     files:
       - "packages/structural-codes/core/pyproject.toml"
       - "packages/structural-codes/core/README.md"
       - "packages/structural-codes/core/CHANGELOG.md"
+      - "packages/structural-codes/core/src/structural_codes/__init__.py"
       - "packages/structural-codes/core/tests/unit/test_package.py"
     max_changed_lines: 120
     max_sessions: 2
     tests_first:
-      - "packages/structural-codes/core/tests/unit/test_package.py::test_no_engineering_constants"
       - "packages/structural-codes/core/tests/unit/test_package.py::test_public_modules"
+      - "packages/structural-codes/core/tests/unit/test_package.py::test_version_constant"
     covers: [AC36, AC37, AC38]
-    depends_on: [T12, T13, T14a]
+    depends_on: [T12, T13, T14a, T14b]
 ---
 
 # Implementation plan: structural-codes core framework
@@ -329,7 +345,27 @@ entries.
 
 **T12 Command line.** `python -m structural_codes verify --pack P` and `hash --pack P`; exit codes 0, 1, 2; `verify`
 also reads the pack's `check_modules` with `tomllib` and exits 2 on a lint-scope violation; output to an injected stream
-(no `print`, FB007).
+(no `print`, FB007). Amendment B-419: `P` is the filesystem path of a pack project root (the folder holding its
+`pyproject.toml`), resolved as spec §4.9.3 states: the single entry-point name under
+`[project.entry-points."structural_codes.packs"]` and `[tool.eng-gate] check_modules` are read from that
+`pyproject.toml`, the `Pack` of that name is taken from `Registry.discover().packs`, and `verify` calls
+`verify_pack(pack, P / "tests/data/golden/verification")` for a pack without an overlay. For an overlay pack (review of
+#234) the check set is every discovered check whose `meta.pack` is the pack's name, which includes the inherited checks
+the registry derives; `verify` calls `verify_check(check, CaseFile.load(...), registry=registry)` with the discovered
+registry for each of them (a missing case file gives `verify_pack`'s not-verified report), because `verify_pack` builds
+`Registry.of([pack])`, which rejects an overlay without its base, and loops over `pack.checks` only; `hash` prints the
+content hash of that same check set, and the lint-scope check covers `pack.checks`. The output lines and every exit-2 case (resolution errors,
+`CheckDefinitionError`, `VerificationDataError`, lint-scope violations, argparse usage errors; `hash` exits 0 or 2 and
+skips the lint-scope check) are those of spec §4.9.3. `tests/unit/test_cli.py` builds each pack root in pytest's
+`tmp_path` at run time (a `pyproject.toml` with the entry point and `check_modules`, and the case YAML under
+`tests/data/golden/verification/`), points `sys.path` at `tests/fixtures/synthbase/src` and monkeypatches the entry
+points as `tests/unit/test_registry.py` does; it builds one root each for exit 0, exit 1 (a failing case) and exit 2 (a
+lint-scope violation, bad case data, an unknown pack), and one overlay root on `tests/fixtures/synthover/src` (with
+`synthbase` also registered) for `test_overlay_includes_inherited`, which expects the inherited check
+`synthover.s4_1.two_pre` in both the `verify` report and the `hash` output, and exit 0. No fixture file is committed, so
+the task stays inside its three files. The 150-line budget covers `_cli.py` and `__main__.py` only (argument parsing,
+the `pyproject.toml` resolution, the check-set selection with its overlay branch of a few lines, two commands and their
+output); the test lines do not count, so 150 lines remain enough.
 
 **T13 Notes.** `render_html` and the label table; golden file committed under `tests/data/golden/notes/` (a protected
 test oracle; the owner reviews it). Can run in parallel with T9 to T12 once T8 is merged.
@@ -338,10 +374,26 @@ test oracle; the owner reviews it). Can run in parallel with T9 to T12 once T8 i
 packs can import them (gate import check IM002). The test checks one direction only: the 11 named modules are declared, and
 every declared module exists in `src/` and is a §4.1 module. It does not require every §4.1 module in `src/` to be declared,
 so T11 (`lifecycle`) and T13 (`notes`) may merge before or after T14a without breaking it; they never touch
-`pyproject.toml`. T14 declares `lifecycle` and `notes` and owns the full-equality check (`test_public_modules`).
+`pyproject.toml`. T14b declares `lifecycle`; T14 declares `notes` and owns the full-equality check (`test_public_modules`).
 
-**T14 Package-level.** Adds `structural_codes.lifecycle` (T11) and `structural_codes.notes` (T13) to `public_modules`,
-the package-level tests, README usage of `structural_codes.evaluate`, changelog entry for 0.1.0.
+**T14b Lifecycle public (amendment B-419).** Adds `structural_codes.lifecycle` to `public_modules` with a changelog line,
+so the packs' `tests/unit/test_pack.py::test_all_draft` (plans 0002 and 0003) and
+`tests/unit/test_pack_columns.py::test_all_draft` (plan 0004) can import `State` and `resolve_state` without failing
+the gate's import check (IM002, which reads `tests/` as well as `src/`). Its first commit adds
+`test_package.py::test_lifecycle_declared`, which asserts `structural_codes.lifecycle` is in `public_modules` and fails
+until the implementation commit declares it; `test_public_modules_declared` (T14a) keeps passing, because `lifecycle`
+exists in `src/` after T11. It does not touch T11's files.
+
+**T14 Package-level.** Adds `structural_codes.notes` (T13) to `public_modules` (`structural_codes.lifecycle` comes with
+T14b), the package-level tests, README usage of `structural_codes.evaluate`, and a changelog entry under an
+"Unreleased / 0.1.0" heading. Amendment B-419: T14 also sets `__all__` in `structural_codes/__init__.py` to the §4.1
+names in sorted order (`["BatchItem", "Evaluation", "Mode", "__version__", "evaluate", "evaluate_batch"]`), replaces the
+explicit-alias imports and the B-262 comment with plain imports, and rewrites `test_version_constant` to assert that
+`__all__`. T14 does not change the version: `__version__` and the `pyproject.toml` version stay `0.1.0.dev0`, because
+the release bump belongs to the release lane. Test order: the first commit holds `test_public_modules` (full equality,
+fails while `notes` is undeclared) and the rewritten `test_version_constant` (fails while `__all__` is
+`["__version__"]`); `test_no_engineering_constants` (AC36) comes in a later commit of the same task as a regression
+guard, because the core source already meets AC36 and the test would pass at the base (test-first rule TF004).
 
 ## 3. Dependencies
 
