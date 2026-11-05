@@ -237,6 +237,27 @@ def test_item_limit_counts_unreferenced_items_of_record(fx: ModuleType, tmp_path
     assert rig.store.puts == before
 
 
+def test_item_limit_counts_nested_lists(fx: ModuleType, tmp_path: Path) -> None:
+    value: dict[str, JsonValue] = {"span_mm": 1.0, "areas": [{"pts": [1, 2]}, {"pts": [3]}]}  # 2 outer + 3 inner = 5
+    over = make(fx, tmp_path / "o", max_items=4)
+    rid = over.source(value)
+    args: dict[str, JsonValue] = {"span_mm": {"$ref": f"{rid}#/value/span_mm"}}
+    out = over.port.run("harness.port_sum", args)
+    assert isinstance(out, FailureEnvelope)
+    assert out.error.code is ErrorCode.LIMIT_EXCEEDED
+    assert out.error.expected == {"max": 4}
+    assert out.error.received == 5
+    ok = make(fx, tmp_path / "k", max_items=5)
+    rid = ok.source(value)
+    assert isinstance(ok.port.run("harness.port_sum", {"span_mm": {"$ref": f"{rid}#/value/span_mm"}}), SuccessEnvelope)
+
+
+def test_run_unknown_calc_is_not_found(fx: ModuleType, tmp_path: Path) -> None:
+    out = make(fx, tmp_path).port.run("harness.nope", {})
+    assert isinstance(out, FailureEnvelope)
+    assert out.error.code is ErrorCode.NOT_FOUND
+
+
 def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path)
     args = rig.args(offset=2.5, whole=False)
@@ -302,6 +323,8 @@ def test_production_and_withdrawn_refusal(fx: ModuleType, tmp_path: Path) -> Non
     with pytest.raises(CalcRefused) as caught:
         prod.port.run("harness.port_sum", args)
     assert caught.value.code is HarnessCode.CALC_NOT_APPROVED
+    assert "harness.port_sum" in str(caught.value)
+    assert "draft" in str(caught.value)
     assert prod.store.puts == before
     approved = make(fx, tmp_path / "a", RunClass.PRODUCTION, approved=True)
     assert approved.port.preflight(["harness.port_sum"]) == []
@@ -312,6 +335,8 @@ def test_production_and_withdrawn_refusal(fx: ModuleType, tmp_path: Path) -> Non
         with pytest.raises(CalcRefused) as withdrawn:
             run(gone)
         assert withdrawn.value.code is HarnessCode.CALC_WITHDRAWN
+        assert "harness.port_sum" in str(withdrawn.value)
+        assert "withdrawn" in str(withdrawn.value)
     trial = make(fx, tmp_path / "t")
     assert trial.port.preflight(["harness.port_sum"]) == []
     with pytest.raises(ContractError) as unknown:
