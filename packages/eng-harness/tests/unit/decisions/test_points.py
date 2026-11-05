@@ -147,7 +147,7 @@ def test_registry_unique_names_and_immutable() -> None:
 def _state_with(annotation: Any) -> type[BaseModel]:
     class Holder(BaseModel):
         model_config = _STRICT
-        field: annotation  # type: ignore[valid-type]  # B-166: dynamic annotation under test
+        field: annotation
 
     return Holder
 
