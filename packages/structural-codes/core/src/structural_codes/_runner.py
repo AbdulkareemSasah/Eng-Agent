@@ -5,9 +5,10 @@ it by mode, validate every item with `validate_input`, then per item the member 
 then the governing verdict of each subject and the payload. R1 module: a mistake here is a wrong verdict.
 Units: none of its own; quantities keep the units of the check's fields.
 Errors: `ContractError` (`NOT_FOUND`, `INVALID_ARGUMENT`, and every error of `validate_input`, with `field` prefixed
-`items[<k>]` in a batch); `CheckNotUsable`; `CheckDefinitionError` for a body that records no verdict or raises an
-undeclared gap. A `ZeroDivisionError`, `OverflowError`, `TraceValueError` or math-domain `ValueError` in an item gives
-an `ERROR` verdict for that item; any other exception propagates.
+`items[<k>]` in a batch); `CheckNotUsable` (a withdrawn check in any mode, an unapproved one in `production`);
+`ApprovalsFileError` for an invalid `approvals.yaml`; `CheckDefinitionError` for a body that records no verdict or
+raises an undeclared gap. A `ZeroDivisionError`, `OverflowError`, `TraceValueError` or math-domain `ValueError` in an
+item gives an `ERROR` verdict for that item; any other exception propagates.
 """
 
 import dis
@@ -31,12 +32,12 @@ from structural_codes.check import Check
 from structural_codes.content_hash import content_hash
 from structural_codes.errors import CheckDefinitionError, CheckNotUsable, NotImplementedGap, TraceValueError
 from structural_codes.inputs import CheckInputs
+from structural_codes.lifecycle import State, resolve_state
 from structural_codes.pack import Registry
 from structural_codes.trace import TraceRecorder
 
 __all__ = ["BatchItem", "Evaluation", "Mode", "evaluate", "evaluate_batch"]
 
-State = Literal["draft", "verified", "approved", "withdrawn"]
 Mode = Literal["trial", "production"]
 """`trial` runs draft and approved checks; `production` only approved ones (spec 4.8)."""
 
@@ -74,11 +75,6 @@ class _NoRecords:
 
     def payload(self, result_id: str) -> dict[str, Any]:
         raise ContractError(ErrorCode.INVALID_ARGUMENT, "no record source was given")
-
-
-def _state_of(check: Check) -> State:
-    """The lifecycle state of a check; task T11 resolves it from `approvals.yaml`, until then every check is a draft."""
-    return "draft"
 
 
 def _untracked(_model_id: str) -> int | None:
@@ -206,7 +202,8 @@ def evaluate_batch(
 
     Raises:
         ContractError: unknown check (`NOT_FOUND`), unknown mode, or an item that fails validation (AC27, AC28).
-        CheckNotUsable: the check is not usable in `mode` (until the lifecycle task every check is `draft`).
+        CheckNotUsable: the check is withdrawn, or not approved in `production` mode (AC25).
+        ApprovalsFileError: a pack's `approvals.yaml` is invalid.
         CheckDefinitionError: a body records no verdict or raises an undeclared gap, or the check is malformed.
     """
     return _run(check_id, items, True, mode, registry, source, current_revision, policy)
@@ -241,10 +238,13 @@ def _run(
     known = registry or Registry.discover()
     found = known.get(check_id)
     pack = next(p for p in known.packs if p.name == found.meta.pack)
-    state = _state_of(found)
     if mode not in get_args(Mode):
         raise ContractError(ErrorCode.INVALID_ARGUMENT, f"unknown mode {str(mode)[:50]!r}", field="mode")
-    if mode == "production":
+    digest = content_hash(found)
+    state = resolve_state(found, known, digest=digest)
+    if state == "withdrawn":
+        raise CheckNotUsable(check_id, "state withdrawn: the check is withdrawn and runs in no mode")
+    if mode == "production" and state != "approved":
         raise CheckNotUsable(check_id, f"state {state}: production mode needs an approved check")
     model: Any = found.inputs  # a CheckInputs subclass, checked when the check is defined
     validated: list[ValidatedInput[Any]] = []
@@ -263,7 +263,6 @@ def _run(
             if batched:
                 raise _prefixed(exc, k) from exc
             raise
-    digest = content_hash(found)
     recorders = [
         TraceRecorder(v, calc_id=check_id, calc_version=pack.version, content_sha256=digest, subject=i.subject)
         for v, i in zip(validated, items, strict=True)
