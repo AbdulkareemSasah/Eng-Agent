@@ -81,7 +81,7 @@ def test_csi_error_without_data_not_found_texts(text: str) -> None:
     assert _map("csi_error", W, {}, text).code is C.NOT_FOUND
 
 
-def test_csi_error_without_such_data_other_text_is_invalid_argument() -> None:
+def test_csi_error_without_data_other_text_is_invalid_argument() -> None:
     assert _map("csi_error", W, {"product": "ETABS"}, "name must not be empty").code is C.INVALID_ARGUMENT
 
 
