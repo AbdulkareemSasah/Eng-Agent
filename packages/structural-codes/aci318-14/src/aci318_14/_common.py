@@ -15,15 +15,13 @@ from structural_codes.trace import TraceRecorder
 
 __all__ = ["CITED", "FC_MIN", "FY_MAX", "NORMALWEIGHT", "ConcreteClass", "const"]
 
-_SF = "ACI 318-14 22.5.3.1, 22.6.3.1 and 25.4.1.4 (limit on the square root of f'c, in MPa^0.5)"
-_FY = "ACI 318-14 Table 20.2.2.4(a) (flexure, other than special seismic systems)"
 CITED = MappingProxyType(
     {
         "phi_v": Cited(value=0.75, unit="1", source="ACI 318-14 Table 21.2.1, row (b) shear"),
         "lambda_nw": Cited(value=1.0, unit="1", source="ACI 318-14 19.2.4.2 (normalweight concrete)"),
-        "sf_max": Cited(value=8.3, unit="1", source=_SF),
+        "sf_max": Cited(value=8.3, unit="1", source="ACI 318-14 22.5.3.1, 22.6.3.1, 25.4.1.4 (limit on sqrt f'c)"),
         "fc_min": Cited(value=17, unit="MPa", source="ACI 318-14 Table 19.2.1.1 (minimum f'c, general row)"),
-        "fy_max": Cited(value=550, unit="MPa", source=_FY),
+        "fy_max": Cited(value=550, unit="MPa", source="ACI 318-14 Table 20.2.2.4(a) (not special seismic)"),
         "k_m": Cited(value=0.001, unit="1", source="SI prefix milli: m per mm (EC §4.7.3)"),
         "k_kN": Cited(value=0.001, unit="1", source="SI prefix kilo: kN per N (EC §4.7.3)"),
         "k_kNm": Cited(value=1.0e-6, unit="1", source="SI prefixes kilo and milli: kN.m per N.mm (EC §4.7.3)"),
