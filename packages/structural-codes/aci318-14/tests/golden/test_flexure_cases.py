@@ -14,7 +14,22 @@ from aci318_14.checks.flexure import flexure_at_column_face
 
 NAME = "aci318_14.13_2_7_1.flexure_at_column_face.yaml"
 CASES = Path(__file__).parents[1] / "data" / "golden" / "verification" / NAME
-CASE_IDS = ("HC-1", "HC-2", "HC-3", "BD-1.a", "BD-1.b", "BD-2", "BD-2.b", "BD-2.c", "BD-2.d", "BD-3.a", "BD-3.b", "BD-3.c", "BD-4.a", "BD-4.b")
+CASE_IDS = (
+    "HC-1",
+    "HC-2",
+    "HC-3",
+    "BD-1.a",
+    "BD-1.b",
+    "BD-2",
+    "BD-2.b",
+    "BD-2.c",
+    "BD-2.d",
+    "BD-3.a",
+    "BD-3.b",
+    "BD-3.c",
+    "BD-4.a",
+    "BD-4.b",
+)
 
 
 def test_hand_checks() -> None:
