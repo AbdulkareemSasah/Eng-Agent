@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 from eng_contract.canonical import canonical_json
-from eng_contract.envelope import HostInfo, LiteralInput, Provenance, RefInput
+from eng_contract.envelope import FileSource, HostInfo, LiteralInput, Provenance, RefInput
 from eng_contract.errors import ContractError, ErrorCode, WarningCode
 from eng_contract.store import ResultStore
 
@@ -70,6 +70,13 @@ def test_limits_and_provenance(store: ResultStore) -> None:
     assert (p.inputs, p.started_at, p.duration_ms) == (inputs, "2026-01-01T00:00:01.000Z", 37)
     # parents of the stored result are the results of the resolved references
     assert store.get(envelope.result_id).parents == [rid]
+
+
+def test_provenance_records_input_files(store: ResultStore) -> None:
+    # spec 0002 section 4.5.3: provenance carries the files read (base name, hash, size), none by default
+    source = FileSource(name="loads.csv", sha256=SHA, size_bytes=12)
+    assert _make(store, {"n": 1}, files=[source]).provenance.files == [source]
+    assert _make(store, {"n": 1}).provenance.files == []
 
 
 def _producer() -> Provenance:
