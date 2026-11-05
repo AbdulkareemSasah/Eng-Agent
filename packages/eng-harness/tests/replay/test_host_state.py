@@ -135,6 +135,8 @@ def test_restore_is_not_offered_after_another_model_was_written(tmp_path: Path) 
     host.add_model("m1", INSTANCE)
     host.add_model("m2", INSTANCE)
     steps = (
+        start("0", "write_b", M1, write=True),
+        done("0"),
         bound("m1", INSTANCE),
         bound("m2", INSTANCE),
         saved(rig, "m1"),
@@ -249,14 +251,18 @@ def test_first_use_binding(tmp_path: Path) -> None:
 def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
     rig, host = scripted_rig(tmp_path)
     host.add_model("m1", INSTANCE)
-    steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), bound("m1", INSTANCE), saved(rig, "m1")]
+    host.models["m1"] = host.models["m1"].model_copy(update={"revision": 1, "fingerprint": "fp1"})  # the first write
+    second: dict[str, JsonValue] = {"n": 2, "model": "m1"}
+    workflow = chain([("read_a", {"n": 0}), ("write_b", M1), ("write_b", second), ("read_c", {"n": 3})])
+    steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), start("1", "write_b", M1, write=True), done("1")]
+    steps += [bound("m1", INSTANCE), saved(rig, "m1")]
     if after_save != "none":
-        steps += [start("1", "write_b", M1, write=True), *([done("1")] if after_save == "completed" else [])]
-    run_id = forge(rig, chain(ORIGINAL), *steps)
+        steps += [start("2", "write_b", second, write=True), *([done("2")] if after_save == "completed" else [])]
+    run_id = forge(rig, workflow, *steps)
     # the engineer closed the host and reopened the model's last saved file: a new instance holds the saved state
     host.bound["m1"] = REOPENED.instance_id
     host.instances["csi"].append(REOPENED)
-    outcome = resume(rig, chain(ORIGINAL), run_id)
+    outcome = resume(rig, workflow, run_id)
     rebound = [p for p in _kinds(rig, run_id, T.MODEL_BOUND) if p.reason == "reopened"]
     assert [(p.model_key, p.instance_id) for p in rebound] == [("m1", "csi-2")]  # journaled in every case
     assert [c for c in host.calls if c[0] in ("read_units", "model_state")][:2] == [
