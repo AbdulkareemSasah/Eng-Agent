@@ -309,8 +309,10 @@ Q16).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9
   (`decide_many`) and T10 (engine wiring) merged before the tasks that need them (T1 needs T5, which builds the provider error types in `interfaces.py`, amendment B-411; T8
   needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14b for the header field of AC48; spec 0006
-  reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7), built by plan 0006 T14b,
-  which in turn needs this plan's T1 and T10. Spike S-07 is not a dependency of this plan; it gates the later
+  reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
+  0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
+  this plan (its tests use recorders); plan 0006 T18 binds their defaults to `load_providers_config` and
+  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18 there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
 

@@ -42,3 +42,10 @@ def test_public_modules_declared() -> None:
     }
     assert declared >= _REQUIRED_NOW
     assert declared <= existing & _SPEC_41_MODULES
+
+
+def test_lifecycle_declared() -> None:
+    """structural_codes.lifecycle is a declared public module (plan T14b), so the packs tests may import it."""
+    root = Path(__file__).resolve().parents[2]
+    config = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert "structural_codes.lifecycle" in config["tool"]["eng-gate"]["public_modules"]
