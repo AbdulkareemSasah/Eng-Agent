@@ -125,6 +125,8 @@ tasks:
     covers: [AC9, AC10]
     depends_on: [T2]
   - id: T6
+    # Amendment (B-418, documents only): starts only after the documents pull request B-405 (spec 0013 AC13 and §4.5:
+    # an id outside the allowlist gives ContractError NOT_FOUND, spec 0010 C4) has merged; see section 3
     title: Code-pack route in the CalcPort for the three ACI 318-14 column checks
     files:
       - "packages/eng-harness/CHANGELOG.md"
@@ -395,7 +397,11 @@ references; exact tolerance comparison; `matched`, `no_section_in_model`, `ambig
 `describe` from `CheckMeta`, `run` building `BatchItem`s with references and calling `evaluate_batch` in the run's
 mode, storage of the `verdicts.set/1` payload, refusal in `production`. If a merged plan already provides a code-pack
 route when T6 starts, T6 adds the three ids to it and its tests instead; the lead records which by a plan amendment.
-T6 starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
+T6 starts only after the documents pull request B-405 has merged (amendment B-418): it amends spec 0013 AC13 and §4.5
+so that an id outside the allowlist gives `ContractError` `NOT_FOUND` (spec 0010 C4), and
+`test_code_pack_route.py::test_only_listed_checks` is written to that text, never to `RegistryError`. Otherwise footing
+T2 (plan 0010) could not add its ids without changing a merged expectation (A4).
+T6 also starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
@@ -444,7 +450,8 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
 - Before T2 to T5, T7, T8: plan 0003 T1 to T6 (calc framework, golden infrastructure); T5 also needs plan 0003 T11
   (`harness.section_round`); T7 and T8 need plan 0011 T6 (Revit kinds and role map) and T12 (`harness.frame_element_map`).
 - Before T6: plan 0003 T5 (`HarnessCalcPort`); structural-codes core plan 0001 T8 (`evaluate_batch`) and T11 (lifecycle
-  and mode usability), and plan 0004 T5 (the column checks registered).
+  and mode usability), and plan 0004 T5 (the column checks registered); the documents pull request B-405 (spec 0013
+  AC13 and §4.5 answer `NOT_FOUND`, spec 0010 C4), scheduled before this T6 and before footing T2 (amendment B-418).
 - Before T9: plan 0005 T4 and T9 (rules, `decide_many`).
 - Before T10: engine plan 0001 (`block.py`, `_runner.py`) and plan 0007 T8, T9 and T2 (the blocks and the check it
   amends).
