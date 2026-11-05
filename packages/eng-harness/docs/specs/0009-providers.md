@@ -634,7 +634,7 @@ the one engineer screen; the data terms of each service (S-07).
 ## 10. Version impact
 
 New modules of `eng-harness` (phase 2). `decisions.interfaces` gains `ProviderErrorCode`, `ProviderError` and
-`ProviderFailure` (additive). `harness.toml` gains `[providers.*]`. New runtime dependencies `pydantic-ai-slim` (extra
+`ProviderFailure` (additive; built by plan 0005 T5, amendment B-411; AC5 here tests their shape). `harness.toml` gains `[providers.*]`. New runtime dependencies `pydantic-ai-slim` (extra
 `openai`), `keyring` and `httpx2`, with their ADRs. `decisions.lock.json` and `rules.lock.json` are unchanged. The
 `decision_made` payload is unchanged; `info.version` strings (`<model_version>;map-<n>` or `;prompt-<n>`) appear in
 `decided_by` and in suggestions.
