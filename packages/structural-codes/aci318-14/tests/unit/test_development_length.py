@@ -200,3 +200,26 @@ def test_rectangular_plan_uses_each_direction_own_bars() -> None:
     assert not y.governing
     assert x.clause == y.clause == "25.4.2.3"
     assert [x.status, y.status] == [VerdictStatus.PASS, VerdictStatus.PASS]
+
+
+def test_step_sources_and_uses() -> None:
+    """Each recorded step cites its clause and names every input it uses, in formula order (clause spec §4, §6)."""
+    steps = {s.name: s for s in run().traces[0].steps}
+    expected = {
+        "la_x_mm": ("ACI 318-14 13.2.7.1: critical section", ["Lx_mm", "c_half", "cx_mm", "end_cover_mm"]),
+        "sf": ("ACI 318-14 25.4.1.4", ["fc_MPa", "sf_max"]),
+        "psi_t": ("ACI 318-14 Table 25.4.2.4", ["psi_t_bottom"]),
+        "psi_te": ("ACI 318-14 25.4.2.4", ["psi_t", "psi_e", "psi_te_max"]),
+        "cb_x_mm": ("ACI 318-14 25.4.2.3 (cb)", ["cover_x_mm", "db_x_mm", "c_half", "s_x_mm"]),
+        "conf_x_ratio": ("ACI 318-14 25.4.2.3", ["cb_x_mm", "Ktr", "db_x_mm", "conf_max"]),
+        "ld_eq_y_mm": (
+            "ACI 318-14 eq. 25.4.2.3a (SI)",
+            ["fy_MPa", "c_ld", "lambda_nw", "sf", "psi_te", "psi_s_ratio", "conf_y_ratio", "db_y_mm"],
+        ),
+        "ld_y_mm": ("ACI 318-14 25.4.2.1", ["ld_eq_y_mm", "ld_min"]),
+    }
+    for name, (source, uses) in expected.items():
+        assert steps[name].source.startswith(source), name
+        assert steps[name].uses == uses, name
+    la_source = "ACI 318-14 13.2.7.1: critical section at the column face; straight length to the bar end"
+    assert steps["la_x_mm"].source == steps["la_y_mm"].source == la_source
