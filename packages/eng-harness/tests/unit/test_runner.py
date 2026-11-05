@@ -1,169 +1,34 @@
-"""Engine start: validation, the run header, the run class and the unreleased-tool record (plan 0001 T9).
+"""Engine start and resume: validation, the run header, the run class and the unreleased-tool record (plan 0001 T9b).
 
-Covers spec 0001 AC16 (input and output validation), the start halves of AC65 (run class) and AC68 (unreleased tools),
-the run header of section 4.4.2, the minimal `ctx.tool` and the settings of section 4.10. Resume, the replay index and
-the resume halves of AC65 and AC68 belong to task T9b. Fake ports and a real SQLite journal in a temporary workspace;
-the fake host's ledger shows which calls reached it. The rig is local to this file: the task's file scope holds no
-shared test helper.
+Covers spec 0001 AC16 (input and output validation), AC65 (run class) and AC68 (unreleased tools) at start and at
+resume, the run header of section 4.4.2, the minimal `ctx.tool` and the settings of section 4.10. Fake ports and a real
+SQLite journal in a temporary workspace (the rig of `tests/workflows/rig.py`); its call log shows which port calls an
+engine made, and the fake host's ledger shows which calls reached the host. The replay tests are in `tests/replay/`.
 """
 
 import asyncio
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
 
 import pytest
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
-from eng_contract.ids import FixedClock, SeededIdSource
-from eng_contract.store import LocationClass, ResultStore, Workspace
-from fakes.ports import FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort, failure
-from pydantic import BaseModel, JsonValue, ValidationError
+from fakes.ports import failure
+from pydantic import JsonValue, ValidationError
+from workflows.chain import ChainOutput, bad_output, chain
+from workflows.rig import BASIS_REF, make_rig, request, steps
 
 from eng_harness import __version__
-from eng_harness._kinds import HARNESS_KINDS
-from eng_harness.block import Registry, WorkflowDef, workflow
-from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest, RunStatus
+from eng_harness.engine import EngineSettings, PermissionMode, RunRequest, RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, RunRefused
-from eng_harness.journal import Event, EventType, JournalReader
+from eng_harness.journal import EventType, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import RunClass, ToolInfo
+from eng_harness.ports import RunClass
 
 T = EventType
-START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
-BASIS_REF = "res_" + "0" * 26
 RUN_ID = re.compile(r"^run_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
-TOOLS = (
-    ToolInfo(name="read_a", effect="read", action="plain", host_key="csi"),
-    ToolInfo(name="read_c", effect="read", action="plain", host_key="csi"),
-    ToolInfo(name="write_b", effect="write", action="plain", host_key="csi", model_param="model"),
-)
-Step = tuple[str, dict[str, JsonValue]]
-
-
-class ChainInput(BaseModel):
-    """Input of the test workflows: a label and an integer count (so a string for the count is an invalid input)."""
-
-    label: str = "x"
-    count: int = 0
-
-
-class ChainOutput(BaseModel):
-    """Output of the test workflows: the result reference of each step, in order."""
-
-    refs: list[str]
-
-
-class Impostor(BaseModel):
-    """A model that is not `ChainOutput`."""
-
-    refs: list[str] = []
-
-
-def chain(steps: Sequence[Step], *, always_ask: tuple[str, ...] = ()) -> WorkflowDef[ChainInput, ChainOutput]:
-    """A workflow that calls each of `steps` in order and returns their result references."""
-
-    @workflow(name="chain", version=1, description="Calls its tools in order.", always_ask=always_ask)
-    async def run(ctx: Any, inp: ChainInput) -> ChainOutput:
-        refs = []
-        for tool, args in steps:
-            result = await ctx.tool(tool, args)
-            refs.append(result.ref.ref)
-        return ChainOutput(refs=refs)
-
-    return run
-
-
-@workflow(name="bad_output", version=1, description="Returns a value that is not its output model.")
-async def bad_output(ctx: Any, inp: ChainInput) -> ChainOutput:
-    """Returns an `Impostor`, which the engine must refuse."""
-    return cast(ChainOutput, Impostor())
-
-
-def steps(*names: str) -> Sequence[Step]:
-    """Steps that call the tools `names` in order, each with its position as the argument `n`."""
-    return [(name, {"n": index}) for index, name in enumerate(names)]
-
-
-@dataclass
-class Rig:
-    """The parts of an engine's world: workspace, result store, deterministic sources and the fake host."""
-
-    workspace: Workspace
-    store: ResultStore
-    clock: FixedClock
-    ids: SeededIdSource
-    host: FakeHost
-    approvals: FakeApprovalPort
-    inputs: FakeInputPort
-
-    def engine(
-        self,
-        *workflows: WorkflowDef[Any, Any],
-        calc_class: RunClass = RunClass.PRODUCTION,
-        settings: EngineSettings | None = None,
-    ) -> Engine:
-        """An engine that registers `workflows`; its calc port has class `calc_class`."""
-        ports = EnginePorts(
-            tool=self.host,
-            host=self.host,
-            calc=FakeCalcPort(calc_class, []),
-            basis=FakeBasisPort({}),
-            approvals=self.approvals,
-            inputs=self.inputs,
-        )
-        return Engine(
-            self.workspace, Registry(workflows), ports, self.store, settings or EngineSettings(), self.clock, self.ids
-        )
-
-    def run_dir(self, run_id: str) -> Path:
-        """The folder of the run."""
-        return self.workspace.root / "runs" / run_id
-
-    def run_ids(self) -> list[str]:
-        """The ids of the run folders, sorted."""
-        return sorted(p.name for p in (self.workspace.root / "runs").glob("run_*"))
-
-    def events(self, run_id: str) -> list[Event]:
-        """The journal of the run, read and verified."""
-        reader = JournalReader(self.run_dir(run_id))
-        try:
-            return reader.events()
-        finally:
-            reader.close()
-
-    def header(self, run_id: str) -> ev.RunHeader:
-        """The run header, the payload of the first event."""
-        head = self.events(run_id)[0].payload
-        assert isinstance(head, ev.RunHeader)
-        return head
-
-
-def make_rig(root: Path, unreleased: Mapping[str, str] | None = None) -> Rig:
-    """A rig whose workspace and result store are under `root`."""
-    clock = FixedClock(START_MS, 1)
-    ids = SeededIdSource(b"harness", clock)
-    workspace = Workspace(root=root / "ws", classification=LocationClass.LOCAL)
-    store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
-    host = FakeHost(TOOLS, ids, clock, unreleased)
-    return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort())
-
-
-def request(
-    workflow_name: str = "chain",
-    values: Mapping[str, JsonValue] | None = None,
-    *,
-    run_class: RunClass = RunClass.PRODUCTION,
-    mode: PermissionMode = PermissionMode.WORK_ON_COPY,
-) -> RunRequest:
-    """A request to run `workflow_name` with the input `values`."""
-    return RunRequest(
-        workflow=workflow_name, input=dict(values or {}), basis_ref=BASIS_REF, mode=mode, run_class=run_class
-    )
 
 
 @pytest.mark.parametrize(
@@ -208,6 +73,21 @@ def test_run_class_recorded_and_checked(tmp_path: Path) -> None:
         reader = JournalReader(rig.run_dir(outcome.run_id))
         assert reader.run().run_class == run_class.value  # the reader shows the recorded class
         reader.close()
+    # a resume is refused the same way, before any other port call and before anything is journaled (4.5.1 step 3)
+    for run_class in RunClass:
+        other = RunClass.TRIAL if run_class is RunClass.PRODUCTION else RunClass.PRODUCTION
+        rig.host.script("read_a", failure(ErrorCode.HOST_BUSY))
+        stopped = asyncio.run(rig.engine(workflow_def, calc_class=run_class).start(request(run_class=run_class)))
+        assert stopped.status is RunStatus.NEEDS_ENGINEER  # the run waits for the engineer: it can be resumed
+        before, logged = rig.events(stopped.run_id), list(rig.log)
+        with pytest.raises(RunRefused) as mismatch:
+            asyncio.run(rig.engine(workflow_def, calc_class=other).resume(stopped.run_id))
+        assert mismatch.value.code is HarnessCode.RUN_CLASS_MISMATCH
+        assert (other.value in mismatch.value.message, run_class.value in mismatch.value.message) == (True, True)
+        assert rig.log == logged
+        assert rig.events(stopped.run_id) == before
+        resumed = asyncio.run(rig.engine(workflow_def, calc_class=run_class).resume(stopped.run_id))
+        assert resumed.status is RunStatus.COMPLETED  # the matching calc port resumes it
 
 
 def test_unreleased_tools_recorded(tmp_path: Path) -> None:
@@ -220,6 +100,22 @@ def test_unreleased_tools_recorded(tmp_path: Path) -> None:
     released = make_rig(tmp_path / "released")  # no tool is unreleased: the record is empty
     done = asyncio.run(released.engine(chain(steps("read_a"))).start(request()))
     assert released.header(done.run_id).unreleased_tools == {}
+    # at a resume the mapping is recorded in `run_resumed` only when it differs from the last recorded one (AC68)
+    rig = make_rig(tmp_path / "resumed", {"write_b": "B-1"})
+    rig.host.script("read_c", *[failure(ErrorCode.HOST_BUSY)] * 4)  # the run and three resumes stop at the second step
+    engine = rig.engine(chain(steps("read_a", "read_c")))
+    run_id = asyncio.run(engine.start(request())).run_id
+    asyncio.run(engine.resume(run_id))  # the same mapping: nothing is recorded
+    rig.host.unreleased = {"read_c": "B-2"}
+    asyncio.run(engine.resume(run_id))  # another mapping: recorded
+    asyncio.run(engine.resume(run_id))  # the same as the last recorded one (not as the union): nothing is recorded
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    resumes = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.RunResumed)]
+    assert [r.unreleased_tools for r in resumes] == [None, {"read_c": "B-2"}, None, None]
+    reader = JournalReader(rig.run_dir(run_id))
+    assert dict(reader.run().unreleased_tools) == {"write_b": "B-1", "read_c": "B-2"}  # the union over the whole run
+    assert reader.run().run_class == "production"
+    reader.close()
 
 
 def test_start_journals_header_and_output(tmp_path: Path) -> None:
@@ -336,3 +232,12 @@ def test_settings_and_enums() -> None:
         settings.__setattr__("max_attempts_cap", 3)  # the model is frozen
     assert {m.value for m in PermissionMode} == {"work_on_copy", "approve_each_write", "autonomous_logged"}
     assert {s.value for s in RunStatus} == {"COMPLETED", "PAUSED", "NEEDS_ENGINEER", "FAILED"}
+
+
+@pytest.mark.parametrize("bad", ["", "run_x", "../x", "run_" + "0" * 26, "run_" + "0" * 26 + "/.."])
+def test_resume_of_an_unknown_run(tmp_path: Path, bad: str) -> None:
+    rig = make_rig(tmp_path)
+    with pytest.raises(ContractError) as refused:
+        asyncio.run(rig.engine(chain(steps("read_a"))).resume(bad))
+    assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    assert rig.log == []
