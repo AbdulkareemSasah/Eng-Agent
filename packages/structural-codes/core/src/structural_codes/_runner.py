@@ -10,6 +10,7 @@ undeclared gap. A `ZeroDivisionError`, `OverflowError`, `TraceValueError` or mat
 an `ERROR` verdict for that item; any other exception propagates.
 """
 
+import dis
 import logging
 import re
 from collections import Counter
@@ -42,9 +43,9 @@ Mode = Literal["trial", "production"]
 _log = logging.getLogger(__name__)
 _FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _CONTAINED = (ZeroDivisionError, OverflowError, TraceValueError, ValueError)
-# Message forms of the ValueError the math module raises outside a function's domain: "math domain error" (pow, fmod)
-# and "expected <requirement>, got <value>" (sqrt, log, acos, ...). Any other ValueError is a defect in the body.
-_MATH_DOMAIN = re.compile(r"math domain error|expected .+, got .+")
+# Message forms of the ValueError the math module raises outside a function's domain: "math domain error" (pow, fmod),
+# "expected <requirement>[, got <value>]" (sqrt, log, acos, ...) and the integer functions' "... negative/nonnegative".
+_MATH_DOMAIN = re.compile(r"math domain error|expected .+|\w+\(\) .*(negative|nonnegative).*")
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +116,20 @@ def _raw(check: Check, inputs: Mapping[str, Any] | CheckInputs, source: RecordSo
     return inputs
 
 
+def _is_math_domain(exc: ValueError) -> bool:
+    """True for a ValueError raised by a math-module call, not by a `raise` statement or a library such as pydantic.
+
+    A call into C code leaves no frame of its own: the innermost traceback instruction is then a call, whereas an
+    explicit `raise` in the body (whatever its message) ends at `RAISE_VARARGS`. The message form is checked as well.
+    """
+    tb = exc.__traceback__
+    while tb is not None and tb.tb_next is not None:
+        tb = tb.tb_next
+    if type(exc) is not ValueError or tb is None or not _MATH_DOMAIN.fullmatch(str(exc)):
+        return False
+    return all(i.opname != "RAISE_VARARGS" for i in dis.get_instructions(tb.tb_frame.f_code) if i.offset == tb.tb_lasti)
+
+
 def _decide(check: Check, inp: Any, t: TraceRecorder, subject: Subject) -> VerdictStatus | None:
     """Run member scope, preconditions and body; return the status of the single framework verdict, or None.
 
@@ -138,7 +153,7 @@ def _decide(check: Check, inp: Any, t: TraceRecorder, subject: Subject) -> Verdi
         return VerdictStatus.NEEDS_ENGINEER
     except _CONTAINED as exc:
         # Only an arithmetic failure is contained (AC28): a malformed model or any other ValueError is a defect.
-        if isinstance(exc, ValueError) and not _MATH_DOMAIN.fullmatch(str(exc)):  # includes pydantic's ValidationError
+        if isinstance(exc, ValueError) and not _is_math_domain(exc):  # includes pydantic's ValidationError
             raise
         _log.warning("check item failed", extra={"check_id": meta.check_id, "error": type(exc).__name__})
         t.note(f"verdict ERROR: {type(exc).__name__}: {str(exc)[:500]}")
