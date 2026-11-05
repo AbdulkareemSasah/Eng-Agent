@@ -96,6 +96,46 @@ def test_gaps_and_preconditions() -> None:
     assert [v.status for v in at_limit.verdicts] == [VerdictStatus.PASS, VerdictStatus.PASS]
 
 
+def test_tension_controlled_limit_is_inclusive() -> None:
+    """BD-2.b: eps_t = eps_tc exactly is tension-controlled, so both verdicts PASS (clause spec §4 step 6; FL-AC3).
+
+    Hand values: c = 0.003 * 500 / 0.008 = 187.5 mm, a = 0.85 * c = 159.375 mm,
+    As = a * 0.85 * 28 * 2500 / 420 = 22578.125 mm2; every step is exact in binary floating point.
+    """
+    payload = run(As_x_mm2=22578.125, As_y_mm2=22578.125)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.PASS, VerdictStatus.PASS]
+    found = steps(payload)
+    assert found["c_x_mm"] == 187.5
+    assert found["eps_t_x_ratio"] == 0.005
+    assert found["eps_t_y_ratio"] == 0.005
+    assert found["phiMn_x_kNm"] == pytest.approx(3587.170166, abs=_M_KNM)
+
+
+def test_just_below_tension_controlled_limit() -> None:
+    """BD-2.c: As_x = 22650 mm2 gives eps_t_x = 0.004975 < eps_tc: one NEEDS_ENGINEER verdict naming G-2 (FL-AC3)."""
+    payload = run(As_x_mm2=22650.0)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
+    assert any(m.startswith("G-2 (21.2.2)") for m in payload.traces[0].messages)
+    found = steps(payload)
+    assert found["eps_t_x_ratio"] == pytest.approx(0.004975, abs=_RATIO)
+    assert "phiMn_x_kNm" not in found
+
+
+def test_gap_in_y_direction_alone() -> None:
+    """BD-2.d: As_y = 40000 mm2 alone; X passes its strain test, Y raises G-2 from its own depth (FL-AC3)."""
+    payload = run(As_y_mm2=40000.0)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
+    messages = [m for m in payload.traces[0].messages if m.startswith("G-2 (21.2.2)")]
+    assert len(messages) == 1
+    assert "eps_t_y_ratio" in messages[0]
+    found = steps(payload)
+    assert found["c_y_mm"] == pytest.approx(332.179931, abs=_MM)
+    assert found["eps_t_y_ratio"] == pytest.approx(0.001516, abs=_RATIO)
+    assert found["eps_t_x_ratio"] == pytest.approx(0.061509, abs=_RATIO)
+    assert found["phiMn_x_kNm"] == pytest.approx(518.740518, abs=_M_KNM)
+    assert "phiMn_y_kNm" not in found
+
+
 @pytest.mark.parametrize(
     ("changes", "precondition", "gap"),
     [
