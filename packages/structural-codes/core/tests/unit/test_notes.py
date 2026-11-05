@@ -86,7 +86,7 @@ def test_unknown_check_is_not_found(registry: Registry) -> None:
     raw["traces"][0]["calc_id"] = "synthbase.9_9.unknown"
     with pytest.raises(ContractError) as info:
         render_html(VerdictSet.model_validate(raw), registry=registry)
-    assert info.value.code is ErrorCode.NOT_FOUND
+    assert info.value.detail.code is ErrorCode.NOT_FOUND
 
 
 def test_verdict_without_trace_is_listed(registry: Registry) -> None:
