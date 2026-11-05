@@ -127,6 +127,28 @@ def test_status_failed_and_running(run_dir: Path, store: ResultStore, ids: Seede
     assert reader.run().ended_at is not None
 
 
+def test_reconciled_step_and_wrong_event_types(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
+    writer = _writer(run_dir, store, ids)
+    writer.append(T.RUN_STARTED, HEADER)
+    reconciled = {"op_id": "op", "outcome": "applied", "result": COMPLETED["result"], "decided_by": "adapter",
+                  "evidence": []}  # fmt: skip
+    _step(writer, "0", (T.STEP_RECONCILED, reconciled))
+    step = JournalReader(run_dir).steps()[0]
+    assert (step.status, step.result_ref) == ("reconciled", REF)
+    # spec 4.4.5: each request is answered only by its own event type
+    writer.append(T.INPUT_REQUESTED, {**INPUT, "request_id": "i1"})
+    writer.append(T.INPUT_REQUESTED, {**INPUT, "request_id": "d1", "kind": "engine.decision"})
+    writer.append(T.APPROVAL_REQUESTED, {**APPROVAL, "request_id": "a1"})
+    writer.append(T.DECISION_MADE, {**DECISION, "request_id": "i1"})
+    writer.append(T.INPUT_PROVIDED, {"request_id": "d1", "answer_ref": REF, "by": "engineer:x"})
+    writer.append(T.INPUT_PROVIDED, {"request_id": "a1", "answer_ref": REF, "by": "engineer:x"})
+    reader = JournalReader(run_dir)
+    assert [r.resolution for r in reader.requests()] == [None, None, None]
+    assert reader.run().pending == ("i1", "d1", "a1")
+    writer.close()
+    reader.close()
+
+
 def test_run_class_and_unreleased_tools(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
     writer = _writer(run_dir, store, ids)
     rec_a, rec_b, runtime = {"since": "b-1"}, {"since": "b-2"}, {"providers": ["p"]}
@@ -142,6 +164,8 @@ def test_run_class_and_unreleased_tools(run_dir: Path, store: ResultStore, ids: 
     run = reader.run()
     assert dict(run.unreleased_tools) == {"t_a": rec_a, "t_b": rec_b}
     assert dict(run.decision_runtime) == runtime  # AC69: the last recorded object
+    writer.append(T.RUN_RESUMED, {**RESUMED, "resume_no": 4, "decision_runtime": {}})  # recorded empty: not "unchanged"
+    assert dict(reader.run().decision_runtime) == {}
 
 
 def test_reader_verifies(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
