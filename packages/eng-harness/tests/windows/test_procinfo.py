@@ -276,6 +276,26 @@ def test_children_are_direct_running_and_not_older_than_the_parent() -> None:
     assert inspector.children(99) == []
 
 
+def test_listing_skips_inaccessible(caplog: pytest.LogCaptureFixture) -> None:
+    table = {
+        10: _Process(CREATED),
+        11: _Process(CREATED + 5, parent=10),  # a child the engine may not open
+        12: _Process(CREATED + 6, parent=10),
+        13: _Process(CREATED, path="C:\\a\\Etabs.exe"),  # a matching process the engine may not open
+        14: _Process(CREATED, path="C:\\a\\Etabs.exe"),
+    }
+    inspector, kernel32 = _inspector(table)
+    kernel32.denied = {11, 13}
+    with caplog.at_level("DEBUG"):
+        assert [c.pid for c in inspector.children(10)] == [12]
+        assert [i.pid for i in inspector.snapshot(["etabs.exe"])] == [14]
+    assert "11" in caplog.text
+    assert "13" in caplog.text
+    with pytest.raises(OSError, match=r"OpenProcess\(11\)"):
+        inspector.identity(11)
+    assert sorted(kernel32.closed) == list(range(1000, 1000 + len(kernel32.opened)))
+
+
 @pytest.mark.parametrize("call", ["GetProcessTimes", "QueryFullProcessImageNameW", "CreateToolhelp32Snapshot"])
 def test_a_failed_query_is_raised_and_the_handle_is_still_closed(call: str) -> None:
     inspector, kernel32 = _inspector({42: _Process(CREATED)})
