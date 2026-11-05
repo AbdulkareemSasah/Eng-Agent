@@ -111,7 +111,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   given a run with no live engine, `stop` exits 0, says it is not running and writes no stop file; given a stop file
   left behind, `resume` removes it before the engine starts. Test:
   `tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point` (a fake engine from `CliDeps` that polls
-  `FileRunControl`; the real-engine stop is re-checked in plan T17, B-412).
+  `FileRunControl`; the real-engine stop is re-checked in plan T17, B-412). The two removals in `cli/_run.py` are also
+  tested by `tests/replay/test_cli_resume.py::test_stop_file_removed_on_return_and_before_resume` (plan T14).
 - AC10. Given an interrupt signal, then the first one is a stop request (as AC9) and the second ends the process at
   once with exit 130; the journal then resumes as after any crash (engine AC30). Test:
   `tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop`.
@@ -395,8 +396,10 @@ Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_htm
 The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
 takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener, decision-runtime
 assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
-runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged has no
-default until it does, and a command that needs it stays "not available in this build" (plan §3, B-412).
+runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged is an
+optional field that defaults to `None` until it does (so `CliDeps()` still builds); a command whose collaborators are
+not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation
+(plan §3, B-412).
 
 **Invocation from the workspace root (B-354).** The one supported form is
 `uv run --package eng-harness eng-harness <command> [options]`, run in the workspace root. The root project

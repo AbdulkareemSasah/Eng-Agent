@@ -301,6 +301,7 @@ tasks:
     # handling, the launch address on the terminal only (AC10, AC61) and the decision layer of amendment B-098
     # (AC62, AC63).
     # Amendment (B-412, documents only): cli/__init__.py added (CliDeps fields, run and resume handlers); CliDeps defaults rule of section 3; page report bound to build_report.
+    # Amendment (B-412 review, documents only): stop-file removals of spec 4.4.8 in _run.py and their test; budget 340 -> 360.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -314,12 +315,13 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
     # Amendment B-354: `run --answers FILE` (AC64), about 30 lines; budget 310 -> 340.
-    max_changed_lines: 340
+    max_changed_lines: 360
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_completes_and_writes_report"
       - "packages/eng-harness/tests/replay/test_cli_resume.py::test_no_wait_then_resume"
+      - "packages/eng-harness/tests/replay/test_cli_resume.py::test_stop_file_removed_on_return_and_before_resume"
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request"
@@ -527,12 +529,15 @@ completes AC51.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
-tests. Budget 340 lines. The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
+tests. Budget 360 lines (340 before the B-412 review). The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
 FILE` (AC64): the object is checked in step 2 and the page `InputPort` is wrapped in `_wiring.py` so that the first data
 request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340). Amendment
 B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
 `resume` handlers there; `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
-and store.
+and store. T14 also owns the stop-file removals of spec §4.4.8 in `cli/_run.py`: the run process removes `stop.json`
+when `Engine.start` or `Engine.resume` returns while the file exists, and `resume` removes a stale one before
+`Engine.resume`; `test_stop_file_removed_on_return_and_before_resume` checks both with a fake engine from `CliDeps`
+(about 20 lines, hence 340 to 360). AC9 stays covered by T16, whose stop test relies on these removals.
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
@@ -540,8 +545,8 @@ Amendment B-098: the decision layer is built from `[providers.*]` through `load_
 assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
 the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
-`cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they have no default and are
-required, AC62 is tested through injected recorders, and plan 0009 T10 (or a named follow-up) binds the defaults. The
+`cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they default to `None` (the
+decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and plan 0009 T10 (or a named follow-up) binds the defaults. The
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
@@ -579,7 +584,7 @@ T7 (AC29, AC37, in `test_page_approval.py`) and T16 (AC9, in `test_cli_stop.py`)
 - Runtime: none new (`eng-contract`, `pydantic`; the YAML and MCP dependencies belong to plans 0004 and 0002). No
   package ADR is needed. Using Jinja2 instead would need one (A10; spec Q1).
 - Development: none new.
-- Other plans: engine plan T4 (reader), T6 (ports), T9 (runner), T15 (approvals), T18 (progress delivery);
+- Other plans: engine plan T4 (reader), T6 (ports), T9 and T9b (runner start, resume; split by B-424), T15 (approvals), T18 (progress delivery);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry; for T14b (B-098),
   decision plan T10 (the cascade's `runtime_summary()`), engine plan T14b (`decision_runtime` in the header) and
@@ -588,17 +593,19 @@ T7 (AC29, AC37, in `test_page_approval.py`) and T16 (AC9, in `test_cli_stop.py`)
   implementation missing states it.
 - `CliDeps` defaults rule (amendment B-412; T14, T14b, T15, T16). Each `CliDeps` collaborator whose real implementation
   is not merged (engine factory, port builder, calc preflight, `freeze`, workflow registry, providers loader, decision
-  assembler, doctor callable) has no default and is required when `CliDeps` is built with it. The default `CliDeps()`
-  (what `eng_harness.cli:main` uses with `deps=None`) registers no handler for a command whose collaborators are
-  missing, so that command keeps exiting 2 "not available in this build". No stub stands in for a missing
-  implementation in production code. The task that merges the real implementation, or a named follow-up, binds the
-  default and registers the handler.
+  assembler, doctor callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
+  still builds (what `eng_harness.cli:main` uses with `deps=None`, and what `tests/unit/cli/test_opener.py` calls).
+  Tests pass the collaborators explicitly. A command counts as available only when every collaborator it needs is not
+  `None`: the handler table (or the handler at dispatch) checks this, so with the default `CliDeps()` that command
+  keeps exiting 2 "not available in this build". No stub stands in for a missing implementation in production code.
+  The task that merges the real implementation, or a named follow-up, replaces the `None` default with the real one.
+  (Amendment B-412 review: the earlier wording "no default and required" would make `CliDeps()` raise `TypeError`.)
 - Staged engine (amendment B-412). The engine runner and approvals (engine plan T9 to T15) and progress delivery
   (engine plan T18) are not merged when T5, T7 and T16 may be built. T5 tests the sink alone; T7's workflow tests use a
   test-local engine stand-in that journals through the merged `JournalWriter`; T16's stop test uses a fake engine from
   `CliDeps`. T17 waits for engine plan T15 and T18 and re-checks the deferred halves (AC9, AC19, AC29, AC37) with the
   real engine.
-- Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`), engine §4.9 (`item_reasons`, the choice
+- Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`; `stop.json` and `heartbeat.json`, Q19), engine §4.9 (`item_reasons`, the choice
   convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here.
 
 ## 4. Verification
