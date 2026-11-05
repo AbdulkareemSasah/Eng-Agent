@@ -9,6 +9,7 @@ import pytest
 from eng_contract.kinds import NEUTRAL_KINDS
 
 from eng_harness._calc import _hash
+from eng_harness._calc._approvals import APPROVALS_PATH, check_approvals, load_approvals
 from eng_harness.calc import CalcRegistry, CalcRegistryError
 from eng_harness.calcs import REGISTRY
 
@@ -143,3 +144,11 @@ def test_main_requires_exactly_the_write_flag(fixtures: ModuleType, tmp_path: Pa
         with pytest.raises(SystemExit):
             _hash.main(argv, registry=CalcRegistry(kinds), lock_path=target)
     assert target.read_bytes() == _hash.render_lock(EMPTY)
+
+
+def test_shipped_calcs_are_draft() -> None:
+    """AC10: the shipped approvals.yaml parses, and every registered calc declares draft (ADR-0028 section 4)."""
+    shipped = load_approvals(APPROVALS_PATH, REGISTRY)
+    assert shipped.schema_version == 1
+    assert [calc_id for calc_id in REGISTRY if REGISTRY[calc_id].verification != "draft"] == []
+    assert not any(finding.kind == "unknown_calc" for finding in check_approvals(REGISTRY, shipped))
