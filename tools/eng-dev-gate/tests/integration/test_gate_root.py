@@ -32,7 +32,8 @@ def _gate_yml(*, bootstrap: bool, diff_lines: int) -> str:
         f"bootstrap: {{enabled: {str(bootstrap).lower()}, gate_branch: build/v1}}\nmain_branch: main\n"
         f"{'' if bootstrap else IDENTITIES}"
         "spec_globs: []\nplan_globs: []\ntest_globs: []\ngenerated_globs: []\nspike_globs: []\n"
-        f"limits: {{diff_lines: {diff_lines}, max_task_lines: 400, test_run_seconds: 600, max_file_bytes: 1048576}}\n"
+        f"limits: {{diff_lines: {diff_lines}, max_task_lines: 400, test_run_seconds: 600, max_file_bytes: 1048576"
+        f", mutation_run_seconds: 7200}}\n"
     )
 
 
