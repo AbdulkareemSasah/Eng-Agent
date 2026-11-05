@@ -1,0 +1,43 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.model_fingerprint",
+    "status": "draft",
+    "version": 1
+  },
+  "complete": true,
+  "covered": [
+    "model.frame_placements/1",
+    "model.stories/1"
+  ],
+  "draft": true,
+  "fingerprint": "fp1:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "method": "harness.fp/1",
+  "model_id": "mdl_00000000000000000000000000",
+  "model_revision": 3,
+  "sections": [
+    {
+      "complete": true,
+      "items": 2,
+      "kind": "model.frame_placements/1",
+      "result_id": "res_00000000000000000000000001",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    {
+      "complete": true,
+      "items": 1,
+      "kind": "model.stories/1",
+      "result_id": "res_00000000000000000000000002",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.model_fingerprint",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
