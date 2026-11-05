@@ -166,7 +166,9 @@ def request(
     )
 
 
-@pytest.mark.parametrize("bad", [{"count": "3"}, {"count": 1.5}, {"count": None}, {"label": 5}])
+@pytest.mark.parametrize(
+    "bad", [{"count": "3"}, {"count": 1.5}, {"count": None}, {"label": 5}, {"count": float("nan")}]
+)
 def test_input_and_output_validation(tmp_path: Path, bad: dict[str, JsonValue]) -> None:
     rig = make_rig(tmp_path)
     engine = rig.engine(chain(steps("read_a")), bad_output)
