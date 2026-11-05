@@ -6,6 +6,8 @@ full contact at `q_min = 0` (FS S5). Each precondition is tested just below, at 
 
 # ruff: noqa: N815  # B-271: field names are fixed by the contract's unit suffixes (EC §4.7.2), e.g. fc_MPa
 
+import os
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -151,3 +153,33 @@ def test_statics_is_reused_not_repeated() -> None:
     assert COMPRESSION.test(model, t)
     with pytest.raises(CheckDefinitionError):
         statics(model, t)
+
+
+_CLAUSES = Path(__file__).resolve().parents[3] / "docs" / "clauses" / "aci318_14"
+_SF_NOTE = "true unit MPa^0.5; stored as 1 because the eng-contract unit table has no MPa^0.5 (plan 0002 §6 Q6)"
+
+
+def _section5_rows(text: str) -> list[list[str]]:
+    """Return the cells of the §5 table rows of a clause spec (plan 0002 T2c)."""
+    body = text.split("\n## 5.", 1)[1].split("\n## ", 1)[0]
+    return [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in body.splitlines() if ln.startswith("| `")]
+
+
+def test_shared_sources_match_clause_specs() -> None:
+    """Each shared constant's row in every clause spec §5 equals its `Cited` (plan 0002 §1.1, T2c).
+
+    The clause specs sit outside the member; mutmut's copy of it (``MUTANT_UNDER_TEST`` set) lacks them, so only
+    there a missing folder skips; in every other run it fails (as B-369).
+    """
+    if not _CLAUSES.is_dir() and "MUTANT_UNDER_TEST" in os.environ:
+        pytest.skip("the clause specs are outside the copy the mutation step runs (B-423); expires 2026-12-31")
+    seen: set[str] = set()
+    for spec in sorted(_CLAUSES.glob("*.md")):
+        for symbol, value, unit, citation, *_ in _section5_rows(spec.read_text(encoding="utf-8")):
+            name = symbol.strip("`")
+            if name not in CITED or (name == "c_half" and "development_length" in spec.name):
+                continue
+            seen.add(name)
+            assert (citation, float(value), unit) == (CITED[name].source, CITED[name].value, CITED[name].unit), spec
+    assert seen == set(CITED)
+    assert CITED["sf_max"].note == _SF_NOTE

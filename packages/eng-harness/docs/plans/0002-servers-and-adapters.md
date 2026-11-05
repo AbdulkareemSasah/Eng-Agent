@@ -150,6 +150,11 @@ tasks:
     depends_on: [T5]
   - id: T6b
     title: Build check, tool-list fingerprint pinned from the inventory, and ServerCheck
+    # Amendment (B-413, documents only): test_build_mismatch_stops_run (the engine stop of AC9, engine AC44) moves to
+    # T19, so T6b does not wait for engine T13; the workflow fixture's build pins and the fake's script_enabled join the files.
+    # Amendment (B-413, documents only): the check is a ServerManager constructor argument, run by _session.py only on a
+    # restart (engine calls preflight at start and resume); the fixture uses sasaah-csi-mcp only for the CSI fake, the PAGED double keeps its adapter.
+    # Amendment (B-413, documents only): test_restart_repeats_build_check covers AC11's build-check clause on a restart.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -160,14 +165,16 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
+      - "packages/eng-harness/tests/workflow/conftest.py"  # build pins from the SHA-256 of sys.executable and the allowlist's sasaah_commit (B-413)
+      - "packages/eng-harness/tests/fakes/sasaah_csi/server.py"  # csi_status reports script_enabled false, spec §4.3.4 item 5 (B-413)
     max_changed_lines: 180
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_fingerprint_definition"
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_each_mismatch"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
-    covers: [AC9, AC10]
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_restart_repeats_build_check"
+    covers: [AC9, AC10, AC11]
     depends_on: [T6]
   - id: T7
     title: Machine-level host-instance lock and process guard
@@ -246,6 +253,7 @@ tasks:
     depends_on: [T8b]
   - id: T10
     title: Harness-side model identity (ADR-0032), CSI session operations, HostPort file and instance methods
+    # Amendment (B-413, documents only): the synthetic CSI fake joins the files (a restore needs a distinct launched instance).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -255,6 +263,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_identity.py"
       - "packages/eng-harness/tests/workflow/adapters/__init__.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # the fake's behaviour for the session operations, test code (B-413)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -265,6 +274,7 @@ tasks:
     depends_on: [T7, T9]
   - id: T11
     title: CSI model-state reader, model kinds, fingerprint and units read
+    # Amendment (B-413, documents only): the units trap (AC22, engine AC45) moves to T19; the synthetic CSI fake joins the files.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -274,18 +284,18 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py"
-      - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"
       - "packages/eng-harness/tests/property/test_fingerprint.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # csi_model_info replies (object_counts, program_version), test code (B-413)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py::test_kinds_and_fingerprint"
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent_and_edit_sensitive"
-      - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
-    covers: [AC22, AC27]
+    covers: [AC27]
     depends_on: [T10]
   - id: T12
     title: CSI edit kinds, read-back helpers and check_model
+    # Amendment (B-413, documents only): the synthetic CSI fake joins the files (its edit tools must apply the writes they report).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -297,6 +307,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_steps.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_edits.py"
       - "packages/eng-harness/tests/workflow/adapters/test_readback.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # applies the §4.6.2 edit tools, loads and restraints, test code (B-413)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -308,6 +319,7 @@ tasks:
     depends_on: [T11]
   - id: T13
     title: CSI analysis, design and results through the long role
+    # Amendment (B-413, documents only): the synthetic CSI fake joins the files (analysis status, design results, forces).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -316,6 +328,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_analysis.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # analysis, design and result replies, test code (B-413)
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
@@ -324,6 +337,7 @@ tasks:
     depends_on: [T12]
   - id: T14
     title: Reconciliation by reading model state, preview and read_back
+    # Amendment (B-413, documents only): the synthetic CSI fake joins the files (timeout_after_apply leaves each write applied).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -331,6 +345,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
       - "packages/eng-harness/src/eng_harness/adapters/_ledger.py"
       - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # fault behaviour per write tool, test code (B-413)
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -394,22 +409,29 @@ tasks:
     depends_on: [T16]
   - id: T18
     title: eng-harness doctor
+    # Amendment (B-413, documents only): the Windows test is test_doctor_windows.py, since without __init__.py files mypy
+    # would name both tests/unit/test_doctor.py and tests/windows/test_doctor.py "test_doctor" (duplicate module).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/src/eng_harness/doctor.py"
       - "packages/eng-harness/tests/unit/test_doctor.py"
-      - "packages/eng-harness/tests/windows/test_doctor.py"
+      - "packages/eng-harness/tests/windows/test_doctor_windows.py"
     max_changed_lines: 350
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_checks_and_output"
-      - "packages/eng-harness/tests/windows/test_doctor.py::test_integrity_level"
+      - "packages/eng-harness/tests/windows/test_doctor_windows.py::test_integrity_level"
       - "packages/eng-harness/tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools"
     covers: [AC37, AC39]
     depends_on: [T7]
   - id: T19
     title: Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes
+    # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16 and T19;
+    # it also takes the two engine stops left out of T6b and T11 (AC9's engine clause, AC22), which fail at its base
+    # because build_ports does not exist there yet.
+    # Amendment (B-413, documents only): also takes the SAFE engine stop test_safe_build_mismatch_stops_run (spec 0008
+    # AC4's stop) from plan 0008 T3 and T8, failing at its base for the same reason; it waits for plan 0008 T3.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -418,16 +440,25 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
       - "packages/eng-harness/tests/workflow/test_build_ports.py"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b) and the SAFE stop (from plan 0008), B-413
+      - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
     max_changed_lines: 200
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
-    covers: [AC36, AC41]
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run"
+      - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
+    covers: [AC9, AC22, AC36, AC41]
     depends_on: [T17, T18, T20]
   - id: T20
     title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
+    # Amendment (B-413, documents only): test_route_key leaves tests_first (no config-level route rule fails at the base;
+    # AC41 makes every route rule of the framework an allowlist load error; the IDEA section's configuration check for a
+    # missing route is plan 0014 T1's, spec 0014 AC1); a route on a CSI section is covered in test_route_filter.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -443,7 +474,6 @@ tasks:
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/servers/test_config.py::test_audit_log_flag"
-      - "packages/eng-harness/tests/unit/servers/test_config.py::test_route_key"
       - "packages/eng-harness/tests/unit/servers/test_launch_args.py::test_audit_log_default_and_off"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_routes_declared"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_route_filter"
@@ -464,13 +494,16 @@ and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock 
 T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), model state (T11), edits
 and read-back (T12), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
 command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19) that wires the ports into
-the engine and runs the crash matrix. T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1)
+the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
+build check, the units trap; B-413). T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1)
 needs and that no CSI task uses.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line and
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
-own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Tasks that share a source file are
+own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
+CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
+share it (T6b, T10 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11,
 T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20). Parallel tasks
@@ -516,7 +549,26 @@ AC38's load side (B-068): the `release` and `release_record` keys on allowlist e
 
 **T6b Build check** (§4.5.1). The fingerprint of the tool list computed from the inventory and pinned in the allowlist
 header (`fingerprint_source = "s12-inventory"`, `_allowlist.py` and `_allowlist.toml`), the build check and
-`ServerCheck`; the workflow test stops a run through the engine's preflight. Budget 180 lines. T6b edits `_session.py`,
+`ServerCheck`; the workflow fixture's build pins become the real ones (the SHA-256 of `sys.executable` and the
+allowlist's `sasaah_commit`) and the fake's `csi_status` reports `script_enabled: false`, so the build check passes when
+`preflight` runs over the CSI fake and when a role of it restarts. Where the check runs (spec §4.3.4, B-413): the engine
+calls `ServerManager.preflight` at run start and resume; `_session.py` runs the check itself only on a restart
+(§4.3.5), never on a role's first start. The check reaches the `ServerManager` as a constructor argument beside the
+launcher (`build_ports`, wired in T19, builds it from the adapter allowlist, so `servers` needs no import of
+`adapters`); a `ServerManager`
+built without one answers `preflight` with `ok` false and runs no check on a restart. The fixture `make_config` names
+the CSI allowlist's adapter `sasaah-csi-mcp`, with `--disable-script` in its args (spec §4.2 rule 3; the fake reads no
+command-line options), only when its script is the CSI fake, through a fixture parameter that follows the script; the
+configs of the PAGED transport double in `test_session.py` keep the adapter `synthetic-csi` and no `--disable-script`,
+so the argv assertions of `test_launch_arguments` and `test_launch_arguments_without_audit_log` stay as they are. The
+existing T5 tests build `ServerManager` without a check, so the restart in
+`test_server_exiting_before_handshake_is_not_connected` runs none and no T5 expectation changes (A4); not through a
+mapping of `synthetic-csi` in `_session.py` (B-413). `test_session.py::test_restart_repeats_build_check` (AC11's
+build-check clause, B-413) builds a `ServerManager` with a check over the CSI fake, kills the server during a call and
+shows that the restart runs the check again before the re-attach (§4.3.5); it fails
+at T6b's base because `servers/_buildcheck.py` and the `ServerManager` check argument do not exist there. The workflow
+test that stops a run through the engine's preflight is T19's (B-413).
+Budget 180 lines. T6b edits `_session.py`,
 so T7 follows it.
 
 **T7 Lock and guard** (§4.4). OS locks in the machine-level lock folder, holder records, stale handling; launched
@@ -539,7 +591,8 @@ save with hash and identity update, restore (a new hidden instance when launch o
 `model_files`.
 
 **T11 Model state** (§4.6.4). The read set, the six model kinds and the status, the fingerprint, `LIMIT_EXCEEDED` on
-truncation, outside-edit detection, `read_units`; the units-trap workflow test with the synthetic fault.
+truncation, outside-edit detection, `read_units`. The units-trap workflow test, in which the engine stops, is T19's
+(B-413).
 
 **T12 Edits and read-back** (§4.6.1, §4.6.2, §4.5.8). Argument models and builders per edit kind, the
 `NotImplementedGap` entries H-G1 to H-G3 and the seismic exclusion, read-back helpers, `check_model` with the basis
@@ -572,7 +625,17 @@ JSON output, exit codes; the unreleased-tools check and the `extra_checks` exten
 fake-server processes; the crash matrix that kills the engine at each write step and resumes. Completes
 `docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20); the route-bearing
 case is tested in `test_build_ports.py` with a synthetic routed allowlist (test data, product-neutral), since the CSI
-cycle has no route (AC41).
+cycle has no route (AC41). The two engine stops moved out of T6b and T11 (B-413):
+`test_session.py::test_build_mismatch_stops_run`, a mismatched build stops the run before any write (AC9's engine
+clause, engine AC44); `test_units_after_timeout.py::test_units_trap`, the synthetic fault `units_left_changed` makes the
+engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). The SAFE engine
+stop of spec 0008 AC4 (`test_session.py::test_safe_build_mismatch_stops_run`, a SAFE server whose build does not match
+the SAFE fingerprint stops the run before any write) is also T19's (B-413): plan 0008 has no later task that adds a
+source file the stop needs, so there it would pass at its merge base (test-first TF004). All three need `build_ports`,
+which this task adds to `src/eng_harness/adapters/__init__.py`, so they fail at its base. They read the pinned
+fingerprints and the units through the allowlist loader and the ports. T19 starts after plan 0008 T3 (the SAFE server
+section and per-product `[fingerprint]` header of 0008 T1, the SAFE fake mode of 0008 T2, the pinned SAFE fingerprint
+of 0008 T3).
 
 **T20 Framework additions for the IDEA adapter** (AC40 to AC42, spec §11 A3, B-085). `audit_log` on the server
 section (default true) and the argv builder `servers/_launch_args.py`, wired into `_session.py`, so the CSI argv stays
@@ -588,14 +651,17 @@ they are used (plan 0014 T5, T7, T8).
 - Development: the root workspace group; no new development dependency.
 - Work items: the engine plan's ([0001-engine](0001-engine.md)) T1 (package skeleton) before this plan's T1; its T6
   (ports, port data types and fakes) before T8; its run loop, invariants and replay tasks before the workflow and
-  replay tests that run the real engine (T6b's `test_build_mismatch_stops_run`, T11's units trap, T19). `eng-contract`
+  replay tests that run the real engine: T19 waits for engine 0001 T13, T15, T16 and T19 (T13 brings in T9 to
+  T12; B-413). No earlier task of this plan runs the real engine. T19 also waits for plan
+  [0008-safe-adapter](0008-safe-adapter.md) T3 (and so its T1 and T2), because it writes the SAFE engine stop of spec
+  0008 AC4 (B-413). `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
 
 ## 4. Verification
 
 - Local gate per task (`uv run eng-gate check` once available; until then ruff, mypy strict and pytest with coverage
   from `packages/eng-harness/`); the pull request links its CI run.
-- Windows CI job: `tests/windows/` (jobs, breakaway, inspector, doctor integrity level).
+- Windows CI job: `tests/windows/` (jobs, breakaway, inspector, doctor integrity level in `test_doctor_windows.py`).
 - Needs local test (spec §12, listed in `docs/local-testing.md`): everything that drives `sasaah-csi-mcp`, ETABS or
   the PowerShell tools, including the breakaway of a server-launched ETABS, the long-role attach, the live
   fingerprint, the table keys, timeouts and reconciliation with S-02, fingerprint stability with S-04, the doctor and
