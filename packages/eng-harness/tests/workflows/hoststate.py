@@ -3,7 +3,7 @@
 Test doubles, never shipped. The stop point of these tests (a write cut off between its start and its end) is not
 reachable through the public API, so `forge` writes the journal of such a run by hand, event by event, and the test
 resumes it with a real engine. `ScriptedHost` is the rig's fake host with a log of its reconciler calls and a reconciler
-that can be absent or fail. No clock, network or host program.
+that can be absent or fail, and a read-back that can answer, fail or raise. No clock, network or host program.
 """
 
 import asyncio
@@ -15,7 +15,7 @@ from typing import Any
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
-from fakes.ports import failure
+from fakes.ports import ENVELOPE, failure
 from pydantic import JsonValue
 
 from eng_harness.block import BlockDef
@@ -33,7 +33,7 @@ Forged = tuple[EventType, str | None, int | None, dict[str, Any]]
 
 
 class ScriptedHost(Host):
-    """The rig's fake host with a log of reconciler calls and a reconciler that can be absent or fail."""
+    """The rig's fake host with a log of reconciler calls, a reconciler that can be absent or fail and a read-back."""
 
     def __init__(self, ids: SeededIdSource, clock: FixedClock, runs_dir: Path) -> None:
         """Serve the rig's tools; `calls` gets (method, op id, None) for each reconciler call."""
@@ -42,6 +42,7 @@ class ScriptedHost(Host):
         self.unsupported: set[str] = set()
         self.reconcile_error: ContractError | None = None
         self.reconciled_args: list[Mapping[str, JsonValue]] = []
+        self.read_back_reply: ENVELOPE | ContractError | None = None  # None: the adapter has no read-back
 
     def supports_reconcile(self, tool: str) -> bool:
         """False for the tools in `unsupported`, else as the fake host."""
@@ -54,6 +55,12 @@ class ScriptedHost(Host):
         if self.reconcile_error is not None:
             raise self.reconcile_error
         return await super().reconcile(tool, args, op_id)
+
+    async def read_back(self, tool: str, args: Mapping[str, JsonValue]) -> ENVELOPE | None:
+        """`read_back_reply`: returned as it is, or raised when it is an error; None means no read-back."""
+        if isinstance(self.read_back_reply, ContractError):
+            raise self.read_back_reply
+        return self.read_back_reply
 
 
 def scripted_rig(root: Path) -> tuple[Rig, ScriptedHost]:

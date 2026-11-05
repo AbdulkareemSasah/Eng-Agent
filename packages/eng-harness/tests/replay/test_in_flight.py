@@ -1,10 +1,11 @@
 """In-flight steps at a resume: reconciliation of writes and the rerun of reads (plan 0001 T11b; spec 0001 4.5.3).
 
 Covers AC31 (a write in flight is reconciled before the block is called: `applied`, `not_applied`, and every other
-outcome as a stop with an engineer request) and AC32 (a read or calc in flight runs again after `step_rerun`). The runs
-are forged by hand, because a cut-off between a step's start and its end cannot be reached through the public API: the
-journal holds the steps up to the cut, and a new engine resumes it as a new process would. The fake host's reconciler
-answers per `op_id`; its call log and the rig's port-call log show what the resume asked of the ports.
+outcome as a stop with an engineer request; a write found applied whose result cannot be read stays in flight) and AC32
+(a read or calc in flight runs again after `step_rerun`). The runs are forged by hand, because a cut-off between a
+step's start and its end cannot be reached through the public API: the journal holds the steps up to the cut, and a
+new engine resumes it as a new process would. The fake host's reconciler answers per `op_id`; its call log and the
+rig's port-call log show what the resume asked of the ports.
 """
 
 from pathlib import Path
@@ -13,6 +14,7 @@ from typing import Any
 import pytest
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
+from fakes.ports import failure
 from pydantic import JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
 from workflows.ctx_flows import flow, success
@@ -271,3 +273,52 @@ def test_a_partial_result_is_not_the_result_of_a_write_found_applied(tmp_path: P
     assert closing.result is not None
     assert closing.result.ref != partial.result_id  # what the adapter found half done is not the write's result
     assert closing.result.summary == {}
+
+
+UNREADABLE = ["adapter_result", "read_back", "read_back_raises", "engineer"]
+
+
+def _found_applied_but_unreadable(host: ScriptedHost, cause: str) -> str:
+    """Arrange that the write in flight is found applied and its result cannot be read; the code of the failure."""
+    if cause == "engineer":  # the adapter cannot decide and the engineer will say `applied`
+        _cannot_reconcile(host, "unknown")
+    else:
+        failed_result = failure(ErrorCode.HOST_BUSY) if cause == "adapter_result" else None
+        host.reconciliations[OP] = Reconciliation(outcome="applied", result=failed_result)
+    if cause == "read_back_raises":
+        host.read_back_reply = ContractError(ErrorCode.HOST_ERROR, "the read-back failed", retryable=False)
+        return "HOST_ERROR"
+    if cause != "adapter_result":
+        host.read_back_reply = failure(ErrorCode.HOST_BUSY)
+    return "HOST_BUSY"
+
+
+@pytest.mark.parametrize("cause", UNREADABLE)
+def test_a_write_found_applied_whose_result_cannot_be_read_stays_in_flight(tmp_path: Path, cause: str) -> None:
+    rig, host, run_id = _cut_off_write(tmp_path)
+    code = _found_applied_but_unreadable(host, cause)
+    if cause == "engineer":
+        resume(rig, chain(ORIGINAL), run_id)
+        asked = rig.inputs.presented[-1]
+        rig.inputs.script(asked.request_id, answer(asked, "applied", "outcome"))
+    stopped = resume(rig, chain(ORIGINAL), run_id)
+    assert stopped.status is RunStatus.NEEDS_ENGINEER  # a failure is not "no read-back": nothing is journaled as done
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "needs_reconciliation"
+    assert code in stopped.escalation.detail
+    assert _events(rig, run_id, ev.StepReconciled) == []
+    assert host.ledger == []  # the write is not sent again, and the block did not run on
+    presented = len(rig.inputs.presented)
+    reply = success(rig, {"tool": "write_b"})  # the read-back works at the next resume: the step is reconciled then
+    host.read_back_reply = reply
+    if cause != "engineer":
+        host.reconciliations[OP] = Reconciliation(outcome="applied")
+    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
+    (closing,) = _events(rig, run_id, ev.StepReconciled)
+    assert closing.outcome == "applied"
+    assert closing.decided_by == ("engineer:test" if cause == "engineer" else "adapter")
+    assert closing.result is not None
+    assert closing.result.ref == reply.result_id
+    # an answer given at the earlier resume is read from the journal: no second answer event, no new presentation
+    assert len(_events(rig, run_id, ev.InputProvided)) == (1 if cause == "engineer" else 0)
+    assert len(rig.inputs.presented) == presented
