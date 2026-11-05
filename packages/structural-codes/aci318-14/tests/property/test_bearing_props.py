@@ -10,7 +10,7 @@ from typing import Any
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
 from hypothesis import assume, given, settings
 from hypothesis import strategies as st
-from structural_codes import evaluate
+from structural_codes import BatchItem, evaluate_batch
 from structural_codes.pack import Pack, Registry
 
 from aci318_14 import __version__
@@ -47,24 +47,23 @@ _inputs = st.fixed_dictionaries(
 )
 
 
-def _run(inputs: dict[str, Any]) -> tuple[VerdictStatus, float | None, dict[str, float]]:
-    raw = {**inputs, "reaction_height_mm": 0.0, "allowable_kind": "gross"}
-    payload = evaluate(_ID, raw, subject=_F1, registry=_REGISTRY).payload
-    verdict = payload.verdicts[0]
-    return verdict.status, verdict.ratio, {s.name: s.value for s in payload.traces[0].steps}
+def _run(*cases: dict[str, Any]) -> list[tuple[VerdictStatus, float | None, dict[str, Any]]]:
+    """Evaluate the cases in one batch; per case the status, the ratio and the trace steps by name."""
+    items = [BatchItem(_F1, {**c, "reaction_height_mm": 0.0, "allowable_kind": "gross"}) for c in cases]
+    payload = evaluate_batch(_ID, items, registry=_REGISTRY).payload
+    steps = [{s.name: s.value for s in trace.steps} for trace in payload.traces]
+    return [(v.status, v.ratio, k) for v, k in zip(payload.verdicts, steps, strict=True)]
 
 
 @settings(derandomize=True, max_examples=150, deadline=None)
 @given(inputs=_inputs, grow=st.sampled_from(_GROWS), more=_num(1, 50))
 def test_monotone_and_sign_free(inputs: dict[str, Any], grow: str, more: float) -> None:
     """Increasing one load or overburden input never lowers q_max; flipping MX and MY changes nothing (BP-AC4)."""
-    status, ratio, steps = _run(inputs)
     larger = {**inputs, grow: inputs[grow] + more}
-    status_2, _, steps_2 = _run(larger)
+    flipped = {**inputs, "MX_kNm": -inputs["MX_kNm"], "MY_kNm": -inputs["MY_kNm"]}
+    (status, ratio, steps), (status_2, _, steps_2), (status_3, ratio_3, steps_3) = _run(inputs, larger, flipped)
     full = (VerdictStatus.PASS, VerdictStatus.FAIL)
     assume(status in full and status_2 in full)
     assert steps_2["q_max_kPa"] >= steps["q_max_kPa"]
-    flipped = {**inputs, "MX_kNm": -inputs["MX_kNm"], "MY_kNm": -inputs["MY_kNm"]}
-    status_3, ratio_3, steps_3 = _run(flipped)
     assert (status_3, ratio_3) == (status, ratio)
     assert (steps_3["q_max_kPa"], steps_3["q_min_kPa"]) == (steps["q_max_kPa"], steps["q_min_kPa"])

@@ -106,7 +106,7 @@ class _Records:
 
     def __init__(self) -> None:
         engineer = "engineer:Sam@2026-02-01T08:00:00.000Z"
-        fields = {
+        fields: dict[str, dict[str, Any]] = {
             "foundation.allowable_bearing_pressure": {"value": 250.0, "unit": "kPa"},
             "foundation.allowable_bearing_kind": {"value": "gross", "unit": None},
         }
