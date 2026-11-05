@@ -5,6 +5,7 @@ No host program is involved. These checks need the owner's machine (plan 0001 se
 2. The run lock is released after killing the engine from Task Manager (`uv run pytest tests/unit/test_journal_reader.py tests/windows/test_run_lock_windows.py -m windows`; the second file starts a holder process, kills it, and checks that the engine's lock refuses a second process while a run is under way; the Windows job runs only `tests/windows`, so also run `tests/replay/test_resume.py::test_resume_holds_the_run_lock` there: the same for `Engine.resume`).
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
+5. Plan 0001 T11b (spec 0001 AC31, AC32) against a real host and adapter, once spec 0002's `ToolPort` adapters exist: kill the host program during a write and resume (the adapter's `reconcile` for each outcome `applied`, `not_applied`, `partial` and `unknown`, and a tool without a reconciler), the engineer's answer to the `engine.in_flight` request, and a read killed in flight. Only the fakes have run these.
 
 Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 1. `csi_launch` on the owner's machine: which process is the ETABS parent, the pid the reply names, and that the instance survives the server job's closure.

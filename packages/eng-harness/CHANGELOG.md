@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- In-flight steps at a resume: `engine/_inflight.py` (a write in flight is reconciled before the block is called, `applied` and `not_applied` as `step_reconciled`, any other outcome, no reconciler or a reconciler error as an `engine.in_flight` request with the choices `applied`, `not_applied` and `abandon`; a read, calc or tool step in flight gets `step_rerun` and runs again as the same attempt) and `Engine.resume` runs step 7 of spec 4.5.1 before it calls the block (plan 0001 T11b, B-349; spec 0001 AC31, AC32).
 - Decision provider interfaces: `eng_harness.decisions.interfaces` (`ProviderInfo`, `ProviderRequest`, `ChoiceAnswer`, `YesNoAnswer`, `LLMAnswer`, `DecisionProvider`, `LLMProvider`, `ProviderErrorCode`, `OutgoingPlace`, `ProviderError`, `ProviderFailure`) and the port data in `decisions/_record.py` (`DecisionCall` with `sensitive_values`, `EngineerChoice`, `DecisionAnswer`, `PendingAnswer`, `DecisionScreen`, `Suggestion`), with scripted fake providers in `tests/fakes/decision_providers.py` (plan 0005 T5, B-169; spec 0005 AC41).
 
 - CalcPort: `HarnessCalcPort`, `CalcSettings` and `CalcRefusal` in `_calc/_port.py` (`describe` with `ref_rules` from the `x-eng` metadata, `run` with status check by run class, `validate_input` under `require_refs`, `InputMeta` from the records, item limit, `CalcMeta`, draft mark and trace, storage as `harness`; `preflight`; defects as `INTERNAL`), with the calc step workflow test through the real engine (plan 0003 T5, B-144; spec 0003 AC4, AC11 to AC18).
