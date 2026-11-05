@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import quote
 
 from eng_contract.errors import ErrorDetail
@@ -27,7 +27,7 @@ class RunView:
     run_id: str
     workflow: str
     mode: str
-    status: Literal["RUNNING", "INTERRUPTED", "PAUSED", "NEEDS_ENGINEER", "COMPLETED", "FAILED"]
+    status: str  # RUNNING, INTERRUPTED, PAUSED, NEEDS_ENGINEER, COMPLETED or FAILED
     started_at: str
     ended_at: str | None
     draft: bool | None
@@ -148,7 +148,7 @@ class JournalReader:
                 continue
             if key not in views:
                 raise JournalIntegrityError(f"step event seq {e.seq} has no step_started", evidence=[f"seq:{e.seq}"])
-            end = {"status": "rerun", "ended_at": e.at}
+            end: dict[str, Any] = {"status": "rerun", "ended_at": e.at}
             if isinstance(p, ev.StepCompleted):
                 ref = p.result.ref if p.result else p.output_ref
                 end |= {"status": "completed", "duration_ms": p.duration_ms, "result_ref": ref}
