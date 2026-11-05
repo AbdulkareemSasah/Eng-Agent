@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Progress sink and heartbeat: `TerminalProgress` (formats an event and queues the text for one writer thread; `emit` never blocks, drops the oldest line when the queue is full and prints the count later, raises what the renderer raises), `Heartbeat` (asyncio task: heartbeat line and atomic `heartbeat.json` every interval, run folder read at each beat and never created), `Liveness` and `read_liveness` (run lock plus file age: running, no heartbeat, not running), with the 200 ms latency test in `tests/perf` (plan 0006 T5, B-179; spec 0006 AC18 to AC20).
 - Decision provider interfaces: `eng_harness.decisions.interfaces` (`ProviderInfo`, `ProviderRequest`, `ChoiceAnswer`, `YesNoAnswer`, `LLMAnswer`, `DecisionProvider`, `LLMProvider`, `ProviderErrorCode`, `OutgoingPlace`, `ProviderError`, `ProviderFailure`) and the port data in `decisions/_record.py` (`DecisionCall` with `sensitive_values`, `EngineerChoice`, `DecisionAnswer`, `PendingAnswer`, `DecisionScreen`, `Suggestion`), with scripted fake providers in `tests/fakes/decision_providers.py` (plan 0005 T5, B-169; spec 0005 AC41).
 
 - CalcPort: `HarnessCalcPort`, `CalcSettings` and `CalcRefusal` in `_calc/_port.py` (`describe` with `ref_rules` from the `x-eng` metadata, `run` with status check by run class, `validate_input` under `require_refs`, `InputMeta` from the records, item limit, `CalcMeta`, draft mark and trace, storage as `harness`; `preflight`; defects as `INTERNAL`), with the calc step workflow test through the real engine (plan 0003 T5, B-144; spec 0003 AC4, AC11 to AC18).

@@ -68,7 +68,9 @@ def test_loop_beats_after_each_interval(tmp_path: Path) -> None:
         if len(sleeps) > 3:
             raise asyncio.CancelledError
 
-    looped = Heartbeat(sink, FixedClock(START_MS + 10_000, 10_000), interval_s=10, run_dir=lambda: tmp_path, sleep=sleep)
+    looped = Heartbeat(
+        sink, FixedClock(START_MS + 10_000, 10_000), interval_s=10, run_dir=lambda: tmp_path, sleep=sleep
+    )
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(looped.run())
     sink.close()
