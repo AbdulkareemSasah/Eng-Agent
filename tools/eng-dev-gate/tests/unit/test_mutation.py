@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
+from eng_dev_gate import toolrun
 from eng_dev_gate.checks import mutation
 from eng_dev_gate.checks.registry import StepContext
 from eng_dev_gate.report import Severity
@@ -35,9 +36,11 @@ class FakeMutmut:
         self.statuses, self.run_exit, self.run_output, self.lock_exit = list(statuses), run_exit, run_output, lock_exit
         self.config: str | None = None
         self.calls: list[list[str]] = []
+        self.timeouts: dict[str, float | None] = {}
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append(list(argv))
+        self.timeouts["results" if "results" in argv else "run"] = timeout_seconds
         if list(argv[:2]) == ["uv", "lock"]:
             return ToolResult(exit_code=self.lock_exit, output="lock is stale")
         if "results" in argv:
@@ -231,6 +234,8 @@ def test_judged_tree_runs_mutmut_in_its_own_environment(repo: Repo, tmp_path: Pa
     base, member = _setup(repo)
     _change(repo)
     runner = FakeMutmut(["killed"] * 3)
+    (tmp_path / ".gate").mkdir()
+    (tmp_path / ".gate" / "gate.yml").write_text(GATE_YML, encoding="utf-8")  # the gate root holds the limits
     ctx = StepContext(repo.root, tmp_path, member, runner, base=base)  # gate root differs from the judged tree
     assert mutation.run_step(ctx) == []
     ran = [call for call in runner.calls if "mutmut" in call]
@@ -343,3 +348,38 @@ def test_uncovered_mutants_count_as_survivors(repo: Repo) -> None:
     assert [f.code for f in mutation.run_step(_context(repo, member, mixed, base))] == ["MU001"]
     with pytest.raises(EnvironmentFaultError, match="MU002"):  # mutants exist and the run crashed: a backend fault
         mutation.run_step(_context(repo, member, FakeMutmut(["no tests"], run_exit=1, run_output="boom"), base))
+
+
+def _with_run_limit(repo: Repo, seconds: int) -> None:
+    """Give the gate root's ``gate.yml`` the ``limits.mutation_run_seconds`` value ``seconds``."""
+    text = GATE_YML.replace("mutation_run_seconds: 7200", f"mutation_run_seconds: {seconds}")
+    (repo.root / ".gate" / "gate.yml").write_text(text, encoding="utf-8")
+
+
+def test_run_time_limit_from_gate_config(repo: Repo) -> None:
+    """AC53c: ``mutmut run`` is bounded by limits.mutation_run_seconds, ``mutmut results`` by the default bound."""
+    base, member = _setup(repo)
+    _change(repo)
+    _with_run_limit(repo, 4321)
+    runner = FakeMutmut(["killed"] * 5)
+    assert mutation.run_step(_context(repo, member, runner, base)) == []
+    assert runner.timeouts == {"run": 4321, "results": None}
+
+
+def test_run_timeout_is_an_environment_fault_naming_the_limit(repo: Repo) -> None:
+    """AC53c: a timed out ``mutmut run`` is MU002 and names the limit and its setting."""
+
+    class TimingOut(FakeMutmut):
+        def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
+            if "run" in argv:
+                raise toolrun.ToolTimeoutError("mutmut timed out")
+            return super().run(argv, cwd, timeout_seconds=timeout_seconds)
+
+    base, member = _setup(repo)
+    _change(repo)
+    _with_run_limit(repo, 4321)
+    with pytest.raises(
+        EnvironmentFaultError,
+        match=r"MU002 mutation: mutmut run timed out after 4321 s \(limits\.mutation_run_seconds\)",
+    ):
+        mutation.run_step(_context(repo, member, TimingOut([]), base))
