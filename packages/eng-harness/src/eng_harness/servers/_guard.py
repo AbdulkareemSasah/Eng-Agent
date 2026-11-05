@@ -66,6 +66,7 @@ class ProcessGuard:
     def __init__(self, inspector: ProcessInspector, run_dir: Path, *, host_exes: Sequence[str]) -> None:
         """`host_exes` are the image names of the host program; any other child of a job member is a helper."""
         self._inspector, self._run_dir, self._exes = inspector, run_dir, list(host_exes)
+        self._exes_folded = {e.casefold() for e in host_exes}  # image names are compared without case
         self._launches: dict[tuple[int, str], _Launch] = {}
         self._helpers: dict[str, dict[tuple[int, str], ProcessIdentity]] = {}
         self._left_open: dict[tuple[int, str], StartedInstance] = {}
@@ -103,14 +104,19 @@ class ProcessGuard:
                 self._left_open.pop(key, None)
                 continue  # gone, or the pid belongs to another process now
             if await self._exit(sessions, instance, self._launches.get(key)):
+                self._left_open.pop(key, None)
                 continue
-            if not instance.visible:
-                self._inspector.terminate(instance.identity)
-            else:
-                logger.warning("visible %s pid %d left open", instance.program, instance.pid)
+            try:
+                if instance.visible:
+                    logger.warning("visible %s pid %d left open", instance.program, instance.pid)
+                    self._left_open[key] = instance
+                else:
+                    self._inspector.terminate(instance.identity)
+            except OSError as error:  # for example an elevated host: it keeps running, so it is listed
+                logger.warning("%s pid %d could not be ended: %s", instance.program, instance.pid, error)
                 self._left_open[key] = instance
-        if self._left_open:
-            path = self._run_dir / "hosts" / "left_open.json"
+        path = self._run_dir / "hosts" / "left_open.json"
+        if self._left_open or path.exists():  # an emptied listing is rewritten, not left stale
             path.parent.mkdir(parents=True, exist_ok=True)
             listed = [
                 {"pid": i.pid, "started_at": i.started_at, "program": i.program} for i in self._left_open.values()
@@ -137,8 +143,13 @@ class ProcessGuard:
         """Record the children of job `members` that are neither members nor host programs (spec 4.3.1)."""
         known = {(m.pid, m.started_at) for m in members}
         for member in members:
-            for child in self._inspector.children(member.pid):
-                if child.exe_name not in self._exes and (child.pid, child.started_at) not in known:
+            try:
+                children = self._inspector.children(member.pid)
+            except OSError as error:  # best effort: a failed Win32 call must not stop a call or the server's stop
+                logger.warning("children of pid %d could not be read: %s", member.pid, error)
+                continue
+            for child in children:
+                if child.exe_name.casefold() not in self._exes_folded and (child.pid, child.started_at) not in known:
                     self._helpers.setdefault(key, {})[child.pid, child.started_at] = child
 
     def terminate_helpers(self, key: str) -> None:

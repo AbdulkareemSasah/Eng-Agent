@@ -358,12 +358,14 @@ class ServerManager:
                 task_status.started(error)  # reported to the caller of `_start`
         finally:
             if launched is not None:
-                if self._helpers is not None:
-                    self._helpers.observe_helpers(f"{role.server}/{role.name}", launched.job_members())
-                launched.terminate_job()
-                if self._helpers is not None:
-                    self._helpers.terminate_helpers(f"{role.server}/{role.name}")
-                launched.close()
+                try:
+                    if self._helpers is not None:
+                        self._helpers.observe_helpers(f"{role.server}/{role.name}", launched.job_members())
+                finally:  # a failed observation must not leave the job running or the handles open
+                    launched.terminate_job()
+                    if self._helpers is not None:
+                        self._helpers.terminate_helpers(f"{role.server}/{role.name}")
+                    launched.close()
             if live is not None:
                 live.finished.set()
 
