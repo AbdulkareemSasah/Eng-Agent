@@ -4,6 +4,7 @@ from eng_contract.kinds import NEUTRAL_KINDS
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness.kinds.calcs import CALC_KINDS
+from eng_harness.kinds.edit_cycle import EDIT_CYCLE_KINDS
 from eng_harness.kinds.footing import FOOTING_KINDS
 
 
@@ -28,5 +29,5 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.run_output/1": Value,
         "harness.approval_preview/1": ApprovalPreview,
     }
-).extend(CALC_KINDS | FOOTING_KINDS)
-"""The neutral kinds, the four harness kinds, calc kinds (0003 4.6 to 4.11), footing kinds (0010 4.2)."""
+).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS)
+"""The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2) and edit-cycle kinds."""
