@@ -1,0 +1,7 @@
+run started: w (work_on_copy)
+done: read_model [0] 00:05
+waiting for engineer: Apply change, 00:00
+approval: approve
+done: analyze [1] 01:00
+model saved: a.edb (revision 1)
+run completed, 01:10

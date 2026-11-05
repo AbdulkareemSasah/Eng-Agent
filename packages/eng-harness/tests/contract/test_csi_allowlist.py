@@ -60,3 +60,43 @@ def test_fake_server_kinds_match_inventory() -> None:
     expected = {t["name"]: t["server_kind"] for t in inventory["tools"] if not t["excluded_from_allowlist"]}
     actual = {t["name"]: t.get("server_kind") for t in _load(SCHEMAS)["tools"]}
     assert actual == expected
+
+
+def _expected_units(tool: dict[str, Any]) -> str:
+    """The `units` handling the inventory's evidence implies (spec 0002 section 4.5.1)."""
+    change = tool["changes_host_units"]
+    if change["units_param_declared"]:
+        return "token" if change["applied"] else "declared_ignored"
+    return "present" if change["quantities_follow_present_units"] else "none"
+
+
+def test_against_inventory() -> None:
+    """AC16: the allowlist names only non-excluded inventory tools of the pinned build, and agrees with them."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    inventory = _inventory()
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    allowlist = csi_allowlist()
+    assert allowlist.sasaah_commit == inventory["sasaah_commit"]
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert allowlist.tools
+    for tool in allowlist.tools:
+        item = by_name[tool.name]  # a KeyError is a tool absent from the pinned build
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert tool.kind == ("session" if item["classification"] == "file" else item["classification"]), tool.name
+        if item["server_kind"] == "Read":
+            assert tool.effect == "read", tool.name
+        if item["server_kind"] in ("Write", "Destructive"):
+            assert tool.effect == "write", tool.name
+        assert (tool.confirm != "never") == item["confirm_required"], tool.name
+        assert tool.units == _expected_units(item), tool.name
+        assert tool.products == ("ETABS",)
+
+
+def test_allowlist_is_served_by_the_fake() -> None:
+    """AC35: every allowlisted tool is in the synthetic fake, which carries the inventory's schemas."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    served = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    assert {tool.name for tool in csi_allowlist().tools} <= served

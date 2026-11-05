@@ -1,0 +1,112 @@
+# Case file of aci318_14.13_3_1_1.bearing_pressure_service (plan 0002 T3; clause spec §8). Protected test oracle.
+# Every case is the author's hand check or boundary case from the clause spec's equations (§4): not independent
+# evidence (core spec 4.9.1). Inputs are synthetic hand-check values, not project values. Tolerances are those of the
+# clause spec §8: abs_tol 0.01 kPa on pressures, 1e-6 on ratios, rel_tol the architecture/10 §6 default.
+# No worked example exists yet (plan §6 G-WE); PC-1 needs a local test with SAFE (docs/local-testing.md).
+format: structural-codes-verification/1
+check_id: aci318_14.13_3_1_1.bearing_pressure_service
+cases:
+  - id: HC-1
+    kind: hand_check
+    source:
+      derivation: "Clause spec §4 S1, S3, S5: W = 6.25 m2 * (0.6*24 + 1.0*18) kPa = 202.5 kN; q_max = 1402.5/6.25"
+    subject: {kind: footing, id: F1}
+    inputs: &common
+      FX_kN: 0.0
+      FY_kN: 0.0
+      FZ_kN: 1200.0
+      MX_kNm: 0.0
+      MY_kNm: 0.0
+      Lx_mm: 2500.0
+      Ly_mm: 2500.0
+      reaction_height_mm: 0.0
+      h_mm: 600.0
+      soil_depth_mm: 1000.0
+      gamma_c_kN_m3: 24.0
+      gamma_s_kN_m3: 18.0
+      surcharge_kPa: 0.0
+      q_allow_kPa: 250.0
+      allowable_kind: gross
+    expected:
+      status: PASS
+      values:
+        q_max_kPa: {value: 224.4, unit: kPa, abs_tol: 0.01}
+        demand: {value: 224.4, unit: kPa, abs_tol: 0.01}
+        capacity: {value: 250.0, unit: kPa, abs_tol: 0.01}
+        ratio: {value: 0.8976, unit: "1", abs_tol: 1.0e-6}
+  - id: HC-2
+    kind: hand_check
+    source:
+      derivation: "Clause spec §4 S2, S5: |Mby| = 150 kN.m, Sy = 2.604167 m3, q = 224.4 +/- 57.6 kPa"
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MY_kNm: 150.0}
+    expected:
+      status: FAIL
+      values:
+        q_max_kPa: {value: 282.0, unit: kPa, abs_tol: 0.01}
+        q_min_kPa: {value: 166.8, unit: kPa, abs_tol: 0.01}
+        ratio: {value: 1.128, unit: "1", abs_tol: 1.0e-6}
+  - id: HC-3
+    kind: hand_check
+    source:
+      derivation: "Clause spec §4 S2: |Mby| = 0.6 m * 40 kN = 24.0 kN.m, q_max = 224.4 + 24/2.604167"
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FX_kN: 40.0, reaction_height_mm: 600.0}
+    expected:
+      status: PASS
+      values:
+        q_max_kPa: {value: 233.616, unit: kPa, abs_tol: 0.01}
+        ratio: {value: 0.934464, unit: "1", abs_tol: 1.0e-6}
+  - id: BD-1
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: 200.0, MY_kNm: 300.0}
+    covers: [FULL_CONTACT, G-1]
+    expected:
+      status: NEEDS_ENGINEER
+      values:
+        q_min_kPa: {value: -50.8, unit: kPa, abs_tol: 0.01}
+  - id: BD-2
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MY_kNm: 584.375}
+    covers: [FULL_CONTACT]
+    expected:
+      status: FAIL
+      values:
+        q_min_kPa: {value: 0.0, unit: kPa, abs_tol: 0.01}
+        q_max_kPa: {value: 448.8, unit: kPa, abs_tol: 0.01}
+        ratio: {value: 1.7952, unit: "1", abs_tol: 1.0e-6}
+  - id: BD-3
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: -250.0}
+    covers: [COMPRESSION]
+    expected:
+      status: NEEDS_ENGINEER
+  - id: BD-4
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, allowable_kind: net}
+    covers: [ALLOWABLE_GROSS, G-2]
+    expected:
+      status: NEEDS_ENGINEER
+  - id: BD-5
+    kind: boundary
+    subject: {kind: frame, id: B1}
+    inputs: *common
+    expected:
+      status: NOT_APPLICABLE
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: SAFE
+      program_version: "to be recorded at the local test"
+      status: needs_local_test
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MY_kNm: 150.0}
+    expected:
+      status: FAIL
+      values:
+        q_max_kPa: {value: 282.0, unit: kPa, abs_tol: 0.01}
+review: null

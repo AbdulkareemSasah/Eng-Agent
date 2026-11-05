@@ -11,11 +11,19 @@ import sys
 from ctypes import c_void_p, sizeof
 from dataclasses import dataclass
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from eng_harness.servers._procinfo import FILETIME, PROCESSENTRY32W, ProcessIdentity, WindowsProcessInspector
+from eng_harness.servers import _procinfo
+from eng_harness.servers._procinfo import (
+    FILETIME,
+    PROCESSENTRY32W,
+    PosixProcessInspector,
+    ProcessIdentity,
+    WindowsProcessInspector,
+)
 
 # winnt.h access rights and winerror.h codes, restated here as the oracle of the fake.
 PROCESS_TERMINATE = 0x0001
@@ -23,6 +31,7 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 SYNCHRONIZE = 0x00100000
 ERROR_ACCESS_DENIED = 5
 ERROR_INVALID_PARAMETER = 87
+ERROR_INVALID_HANDLE = 6
 ERROR_NO_MORE_FILES = 18
 ERROR_BAD_LENGTH = 24
 WAIT_OBJECT_0, WAIT_TIMEOUT = 0, 0x102
@@ -30,6 +39,7 @@ TH32CS_SNAPPROCESS = 0x2
 KILLED = 1  # the exit code given to a process the inspector ends
 
 CREATED = 133_000_000_000_000_000  # a FILETIME of 2022: 100 ns ticks since 1601-01-01
+OTHER = "C:\\Program Files\\Vendor\\Other.exe"
 PATH = "C:\\Program Files\\Vendor\\Etabs.exe"
 ETABS = ProcessIdentity(pid=42, started_at=str(CREATED), exe_name="Etabs.exe")
 
@@ -51,6 +61,7 @@ class _FakeKernel32:
     def __init__(self, table: dict[int, _Process]) -> None:
         self.table = table
         self.denied: set[int] = set()
+        self.open_error: int | None = None  # a last error every OpenProcess fails with
         self.fail: dict[str, int] = {}  # function name -> the last error it sets while returning failure
         self.terminate_fails = False
         self.exits_before_terminate = False
@@ -78,6 +89,9 @@ class _FakeKernel32:
         return name in self.fail
 
     def open_process(self, rights: int, inherit: bool, pid: int) -> int | None:
+        if self.open_error is not None:
+            self._error = self.open_error
+            return None
         if pid in self.denied:
             self._error = ERROR_ACCESS_DENIED
             return None
@@ -276,6 +290,35 @@ def test_children_are_direct_running_and_not_older_than_the_parent() -> None:
     assert inspector.children(99) == []
 
 
+def test_listing_skips_inaccessible(caplog: pytest.LogCaptureFixture) -> None:
+    table = {
+        10: _Process(CREATED, path=OTHER),
+        11: _Process(CREATED + 5, parent=10, path=OTHER),  # a child the engine may not open
+        12: _Process(CREATED + 6, parent=10, path=OTHER),
+        13: _Process(CREATED, path="C:\\a\\Etabs.exe"),  # a matching process the engine may not open
+        14: _Process(CREATED, path="C:\\a\\Etabs.exe"),
+    }
+    inspector, kernel32 = _inspector(table)
+    kernel32.denied = {11, 13}
+    with caplog.at_level("DEBUG"):
+        assert [c.pid for c in inspector.children(10)] == [12]
+        assert [i.pid for i in inspector.snapshot(["etabs.exe"])] == [14]
+    assert "11" in caplog.text
+    assert "13" in caplog.text
+    with pytest.raises(OSError, match=r"OpenProcess\(11\)"):
+        inspector.identity(11)
+    assert sorted(set(kernel32.closed)) == [*range(1000, 1000 + len(kernel32.opened)), 5000]  # 5000: the snapshot
+
+
+def test_other_open_errors_are_raised_during_a_listing() -> None:
+    """Only access denied is left out of a listing; any other OpenProcess error is raised (AC7a)."""
+    inspector, kernel32 = _inspector({10: _Process(CREATED, path="C:\\a\\Etabs.exe")})
+    kernel32.open_error = ERROR_INVALID_HANDLE
+    with pytest.raises(OSError, match=r"OpenProcess\(10\)") as raised:
+        inspector.snapshot(["etabs.exe"])
+    assert not isinstance(raised.value, PermissionError)
+
+
 @pytest.mark.parametrize("call", ["GetProcessTimes", "QueryFullProcessImageNameW", "CreateToolhelp32Snapshot"])
 def test_a_failed_query_is_raised_and_the_handle_is_still_closed(call: str) -> None:
     inspector, kernel32 = _inspector({42: _Process(CREATED)})
@@ -295,6 +338,40 @@ def test_a_failed_enumeration_is_raised() -> None:
     kernel32.enumeration_error = ERROR_BAD_LENGTH
     with pytest.raises(OSError, match="Process32NextW"):
         inspector.snapshot(["etabs.exe"])
+
+
+def _fake_proc(root: Path, pid: int, comm: str) -> None:
+    (root / str(pid)).mkdir()
+    fields = ["S", "1", "1"] + ["0"] * 16 + ["77"]  # state, ppid, pgrp, ..., field 22 (start ticks)
+    (root / str(pid) / "stat").write_text(f"{pid} ({comm}) {' '.join(fields)}\n", encoding="utf-8")
+
+
+def test_listing_skips_unreadable_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A /proc entry another user hides (hidepid) is left out of listings; identity on it still raises (AC7a)."""
+
+    for pid, comm in ((2, "hidden"), (3, "shown")):
+        _fake_proc(tmp_path, pid, comm)
+    (tmp_path / "boot_id").write_text("fake-boot-id\n", encoding="ascii")
+    monkeypatch.setattr(_procinfo, "_PROC", tmp_path)
+    monkeypatch.setattr(_procinfo, "_BOOT_ID", tmp_path / "boot_id")
+    real_read_text = Path.read_text
+
+    def read_text(self: Path, *args: Any, **kwargs: Any) -> str:
+        if self.parent.name == "2":
+            raise PermissionError(13, "hidepid", str(self))
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    inspector = PosixProcessInspector()
+    with caplog.at_level("DEBUG"):
+        assert [i.pid for i in inspector.children(1)] == [3]
+        assert [i.pid for i in inspector.snapshot(["hidden", "shown"])] == [3]
+        assert [i.pid for i in inspector.group_members(1)] == [3]
+    assert "2" in caplog.text
+    with pytest.raises(PermissionError):
+        inspector.identity(2)
 
 
 if sys.platform == "win32":

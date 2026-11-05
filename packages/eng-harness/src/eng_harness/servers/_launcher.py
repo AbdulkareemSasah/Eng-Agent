@@ -73,7 +73,7 @@ class LaunchedProcess(Protocol):
         """Return the running processes of the job."""
 
     def close(self) -> None:
-        """Release the pipes and handles; does not end the job (call `terminate_job`); idempotent."""
+        """Release the pipes and handles, idempotent; on Windows it ends the job (kill-on-close): close only then."""
 
 
 class ProcessLauncher(Protocol):
