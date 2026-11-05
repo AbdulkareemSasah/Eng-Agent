@@ -1,0 +1,45 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.footing_subjects",
+    "status": "draft",
+    "version": 1
+  },
+  "draft": true,
+  "excluded": [
+    {
+      "column": null,
+      "joint": "J3",
+      "reason": "NO_COLUMN_AT_JOINT"
+    }
+  ],
+  "subjects": [
+    {
+      "column": "C1",
+      "cx_mm": 400.0,
+      "cy_mm": 400.0,
+      "id": "J1",
+      "joint": "J1",
+      "x_mm": 0.0,
+      "y_mm": 0.0
+    },
+    {
+      "column": "C2",
+      "cx_mm": 400.0,
+      "cy_mm": 500.0,
+      "id": "J2",
+      "joint": "J2",
+      "x_mm": 6000.0,
+      "y_mm": 0.0
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.footing_subjects",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.safe_equilibrium",
+    "status": "draft",
+    "version": 1
+  },
+  "draft": true,
+  "patterns": [
+    {
+      "applied_kN": 1000.0,
+      "pattern": "DEAD",
+      "reaction_kN": -1004.0,
+      "self_weight": false,
+      "status": "PASS"
+    },
+    {
+      "applied_kN": 0.0,
+      "pattern": "SELF",
+      "reaction_kN": -50.0,
+      "self_weight": true,
+      "status": "NOT_COMPARED"
+    }
+  ],
+  "tolerance": 0.01,
+  "trace": {
+    "calc_id": "harness.safe_equilibrium",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
