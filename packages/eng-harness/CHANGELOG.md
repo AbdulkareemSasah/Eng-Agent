@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Decision redaction: `decisions/_redaction.py` (deny-list field names refused at point creation with `extra_denied_tokens` added never removed, `check_state` findings with field path and reason only for a path, URL, address, sensitive value or over-long string, `outgoing_state` without `Ref` fields) and the `Label` bound shared with `_points.py` (plan 0005 T3, B-167; spec 0005 AC32, AC33 pure check, AC34).
+- Decision redaction: `decisions/_redaction.py` (deny-list field names refused at point creation with `extra_denied_tokens` added never removed, `check_state` findings with field path and reason only for a path, URL (a "scheme://" form or a known scheme word), address, sensitive value or over-long string, and a `TypeError` naming the path for any non-JSON value, `outgoing_state` without `Ref` fields) and the `Label` bound shared with `_points.py` (plan 0005 T3, B-167; spec 0005 AC32, AC33 pure check, AC34).
 - Progress display: `eng_harness.progress` with `ExpectedTimes.build` (read-only journals, median, range and sample floor), `estimate` and `ProgressRenderer` for terminal, plain and JSON modes, with golden snapshots; the sink, heartbeat task and JSON-mode heartbeat follow in T5 (plan 0006 T4, B-178; spec 0006 AC15 to AC17).
 
 - Decision points: `DecisionPoint`, `decision_point`, `Refs`, `PointRegistry` (state field rules of AC2, `schema_sha256`), `check_state_size`, `check_lock`, `write_lock` and `discover()` in `decisions/_points.py`, the empty `decisions.lock.json` and `python -m eng_harness.decisions --write-lock`; `Label` and `DecisionDefinitionError` now live in `_points.py` and stay importable from `decisions.types` (plan 0005 T2, B-166; spec 0005 AC1 to AC4).

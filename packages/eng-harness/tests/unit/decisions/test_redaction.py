@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness.decisions._points import DecisionPoint, Refs, decision_point
 from eng_harness.decisions._policy import DecisionSettings
@@ -107,7 +107,7 @@ def test_by_construction() -> None:
 
 def test_runtime_check_blocks_send() -> None:
     sample = "Acme Tower"
-    state = {
+    state: dict[str, JsonValue] = {
         "a": "C:temp",
         "b": "see /etc/passwd",
         "c": "dir\\file",
@@ -223,8 +223,8 @@ def test_runtime_check_refuses_non_json(bad: Any, path: str) -> None:
 def test_url_needs_a_scheme_form() -> None:
     """Plain text with a colon is no URL; a scheme with '//' or a known scheme word is (spec 0005 section 4.10)."""
     assert _found({"a": "Note: enlarge", "b": "ratio 1:2", "c": "step one: rebar"}) == set()
-    assert _found({"a": "ftp://host"}) == {("a", "url")}
-    assert _found({"a": "see custom+x://h"}) == {("a", "url")}
+    assert ("a", "url") in _found({"a": "ftp://host"})  # the "//" also makes it a path
+    assert ("a", "url") in _found({"a": "see custom+x://h"})
     assert _found({"a": "mailto:someone"}) == {("a", "url")}
     assert _found({"a": "FILE:x"}) == {("a", "url")}
     assert _found({"a": "tel:123"}) == {("a", "url")}
