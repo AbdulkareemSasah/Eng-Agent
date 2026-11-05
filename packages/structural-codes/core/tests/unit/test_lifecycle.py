@@ -17,11 +17,11 @@ from typing import Any
 import pytest
 from eng_contract.errors import ErrorCode
 from eng_contract.verdicts import Subject, SubjectKind
-from structural_codes.lifecycle import ApprovalsFile, resolve_state
 
 from structural_codes import evaluate
 from structural_codes.content_hash import content_hash
 from structural_codes.errors import ApprovalsFileError, CheckNotUsable
+from structural_codes.lifecycle import ApprovalsFile, resolve_state
 from structural_codes.overlay import InheritedCheck
 from structural_codes.pack import Pack, Registry
 
@@ -96,7 +96,11 @@ def site(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[_Site]:
 
 
 def _inherited_id(registry: Registry) -> str:
-    (found,) = [c.meta.check_id for c in registry.checks if isinstance(c, InheritedCheck) and c.meta.pack == _OVER]
+    (found,) = [
+        c.meta.check_id
+        for c in registry.checks
+        if isinstance(c, InheritedCheck) and c.meta.pack == _OVER and c.base.meta.check_id == _TWO_PRE
+    ]
     return found
 
 
@@ -153,6 +157,9 @@ def test_approvals_file() -> None:
     )
     with pytest.raises(ApprovalsFileError):
         ApprovalsFile.parse(stamp)
+    quoted = (_DATA / "full.yaml").read_text(encoding="utf-8").replace("date: 2026-11-05", 'date: "2026-13-45"', 1)
+    with pytest.raises(ApprovalsFileError):
+        ApprovalsFile.parse(quoted)
     with pytest.raises(ApprovalsFileError):
         ApprovalsFile.parse("format: structural-codes-approvals/1\napprovals: [1]\nwithdrawn: []\n")
 
