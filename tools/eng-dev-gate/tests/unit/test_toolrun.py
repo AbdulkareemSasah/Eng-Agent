@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 import pytest
-from eng_dev_gate.results import EnvironmentFaultError
 from eng_dev_gate import toolrun
+from eng_dev_gate.results import EnvironmentFaultError
 from eng_dev_gate.toolrun import SubprocessToolRunner, python_module
 
 

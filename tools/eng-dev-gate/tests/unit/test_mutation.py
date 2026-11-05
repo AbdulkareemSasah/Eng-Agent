@@ -8,11 +8,11 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
+from eng_dev_gate import toolrun
 from eng_dev_gate.checks import mutation
 from eng_dev_gate.checks.registry import StepContext
 from eng_dev_gate.report import Severity
 from eng_dev_gate.results import EnvironmentFaultError, UsageError
-from eng_dev_gate import toolrun
 from eng_dev_gate.toolrun import ToolResult
 from eng_dev_gate.workspace import Member
 from support.repo import Repo
@@ -234,6 +234,8 @@ def test_judged_tree_runs_mutmut_in_its_own_environment(repo: Repo, tmp_path: Pa
     base, member = _setup(repo)
     _change(repo)
     runner = FakeMutmut(["killed"] * 3)
+    (tmp_path / ".gate").mkdir()
+    (tmp_path / ".gate" / "gate.yml").write_text(GATE_YML, encoding="utf-8")  # the gate root holds the limits
     ctx = StepContext(repo.root, tmp_path, member, runner, base=base)  # gate root differs from the judged tree
     assert mutation.run_step(ctx) == []
     ran = [call for call in runner.calls if "mutmut" in call]
@@ -350,9 +352,7 @@ def test_uncovered_mutants_count_as_survivors(repo: Repo) -> None:
 
 def _with_run_limit(repo: Repo, seconds: int) -> None:
     """Give the gate root's ``gate.yml`` the ``limits.mutation_run_seconds`` value ``seconds``."""
-    text = GATE_YML.replace(
-        "  max_file_bytes: 1048576\n", f"  max_file_bytes: 1048576\n  mutation_run_seconds: {seconds}\n"
-    )
+    text = GATE_YML.replace("mutation_run_seconds: 7200", f"mutation_run_seconds: {seconds}")
     (repo.root / ".gate" / "gate.yml").write_text(text, encoding="utf-8")
 
 
