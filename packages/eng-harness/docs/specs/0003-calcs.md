@@ -342,7 +342,11 @@ occur in the neutral model kinds of contract §4.10.2.
 
 `modules` holds the calc's module and every module of `eng_harness` it imports, transitively. This includes helpers,
 `eng_harness.calc` and `eng_harness.kinds.calcs`. The closure is found statically with `ast` (relative imports
-resolved, `if TYPE_CHECKING` blocks included), without importing anything new. Third-party and standard-library
+resolved, `if TYPE_CHECKING` blocks included), without importing anything new: modules are found by file lookup under
+the `eng_harness` source root, not `importlib.util.find_spec`, which would run parent `__init__` modules. A parent
+package's `__init__` is hashed only when an import names that package and takes an attribute from it, never as an
+implicit parent (otherwise `calcs/__init__.py`, which imports every calc, would put every calc into every calc's
+closure; amendment B-388, B-141 review). Third-party and standard-library
 modules are not hashed: golden tests guard them (Q8). A framework change therefore invalidates every approval. This
 is deliberate, so no change to a calc's behavior keeps an approval.
 

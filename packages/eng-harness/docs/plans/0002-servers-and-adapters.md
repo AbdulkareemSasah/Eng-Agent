@@ -67,6 +67,21 @@ tasks:
       - "packages/eng-harness/tests/windows/test_procinfo.py::test_identity_windows"
     covers: [AC5, AC6, AC7]
     depends_on: [T2]
+  - id: T3b
+    title: Process listings leave out processes the engine may not open; close() documented as ending a Windows job
+    # Amendment (B-388, documents only): the B-122 reviews found that one process OpenProcess refuses (another user's
+    # host program) made snapshot() and children() fail, and that the port docstring of close() disagreed with the
+    # Windows kill-on-close behaviour.
+    files:
+      - "packages/eng-harness/src/eng_harness/servers/_procinfo.py"
+      - "packages/eng-harness/src/eng_harness/servers/_launcher.py"
+      - "packages/eng-harness/tests/windows/test_procinfo.py"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/windows/test_procinfo.py::test_listing_skips_inaccessible"
+    covers: [AC7a]
+    depends_on: [T3]
   - id: T4
     title: Synthetic Sasaah CSI fake server (test-only) and its schema check
     files:
@@ -354,6 +369,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py::test_prepare_outputs_hashed"
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py::test_build_config_and_pins"
+      - "packages/eng-harness/tests/workflow/adapters/test_cli.py::test_timeout_no_effect"
     covers: [AC6, AC31, AC32]  # AC6: a timed-out tool step fails TIMEOUT_NO_EFFECT (B-378)
     depends_on: [T14]
   - id: T17

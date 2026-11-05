@@ -84,6 +84,9 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC9. Given JSON with `"ok": false` and an `error`, when parsed as `Envelope`, then a `FailureEnvelope` results; with
   `"ok": true`, a `SuccessEnvelope`; with `ok` missing or not a boolean, validation fails. Test:
   `test_envelope.py::test_discriminated_by_ok`.
+- AC9a. Given an input `{"ref": ...}` whose pointer holds a newline, which `RefString` accepts, when parsed as
+  `RefInput`, then it validates exactly as `RefString` does: `RefInput.ref` is a `RefString` (§4.6.1), not a local
+  pattern (amendment B-391, B-017 review). Test: `test_envelope.py::test_ref_input_uses_ref_string`.
 - AC10. For every error code of 04 §8.1, given an `ErrorDetail` with that code, when `retryable` contradicts the rule
   of §4.2.3, then validation fails; `PRECONDITION_FAILED` without `precondition`, `INTERNAL` without `incident_id`,
   and `precondition` on any other code fail too. Test: `tests/unit/test_errors.py::test_retry_rules_per_code`
@@ -471,7 +474,10 @@ random part. `res_` or `mdl_` is prefixed.
 `payload` (`dict[str, JsonValue]` or null), `payload_file` (`str` or null) **[added]**.
 
 Rules: exactly one of `payload` and `payload_file` is set; `payload_file`, when set, equals
-`<result_id>.payload.json.gz`; `payload_sha256` is over the canonical payload in both cases. The record file on disk
+`<result_id>.payload.json.gz`; `payload_sha256` is over the canonical payload in both cases. The result store
+enforces both rules: it computes `payload_sha256` itself when it writes, raises `CanonicalJsonError` for a payload that
+cannot be written as canonical JSON, and checks the hash on every read (`StoreIntegrityError`); `ResultRecord` itself
+checks neither, and `make_success` raises `CanonicalJsonError` for such a record (amendment B-391, B-016 review). The record file on disk
 is the canonical JSON of the record. The stored payload is the normalized form
 `kinds[kind].model_validate(payload).model_dump(mode="json", by_alias=True, exclude_none=False)`: every default is
 written out and every lax-coerced value is replaced by its validated value, so the record always validates against its
@@ -781,7 +787,8 @@ Rules (11 §3 rule 2):
    itself. Equality across π powers is not transitive at the last float64 bit; this is documented on the class, and
    canonical stored data never mixes `deg` and `rad` (angles are canonical `deg`).
 6. `Quantity.to(symbol) -> Quantity` converts through `units.convert`; `Quantity.canonical(kind)` converts to the
-   canonical unit of a quantity kind.
+   canonical unit of a quantity kind. Both convert the float's binary value with one rounding, so `q.to(u)` need not
+   compare equal to `q` (for example `25.4 mm` to `in` gives `0.9999999999999999 in`; amendment B-391, B-069 review).
 
 `Cited` (frozen model): `value` (finite `float` or `int`), `unit` (`str` in `UNITS`; `"1"` for dimensionless),
 `source` (`str`, 8 to 500 characters, non-blank: document, edition and clause, table or page, for example
