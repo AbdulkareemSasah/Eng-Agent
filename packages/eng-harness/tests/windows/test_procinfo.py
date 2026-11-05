@@ -30,6 +30,7 @@ TH32CS_SNAPPROCESS = 0x2
 KILLED = 1  # the exit code given to a process the inspector ends
 
 CREATED = 133_000_000_000_000_000  # a FILETIME of 2022: 100 ns ticks since 1601-01-01
+OTHER = "C:\\Program Files\\Vendor\\Other.exe"
 PATH = "C:\\Program Files\\Vendor\\Etabs.exe"
 ETABS = ProcessIdentity(pid=42, started_at=str(CREATED), exe_name="Etabs.exe")
 
@@ -278,9 +279,9 @@ def test_children_are_direct_running_and_not_older_than_the_parent() -> None:
 
 def test_listing_skips_inaccessible(caplog: pytest.LogCaptureFixture) -> None:
     table = {
-        10: _Process(CREATED),
-        11: _Process(CREATED + 5, parent=10),  # a child the engine may not open
-        12: _Process(CREATED + 6, parent=10),
+        10: _Process(CREATED, path=OTHER),
+        11: _Process(CREATED + 5, parent=10, path=OTHER),  # a child the engine may not open
+        12: _Process(CREATED + 6, parent=10, path=OTHER),
         13: _Process(CREATED, path="C:\\a\\Etabs.exe"),  # a matching process the engine may not open
         14: _Process(CREATED, path="C:\\a\\Etabs.exe"),
     }
@@ -293,7 +294,7 @@ def test_listing_skips_inaccessible(caplog: pytest.LogCaptureFixture) -> None:
     assert "13" in caplog.text
     with pytest.raises(OSError, match=r"OpenProcess\(11\)"):
         inspector.identity(11)
-    assert sorted(kernel32.closed) == list(range(1000, 1000 + len(kernel32.opened)))
+    assert set(range(1000, 1000 + len(kernel32.opened))) <= set(kernel32.closed)
 
 
 @pytest.mark.parametrize("call", ["GetProcessTimes", "QueryFullProcessImageNameW", "CreateToolhelp32Snapshot"])

@@ -7,6 +7,7 @@ FILETIME of `GetProcessTimes` as a decimal integer.
 """
 
 import errno
+import logging
 import os
 import signal
 import sys
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+logger = logging.getLogger(__name__)
 _PROC = Path("/proc")
 _BOOT_ID = _PROC / "sys" / "kernel" / "random" / "boot_id"
 
@@ -146,6 +148,7 @@ class PosixProcessInspector:
 PROCESS_TERMINATE, PROCESS_QUERY_LIMITED_INFORMATION, SYNCHRONIZE = 0x0001, 0x1000, 0x00100000
 WAIT_OBJECT_0, WAIT_TIMEOUT = 0, 0x102
 ERROR_NO_MORE_FILES, ERROR_INVALID_PARAMETER = 18, 87  # the end of a walk; OpenProcess for a pid no process has
+ERROR_ACCESS_DENIED = 5  # OpenProcess for a process the engine may not open
 TH32CS_SNAPPROCESS, KILLED_EXIT_CODE = 0x2, 1  # a terminated process gets any exit code but STILL_ACTIVE (259)
 IMAGE_NAME_CHARS = 32767  # the longest extended-length path
 INVALID_HANDLE_VALUE = (1 << 8 * sizeof(c_void_p)) - 1
@@ -186,11 +189,16 @@ def win32_error(kernel32: Kernel32, call: str) -> OSError:
     return OSError(None, f"{call} failed", None, kernel32.last_error())
 
 
+class ProcessAccessDeniedError(PermissionError):
+    """`OpenProcess` was refused for a process the engine may not open (ERROR_ACCESS_DENIED)."""
+
+
 class WindowsProcessInspector:
     """`ProcessInspector` over kernel32: the pid with the creation FILETIME of `GetProcessTimes`.
 
     A process that has exited has no identity. A failed Win32 call raises `OSError`, except `OpenProcess` for a pid
-    that no process has.
+    that no process has. `snapshot` and `children` leave out a process the engine may not open and log its pid (AC7a);
+    `identity` and `terminate` on that pid raise `ProcessAccessDeniedError`.
     """
 
     def __init__(self, kernel32: Kernel32) -> None:
@@ -201,6 +209,8 @@ class WindowsProcessInspector:
         """Open `pid` once for a whole check (None when no such process exists) and close it afterwards."""
         handle = self._k.OpenProcess(rights, False, pid)
         if not handle and self._k.last_error() != ERROR_INVALID_PARAMETER:
+            if self._k.last_error() == ERROR_ACCESS_DENIED:
+                raise ProcessAccessDeniedError(f"OpenProcess({pid}) failed: access denied")
             raise win32_error(self._k, f"OpenProcess({pid})")
         try:
             yield int(handle) if handle else None
@@ -251,18 +261,26 @@ class WindowsProcessInspector:
         finally:
             self._k.CloseHandle(snapshot)
 
+    def _listed(self, pid: int) -> ProcessIdentity | None:
+        """Return the identity of a listed process; None when it ended or the engine may not open it (logged)."""
+        try:
+            return self.identity(pid)
+        except ProcessAccessDeniedError:
+            logger.info("process %d left out of the listing: access denied", pid)
+            return None
+
     def children(self, pid: int) -> list[ProcessIdentity]:
         """Return the running direct children of `pid`; one older than `pid` is no child (a reused parent pid)."""
         parent = self.identity(pid)
         if parent is None:
             return []
-        found = (self.identity(child) for child, ppid, _ in self._entries() if ppid == pid)
+        found = (self._listed(child) for child, ppid, _ in self._entries() if ppid == pid)
         return [c for c in found if c is not None and int(c.started_at) >= int(parent.started_at)]
 
     def snapshot(self, exe_names: list[str]) -> list[ProcessIdentity]:
         """Return every running process whose image file name is in `exe_names` (compared without case)."""
         wanted = {name.lower() for name in exe_names}
-        found = (self.identity(pid) for pid, _, name in self._entries() if name.lower() in wanted)
+        found = (self._listed(pid) for pid, _, name in self._entries() if name.lower() in wanted)
         return [i for i in found if i is not None]
 
     def terminate(self, identity: ProcessIdentity) -> bool:
