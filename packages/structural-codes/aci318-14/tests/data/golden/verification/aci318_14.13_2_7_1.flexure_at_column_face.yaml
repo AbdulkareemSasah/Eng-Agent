@@ -2,7 +2,7 @@
 # Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
 # absolute ones (0.001 kN.m on moments, 1e-4 mm on lengths, 1e-6 on ratios and strains), with rel_tol 0 so that the
 # absolute tolerance alone applies. The spec's BD-1, BD-3 and BD-4 hold several inputs each; they are split into .a,
-# .b and .c here. BD-2.b to BD-2.d (the eps_tc limit and the Y direction alone) extend the spec's BD-2 row.
+# .b and .c here. BD-2.b to BD-2.e (the eps_tc limit, the Y direction alone and d_x != d_y) extend the spec's BD-2 row.
 format: structural-codes-verification/1
 check_id: aci318_14.13_2_7_1.flexure_at_column_face
 cases:
@@ -128,6 +128,20 @@ cases:
         phiMn_x_kNm: {value: 518.740518, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         c_y_mm: {value: 332.179931, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
         eps_t_y_ratio: {value: 0.001516, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  # BD-2.e: d_x != d_y. With As = 22578.125 mm2 and d_y = 450 mm, c = 187.5 mm both ways; eps_t_x = 0.005 passes,
+  # eps_t_y = 0.003 (450 - 187.5) / 187.5 = 0.0042 < eps_tc raises G-2 in Y from its own depth (§4 step 6).
+  - id: BD-2.e
+    kind: boundary
+    covers: [G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, As_x_mm2: 22578.125, As_y_mm2: 22578.125, d_y_mm: 450}
+    expected:
+      status: NEEDS_ENGINEER
+      values:
+        eps_t_x_ratio: {value: 0.005, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phiMn_x_kNm: {value: 3587.170166, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        c_y_mm: {value: 187.5, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_y_ratio: {value: 0.0042, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-3.a
     kind: boundary
     covers: [FY_MAX]

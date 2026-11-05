@@ -136,6 +136,24 @@ def test_gap_in_y_direction_alone() -> None:
     assert "phiMn_y_kNm" not in found
 
 
+def test_gap_uses_each_direction_own_depth() -> None:
+    """BD-2.e: d_x != d_y; only Y, with the smaller depth, falls below eps_tc and raises G-2 (§4 step 6; FL-AC3).
+
+    Common inputs with As_x = As_y = 22578.125 mm2 and d_y = 450 mm: c = 187.5 mm in both directions;
+    eps_t_x = 0.003 * (500 - 187.5) / 187.5 = 0.005 (tension-controlled, phiMn_x = 3587.170166 kN.m recorded);
+    eps_t_y = 0.003 * (450 - 187.5) / 187.5 = 0.0042 < eps_tc, so the result is one NEEDS_ENGINEER verdict naming G-2.
+    """
+    payload = run(As_x_mm2=22578.125, As_y_mm2=22578.125, d_y_mm=450.0)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
+    assert any(m.startswith("G-2 (21.2.2)") and "eps_t_y_ratio" in m for m in payload.traces[0].messages)
+    found = steps(payload)
+    assert found["eps_t_x_ratio"] == pytest.approx(0.005, abs=_RATIO)
+    assert found["phiMn_x_kNm"] == pytest.approx(3587.170166, abs=_M_KNM)
+    assert found["c_y_mm"] == pytest.approx(187.5, abs=_MM)
+    assert found["eps_t_y_ratio"] == pytest.approx(0.0042, abs=_RATIO)
+    assert "phiMn_y_kNm" not in found
+
+
 @pytest.mark.parametrize(
     ("changes", "precondition", "gap"),
     [
@@ -207,8 +225,15 @@ def test_rectangular_plan_uses_the_width_across_each_direction() -> None:
     q0 = 1700 / 6.0 = 283.333 kPa; Mu_x = 3.0 * q0 * 0.8^2 / 2 = 272.0; Mu_y = 2.0 * q0 * 1.3^2 / 2 = 478.833 kN.m;
     a_x = 3000*420 / (0.85*28*3000) = 17.647059 mm = a_y; phiMn_x = 0.9 * 1260000 * (500 - a_x/2) * 1e-6 = 556.994118;
     phiMn_y = 0.9 * 840000 * (450 - a_y/2) * 1e-6 = 333.529412 kN.m; Y fails (ratio 1.435655) and governs.
+    Strains (§4 step 6, dt = d_x for X and d_y for Y): c = 17.647059 / 0.85 = 20.761246 mm in both directions;
+    eps_t_x = 0.003 * (500 - c) / c = 0.069250; eps_t_y = 0.003 * (450 - c) / c = 0.062025.
     """
     payload = run(Lx_mm=2000.0, Ly_mm=3000.0, d_x_mm=500.0, d_y_mm=450.0, As_x_mm2=3000.0, As_y_mm2=2000.0)
+    found = steps(payload)
+    assert found["c_x_mm"] == pytest.approx(20.761246, abs=_MM)
+    assert found["c_y_mm"] == pytest.approx(20.761246, abs=_MM)
+    assert found["eps_t_x_ratio"] == pytest.approx(0.069250, abs=_RATIO)
+    assert found["eps_t_y_ratio"] == pytest.approx(0.062025, abs=_RATIO)
     x, y = payload.verdicts
     assert x.demand is not None
     assert x.capacity is not None
