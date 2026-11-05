@@ -95,8 +95,8 @@ def test_monotone(base: dict[str, Any], more: float) -> None:
 @given(base=footings())
 def test_swap_symmetry(base: dict[str, Any]) -> None:
     """Swapping the X and Y data together swaps the two verdicts (clause spec §4, direction Y)."""
-    pairs = (("Lx_mm", "Ly_mm"), ("cx_mm", "cy_mm"), ("db_x_mm", "db_y_mm"), ("s_x_mm", "s_y_mm"))
-    pairs += (("cover_x_mm", "cover_y_mm"),)
+    pairs: list[tuple[str, str]] = [("Lx_mm", "Ly_mm"), ("cx_mm", "cy_mm"), ("db_x_mm", "db_y_mm")]
+    pairs += [("s_x_mm", "s_y_mm"), ("cover_x_mm", "cover_y_mm")]
     swapped = dict(base)
     for a, b in pairs:
         swapped[a], swapped[b] = base[b], base[a]

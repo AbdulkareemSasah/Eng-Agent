@@ -47,7 +47,7 @@ COMMON: dict[str, Any] = {
 }
 _MM = 0.001
 _RATIO = 1e-6
-_BODY = {"cb_x_mm", "cb_y_mm", "ld_x_mm", "ld_y_mm", "ld_eq_x_mm", "psi_s"}
+_BODY = {"cb_x_mm", "cb_y_mm", "ld_x_mm", "ld_y_mm", "ld_eq_x_mm", "psi_s_ratio"}
 
 
 def run(subject: Subject = FOOTING, **changes: Any) -> VerdictSet:
@@ -85,7 +85,8 @@ def test_preconditions(changes: dict[str, Any], precondition: str, gap: str | No
 
 def test_limits_pass() -> None:
     """At the limits (fc = 17 MPa, fy = 550 MPa, la just above zero) both normal verdicts are produced (DL-AC2)."""
-    for changes in ({"fc_MPa": 17.0}, {"fy_MPa": 550.0}):
+    limits: tuple[dict[str, Any], ...] = ({"fc_MPa": 17.0}, {"fy_MPa": 550.0})
+    for changes in limits:
         payload = run(**changes)
         assert [v.status for v in payload.verdicts] == [VerdictStatus.PASS, VerdictStatus.PASS], changes
     tight = run(end_cover_mm=1049.0)
@@ -101,15 +102,19 @@ def test_member_scope() -> None:
 
 
 def test_psi_s_assumption() -> None:
-    """The trace records psi_s from the constant psi_s_used and every verdict names plan §6 Q10 (DL-AC3)."""
+    """The trace records psi_s from the constant psi_s_used and every verdict names plan §6 Q10 (DL-AC3).
+
+    The step is named `psi_s_ratio`: the bare `psi_s` ends in the time suffix `_s`, which fixes the unit `s`
+    (core AC10).
+    """
     payload = run()
     trace = payload.traces[0]
     cited = {c.name: c.cited for c in trace.constants}
     assert cited["psi_s_used"].value == pytest.approx(1.0)
     assert cited["psi_s_used"].source.startswith("ACI 318-14 Table 25.4.2.4")
     steps = {s.name: s for s in trace.steps}
-    assert steps["psi_s"].uses == ["psi_s_used"]
-    assert steps["psi_s"].value == pytest.approx(1.0)
+    assert steps["psi_s_ratio"].uses == ["psi_s_used"]
+    assert steps["psi_s_ratio"].value == pytest.approx(1.0)
     assert len(payload.verdicts) == 2
     for verdict in payload.verdicts:
         assert any("Q10" in a for a in verdict.assumptions)
@@ -135,7 +140,18 @@ def test_constants_and_trace() -> None:
         assert cited[name].value == pytest.approx(value), name
         assert cited[name].source.startswith(source), name
     names = [s.name for s in trace.steps]
-    order = ["la_x_mm", "la_y_mm", "sf", "psi_t", "psi_e", "psi_s", "cb_x_mm", "conf_x_ratio", "ld_eq_x_mm", "ld_x_mm"]
+    order = [
+        "la_x_mm",
+        "la_y_mm",
+        "sf",
+        "psi_t",
+        "psi_e",
+        "psi_s_ratio",
+        "cb_x_mm",
+        "conf_x_ratio",
+        "ld_eq_x_mm",
+        "ld_x_mm",
+    ]
     assert [n for n in names if n in order] == order
     assert {"cb_y_mm", "conf_y_ratio", "ld_eq_y_mm", "ld_y_mm"} <= set(names)
     steps = {s.name: s for s in trace.steps}
@@ -155,7 +171,7 @@ def test_rectangular_plan_uses_each_direction_own_bars() -> None:
     Y: Ly = 2000, cy = 300, db = 16, cover = 80, s = 250: la = 1000 - 150 - 75 = 775 mm, cb = min(88, 125) = 88 mm,
     conf = 2.5 (limit), ld = 461.803865 mm, ratio 0.595876. A swapped direction input fails here.
     """
-    changes = {
+    changes: dict[str, Any] = {
         "Lx_mm": 3000.0,
         "Ly_mm": 2000.0,
         "cx_mm": 500.0,
