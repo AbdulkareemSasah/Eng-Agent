@@ -1,0 +1,136 @@
+# Case file of aci318_14.13_2_7_1.flexure_at_column_face (clause spec §8; plan 0002 T6). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (0.001 kN.m on moments, 1e-4 mm on lengths, 1e-6 on ratios and strains), with rel_tol 0 so that the
+# absolute tolerance alone applies. The spec's BD-1, BD-3 and BD-4 hold several inputs each; they are split into .a,
+# .b and .c here.
+format: structural-codes-verification/1
+check_id: aci318_14.13_2_7_1.flexure_at_column_face
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4 steps 1 to 9, common inputs of §8"}
+    subject: {kind: footing, id: F1}
+    inputs: &common
+      FX_kN: 0
+      FY_kN: 0
+      FZ_kN: 1700
+      MX_kNm: 0
+      MY_kNm: 0
+      Lx_mm: 2500
+      Ly_mm: 2500
+      cx_mm: 400
+      cy_mm: 400
+      d_x_mm: 500
+      d_y_mm: 500
+      As_x_mm2: 2800
+      As_y_mm2: 2800
+      reaction_height_mm: 0
+      fc_MPa: 28
+      fy_MPa: 420
+    expected:
+      status: PASS
+      values:
+        Lp_x_mm: {value: 1050, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        Mu_x_kNm: {value: 374.85, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        Mu_y_kNm: {value: 374.85, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        beta1_ratio: {value: 0.85, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        a_x_mm: {value: 19.764706, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        c_x_mm: {value: 23.252595, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_x_ratio: {value: 0.061509, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        Mn_x_kNm: {value: 576.378353, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        phiMn_x_kNm: {value: 518.740518, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        phiMn_y_kNm: {value: 518.740518, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.722616, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        ratio_2: {value: 0.722616, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 3 with moment: common inputs of §8 with MY = 200 kN.m"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MY_kNm: 200}
+    expected:
+      status: PASS
+      values:
+        Mu_x_kNm: {value: 451.0548, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        demand: {value: 451.0548, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.869519, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        Mu_y_kNm: {value: 374.85, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio_2: {value: 0.722616, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 4 middle row: common inputs of §8 with fc = 40 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 40}
+    expected:
+      status: PASS
+      values:
+        beta1_ratio: {value: 0.764286, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        a_x_mm: {value: 13.835294, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        Mn_x_kNm: {value: 579.864847, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        phiMn_x_kNm: {value: 521.878362, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.718271, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.a
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 28}
+    expected:
+      status: PASS
+      values:
+        beta1_ratio: {value: 0.85, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.b
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 55}
+    expected:
+      status: PASS
+      values:
+        beta1_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-2
+    kind: boundary
+    covers: [G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, As_x_mm2: 40000, As_y_mm2: 40000}
+    expected:
+      status: NEEDS_ENGINEER
+      values:
+        c_x_mm: {value: 332.179931, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_x_ratio: {value: 0.001516, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-3.a
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 550}
+    expected: {status: PASS}
+  - id: BD-3.b
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.c
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 16}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-4.a
+    kind: boundary
+    covers: [COMPRESSION]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: 0}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-4.b
+    kind: boundary
+    covers: [FULL_CONTACT, G-1]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: 100, MY_kNm: 200}
+    expected: {status: NEEDS_ENGINEER}
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: SAFE
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MY_kNm: 200}
+    expected: {status: PASS}
+review: null
