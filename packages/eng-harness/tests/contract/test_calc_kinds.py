@@ -1,4 +1,4 @@
-"""Contract tests of the calc kinds (plan 0003 T4, part 1; spec 0003 AC47, §4.6 to §4.8 effects)."""
+"""Contract tests of the calc kinds (plan 0003 T4 and T4b; spec 0003 AC47, §4.6 to §4.11)."""
 
 import copy
 import json
@@ -19,6 +19,12 @@ KINDS = {
     "model_fingerprint": "harness.model_fingerprint/1",
     "model_diff": "harness.model_diff/1",
     "expected_effects": "harness.expected_effects/1",
+}
+REPORT_KINDS = {
+    "readback_check": "harness.readback_check/1",
+    "design_summary": "harness.design_summary/1",
+    "section_size": "harness.section_size/1",
+    "placement_comparison": "harness.placement_comparison/1",
 }
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -149,9 +155,89 @@ def test_fixtures() -> None:
             HARNESS_KINDS[KINDS[stem]].model_validate(payload)
 
 
+def _unsort_members(p: dict[str, Any]) -> None:
+    p["members"].reverse()
+
+
+def _rb_status(p: dict[str, Any]) -> None:
+    p["status"] = "PASS"
+
+
+def _rb_trace(p: dict[str, Any]) -> None:
+    p["trace"]["calc_id"] = "harness.other"
+
+
+def _sum_label(p: dict[str, Any]) -> None:
+    p["top"]["label"] = "top 2 by ratio"
+
+
+def _sum_counts(p: dict[str, Any]) -> None:
+    p["counts"]["FAIL"] = 0
+
+
+def _sum_newly(p: dict[str, Any]) -> None:
+    p["changes"]["newly_failing"][0]["previous_status"] = "FAIL"
+
+
+def _sum_status(p: dict[str, Any]) -> None:
+    p["status"] = "PASS"
+
+
+def _size_unit(p: dict[str, Any]) -> None:
+    p["size"] = {"value": 0.45, "unit": "m"}
+
+
+def _size_multiple(p: dict[str, Any]) -> None:
+    p["multiple"] = 0
+
+
+def _pl_difference(p: dict[str, Any]) -> None:
+    p["counts"][0]["difference"] = 5
+
+
+def _pl_equal(p: dict[str, Any]) -> None:
+    p["equal"] = True
+
+
+def _pl_type(p: dict[str, Any]) -> None:
+    p["counts"][2]["name"] = "slab"
+
+
+REPORT_INVALID: list[tuple[str, Mutation, str]] = [
+    ("readback_check", _rb_status, "status"),
+    ("readback_check", _rb_trace, "calc_id"),
+    ("design_summary", _sum_label, "label"),
+    ("design_summary", _sum_counts, "counts"),
+    ("design_summary", _unsort_members, "sorted"),
+    ("design_summary", _sum_newly, "newly_failing"),
+    ("design_summary", _sum_status, "status"),
+    ("section_size", _size_unit, "mm"),
+    ("section_size", _size_multiple, "greater than or equal to 1"),
+    ("placement_comparison", _pl_difference, "difference"),
+    ("placement_comparison", _pl_equal, "equal"),
+    ("placement_comparison", _pl_type, "type"),
+]
+
+
+def test_report_fixtures() -> None:
+    """AC47: the four report fixtures pass through their kinds and reload; every invalid one fails on its rule."""
+    for stem, kind in REPORT_KINDS.items():
+        model = HARNESS_KINDS[kind]
+        payload = _load(stem)
+        parsed = model.model_validate(payload)
+        assert model.model_validate(parsed.model_dump(mode="json", exclude_none=False)) == parsed
+        with pytest.raises(ValidationError, match="Extra inputs"):
+            model.model_validate({**payload, "unknown_field": 1})
+    for stem, mutate, fragment in REPORT_INVALID:
+        payload = copy.deepcopy(_load(stem))
+        mutate(payload)
+        with pytest.raises(ValidationError, match=fragment):
+            HARNESS_KINDS[REPORT_KINDS[stem]].model_validate(payload)
+
+
 def test_calc_kinds_are_harness_family_and_extend_the_registry() -> None:
     """The calc kinds sit in the harness family beside the neutral and engine kinds."""
-    assert set(CALC_KINDS) == set(KINDS.values())
+    assert set(CALC_KINDS) == set(KINDS.values()) | set(REPORT_KINDS.values())
     assert all(name.startswith("harness.") for name in CALC_KINDS)
     for name, model in CALC_KINDS.items():
         assert HARNESS_KINDS[name] is model
