@@ -23,7 +23,7 @@ def test_escalate(tmp_path: Path) -> None:
         first = await ctx.tool("read_a", {"n": 0})
         refs.append(first.ref.ref)
         await ctx.escalate("the section is not covered", [first.ref])
-        raise AssertionError("escalate does not return")  # pragma: no cover
+        raise AssertionError("escalate does not return")
 
     workflow = flow(body)
     stopped = asyncio.run(rig.engine(workflow).start(request()))
