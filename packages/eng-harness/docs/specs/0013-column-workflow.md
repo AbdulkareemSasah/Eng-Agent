@@ -123,7 +123,8 @@ values are synthetic and say so.
 - AC13. Given the code-pack route (§4.5) and the three check ids, when the workflow calls `ctx.calc` with a reference
   to an item list of `harness.column_check_items/1`, then `structural_codes.evaluate_batch` runs in mode `trial`, the
   stored `verdicts.set/1` has one trace per item in item order and `draft: true`; given run class `production`, then
-  the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside §4.5, then `RegistryError`.
+  the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
+  then `ContractError` `NOT_FOUND` before any evaluation (calcs §6; amendment B-405, spec 0010 C4).
   Tests: `tests/unit/calcs/test_code_pack_route.py::test_batch_through_calcport`, `::test_production_refused`,
   `::test_only_listed_checks`.
 - AC14. Given every state of the §4.8 tables, when the rules run, then the listed option or no decision (engineer)
@@ -354,15 +355,22 @@ element of the read set changed type between `before` and `after` (`UNEXPECTED_T
 
 ### 4.5 Code checks through the CalcPort
 
-The CalcPort serves the code packs (engine §4.8 "spec 0003 and code packs"; CF §1), but no merged harness spec defines
-the route (C2). This spec defines the part it needs **[added]**: `_calc/_code_packs.py` lets `HarnessCalcPort` run a
-check id from a fixed allowlist (`aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`,
-`aci318_14.10_6_1_1.longitudinal_reinforcement_limits`): `describe` returns the check's `CheckMeta` as `CalcInfo`
-(status from the pack's lifecycle), and `run(check_id, {"batch": <reference to an item list>})` resolves the list, builds
-`BatchItem`s with references, calls `structural_codes.evaluate_batch(check_id, items, mode=<run class>)` and stores the
-`verdicts.set/1` payload with provenance `tool: "structural-codes"`. A run class `production` with a draft check is
-refused (CF AC25). If another merged plan provides this route first, the column checks are added to its allowlist
-instead.
+The CalcPort serves the code packs through one route (engine §4.8, calcs §4.12 item 4, amendment B-405; CF §1;
+C2 settled). [Spec 0010](0010-design-isolated-footing.md) §4.3 describes the same route from the footing side, and
+the two descriptions are one route (spec 0010 C3). `_calc/_code_packs.py` (`CodePackRoute`, consulted by
+`HarnessCalcPort` for an id that does not start with `harness.`) runs a check id only from a fixed allowlist that holds
+both workflows' ids. This workflow adds the part it needs **[added]**: the three column ids
+(`aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`,
+`aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) and the `batch` argument. `describe` returns the check's
+`CheckMeta` as `CalcInfo` (`status` is the check's lifecycle state), and `run(check_id, {"batch": <reference to an item
+list>})` resolves the list (the inline `items` argument of spec 0010 §4.3 is the other form of the same `run`), builds
+`BatchItem`s with references, refuses a run class `production` with a check that is not `approved` before any
+evaluation (`CalcRefused`, calcs §4.12; CF AC25), calls `structural_codes.evaluate_batch(check_id, items, mode=<run
+class>, registry, source=store, policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with
+provenance `tool: "structural-codes"`. A check id outside the allowlist, or one the registry does not know, is
+`ContractError` `NOT_FOUND` before any evaluation, as an unknown calc id (calcs §6), never an exception of
+`structural_codes` raised to the block (spec 0010 C4, settled by B-405). Whichever of plan T6 and plan 0010 T2 merges
+first builds the route; the other adds its ids, its argument form and its tests.
 
 ### 4.6 Steps as ctx calls
 
@@ -472,6 +480,7 @@ length is a reference to this run's ETABS `model.sections/1` field (U1), so a co
 | Selection empty or unknown names | `harness.column_selection/1` `FAIL`, scope asked again | issues |
 | Forces not `host_local/1`, basis field missing | `CalcRefused` | field |
 | Production run with draft checks or calcs | `CalcRefused` (0003 §4.12) | calc id |
+| Check id outside the §4.5 allowlist, or unknown to the registry | `NOT_FOUND` (0003 §6; B-405) | `check_id` |
 | Mode not allowed (Revit run) | `RunRefused` `MODE_NOT_ALLOWED` **[added]** | mode |
 | ETABS changed since the design run | `PRECONDITION_FAILED` (`etabs_revision`) | fingerprints |
 | Revit gaps (save, restore) | `NotImplementedGap` (RV AC24) | gap id |
@@ -537,7 +546,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Align in one lead documents change before plan T3; this spec follows the clause specs |
-| C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | §4.5 defines the part this workflow needs; move it to spec 0003 by amendment if the footing workflow needs it too |
+| C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |
 | C4 | 19 §1 names one workflow; this spec has two runs (Q1) | Owner | As Q1 |
 | CW-G1 | `csi_design_results` returns concrete design for beams only (S-12 §1 step 13; EC-G2): no host verdict for concrete columns | Owner | Code-pack checks only; Sasaah typed column result tool |

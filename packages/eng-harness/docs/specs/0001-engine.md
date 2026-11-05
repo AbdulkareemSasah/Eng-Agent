@@ -35,6 +35,10 @@ The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.i
 `runtime_summary()` (§4.8), `run_started` and `run_resumed` gain `decision_runtime` (§4.4.2), and `RunView` shows it
 (§4.4.5). It is listed in §11 (Q24); the new criterion is AC69.
 
+**Amendment B-405.** Spec 0010 (Q10, C2) asked how a code-pack check reaches the `CalcPort`: through the one code-pack
+route of spec 0010 §4.3 and spec 0013 §4.5, named in §4.8 ("Code-pack checks"). It is listed in §11 (Q25); it adds no
+criterion here (the route's criteria are spec 0010 AC3, AC4 and spec 0013 AC13).
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -835,7 +839,7 @@ lead decision D-5) and a shared conformance test (AC57). All results from host t
 |---|---|---|
 | `ToolPort` | `describe(tool) -> ToolInfo` (refuses a tool outside the allowlist with `INVALID_ARGUMENT`); `unreleased_tools() -> Mapping[str, str]` (tool name to the record of its project-lane work, ADR-0026 §3; empty when every tool is released); `call(tool, args, *, op_id, model) -> Envelope`; `supports_reconcile(tool) -> bool`; `reconcile(tool, args, op_id) -> Reconciliation`; `read_back(tool, args) -> Envelope \| None`; `preview(tool, args) -> Preview` | Spec 0002 (adapters) |
 | `HostPort` | `preflight(min_builds) -> list[ServerCheck]`; `acquire(host_key) -> HostLease`; `release(lease)`; `session_epoch(host_key) -> int`; `locate(model_key) -> HostInstance \| None`; `model_state(model_key, instance_id) -> HostModelState`; `check_model(model_key) -> Envelope` (`issues.model_check/1`); `save(model_key, role) -> SavedModel`; `read_units(model_key, instance_id) -> UnitsState`; `working_copy(model_key, folder) -> ModelKey`; `restore(model_key, saved) -> HostInstance`; `model_files(model_key) -> tuple[Path, ...]`; `started_instances(host_key) -> list[HostInstance]`; `close_started(host_key, instances: Sequence[HostInstance]) -> None` | Spec 0002 (server processes, Job Objects, host-instance locks, process start times) |
-| `CalcPort` | `run_class: RunClass` (read-only, set at construction); `describe(calc_id) -> CalcInfo` (`id`, `version`, `content_sha256`, `status`, `engineering_params`, `basis_fields` (the basis paths the calc reads), `ref_rules` (field path to contract `RefRule`)); `run(calc_id, args) -> Envelope` (may raise `CalcRefused`, §6) | Spec 0003 and code packs |
+| `CalcPort` | `run_class: RunClass` (read-only, set at construction); `describe(calc_id) -> CalcInfo` (`id`, `version`, `content_sha256`, `status`, `engineering_params`, `basis_fields` (the basis paths the calc reads), `ref_rules` (field path to contract `RefRule`)); `run(calc_id, args) -> Envelope` (may raise `CalcRefused`, §6) | Spec 0003; code-pack checks through the one code-pack route (below) |
 | `BasisPort` | `load(basis_ref) -> LoadedBasis` (`result_id`, `basis`: the `basis.design_basis/1` payload model) | Spec 0004 |
 | `DecisionPort` | `decide(call: DecisionCall) -> DecisionAnswer \| PendingAnswer`; `decide_many(calls: Sequence[DecisionCall]) -> list[DecisionAnswer \| PendingAnswer]` (§4.9.1); `runtime_summary() -> Mapping[str, JsonValue]` (synchronous, no I/O: the summary of the providers and released points the port was built with, for the run header, AC69; empty when it has none) | Spec 0005 |
 | `ApprovalPort` | `present(request: ApprovalRequest) -> None`; `answer(request_id, *, wait: bool) -> ApprovalAnswer \| None` (`None`: no answer; the engine pauses) | Spec 0006 |
@@ -853,6 +857,15 @@ subclass); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unk
 `SavedModel` (`model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name`); `UnitsState` (`loaded`, `ok`, `present`,
 `expected`; `ok` true and `present` `None` when `loaded` is false); `HostLease`; `HostInstance` (`instance_id`, `pid`, `process_started_at`, `program`); `RunClass` (`StrEnum`: `trial`, `production`; spec 0003 §4.5); `ApprovalRequest`,
 `ApprovalAnswer`, `InputRequest`, `InputAnswer` (§4.9, §4.9.1).
+
+**Code-pack checks (amendment B-405).** A code-pack check reaches the `CalcPort` through one route only: the code-pack
+route of [spec 0010](0010-design-isolated-footing.md) §4.3 and [spec 0013](0013-column-workflow.md) §4.5
+(`_calc/_code_packs.py`, `CodePackRoute`), which `HarnessCalcPort` consults for an id that does not start with
+`harness.` (spec 0003 §4.12 item 4). The route runs only the check ids of its fixed allowlist; `describe` or `run` of
+any other id is `ContractError` `NOT_FOUND`, as an unknown calc id (spec 0003 §6). A code-pack check is described by
+the same `CalcInfo` (its `status` is the check's lifecycle state) and is subject to the same run class: a `production`
+run refuses a check that is not `approved` with `CalcRefused`. Block code imports no pack: blocks reach code-pack
+checks only through `ctx.calc`.
 
 **Decision port types.** `DecisionCall`, `EngineerChoice`, `DecisionAnswer` and `PendingAnswer` have one owner: spec
 0005 §4.5, built in `eng_harness.decisions.interfaces` (decision plan T5), with `DecisionCall.sensitive_values`
@@ -1076,3 +1089,4 @@ defaults to empty.
 | Q22 | Spec 0006 Q4: remove `inbox/` from the run folder; a file there would let any local process answer | Owner | Accept (§4.4.1) |
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
 | Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |
+| Q25 | Spec 0010 Q10 and C2: code-pack checks reach the `CalcPort` through the one code-pack route (`_calc/_code_packs.py`, spec 0010 §4.3, spec 0013 §4.5), consulted for ids that do not start with `harness.`; an id outside its allowlist is `NOT_FOUND`; the run class applies as to calcs | Owner | Accept (§4.8, amendment B-405; draft until the owner approves) |
