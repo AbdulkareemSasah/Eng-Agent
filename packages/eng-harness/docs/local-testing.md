@@ -10,7 +10,7 @@ No host program is involved. These checks need the owner's machine (plan 0001 se
 Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 1. `csi_launch` on the owner's machine: which process is the ETABS parent, the pid the reply names, and that the instance survives the server job's closure.
 2. A second server (`long` role) attaching by pid to a server-launched instance.
-3. The live `tools/list` fingerprint against the allowlist's.
+3. The live `tools/list` fingerprint against the allowlist's, and that the real `csi_status` reports `read_only` and `script_enabled` false (the build check requires both).
 4. The `serverInfo` the Sasaah server reports.
 5. Every table key and reply field of spec 0002 sections 4.6.2 and 4.6.4, and the reply fields of every mapped list tool.
 6. A server `timeout` during a write and during an analysis, the units afterwards, each reconciliation rule, `locked` after a completed analysis, and a proof-of-end mechanism for an abandoned analysis call; after a `timeout` on a role, re-attachment with `launched: false`, `csi_exit` refused, and what `csi_status` reports.
