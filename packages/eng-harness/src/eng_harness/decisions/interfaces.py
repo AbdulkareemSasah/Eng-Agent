@@ -1,8 +1,7 @@
 """Provider interfaces of the decision layer (spec 0005 section 4.7; plan 0005 T5).
 
-No implementation here: the cascade catches the error types defined below and imports no provider code. Units:
-``confidence`` is a ratio in [0, 1]. Errors: a provider fails only with ``ProviderError`` (a call) or
-``ProviderFailure`` (one entry of a batch); their messages are fixed, so remote text never travels through them.
+No implementation here; the cascade imports no provider code. Units: ``confidence`` is a ratio in [0, 1]. Errors: a
+provider fails only with ``ProviderError`` (a call) or ``ProviderFailure`` (a batch entry); messages are fixed.
 """
 
 from collections.abc import Mapping, Sequence
