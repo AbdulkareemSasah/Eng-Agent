@@ -153,6 +153,7 @@ tasks:
   - id: T7
     title: "Answer models and checks, approval and input ports, durable wait, stop-file run control"
     # Amendment (B-412, documents only): pages/__init__.py added; stop-file protocol of spec 4.4.8; dispatch mapping with refusal fallback; report callable; engine stand-in in workflow tests.
+    # Amendment (B-412 fourth review, documents only): tests/helpers/engine_standin.py added (the shared engine stand-in that T9 imports).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli, eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -161,6 +162,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_wait.py"
       - "packages/eng-harness/src/eng_harness/cli/_control.py"
+      - "packages/eng-harness/tests/helpers/engine_standin.py"
       - "packages/eng-harness/tests/unit/pages/test_answer_models.py"
       - "packages/eng-harness/tests/unit/pages/test_answer_validation.py"
       - "packages/eng-harness/tests/unit/pages/test_single_use.py"
@@ -200,6 +202,7 @@ tasks:
     title: "Approval screens: change set, promotion, info and sign-off"
     # Amendment (B-412, documents only): pages/_ports.py added to register the four screens in the PageApp dispatch; the AC42 test injects a stub report callable.
     # Amendment (B-412 third review, documents only): the AC42 workflow test uses the test-local engine stand-in of T7; T17c re-checks AC42 with the real engine.
+    # Amendment (B-412 fourth review, documents only): the stand-in is imported from tests/helpers/engine_standin.py (T7's file), not duplicated.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -306,6 +309,7 @@ tasks:
     # Amendment (B-412 review, documents only): stop-file removals of spec 4.4.8 in _run.py and their test; budget 340 -> 360.
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (the shared fully set CliDeps builder of section 3).
     # Amendment (B-412 third review, documents only): workflow and replay tests use a fake engine from CliDeps; T17c re-checks AC7, AC8, AC46 and AC64 with the real engine.
+    # Amendment (B-412 fourth review, documents only): T14 binds the engine-factory default to the merged Engine and adds the workflow-registry field (T18 binds it after plan 0010 T9).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -363,6 +367,7 @@ tasks:
     # Amendment (B-412, documents only): cli/__init__.py, _run.py, _wiring.py, pages/__init__.py and _ports.py added; budget 250 -> 330 (screen, port, setup log and run step 3 share it).
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T15 extends the shared builder with any new basis field).
     # Amendment (B-412 third review, documents only): workflow tests use a fake engine from CliDeps; T17c re-checks AC47 with the real engine.
+    # Amendment (B-412 fourth review, documents only): freeze and BasisSetupPort are merged, so T15 binds those CliDeps defaults itself.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -387,6 +392,7 @@ tasks:
     title: "Commands status, stop, report and doctor"
     # Amendment (B-412, documents only): cli/__init__.py added (handlers, doctor field); report and doctor handlers in cli/_status.py; stop test drives a fake engine (real one re-checked in T17).
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T16 extends the shared builder with the doctor field); T18 binds the doctor default.
+    # Amendment (B-412 fourth review, documents only): stop writes the file only while the run lock is held; --wait waits for the lock release (spec 4.4.8).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -472,6 +478,7 @@ tasks:
   - id: T18
     title: "Bind the CliDeps defaults to the merged real implementations"
     # Amendment (B-412 second review, documents only): new; the one task that replaces the None defaults of the section 3 rule.
+    # Amendment (B-412 fourth review, documents only): the registry is plan 0010 T9's workflows/__init__.py (T18 waits for it); engine factory and freeze are bound by T14 and T15.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -508,7 +515,8 @@ lets the rest stack on them:
 - T14 to T16 wire the commands: run and resume first (T14, then T14b for signals, the launch address and the decision
   layer; they exercise everything), then the basis confirmation inside `run`, then status, stop, report and doctor. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
   environment test and the real-engine re-checks (test files only); T17b adds the local testing list and the agent
-  rule; T18 binds the `CliDeps` defaults once every real implementation has merged.
+  rule; T17c re-checks the run commands and screens with the real engine (test files only); T18 binds the `CliDeps`
+  defaults whose real implementations were not merged when T14 to T16 were built.
 
 No new runtime dependency: `http.server`, `argparse`, `subprocess`, `statistics`, `secrets`, `hmac` and `html` from the
 standard library (spec §2, Q1). Reuse: `JournalReader`, the ports and `Event` from engine T4 and T6; `ResultStore`
@@ -563,7 +571,9 @@ builder. T9 and T10 register their builders in the mapping, and T15 registers th
 (`GET /report`), by default a fixed "report not available yet" document; T14 binds it. (5) The workflow tests
 (`test_answer_bound_to_hash`, `test_page_confirms_after_commit`) drive `PageApprovalPort` with a test-local stand-in for
 the engine that journals `approval_requested` and `approval_resolved` through the merged `JournalWriter` and feeds the
-events to the page sink; the real-engine half of AC29 and AC37 is re-checked in T17.
+events to the page sink; the real-engine half of AC29 and AC37 is re-checked in T17. The stand-in lives in the shared
+test helper `tests/helpers/engine_standin.py` (amendment B-412 fourth review), so that T9 imports it instead of
+duplicating it.
 
 **T8 Release marks** (spec §4.6.3). `ReleaseMarks`, `unreleased_dependencies` with the breadth-first closure over
 `parents` and provenance inputs, the depth limit, and the package skeleton of `report/`. The property test compares
@@ -573,7 +583,7 @@ with an independent reachability oracle on random graphs.
 acknowledgement rules; `_labels.py` catalog; snapshots. Amendment B-412: T9 registers the `CHANGE_SET`, `PROMOTION`,
 `INFO` and `SIGN_OFF` builders in the dispatch mapping of `pages/_ports.py` (T7); the AC42 test injects a stub
 `report` callable. Amendment B-412 third review: `test_signoff_rules` opens the `SIGN_OFF` request through the
-test-local engine stand-in of T7 (engine approvals, engine plan T15, are not merged when T9 is built); T17c re-checks
+test-local engine stand-in of T7, imported from `tests/helpers/engine_standin.py` (engine approvals, engine plan T15, are not merged when T9 is built); T17c re-checks
 AC42 with the real engine.
 
 **T10 Choice screens** (spec §4.4.6). Choice sets from the request's JSON Schema (engineer turn, batched decisions,
@@ -602,7 +612,9 @@ tests. Budget 360 lines (340 before the B-412 review). The original T14 (430 lin
 FILE` (AC64): the object is checked in step 2 and the page `InputPort` is wrapped in `_wiring.py` so that the first data
 request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340). Amendment
 B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
-`resume` handlers there; `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
+`resume` handlers there. Its fields include the engine factory, bound at once to the merged `eng_harness.engine.Engine`
+(engine plan T9 and T9b), and the workflow-registry field (default `None`; T18 binds it to the registry of
+`workflows/__init__.py` once plan 0010 T9 merges, which plan 0010 T9 relies on) (amendment B-412 fourth review); `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
 and store. T14 also owns the stop-file removals of spec §4.4.8 in `cli/_run.py`: the run process removes `stop.json`
 when `Engine.start` or `Engine.resume` returns while the file exists, and `resume` removes a stale one before
 `Engine.resume`; `test_stop_file_removed_on_return_and_before_resume` checks both with a fake engine from `CliDeps`
@@ -622,13 +634,15 @@ first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`.
 Amendment B-354: `run --no-wait` with required basis fields exits 10 before any run exists, nothing stored (AC47).
 Amendment B-412: step 3 of spec §4.2.2 goes in `cli/_run.py` and `cli/_wiring.py`; `PageBasisSetupPort` is exported
 from `pages/__init__.py`, and its port class and the `setup` kind are registered in the dispatch of `pages/_ports.py`. A
-basis-port factory or `freeze` that becomes a `CliDeps` field goes in `cli/__init__.py` under the defaults rule of §3
-(T18 binds its default).
+basis-port factory or `freeze` that becomes a `CliDeps` field goes in `cli/__init__.py` under the defaults rule of §3;
+both real implementations are merged (`BasisSetupPort` and `eng_harness.basis.freeze`, plan 0004 T7 and T8), so T15
+binds such a field's default itself (amendment B-412 fourth review; T18 does not).
 Budget 250 to 330: about 120 for the screen, 60 for the port and its registration, 50 for the setup log, 70 for step 3
 and `--no-wait`, and 30 for the wiring (an estimate, not a measurement).
 
 **T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the `stop` command in
-`cli/_stop.py` (it writes and waits on the stop file whose protocol lives in `cli/_control.py`, T7),
+`cli/_stop.py` (it writes the stop file only when the run lock is held, and `--wait` waits until the run lock is
+released, spec §4.4.8; the stop-file protocol lives in `cli/_control.py`, T7; amendment B-412 fourth review),
 the report command, the doctor pass-through. Amendment B-412: the report and doctor handlers live in `cli/_status.py`;
 T16 registers the four handlers in the `CliDeps` handler table in `cli/__init__.py`. The doctor callable is a `CliDeps`
 field under the defaults rule of §3, injected in `test_doctor_command`; T18 binds its default to `eng_harness.doctor.run` once plan 0002 T18 has merged.
@@ -674,10 +688,14 @@ with a recording decision assembler, as in T14b) and AC64
 review checks. It is split from T17 to keep each test-only pull request within two sessions.
 
 **T18 Bind the CliDeps defaults** (amendment B-412 second review; spec §4.1, AC13, AC62). The one task that replaces
-each `None` default of the §3 rule with the real implementation: the engine factory (engine plan T9 and T9b), the port
-builder `build_ports` (plan 0002), the calc preflight (plan 0003 `HarnessCalcPort.preflight`), `freeze` (plan 0004
-T8), the workflow registry (plan 0007), `load_providers_config` and `assemble_decision_runtime` (plan 0009 T1 and
-T10), and `eng_harness.doctor.run` (plan 0002 T18). It waits for all of them; if one is still missing long after the
+each `None` default of the §3 rule with the real implementation: the port builder `build_ports` (plan 0002 T19), the calc
+preflight (plan 0003 `HarnessCalcPort.preflight`), the workflow registry of `src/eng_harness/workflows/__init__.py`
+(plan 0010 T9, the one task that creates that module), `load_providers_config` and `assemble_decision_runtime` (plan
+0009 T1 and T10), and `eng_harness.doctor.run` (plan 0002 T18). The engine factory and `freeze` are merged (engine
+plan T9 and T9b; plan 0004 T8) and are bound by T14 and T15, not here (amendment B-412 fourth review). It waits for
+all of them, plan 0010 T9 included. No task yet registers the model-edit-cycle workflow of plan 0007 in that module
+(plan 0007's tests drive the engine directly, its §3 T11 row); that gap is a lead item for the owner queue. In
+short, T18 waits for every provider above; if one is still missing long after the
 others, the lead amends this plan to split T18 rather than bind a stub. `test_defaults_are_the_real_implementations`
 checks that each field of `CliDeps()` is the real callable and that `run`, `resume` and `doctor` are then available;
 it fails at the merge base because the defaults are `None`.
@@ -689,27 +707,30 @@ it fails at the merge base because the defaults are `None`.
 - Development: none new.
 - Other plans: engine plan T4 (reader), T6 (ports), T9 and T9b (runner start, resume; split by B-424), T15 (approvals), T18 (progress delivery);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
-  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 for the workflow registry; for T14b (B-098),
+  T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0010 T9 for the workflow registry (`workflows/__init__.py`; plan 0007 adds no registry); for T14b (B-098),
   decision plan T10 (the cascade's `runtime_summary()`), engine plan T14b (`decision_runtime` in the header) and
   provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14, T14b and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it. Their real-engine halves are re-checked in T17c (staged engine, below); plan 0009
   section 3 says the same (amendment B-412 third review).
 - `CliDeps` defaults rule (amendment B-412; T14, T14b, T15, T16). Each `CliDeps` collaborator whose real implementation
-  is not merged (engine factory, port builder, calc preflight, `freeze`, workflow registry, providers loader, decision
-  assembler, doctor callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
+  is not merged (port builder, calc preflight, workflow registry, providers loader, decision assembler, doctor
+  callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
   still builds (what `eng_harness.cli:main` uses with `deps=None`, and what `tests/unit/cli/test_opener.py` calls).
   Tests pass the collaborators explicitly. A command counts as available only when every collaborator it needs is not
   `None`: the handler table (or the handler at dispatch) checks this, so with the default `CliDeps()` that command
   keeps exiting 2 "not available in this build". No stub stands in for a missing implementation in production code.
   T18 replaces every `None` default with the real one once the real implementations have merged; the providing
-  tasks of the other plans do not touch `cli/__init__.py`. Tests build a fully set `CliDeps` through the shared helper
+  tasks of the other plans do not touch `cli/__init__.py`. A collaborator whose real implementation is already merged
+  when its field is added gets that default in the same task: the engine factory (`eng_harness.engine.Engine`, engine
+  plan T9 and T9b) in T14, `freeze` and any basis-port factory (plan 0004 T7 and T8) in T15 (amendment B-412 fourth
+  review: they were listed as not merged, which was out of date). Tests build a fully set `CliDeps` through the shared helper
   `tests/helpers/cli_deps.py`, which T14 creates and T14b, T15 and T16 extend with the fields they add, so that a new
   field does not turn an earlier task's `run` or `resume` test into exit 2 (amendment B-412 second review).
   (Amendment B-412 review: the earlier wording "no default and required" would make `CliDeps()` raise `TypeError`.)
 - Staged engine (amendment B-412; extended by the third review to every staged criterion, matching spec §9). The
-  engine runner and approvals (engine plan T9 to T15) and progress delivery (engine plan T18) are not merged when T5,
-  T7, T9, T14, T14b, T15 and T16 may be built. T5 tests the sink alone; T7's and T9's workflow tests use a test-local
+  runner's start and resume (engine plan T9 and T9b) are merged, but stop polling and approvals (engine plan T10 to
+  T15) and progress delivery (engine plan T18) are not merged when T5, T7, T9, T14, T14b, T15 and T16 may be built. T5 tests the sink alone; T7's and T9's workflow tests use a test-local
   engine stand-in that journals through the merged `JournalWriter`; the workflow and replay tests of T14, T14b, T15 and
   T16 use a fake engine from `CliDeps`. T17 waits for engine plan T15 and T18 and re-checks AC9, AC19, AC29 and AC37
   with the real engine; T17c waits for engine plan T15 and re-checks AC7, AC8, AC42, AC46, AC47, AC61, AC63 and AC64

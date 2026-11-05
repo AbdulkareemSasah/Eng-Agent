@@ -401,7 +401,8 @@ assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), 
 runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged is an
 optional field that defaults to `None` until it does (so `CliDeps()` still builds); a command whose collaborators are
 not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation;
-plan T18 binds every default once the real implementations have merged (plan §3, B-412).
+plan T18 binds every such default once the real implementations have merged, while a collaborator already merged when
+its field is added (the engine factory, `freeze`) gets its default in that task (plan §3, B-412).
 
 **Invocation from the workspace root (B-354).** The one supported form is
 `uv run --package eng-harness eng-harness <command> [options]`, run in the workspace root. The root project
