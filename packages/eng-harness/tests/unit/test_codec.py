@@ -1,5 +1,7 @@
 """The result codec (plan task T7; spec 0001 section 4.5.2 "Codec", AC11)."""
 
+from collections.abc import Mapping
+
 import pytest
 from eng_contract.canonical import CanonicalJsonError, canonical_json, loads
 from eng_contract.quantity import LabeledQuantity, Quantity
@@ -25,9 +27,16 @@ def _journaled(summary: object) -> object:
     return loads(canonical_json(summary))
 
 
-def _tool_result(summary: dict[str, object]) -> ToolResult:
+def _tool_result(summary: Mapping[str, object]) -> ToolResult:
     return ToolResult.model_validate(
-        {"tool": "t/x", "ref": Ref(ref=RESULT), "summary": summary, "warnings": (), "complete": True, "model": None}
+        {
+            "tool": "t/x",
+            "ref": Ref.model_validate({"$ref": RESULT}),
+            "summary": summary,
+            "warnings": (),
+            "complete": True,
+            "model": None,
+        }
     )
 
 

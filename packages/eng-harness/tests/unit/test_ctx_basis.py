@@ -119,7 +119,7 @@ def test_preview_and_approval() -> None:
     preview = Preview(items=(item,), diff_ref=None, models=(handle,))
     assert preview.models[0].revision == 2
     with pytest.raises(ValidationError):
-        item.label = "x"  # type: ignore[misc]  # B-106: the model is frozen
+        item.label = "x"
     approved = Approval(request_id="apr_1", approved=True, rejected_items=("b",), item_reasons={"b": "no"}, reason=None)
     assert approved.accepts("a")
     assert not approved.accepts("b")
@@ -131,5 +131,5 @@ def test_enums_attempt_and_answered() -> None:
     assert {k.name for k in ApprovalKind} == {"CHANGE_SET", "PROMOTION", "SIGN_OFF", "INFO"}
     assert {p.name for p in Promotion} == {"FILE_COPY", "REPLAY_WRITES"}
     assert Attempt(index=0, is_last=False).index == 0
-    answered = Answered[Form](value=Form(depth_mm=3.0), ref=Ref(ref=RESULT))
+    answered = Answered[Form](value=Form(depth_mm=3.0), ref=Ref.model_validate({"$ref": RESULT}))
     assert answered.field_ref("depth_mm").ref == f"{RESULT}#/fields/depth_mm/value"

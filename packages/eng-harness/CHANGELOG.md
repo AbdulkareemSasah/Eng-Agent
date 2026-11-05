@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ctx types and the result codec: `eng_harness.ctx` (`ToolResult`, `ReadResult`, `CalcResult`, `Decision`, `Answered`, `Approval`, `ApprovalKind`, `Preview`, `PreviewItem`, `Attempt`, `ModelHandle`, `Promotion`, `ArgValue`, `DecisionRequest`, `BasisCount` and `BasisView` with `ref`, `quantity`, `count`, `choice`) and `engine/_codec.py` (canonical round trip, then `Quantity` rebuilt); the `Ctx` protocol follows with the calls (plan 0001 T7, B-106; spec 0001 AC11, AC17).
 - Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
 - Basis draft: `build_draft`, `BasisDraft`, `EngineerValues`, `DetectedValue` in `eng_harness.basis` (precedence engineer, detected, template; sources and citations with the defining ancestor; `detected_differs` warning; pending list; `unused` template paths; draft `sha256`; the values file cannot set `confirmed`) (B-160; spec 0004 AC14 to AC20).
 - Calc kinds part 1: `eng_harness.kinds.calcs` (`CalcMeta`, `harness.model_fingerprint/1`, `harness.model_diff/1`, `harness.expected_effects/1`) registered in `eng_harness._kinds`; `kinds/**` added to the R2 modules (plan 0003 T4, B-143; spec 0003 AC47).
