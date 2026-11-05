@@ -191,6 +191,175 @@ def _size_multiple(p: dict[str, Any]) -> None:
     p["multiple"] = 0
 
 
+def _rb_clean(p: dict[str, Any]) -> None:
+    p["items"] = p["items"][:1]
+    p["unexpected"] = []
+    p["status"] = "PASS"
+
+
+def _rb_not_read(p: dict[str, Any]) -> None:
+    _rb_clean(p)
+    p["items"][0]["result"] = "not_read"
+
+
+def _rb_incomplete(p: dict[str, Any]) -> None:
+    _rb_clean(p)
+    p["complete"] = False
+
+
+def _rb_needs(p: dict[str, Any]) -> None:
+    _rb_clean(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _rb_not_read_needs(p: dict[str, Any]) -> None:
+    _rb_not_read(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _rb_incomplete_needs(p: dict[str, Any]) -> None:
+    _rb_incomplete(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_only_pass(p: dict[str, Any]) -> None:
+    """Drop the failing verdict: one PASS verdict is left and the status is PASS."""
+    p["counts"]["FAIL"] = 0
+    p["failing"] = []
+    p["failing_members"] = []
+    p["governing_by_group"] = []
+    p["governing"] = None
+    p["members"] = p["members"][1:]
+    p["top"] = {"n": 1, "of_total": 1, "label": "top 1 of 1 by ratio", "rows": p["top"]["rows"][1:]}
+    p["changes"]["newly_failing"] = []
+    p["status"] = "PASS"
+
+
+def _sum_not_designed(p: dict[str, Any]) -> None:
+    _sum_only_pass(p)
+    p["not_designed"] = ["F9"]
+
+
+def _sum_incomplete(p: dict[str, Any]) -> None:
+    _sum_only_pass(p)
+    p["complete"] = False
+
+
+def _sum_empty(p: dict[str, Any]) -> None:
+    _sum_only_pass(p)
+    p["counts"]["PASS"] = 0
+    p["members"] = []
+    p["top"] = {"n": 0, "of_total": 0, "label": "top 0 of 0 by ratio", "rows": []}
+    p["changes"]["appeared"] = []
+
+
+def _sum_needs(p: dict[str, Any]) -> None:
+    _sum_only_pass(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_not_designed_needs(p: dict[str, Any]) -> None:
+    _sum_not_designed(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_incomplete_needs(p: dict[str, Any]) -> None:
+    _sum_incomplete(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_empty_needs(p: dict[str, Any]) -> None:
+    _sum_empty(p)
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_attention(p: dict[str, Any]) -> None:
+    _sum_only_pass(p)
+    row = dict(p["top"]["rows"][0], status="NEEDS_ENGINEER", ratio=None, subject_id="F3")
+    p["attention"] = [row]
+    p["counts"]["NEEDS_ENGINEER"] = 1
+    p["top"] = {"n": 1, "of_total": 2, "label": "top 1 of 2 by ratio", "rows": p["top"]["rows"]}
+    p["status"] = "NEEDS_ENGINEER"
+
+
+def _sum_attention_pass(p: dict[str, Any]) -> None:
+    _sum_attention(p)
+    p["status"] = "PASS"
+
+
+def _sum_two_failing(p: dict[str, Any], order: tuple[int, int]) -> None:
+    row = p["failing"][0]
+    other = dict(row, subject_id="F5", ratio=1.1)
+    p["failing"] = [[row, other][i] for i in order]
+    p["counts"]["FAIL"] = 2
+    p["counts"]["PASS"] = 1
+    p["top"]["of_total"] = 3
+    p["top"]["label"] = "top 2 of 3 by ratio"
+    p["members"] = sorted(
+        [*p["members"], {**p["members"][0], "subject_id": "F5", "ratio": 1.1}],
+        key=lambda m: m["subject_id"],
+    )
+
+
+def _sum_failing_sorted(p: dict[str, Any]) -> None:
+    _sum_two_failing(p, (0, 1))
+
+
+def _sum_failing_unsorted(p: dict[str, Any]) -> None:
+    _sum_two_failing(p, (1, 0))
+
+
+def _sum_top_n(p: dict[str, Any]) -> None:
+    p["top"]["n"] = 1
+
+
+def _sum_of_total(p: dict[str, Any]) -> None:
+    p["top"]["of_total"] = 3
+    p["top"]["label"] = "top 2 of 3 by ratio"
+
+
+def _sum_kind(p: dict[str, Any]) -> None:
+    p["governing"]["subject_kind"] = "bogus"
+
+
+def _sum_check_id(p: dict[str, Any]) -> None:
+    p["governing"]["check_id"] = "Bad Id"
+
+
+def _sum_fail_below_limit(p: dict[str, Any]) -> None:
+    p["governing"]["ratio"] = 0.8
+
+
+def _sum_group_kind(p: dict[str, Any]) -> None:
+    p["governing_by_group"][0]["row"]["subject_kind"] = "area"
+
+
+def _sum_group_check(p: dict[str, Any]) -> None:
+    p["governing_by_group"][0]["row"]["check_id"] = "host.csi.other"
+
+
+def _sum_group_twice(p: dict[str, Any]) -> None:
+    p["governing_by_group"].append(copy.deepcopy(p["governing_by_group"][0]))
+
+
+def _size_valid(p: dict[str, Any]) -> None:
+    p["required"]["value"] = 450.0
+
+
+def _size_below(p: dict[str, Any]) -> None:
+    p["size"]["value"] = 400.0
+    p["multiple"] = 8
+
+
+def _size_too_big(p: dict[str, Any]) -> None:
+    p["size"]["value"] = 500.0
+    p["multiple"] = 10
+
+
+def _size_not_multiple(p: dict[str, Any]) -> None:
+    p["multiple"] = 8
+
+
 def _pl_difference(p: dict[str, Any]) -> None:
     p["counts"][0]["difference"] = 5
 
@@ -200,23 +369,66 @@ def _pl_equal(p: dict[str, Any]) -> None:
 
 
 def _pl_type(p: dict[str, Any]) -> None:
+    # Only the type rule fails: the renamed row keeps its place in the sort order and its difference.
     p["counts"][2]["name"] = "slab"
+    p["counts"][2]["element"] = "frame"
 
 
 REPORT_INVALID: list[tuple[str, Mutation, str]] = [
-    ("readback_check", _rb_status, "status"),
-    ("readback_check", _rb_trace, "calc_id"),
-    ("design_summary", _sum_label, "label"),
-    ("design_summary", _sum_counts, "counts"),
-    ("design_summary", _unsort_members, "sorted"),
-    ("design_summary", _sum_newly, "newly_failing"),
-    ("design_summary", _sum_status, "status"),
-    ("section_size", _size_unit, "mm"),
+    ("readback_check", _rb_status, "by rule R4"),
+    ("readback_check", _rb_not_read, "must be NEEDS_ENGINEER by rule R4"),
+    ("readback_check", _rb_incomplete, "must be NEEDS_ENGINEER by rule R4"),
+    ("readback_check", _rb_needs, "must be PASS by rule R4"),
+    ("readback_check", _rb_trace, "trace calc_id"),
+    ("design_summary", _sum_label, "label must state"),
+    ("design_summary", _sum_counts, "counts must match failing and attention"),
+    ("design_summary", _unsort_members, "members must be sorted and unique"),
+    ("design_summary", _sum_newly, "of newly_failing does not fit"),
+    ("design_summary", _sum_status, "by rule S6"),
+    ("design_summary", _sum_needs, "must be PASS by rule S6"),
+    ("design_summary", _sum_not_designed, "must be NEEDS_ENGINEER by rule S6"),
+    ("design_summary", _sum_incomplete, "must be NEEDS_ENGINEER by rule S6"),
+    ("design_summary", _sum_empty, "must be NEEDS_ENGINEER by rule S6"),
+    ("design_summary", _sum_attention_pass, "must be NEEDS_ENGINEER by rule S6"),
+    ("design_summary", _sum_failing_unsorted, "failing must be sorted by ratio"),
+    ("design_summary", _sum_top_n, "n must be the number of rows"),
+    ("design_summary", _sum_of_total, "counts must add up to top.of_total"),
+    ("design_summary", _sum_kind, "Input should be 'joint'"),
+    ("design_summary", _sum_check_id, "String should match pattern"),
+    ("design_summary", _sum_fail_below_limit, "contradicts ratio"),
+    ("design_summary", _sum_group_kind, "does not match its group"),
+    ("design_summary", _sum_group_check, "does not match its group"),
+    ("design_summary", _sum_group_twice, "governing_by_group must be sorted and unique"),
+    ("section_size", _size_unit, "must be in mm"),
     ("section_size", _size_multiple, "greater than or equal to 1"),
-    ("placement_comparison", _pl_difference, "difference"),
-    ("placement_comparison", _pl_equal, "equal"),
-    ("placement_comparison", _pl_type, "type"),
+    ("section_size", _size_below, "size must be at least required"),
+    ("section_size", _size_too_big, "size must be less than required plus increment"),
+    ("section_size", _size_not_multiple, "size must be multiple times increment"),
+    ("placement_comparison", _pl_difference, "difference must be b - a"),
+    ("placement_comparison", _pl_equal, "equal must follow rule P6"),
+    ("placement_comparison", _pl_type, "is not a type of"),
 ]
+
+REPORT_VALID: list[tuple[str, Mutation]] = [
+    ("readback_check", _rb_clean),
+    ("readback_check", _rb_not_read_needs),
+    ("readback_check", _rb_incomplete_needs),
+    ("design_summary", _sum_only_pass),
+    ("design_summary", _sum_not_designed_needs),
+    ("design_summary", _sum_incomplete_needs),
+    ("design_summary", _sum_empty_needs),
+    ("design_summary", _sum_attention),
+    ("design_summary", _sum_failing_sorted),
+    ("section_size", _size_valid),
+]
+
+
+def test_report_valid_variants() -> None:
+    """AC47: the status rules R4 and S6 and the section size rules hold on every branch, not only on FAIL."""
+    for stem, mutate in REPORT_VALID:
+        payload = copy.deepcopy(_load(stem))
+        mutate(payload)
+        HARNESS_KINDS[REPORT_KINDS[stem]].model_validate(payload)
 
 
 def test_report_fixtures() -> None:
