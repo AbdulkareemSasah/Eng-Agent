@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Provider configuration: `eng_harness.providers` (`load_providers_config`, `ProvidersConfig`, `[providers.decision]` and `[providers.llm]` with endpoint, secret-key and timeout rules, warning `request_timeout_below_policy`), the runtime dependencies `pydantic-ai-slim[openai]` (exact pin), `keyring` and `httpx2`, and the autouse network guard of the test tree (plan 0009 T1, B-220; spec 0009 AC1 to AC4, AC36, AC46).
 - Progress sink and heartbeat: `TerminalProgress` (formats an event and queues the text for one writer thread; `emit` never blocks, drops the oldest line when the queue is full and prints the count later, raises what the renderer raises), `Heartbeat` (asyncio task: heartbeat line and atomic `heartbeat.json` every interval, run folder read at each beat and never created), `Liveness` and `read_liveness` (run lock plus file age: running, no heartbeat, not running), with the 200 ms latency test in `tests/perf` (plan 0006 T5, B-179; spec 0006 AC18 to AC20).
 - Decision provider interfaces: `eng_harness.decisions.interfaces` (`ProviderInfo`, `ProviderRequest`, `ChoiceAnswer`, `YesNoAnswer`, `LLMAnswer`, `DecisionProvider`, `LLMProvider`, `ProviderErrorCode`, `OutgoingPlace`, `ProviderError`, `ProviderFailure`) and the port data in `decisions/_record.py` (`DecisionCall` with `sensitive_values`, `EngineerChoice`, `DecisionAnswer`, `PendingAnswer`, `DecisionScreen`, `Suggestion`), with scripted fake providers in `tests/fakes/decision_providers.py` (plan 0005 T5, B-169; spec 0005 AC41).
 

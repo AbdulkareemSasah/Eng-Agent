@@ -4,9 +4,10 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
+
 from eng_harness.providers import ProvidersConfig, load_providers_config
 
-SECRET = "sk-test-VALUE-123"  # a synthetic value; it must never appear in a message
+SYNTHETIC_VALUE = "sk-test-VALUE-123"  # a synthetic value; it must never appear in a message
 
 DECISION: dict[str, Any] = {
     "backend": "openrouter",
@@ -112,23 +113,23 @@ def test_endpoint_rules_accepted_and_local() -> None:
 @pytest.mark.parametrize("table", ["decision", "llm"])
 def test_secret_keys_refused(table: str, name: str) -> None:
     base = DECISION if table == "decision" else LLM
-    error = _refused({table: {**base, name: SECRET}})
+    error = _refused({table: {**base, name: SYNTHETIC_VALUE}})
     text = str(error) + error.detail.message + (error.detail.hint or "") + repr(error.detail.received)
     assert name in error.detail.message
     assert "credential store" in error.detail.message
-    assert SECRET not in text
+    assert SYNTHETIC_VALUE not in text
     assert error.detail.received is None
 
 
 def test_secret_value_never_in_other_messages() -> None:
     for table in (
-        {"decision": {**DECISION, "request_timeout_ms": SECRET}},
-        {"decision": {**DECISION, "backend": SECRET}},
-        {"decision": {**DECISION, "base_url": f"https://u:{SECRET}@example.test/v1"}},
-        {"decision": {**DECISION, "local": SECRET}},
+        {"decision": {**DECISION, "request_timeout_ms": SYNTHETIC_VALUE}},
+        {"decision": {**DECISION, "backend": SYNTHETIC_VALUE}},
+        {"decision": {**DECISION, "base_url": f"https://u:{SYNTHETIC_VALUE}@example.test/v1"}},
+        {"decision": {**DECISION, "local": SYNTHETIC_VALUE}},
     ):
         error = _refused(table)
-        assert SECRET not in str(error) + repr(error.detail)
+        assert SYNTHETIC_VALUE not in str(error) + repr(error.detail)
 
 
 def test_timeout_ceiling() -> None:

@@ -11,7 +11,11 @@ def test_non_loopback_connect_is_refused() -> None:
         (socket.AF_INET, ("example.test", 80)),
         (socket.AF_INET6, ("2001:db8::1", 9, 0, 0)),
     ):
-        with socket.socket(family, socket.SOCK_STREAM) as sock:
+        try:
+            sock = socket.socket(family, socket.SOCK_STREAM)
+        except OSError:  # the family is not available on this machine (for example IPv6 disabled)
+            continue
+        with sock:
             sock.settimeout(0.2)
             with pytest.raises(OSError, match="non-loopback"):
                 sock.connect(address)
