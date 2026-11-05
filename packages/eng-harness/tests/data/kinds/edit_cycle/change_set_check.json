@@ -1,0 +1,54 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.change_set_check",
+    "status": "draft",
+    "version": 1
+  },
+  "complete": true,
+  "draft": true,
+  "issues": [
+    {
+      "code": "CONFLICTS_WITH_ENGINEER_CHANGE",
+      "detail": "engineer set C30, item sets C40",
+      "gap": null,
+      "item_id": "i1",
+      "severity": "warning"
+    }
+  ],
+  "resolved": [
+    {
+      "item_id": "i1",
+      "kind": "frame_section",
+      "targets": [
+        "F1",
+        "F2"
+      ],
+      "values": []
+    },
+    {
+      "item_id": "i2",
+      "kind": "wall_section",
+      "targets": [
+        "W20"
+      ],
+      "values": [
+        {
+          "pointer": "/thickness_mm",
+          "ref": "res_00000000000000000000000001#/bounds/thickness_min",
+          "unit": "mm"
+        }
+      ]
+    }
+  ],
+  "status": "PASS",
+  "trace": {
+    "calc_id": "harness.change_set_check",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
