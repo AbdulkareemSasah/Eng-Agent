@@ -37,11 +37,11 @@ def _result(body: object, *, is_error: bool = False) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": json.dumps(body)}], "isError": is_error}
 
 
-def _make(store: ResultStore, payload: dict[str, Any], *, truncated: bool = False, **over: Any) -> Any:
+def _make(store: ResultStore, value: dict[str, Any], *, truncated: bool = False, **over: Any) -> Any:
     fields: dict[str, Any] = {
         "tool": TOOL,
         "kind": KIND,
-        "payload": {"value": payload},
+        "payload": {"value": value},
         "summary": {"count": 1},
         "reply": HostReply(data={}, truncated=truncated),
         "check": CHECK,
