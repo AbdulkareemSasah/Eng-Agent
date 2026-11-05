@@ -686,18 +686,19 @@ coincident frames (`ambiguous`).
    at most the counts and status.
 3. Contract errors become failure envelopes. `NotImplementedGap` and `CalcRefused` propagate as `StepError`s (engine
    §6). Any other exception is `INTERNAL`.
-4. Code-pack checks (amendment B-405). The same port serves the checks of the `structural-codes` packs through one
-   route and no other: `CodePackRoute` in `_calc/_code_packs.py`, defined by
-   [spec 0010](0010-design-isolated-footing.md) §4.3 and [spec 0013](0013-column-workflow.md) §4.5, which
-   `HarnessCalcPort` consults for an id that does not start with `harness.` (every calc id of this spec does). The
-   route runs only the ids of its fixed allowlist; any other id is `NOT_FOUND` (§6), and no exception of
-   `structural_codes` reaches the engine as such. Its `CalcInfo` has the fields of item 1, with `status` the check's
-   lifecycle state (the four values of a calc status). The run-class rule of §4.5 applies unchanged: in `production`
-   only `approved` checks run and any other is refused with `CalcRefused` before evaluation; `withdrawn` checks never
-   run; in `trial` a check that is not `approved` runs with `draft: true`. Results are stored as `verdicts.set/1` with
-   provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks themselves, their content hash
-   and their approvals belong to the packs (CF), not to this spec's `approvals.yaml`. Criteria and tests: spec 0010
-   AC3, AC4 and spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py`).
+4. Code-pack checks (amendment B-405). The same port serves the checks of the `structural-codes` packs through one route
+   and no other: `CodePackRoute` in `_calc/_code_packs.py`, defined by [spec 0010](0010-design-isolated-footing.md) §4.3
+   and [spec 0013](0013-column-workflow.md) §4.5, which `HarnessCalcPort` consults for an id that does not start with
+   `harness.` (every calc id of this spec does). The route runs only the ids of its fixed allowlist; any other id is
+   `NOT_FOUND` (§6), and no exception of `structural_codes` reaches the engine as such. Its `CalcInfo` has the fields of
+   item 1, with `status` the check's lifecycle state (the four values of a calc status) and `version` as spec 0010 Q20
+   settles (open: a merged check has no integer version). The run-class rule of §4.5 applies unchanged: in `production`
+   only `approved` checks run and any other is refused with `CalcRefused` before evaluation; a `withdrawn` check is
+   refused in both run classes with `CalcRefused` `CALC_WITHDRAWN` before evaluation (so the pack's `CheckNotUsable` is
+   never reached); in `trial` a check that is not `approved` runs with `draft: true`. Results are stored as
+   `verdicts.set/1` with provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks themselves,
+   their content hash and their approvals belong to the packs (CF), not to this spec's `approvals.yaml`. Criteria and
+   tests: spec 0010 AC3, AC4 and spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py`).
 
 The kinds of §4.6 to §4.11 and `harness.expected_effects/1` are registered with `KindRegistry.extend` beside the
 engine's harness kinds (engine plan T3, `_kinds.py`). The CalcPort stores calc results with `producer.host` null:
@@ -746,7 +747,8 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 | Reference failures | `REF_NOT_FOUND`, `REF_POINTER_INVALID`, `REF_KIND_MISMATCH`, `REF_UNIT_MISMATCH`; `REF_STALE` (raised by the engine, invariant 3, for a field not `stale_ok`, §4.13) | contract §4.6.2 |
 | Out of bounds | `OUT_OF_RANGE` | `field`, `expected`, `received` |
 | Item limit | `LIMIT_EXCEEDED` | `expected {max}`, `received` |
-| Unknown calc id, or a code-pack check id outside the route's allowlist (§4.12 item 4) | `NOT_FOUND` | — |
+| Unknown calc id | `NOT_FOUND` | — |
+| Code-pack check id outside the route's allowlist, or unknown to the pack registry (§4.12 item 4) | `NOT_FOUND` | `check_id` |
 | Calc defect | `INTERNAL` | `incident_id` |
 | Not approved in production; withdrawn | `CalcRefused` (`CALC_NOT_APPROVED`, `CALC_WITHDRAWN`) **[added]** | calc id, status |
 | Gap of §11 | `NotImplementedGap` (`NOT_IMPLEMENTED`) | gap id |

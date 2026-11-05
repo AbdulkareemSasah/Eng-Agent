@@ -244,21 +244,24 @@ for them (resolved when the registry is built, SBC Q1). `run` takes either argum
 the `batch` reference of spec 0013 §4.5. This workflow also adds `NotImplementedGap` as a verdict. `CodePackRoute` is
 consulted by `HarnessCalcPort` for an id that does not start with `harness.` (harness calc ids do):
 
-1. `describe(check_id)`: an id outside the allowlist, or one the `Registry` the run was built with does not know
-   (packs discovered once at engine construction, CF §4.6), is `ContractError` `NOT_FOUND`, as an unknown calc id in
-   calcs §6, never an exception of `structural_codes` raised to the block (C4; the pack's own `Registry.get` answers
-   `NOT_FOUND` for an unknown id too). Otherwise `CalcInfo` (the fields of engine §4.8) with the check's version,
-   `content_sha256`, `status` (the check's lifecycle state: `draft`, `verified`, `approved` or `withdrawn`, the values
-   of a calc status), `basis_fields` (the basis paths its input model declares as sources) and `ref_rules` (no
-   `stale_ok`).
+1. `describe(check_id)`: an id outside the allowlist, or one the `Registry` the run was built with does not know (packs
+   discovered once at engine construction, CF §4.6), is `ContractError` `NOT_FOUND`, as an unknown calc id in calcs §6,
+   never an exception of `structural_codes` raised to the block (C4; the pack's own `Registry.get` answers `NOT_FOUND`
+   for an unknown id too). Otherwise `CalcInfo` (the fields of engine §4.8) with `version` as Q20 settles (open:
+   `CalcInfo.version` is an integer of at least 1, and a merged check has no integer version, only its pack's string
+   `version`; Q20 blocks plan T2 and plan 0013 T6), `content_sha256`, `status` (the check's lifecycle state: `draft`,
+   `verified`, `approved` or `withdrawn`, the values of a calc status), `basis_fields` (the basis paths its input model
+   declares as sources) and `ref_rules` (no `stale_ok`).
 2. `run(check_id, {"items": [{"subject": Subject, "inputs": {name: Ref}}]})` or `run(check_id, {"batch": <reference to
-   an item list>})` (the list is resolved into the same items): the allowlist as in step 1, then the run-class refusal
-   of calcs §4.12 before any evaluation (production needs `approved`, `CalcRefused`; the pack's own `CheckNotUsable` is
-   therefore not reached), then `evaluate_batch(check_id, items, mode=<run class>, registry, source=store,
-   current_revision=..., policy=InputPolicy(require_refs=True))`; it stores the payload as `verdicts.set/1` (parents
-   the referenced results) and returns `make_success` with the counts. `NotImplementedGap` from a check is a verdict,
-   not an error (CF §4.4); a contract error of an item becomes a failure envelope (calcs §4.12 item 3); every other
-   exception is `INTERNAL` with an incident id.
+   an item list>})` (the list is resolved into the same items): the allowlist as in step 1, then the refusals of calcs
+   §4.12 item 4 before any evaluation: a `withdrawn` check is refused in both run classes (`CalcRefused`
+   `CALC_WITHDRAWN`), and in `production` a check that is not `approved` is refused (`CalcRefused` `CALC_NOT_APPROVED`).
+   The pack's own `CheckNotUsable` (CF AC25, raised for a withdrawn check in either mode and for a check that is not
+   approved in `production`) is unreachable only because of these two refusals. Then `evaluate_batch(check_id, items,
+   mode=<run class>, registry, source=store, current_revision=..., policy=InputPolicy(require_refs=True))`; it stores
+   the payload as `verdicts.set/1` (parents the referenced results) and returns `make_success` with the counts.
+   `NotImplementedGap` from a check is a verdict, not an error (CF §4.4); a contract error of an item becomes a failure
+   envelope (calcs §4.12 item 3); every other exception is `INTERNAL` with an incident id.
 3. Item limit `CalcSettings.max_items` applies to the item count, in both argument forms.
 
 `code_pack_check(base_id)` in the workflow resolves the id: the base id for `aci318_14`, `sbc304_2018.check_id_for(base_id)`
@@ -541,6 +544,7 @@ code-pack route (additive to engine §4.8).
 | Q17 | Engineer dimensions are one square plan size `L` with `h` and `s`; a rectangular footing cannot be entered, because the band rule is not checked (Q2, ACI plan Q7); an engineer plan off the increment is kept and flagged, and `enlarge_plan` then rounds up to the next multiple | Owner | Accept for v1; add `Lx`, `Ly` in a new `FootingDimensions` version together with the band-rule check |
 | Q18 | A large moment can give partial contact (`q_min < 0`) at the size found from `N` only; bearing is then `NEEDS_ENGINEER` (BP G-1), not `FAIL`, so the footing goes to the engineer with no enlargement round | Owner | Accept for v1 (explicit and tested, AC19). Later, preferred: a cited calc that sizes for `q_min ≥ 0` from the moments (BP S5 solved for the plan), so the first size already has full contact; alternative: a rule that may enlarge a bearing `NEEDS_ENGINEER` with reason `FULL_CONTACT` while `plan_at_max` is false (needs the reason in the decision state, a new point version) |
 | Q19 | `compare.length` and `checks.equilibrium_relative_tolerance` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
+| Q20 | **[added]** A code-pack check's `CalcInfo.version` (§4.3 step 1): engine §4.8 and `eng_harness.ports.CalcInfo` require an integer of at least 1 (also `ctx` `calc_version` and the journaled step version, engine AC13), but a merged check has no integer version: `CheckMeta` has none, and the only version is the pack's string `version`, which CF AC9 makes the trace's `calc_version` | Owner, lead | Open; blocks plan T2 and plan 0013 T6. Settled by a lead documents pull request amending CF §4.2 (or engine §4.8 if the second option is chosen) before either task starts. Recommendation: give each check an integer `version` in `CheckMeta` (starting at 1, raised when the check's behaviour changes), which the route passes as `CalcInfo.version`, the pack's string version staying in the trace (CF AC9). Alternative: a `CalcInfo` field for a string pack version (a port and journal change). No task invents a mapping meanwhile |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |
 | FG-3 | Footings cannot be resized in SAFE (SAFE SG-4); the cross-check uses the prepared geometry | Owner | Sasaah typed `csi_resize_area_rect` (SAFE Q5) |

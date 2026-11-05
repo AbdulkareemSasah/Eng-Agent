@@ -355,22 +355,24 @@ element of the read set changed type between `before` and `after` (`UNEXPECTED_T
 
 ### 4.5 Code checks through the CalcPort
 
-The CalcPort serves the code packs through one route (engine §4.8, calcs §4.12 item 4, amendment B-405; CF §1;
-C2 settled). [Spec 0010](0010-design-isolated-footing.md) §4.3 describes the same route from the footing side, and
-the two descriptions are one route (spec 0010 C3). `_calc/_code_packs.py` (`CodePackRoute`, consulted by
-`HarnessCalcPort` for an id that does not start with `harness.`) runs a check id only from a fixed allowlist that holds
-both workflows' ids. This workflow adds the part it needs **[added]**: the three column ids
-(`aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`,
-`aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) and the `batch` argument. `describe` returns the check's
-`CheckMeta` as `CalcInfo` (`status` is the check's lifecycle state), and `run(check_id, {"batch": <reference to an item
+The CalcPort serves the code packs through one route (engine §4.8, calcs §4.12 item 4, amendment B-405; CF §1; C2
+settled). [Spec 0010](0010-design-isolated-footing.md) §4.3 describes the same route from the footing side, and the two
+descriptions are one route (spec 0010 C3). `_calc/_code_packs.py` (`CodePackRoute`, consulted by `HarnessCalcPort` for
+an id that does not start with `harness.`) runs a check id only from a fixed allowlist that holds both workflows' ids.
+This workflow adds the part it needs **[added]**: the three column ids (`aci318_14.22_4_2_1.max_axial_strength`,
+`aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) and the `batch`
+argument. `describe` returns the check's `CheckMeta` as `CalcInfo` (`status` is the check's lifecycle state; `version`
+as spec 0010 Q20 settles, open, which blocks plan T6, see Q13), and `run(check_id, {"batch": <reference to an item
 list>})` resolves the list (the inline `items` argument of spec 0010 §4.3 is the other form of the same `run`), builds
-`BatchItem`s with references, refuses a run class `production` with a check that is not `approved` before any
-evaluation (`CalcRefused`, calcs §4.12; CF AC25), calls `structural_codes.evaluate_batch(check_id, items, mode=<run
-class>, registry, source=store, policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with
-provenance `tool: "structural-codes"`. A check id outside the allowlist, or one the registry does not know, is
-`ContractError` `NOT_FOUND` before any evaluation, as an unknown calc id (calcs §6), never an exception of
-`structural_codes` raised to the block (spec 0010 C4, settled by B-405). Whichever of plan T6 and plan 0010 T2 merges
-first builds the route; the other adds its ids, its argument form and its tests.
+`BatchItem`s with references, refuses before any evaluation a `withdrawn` check in both run classes (`CalcRefused`
+`CALC_WITHDRAWN`) and, in run class `production`, a check that is not `approved` (`CalcRefused` `CALC_NOT_APPROVED`;
+calcs §4.12 item 4; so the pack's `CheckNotUsable`, CF AC25, is never reached), calls
+`structural_codes.evaluate_batch(check_id, items, mode=<run class>, registry, source=store,
+policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with provenance `tool:
+"structural-codes"`. A check id outside the allowlist, or one the registry does not know, is `ContractError` `NOT_FOUND`
+before any evaluation, as an unknown calc id (calcs §6), never an exception of `structural_codes` raised to the block
+(spec 0010 C4, settled by B-405). Whichever of plan T6 and plan 0010 T2 merges first builds the route; the other adds
+its ids, its argument form and its tests.
 
 ### 4.6 Steps as ctx calls
 
@@ -545,6 +547,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q10 | Update in Revit every matched pair whose size differs (including differences older than this design), or only the columns changed in this design | Owner | Every differing pair, each item marked `preexisting` or `changed_in_design` in the preview so the engineer can reject single items |
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
+| Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | As spec 0010 Q20 (one answer for both); open, blocks plan T6 |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Align in one lead documents change before plan T3; this spec follows the clause specs |
 | C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |
