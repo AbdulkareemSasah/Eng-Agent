@@ -53,6 +53,17 @@ def fx() -> ModuleType:
     return module
 
 
+class _CountingStore(ResultStore):
+    """A result store that counts `put` calls."""
+
+    puts = 0
+
+    def put(self, *args: Any, **kwargs: Any) -> Any:
+        """Count, then delegate."""
+        self.puts += 1
+        return super().put(*args, **kwargs)
+
+
 class Rig:
     """A port over a store that counts `put` calls."""
 
@@ -65,17 +76,9 @@ class Rig:
         clock = FixedClock(1_767_225_600_000, 1)
         self.ids = SeededIdSource(b"harness", clock)
         kinds = fx.kinds()
-        self.store = ResultStore(
+        self.store = _CountingStore(
             Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), kinds, self.ids, clock
         )
-        self.puts = 0
-        real_put = self.store.put
-
-        def counting(*args: Any, **kwargs: Any) -> Any:
-            self.puts += 1
-            return real_put(*args, **kwargs)
-
-        self.store.put = counting  # type: ignore[method-assign]  # B-144: count writes of the port
         registry = CalcRegistry(kinds, [fx.port_sum], hasher=lambda _: HASH)
         self.port = HarnessCalcPort(
             registry, approvals, self.store, CalcSettings(max_items=max_items), run_class, clock, self.ids
@@ -86,7 +89,8 @@ class Rig:
         producer = Provenance(
             tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0
         )
-        return self.store.put(kind or self.fx.SOURCE_KIND, {"value": value}, producer).result_id
+        result_id: str = self.store.put(kind or self.fx.SOURCE_KIND, {"value": value}, producer).result_id
+        return result_id
 
     def args(self, **extra: Any) -> dict[str, Any]:
         """Arguments with a valid span reference."""
@@ -147,13 +151,13 @@ def test_input_validation_codes(fx: ModuleType, tmp_path: Path) -> None:
     assert code({"span_mm": {"$ref": f"{rid}#/value/missing"}}) is ErrorCode.REF_POINTER_INVALID
     assert code({"span_mm": {"$ref": "res_" + "0" * 26}}) is ErrorCode.REF_NOT_FOUND
     assert code({"span_mm": {"$ref": f"{neg}#/value/span_mm"}}) is ErrorCode.OUT_OF_RANGE
-    assert rig.puts == 3  # only the three source records
+    assert rig.store.puts == 3  # only the three source records
 
 
 def test_item_limit(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path, max_items=3)
     rid = rig.source({"span_mm": 1.0, "rows": [1.0, 2.0, 3.0, 4.0]})
-    before = rig.puts
+    before = rig.store.puts
     out = rig.port.run(
         "harness.port_sum", {"span_mm": {"$ref": f"{rid}#/value/span_mm"}, "rows": {"$ref": f"{rid}#/value/rows"}}
     )
@@ -161,17 +165,17 @@ def test_item_limit(fx: ModuleType, tmp_path: Path) -> None:
     assert out.error.code is ErrorCode.LIMIT_EXCEEDED
     assert out.error.expected == {"max": 3}
     assert out.error.received == 4
-    assert rig.puts == before
+    assert rig.store.puts == before
 
 
 def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path)
     args = rig.args(offset=2.5, whole=False)
     rid = args.pop("_rid")
-    before = rig.puts
+    before = rig.store.puts
     out = rig.port.run("harness.port_sum", args)
     assert isinstance(out, SuccessEnvelope)
-    assert rig.puts == before + 1
+    assert rig.store.puts == before + 1
     record = rig.store.get(out.result_id)
     assert record.kind == fx.OUTPUT_KIND
     assert record.complete is False
@@ -196,11 +200,11 @@ def test_production_and_withdrawn_refusal(fx: ModuleType, tmp_path: Path) -> Non
     ]
     args = prod.args()
     args.pop("_rid")
-    before = prod.puts
+    before = prod.store.puts
     with pytest.raises(CalcRefused) as caught:
         prod.port.run("harness.port_sum", args)
     assert caught.value.code is HarnessCode.CALC_NOT_APPROVED
-    assert prod.puts == before
+    assert prod.store.puts == before
     approved = make(fx, tmp_path / "a", RunClass.PRODUCTION, approved=True)
     assert approved.port.preflight(["harness.port_sum"]) == []
     assert isinstance(run(approved), SuccessEnvelope)
@@ -234,12 +238,12 @@ def test_not_implemented_gap(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path)
     args = rig.args(gap=True)
     args.pop("_rid")
-    before = rig.puts
+    before = rig.store.puts
     with pytest.raises(NotImplementedGap) as caught:
         rig.port.run("harness.port_sum", args)
     assert fx.GAP_ID in caught.value.message
     assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
-    assert rig.puts == before
+    assert rig.store.puts == before
 
 
 def test_unexpected_exception_is_internal(fx: ModuleType, tmp_path: Path) -> None:

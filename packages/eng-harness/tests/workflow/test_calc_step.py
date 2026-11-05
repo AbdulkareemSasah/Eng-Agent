@@ -9,6 +9,7 @@ from types import ModuleType
 from eng_contract.envelope import Provenance, SuccessEnvelope
 from eng_contract.store import ResultStore
 from workflows.calc_test_blocks import calc_step, engine
+from workflows.chain import ChainOutput
 from workflows.rig import make_rig, request
 
 from eng_harness._calc._approvals import ApprovalsFile
@@ -58,7 +59,11 @@ def test_calc_step_end_to_end(tmp_path: Path) -> None:
     assert outcome.status is RunStatus.COMPLETED
     done = [e.payload for e in rig.events(outcome.run_id) if isinstance(e.payload, ev.StepCompleted) and e.payload.calc]
     assert [p.calc for p in done] == [ev.CalcRef(id=fx.CALC_ID, version="2", content_sha256=HASH, status="draft")]
-    stored = rig.store.get(done[0].result.ref)  # type: ignore[union-attr]  # B-144: a calc step has a result
+    result = done[0].result
+    assert result is not None
+    assert isinstance(outcome.output, ChainOutput)
+    assert outcome.output.refs[1] == repr(502.5)
+    stored = rig.store.get(result.ref)
     assert stored.kind == fx.OUTPUT_KIND
     assert stored.parents == [source.result_id]
     assert rig.store.payload(stored.result_id)["total"] == 502.5
