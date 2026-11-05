@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from eng_contract.errors import ErrorCode
 from eng_contract.quantity import LabeledQuantity, Quantity
-from eng_contract.units import UnitError
+from eng_contract.units import UNITS, UnitError
 
 _Q = Quantity(450, "mm")
 
@@ -150,3 +150,17 @@ def test_conversions() -> None:
         Quantity(1, "kip").canonical("no_such_kind")
     with pytest.raises(UnitError):
         Quantity(1, "kip").to("mm")
+
+
+def test_eq_with_non_quantity_is_not_implemented() -> None:
+    """Rule 3: a non-Quantity gives NotImplemented, not False."""
+    assert Quantity(1, "mm").__eq__(1) is NotImplemented
+
+
+def test_hash_includes_dimension() -> None:
+    """Rule 5: hash((dimension, sifloat)); equal SI values of different dimensions are unequal."""
+    length, force = Quantity(1, "m"), Quantity(1, "N")
+    assert length != force
+    assert hash(length) == hash((UNITS["m"].dimension, 1.0))
+    assert hash(force) == hash((UNITS["N"].dimension, 1.0))
+    assert hash(length) != hash(force)
