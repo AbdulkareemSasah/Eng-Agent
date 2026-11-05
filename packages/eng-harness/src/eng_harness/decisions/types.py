@@ -9,19 +9,22 @@ from typing import Annotated
 
 from pydantic import StringConstraints
 
+from eng_harness.decisions._points import DecisionDefinitionError, DecisionPoint, Label, Refs, decision_point
 from eng_harness.decisions._policy import DecisionPolicy
 
-__all__ = ["DecisionDefinitionError", "DecisionPolicy", "Label", "Pick", "Rationale"]
-
-# AC2: 1 to 80 characters, no control character, none of / \ @ : (a path, URL or address cannot be a label).
-Label = Annotated[str, StringConstraints(min_length=1, max_length=80, pattern=r"^[^\x00-\x1f\x7f-\x9f/\\@:]+$")]
+__all__ = [
+    "DecisionDefinitionError",
+    "DecisionPoint",
+    "DecisionPolicy",
+    "Label",
+    "Pick",
+    "Rationale",
+    "Refs",
+    "decision_point",
+]
 
 # AC2: 1 to 300 characters, no digit in any script (the form gate rule FB006 probes).
 Rationale = Annotated[str, StringConstraints(min_length=1, max_length=300, pattern=r"^\D+$")]
-
-
-class DecisionDefinitionError(ValueError):
-    """An invalid point, rule or policy definition, raised at import or registration (spec 6)."""
 
 
 @dataclass(frozen=True, slots=True)
