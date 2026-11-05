@@ -13,34 +13,21 @@ from pydantic import BaseModel, ConfigDict, Field, InstanceOf, JsonValue
 from eng_harness.ctx import BasisView
 from eng_harness.decisions._points import DecisionPoint
 from eng_harness.decisions._policy import DecisionPolicy
-from eng_harness.decisions._rules import Rule
-
-__all__ = [
-    "DecisionAnswer",
-    "DecisionCall",
-    "DecisionScreen",
-    "EngineerChoice",
-    "PendingAnswer",
-    "ProviderOption",
-    "ScreenField",
-    "ScreenItem",
-    "Suggestion",
-    "SuggestionCode",
-]
+from eng_harness.decisions._rules import Rationale, Rule
 
 
-class _Frozen(BaseModel):
+class Frozen(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class ProviderOption(_Frozen):
+class ProviderOption(Frozen):
     """One option as a provider or the engineer sees it: the value and its label."""
 
     value: str
     label: str
 
 
-class EngineerChoice(_Frozen):
+class EngineerChoice(Frozen):
     """The engineer's answer to a pending decision: an option value, who answered and when."""
 
     choice: str
@@ -66,14 +53,14 @@ class DecisionCall(BaseModel):
     sensitive_values: tuple[str, ...] = ()
 
 
-class SuggestionCode(_Frozen):
+class SuggestionCode(Frozen):
     """The identity of the rule code that answered (spec 4.9)."""
 
     rule_version: int
     rule_sha256: str
 
 
-class Suggestion(_Frozen):
+class Suggestion(Frozen):
     """One tier's entry in ``decision_made.suggestions``; ``error`` is a class name and code, never a message."""
 
     tier: Literal[1, 2, 3]
@@ -90,14 +77,14 @@ class Suggestion(_Frozen):
     ]
     choice: str | None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
-    rationale: str | None = None
+    rationale: Rationale | None = None
     latency_ms: int = Field(ge=0)
     shadow: bool
     code: SuggestionCode | None = None
     error: str | None = None
 
 
-class DecisionAnswer(_Frozen):
+class DecisionAnswer(Frozen):
     """A decided call; the engine builds ``decision_made`` from it."""
 
     choice: str
@@ -109,7 +96,7 @@ class DecisionAnswer(_Frozen):
     suggestions: tuple[Suggestion, ...] = ()
 
 
-class ScreenField(_Frozen):
+class ScreenField(Frozen):
     """One labeled state field; ``ref`` is set (and ``value`` null) for a ``Ref`` field."""
 
     label: str
@@ -117,7 +104,7 @@ class ScreenField(_Frozen):
     ref: str | None = None
 
 
-class ScreenItem(_Frozen):
+class ScreenItem(Frozen):
     """One call on the engineer screen: title, options, fields and every suggestion."""
 
     request_id: str
@@ -127,13 +114,13 @@ class ScreenItem(_Frozen):
     suggestions: tuple[Suggestion, ...] = ()
 
 
-class DecisionScreen(_Frozen):
+class DecisionScreen(Frozen):
     """Data for the engineer page (spec 0006) to render; one item per pending call of a batch."""
 
     items: tuple[ScreenItem, ...]
 
 
-class PendingAnswer(_Frozen):
+class PendingAnswer(Frozen):
     """The call waits for the engineer; ``rejected`` says why a previous choice was refused."""
 
     request_id: str

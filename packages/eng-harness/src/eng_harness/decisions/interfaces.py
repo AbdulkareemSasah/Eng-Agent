@@ -9,19 +9,17 @@ from collections.abc import Mapping, Sequence
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue
+from pydantic import Field, JsonValue
 
 from eng_harness.decisions._record import (
     DecisionAnswer,
     DecisionCall,
     DecisionScreen,
     EngineerChoice,
+    Frozen,
     PendingAnswer,
     ProviderOption,
-    ScreenField,
-    ScreenItem,
     Suggestion,
-    SuggestionCode,
 )
 from eng_harness.decisions._rules import Rationale
 
@@ -42,19 +40,12 @@ __all__ = [
     "ProviderInfo",
     "ProviderOption",
     "ProviderRequest",
-    "ScreenField",
-    "ScreenItem",
     "Suggestion",
-    "SuggestionCode",
     "YesNoAnswer",
 ]
 
 
-class _Frozen(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class ProviderInfo(_Frozen):
+class ProviderInfo(Frozen):
     """Who a provider is; recorded in suggestions and the run header."""
 
     provider: str
@@ -64,7 +55,7 @@ class ProviderInfo(_Frozen):
     supports_batch: bool
 
 
-class ProviderRequest(_Frozen):
+class ProviderRequest(Frozen):
     """The only data a provider receives: redaction-checked state, no ``Ref`` fields, no sensitive values."""
 
     request_id: str
@@ -74,21 +65,21 @@ class ProviderRequest(_Frozen):
     state: Mapping[str, JsonValue]
 
 
-class ChoiceAnswer(_Frozen):
+class ChoiceAnswer(Frozen):
     """A tier 2 choice with its confidence (ratio)."""
 
     choice: str
     confidence: float = Field(ge=0.0, le=1.0, allow_inf_nan=False)
 
 
-class YesNoAnswer(_Frozen):
+class YesNoAnswer(Frozen):
     """A tier 2 yes or no with its confidence (ratio)."""
 
     answer: bool
     confidence: float = Field(ge=0.0, le=1.0, allow_inf_nan=False)
 
 
-class LLMAnswer(_Frozen):
+class LLMAnswer(Frozen):
     """A tier 3 choice with a rationale that contains no digit (``Rationale``)."""
 
     choice: str
@@ -140,7 +131,7 @@ class ProviderError(Exception):
         self.where = where
 
 
-class ProviderFailure(_Frozen):
+class ProviderFailure(Frozen):
     """The batch entry for one failed request."""
 
     code: ProviderErrorCode
@@ -154,19 +145,15 @@ class DecisionProvider(Protocol):
 
     async def choose(self, request: ProviderRequest) -> ChoiceAnswer:
         """Choose one option; raises ``ProviderError``."""
-        ...
 
     async def yes_no(self, request: ProviderRequest) -> YesNoAnswer:
         """Answer a point that has ``yes_no`` set; raises ``ProviderError``."""
-        ...
 
     async def score(self, request: ProviderRequest) -> Mapping[str, float]:
         """Score each option to order the engineer screen, never to choose; raises ``ProviderError``."""
-        ...
 
     async def batch(self, requests: Sequence[ProviderRequest]) -> Sequence[ChoiceAnswer | ProviderFailure]:
         """One entry per request, in order."""
-        ...
 
 
 @runtime_checkable
@@ -177,4 +164,3 @@ class LLMProvider(Protocol):
 
     async def decide(self, request: ProviderRequest) -> LLMAnswer:
         """Choose one option with a rationale; raises ``ProviderError``."""
-        ...

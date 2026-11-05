@@ -165,4 +165,6 @@ def test_port_models_shape() -> None:
     assert "items" in DecisionScreen.model_fields
     assert set(Suggestion.model_fields) >= {"tier", "by", "outcome", "choice", "confidence", "rationale", "shadow"}
     with pytest.raises(ValidationError):
-        Suggestion(tier=2, by="model:p/m@1", outcome="bogus", choice=None, confidence=None, latency_ms=1, shadow=True)
+        Suggestion.model_validate(
+            {"tier": 2, "by": "model:p/m@1", "outcome": "bogus", "choice": None, "latency_ms": 1, "shadow": True}
+        )
