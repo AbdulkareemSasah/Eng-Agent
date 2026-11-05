@@ -8,7 +8,8 @@ risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendmen
 tasks:
   - id: T1
     # Amendment (B-418, documents only): external gate on plan 0002 written on depends_on; servers/_session.py added (the
-    # build check takes the server's product); pre-start grep of the shared modules for ETABS-only names (section 2)
+    # build check takes the server's product); pre-start grep of the shared modules for ETABS-only names, each hit a
+    # lead plan amendment adding the file here before T1 starts, no lint exclusions (section 2)
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
@@ -251,9 +252,10 @@ T11, T12, T13 and T14 are merged on `build/v1` (amendment B-418; the gate is wri
 and T3 also waits for 0002 T15 or drops `csi_unlock_model`, T8 for 0002 T17). Before starting, the writer checks with
 `git ls-tree` that the 0002 files T1 lists exist, then greps the shared modules (`adapters/_hostport.py`,
 `adapters/csi/_session_ops.py`, `_state.py`, `_replies.py`, `_edits.py`, `_tools.py`, `_checks.py`, `_reconcile.py`)
-for `ETABS` or `.EDB`. A file with a hit is either asked of the profile (the lead then adds it to T1's files by a plan
-amendment) or listed in `test_no_product_branches_in_shared` as an explicit exclusion, named in the pull request, that
-T3, T5 or T6 removes when it touches that file. The two existing 0002 tests that read the pinned fingerprint
+for `ETABS` or `.EDB`. Every hit is reported to the lead before T1 starts, and the lead adds that file to T1's files by
+a plan amendment, so that T1 makes it ask the profile; T1 starts only when the grep finds no hit outside T1's files.
+`test_no_product_branches_in_shared` carries no exclusions: no later task lists `test_products.py`, and `_state.py`,
+`_replies.py` and `_edits.py` are in no other task of this plan, so an exclusion could never be removed in scope. The two existing 0002 tests that read the pinned fingerprint
 (`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`, `test_session.py::test_build_mismatch_stops_run`) are in
 T1's files: they change only in how they read the header (the ETABS entry of `[fingerprint]`), never in the value they
 expect, and they are the regression proof that the ETABS fingerprint is unchanged.

@@ -357,8 +357,8 @@ distances, assembled schedule.
 
 **T7 Points and rules** (spec §4.5). Two points with their state models, five rules with typical and boundary tests, lock
 entries; the rules' review table goes to the owner (spec 0005 §4.4). T7 creates no `workflows/__init__.py`: the merged
-gate type-checks a package folder without one, that module is the workflow registry of plan 0007 T8 (amendment B-417),
-and footing T9 registers this workflow in it (amendment B-418).
+gate type-checks a package folder without one, and footing T9 creates or extends `workflows/__init__.py` (the module
+through which the command line of plan 0006 T14 finds workflows) and registers this workflow in it (amendment B-418).
 
 **T8 Block** (spec §4.6). The rounds loop with `ctx.attempts`, the six batched checks through the route of T2 with the
 ACI pack, `decide_many`, engineer dimensions, resize and closures. Tests drive the block through a test workflow in
