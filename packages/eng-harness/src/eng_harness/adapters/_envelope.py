@@ -1,17 +1,18 @@
 """Host replies as contract envelopes (plan 0002 T8; spec 0002 section 4.5.3, AC19).
 
-Purpose: parse a Sasaah reply (one JSON text block), store the canonical payload and answer with an envelope: summary
-at most 4096 bytes, inline data up to 16384 bytes, `PARTIAL_DATA` on `truncated`, provenance with the build.
-Units: bytes and milliseconds. Errors: `ContractError` `HOST_ERROR` (host code `UNEXPECTED_REPLY`, spec 0002 A3, or
-the server's code for an error reply, which T9's table maps first), `LIMIT_EXCEEDED`, `INVALID_ARGUMENT` (payload).
+Purpose: parse a Sasaah reply (one JSON text block), store the canonical payload, answer with an envelope: summary at
+most 4096 bytes, inline data up to 16384, `PARTIAL_DATA` on `truncated`, provenance with the build and input `files`.
+Units: bytes, milliseconds. Errors: `ContractError` `HOST_ERROR` (host code `UNEXPECTED_REPLY`, spec 0002 A3, or the
+server's code for an error reply, T9's table maps it), `LIMIT_EXCEEDED`, `INVALID_ARGUMENT` (payload).
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from eng_contract.canonical import canonical_json
 from eng_contract.envelope import (
     SUMMARY_LIMIT_BYTES,
+    FileSource,
     HostInfo,
     LiteralInput,
     Provenance,
@@ -59,6 +60,7 @@ def make_envelope(
     inputs: Mapping[str, RefInput | LiteralInput],
     started_at: Timestamp,
     duration_ms: int,
+    files: Sequence[FileSource] = (),
 ) -> SuccessEnvelope:
     """Store `payload` (canonical units) as a `kind` result; `tool` is `<adapter>/<tool>`, the build is `check.build`.
 
@@ -74,12 +76,11 @@ def make_envelope(
         tool_version=check.build,
         host=host,
         inputs=dict(inputs),
+        files=list(files),
         started_at=started_at,
         duration_ms=duration_ms,
     )
-    truncated = reply.get("truncated") is True
-    parents = dict.fromkeys(parse_ref(i.ref)[0] for i in inputs.values() if isinstance(i, RefInput))
-    record = store.put(kind, payload, producer, parents=list(parents), complete=not truncated)
-    note = "the host reply was truncated: lists stop at 2000 with no paging"
-    warnings = [ContractWarning(code=WarningCode.PARTIAL_DATA, message=note)] if truncated else []
-    return make_success(record, summary, warnings)
+    parents = [*dict.fromkeys(parse_ref(i.ref)[0] for i in inputs.values() if isinstance(i, RefInput))]
+    record = store.put(kind, payload, producer, parents=parents, complete=reply.get("truncated") is not True)
+    note = ContractWarning(code=WarningCode.PARTIAL_DATA, message="the host reply was truncated: lists stop at 2000")
+    return make_success(record, summary, [] if record.complete else [note])
