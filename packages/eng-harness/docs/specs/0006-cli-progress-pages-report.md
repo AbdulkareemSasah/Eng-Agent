@@ -712,7 +712,9 @@ first interrupt of AC10). The writer writes a temporary file in the same folder 
 reader never sees a partial file. `cli/_control.py` holds the protocol:
 
 - `FileRunControl.stop_requested(run_id)` (the engine's `RunControlPort`) returns true while the file exists, whatever
-  its content; the page ports' wait (§4.4.5 step 2) polls the same check.
+  its content; the page ports' wait (§4.4.5 step 2) polls the same check. `eng_harness.pages` may not import
+  `eng_harness.cli` (§4.1), so the page ports take the check by injection (`stop_requested: Callable[[], bool]`), and
+  `cli/_wiring.py` binds it to `FileRunControl` for the run.
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -882,8 +884,12 @@ port under test with a test-local stand-in for the engine (it journals through t
 the events to the sink) or with a fake engine from `CliDeps`. This holds for every such criterion: AC29 and AC37 (plan
 T7), AC42 (plan T9), AC7, AC8, AC46 and AC64 (plan T14), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
 T16). AC33, AC34 and AC35 are built only in plan T17, with the real engine. Plans T17 and T17c wait for the real engine
-with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery (engine plan
-T18). They re-check each staged criterion, and the engine half of AC19, with the real engine. Plan T17:
+with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery and the
+run-control check between steps (engine plan T18; the run-control half is added to it by amendment B-412). Until the
+engine's `EnginePorts` holds the decision, progress and run-control fields (engine plan T14 and T18), `cli/_wiring.py`
+builds those ports and gives them to the `CliDeps` engine factory, whose default passes the real engine only the
+fields `EnginePorts` holds; plan T16b completes that mapping, and plans T17 and T17c depend on it, so they re-check each
+staged criterion, and the engine half of AC19, with the real engine through the production wiring. Plan T17:
 `tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point` (AC9),
 `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (AC19),
 `tests/workflow/test_page_approval.py::test_answer_bound_to_hash_real_engine` (AC29) and

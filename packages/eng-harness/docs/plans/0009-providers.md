@@ -312,7 +312,7 @@ Q16).
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
   0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
   this plan (its tests use recorders); plan 0006 T18 binds their defaults to `load_providers_config` and
-  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's files. Spike S-07 is not a dependency of this plan; it gates the later
+  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18 there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
 
