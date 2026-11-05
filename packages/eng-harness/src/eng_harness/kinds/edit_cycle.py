@@ -21,6 +21,7 @@ __all__ = [
     "AnalysisSummary",
     "ChangeSetCheck",
     "CsiNameLists",
+    "Label",
 ]
 
 NONEMPTY = 1
@@ -28,7 +29,9 @@ NONEMPTY = 1
 LABEL_MAX = 200
 """Maximum length of a name or short text (spec 0007 section 5)."""
 
-_Str = Annotated[str, StringConstraints(min_length=NONEMPTY, max_length=LABEL_MAX)]
+Label = Annotated[str, StringConstraints(min_length=NONEMPTY, max_length=LABEL_MAX)]
+"""A name or short text: 1 to `LABEL_MAX` characters."""
+_Str = Label
 _Ptr = Annotated[str, StringConstraints(pattern=r"^(/([^~/]|~[01])*)*$")]
 _Count = Annotated[int, Field(ge=0)]
 _Code = Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z_]*$")]
