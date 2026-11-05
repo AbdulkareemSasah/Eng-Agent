@@ -149,7 +149,7 @@ tasks:
     # Amendment (B-415 review fix, documents only): block.py imports FieldSpec from eng_harness.basis._fields (engine
     # §4.1.2), and the gate also runs tests/rules/test_decision_imports.py::test_types_module_is_block_safe unchanged.
     # Amendment (B-415 review fix, documents only): _hoststate.py and _runner.py added for EC2's resume cases (both
-    # extended from plan 0001 T11b); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
+    # extended from plan 0001 T11c, split from T11b by B-427); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
@@ -376,9 +376,9 @@ approval's write chain (with the engine's `p~post.save` results), and a save to 
 Starts only after the engine spec amendment is merged. Amendment B-415: that amendment is work item B-415 (engine spec
 §4.2, §4.6 "Tool saves", §4.7, §4.8 `ToolInfo.saves_new_file`, §4.9; rules EC1 to EC6 of its §3.9, one per test of
 this task, which add no engine criterion: spec AC33 covers them;
-§11 Q26 to Q30). It adds `ports.py` (`saves_new_file`, default false) and `engine/_ctx_impl.py` (only the calls into
+§11 Q30 to Q34). It adds `ports.py` (`saves_new_file`, default false) and `engine/_ctx_impl.py` (only the calls into
 the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
-save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11b) to this task's
+save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11c, split from T11b by B-427) to this task's
 files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
 Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
 package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
@@ -470,7 +470,7 @@ uninterrupted run.
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11b (`_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
 | T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment (owner question OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |

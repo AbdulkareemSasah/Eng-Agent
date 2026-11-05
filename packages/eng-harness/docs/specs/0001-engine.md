@@ -39,8 +39,11 @@ The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.i
 route of spec 0010 §4.3 and spec 0013 §4.5, named in §4.8 ("Code-pack checks"). It is listed in §11 (Q25); it adds no
 criterion here (the route's criteria are spec 0010 AC3, AC4 and spec 0013 AC13).
 
+**Amendment B-427.** The B-349 writer's questions are listed in §11 (Q26 to Q29) as draft decisions; AC34 is amended to
+match; it adds no criterion.
+
 **Amendment B-415.** Spec 0007 (Q2, Q3, Q5) and spec 0004 (Q7) asked for changes to this spec for the model edit
-cycle; they are made here and listed in §11 (Q26 to Q30): `WorkflowDef.basis_fields`, from which `required_basis` is
+cycle; they are made here and listed in §11 (Q30 to Q34): `WorkflowDef.basis_fields`, from which `required_basis` is
 derived, and `WorkflowDef.copy_on_open` (§4.2, §4.7); `model_saved` journaled for tool saves (§4.6 "Tool saves");
 `ToolInfo.saves_new_file` (§4.8); a save passed `under=` an approval re-checked and chained like a write, with the
 engine's `p~post.save` results in the chain (§4.9); no `approve_each_write` preview for a save to a new file (§4.7);
@@ -251,7 +254,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   step is treated as in flight at once: no further step on that host is sent until reconciliation. Test:
   `tests/workflow/test_honest_outcomes.py::test_unknown_outcome_reconciled_first`.
 - AC34. Given a run that wrote a model, when it resumes and the model's identity, revision or fingerprint differs
-  from the last `model_saved`, then the run stops with the three choices of 11 §5; `accept` saves and records a new
+  from the last `model_saved` (or, when a write on it completed or was reconciled `applied` after that save, its
+  identity or revision differs from the latest such result's `provenance.host`, §4.5.4; draft decision B-427, owner
+  queue, Q27 and Q28), then the run stops with the three choices of 11 §5; `accept` saves and records a new
   baseline and continues; `restore` restores the saved copy and replays from the step after its `model_saved` (§4.5.4);
   `abandon` records `run_failed`. Test: `tests/replay/test_host_state.py::test_three_choices`.
 - AC35. Given a completed run, when it is resumed, then it returns the recorded output with no ToolPort, CalcPort,
@@ -726,7 +731,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `check_enforced` | `invariant` (1 to 10), `model_key` or `host_key`, `outcome` (`pass`, `fail`), `ref` | NORMAL |
 | `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` and `origin_file_names` (base names of the original's files; working copies) | FULL |
 | `run_paused` | `reason` (`awaiting_approval`, `awaiting_input`, `stop_requested`), `request_ids` | NORMAL |
-| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq`, `unreleased_tools` (only when it differs from the last recorded mapping), `decision_runtime` (only when it differs from the last recorded object) | NORMAL |
+| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq` (set only in a second `run_resumed` with the same `resume_no`, appended after a `restore`, §4.5.4; that second event is not a new resume: readers count and list distinct `resume_no` values; draft decision B-427, owner queue), `unreleased_tools` (only when it differs from the last recorded mapping), `decision_runtime` (only when it differs from the last recorded object) | NORMAL |
 | `run_escalated` | `reason` (`replay_divergence`, `needs_reconciliation`, `host_state_mismatch`, `units_mismatch`, `attempts_exhausted`, `block_escalation`, `block_rule_violation`, `unhandled_error`), `detail`, `evidence`, `request_id` | NORMAL |
 | `run_completed` | `output_ref`, `output_sha256`, `draft` | FULL |
 | `run_failed` | `reason` (`abandoned`), `by` | FULL |
@@ -851,8 +856,9 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 For every model the run wrote to, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
-last `model_saved`, or, when a write on it was reconciled `applied` after that save (§4.5.1 step 7), with the revision
-and fingerprint of the reconciled result's `provenance.host`. A model with `HostModelState.loaded` false (a lost model,
+last `model_saved`, or, when a write on it completed or was reconciled `applied` after that save (§4.5.1 step 7), with
+the model identity and revision of the latest such result's `provenance.host` (the contract's `HostInfo` has no
+fingerprint, so against a result the fingerprint is not compared; draft decision B-427, owner queue). A model with `HostModelState.loaded` false (a lost model,
 §4.5.1 step 6) is a mismatch with reason `model_not_loaded`. A reopened model is compared with its last `model_saved`
 only, never with a reconciled result, and any write on it after that save (completed, reconciled or in flight) is a
 mismatch with reason `model_reopened`: the reopened file cannot hold it. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
@@ -863,8 +869,9 @@ request (`engine.host_state`) offering three choices (11 §5):
   no state to accept) or a `model_reopened` mismatch (the journal would hold writes the model lacks) **[added]**.
 - `restore`: `HostPort.restore(model_key, saved)` reopens the last saved working copy and returns the instance that
   holds it (the bound instance if it still runs, else one spec 0002 starts, which is journaled as `host_started`); the
-  engine journals `model_bound` (reason `restored`) for it before any other call on the model; `run_resumed` records
-  `restored_to_seq` (the `seq` of that `model_saved`), and the replay index ignores every step event after it, so those
+  engine journals `model_bound` (reason `restored`) for it before any other call on the model; a second `run_resumed`
+  with the same `resume_no`, appended after the restore, records `restored_to_seq` (the `seq` of that `model_saved`;
+  it is not a new resume: readers count and list distinct `resume_no` values; draft decision B-427, owner queue), and the replay index ignores every step event after it, so those
   steps run live again as new attempts (`step_rerun`, reason `restored`) with new `op_id`s. Offered only when no other
   model was written after that `seq` **[added: otherwise a restore would repeat writes on the other model]**. After the
   restore and before any live step on that model, the engine reads units again against the new binding
@@ -930,7 +937,7 @@ before the host-state check, so that an engineer change made while the run was p
 
 - During reconciliation (§4.5.1 step 7) the engine reads no model state and appends no `model_saved` for it.
 - The host-state check (§4.5.1 step 8, §4.5.4) treats it as a write reconciled `applied`: it compares the live state
-  with the revision and fingerprint of the result's `provenance.host`. For a new-file save whose result has
+  with the model identity and revision of the result's `provenance.host` (no fingerprint, §4.5.4, draft decision B-427). For a new-file save whose result has
   `saved_file`, a `saved_file.sha256` that differs from the live `file_sha256` is also a mismatch (reason
   `host_state_mismatch`, handled by the engineer's choice as §4.5.4 states).
 - When that check passes for the model, the engine appends the `model_saved` (role `revision`) before the root block
@@ -972,7 +979,7 @@ again.
   true and whose `ToolInfo.overwrites_original(args)` is false gets no `p~pre.approve` preview: it changes no model
   content and writes no existing file. An in-place tool save and every other write keep their preview, and a save
   over an original stays always-ask (EC6). **[added: 11 §7 says every write step in `approve_each_write` shows its
-  dry-run change set; its row needs the matching amendment, which goes to the owner queue (Q28)]**
+  dry-run change set; its row needs the matching amendment, which goes to the owner queue (Q32)]**
 - **`autonomous_logged`.** Writes run directly; a `ctx.approve` of kind `INFO` or `CHANGE_SET` is resolved by the mode
   (`approval_resolved`, `by: "mode:autonomous_logged"`) **[added: 11 §3 says approval behavior depends on the mode]**.
 - **Always ask, in every mode.** Approval kinds `PROMOTION` and `SIGN_OFF`; tools with `ToolInfo.action` `delete`; a
@@ -1064,7 +1071,7 @@ instance of a model is the `instance_id` of its last `model_bound`. The engine j
 `first_use` before the first step of the run addressed to the model, from `HostPort.locate(model_key)`, whether or not
 the engine started that instance (for a tool with action `open` or for `working_copy`, after that step instead, since
 the model is not open before it; `locate` returning `None` before any other step refuses the step with `ContractError`
-`PRECONDITION_FAILED`, condition `model_loaded`); (b) with reason `restored` after `HostPort.restore` (§4.5.4); (c)
+`PRECONDITION_FAILED`, condition `model_open`, the contract's `Precondition` name; draft decision B-427, owner queue); (b) with reason `restored` after `HostPort.restore` (§4.5.4); (c)
 with reason `reopened` at resume (§4.5.1 step 6). `HostPort.read_units` and `HostPort.model_state` take the bound
 `instance_id` and never raise when that instance does not have the model open or is not running: they return
 `loaded: false` (spec 0002 starts no host program to answer them). A server that cannot be reached fails the preflight (invariant 8).
@@ -1287,8 +1294,12 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
 | Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |
 | Q25 | Spec 0010 Q10 and C2: code-pack checks reach the `CalcPort` through the one code-pack route (`_calc/_code_packs.py`, spec 0010 §4.3, spec 0013 §4.5), consulted for ids that do not start with `harness.`; an id outside its allowlist is `NOT_FOUND`; the run class applies as to calcs | Owner | Accept (§4.8, amendment B-405; draft until the owner approves) |
-| Q26 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which imports it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
-| Q27 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
-| Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
-| Q29 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
-| Q30 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
+| Q26 | B-349: how `restored_to_seq` reaches the journal, since the resume's `run_resumed` is appended (§4.5.1 step 3) before the host-state check that may restore | Owner | Draft decision B-427, owner queue: a second `run_resumed` with the same `resume_no`, appended after the restore (as built; §4.4.2, §4.5.4); it is not a new resume: readers count and list distinct `resume_no` values (follow-up: spec 0006 AC56 and the report model deduplicate by `resume_no`) |
+| Q27 | B-349: what the host-state check compares a model with when a write on it completed (not reconciled) after its last save | Owner | Draft decision B-427, owner queue: the latest completed or reconciled-`applied` result's `provenance.host`, as for a reconciled write (§4.5.4; AC34 amended to match) |
+| Q28 | B-349: the contract's `HostInfo` has no fingerprint, and `Precondition` has `model_open`, not `model_loaded` | Owner | Draft decision B-427, owner queue: against a result compare identity and revision only, and use `model_open`; no contract change (§4.5.4, §4.8; AC34 amended to match) |
+| Q29 | B-349: who refuses a step when `locate` returns `None`, where `first_use` `model_bound` lands, and which models resume step 6 covers | Owner | Draft decision B-427, owner queue: engine plan T13 refuses (`PRECONDITION_FAILED`, `model_open`), moves the seam so `model_bound` lands before `step_started`, and covers every model the journal addressed (§4.5.1, §4.8) |
+| Q30 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which imports it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
+| Q31 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
+| Q32 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
+| Q33 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
+| Q34 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
