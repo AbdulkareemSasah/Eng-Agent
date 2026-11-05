@@ -4,7 +4,9 @@ import hashlib
 import importlib
 import inspect
 import json
+import types
 from collections.abc import Callable
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +49,11 @@ GOOD: dict[str, Any] = {
 
 def _view(declared: tuple[str, ...] = ("limits.bearing_ratio", "limits.other_ratio")) -> BasisView:
     field = BasisField(
-        value=0.5, unit="1", source="engineer:eng@2026-01-01T00:00:00.000Z", confirmed=True, citation=None
+        value=0.5,
+        unit="1",
+        source="engineer:eng@2026-01-01T00:00:00.000Z",
+        confirmed=True,
+        citation=None,
     )
     basis = DesignBasis(template=None, fields={"limits.bearing_ratio": field, "limits.other_ratio": field})
     return BasisView(RESULT, basis, declared)
@@ -71,6 +77,13 @@ def _plain_state_fn(state: int, basis: RuleBasis) -> None:
 
 def _any_state_fn(state: Any, basis: RuleBasis) -> None:
     return None
+
+
+def _bare_fn(state: Any, basis: RuleBasis) -> None:
+    return None
+
+
+_bare_fn.__annotations__.clear()  # the first parameter is not annotated at all
 
 
 def _one_param_fn(state: BaseModel) -> None:
@@ -106,6 +119,7 @@ def _make(fn: Callable[..., object] = _fn, **overrides: object) -> Rule:
         (_generator_fn, {}),
         (_plain_state_fn, {}),
         (_any_state_fn, {}),
+        (_bare_fn, {}),
         (_one_param_fn, {}),
         (_no_source_fn, {}),
     ],
@@ -237,3 +251,98 @@ def test_write_lock_command_writes_both_and_refuses_a_bump(tmp_path: Path, monke
     with pytest.raises(DecisionDefinitionError, match="VERSION_BUMP_REQUIRED"):
         command.main(["--write-lock"])
     assert json.loads(rules_lock.read_text(encoding="utf-8")) == stale  # refused: neither lock written
+
+
+def test_registration_messages_and_bounds() -> None:
+    for version in (1, 9999):
+        assert _make(version=version).version == version
+    with pytest.raises(DecisionDefinitionError) as info:
+        _make(version=10000)
+    assert str(info.value) == "version: 10000 must be an integer from 1 to 9999"
+    with pytest.raises(DecisionDefinitionError) as info:
+        _make(id="other_point.some_rule")
+    assert str(info.value) == f"rule id: 'other_point.some_rule' must match <point>.<name> with the point {POINT!r}"
+    with pytest.raises(DecisionDefinitionError) as info:
+        _make(_one_param_fn)
+    assert str(info.value) == f"rule function: {GOOD['id']} takes (state, basis)"
+    with pytest.raises(DecisionDefinitionError) as info:
+        _make(_async_fn)
+    assert str(info.value) == f"rule function: {GOOD['id']} must be a plain synchronous function"
+    with pytest.raises(DecisionDefinitionError) as info:
+        _make(_plain_state_fn)
+    assert (
+        str(info.value)
+        == f"rule function: {GOOD['id']}: the first parameter must be annotated with the point's state model"
+    )
+    with pytest.raises(DecisionDefinitionError, match="invalid rationale or threshold path"):
+        _make(rationale="")
+    assert _make(id="abc.x", point="abc").id == "abc.x"
+    with pytest.raises(DecisionDefinitionError):
+        _make(id="ab.x", point="ab")  # the point part has 3 to 64 characters
+    assert _make(id="a" + "b" * 63 + ".x", point="a" + "b" * 63).version == 1
+    with pytest.raises(DecisionDefinitionError):
+        _make(id="a" + "b" * 64 + ".x", point="a" + "b" * 64)
+
+
+class _Mode(StrEnum):
+    FAST = "fast"
+
+
+def test_rule_basis_count_and_choice_read_declared_paths() -> None:
+    declared = ("limits.n", "limits.mode")
+    fields = {
+        "limits.n": BasisField(
+            value=3, unit=None, source="engineer:eng@2026-01-01T00:00:00.000Z", confirmed=True, citation=None
+        ),
+        "limits.mode": BasisField(
+            value="fast", unit=None, source="engineer:eng@2026-01-01T00:00:00.000Z", confirmed=True, citation=None
+        ),
+    }
+    basis = RuleBasis(BasisView(RESULT, DesignBasis(template=None, fields=fields), declared), declared)
+    assert basis.count("limits.n") == 3
+    assert basis.choice("limits.mode", _Mode) is _Mode.FAST
+    with pytest.raises(BlockRuleViolation) as info:
+        basis.count("limits.x")
+    assert str(info.value) == "basis path 'limits.x' is not in the rule's thresholds"
+
+
+def test_missing_rule_tests(tmp_path: Path) -> None:
+    registry = RuleRegistry([bearing_only])
+    file = f"test_{bearing_only.module.rsplit('.', 1)[-1]}.py"
+    expected = [
+        _rules.RuleTestFinding(bearing_only.id, file, "test_bearing_only_typical"),
+        _rules.RuleTestFinding(bearing_only.id, file, "test_bearing_only_boundary"),
+    ]
+    assert list(_rules.missing_rule_tests(registry, tmp_path)) == expected
+    (tmp_path / file).write_text("def test_other_typical():\n    pass\n", encoding="utf-8")
+    assert list(_rules.missing_rule_tests(registry, tmp_path)) == expected
+    (tmp_path / file).write_text("def test_bearing_only_typical():\n    pass\n", encoding="utf-8")
+    assert list(_rules.missing_rule_tests(registry, tmp_path)) == expected[1:]
+    (tmp_path / file).write_text(
+        "async def test_bearing_only_typical():\n    pass\ndef test_bearing_only_boundary():\n    pass\n",
+        encoding="utf-8",
+    )
+    assert _rules.missing_rule_tests(registry, tmp_path) == ()
+
+
+def test_discover_collects_sorted_unique_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    package = types.ModuleType("eng_harness.rules")
+    package.__path__ = ["unused"]
+    package.first = reads_undeclared  # type: ignore[attr-defined]  # B-168: a stand-in package attribute
+    package.noise = 5  # type: ignore[attr-defined]  # B-168: a non-rule value is ignored
+    sub = types.ModuleType("eng_harness.rules.sub")
+    sub.again = reads_undeclared  # type: ignore[attr-defined]  # B-168: the same rule twice is one rule
+    sub.other = bearing_only  # type: ignore[attr-defined]  # B-168: a second rule
+    modules = {"eng_harness.rules": package, "eng_harness.rules.sub": sub}
+    seen: list[tuple[object, str]] = []
+
+    def walk(path: object, prefix: str, onerror: object = None) -> list[types.SimpleNamespace]:
+        seen.append((path, prefix))
+        return [types.SimpleNamespace(name="eng_harness.rules.sub")]
+
+    monkeypatch.setattr(_rules.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(_rules.importlib, "import_module", lambda name: modules[name])
+    monkeypatch.setattr(_rules.pkgutil, "walk_packages", walk)
+    found = discover()
+    assert [r.id for r in found.rules] == ["fixture_point.bearing_only", "fixture_point.reads_undeclared"]
+    assert seen == [(["unused"], "eng_harness.rules.")]
