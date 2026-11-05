@@ -2,7 +2,8 @@
 # Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
 # absolute ones (0.001 kN.m on moments, 1e-4 mm on lengths, 1e-6 on ratios and strains), with rel_tol 0 so that the
 # absolute tolerance alone applies. The spec's BD-1, BD-3 and BD-4 hold several inputs each; they are split into .a,
-# .b and .c here. BD-2.b to BD-2.e (the eps_tc limit, the Y direction alone and d_x != d_y) extend the spec's BD-2 row.
+# .b and .c here. BD-2.b to BD-2.f (the eps_tc limit, the Y direction alone, d_x != d_y, the upper beta1 row)
+# extend the spec's BD-2 row.
 format: structural-codes-verification/1
 check_id: aci318_14.13_2_7_1.flexure_at_column_face
 cases:
@@ -65,6 +66,9 @@ cases:
       values:
         beta1_ratio: {value: 0.764286, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
         a_x_mm: {value: 13.835294, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        # c = a / beta1 = 13.835294 / 0.764286 = 18.102253 mm; eps_t = 0.003 (500 - c) / c = 0.079863 (§4 steps 5, 6)
+        c_x_mm: {value: 18.102253, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_x_ratio: {value: 0.079863, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
         Mn_x_kNm: {value: 579.864847, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         phiMn_x_kNm: {value: 521.878362, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 0.718271, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
@@ -142,6 +146,23 @@ cases:
         phiMn_x_kNm: {value: 3587.170166, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         c_y_mm: {value: 187.5, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
         eps_t_y_ratio: {value: 0.0042, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  # BD-2.f: upper beta1 row. fc = 55 (beta1 = 0.65), d_x = 600 mm, As = 38958.33 mm2 both ways:
+  # a = As fy / (0.85 fc Ly) = 139.999988 mm, c = a / 0.65 = 215.384597 mm; eps_t_x = 0.003 (600 - c) / c = 0.005357
+  # passes; eps_t_y = 0.003 (500 - c) / c = 0.003964 < eps_tc raises G-2 (with c = a / 0.85 it would wrongly pass).
+  - id: BD-2.f
+    kind: boundary
+    covers: [G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 55, d_x_mm: 600, As_x_mm2: 38958.33, As_y_mm2: 38958.33}
+    expected:
+      status: NEEDS_ENGINEER
+      values:
+        beta1_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        c_x_mm: {value: 215.384597, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_x_ratio: {value: 0.005357, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phiMn_x_kNm: {value: 7804.91192, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        c_y_mm: {value: 215.384597, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_y_ratio: {value: 0.003964, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-3.a
     kind: boundary
     covers: [FY_MAX]

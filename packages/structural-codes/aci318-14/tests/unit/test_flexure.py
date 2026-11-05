@@ -218,6 +218,83 @@ def test_hc1_values_and_trace() -> None:
     assert [n for n in names if n in order] == order
 
 
+# Every recorded quantity in each row of Table 22.2.2.4.3, X and Y, with d_x != d_y, Lx != Ly and As_x/Ly != As_y/Lx
+# so that a swapped direction, a fixed beta1 in c or alpha_1 in place of beta1 changes at least one value.
+# Common inputs except Lx = 2000, Ly = 3000, d_x = 500, d_y = 450 mm, As_x = 3000, As_y = 2500 mm2 (clause spec §4):
+# Mu_x = 3.0 * (1700/6.0) * 0.8^2 / 2 = 272.0, Mu_y = 2.0 * (1700/6.0) * 1.3^2 / 2 = 478.833333 kN.m;
+# a_x = As_x fy / (0.85 fc Ly), a_y = As_y fy / (0.85 fc Lx); c = a / beta1; eps_t = 0.003 (d - c) / c;
+# Mn = As fy (d - a/2) 1e-6; phiMn = 0.9 Mn; ratio = Mu / phiMn. Values rounded to 6 decimals.
+_ROW_INPUTS: dict[str, Any] = {
+    "Lx_mm": 2000.0,
+    "Ly_mm": 3000.0,
+    "d_x_mm": 500.0,
+    "d_y_mm": 450.0,
+    "As_x_mm2": 3000.0,
+    "As_y_mm2": 2500.0,
+}
+_ROW_NAMES = ("beta1_ratio", "a_x_mm", "c_x_mm", "eps_t_x_ratio", "Mn_x_kNm", "phiMn_x_kNm", "a_y_mm", "c_y_mm")
+_ROW_NAMES += ("eps_t_y_ratio", "Mn_y_kNm", "phiMn_y_kNm")
+_ROW_TOL = (_RATIO, _MM, _MM, _RATIO, _M_KNM, _M_KNM, _MM, _MM, _RATIO, _M_KNM, _M_KNM)
+
+
+@pytest.mark.parametrize(
+    ("fc", "values", "ratios"),
+    [
+        (
+            25.0,
+            (0.85, 19.764706, 23.252595, 0.061509, 617.548235, 555.793412)
+            + (24.705882, 29.065744, 0.043446, 459.529412, 413.576471),
+            (0.489390, 1.157787),
+        ),
+        (
+            40.0,
+            (0.764286, 12.352941, 16.162727, 0.089806, 622.217647, 559.995882)
+            + (15.441176, 20.203408, 0.063820, 464.393382, 417.954044),
+            (0.485718, 1.145660),
+        ),
+        (
+            60.0,
+            (0.65, 8.235294, 12.669683, 0.115393, 624.811765, 562.330588)
+            + (10.294118, 15.837104, 0.082243, 467.095588, 420.386029),
+            (0.483701, 1.139032),
+        ),
+    ],
+)
+def test_every_quantity_in_each_beta1_row(fc: float, values: tuple[float, ...], ratios: tuple[float, float]) -> None:
+    """Rows fc <= 28, between and >= 55 of Table 22.2.2.4.3: a, c, eps_t, Mn, phiMn and the ratio, X and Y (§4)."""
+    payload = run(fc_MPa=fc, **_ROW_INPUTS)
+    found = steps(payload)
+    for name, value, tol in zip(_ROW_NAMES, values, _ROW_TOL, strict=True):
+        assert found[name] == pytest.approx(value, abs=tol), name
+    x, y = payload.verdicts
+    assert x.demand is not None
+    assert y.demand is not None
+    assert x.demand.value == pytest.approx(272.0, abs=_M_KNM)
+    assert y.demand.value == pytest.approx(478.833333, abs=_M_KNM)
+    assert (x.ratio, y.ratio) == (pytest.approx(ratios[0], abs=_RATIO), pytest.approx(ratios[1], abs=_RATIO))
+    assert [x.status, y.status] == [VerdictStatus.PASS, VerdictStatus.FAIL]
+
+
+def test_gap_at_upper_beta1_row_uses_beta1_in_c() -> None:
+    """BD-2.f: fc = 55 (beta1 = 0.65), d_x = 600, d_y = 500 mm, As = 38958.33 mm2 both ways; Y alone raises G-2.
+
+    a = 38958.33 * 420 / (0.85 * 55 * 2500) = 139.999988 mm; c = a / 0.65 = 215.384597 mm in both directions;
+    eps_t_x = 0.003 * (600 - c) / c = 0.005357 (tension-controlled, phiMn_x = 0.9 * As fy (600 - a/2) 1e-6
+    = 7804.911920 kN.m); eps_t_y = 0.003 * (500 - c) / c = 0.003964 < eps_tc. With c = a / 0.85 (164.705868 mm) the
+    Y strain would read 0.006107 and the section would wrongly pass with phi = 0.90.
+    """
+    payload = run(fc_MPa=55.0, d_x_mm=600.0, As_x_mm2=38958.33, As_y_mm2=38958.33)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
+    assert any(m.startswith("G-2 (21.2.2)") and "eps_t_y_ratio" in m for m in payload.traces[0].messages)
+    found = steps(payload)
+    assert found["c_x_mm"] == pytest.approx(215.384597, abs=_MM)
+    assert found["eps_t_x_ratio"] == pytest.approx(0.005357, abs=_RATIO)
+    assert found["phiMn_x_kNm"] == pytest.approx(7804.911920, abs=_M_KNM)
+    assert found["c_y_mm"] == pytest.approx(215.384597, abs=_MM)
+    assert found["eps_t_y_ratio"] == pytest.approx(0.003964, abs=_RATIO)
+    assert "phiMn_y_kNm" not in found
+
+
 def test_rectangular_plan_uses_the_width_across_each_direction() -> None:
     """Asymmetric hand check: b = Ly with d_x and As_x for X, b = Lx with d_y and As_y for Y (clause spec §4).
 

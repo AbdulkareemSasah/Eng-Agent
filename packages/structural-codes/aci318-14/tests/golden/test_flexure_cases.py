@@ -25,6 +25,7 @@ CASE_IDS = (
     "BD-2.c",
     "BD-2.d",
     "BD-2.e",
+    "BD-2.f",
     "BD-3.a",
     "BD-3.b",
     "BD-3.c",
