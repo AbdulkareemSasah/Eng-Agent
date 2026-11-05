@@ -311,10 +311,10 @@ def test_report_and_requirements(registry: Registry) -> None:
     failed_pc["cases"][1]["expected"]["status"] = "FAIL"
     assert _unmet(failed_pc, registry) == ["(2)", "(6)"]
 
-    # (5) the review: absent, a stale hash, the author as reviewer.
+    # (5) the review: absent (so no property test is listed either), a stale hash, the author as reviewer.
     no_review = _verified_doc(registry)
     del no_review["review"]
-    assert _unmet(no_review, registry) == ["(5)"]
+    assert _unmet(no_review, registry) == ["(4)", "(5)"]  # property tests are listed in the review block
     stale = _verified_doc(registry)
     stale["review"]["content_sha256"] = "0" * 64
     assert _unmet(stale, registry) == ["(5)"]
@@ -337,12 +337,16 @@ def test_boundary_paths(registry: Registry) -> None:
         base = _verified_doc(registry)
         base["check_id"] = check_id
         base["review"] = _review(check_id, registry, boundary_tests=tests or [])
-        base["cases"] = [_case("WE-1", "worked_example", source=_BOOK), *cases]
+        # a declared gap replaces the verdict, so its example expects NEEDS_ENGINEER and no values
+        example = _case("WE-1", "worked_example", source=_BOOK)
+        if check_id == _GAP:
+            example["expected"] = {"status": "NEEDS_ENGINEER", "values": {}}
+        base["cases"] = [example, *cases]
         return base
 
-    def covering(case_id: str, *paths: str, width: int = 10) -> dict[str, Any]:
+    def covering(case_id: str, *paths: str, width: int, status: str) -> dict[str, Any]:
         inputs = {"width_mm": width, "demand_mm": 50, "capacity_mm": 100}
-        return _case(case_id, "boundary", inputs=inputs, covers=list(paths))
+        return _case(case_id, "boundary", status=status, values={}, inputs=inputs, covers=list(paths))
 
     # A check without preconditions and gaps has no path to cover.
     assert _unmet(doc(_SIZED), registry) == []
@@ -351,22 +355,34 @@ def test_boundary_paths(registry: Registry) -> None:
     assert [u[:3] for u in report.unmet] == ["(3)"]
     assert "P1" in report.unmet[0]
     assert "P2" in report.unmet[0]
-    one = doc(_TWO_PRE, covering("BD-P1", "P1", width=60))
+    one = doc(_TWO_PRE, covering("BD-P1", "P1", width=60, status="NOT_APPLICABLE"))
     report = verify_check(registry.get(_TWO_PRE), _load(one), registry=registry)
     assert [u[:3] for u in report.unmet] == ["(3)"]
     assert "P2" in report.unmet[0]
     assert "P1" not in report.unmet[0]
-    both = doc(_TWO_PRE, covering("BD-P1", "P1", width=60), covering("BD-P2", "P2", width=30))
+    both = doc(
+        _TWO_PRE,
+        covering("BD-P1", "P1", width=60, status="NOT_APPLICABLE"),
+        covering("BD-P2", "P2", width=30, status="NEEDS_ENGINEER"),
+    )
     assert _unmet(both, registry, _TWO_PRE) == []
-    listed = doc(_TWO_PRE, covering("BD-P1", "P1", width=60), tests=["P2: tests/unit/test_x.py::test_p2"])
+    listed = doc(
+        _TWO_PRE,
+        covering("BD-P1", "P1", width=60, status="NOT_APPLICABLE"),
+        tests=["P2: tests/unit/test_x.py::test_p2"],
+    )
     assert _unmet(listed, registry, _TWO_PRE) == []
-    wrong_listed = doc(_TWO_PRE, covering("BD-P1", "P1", width=60), tests=["P3: tests/unit/test_x.py::test_p3"])
+    wrong_listed = doc(
+        _TWO_PRE,
+        covering("BD-P1", "P1", width=60, status="NOT_APPLICABLE"),
+        tests=["P3: tests/unit/test_x.py::test_p3"],
+    )
     assert _unmet(wrong_listed, registry, _TWO_PRE) == ["(3)"]
     # A declared gap is a NEEDS_ENGINEER path and needs its own boundary item.
     report = verify_check(registry.get(_GAP), _load(doc(_GAP)), registry=registry)
     assert [u[:3] for u in report.unmet] == ["(3)"]
     assert "G-3" in report.unmet[0]
-    assert _unmet(doc(_GAP, covering("BD-G3", "G-3")), registry, _GAP) == []
+    assert _unmet(doc(_GAP, covering("BD-G3", "G-3", width=10, status="NEEDS_ENGINEER")), registry, _GAP) == []
 
 
 def test_verify_pack(registry: Registry) -> None:
