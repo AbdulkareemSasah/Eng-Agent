@@ -62,7 +62,7 @@ r1_modules = [
   "src/eng_harness/engine/_invariants.py", "src/eng_harness/engine/_hostsafety.py",
   "src/eng_harness/engine/_approvals.py", "src/eng_harness/engine/_modes.py",
   "src/eng_harness/engine/_promote.py", "src/eng_harness/engine/_replay.py",
-  "src/eng_harness/calcs/**",
+  "src/eng_harness/calcs/**", "src/eng_harness/_calc/**",
 ]
 r2_modules = ["src/eng_harness/journal/**", "src/eng_harness/ctx.py", "src/eng_harness/block.py",
               "src/eng_harness/ports.py", "src/eng_harness/errors.py"]
