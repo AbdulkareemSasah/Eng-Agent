@@ -328,7 +328,8 @@ the `items` argument and its tests to that route (the dependencies are then alre
 which by a plan amendment; otherwise T2 builds the route with both workflows' ids and plan 0013 T6 extends it. T2 also
 starts only after the documents pull request that settles spec C4 (an id outside the allowlist gives `NOT_FOUND`, spec
 0013 AC13 amended); T2 never changes an expectation of a merged test of that file to meet this spec (A4). Provenance is
-`tool: "structural-codes"` in both specs.
+`tool: "structural-codes"` in both specs. T2 also starts only after spec Q20 (a check's `CalcInfo.version`) is settled
+by its documents pull request.
 
 **T3 Subjects** (spec §4.4.1). Creates `calcs/footing/`, the registration test shared by the calc tasks, and the first
 verification record (from the spec 0003 template).
