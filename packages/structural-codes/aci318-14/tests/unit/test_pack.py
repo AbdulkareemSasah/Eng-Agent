@@ -2,6 +2,7 @@
 
 import importlib
 import pkgutil
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +48,7 @@ def _cited() -> list[Cited]:
         for value in vars(importlib.import_module(info.name)).values():
             if isinstance(value, Cited):
                 found.append(value)
-            elif hasattr(value, "values") and callable(value.values):
+            elif isinstance(value, Mapping):
                 found.extend(v for v in value.values() if isinstance(v, Cited))
     return found
 

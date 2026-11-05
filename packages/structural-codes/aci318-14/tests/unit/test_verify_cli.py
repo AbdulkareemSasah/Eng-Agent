@@ -1,7 +1,7 @@
 """The pack through `python -m structural_codes verify` (plan 0002 T9; PK-AC8)."""
 
 import re
-import subprocess  # noqa: S404  # B-278: the test runs this interpreter with fixed arguments
+import subprocess  # B-278: the test runs this interpreter with fixed arguments
 import sys
 from pathlib import Path
 

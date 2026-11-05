@@ -1,7 +1,7 @@
 """Replay test: the payloads do not depend on the hash seed (plan 0002 T9; PK-AC7)."""
 
 import os
-import subprocess  # noqa: S404  # B-278: the test runs this interpreter with a fixed environment
+import subprocess  # B-278: the test runs this interpreter with a fixed environment
 import sys
 from pathlib import Path
 
@@ -19,14 +19,14 @@ registry = Registry.of([PACK])
 for check in PACK.checks:
     case = next(c for c in CaseFile.load(Path(sys.argv[1]) / (check.meta.check_id + ".yaml")).cases if c.id == "HC-1")
     payload = evaluate(check.meta.check_id, case.inputs, subject=case.subject, registry=registry).payload
-    sys.stdout.write(canonical_json(payload.model_dump(mode="json")) + "\\n")
+    sys.stdout.buffer.write(canonical_json(payload.model_dump(mode="json")) + b"\\n")
 """
 
 
-def _run(seed: str) -> str:
+def _run(seed: str) -> bytes:
     env = {**os.environ, "PYTHONHASHSEED": seed}
     done = subprocess.run(  # noqa: S603  # B-278: fixed arguments, no shell, no untrusted input
-        [sys.executable, "-c", _SCRIPT, str(_CASES)], env=env, capture_output=True, text=True, check=True
+        [sys.executable, "-c", _SCRIPT, str(_CASES)], env=env, capture_output=True, check=True
     )
     return done.stdout
 
