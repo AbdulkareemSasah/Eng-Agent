@@ -1,0 +1,160 @@
+# Case file of aci318_14.22_6_5_2.punching_shear (clause spec §8; plan 0002 T5). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (1e-5 MPa on stresses, 0.001 kN on forces, 1e-6 on ratios), with rel_tol 0 so that the absolute
+# tolerance alone applies. The spec states none for mm; lengths use 0.001 mm, tighter than the rounding of §8.
+# The spec's BD-1, BD-2 and BD-3 hold several inputs each; they are split into .a, .b, ... here.
+format: structural-codes-verification/1
+check_id: aci318_14.22_6_5_2.punching_shear
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4 steps 1 to 6, common inputs of §8; expression (a) governs"}
+    subject: {kind: footing, id: F1}
+    inputs: &common
+      FX_kN: 0
+      FY_kN: 0
+      FZ_kN: 1700
+      MX_kNm: 0
+      MY_kNm: 0
+      Lx_mm: 2500
+      Ly_mm: 2500
+      cx_mm: 400
+      cy_mm: 400
+      d_mm: 500
+      reaction_height_mm: 0
+      fc_MPa: 28
+      concrete_class: normalweight
+    expected:
+      status: PASS
+      values:
+        b1_mm: {value: 900, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        b2_mm: {value: 900, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        bo_mm: {value: 3600, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        Vu_kN: {value: 1479.68, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        vu_MPa: {value: 0.822044, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_a_MPa: {value: 1.746196, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_b_MPa: {value: 2.698666, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_c_MPa: {value: 3.318360, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_MPa: {value: 1.746196, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        phivc_MPa: {value: 1.309647, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        ratio: {value: 0.627684, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4, common inputs of §8 with cx = 900 mm, cy = 300 mm; expression (b) governs"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, cx_mm: 900, cy_mm: 300}
+    expected:
+      status: PASS
+      values:
+        beta_ratio: {value: 3, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        bo_mm: {value: 4400, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        Vu_kN: {value: 1395.36, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        vu_MPa: {value: 0.634255, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_b_MPa: {value: 1.499259, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_MPa: {value: 1.499259, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        phivc_MPa: {value: 1.124444, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        ratio: {value: 0.564060, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4, Lx = Ly = 3000 mm, cx = cy = 1500 mm, d = 250 mm; expression (c) governs"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, Lx_mm: 3000, Ly_mm: 3000, cx_mm: 1500, cy_mm: 1500, d_mm: 250}
+    expected:
+      status: PASS
+      values:
+        bo_mm: {value: 7000, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        Vu_kN: {value: 1121.527778, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        vu_MPa: {value: 0.640873, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_c_MPa: {value: 1.505810, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        vc_MPa: {value: 1.505810, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        phivc_MPa: {value: 1.129358, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        ratio: {value: 0.567467, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.a
+    kind: boundary
+    covers: [PERIMETER_INSIDE, G-3]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, d_mm: 2200}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-1.b
+    kind: boundary
+    covers: [PERIMETER_INSIDE]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, d_mm: 2100}
+    expected:
+      status: PASS
+      values:
+        Vu_kN: {value: 0, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  # BD-1.c: cx + d > Lx while cy + d <= Ly; the X limit is tested independently of Y.
+  - id: BD-1.c
+    kind: boundary
+    covers: [PERIMETER_INSIDE, G-3]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, Lx_mm: 1200, Ly_mm: 3000, cx_mm: 900, cy_mm: 300}
+    expected: {status: NEEDS_ENGINEER}
+  # BD-1.d: cx + d = Lx only (clause spec §4): A = 4.2e6 mm2, b1*b2 = 1400*800 mm2, beta = 3, (b) governs.
+  - id: BD-1.d
+    kind: boundary
+    covers: [PERIMETER_INSIDE]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, Lx_mm: 1400, Ly_mm: 3000, cx_mm: 900, cy_mm: 300}
+    expected:
+      status: PASS
+      values:
+        bo_mm: {value: 4400, unit: mm, abs_tol: 0.001, rel_tol: 0}
+        Vu_kN: {value: 1246.666667, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        vu_MPa: {value: 0.566667, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        phivc_MPa: {value: 1.124444, unit: MPa, abs_tol: 1.0e-5, rel_tol: 0}
+        ratio: {value: 0.503953, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-2.a
+    kind: boundary
+    covers: [G-4]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, MX_kNm: 10}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.b
+    kind: boundary
+    covers: [G-4]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FY_kN: 5, reaction_height_mm: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.a
+    kind: boundary
+    covers: [NORMALWEIGHT, G-1]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, concrete_class: sand_lightweight}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.b
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 16}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.c
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fc_MPa: 17}
+    expected: {status: PASS}
+  - id: BD-3.d
+    kind: boundary
+    covers: [COMPRESSION]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: 0}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.e
+    kind: boundary
+    covers: [FULL_CONTACT, G-2]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, FZ_kN: 100, MY_kNm: 200}
+    expected: {status: NEEDS_ENGINEER}
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: SAFE
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: footing, id: F1}
+    inputs: *common
+    expected: {status: PASS}
+review: null

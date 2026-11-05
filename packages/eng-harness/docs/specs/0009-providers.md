@@ -127,8 +127,10 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
   `tests/property/test_provider_properties.py::test_sensitive_text_never_reaches_the_transport` (the strategies include
   non-ASCII scripts, quotes, backslashes and mixed case, and place the text in values and in nested object keys).
 - AC13. Given an adapter called directly (outside the cascade, for example by evaluation tooling) with a
-  `ProviderRequest` whose state fails the redaction check of spec 0005 §4.10, then `REDACTION_BLOCKED` and zero
-  requests. Test: `test_outgoing.py::test_adapter_rechecks_state`.
+  `ProviderRequest` whose state fails the redaction check of spec 0005 §4.10, run with `DecisionSettings.sensitive_values`
+  only (a `ProviderRequest` carries no sensitive values; the union with `DecisionCall.sensitive_values` is the cascade's
+  first line, spec 0005 §4.10, amendment B-411), then `REDACTION_BLOCKED` and zero requests. Test:
+  `test_outgoing.py::test_adapter_rechecks_state`.
 - AC14. Given a failure of each code of §4.5 with the root logger at `DEBUG` and the `openai`, `httpx2`, `httpcore2` and
   `pydantic_ai` loggers captured, then no record, message or traceback text contains the sentinel key, a request body,
   a response body or a header value. Tests: `test_http.py::test_no_secret_or_body_in_logs_or_errors` (the shared
@@ -408,8 +410,12 @@ code, so no frame in the traceback of the raised error holds the original except
 reads the key into a local that does not outlive the hook call, and no exception handler runs in a frame that holds it.
 
 Before any transport call, `_outgoing.py` (1) re-runs the redaction check of spec 0005 §4.10 on the request state (AC13),
-and (2) scans the final serialized body, with the point name, option values and labels included, for every `sensitive_values`
-entry and for the key (AC12). The scan does not search raw bytes: it parses the body as JSON, walks every string value,
+and (2) scans the final serialized body, with the point name, option values and labels included, for every
+`DecisionSettings.sensitive_values` entry and for the key (AC12). Both use `DecisionSettings.sensitive_values` only: a
+`ProviderRequest` carries no sensitive values, and the values a call supplies (`DecisionCall.sensitive_values`, the
+model-file base names of engine spec §4.9.1) are guarded by the cascade's first line alone, which runs over the union
+(spec 0005 §4.10, amendment B-411); passing them to the adapter would send them out.
+The scan does not search raw bytes: it parses the body as JSON, walks every string value,
 parses the embedded data block of the user message the same way and walks it too, and compares with NFC normalization
 and Unicode case folding, so escaping (`\uXXXX`, quotes, backslashes) cannot hide a value. The walk covers every
 object key as well as every string value, at any depth: the type rules of spec 0005 AC2 constrain only states the
@@ -634,7 +640,7 @@ the one engineer screen; the data terms of each service (S-07).
 ## 10. Version impact
 
 New modules of `eng-harness` (phase 2). `decisions.interfaces` gains `ProviderErrorCode`, `ProviderError` and
-`ProviderFailure` (additive). `harness.toml` gains `[providers.*]`. New runtime dependencies `pydantic-ai-slim` (extra
+`ProviderFailure` (additive; built by plan 0005 T5, amendment B-411; spec 0005 AC41 tests their shape first, and AC5 here keeps a regression test). `harness.toml` gains `[providers.*]`. New runtime dependencies `pydantic-ai-slim` (extra
 `openai`), `keyring` and `httpx2`, with their ADRs. `decisions.lock.json` and `rules.lock.json` are unchanged. The
 `decision_made` payload is unchanged; `info.version` strings (`<model_version>;map-<n>` or `;prompt-<n>`) appear in
 `decided_by` and in suggestions.
