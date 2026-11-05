@@ -147,6 +147,8 @@ class _Ctx:
         Raises:
             ToolFailed: a failure envelope. `ContractError`: a tool outside the allowlist.
             BlockRuleViolation: a step started while another is in progress in the same scope.
+            Any exception of the port itself ends the run with no closing event: the step stays in flight, for the
+            reconciliation of task T11b.
         """
         arguments = dict(args or {})
         return await step(lambda path: self._tool(path, name, arguments))
@@ -206,12 +208,13 @@ class Engine:
                 folder.
             RunLocked: another engine holds the new run's lock.
         """
-        found = next((b for b in self._registry.blocks if b.name == request.workflow), None)
-        if not isinstance(found, WorkflowDef):
+        workflow = next(
+            (b for b in self._registry.blocks if isinstance(b, WorkflowDef) and b.name == request.workflow), None
+        )
+        if workflow is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"workflow {request.workflow!r} is not registered")
-        workflow: WorkflowDef[Any, Any] = found
         inp = _parse(workflow.input_model, request.input, "the run input")
-        if (actual := self._ports.calc.run_class) is not request.run_class:
+        if (actual := self._ports.calc.run_class) != request.run_class:
             raise errors.RunRefused(
                 errors.HarnessCode.RUN_CLASS_MISMATCH,
                 f"the calc port is {actual.value}, the run {request.run_class.value}",
