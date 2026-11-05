@@ -186,12 +186,14 @@ tasks:
     depends_on: [T2, T4, T5, T6, T7]
   - id: T9
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
-    # allowlist ids (moved from T2); uv.lock added
+    # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
       - "uv.lock"   # workspace root lock file: the sbc304-2018 dependency (B-418)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/_calc/_code_packs.py"  # B-418: the SBC ids from check_id_for join the route's allowlist here
+      - "packages/eng-harness/tests/unit/calcs/test_code_pack_route.py"  # B-418: allowlist cases for the SBC ids
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/__init__.py"
       - "packages/eng-harness/src/eng_harness/blocks.lock.json"
@@ -364,7 +366,8 @@ ACI pack, `decide_many`, engineer dimensions, resize and closures. Tests drive t
 
 **T9 Workflow** (spec §4.2, §4.7, §4.8). Definition, input and output models, `basis_fields`, steps 1 to 13 and 15, the
 seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sbc304-2018` workspace dependency, its
-`uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist, moved here from T2 by amendment B-418),
+`uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
+allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
 approvals per mode, and registration in `workflows/__init__.py`
 (the module through which the command line of plan 0006 T14 finds workflows; if that task names another module, this
 task follows it and the file list is amended).
