@@ -1,0 +1,94 @@
+# Case file of aci318_14.8_6_1_1.min_flexural_reinforcement (clause spec §8; plan 0002 T7). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (1e-6 mm2 on areas, 1e-9 on ratios), with rel_tol 0 so that the absolute tolerance alone applies.
+# Expected values are the exact results of §4 (the spec's table shows them rounded to six decimals).
+# The spec's BD-1 holds two inputs; it is split into .a (fy = 420 exactly) and .b (the next double below 420).
+format: structural-codes-verification/1
+check_id: aci318_14.8_6_1_1.min_flexural_reinforcement
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4, second row of Table 8.6.1.1, common inputs of §8 with fy = 420 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs: &common
+      Lx_mm: 2500
+      Ly_mm: 2500
+      h_mm: 600
+      As_x_mm2: 2800
+      As_y_mm2: 2800
+      fy_MPa: 420
+    expected:
+      status: PASS
+      values:
+        Ag_x_mm2: {value: 1500000, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        Ag_y_mm2: {value: 1500000, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        rho_min_ratio: {value: 0.0018, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+        As_min_x_mm2: {value: 2700, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        As_min_y_mm2: {value: 2700, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 0.964285714286, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+        ratio_2: {value: 0.964285714286, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4, first row of Table 8.6.1.1, common inputs of §8 with fy = 280 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 280}
+    expected:
+      status: FAIL
+      values:
+        rho_min_ratio: {value: 0.0020, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+        As_min_x_mm2: {value: 3000, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 1.071428571429, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4, second row, first term (0.0018 * 420 / fy), common inputs with fy = 520 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 520}
+    expected:
+      status: PASS
+      values:
+        rho_min_ratio: {value: 0.001453846154, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+        As_min_x_mm2: {value: 2180.7692307692, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 0.778846153846, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: HC-4
+    kind: hand_check
+    source: {derivation: "clause spec §4, second row, lower limit 0.0014, common inputs with fy = 550 MPa"}
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 550}
+    expected:
+      status: PASS
+      values:
+        rho_min_ratio: {value: 0.0014, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+        As_min_x_mm2: {value: 2100, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 0.75, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: BD-1.a
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 420}
+    expected:
+      status: PASS
+      values:
+        rho_min_ratio: {value: 0.0018, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: BD-1.b
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 419.99999999999994}
+    expected:
+      status: FAIL
+      values:
+        rho_min_ratio: {value: 0.0020, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: BD-2
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: footing, id: F1}
+    inputs: {<<: *common, fy_MPa: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: SAFE
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: footing, id: F1}
+    inputs: *common
+    expected: {status: PASS}
+review: null

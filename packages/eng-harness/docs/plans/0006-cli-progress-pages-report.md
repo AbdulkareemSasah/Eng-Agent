@@ -236,6 +236,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/report/_model.py"
       - "packages/eng-harness/tests/unit/report/test_timings.py"
       - "packages/eng-harness/tests/fixtures/report_run.py"
+      - "packages/eng-harness/tests/fixtures/__init__.py"  # B-426: mypy needs the package marker (one module name for the fixture)
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
