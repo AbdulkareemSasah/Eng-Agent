@@ -41,7 +41,7 @@ class Recorder:
                 return argv, cwd
         raise AssertionError(f"no {kind} call in {self.calls}")
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append((list(argv), cwd))
         if argv[:3] == ["uv", "lock", "--check"]:
             return ToolResult(exit_code=self._lock_exit, output="error: the lockfile needs to be updated")
