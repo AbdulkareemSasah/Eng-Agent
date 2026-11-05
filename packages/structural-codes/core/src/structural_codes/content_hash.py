@@ -19,6 +19,7 @@ from eng_contract.canonical import payload_sha256
 from structural_codes._closure import import_closure, is_package
 from structural_codes.check import Check
 from structural_codes.errors import CheckDefinitionError
+from structural_codes.overlay import InheritedCheck
 
 __all__ = ["content_hash", "lint_scope_violations"]
 
@@ -52,7 +53,8 @@ def _document(check: Check, base: str | None) -> dict[str, Any]:
 def content_hash(check: Check, *, base: str | None = None) -> str:
     """Return the lower-case hex SHA-256 of the check's content document (spec 4.7).
 
-    `base` is the content hash of the base check of an inherited overlay entry, or `None`. Sources are LF-normalized,
+    `base` is the content hash of the base check of an inherited overlay entry, or `None`; an `InheritedCheck` takes
+    the hash of its own base check when none is given (AC18). Sources are LF-normalized,
     so line endings do not change the hash; a pack module that the check does not import does not either.
 
     Raises:
@@ -60,6 +62,8 @@ def content_hash(check: Check, *, base: str | None = None) -> str:
     """
     if base is not None and not _SHA256.fullmatch(base):
         raise CheckDefinitionError(f"base content hash must be 64 lower-case hex digits, got {base!r}")
+    if base is None and isinstance(check, InheritedCheck):
+        base = content_hash(check.base)
     return payload_sha256(_document(check, base))
 
 
