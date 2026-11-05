@@ -4,7 +4,7 @@ import json
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from eng_contract.canonical import payload_sha256
@@ -148,7 +148,7 @@ def test_write_failure_is_loud(tmp_path: Path) -> None:
     def connect(path: str) -> sqlite3.Connection:
         flaky = _Flaky(sqlite3.connect(path, isolation_level=None))
         made.append(flaky)
-        return flaky  # type: ignore[return-value]  # B-170: test double that delegates to a real connection
+        return cast(sqlite3.Connection, flaky)  # test double delegating to a real connection
 
     store = _make(tmp_path, connect=connect)
     store.open_pending("req_9", "batch_1", _screen("req_9"), {})
