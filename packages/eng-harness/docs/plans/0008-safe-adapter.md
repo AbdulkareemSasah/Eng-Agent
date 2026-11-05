@@ -9,7 +9,8 @@ tasks:
   - id: T1
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
     # Amendment (B-413, documents only): only test_pinned_fingerprint_from_inventory is an existing plan 0002 test it adapts;
-    # test_build_mismatch_stops_run is written later, in plan 0002 T19, which runs the real engine.
+    # test_build_mismatch_stops_run is written later, in plan 0002 T19, which runs the real engine, so the
+    # tests/workflow/servers/test_session.py glob, kept only to adapt it, is dropped.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -24,7 +25,6 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_products.py"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py"
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -302,7 +302,7 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   T9 to T12), as plan 0002 T19 does; no other task of this plan runs the real engine (B-413). Plan 0002 T19 in turn waits
   for T3 of this plan, because it writes the SAFE engine stop of AC4 (`test_session.py::test_safe_build_mismatch_stops_run`)
   next to the ETABS one, where `build_ports` makes it fail at the merge base (B-413). No cycle: T1 to T3 of this plan wait
-  only for plan 0002 T1 to T15.
+  only for plan 0002 T1 to T14 (0002 T15 only for T3's conditional `csi_unlock_model` entry).
 - Specs: `eng-contract` 0.1.0 merged. The edit-cycle workflow spec 0007 is not needed; the footing workflow spec uses the
   kinds and gaps defined here.
 - Owner decisions that do not block T1 to T8: Q1 to Q7 of the spec (the recommendations are implemented). Q8 (whether a candidate-mapped soil-pressure result may feed a verdict) is for the footing-workflow spec and does not affect T1 to T9.

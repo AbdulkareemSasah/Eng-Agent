@@ -251,7 +251,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. `build_ports`
   loads each adapter's allowlist for its server section's `route`. Tests:
   `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter` (also a `route` on a CSI
-  section; amendment B-413: every route rule is decided at allowlist load, none by the configuration loader),
+  section; amendment B-413: a `route` on a CSI section is decided at allowlist load),
   `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data).
 - AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
   loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
@@ -344,8 +344,9 @@ Rules:
 5. **[added: B-085]** `audit_log` (boolean, default true) says whether the server has Sasaah's `--audit-log` option;
    false for a server without it (IDEA: an unknown argument would only be warned about and ignored, spec 0014 §4.2
    rule 4). `route` (string) names one of the routes the adapter's allowlist header declares (§4.5.1); it is required
-   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI). The configuration loader
-   reads `route` as an optional string only; both refusals are allowlist load errors (AC41; amendment B-413).
+   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI). A `route` on a section
+   whose adapter declares no routes (CSI) is an allowlist load error (AC41; amendment B-413); a missing `route` for an
+   adapter that requires one stays a configuration load error (spec 0014 AC1).
 
 ### 4.3 Server lifecycle
 

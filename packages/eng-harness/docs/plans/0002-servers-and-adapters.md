@@ -546,7 +546,9 @@ AC38's load side (B-068): the `release` and `release_record` keys on allowlist e
 header (`fingerprint_source = "s12-inventory"`, `_allowlist.py` and `_allowlist.toml`), the build check and
 `ServerCheck`; the workflow fixture's build pins become the real ones (the SHA-256 of `sys.executable` and the
 allowlist's `sasaah_commit`) and the fake's `csi_status` reports `script_enabled: false`, so the session's build check
-passes on start and restart. The workflow test that stops a run through the engine's preflight is T19's (B-413).
+passes on start and restart. The fixture reaches the CSI allowlist through the adapter name `sasaah-csi-mcp`, with
+`--disable-script` in its args (the configuration rule of spec §4.2 rule 3; the fake reads no command-line options), not
+through a mapping of `synthetic-csi` in `_session.py` (B-413). The workflow test that stops a run through the engine's preflight is T19's (B-413).
 Budget 180 lines. T6b edits `_session.py`,
 so T7 follows it.
 
@@ -610,8 +612,8 @@ clause, engine AC44); `test_units_after_timeout.py::test_units_trap`, the synthe
 engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). The SAFE engine
 stop of spec 0008 AC4 (`test_session.py::test_safe_build_mismatch_stops_run`, a SAFE server whose build does not match
 the SAFE fingerprint stops the run before any write) is also T19's (B-413): plan 0008 has no later task that adds a
-source file the stop needs, so there it would pass at its merge base (test-first TF004). All three need `build_ports`
-from `src/eng_harness/adapters/__init__.py`, which this task adds, so they fail at its base. They read the pinned
+source file the stop needs, so there it would pass at its merge base (test-first TF004). All three need `build_ports`,
+which this task adds to `src/eng_harness/adapters/__init__.py`, so they fail at its base. They read the pinned
 fingerprints and the units through the allowlist loader and the ports. T19 starts after plan 0008 T3 (the SAFE server
 section and per-product `[fingerprint]` header of 0008 T1, the SAFE fake mode of 0008 T2, the pinned SAFE fingerprint
 of 0008 T3).
