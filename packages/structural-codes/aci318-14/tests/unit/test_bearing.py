@@ -89,6 +89,28 @@ def test_contact_at_zero_and_scope() -> None:
     assert frame.verdicts[0].status is VerdictStatus.NOT_APPLICABLE
 
 
+@pytest.mark.parametrize(
+    ("moment", "q_max", "q_min", "status"),
+    [
+        ({"MY_kNm": 150.0}, 282.4, 182.4, VerdictStatus.PASS),
+        ({"MX_kNm": 150.0}, 307.4, 157.4, VerdictStatus.FAIL),
+    ],
+)
+def test_rectangular_axes(moment: dict[str, float], q_max: float, q_min: float, status: VerdictStatus) -> None:
+    """S1, S3, S5 hand check on a 3000 x 2000 mm plan: |Mby| pairs with Sy = Ly*Lx^2/6 and |Mbx| with Sx = Lx*Ly^2/6.
+
+    A = 6 m2, W = 6 * (0.6*24 + 1.0*18) = 194.4 kN, N/A = 1394.4/6 = 232.4 kPa; Sy = 2*3^2/6 = 3.0 m3,
+    Sx = 3*2^2/6 = 2.0 m3; q_allow = 300 kPa. A swapped pairing gives the other row's pressures.
+    """
+    payload = _run(Lx_mm=3000.0, Ly_mm=2000.0, q_allow_kPa=300.0, **moment)
+    (verdict,) = payload.verdicts
+    steps = _steps(payload)
+    assert steps["q_max_kPa"] == pytest.approx(q_max, abs=_P_KPA)
+    assert steps["q_min_kPa"] == pytest.approx(q_min, abs=_P_KPA)
+    assert verdict.status is status
+    assert verdict.ratio == pytest.approx(q_max / 300.0, abs=_RATIO)
+
+
 def test_metadata() -> None:
     """Check id, clause, member scope, gaps and spec path of the clause spec (§2, §10; plan §2 T3 to T8)."""
     meta = bearing_pressure_service.meta
