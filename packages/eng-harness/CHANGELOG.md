@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc kinds part 2: payload models of `harness.design_summary/1`, `harness.section_size/1`, `harness.placement_comparison/1` and `harness.readback_check/1` registered in `eng_harness.kinds.calcs` (plan 0003 T4b, B-380; spec 0003 AC47).
 - Calc kinds part 1: `eng_harness.kinds.calcs` (`CalcMeta`, `harness.model_fingerprint/1`, `harness.model_diff/1`, `harness.expected_effects/1`) registered in `eng_harness._kinds`; `kinds/**` added to the R2 modules (plan 0003 T4, B-143; spec 0003 AC47).
 - approvals.yaml schema and strict loader (`_calc/_approvals.py`, reusing the templates YAML loader and ADR-0004; no second YAML library), status resolution (withdrawn, then exact id, version and hash match, else declared state), `check_approvals` and the shipped empty `calcs/approvals.yaml` (plan 0003 T3, B-142; spec 0003 AC8 to AC10).
 - Blocks and workflows: `eng_harness.block` (decorators, `BlockDef`, `WorkflowDef`, immutable `Registry`, code hash, `check_lock`, `write_lock`, `--write-lock`) and the empty `blocks.lock.json` (plan 0001 T5, B-104; spec 0001 AC2 to AC4).
