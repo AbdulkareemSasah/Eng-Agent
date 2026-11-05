@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Shared column section model CS S1 to S7 and column preconditions CP (`_column.py`); the stress-block and `phi` constants and `beta1` move out of the flexure check into `_common.py` (`SECTION_CITED`) and `_column.py`, with no value, citation or output change (B-330).
 - Pack assembly: `PACK` with the six footing checks, entry point `structural_codes.packs`, README usage, pack-level tests (B-278).
 - Package skeleton: `pyproject.toml`, empty `approvals.yaml`, `__version__`, empty `checks` package (B-270).
 - Shared footing statics FS S1 to S5, the one-way shear and flexure integrals, shared constants and preconditions (B-271).
