@@ -222,7 +222,7 @@ tasks:
     # Amendment (B-381): the ACI pack's T2 (PR 188) failed the gate's import check (IM002) because no core module was in
     # public_modules yet; T14 declares them only after T12 and T13. T14a declares the section 4.1 modules that exist after
     # T10 (structural_codes, errors, meta, inputs, applicability, trace, check, pack, overlay, content_hash,
-    # verification); T14 adds lifecycle and notes. Pack tasks wait for T14a (the registry orders them across plans).
+    # verification); T14 adds lifecycle and notes whenever T11 and T13 land; the T14a test is one-directional. Pack tasks wait for T14a (the registry orders them across plans).
     files:
       - "packages/structural-codes/core/pyproject.toml"
       - "packages/structural-codes/core/CHANGELOG.md"
@@ -332,7 +332,10 @@ also reads the pack's `check_modules` with `tomllib` and exits 2 on a lint-scope
 test oracle; the owner reviews it). Can run in parallel with T9 to T12 once T8 is merged.
 
 **T14a Public API, early.** `public_modules` in `[tool.eng-gate]` lists the modules of §4.1 that exist after T10, so the
-packs can import them (gate import check IM002); a test compares the list with the modules of §4.1 present in `src/`.
+packs can import them (gate import check IM002). The test checks one direction only: the 11 named modules are declared, and
+every declared module exists in `src/` and is a §4.1 module. It does not require every §4.1 module in `src/` to be declared,
+so T11 (`lifecycle`) and T13 (`notes`) may merge before or after T14a without breaking it; they never touch
+`pyproject.toml`. T14 declares `lifecycle` and `notes` and owns the full-equality check (`test_public_modules`).
 
 **T14 Package-level.** Adds `structural_codes.lifecycle` (T11) and `structural_codes.notes` (T13) to `public_modules`,
 the package-level tests, README usage of `structural_codes.evaluate`, changelog entry for 0.1.0.
