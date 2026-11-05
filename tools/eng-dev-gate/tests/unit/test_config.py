@@ -189,7 +189,7 @@ CLEAN_TABLES = (
 
 
 class _NoRunner:
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         raise AssertionError("the config step runs no tool")
 
 
