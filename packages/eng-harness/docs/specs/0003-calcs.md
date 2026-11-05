@@ -26,6 +26,10 @@ Sasaah repository, items ب2, ب5, ج9, د6, د8) are cited by item. Details not
 **R1 content.** Every calc here is engineering content. It ships with status `draft` and goes to the owner queue
 (ADR-0028 §4). No agent marks a calc `verified` or adds it to `approvals.yaml`.
 
+**Amendment B-405.** Spec 0010 (Q10, C2) asked that this spec state how code-pack checks reach the `CalcPort`: the
+same port serves them through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the
+run-class rule of §4.12, and the `NOT_FOUND` of §6 covers an id outside that route's allowlist. Listed in §11 (Q15).
+
 ## 1. Problem
 
 The edit cycle decides whether a model is safe to keep by comparing states: what changed since the last revision
@@ -342,7 +346,11 @@ occur in the neutral model kinds of contract §4.10.2.
 
 `modules` holds the calc's module and every module of `eng_harness` it imports, transitively. This includes helpers,
 `eng_harness.calc` and `eng_harness.kinds.calcs`. The closure is found statically with `ast` (relative imports
-resolved, `if TYPE_CHECKING` blocks included), without importing anything new. Third-party and standard-library
+resolved, `if TYPE_CHECKING` blocks included), without importing anything new: modules are found by file lookup under
+the `eng_harness` source root, not `importlib.util.find_spec`, which would run parent `__init__` modules. A parent
+package's `__init__` is hashed only when an import names that package and takes an attribute from it, never as an
+implicit parent (otherwise `calcs/__init__.py`, which imports every calc, would put every calc into every calc's
+closure; amendment B-388, B-141 review). Third-party and standard-library
 modules are not hashed: golden tests guard them (Q8). A framework change therefore invalidates every approval. This
 is deliberate, so no change to a calc's behavior keeps an approval.
 
@@ -678,6 +686,19 @@ coincident frames (`ambiguous`).
    at most the counts and status.
 3. Contract errors become failure envelopes. `NotImplementedGap` and `CalcRefused` propagate as `StepError`s (engine
    §6). Any other exception is `INTERNAL`.
+4. Code-pack checks (amendment B-405). The same port serves the checks of the `structural-codes` packs through one route
+   and no other: `CodePackRoute` in `_calc/_code_packs.py`, defined by [spec 0010](0010-design-isolated-footing.md) §4.3
+   and [spec 0013](0013-column-workflow.md) §4.5, which `HarnessCalcPort` consults for an id that does not start with
+   `harness.` (every calc id of this spec does). The route runs only the ids of its fixed allowlist; any other id is
+   `NOT_FOUND` (§6), and no exception of `structural_codes` reaches the engine as such. Its `CalcInfo` has the fields of
+   item 1, with `status` the check's lifecycle state (the four values of a calc status) and `version` as spec 0010 Q20
+   settles (open: a merged check has no integer version). The run-class rule of §4.5 applies unchanged: in `production`
+   only `approved` checks run and any other is refused with `CalcRefused` before evaluation; a `withdrawn` check is
+   refused in both run classes with `CalcRefused` `CALC_WITHDRAWN` before evaluation (so the pack's `CheckNotUsable` is
+   never reached); in `trial` a check that is not `approved` runs with `draft: true`. Results are stored as
+   `verdicts.set/1` with provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks themselves,
+   their content hash and their approvals belong to the packs (CF), not to this spec's `approvals.yaml`. Criteria and
+   tests: spec 0010 AC3, AC4 and spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py`).
 
 The kinds of §4.6 to §4.11 and `harness.expected_effects/1` are registered with `KindRegistry.extend` beside the
 engine's harness kinds (engine plan T3, `_kinds.py`). The CalcPort stores calc results with `producer.host` null:
@@ -727,13 +748,15 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 | Out of bounds | `OUT_OF_RANGE` | `field`, `expected`, `received` |
 | Item limit | `LIMIT_EXCEEDED` | `expected {max}`, `received` |
 | Unknown calc id | `NOT_FOUND` | — |
+| Code-pack check id outside the route's allowlist, or unknown to the pack registry (§4.12 item 4) | `NOT_FOUND` | `check_id` |
 | Calc defect | `INTERNAL` | `incident_id` |
 | Not approved in production; withdrawn | `CalcRefused` (`CALC_NOT_APPROVED`, `CALC_WITHDRAWN`) **[added]** | calc id, status |
 | Gap of §11 | `NotImplementedGap` (`NOT_IMPLEMENTED`) | gap id |
 
 ## 7. Non-goals
 
-- Code checks (phase 2, `structural-codes`). Choosing a section from a catalog. Minimum dimensions and code limits.
+- Code checks themselves (phase 2, `structural-codes`); the CalcPort only routes them (§4.12 item 4). Choosing a
+  section from a catalog. Minimum dimensions and code limits.
 - Comparing total weight, modal periods and reactions (ب2 proposes them). This needs analysis results and its own
   tolerances (gap CG-3).
 - Comparing a model with a drawing (base-point offset, `geom.*` kinds, 18 §6).
@@ -793,6 +816,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q12 | `HostPort.model_state` (spec 0002) needs the fingerprint. In a production run it must be approved | Owner, B-061 | Spec 0002 computes it through the CalcPort, and the command-line preflight includes it |
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
 | Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance`, `mm`, no default) and a new calc version |
+| Q15 | Spec 0010 Q10 and C2: the CalcPort serves code-pack checks through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the run-class rule of §4.5 and §4.12; `NOT_FOUND` (§6) covers an id outside the route's allowlist | Owner | Accept (amendment B-405; draft until the owner approves) |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |
 | CG-3 | Total weight, modal periods and reactions comparison (ب2) | Owner | A later calc with its own basis tolerances, after phase 1 |

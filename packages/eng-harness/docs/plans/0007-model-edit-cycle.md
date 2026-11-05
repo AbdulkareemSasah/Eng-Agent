@@ -6,26 +6,41 @@ status: draft            # draft | approved (approved only by merging this file'
 size: large
 risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
-  - id: T1
-    title: Edit-cycle kinds and the change-set model
+  - id: T1a
+    title: Edit-cycle payload kinds (change_set_check, analysis_summary, csi_name_lists) and their registration
+    # Amendment (B-386, documents only): the former T1 measured 562 changed non-test lines against its limit of 320
+    # (B-195): about 215 for the kinds and their registration, about 350 for the change-set model. Split into T1a and
+    # T1b (D-12); T1b may add to kinds/edit_cycle.py the shared constants its model needs (FB005 keeps numeric literals
+    # out of block modules).
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.edit_cycle, eng_harness.workflows and more (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/_kinds.py"
+      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py"
+      - "packages/eng-harness/tests/data/kinds/edit_cycle/**"
+    max_changed_lines: 260
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py::test_fixtures"
+    covers: [AC3]
+    depends_on: []
+  - id: T1b
+    title: The change-set model (ChangeSetDraft, item and value models, refused kinds as parseable models)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows and its model_edit_cycle module (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/kinds/edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_change_set.py"
       - "packages/eng-harness/tests/unit/edit_cycle/__init__.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py"
-      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py"
-      - "packages/eng-harness/tests/data/kinds/edit_cycle/**"
-    max_changed_lines: 320
+    max_changed_lines: 380
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py::test_model_parses_and_refuses"
-      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py::test_fixtures"
     covers: [AC3]
-    depends_on: []
+    depends_on: [T1a]
   - id: T2
     title: Calc harness.change_set_check (resolve, validate, conflicts, refused kinds)
     files:
@@ -45,7 +60,7 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_golden_cases"
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py::test_refused_kinds_name_their_gap"
     covers: [AC4, AC5, AC6, AC7]
-    depends_on: [T1]
+    depends_on: [T1b]
   - id: T3
     title: Calc harness.expected_effects (projection of a resolved change set)
     files:
@@ -86,7 +101,7 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases"
     covers: [AC30]
-    depends_on: [T1]
+    depends_on: [T1b]
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
     files:
@@ -105,7 +120,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_read_state_tool.py::test_read_set"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py::test_save_as_new_revision_and_open_revision"
     covers: [AC31]
-    depends_on: [T1]
+    depends_on: [T1b]
   - id: T6
     title: Engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields)
     files:
@@ -142,7 +157,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_rules.py::test_rules_typical_and_boundary"
     covers: [AC18]
-    depends_on: [T1]
+    depends_on: [T1b]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     files:
@@ -229,7 +244,7 @@ tasks:
       - "packages/eng-harness/tests/unit/edit_cycle/test_prompts.py::test_prompt_counter"
       - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings"
     covers: [AC29, AC32]
-    depends_on: [T1]
+    depends_on: [T1b]
   - id: T11
     title: Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list
     files:
@@ -276,7 +291,7 @@ The spec is [0007](../specs/0007-model-edit-cycle.md); the owner-facing descript
 [workflow spec](../workflows/model-edit-cycle.md). `max_changed_lines` counts non-test, non-generated lines, as in
 plans 0001 to 0006; golden data, journals and fixtures are test data.
 
-Build the data first and the R1 parts early: the kinds and the change-set model (T1), then the four calcs (T2 to T4),
+Build the data first and the R1 parts early: the kinds and the change-set model (T1a, T1b), then the four calcs (T2 to T4),
 which carry the engineering checks and go to the owner for review as soon as they merge. The adapter additions (T5)
 and the engine amendments (T6) are small, separate and reviewable on their own; T6 waits until the engine spec is
 amended in its own documents pull request (spec Q2, Q3, Q5 and spec 0004 Q7), as B-068 does for earlier amendments.
@@ -293,10 +308,11 @@ temporary workspaces.
 
 ## 2. Tasks
 
-**T1 Kinds and change-set model** (spec §4.2, §4.3.1, §4.3.2). `harness.change_set_check/1`,
-`harness.analysis_summary/1`, `harness.csi_name_lists/1` in `kinds/edit_cycle.py`, registered in `_kinds.py`;
-`ChangeSetDraft`, the item models, value models (basis path or number with unit) and the refused kinds as parseable
-models. No logic beyond Pydantic validation. Fixtures under `tests/data/kinds/edit_cycle/`.
+**T1a Kinds and T1b change-set model** (spec §4.2, §4.3.1, §4.3.2). T1a: `harness.change_set_check/1`,
+`harness.analysis_summary/1`, `harness.csi_name_lists/1` in `kinds/edit_cycle.py`, registered in `_kinds.py`, with
+fixtures under `tests/data/kinds/edit_cycle/`. T1b: `ChangeSetDraft`, the item models, value models (basis path or
+number with unit) and the refused kinds as parseable models. No logic beyond Pydantic validation. Amendment (B-386):
+the former T1 is split because it measured 562 lines against 320 (B-195).
 
 **T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names,
 duplicates, bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources, conflicts with
@@ -336,7 +352,7 @@ summaries; D-2 and D-3 are never open together, spec §4.6), the engineer turn, 
 `_finish.py`, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
 stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched with T15.
 
-**T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1 and value cells with sources (spec 0006
+**T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
 `report/cycle-timings.json` (base names only).
 
@@ -359,7 +375,7 @@ uninterrupted run.
 
 | Task | Needs merged |
 |---|---|
-| T1 | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
+| T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
 | T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`) |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) |

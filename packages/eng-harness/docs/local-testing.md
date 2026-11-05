@@ -2,7 +2,7 @@
 
 No host program is involved. These checks need the owner's machine (plan 0001 section 4; completed by T16 and T19):
 1. The overhead benchmark and the fsync cost on the owner's workstation disk, with antivirus active, against the 20 ms target.
-2. The run lock is released after killing the engine from Task Manager.
+2. The run lock is released after killing the engine from Task Manager (`uv run pytest tests/unit/test_journal_reader.py tests/windows/test_run_lock_windows.py -m windows`; the second file starts a holder process, kills it, and checks that the engine's lock refuses a second process while a run is under way; the Windows job runs only `tests/windows`, so also run `tests/replay/test_resume.py::test_resume_holds_the_run_lock` there: the same for `Engine.resume`).
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
 

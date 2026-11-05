@@ -55,3 +55,9 @@ r1_modules = [
   "src/structural_codes/content_hash.py", "src/structural_codes/verification.py", "src/structural_codes/_runner.py",
 ]
 r2_modules = ["src/structural_codes/**"]
+# Spec 0001 section 4.1 modules that exist now (plan T14a); T14 adds lifecycle and notes.
+public_modules = [
+  "structural_codes", "structural_codes.errors", "structural_codes.meta", "structural_codes.inputs",
+  "structural_codes.applicability", "structural_codes.trace", "structural_codes.check", "structural_codes.pack",
+  "structural_codes.overlay", "structural_codes.content_hash", "structural_codes.verification",
+]

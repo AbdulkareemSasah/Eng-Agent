@@ -1,0 +1,85 @@
+{
+  "ambiguous": [
+    {
+      "candidates": [
+        "F6",
+        "F7"
+      ],
+      "element": "frame",
+      "id": "F5",
+      "side": "a"
+    }
+  ],
+  "by_id": [
+    {
+      "distance_mm": 0.0,
+      "element": "frame",
+      "id": "F1",
+      "result": "reversed"
+    },
+    {
+      "distance_mm": null,
+      "element": "frame",
+      "id": "F2",
+      "result": "reshaped"
+    }
+  ],
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.placement_compare",
+    "status": "draft",
+    "version": 1
+  },
+  "complete": true,
+  "counts": [
+    {
+      "a": 1,
+      "b": 1,
+      "by": "type",
+      "difference": 0,
+      "element": "area",
+      "name": "slab"
+    },
+    {
+      "a": 0,
+      "b": 0,
+      "by": "story",
+      "difference": 0,
+      "element": "frame",
+      "name": "unassigned"
+    },
+    {
+      "a": 2,
+      "b": 1,
+      "by": "type",
+      "difference": -1,
+      "element": "frame",
+      "name": "column"
+    }
+  ],
+  "draft": true,
+  "equal": false,
+  "only_in_a": [
+    {
+      "element": "area",
+      "id": "A1"
+    }
+  ],
+  "only_in_b": [],
+  "renamed": [
+    {
+      "a_id": "F3",
+      "b_id": "F4",
+      "element": "frame"
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.placement_compare",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}

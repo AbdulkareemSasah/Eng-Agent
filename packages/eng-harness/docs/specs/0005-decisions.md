@@ -30,6 +30,14 @@ gains the provider error types of spec 0009 §4.3 (`ProviderErrorCode`, `Outgoin
 runtime it was built with for the run header (§4.12, engine AC69). They are listed in §11 (Q12); the new criterion is
 AC43.
 
+**Amendment B-411 (documents only, plan pre-flight).** Point and rule discovery for the lock files and the rule-test
+convention (§4.2, §4.4, AC4, AC10, AC12), one `--write-lock` command for both locks (§4.4), `DecisionCall.sensitive_values`
+and the union of sensitive values that drives both the tier skips and the hash-only label (§4.5, §4.10, engine spec
+§4.9.1 and its Q19), the pending-store API (§4.11, AC44), the label-append contract that takes the cascade's findings (§4.11, AC36), the
+scope of the provider's second-line check (§4.10: `DecisionSettings.sensitive_values` only), the test names of the
+redaction criteria (AC33, AC34), and the owner of the provider error types (§10: plan 0005 T5, AC41). They are listed
+in §11 (Q13, Q14).
+
 ## 1. Problem
 
 Workflows reach points where the next step depends on a judgment: which fix to try after a failed design check, which
@@ -69,7 +77,8 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
   `test_points.py::test_state_size_limit`.
 - AC4. Given a lock entry `{name, version, schema_sha256}` and a point with the same name and version but another
   options or state schema, when `check_lock` runs, then it reports `VERSION_BUMP_REQUIRED`; and the committed
-  `src/eng_harness/decisions.lock.json` matches the real registry. Tests: `test_points.py::test_check_lock`,
+  `src/eng_harness/decisions.lock.json` matches the registry that `decisions._points.discover()` returns (§4.2).
+  Tests: `test_points.py::test_check_lock`,
   `tests/contract/test_decision_lock.py::test_lock_matches_registry`.
 - AC5. Given a `ctx.decide` call whose `question` is not a registered point, whose options differ from the point's, whose
   state is not an instance of the point's state model, or (refs) whose options count is 0 or above `max_options` or does
@@ -97,14 +106,20 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
   `tests/unit/decisions/test_rules.py::test_registration_rules`.
 - AC10. Given a registered rule, then its `code_sha256` is the SHA-256 of its module source with LF line endings
   (engine spec §4.2), stable across two interpreter runs; and `check_lock` against `src/eng_harness/rules.lock.json`
-  reports `VERSION_BUMP_REQUIRED` for a changed hash with an unchanged version. Tests:
+  reports `VERSION_BUMP_REQUIRED` for a changed hash with an unchanged version; the committed lock matches the registry that
+  `decisions._rules.discover()` returns (§4.4). Tests:
   `test_rules.py::test_code_hash_is_stable`, `tests/contract/test_rule_lock.py::test_lock_matches_registry`.
 - AC11. Given a rule that reads a basis path not in its `thresholds`, then `BlockRuleViolation`; given a declared path,
   then `RuleBasis.quantity(path)` returns the basis `Quantity` and two quantities of one dimension compare. Test:
   `test_rules.py::test_rule_basis_is_restricted`.
-- AC12. Given every registered rule, then `tests/rules/test_<module>.py` contains `test_<name>_typical` and
-  `test_<name>_boundary` (process/10 §4: "tests with typical and boundary states"); a rule without both fails the
-  contract test. Test: `tests/contract/test_rule_tests_exist.py::test_every_rule_has_typical_and_boundary_tests`.
+- AC12. Given every rule of `decisions._rules.discover()` (§4.4), then `tests/rules/test_<module>.py` contains
+  `test_<name>_typical` and `test_<name>_boundary` (process/10 §4: "tests with typical and boundary states"), where
+  `<module>` is the last component of the rule's module name under `eng_harness.rules` and `<name>` the part of the rule
+  id after the dot **[added]**; the check is the pure function `missing_rule_tests(registry, tests_dir)`, which returns one
+  finding per missing test, and a rule without both fails the contract test. Given a fixture rule and a `tmp_path` test
+  folder without its tests, then `missing_rule_tests` reports both, so no `tests/rules/test_<fixture>.py` is committed.
+  Tests: `tests/contract/test_rule_tests_exist.py::test_every_rule_has_typical_and_boundary_tests`,
+  `::test_missing_rule_tests_reports_a_fixture_gap`.
 - AC13. Given `RuleRegistry.review_table()`, then it returns one row per rule with `id`, `point`, `version`,
   `rationale`, `thresholds`, `code_sha256` and the approval state read from `approvals.yaml` (`draft` when absent), for
   the owner's review. Test: `test_rules.py::test_review_table`.
@@ -191,11 +206,15 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
 - AC33. Given a state value that looks like a path, a URL or an email address, that contains a value of
   `DecisionSettings.sensitive_values`, or that is longer than the label bound, when a tier 2 or 3 would receive it, then
   the provider is not called, the suggestion is recorded with outcome `skipped_redaction` and the field paths, and the
-  engineer is asked; the findings contain paths and reasons, never values. Test:
-  `test_redaction.py::test_runtime_check_blocks_send`; property test
+  engineer is asked; the findings contain paths and reasons, never values. The sensitive values are the union of
+  `DecisionSettings.sensitive_values` and `DecisionCall.sensitive_values` (§4.5). Tests:
+  `test_redaction.py::test_runtime_check_blocks_send` (the pure check: findings with `field_path` and `reason`, no value),
+  `tests/unit/decisions/test_cascade.py::test_redaction_skip` (the cascade: provider not called, outcome
+  `skipped_redaction` with the paths, engineer asked); property test
   `tests/property/test_decision_properties.py::test_sensitive_text_never_reaches_a_provider`.
 - AC34. Given `Ref` fields, then they are omitted from the outgoing state and shown on the engineer screen as
-  references. Test: `test_redaction.py::test_refs_not_sent`.
+  references. Tests: `test_redaction.py::test_refs_not_sent` (omitted from the outgoing mapping),
+  `test_cascade.py::test_phase1_rules_then_engineer` (shown on the screen).
 
 ### 3.9 Labeled examples
 
@@ -204,23 +223,35 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
   `<workspace>/decisions/decisions.sqlite` before the answer is returned; `UPDATE` and `DELETE` on `labels` fail; a
   second insert with the same `request_id` is ignored. Test: `tests/unit/decisions/test_labels.py::test_append_only`.
 - AC36. Given a state that fails the redaction check, then the label stores `state_sha256` only and `state` is null.
-  Test: `test_labels.py::test_unredactable_state_hash_only`.
+  The store does not run the value check itself: `append(label, findings)` receives the findings the cascade computed
+  in §4.5 step 1 (over the union of §4.10) and stores `state` as null whenever they are non-empty (amendment B-411).
+  Test: `test_labels.py::test_unredactable_state_hash_only` (the findings come from the check of §4.10 run over a value
+  supplied only as a call's sensitive value, absent from the store's settings).
 - AC37. Given a failed label write, then the step fails with `ContractError` `INTERNAL` and the pending request stays
   presented, so no engineer decision is lost or unrecorded. Test: `test_labels.py::test_write_failure_is_loud`.
 - AC38. Given `record_override(request_id, new_choice, by)` for a decision taken by a rule, model or LLM, then a label
-  with `source="engineer_override"` is appended; for an unknown `request_id`, `NOT_FOUND`. Test:
-  `test_labels.py::test_override_label`.
+  with `source="engineer_override"` is appended; for an unknown `request_id`, `NOT_FOUND`. An override label is always
+  hash-only (`state` null): `record_override` has no call, so it has neither a state nor findings to apply (amendment
+  B-411; the source of the overridden decision's identity is Q14). Test: `test_labels.py::test_override_label`.
 - AC39. Given `export_labels(point, folder)`, then it is refused (`INVALID_ARGUMENT`, field `export_enabled`) unless
   `DecisionSettings.export_enabled`; when enabled it writes one canonical-JSON line per label with `state` only where
-  the redaction check passed, and never `engineer`, `run_id` or `step_path`. Test: `test_labels.py::test_export_is_opt_in`.
+  the redaction check passed (the stored `state` is not null), and never `engineer`, `run_id` or `step_path`. Test:
+  `test_labels.py::test_export_is_opt_in`.
+- AC44. Given `open_pending(request_id, batch_id, screen, outcomes)` with a non-empty `outcomes` object, then
+  `get_pending(request_id)` returns the same `screen`, `batch_id` and `outcomes` unchanged, a second `open_pending` with
+  the same `request_id` keeps the first row, and `close_pending(request_id, closed_at)` changes only `closed_at`
+  (§4.11, amendment B-411). Test: `test_labels.py::test_pending_round_trip`.
 
 ### 3.10 Package-level
 
 - AC40. Given 1,000 rule decisions through the cascade (no journal, no store), then p95 is under 1 ms (12 §1). Test:
   `tests/perf/test_rule_latency.py::test_rule_decision_p95` (also in the Windows CI job).
 - AC41. Given the interfaces of §4.7, then one conformance test runs against the fake providers; and the cascade passes
-  the engine's shared `DecisionPort` conformance test (engine spec AC57). Tests:
+  the engine's shared `DecisionPort` conformance test (engine spec AC57); and the provider error types of §4.7 have
+  their shape (`ProviderErrorCode` and `OutgoingPlace` members, `ProviderError` attributes `code`, `gap`, `where` with
+  `str()` the code value only, `ProviderFailure` fields; amendment B-411). Tests:
   `tests/contract/test_decision_providers.py::test_fake_providers_conform`,
+  `tests/contract/test_decision_providers.py::test_provider_error_shape`,
   `tests/contract/test_decision_port.py::test_cascade_conforms`.
 - AC42. Given `eng_harness.decisions.types`, then it imports nothing from `engine`, `journal`, `ports`, a network or
   database module, and block and rule modules may import it (amendment of engine spec §4.1.2, Q1). Test:
@@ -266,6 +297,14 @@ class FootingFixStrategy: ...  # builds an immutable DecisionPoint; no global re
   by `uv run python -m eng_harness.decisions --write-lock`, which refuses to write an entry whose hash changed while its
   version did not.
 - `PointRegistry(points)` is immutable (`.with_(...)` returns a new one); the cascade is constructed with one.
+- **Discovery [added, amendment B-411].** `decisions._points.discover()` imports every module under the package
+  `eng_harness.workflows` (`pkgutil.walk_packages`, private modules such as `workflows/<name>/_points.py` included; an
+  absent package yields nothing) and returns a `PointRegistry` of the module-level `DecisionPoint` objects, deduplicated
+  by identity and sorted by name; two distinct points with one name are refused (AC1). The imports happen inside
+  `discover()`, never when `decisions` or `decisions._points` is imported, and importing a module registers nothing:
+  this is discovery, not global registration. The lock test (AC4) and `--write-lock` use it; in phase 1 it returns an
+  empty registry. A later plan that adds a point adds it to a workflow module and regenerates `decisions.lock.json`; it
+  does not edit `decisions/_points.py`.
 - Options: an enum yields option values; refs yield `"0"` to `"n-1"`, labelled by the state's `labels_field` (a tuple of
   `Label` of equal length). The engine maps the chosen value to the member or the `Ref` (engine §4.6 item 4). A
   decision never carries a number (P10).
@@ -321,6 +360,18 @@ def bearing_only(state: FootingFailureState, basis: RuleBasis) -> Pick[FootingAc
   and permits only the paths in `thresholds`; the paths are required basis fields of the workflow (engine invariant 5).
 - `rule` builds an immutable `Rule`; `RuleRegistry(rules)` is immutable, checks AC9 and holds `review_table()` (AC13).
   `rules.lock.json` (`[{id, version, code_sha256}]`, sorted by id) mirrors the block lock (AC10).
+- **Discovery [added, amendment B-411].** `decisions._rules.discover()` imports every module under the package
+  `eng_harness.rules` (`pkgutil.walk_packages`; an absent package yields nothing) and returns a `RuleRegistry` of the
+  module-level `Rule` objects, deduplicated by identity and sorted by id, with the same lazy, side-effect-free import as
+  points (§4.2). The lock test (AC10) and the rule-test check (AC12) run over it; it is empty in phase 1. Fixture rules
+  in `tests/rules/fixtures/` are outside `eng_harness.rules` and never discovered. A later plan that adds a rule adds a
+  module under `rules/` and regenerates `rules.lock.json`; it does not edit `decisions/_rules.py`.
+- **Rule-test check [added, amendment B-411].** `missing_rule_tests(registry, tests_dir)` is a pure function that reads
+  the test files under `tests_dir` and returns one finding `{rule_id, expected_file, expected_test}` per missing
+  `test_<name>_typical` or `test_<name>_boundary` in `tests_dir/test_<module>.py` (AC12).
+- **Writing the locks [added, amendment B-411].** `uv run python -m eng_harness.decisions --write-lock` writes both
+  `decisions.lock.json` (from the point discovery) and `rules.lock.json` (from the rule discovery), and refuses, writing
+  neither, when either has an entry whose hash changed while its version did not.
 - Rules are R1 engineering content (process/10 §4): the owner reviews each rule's id, rationale, thresholds and tests. An
   approval is an entry in `approvals.yaml` bound to `code_sha256` (kind `rule`; Q7). In bootstrap mode no agent adds one
   (ADR-0028 §4); every rule is `draft`.
@@ -338,7 +389,8 @@ Port data (frozen models; engine spec §4.8 names `DecisionPort.decide(request)`
 
 - `DecisionCall`: `request_id` (engine-derived and stable per step path, as for approvals), `run_id`, `step_path`,
   `point` (the question), `options` (enum type or the refs sequence), `state`, `rules`, `policy`, `basis`,
-  `engineer_choice: EngineerChoice | None`.
+  `engineer_choice: EngineerChoice | None`, `sensitive_values: tuple[str, ...]` (default empty; the base names of the
+  model files the run touches, read by the engine from the journal, engine spec §4.9.1 and Q19; amendment B-411).
 - `EngineerChoice`: `choice` (option value), `by` (engineer name), `answered_at` (contract `Timestamp`).
 - `DecisionAnswer`: `choice`, `decided_by`, `confidence`, `latency_ms`, `options`, `state_sha256`, `suggestions`. The
   engine builds `decision_made` from it.
@@ -349,7 +401,9 @@ Port data (frozen models; engine spec §4.8 names `DecisionPort.decide(request)`
 
 `decide(call)`:
 
-1. Validate the call (AC5); compute `state_sha256` and the redaction findings (§4.10) once.
+1. Validate the call (AC5); compute `state_sha256` and the redaction findings (§4.10) once, over the sensitive values
+   `settings.sensitive_values ∪ call.sensitive_values`. These findings drive both the tier skips of step 5 (AC33) and
+   the hash-only label of step 6 (AC36).
 2. If a pending record exists for `request_id`, go to 6 (AC19).
 3. **Tier 1.** For each rule in order: run it under `rule_guard`; `Pick` of a valid option answers
    `rule:<id>` (confidence `None`); an invalid result raises `DecisionInvalid` (AC15); `None` continues.
@@ -498,8 +552,15 @@ By construction (AC32) and at runtime (AC33):
   add tokens, never remove one. These are the "known sensitive fields" of 16 §2.
 - **Values**, checked on the serialized state before any tier 2 or 3 call and before a label stores a state: a string
   that matches a drive-letter or rooted path, contains `/` or `\`, a URL scheme or `@`; a string containing a
-  `sensitive_values` entry (case-insensitive, length at least 3); a string over the label bound. A finding is
+  sensitive value (case-insensitive, length at least 3); a string over the label bound. The sensitive values are
+  `DecisionSettings.sensitive_values ∪ DecisionCall.sensitive_values` (amendment B-411); the findings are computed once
+  per call (§4.5 step 1) and the same findings drive the tier skips (AC33) and the hash-only label (AC36). A finding is
   `{field_path, reason}`; it never carries the value.
+- **Scope of the two lines (amendment B-411).** The union above is the cascade's first-line check. A provider receives
+  only a `ProviderRequest` (§4.7), which carries no sensitive values, so the provider's second-line check of
+  [spec 0009](0009-providers.md) §4.6 (AC12, AC13) runs the same function over `DecisionSettings.sensitive_values`
+  only. A value supplied only through `DecisionCall.sensitive_values` is therefore guarded by the first line alone;
+  nothing carries the call's values to a provider, because carrying them would send them out.
 - A failing state is never sent (the tier is skipped, AC33) and is stored hash-only (AC36). The check is a pure
   function over JSON values, applied to every outgoing state with no exception.
 - `local_only` skips every provider whose `is_local` is false (16 §2).
@@ -514,7 +575,15 @@ already refuses a synchronized folder), with the journal's append-only trigger p
   the other tiers, the pairs an evaluation compares.
 - `pending`: `request_id`, `batch_id`, `screen_json`, `outcomes_json`, `created_at`, `closed_at`. Rows are inserted
   and closed (only `closed_at` may change).
-- `LabelStore` API: `append`, `record_override`, `read(point, point_version)`, `export_labels(point, folder)`. The
+- Pending API of the same store (amendment B-411): `open_pending(request_id, batch_id, screen, outcomes)` inserts a row
+  (idempotent by `request_id`: a second call keeps the first row); `get_pending(request_id)` returns `None` or the
+  stored `screen`, `batch_id`, `outcomes` and `created_at`; `close_pending(request_id, closed_at)` sets `closed_at`.
+  `outcomes` is a JSON object from request id to the stored resolved outcome of each other call of a batch (empty for a
+  single `decide`), so a resume reuses it (§4.8, AC29); it round-trips unchanged.
+- `LabelStore` API: `append(label, findings)`, `record_override`, `read(point, point_version)`,
+  `export_labels(point, folder)` (amendment B-411). `append` does not run the value check of §4.10: the cascade passes
+  the findings of §4.5 step 1 (computed over the union of §4.10), and the store keeps `state_sha256` and stores `state`
+  as null whenever the findings are non-empty (AC36). `record_override` stores `state` as null always (AC38). The
   evaluation itself (agreement above threshold, calibration, abstention rate, latency per provider and model;
   process/05 §7) and the release of a point from shadow mode are phase 2 work (non-goals).
 - Export is opt-in (12 §6) and writes anonymized lines for the owner to commit to the harness's `evals/` (Q3).
@@ -584,7 +653,7 @@ importing `eng_harness.providers`. The cascade does not read, build or check the
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC3, AC5 to AC15, AC17 to AC19, AC21 to AC39 | Unit (with fake providers and a temporary workspace) | `tests/unit/decisions/` |
+| AC1 to AC3, AC5 to AC15, AC17 to AC19, AC21 to AC39, AC44 | Unit (with fake providers and a temporary workspace) | `tests/unit/decisions/` |
 | AC4, AC10 (lock), AC12, AC41 | Contract | `tests/contract/` |
 | AC16, AC17 (engine), AC30, AC43 | Fake-host workflow (real engine, real cascade, fake ports) | `tests/workflow/decisions/` |
 | AC20, AC29 | Replay (process/05 §1) | `tests/replay/` |
@@ -604,8 +673,9 @@ New modules of `eng-harness` 0.1.0 (phase 1). `decisions.lock.json` and `rules.l
 change of a point's options or state, or of a rule, needs a version bump (AC4, AC10). The `decision_made` payload
 gains the `suggestions` shape of §4.9; the engine's journal schema stays at version 1 because the field is already
 `suggestions` (engine spec §4.4.2). Amendment B-098 adds `ProviderErrorCode`, `OutgoingPlace`, `ProviderError` and
-`ProviderFailure` to `decisions.interfaces` and `runtime_summary()` to the cascade (additive; built by plan 0009 T1 and
-by this spec's plan T10).
+`ProviderFailure` to `decisions.interfaces` and `runtime_summary()` to the cascade (additive; built by this spec's plan
+T5 and T10; amendment B-411: plan 0009 T1 no longer adds them; AC41 here tests their shape in plan 0005 T5, and spec
+0009 AC5 keeps the same test as a regression test).
 
 ## 11. Open questions, gaps and additions
 
@@ -622,4 +692,6 @@ by this spec's plan T10).
 | Q9 | A failed label write fails the decision step (AC37) instead of continuing | Owner | Accept: the labels are the point of phase 1 shadow data, and the failure is rare |
 | Q10 | A matching rule does not trigger shadow runs of tiers 2 and 3, so rule-decided cases give no evaluation data | Owner | Accept for v1; revisit after the first evaluation shows the volume of engineer-decided cases |
 | Q11 | Floor of `max_options` 32 and `max_state_bytes` 4096 are software limits chosen here | Owner | Accept as settings; raise on need |
-| Q12 | Spec 0009 Q7 (amendment B-098): §4.7 carries the provider error types of spec 0009 §4.3 (`ProviderFailure` was used and undefined), and the cascade hands the decision-runtime summary to the engine for the run header (§4.12, engine Q24) | Owner | Accept (§4.7, §4.12, AC22, AC43); spec 0009 §4.3 and this section must stay identical, and spec 0009 AC5 tests the shapes |
+| Q12 | Spec 0009 Q7 (amendment B-098): §4.7 carries the provider error types of spec 0009 §4.3 (`ProviderFailure` was used and undefined), and the cascade hands the decision-runtime summary to the engine for the run header (§4.12, engine Q24) | Owner | Accept (§4.7, §4.12, AC22, AC43); spec 0009 §4.3 and this section must stay identical; AC41 here tests the shapes first (`test_provider_error_shape`, plan 0005 T5, amendment B-411) and spec 0009 AC5 keeps a regression test |
+| Q13 | Plan pre-flight (amendment B-411): (a) how the lock tests and AC12 enumerate the real points and rules (discovery over `eng_harness.workflows` and `eng_harness.rules`, §4.2, §4.4); (b) one `--write-lock` for both locks; (c) `DecisionCall.sensitive_values` and the union that drives tier skips and hash-only labels (engine Q19); (d) the pending API with stored batch outcomes; (e) plan 0005 T5 builds the provider error types (AC41 `test_provider_error_shape`); (f) `LabelStore.append(label, findings)` takes the cascade's findings and does not re-run the check, so a call-supplied value also makes the label hash-only (AC36); (g) the provider's second-line check of spec 0009 §4.6 uses `DecisionSettings.sensitive_values` only, because `ProviderRequest` carries no sensitive values (§4.10). Cross-plan follow-up: plans 0007 T7 (`tests/unit/edit_cycle/test_rules.py`), 0010 (`tests/rules/test_footing_rules.py`) and 0013 (`tests/unit/rules/test_column_design_rules.py`) name rule-test files that AC12 does not find; each must use `tests/rules/test_<module>.py` with `test_<name>_typical` and `test_<name>_boundary` | Owner | Accept; the follow-up is made in those plans' own amendments (B-417 for plan 0007) |
+| Q14 | Gap (amendment B-411): `record_override(request_id, new_choice, by)` (AC38) needs the overridden decision's `point`, `point_version`, `options` and `state_sha256`, but neither the store (labels and pending rows exist only for decisions that reached the engineer) nor the journal (`decision_made.request_id` is null for an answer of another tier, engine spec §4.4.2) keys a rule, model or LLM decision by `request_id`. The redaction side is settled (an override label is always hash-only, AC38) | Owner | Give `record_override` a keyword argument with the overridden decision's identity (`point`, `point_version`, `options`, `state_sha256`, read by the caller from its `decision_made` event and the point registry), keep `NOT_FOUND` for a `request_id` the caller cannot resolve, and amend AC38 and plan 0005 T6 accordingly; until the owner decides, T6 builds `record_override` against labels and pending rows and records the rest as a gap |
