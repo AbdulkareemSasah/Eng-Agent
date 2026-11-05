@@ -28,12 +28,12 @@ _CITED = {
     "eps_tc": Cited(value=0.005, unit="1", source="ACI 318-14 Table 21.2.2 (tension-controlled strain limit)"),
     "eps_cu": Cited(value=0.003, unit="1", source="ACI 318-14 22.2.2.1"),
     "alpha_1": Cited(value=0.85, unit="1", source="ACI 318-14 22.2.2.4.1 (stress-block concrete stress 0.85 f'c)"),
-    "beta1_hi": Cited(value=0.85, unit="1", source=_T22),
-    "beta1_slope": Cited(value=0.05, unit="1", source=_T22),
-    "beta1_step": Cited(value=7, unit="MPa", source=_T22),
-    "fc_beta_lo": Cited(value=28, unit="MPa", source=_T22),
-    "fc_beta_hi": Cited(value=55, unit="MPa", source=_T22),
-    "beta1_lo": Cited(value=0.65, unit="1", source=_T22),
+    "beta1_hi": Cited(value=0.85, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
+    "beta1_slope": Cited(value=0.05, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
+    "beta1_step": Cited(value=7, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+    "fc_beta_lo": Cited(value=28, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+    "fc_beta_hi": Cited(value=55, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+    "beta1_lo": Cited(value=0.65, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
 }
 _LENGTH = Cited(value=0, unit="mm", source="Geometry: the length of a solid is positive")
 _AREA = Cited(value=0, unit="mm2", source="Geometry: a provided bar area is positive")
