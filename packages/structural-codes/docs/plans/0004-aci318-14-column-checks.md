@@ -147,7 +147,9 @@ task is test-first ([process/05](../../../../design/process/05-testing-and-verif
 
 Start condition: plan 0002 T2 (`_common.py`), T6 (flexure constants) and T9 (pack assembly) are merged before T1; core
 plan 0001 tasks T6, T8, T9, T11 and T12 are merged before T2 to T5 (checks, runner, verification, lifecycle, command
-line), and T14a (public modules declared; amendment B-385) before T1. Q12 of plan 0002 (clause-spec folder) applies here unchanged.
+line), and T14a (public modules declared; amendment B-385) before T1; T14b (`structural_codes.lifecycle` in
+public_modules, without which `tests/unit/test_pack_columns.py::test_all_draft` fails IM002; amendment B-419) before
+T5. Q12 of plan 0002 (clause-spec folder) applies here unchanged.
 
 ## 2. Tasks
 
@@ -191,7 +193,8 @@ clause spec.
 - CK-AC6. Given the hand-check inputs, when evaluated in two subprocesses with `PYTHONHASHSEED` 0 and 1, then the
   canonical JSON of the payloads is byte-identical (the root search is deterministic). Test:
   `tests/replay/test_column_determinism.py::test_identical_across_hash_seeds`.
-- CK-AC7. Given the pack, when `python -m structural_codes verify --pack aci318_14` runs, then it exits 0, every column
+- CK-AC7. Given the pack, when `python -m structural_codes verify --pack P` runs with `P` the pack project root
+  `packages/structural-codes/aci318-14/` (CF §4.9.3, amendment B-419), then it exits 0, every column
   hand check passes, program comparisons are `pending` and no column check is reported `verified` (G-WE). Test:
   `tests/unit/test_pack_columns.py::test_verify_reports_unverified`.
 - CK-AC8. Given the package, when the gate runs, then line coverage ≥ 95%, branch ≥ 90%, mutation ≥ 80% on the R1
