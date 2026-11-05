@@ -163,7 +163,29 @@ tasks:
     covers: [AC5, AC6, AC7, AC8]
     depends_on: [T7]
   - id: T9
-    title: Engine start and resume, run lock, run header, replay index and divergence
+    title: Engine start, run lock, run header, input and output validation, run-class and unreleased_tools records
+    # Amendment (B-424, documents only): the original T9 (477 lines) exceeded limits.max_task_lines (400, gate GC005);
+    # lead decision D-12: split. T9 keeps start; T9b keeps resume and replay.
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the Windows run-lock item
+      - "packages/eng-harness/src/eng_harness/engine/__init__.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/unit/test_run_lock.py"
+      - "packages/eng-harness/tests/windows/test_run_lock_windows.py"
+    max_changed_lines: 360
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_runner.py::test_input_and_output_validation"
+      - "packages/eng-harness/tests/unit/test_run_lock.py::test_one_engine_per_run"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_run_class_recorded_and_checked"
+      - "packages/eng-harness/tests/unit/test_runner.py::test_unreleased_tools_recorded"
+    covers: [AC16, AC28, AC29, AC65, AC68]
+    depends_on: [T4, T5, T8]
+  - id: T9b
+    title: Engine resume, version rule, replay index, divergence variants, code-hash warning, completed-run return
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -171,23 +193,17 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/src/eng_harness/engine/_replay.py"
       - "packages/eng-harness/tests/unit/test_runner.py"
-      - "packages/eng-harness/tests/unit/test_run_lock.py"
-      - "packages/eng-harness/tests/windows/test_run_lock_windows.py"
       - "packages/eng-harness/tests/replay/test_resume.py"
       - "packages/eng-harness/tests/replay/test_divergence.py"
       - "packages/eng-harness/tests/workflows/**"
-    max_changed_lines: 400
-    max_sessions: 3
+    max_changed_lines: 260
+    max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/unit/test_runner.py::test_input_and_output_validation"
-      - "packages/eng-harness/tests/unit/test_run_lock.py::test_one_engine_per_run"
       - "packages/eng-harness/tests/replay/test_resume.py::test_completed_run"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_divergence_variants"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_hash_change_warns"
-      - "packages/eng-harness/tests/unit/test_runner.py::test_run_class_recorded_and_checked"
-      - "packages/eng-harness/tests/unit/test_runner.py::test_unreleased_tools_recorded"
-    covers: [AC16, AC23, AC28, AC29, AC35, AC65, AC68]
-    depends_on: [T4, T5, T8]
+    covers: [AC23, AC35, AC68]  # AC68 for resume
+    depends_on: [T9]
   - id: T10
     title: ctx implementation of tool, read, calc, block, parallel, attempts, escalate
     files:
@@ -214,7 +230,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_ctx_escalate.py::test_escalate"
       - "packages/eng-harness/tests/replay/test_resume.py::test_pause_and_resume"
     covers: [AC9, AC11, AC12, AC13, AC14, AC15, AC27]
-    depends_on: [T9]
+    depends_on: [T9b]
   - id: T11
     title: Input requests (the x-eng-input marker, choice schemas, answer checks) and the escalation request
     # Amendment (B-342, documents only): the original T11 (440 lines) exceeded limits.max_task_lines (400, gate GC005);
@@ -463,7 +479,7 @@ storage, built and tested before anything writes to it), the reader, blocks and 
 the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, the input-request
 builders, in-flight reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
-together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9) are the core S-10 proved, so a
+together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9b) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
 by `depends_on` (T10, T12, T13, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
 shares `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11b and T13 on
@@ -577,10 +593,15 @@ objects after the canonical round trip.
 `op_id`, overlap detection, the parallel driver (all children finish; error choice by rank and index) and the attempts
 iterator. Tested with a stub step executor, before the runner exists.
 
-**T9 Runner and replay** (spec §4.5.1, §4.5.2, §4.4.4). `Engine.start` and `Engine.resume`, input and output
-validation, holding the run lock of `_runlock.py` (with the Windows test under the `windows` marker), the run header and
-the version rule, the run-class check at start and resume and the `unreleased_tools` record (AC65, AC68), the replay index, divergence (all S-10 variants) and the completed-run return. A minimal `ctx.tool`
-is wired here so the divergence tests can run; T10 completes it.
+**T9 Engine start** (spec §4.5.1, §4.4.4). `Engine.start`, input and output validation, holding the run lock of
+`_runlock.py` (with the Windows test under the `windows` marker, and its item in `docs/local-testing.md`), the run
+header, the run-class check at start and the `unreleased_tools` record (AC65, AC68). A minimal `ctx.tool` is wired here
+so the T9b divergence tests can run; T10 completes it. Budget 360 lines (the original T9 measured 477 and was split by
+B-424, D-12).
+
+**T9b Engine resume and replay** (spec §4.5.2 steps 1 to 3 and 9, §4.4.4). `Engine.resume`, the version rule, the
+run-class check at resume (AC68), the replay index (`_replay.py`), divergence (all S-10 variants), the code-hash warning
+and the completed-run return. Budget 260 lines (the original 477 less T9's 360 plus the shared edits; B-424, D-12).
 
 **T10 ctx calls** (spec §4.3.2, §4.3.3). `tool` (with retries), `read`, `calc`, `block`, `parallel`, `attempts`,
 `escalate`, and pause and resume through a test approval stub (the full approval rules come in T15); `CalcRefused`
@@ -682,7 +703,7 @@ ledger and the outputs with an uninterrupted run. Almost all of it is test code.
   (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program. Every
   step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T3b, T9, T11b, T12, T13, T15 and T16 additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T12, T13, T15 and T16 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16 and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 
