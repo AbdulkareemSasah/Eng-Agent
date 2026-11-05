@@ -1,6 +1,7 @@
 """Journal reader API, views, follow and the run lock probe (plan 0001 T4; AC25, AC68)."""
 
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -202,3 +203,27 @@ def test_is_locked(run_dir: Path) -> None:
     assert not is_locked(run_dir)
     second.acquire()  # the lock is free again after release
     second.release()
+
+
+def test_rerun_step_status(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
+    writer = _writer(run_dir, store, ids)
+    writer.append(T.RUN_STARTED, HEADER)
+    _step(writer, "0", (T.STEP_RERUN, {"reason": "read_in_flight"}))
+    (step,) = JournalReader(run_dir).steps()
+    assert (step.status, step.ended_at is not None, step.result_ref) == ("rerun", True, None)
+
+
+# Defined only on Windows (as tests/windows/test_jobs.py does), so no skip enters the ratchet.
+if sys.platform == "win32":
+
+    @pytest.mark.windows
+    def test_windows_lock_excludes_and_releases(tmp_path: Path) -> None:
+        first, second = RunLock(tmp_path), RunLock(tmp_path)
+        first.acquire()
+        assert is_locked(tmp_path)
+        with pytest.raises(RunLocked):
+            second.acquire()
+        first.release()
+        assert not is_locked(tmp_path)
+        second.acquire()
+        second.release()

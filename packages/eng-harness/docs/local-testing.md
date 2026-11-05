@@ -2,7 +2,7 @@
 
 No host program is involved. These checks need the owner's machine (plan 0001 section 4; completed by T16 and T19):
 1. The overhead benchmark and the fsync cost on the owner's workstation disk, with antivirus active, against the 20 ms target.
-2. The run lock is released after killing the engine from Task Manager (the `msvcrt.locking` branch of `_runlock`: `uv run pytest tests/windows/test_runlock.py -m windows`, and a second engine on the same run is refused).
+2. The run lock is released after killing the engine from Task Manager (`uv run pytest tests/unit/test_journal_reader.py -m windows`).
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
 

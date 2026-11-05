@@ -111,9 +111,7 @@ class JournalReader:
         """Events with `seq` above `after_seq`, in order."""
         return [e for e in iter_events(self._conn) if e.seq > after_seq]
 
-    def follow(self, after_seq: int) -> list[ev.Event]:
-        """Same as `events`, for polling by the progress display."""
-        return self.events(after_seq)
+    follow = events  # same as `events`, for polling by the progress display
 
     def header(self) -> ev.RunHeader:
         """The `run_started` payload."""
@@ -172,22 +170,16 @@ class JournalReader:
             ended = ended or (e if e.type in (_T.RUN_COMPLETED, _T.RUN_FAILED) else None)
             if e.type in (_T.RUN_PAUSED, _T.RUN_RESUMED):
                 paused = e.type is _T.RUN_PAUSED
-            if e.type is _T.RUN_RESUMED:
-                tools.update(getattr(p, "unreleased_tools", None) or {})
-                if isinstance(p, ev.RunResumed) and p.decision_runtime is not None:
-                    runtime = dict(p.decision_runtime)
-                escalation = None
-            if isinstance(p, ev.RunEscalated):
-                escalation = p
+            if isinstance(p, ev.RunResumed):
+                tools.update(p.unreleased_tools or {})
+                runtime = dict(p.decision_runtime if p.decision_runtime is not None else runtime)
+            if isinstance(p, ev.RunResumed | ev.RunEscalated):
+                escalation = p if isinstance(p, ev.RunEscalated) else None
         pending = tuple(r.request_id for r in self._requests(events) if r.resolution is None)
-        if ended is not None:
-            status = "COMPLETED" if ended.type is _T.RUN_COMPLETED else "FAILED"
-        elif escalation is not None:
-            status = "NEEDS_ENGINEER"
-        elif paused:
-            status = "PAUSED"
-        else:
-            status = "RUNNING" if is_locked(self._run_dir) else "INTERRUPTED"
+        live = "RUNNING" if is_locked(self._run_dir) else "INTERRUPTED"
+        status = (ended and ("COMPLETED" if ended.type is _T.RUN_COMPLETED else "FAILED")) or (
+            "NEEDS_ENGINEER" if escalation else "PAUSED" if paused else live
+        )
         return RunView(
             h.run_id, h.workflow, h.mode, status, head.at, ended.at if ended else None,
             getattr(ended.payload, "draft", None) if ended else None, pending, escalation, h.run_class,
@@ -211,11 +203,9 @@ class JournalReader:
         views: list[RequestView] = []
         for e in events:
             p = e.payload
-            if isinstance(p, ev.ApprovalRequested):
-                answer_type = _T.APPROVAL_RESOLVED
-            elif isinstance(p, ev.InputRequested):
-                answer_type = _T.DECISION_MADE if p.kind == "engine.decision" else _T.INPUT_PROVIDED
-            else:
+            if not isinstance(p, ev.ApprovalRequested | ev.InputRequested):
                 continue
-            views.append(RequestView(p.request_id, p.kind, p.title, answers.get((answer_type, p.request_id))))
+            t = _T.APPROVAL_RESOLVED if isinstance(p, ev.ApprovalRequested) else _T.INPUT_PROVIDED
+            t = _T.DECISION_MADE if isinstance(p, ev.InputRequested) and p.kind == "engine.decision" else t
+            views.append(RequestView(p.request_id, p.kind, p.title, answers.get((t, p.request_id))))
         return views
