@@ -71,7 +71,7 @@ tasks:
     covers: [AC8, AC9, AC10]
     depends_on: [T2]
   - id: T4
-    title: Calc kinds and their registration
+    title: Calc kinds part 1 (CalcMeta, model fingerprint and diff payloads, expected effects) and their registration
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/.gate/risk-map.yml"
@@ -87,6 +87,22 @@ tasks:
       - "packages/eng-harness/tests/contract/test_calc_kinds.py::test_fixtures"
     covers: [AC47]
     depends_on: [T1]
+  - id: T4b
+    title: Calc kinds part 2 (design summary, section size, placement comparison, readback check payloads)
+    # Split (B-379): the B-143 writer measured 531 changed non-test lines for the former T4 (kinds/calcs.py 520), above
+    # the 400-line task cap; the four report payloads move here.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/kinds/calcs.py"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"
+      - "packages/eng-harness/tests/contract/test_calc_kinds.py"
+      - "packages/eng-harness/tests/data/kinds/calcs/**"
+    max_changed_lines: 340
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_calc_kinds.py::test_report_fixtures"
+    covers: [AC47]
+    depends_on: [T4]
   - id: T5
     title: HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test
     files:
@@ -111,7 +127,7 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_framework.py::test_deterministic_across_processes"
       - "packages/eng-harness/tests/workflow/test_calc_step.py::test_calc_step_end_to_end"
     covers: [AC4, AC11, AC12, AC13, AC14, AC15, AC16, AC17, AC18]
-    depends_on: [T3, T4]
+    depends_on: [T3, T4b]
   - id: T6
     title: Calc-module rules test, golden data loader and golden file lint, verification record template
     files:
@@ -328,10 +344,15 @@ merged one, this task links it and adds no ADR), adds the dependency with `uv ad
 the loader with the schema, refusal of tags, anchors and duplicate keys, status resolution and `check_approvals`, and
 the shipped `approvals.yaml` with empty lists.
 
-**T4 Kinds** (spec §4.6 to §4.11, §4.8 effects). This task adds the payload models of the six calc kinds,
-`harness.expected_effects/1` and `CalcMeta`, with their validators (counts match rows, sorted lists, fingerprint form,
-top-N label). The models live in `eng_harness.kinds.calcs` (R2 path `**/kinds/**`). They are registered in the
-engine's `_kinds.py` with `KindRegistry.extend`. Fixtures go in `tests/data/kinds/calcs/`.
+**T4 Kinds, part 1** (spec §4.6, §4.7, §4.8 effects). This task adds `CalcMeta`, the payload models of
+`model_fingerprint` and `model_diff`, and `harness.expected_effects/1`, with their validators (counts match rows,
+sorted lists, fingerprint form). The models live in `eng_harness.kinds.calcs` (R2 path `**/kinds/**`). They are
+registered in the engine's `_kinds.py` with `KindRegistry.extend`. Fixtures go in `tests/data/kinds/calcs/`.
+
+**T4b Kinds, part 2** (spec §4.9 to §4.11). This task adds the payload models of `design_summary`, `section_size`,
+`placement_comparison` and `readback_check` (validators: counts match rows, sorted and unique lists, top-N label,
+trace identity) to the same module and registers them. Split (B-379): the B-143 writer measured 531 changed non-test
+lines for the former T4, above the 400-line task cap; T5 depends on T4b.
 
 **T5 CalcPort** (spec §4.12). `HarnessCalcPort` and `CalcSettings` go in `_calc/_port.py`. The port validates with
 `validate_input` under `require_refs`, builds `InputMeta` from the records, applies the item limit, runs the pure

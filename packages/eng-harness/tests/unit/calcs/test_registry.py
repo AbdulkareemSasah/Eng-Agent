@@ -113,5 +113,14 @@ def test_registry_lookup_and_hash(fixtures: ModuleType, kinds: KindRegistry) -> 
         registry["harness.absent"]
 
 
+def test_removed_id_not_reused(fixtures: ModuleType, kinds: KindRegistry) -> None:
+    good = _build(fixtures)
+    with pytest.raises(CalcRegistryError) as caught:
+        CalcRegistry(kinds, [good], hasher=_hasher, removed={"harness.fixture_sum"})
+    assert caught.value.rule == "removed"
+    registry = CalcRegistry(kinds, [good], hasher=_hasher, removed={"harness.other"})
+    assert list(registry) == ["harness.fixture_sum"]
+
+
 def test_statuses() -> None:
     assert [s.value for s in CalcStatus] == ["draft", "verified", "approved", "withdrawn"]
