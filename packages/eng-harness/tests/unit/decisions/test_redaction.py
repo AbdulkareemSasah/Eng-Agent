@@ -6,6 +6,10 @@ from typing import Any
 import pytest
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
+from pydantic import BaseModel, ConfigDict
+
+from eng_harness.decisions._points import DecisionPoint, Refs, decision_point
+from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions._redaction import (
     DENIED_TOKENS,
     LABEL_BOUND,
@@ -15,10 +19,6 @@ from eng_harness.decisions._redaction import (
     denied_token,
     outgoing_state,
 )
-from pydantic import BaseModel, ConfigDict
-
-from eng_harness.decisions._points import DecisionPoint, Refs, decision_point
-from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions.types import DecisionDefinitionError, Label
 
 _STRICT = ConfigDict(frozen=True, extra="forbid")
@@ -61,6 +61,7 @@ class Mixed(BaseModel):
     count: int
     anchor: Ref
     anchors: tuple[Ref, ...]
+    pair: tuple[Ref, int]
     inner: Inner
     inners: tuple[Inner, ...]
     q: Quantity
@@ -170,6 +171,7 @@ def test_refs_not_sent() -> None:
         count=2,
         anchor=_ref(_RES),
         anchors=(_ref(_RES), _ref(_RES2)),
+        pair=(_ref(_RES2), 7),
         inner=Inner(ref=_ref(_RES), count=3),
         inners=(Inner(ref=_ref(_RES2), count=4),),
         q=Quantity(2.5, "kN/m"),
@@ -179,6 +181,7 @@ def test_refs_not_sent() -> None:
     out = outgoing_state(state)
     assert out == {
         "count": 2,
+        "pair": [7],
         "inner": {"count": 3},
         "inners": [{"count": 4}],
         "q": {"value": 2.5, "unit": "kN/m"},
