@@ -80,11 +80,16 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `tests/windows/test_jobs.py::test_suspended_assign_resume`, `::test_kill_on_close`, `::test_breakaway_survives`.
 - AC6. Given a command-line tool job (no breakaway), when the step times out, then every process of the job ends and
   the step fails `TIMEOUT_NO_EFFECT`. Tests: `tests/unit/servers/test_launcher_posix.py::test_tool_timeout_kills_group`,
-  `tests/windows/test_jobs.py::test_tool_job_no_breakaway`.
+  `tests/windows/test_jobs.py::test_tool_job_no_breakaway`, `tests/workflow/adapters/test_cli.py::test_timeout_no_effect`
+  (the step part, plan T16; amendment B-388).
 - AC7. Given a running process, when `ProcessInspector.identity(pid)` is read twice, then the start time is equal;
   given a pid reused by a new process, then `alive(pid, started_at)` is false; `terminate(pid, started_at)` ends the
   process only if both match. Tests: `tests/unit/servers/test_procinfo.py::test_identity_stable`,
   `::test_terminate_checks_start_time`, `tests/windows/test_procinfo.py::test_identity_windows`.
+- AC7a. Given a process the engine may not open (another user's host program on a shared machine: `OpenProcess` fails
+  with access denied), then `snapshot` and `children` leave it out and log its pid, while `identity` and `terminate`
+  on that pid raise. Test: `tests/windows/test_procinfo.py::test_listing_skips_inaccessible` (over the fake kernel32;
+  amendment B-388).
 
 ### 3.3 MCP session and build check
 
@@ -352,7 +357,10 @@ close, no breakaway). `LaunchedProcess`: `pid`, `started_at` (from the inspector
 `terminate(identity) -> bool`. `started_at` is the OS creation time as an opaque string (Windows: the creation
 `FILETIME` from `GetProcessTimes` as an integer; Linux: `/proc/<pid>/stat` field 22 plus the boot id from
 `/proc/sys/kernel/random/boot_id`). `terminate` opens the process once, compares the start time on that handle and
-terminates through the same handle, so a reused pid is never hit.
+terminates through the same handle, so a reused pid is never hit. `snapshot` and `children` leave out a process the
+engine may not open (it could not act on it anyway) and log its pid; `identity` and `terminate` on a given pid keep
+raising (AC7a). `LaunchedProcess.close()` releases the handles; on Windows that closes the last job handle, so
+kill-on-close ends the job: callers close a process only when its job may end (amendment B-388, B-122 reviews).
 
 - **POSIX** (development and Linux CI only; no host program runs there): `subprocess.Popen` with
   `start_new_session=True`; the "job" is the process group and `terminate_job` is `killpg`. POSIX has no kill-on-close

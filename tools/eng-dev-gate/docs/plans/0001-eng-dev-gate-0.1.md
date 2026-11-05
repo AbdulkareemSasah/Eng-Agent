@@ -635,6 +635,24 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_package_files_are_copied"
     covers: [AC53b]
     depends_on: [T20, T29]
+  - id: T38
+    title: "mutation step: the backend run is bounded by limits.mutation_run_seconds, not by the bound of one tool call"
+    # Amendment (B-383, documents only): structural-codes core T11 (B-265) changed _runner.py and lifecycle.py, 487
+    # mutants on the check evaluation path; a surviving mutant runs about 100 s of tests, so mutmut run passed the 900 s
+    # bound of one tool call (toolrun.py) and the gate stopped with exit 3 before any score. Initial value 7200 s in
+    # .gate/gate.yml (a gate setting proposed here, owner queue).
+    files:
+      - ".gate/gate.yml"
+      - "tools/eng-dev-gate/src/eng_dev_gate/toolrun.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/config/gate_config.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/mutation.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_run_time_limit_from_gate_config"
+    covers: [AC53c]
+    depends_on: [T3, T20, T37]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
@@ -731,7 +749,8 @@ cleanup and the job.
 
 **T18** adds `secrets` and the `security` job (secret scan plus `uv audit --locked`). **T19** adds `licenses` and the
 generated-document freshness. **T20** adds `mutation` after choosing the backend in a second package-local ADR
-(`docs/adr/0002-mutation-backend.md`). **T21** adds the `workflows` lint, including WF005, the shape of `ci.yml` that keeps every pull-request job on the gate
+(`docs/adr/0002-mutation-backend.md`). Amendment (B-383): T38 bounds the backend run by `limits.mutation_run_seconds` instead of the bound of one
+tool call, which a run of a few hundred mutants on a module that most tests reach passes. **T21** adds the `workflows` lint, including WF005, the shape of `ci.yml` that keeps every pull-request job on the gate
 of the base commit.
 
 **T22** adds the pinned reviewer prompts with their hash manifest, the `review` command, and the `ci-review` job; it
