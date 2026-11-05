@@ -10,7 +10,7 @@ import pytest
 from eng_contract.kinds import NEUTRAL_KINDS
 
 from eng_harness._calc import _approvals
-from eng_harness._calc._approvals import ApprovalsInvalid, check_approvals, load_approvals, resolve_status
+from eng_harness._calc._approvals import ApprovalsError, check_approvals, load_approvals, resolve_status
 from eng_harness.calc import CalcRegistry, CalcStatus
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "data" / "calcs" / "fixture_calcs.py"
@@ -102,7 +102,7 @@ def test_file_validation(registry: CalcRegistry, tmp_path: Path) -> None:
     assert loaded.withdrawn[0].content_sha256 == "any"
 
     def reason(path: Path) -> str:
-        with pytest.raises(ApprovalsInvalid) as caught:
+        with pytest.raises(ApprovalsError) as caught:
             load_approvals(path, registry)
         return caught.value.reason
 
