@@ -1,0 +1,46 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.footing_plan_size",
+    "status": "draft",
+    "version": 1
+  },
+  "draft": true,
+  "footings": [
+    {
+      "Lx_mm": 2000.0,
+      "Ly_mm": 2000.0,
+      "depth_at_max": false,
+      "h_mm": 500.0,
+      "id": "J1",
+      "plan_at_max": false,
+      "reason": null,
+      "s_mm": 200.0,
+      "source": "calc",
+      "spacing_at_min": false,
+      "status": "OK"
+    },
+    {
+      "Lx_mm": 2500.0,
+      "Ly_mm": 2500.0,
+      "depth_at_max": false,
+      "h_mm": 500.0,
+      "id": "J2",
+      "plan_at_max": false,
+      "reason": null,
+      "s_mm": 200.0,
+      "source": "calc",
+      "spacing_at_min": false,
+      "status": "OK"
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.footing_plan_size",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
