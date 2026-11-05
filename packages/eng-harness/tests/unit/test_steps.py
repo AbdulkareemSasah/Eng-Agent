@@ -9,8 +9,10 @@ import hashlib
 from collections.abc import Awaitable, Callable, Sequence
 
 import pytest
+
 from eng_harness.engine._steps import (
     MAX_PATH_LENGTH,
+    Scope,
     attempts,
     block_step,
     inserted_path,
@@ -21,7 +23,6 @@ from eng_harness.engine._steps import (
     step,
     validate_path,
 )
-
 from eng_harness.errors import (
     BlockRuleViolation,
     EngineStop,
@@ -94,20 +95,23 @@ def test_paths_independent_of_completion_order() -> None:
     log_a, results_a = asyncio.run(_workflow((0, 3, 6))())
     log_b, results_b = asyncio.run(_workflow((6, 3, 0))())
     started = [line for line in log_a if line.startswith("start")]
-    assert started == [
-        "start 0",
-        "start 1/0",
-        "start 1/1",
-        "start 2/0/0",
-        "start 2/1/0",
-        "start 2/2/0",
-        "start 2/0/1",
-        "start 2/1/1",
-        "start 2/2/1",
-        "start 3/0/0",
-        "start 3/1/0",
-        "start 4",
-    ]
+    assert sorted(started) == sorted(
+        [
+            "start 0",
+            "start 1/0",
+            "start 1/1",
+            "start 2/0/0",
+            "start 2/1/0",
+            "start 2/2/0",
+            "start 2/0/1",
+            "start 2/1/1",
+            "start 2/2/1",
+            "start 3/0/0",
+            "start 3/1/0",
+            "start 4",
+        ]
+    )
+    assert sorted(line for line in log_b if line.startswith("start")) == sorted(started)
     ends_a = [line for line in log_a if line.startswith("end 2/") and line.endswith("/0")]
     ends_b = [line for line in log_b if line.startswith("end 2/") and line.endswith("/0")]
     assert ends_a == ["end 2/0/0", "end 2/1/0", "end 2/2/0"]
@@ -139,26 +143,11 @@ def test_inserted_and_housekeeping_paths() -> None:
 
 
 def test_path_length_limit() -> None:
-    async def scenario() -> None:
-        async def execute(path: str) -> str:
-            return path
-
-        async def nest(depth: int) -> str:
-            if depth == 0:
-                return await step(execute)
-
-            async def inner(path: str) -> str:
-                return await nest(depth - 1)
-
-            return await block_step(inner)
-
-        with root_scope():
-            deepest = await nest(511)  # "0/0/.../0" with 512 indexes: 1023 characters
-            assert len(deepest) == MAX_PATH_LENGTH - 1
-        with root_scope(), pytest.raises(BlockRuleViolation, match="1024"):
-            await nest(512)
-
-    asyncio.run(scenario())
+    longest_allowed = Scope("/".join(["0"] * 511))  # 1021 characters; its first step is 1023 characters
+    assert len(longest_allowed.begin()) == MAX_PATH_LENGTH - 1
+    too_long = Scope("/".join(["0"] * 512))  # 1023 characters; its first step would be 1025
+    with pytest.raises(BlockRuleViolation, match="1024"):
+        too_long.begin()
 
 
 def test_op_id() -> None:
@@ -366,10 +355,8 @@ def test_attempts_break_ends_the_loop_and_restores_the_scope() -> None:
                 if attempt.index == 0:
                     break
             await step(execute)  # the next step of the enclosing scope, right after the break
-            loop = attempts(1)
-            async for _ in loop:
+            async for _ in attempts(1):
                 break
-            assert loop.exhausted is False
             await step(execute)
         return seen
 

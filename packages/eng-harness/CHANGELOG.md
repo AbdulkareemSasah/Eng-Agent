@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Step paths and scopes: `engine/_steps.py` (path grammar and validation, inserted and housekeeping paths, `op_id`, scope counter with overlap detection, `step`, `block_step`, `parallel` with the error choice by class rank and lowest index, and the attempts iterator) (plan 0001 T8, B-107; spec 0001 AC5 to AC8).
 - ctx types and the result codec: `eng_harness.ctx` (`ToolResult`, `ReadResult`, `CalcResult`, `Decision`, `Answered`, `Approval`, `ApprovalKind`, `Preview`, `PreviewItem`, `Attempt`, `ModelHandle`, `Promotion`, `ArgValue`, `DecisionRequest`, `BasisCount` and `BasisView` with `ref`, `quantity`, `count`, `choice`) and `engine/_codec.py` (canonical round trip, then `Quantity` rebuilt); the `Ctx` protocol follows with the calls (plan 0001 T7, B-106; spec 0001 AC11, AC17).
 - Calc kinds part 2: payload models of `harness.design_summary/1`, `harness.section_size/1`, `harness.placement_comparison/1` and `harness.readback_check/1` registered in `eng_harness.kinds.calcs` (plan 0003 T4b, B-380; spec 0003 AC47).
 - Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
