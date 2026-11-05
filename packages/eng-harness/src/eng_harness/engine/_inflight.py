@@ -266,7 +266,9 @@ async def _write(rt: Resume, step: Step) -> None:
         evidence = []
     result = None
     if outcome == "applied":  # the reconciled result, else the adapter's read-back, else nothing to show
-        reply = (found.result if found is not None else None) or await rt.tool.read_back(began.name, args)
+        reply = (found.result if found and found.outcome == "applied" else None) or await rt.tool.read_back(
+            began.name, args
+        )
         result = _stored(reply) if isinstance(reply, SuccessEnvelope) else _nothing(rt, op)
     payload = {"op_id": op, "outcome": outcome, "result": result and result.model_dump(mode="json"), "decided_by": by}
     rt.writer.append(EventType.STEP_RECONCILED, payload | {"evidence": evidence}, path=step.path, attempt=step.attempt)

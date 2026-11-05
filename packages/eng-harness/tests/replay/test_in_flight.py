@@ -257,3 +257,17 @@ def test_calc_in_flight(tmp_path: Path) -> None:
         ("step_completed", "0", 1), ("run_completed", None, None),
     ]  # fmt: skip
     assert rig.calc_runs == [("harness.demo", args)]
+
+
+def test_a_partial_result_is_not_the_result_of_a_write_found_applied(tmp_path: Path) -> None:
+    rig, host, run_id = _cut_off_write(tmp_path)
+    partial = success(rig, {"tool": "write_b"})
+    host.reconciliations[OP] = Reconciliation(outcome="partial", result=partial)
+    resume(rig, chain(ORIGINAL), run_id)
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(asked.request_id, answer(asked, "applied", "outcome"))
+    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
+    (closing,) = _events(rig, run_id, ev.StepReconciled)
+    assert closing.result is not None
+    assert closing.result.ref != partial.result_id  # what the adapter found half done is not the write's result
+    assert closing.result.summary == {}
