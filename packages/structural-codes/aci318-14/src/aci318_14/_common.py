@@ -1,9 +1,8 @@
 """Shared cited constants and material preconditions of the ACI 318-14 pack (plan 0002 T2). R1 module.
 
-Purpose: `CITED` (constants used by several checks, by trace name; `const` records one), `SECTION_CITED` (the
-stress-block and `phi` constants of the flexure and axial-flexure specs §5, moved here by plan 0004 T1) and the
-preconditions of the clause specs §2. Units: as each `Cited` states (`sf_max` in MPa^0.5 stored with unit 1, plan
-§6 Q6). Errors: `KeyError` for an unknown constant; `CheckDefinitionError` from the recorder for a name recorded twice.
+Purpose: `CITED`, `SECTION_CITED` (shared constants by trace name; `const` records one) and the preconditions of the
+clause specs §2. Units: as each `Cited` states (`sf_max` in MPa^0.5 stored with unit 1, plan §6 Q6). Errors: `KeyError`
+for an unknown constant; `CheckDefinitionError` from the recorder for a name recorded twice.
 """
 
 from enum import StrEnum
@@ -63,10 +62,7 @@ SECTION_CITED = MappingProxyType(
 
 
 def const(t: TraceRecorder, name: str) -> float:
-    """Record the shared constant `name` (of `CITED` or `SECTION_CITED`) on `t` and return its value.
-
-    Errors: see the module docstring.
-    """
+    """Record the shared constant `name` (of `CITED` or `SECTION_CITED`) on `t` and return its value (errors: above)."""
     return t.const(name, CITED[name] if name in CITED else SECTION_CITED[name])
 
 

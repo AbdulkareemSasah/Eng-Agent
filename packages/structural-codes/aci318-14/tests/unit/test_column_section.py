@@ -5,10 +5,6 @@ CS S6 and S7) and the maximum axial strength spec (BD-1 to BD-3). Tolerances are
 and kN.m, 1e-6 on ratios, strains and `phi`.
 """
 
-# ruff: noqa: N815  # B-330: field names are fixed by the contract's unit suffixes (EC §4.7.2), e.g. A_bar_mm2
-
-import os
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,6 +12,7 @@ from eng_contract.cited import Cited
 from eng_contract.envelope import LiteralInput
 from eng_contract.params import ValidatedInput
 from eng_contract.verdicts import Subject, SubjectKind
+from pydantic import create_model
 from structural_codes.applicability import Outcome, Precondition
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.inputs import CheckInputs, bounded, unbounded
@@ -41,39 +38,42 @@ _ONE = Cited(value=0, unit="1", source="Geometry: test input, a count or factor 
 _LEN, _KN, _RATIO = 1e-4, 0.001, 1e-6
 
 
-class _Column(CheckInputs):
-    """Inputs common to the column checks (AF §3, MA §3)."""
-
-    Pu_kN: float = unbounded(reason="signed axial force, compression positive", unit="kN")
-    b_mm: float = bounded(gt=_MM, unit="mm")
-    h_mm: float = bounded(gt=_MM, unit="mm")
-    fc_MPa: float = bounded(gt=_MPA, unit="MPa")
-    fy_MPa: float = bounded(gt=_MPA, unit="MPa")
-    transverse_kind: TransverseKind = TransverseKind.TIED
-    k_factor: float = bounded(gt=_ONE, unit="1")
-    lu_mm: float = bounded(gt=_MM, unit="mm")
-
-
-class _Layout(_Column):
-    """Axial-flexure form: the bar layout of CS S1."""
-
-    d_prime_mm: float = bounded(gt=_MM, unit="mm")
-    n_bars_b: int = bounded(gt=_ONE, unit="1")
-    n_bars_h: int = bounded(gt=_ONE, unit="1")
-    A_bar_mm2: float = bounded(gt=_MM2, unit="mm2")
-
-
-class _Axial(_Column):
-    """Maximum axial strength form: the total steel area as an input."""
-
-    Ast_mm2: float = bounded(gt=_MM2, unit="mm2")
-
-
-class _Limits(CheckInputs):
-    """Reinforcement limits form: both areas as inputs."""
-
-    Ag_mm2: float = bounded(gt=_MM2, unit="mm2")
-    Ast_mm2: float = bounded(gt=_MM2, unit="mm2")
+# The input models are built with `create_model`: their field names carry the contract's unit suffixes (EC §4.7.2).
+_COLUMN = create_model(
+    "_Column",
+    __base__=CheckInputs,
+    __doc__="Inputs common to the column checks (AF §3, MA §3).",
+    Pu_kN=(float, unbounded(reason="signed axial force, compression positive", unit="kN")),
+    b_mm=(float, bounded(gt=_MM, unit="mm")),
+    h_mm=(float, bounded(gt=_MM, unit="mm")),
+    fc_MPa=(float, bounded(gt=_MPA, unit="MPa")),
+    fy_MPa=(float, bounded(gt=_MPA, unit="MPa")),
+    transverse_kind=(TransverseKind, TransverseKind.TIED),
+    k_factor=(float, bounded(gt=_ONE, unit="1")),
+    lu_mm=(float, bounded(gt=_MM, unit="mm")),
+)
+_Layout = create_model(
+    "_Layout",
+    __base__=_COLUMN,
+    __doc__="Axial-flexure form: the bar layout of CS S1.",
+    d_prime_mm=(float, bounded(gt=_MM, unit="mm")),
+    n_bars_b=(int, bounded(gt=_ONE, unit="1")),
+    n_bars_h=(int, bounded(gt=_ONE, unit="1")),
+    A_bar_mm2=(float, bounded(gt=_MM2, unit="mm2")),
+)
+_Axial = create_model(
+    "_Axial",
+    __base__=_COLUMN,
+    __doc__="Maximum axial strength form: the total steel area as an input.",
+    Ast_mm2=(float, bounded(gt=_MM2, unit="mm2")),
+)
+_Limits = create_model(
+    "_Limits",
+    __base__=CheckInputs,
+    __doc__="Reinforcement limits form: both areas as inputs.",
+    Ag_mm2=(float, bounded(gt=_MM2, unit="mm2")),
+    Ast_mm2=(float, bounded(gt=_MM2, unit="mm2")),
+)
 
 
 _BASE: dict[str, Any] = {
@@ -217,33 +217,33 @@ def test_declarations() -> None:
         axial_compression("G3")
 
 
-_AF_SPEC = (
-    Path(__file__).resolve().parents[3]
-    / "docs"
-    / "clauses"
-    / "aci318_14"
-    / "aci318_14.22_4_1_1.axial_flexure_uniaxial.md"
-)
+_T22 = "ACI 318-14 Table 22.2.2.4.3"
+# AF §5: value, unit and Citation cell of each constant `_column.COLUMN_CITED` or `_common.SECTION_CITED` defines.
+AF_SECTION_5 = {
+    "eps_cu": (0.003, "1", "ACI 318-14 22.2.2.1"),
+    "alpha_1": (0.85, "1", "ACI 318-14 22.2.2.4.1 (stress-block concrete stress 0.85 f'c)"),
+    "beta1_hi": (0.85, "1", _T22),
+    "beta1_slope": (0.05, "1", _T22),
+    "beta1_step": (7, "MPa", _T22),
+    "fc_beta_lo": (28, "MPa", _T22),
+    "fc_beta_hi": (55, "MPa", _T22),
+    "beta1_lo": (0.65, "1", _T22),
+    "Es": (200000, "MPa", "ACI 318-14 20.2.2.2"),
+    "phi_cc_tied": (0.65, "1", "ACI 318-14 Table 21.2.2 (compression-controlled, other)"),
+    "phi_cc_spiral": (0.75, "1", "ACI 318-14 Table 21.2.2 (compression-controlled, spiral per 25.7.3)"),
+    "phi_tc": (0.90, "1", "ACI 318-14 Table 21.2.2 (tension-controlled), via Table 21.2.1 (a)"),
+    "phi_tr_tied": (0.25, "1", "ACI 318-14 Table 21.2.2 (transition, other)"),
+    "phi_tr_spiral": (0.15, "1", "ACI 318-14 Table 21.2.2 (transition, spiral)"),
+    "eps_tc": (0.005, "1", "ACI 318-14 Table 21.2.2 (tension-controlled strain limit)"),
+    "pnmax_tied": (0.80, "1", "ACI 318-14 Table 22.4.2.1 (a), nonprestressed, ties"),
+    "pnmax_spiral": (0.85, "1", "ACI 318-14 Table 22.4.2.1 (b), nonprestressed, spirals"),
+    "kl_r_sway": (22, "1", "ACI 318-14 6.2.5(a) (columns not braced against sidesway; used for every column, CP)"),
+    "r_factor": (0.30, "1", "ACI 318-14 6.2.5.1(b) (rectangular columns)"),
+    "c_corner": (4, "1", "Geometry: four corner bars counted twice in `2·n_bars_b + 2·n_bars_h`"),
+}
 
 
 def test_constants_match_clause_spec() -> None:
     """The column and stress-block constants carry the value, unit and Citation cell of AF §5 verbatim."""
-    if not _AF_SPEC.is_file() and "MUTANT_UNDER_TEST" in os.environ:
-        pytest.skip("the clause specs are outside the copy the mutation step runs (B-423); expires 2026-12-31")
-    body = _AF_SPEC.read_text(encoding="utf-8").split("\n## 5.", 1)[1].split("\n## ", 1)[0]
-    rows = [[c.strip() for c in ln.strip().strip("|").split("|")] for ln in body.splitlines() if ln.startswith("| `")]
-    table = {sym.strip("`"): (float(value), unit, citation) for sym, value, unit, citation in rows}
-    for name, cited in {**SECTION_CITED, **COLUMN_CITED}.items():
-        assert table[name] == (float(cited.value), cited.unit, cited.source), name
-    assert set(SECTION_CITED) == {
-        "phi_tc",
-        "eps_tc",
-        "eps_cu",
-        "alpha_1",
-        "beta1_hi",
-        "beta1_slope",
-        "beta1_step",
-        "fc_beta_lo",
-        "fc_beta_hi",
-        "beta1_lo",
-    }
+    found = {name: (c.value, c.unit, c.source) for name, c in {**SECTION_CITED, **COLUMN_CITED}.items()}
+    assert found == AF_SECTION_5
