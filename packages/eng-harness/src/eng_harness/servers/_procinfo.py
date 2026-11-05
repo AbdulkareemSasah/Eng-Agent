@@ -93,7 +93,15 @@ class PosixProcessInspector:
         return found is not None and found[0].started_at == identity.started_at and found[1] != "Z"
 
     def _scan(self) -> list[tuple[ProcessIdentity, str, int, int]]:
-        found = (self._identity(int(entry.name)) for entry in _PROC.iterdir() if entry.name.isdigit())
+        """List every readable process; an entry the engine may not read (hidepid) is left out and logged (AC7a)."""
+        found = []
+        for entry in _PROC.iterdir():
+            if not entry.name.isdigit():
+                continue
+            try:
+                found.append(self._identity(int(entry.name)))
+            except PermissionError:
+                logger.info("process %s left out of the listing: not readable", entry.name)
         return [item for item in found if item is not None]
 
     def children(self, pid: int) -> list[ProcessIdentity]:
