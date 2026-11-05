@@ -28,3 +28,6 @@ Plan 0004 (templates and basis; completed by T9). Nothing here runs in CI:
 
 Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 15. `eng_harness.cli._opener.open_address` opens the launch address in the default browser on Windows (`os.startfile`), macOS and Linux with `BROWSER` set to a capture program (it must not run), and `write_to_terminal` reaches the controlling terminal (`CONOUT$`, `/dev/tty`); with no terminal it returns False and nothing is printed on stdout or stderr.
+
+Plan 0003 T7 (spec 0003 L-1): the model fingerprint on real reads.
+16. `harness.model_fingerprint` over the read set of a real ETABS model: the same fingerprint over repeated reads, and after save and reopen; a different fingerprint after each of the S-04 hand edits E1 to E10 (only CI's synthetic read sets have run).

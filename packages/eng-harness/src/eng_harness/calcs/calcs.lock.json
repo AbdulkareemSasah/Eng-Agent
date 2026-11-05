@@ -1,4 +1,10 @@
 {
-  "calcs": [],
+  "calcs": [
+    {
+      "content_sha256": "258a38bb8e95c309b34d7ac7aeac1b719dfa949898b0042b8b6d526339b13ef9",
+      "id": "harness.model_fingerprint",
+      "version": 1
+    }
+  ],
   "schema": 1
 }

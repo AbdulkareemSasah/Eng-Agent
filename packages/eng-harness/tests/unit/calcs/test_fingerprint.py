@@ -11,7 +11,7 @@ from eng_contract.envelope import FailureEnvelope, HostInfo, Provenance, RefInpu
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from eng_harness._calc._approvals import ApprovalsFile
 from eng_harness._calc._hash import read_lock
@@ -35,11 +35,11 @@ KINDS = {
 }
 
 
-def _point(x: float, y: float, z: float) -> dict[str, float]:
+def _point(x: float, y: float, z: float) -> dict[str, JsonValue]:
     return {"x_mm": x, "y_mm": y, "z_mm": z}
 
 
-FRAMES = {
+FRAMES: dict[str, JsonValue] = {
     "frames": [
         {
             "id": "F1",
@@ -51,7 +51,7 @@ FRAMES = {
         }
     ]
 }
-AREAS = {
+AREAS: dict[str, JsonValue] = {
     "areas": [
         {
             "id": "A1",
@@ -62,7 +62,9 @@ AREAS = {
         }
     ]
 }
-RESTRAINTS = {"joints": [{"joint": "J1", "ux": True, "uy": True, "uz": True, "rx": False, "ry": False, "rz": False}]}
+RESTRAINTS: dict[str, JsonValue] = {
+    "joints": [{"joint": "J1", "ux": True, "uy": True, "uz": True, "rx": False, "ry": False, "rz": False}]
+}
 
 
 def _meta(
@@ -224,7 +226,9 @@ def test_runs_through_the_calc_port(tmp_path: Path) -> None:
     ids = SeededIdSource(b"harness", clock)
     store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
     host = HostInfo(program="fake", version="1", model_id=MDL, model_revision=3)
-    producer = Provenance(tool="csi", tool_version="t", host=host, inputs={}, started_at=clock.now(), duration_ms=0)
+    producer = Provenance(
+        tool="fake-host/read_model", tool_version="t", host=host, inputs={}, started_at=clock.now(), duration_ms=0
+    )
     frames = store.put("model.frame_placements/1", FRAMES, producer).result_id
     restraints = store.put("model.joint_restraints/1", RESTRAINTS, producer, complete=False).result_id
     approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})

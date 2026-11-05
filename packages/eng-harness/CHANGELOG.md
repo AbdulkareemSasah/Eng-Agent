@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc 1, model fingerprint: `harness.model_fingerprint` v1 (draft) in `calcs/model_fingerprint.py` (`FingerprintInput`, `FingerprintBody`, `StateMatch`, `same_state`), the canonical-state helper `calcs/_state.py` (F2 section keys and order) and its lock entry; `REGISTRY` now checks calcs against the neutral and calc kinds (plan 0003 T7, B-146; spec 0003 AC19 to AC23).
 - Decision provider interfaces: `eng_harness.decisions.interfaces` (`ProviderInfo`, `ProviderRequest`, `ChoiceAnswer`, `YesNoAnswer`, `LLMAnswer`, `DecisionProvider`, `LLMProvider`, `ProviderErrorCode`, `OutgoingPlace`, `ProviderError`, `ProviderFailure`) and the port data in `decisions/_record.py` (`DecisionCall` with `sensitive_values`, `EngineerChoice`, `DecisionAnswer`, `PendingAnswer`, `DecisionScreen`, `Suggestion`), with scripted fake providers in `tests/fakes/decision_providers.py` (plan 0005 T5, B-169; spec 0005 AC41).
 
 - CalcPort: `HarnessCalcPort`, `CalcSettings` and `CalcRefusal` in `_calc/_port.py` (`describe` with `ref_rules` from the `x-eng` metadata, `run` with status check by run class, `validate_input` under `require_refs`, `InputMeta` from the records, item limit, `CalcMeta`, draft mark and trace, storage as `harness`; `preflight`; defects as `INTERNAL`), with the calc step workflow test through the real engine (plan 0003 T5, B-144; spec 0003 AC4, AC11 to AC18).
