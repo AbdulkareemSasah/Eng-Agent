@@ -102,7 +102,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   reason, and the engine stops before any write (engine AC44). Tests:
   `tests/unit/servers/test_buildcheck.py::test_fingerprint_definition`, `::test_each_mismatch`,
   `tests/workflow/servers/test_session.py::test_build_mismatch_stops_run` (the engine clause; it runs the real engine,
-  plan task T19a; amendment B-413).
+  plan task T19; amendment B-413).
 - AC10. Given the S-12 inventory, when the fingerprint of the CSI allowlist is computed from it, then it equals the
   value pinned in the allowlist data (`fingerprint_source = "s12-inventory"`). Test:
   `tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`.
@@ -158,7 +158,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC22. Given a timeout on a host whose units were left changed (synthetic fault `units_left_changed`), when the next
   step on that host runs, then `read_units` reports the mismatch and the engine stops with `PRECONDITION_FAILED`
   (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`
-  (it runs the real engine, plan task T19a; amendment B-413).
+  (it runs the real engine, plan task T19; amendment B-413).
 - AC23. Given a write in flight, when reconciled, then the adapter reads the object's state and answers `applied`,
   `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result; given an analysis or design
   in flight with no proof of end of the abandoned call (v1), then the answer is `unknown` whatever the host answers,
@@ -250,9 +250,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   without `routes` in its header (CSI), then an entry with `routes` or a server section with `route` is a load error.
   The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. `build_ports`
   loads each adapter's allowlist for its server section's `route`. Tests:
-  `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter`,
-  `::test_route_filter` also covers a `route` on a CSI section (amendment B-413: every route rule is decided at
-  allowlist load, none by the configuration loader),
+  `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter` (also a `route` on a CSI
+  section; amendment B-413: every route rule is decided at allowlist load, none by the configuration loader),
   `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data).
 - AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
   loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
