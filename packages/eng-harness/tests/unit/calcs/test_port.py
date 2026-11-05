@@ -199,6 +199,44 @@ def test_item_limit_at_limit_runs(fx: ModuleType, tmp_path: Path) -> None:
     assert rig.store.puts == before + 1
 
 
+def _two_record_args(rig: Rig) -> dict[str, Any]:
+    """Arguments referencing two records that hold 2 and 3 list items."""
+    first = rig.source({"span_mm": 1.0, "pad": [1.0, 2.0]})
+    second = rig.source({"rows": [1.0, 2.0, 3.0]})
+    return {"span_mm": {"$ref": f"{first}#/value/span_mm"}, "rows": {"$ref": f"{second}#/value/rows"}}
+
+
+def test_item_limit_totals_over_records(fx: ModuleType, tmp_path: Path) -> None:
+    rig = make(fx, tmp_path, max_items=4)
+    args = _two_record_args(rig)
+    before = rig.store.puts
+    out = rig.port.run("harness.port_sum", args)
+    assert isinstance(out, FailureEnvelope)
+    assert out.error.code is ErrorCode.LIMIT_EXCEEDED
+    assert out.error.expected == {"max": 4}
+    assert out.error.received == 5
+    assert rig.store.puts == before
+
+
+def test_item_limit_totals_over_records_at_limit_runs(fx: ModuleType, tmp_path: Path) -> None:
+    rig = make(fx, tmp_path, max_items=5)
+    args = _two_record_args(rig)
+    before = rig.store.puts
+    assert isinstance(rig.port.run("harness.port_sum", args), SuccessEnvelope)
+    assert rig.store.puts == before + 1
+
+
+def test_item_limit_counts_unreferenced_items_of_record(fx: ModuleType, tmp_path: Path) -> None:
+    rig = make(fx, tmp_path, max_items=3)
+    rid = rig.source({"span_mm": 1.0, "rows": [1.0, 2.0, 3.0, 4.0]})
+    before = rig.store.puts
+    out = rig.port.run("harness.port_sum", {"span_mm": {"$ref": f"{rid}#/value/span_mm"}})
+    assert isinstance(out, FailureEnvelope)
+    assert out.error.code is ErrorCode.LIMIT_EXCEEDED
+    assert out.error.received == 4
+    assert rig.store.puts == before
+
+
 def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     rig = make(fx, tmp_path)
     args = rig.args(offset=2.5, whole=False)
