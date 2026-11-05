@@ -7,7 +7,7 @@ Spec 0006 owns where the file is found and its `[engine]` section; this module r
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -43,6 +43,26 @@ Seconds = Annotated[int, Field(strict=True, ge=1)]  # unit: s
 
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class ReleaseMarked(_Model):
+    """Release mark of an allowlist or `[cli_tools.*]` entry (spec 0002 section 4.5.1, AC38).
+
+    `unreleased` is a project-lane tool not yet through the release lane (ADR-0026); it needs `release_record`, the
+    repository-relative path of its gap report or session record, which a `released` entry must not carry.
+    """
+
+    release: Literal["released", "unreleased"] = "released"
+    release_record: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _release_consistent(self) -> Self:
+        if (self.release == "unreleased") != (self.release_record is not None):
+            raise ValueError("release_record is required exactly when release is unreleased")
+        path = PureWindowsPath(self.release_record or "")  # also splits on "/"
+        if path.anchor or ".." in path.parts:
+            raise ValueError("release_record must be a repository-relative path")
+        return self
 
 
 class BuildPin(_Model):
@@ -133,7 +153,7 @@ class BuildArtifact(_Model):
         return _absolute(value)
 
 
-class CliToolConfig(_Model):
+class CliToolConfig(ReleaseMarked):
     """One `[cli_tools.<name>]` section; `timeout_s` is required."""
 
     shell: str
@@ -169,6 +189,12 @@ class ServersConfig(_Model):
     servers: Mapping[str, ServerConfig] = Field(default_factory=dict)
     cli_tools: Mapping[str, CliToolConfig] = Field(default_factory=dict)
     host_programs: Mapping[str, HostProgramConfig] = Field(default_factory=dict)
+
+    def unreleased_tools(self) -> dict[str, str]:
+        """`{name: release_record}` of the unreleased `[cli_tools.*]` entries (AC38); empty when there are none."""
+        return {
+            n: t.release_record for n, t in self.cli_tools.items() if t.release_record and t.release == "unreleased"
+        }
 
 
 def load_servers_config(path: Path) -> ServersConfig:
