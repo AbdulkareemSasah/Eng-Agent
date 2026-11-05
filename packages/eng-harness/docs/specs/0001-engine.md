@@ -804,8 +804,10 @@ input, append `run_started`; call the root block.
    step 8 resolves it.
 8. Host-state check (§4.5.4) for every model the run wrote; a lost model is a mismatch.
    8a. (Amendment B-415.) For each tool save reconciled `applied` (or journaled without its `model_saved`) whose
-   model passed the check, append its `model_saved` from the check's read (§4.6 "Tool saves", EC2). This appends to
-   the journal and calls no port, so the port order AC62 tests is unchanged.
+   model passed the check, append its `model_saved` from the check's read (§4.6 "Tool saves", EC2), reading
+   `HostPort.model_files(model_key)` for its `file_name` (review fix B-415: the check's `HostModelState` holds no file
+   name). That synchronous read (§4.8) is not one of the port calls AC62 orders; step 8a calls no other port, so the
+   order AC62 tests is unchanged.
 9. Call the root block from the start with the replay index.
 
 Reconciliation therefore never runs without the preflight, a lease, a loaded model and verified units on its host; a
@@ -934,7 +936,8 @@ before the host-state check, so that an engineer change made while the run was p
 - When that check passes for the model, the engine appends the `model_saved` (role `revision`) before the root block
   is called (§4.5.1 step 8a): `model_id` and `revision` from the result's `provenance.host`; `fingerprint` and
   `file_sha256` from the check's own `@resume<n>.model_state.<model_key>` read, which matched; `file_name` as for a
-  live save. When the check stops the run, none is appended: `accept` journals its own `baseline` save, `restore`
+  live save, the base name of the first path of `HostPort.model_files(model_key)` read at step 8a (the one port call
+  step 8a makes, outside the order AC62 tests). When the check stops the run, none is appended: `accept` journals its own `baseline` save, `restore`
   cuts the step (it runs again live), and `abandon` ends the run.
 - A result without `provenance.host`, or a new-file save whose result has no `saved_file` (for example an engineer's
   `applied` with no adapter read-back, which completes with an empty summary, §4.5.3), raises nothing at resume (no
