@@ -8,11 +8,11 @@ from types import ModuleType
 
 from eng_contract.envelope import Provenance, SuccessEnvelope
 from eng_contract.store import ResultStore
-from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from workflows.calc_test_blocks import calc_step, engine
 from workflows.rig import make_rig, request
 
 from eng_harness._calc._approvals import ApprovalsFile
+from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness.calc import CalcRegistry
 from eng_harness.engine import RunStatus
 from eng_harness.journal import EventType

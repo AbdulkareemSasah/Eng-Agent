@@ -11,11 +11,11 @@ from eng_contract.envelope import FailureEnvelope, Provenance, RefInput, Success
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import ResultStore
-from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from pydantic import JsonValue
 
 from eng_harness import __version__
 from eng_harness._calc._approvals import ApprovalsFile
+from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness.calc import CalcRegistry, CalcStatus, NotImplementedGap
 from eng_harness.errors import CalcRefused, HarnessCode
 from eng_harness.ports import RunClass
@@ -182,7 +182,9 @@ def test_result_record(fx: ModuleType, tmp_path: Path) -> None:
     payload = rig.store.payload(out.result_id)
     assert payload["total"] == pytest.approx(502.5, abs=1e-9)
     assert payload["calc"] == {"id": "harness.port_sum", "version": 2, "content_sha256": HASH, "status": "draft"}
-    assert payload["trace"]["content_sha256"] == HASH  # type: ignore[index]  # B-144: JSON value
+    trace = payload["trace"]
+    assert isinstance(trace, dict)
+    assert trace["content_sha256"] == HASH
 
 
 def test_production_and_withdrawn_refusal(fx: ModuleType, tmp_path: Path) -> None:
