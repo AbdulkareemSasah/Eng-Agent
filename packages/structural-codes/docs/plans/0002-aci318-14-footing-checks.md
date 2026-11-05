@@ -50,7 +50,9 @@ tasks:
     # failing-first run; gate spec 4.7). Hand values: §2 T2b.
     files:
       - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py"
-    max_changed_lines: 10
+    # Budget: the task statement of B-421 set 10; two cases (R1, R2) with about 25 hand-value assertions (PK-AC10)
+    # do not fit, so the review of B-421 raised it to 60, pending the lead's confirmation.
+    max_changed_lines: 60
     max_sessions: 1
     tests_first:
       - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py::test_rectangular_statics"
@@ -267,7 +269,7 @@ applies. A check whose constant is not the shared one keeps its own `Cited` and 
 | `fy_max` | 550 | MPa | ACI 318-14 Table 20.2.2.4(a) (not special seismic) | flexure, minimum reinforcement, development, axial |
 | `k_m` | 0.001 | 1 | SI prefix milli: m per mm (EC §4.7.3) | bearing, one-way, punching, flexure |
 | `k_kN` | 0.001 | 1 | SI prefix kilo: kN per N (EC §4.7.3) | one-way, punching (trace name `k_kilo`), axial |
-| `k_kNm` | 1.0e-6 | 1 | SI prefixes kilo and milli: kN.m per N.mm (EC §4.7.3) | flexure, axial |
+| `k_kNm` | 1.0e-6 | 1 | SI prefixes kilo and milli: kN.m per N.mm (EC §4.7.3) | flexure (trace name `k_kilo_milli`), axial |
 | `c_S` | 6 | 1 | Mechanics of materials: section modulus of a rectangle, b*h^2/6 | bearing, one-way, punching, flexure |
 | `c_I` | 12 | 1 | Mechanics of materials: second moment of a rectangle, b*h^3/12 | bearing, one-way, punching, flexure |
 | `c_half` | 2 | 1 | Statics and geometry: factor 2 of a half or a pair (L/2 and c/2 of a centered footing and column, the midpoint xbar, the resultant at a/2, the integral Lp^2/2, mid-depth h/2, the bisection midpoint, two side bars per inner layer) | one-way, flexure, axial (plan 0004 T1 moves the column constants into `_common.py`) |
@@ -275,6 +277,13 @@ applies. A check whose constant is not the shared one keeps its own `Cited` and 
 
 Every text except `c_half` is the source merged in T2 (B-271), so only `c_half` and the `sf_max` note change in code
 (T2c). The texts start with the prefixes of PK-AC4.
+
+Constants that become shared later fall under the same rule. Plan 0004 T1 moves the stress-block and `φ` constants of
+the flexure module (`phi_tc`, `eps_tc`, `eps_cu`, `alpha_1`, `beta1_hi`, `beta1_slope`, `beta1_step`, `fc_beta_lo`,
+`fc_beta_hi`, `beta1_lo`) into `_common.py`, and they then become keys of `CITED` that the T2c test checks. Their rows
+in the flexure and axial-flexure specs §5 are therefore already aligned (B-421) to one plain-text Citation cell equal
+to the source merged in `checks/flexure.py` (B-275), with the values of the flexure spec; plan 0004 T1 moves the
+`Cited` objects unchanged and needs no clause spec change.
 
 ## 2. Tasks
 
@@ -329,7 +338,8 @@ of the one-way and flexure hand checks for `Vu` and `Mu`).
 records that decision). Test `test_shared_sources_match_clause_specs` in `tests/unit/test_common.py` reads §5 of every
 clause spec under `packages/structural-codes/docs/clauses/aci318_14/` and, for each row whose Symbol is a key of
 `CITED`, asserts the Citation cell equals `CITED[name].source`, the Value cell equals its value and the Unit cell its
-unit; it also asserts every key of `CITED` has at least one such row and that the `sf_max` note is the text of §1.1.
+unit (a key added later, such as the plan 0004 T1 constants of §1.1, is checked the same way with no test change);
+it also asserts every key of `CITED` has at least one such row and that the `sf_max` note is the text of §1.1.
 A development-length row named `c_half` is that check's own constant (§1.1) and is excluded by name. It fails at the
 base because the merged `c_half` source and the missing `sf_max` note differ from the specs. `test_footing_statics.py`
 may assert that the constants recorded by `statics`, `one_way_shears` and `face_moments` are the `CITED` objects.
