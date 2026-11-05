@@ -225,3 +225,11 @@ def test_provenance_rejects(over: dict[str, Any]) -> None:
 @pytest.mark.parametrize("ref", [RID, RID + "#", RID + "#/a/0"])
 def test_ref_input_accepts_whole_and_pointer_forms(ref: str) -> None:
     assert RefInput.model_validate({"ref": ref}).ref == ref
+
+
+def test_ref_input_uses_ref_string() -> None:
+    """AC9a: `RefInput.ref` is a `RefString` (spec 4.6.1), whose pointer may hold a newline."""
+    ref = RID + "#/a\nb"
+    assert RefInput.model_validate({"ref": ref}).ref == ref
+    with pytest.raises(ValidationError):
+        RefInput.model_validate({"ref": "res_" + "z" * 26})
