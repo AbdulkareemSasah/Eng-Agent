@@ -13,6 +13,8 @@ from eng_harness.workflows.model_edit_cycle._change_set import (
     REFUSED_KIND_GAPS,
     ChangeSetDraft,
     ChangeSetSettings,
+    LengthInput,
+    WallSection,
     refused_gap,
 )
 
@@ -42,7 +44,14 @@ def _items() -> list[dict[str, Any]]:
             "select": {"story": None, "section": "S150", "area_kind": "slab"},
             "section": "S200",
         },
-        {"id": "a5", "kind": "wall_section", "name": "W250", "material": "C30", "thickness": thickness, "shell_type": "ShellThick"},
+        {
+            "id": "a5",
+            "kind": "wall_section",
+            "name": "W250",
+            "material": "C30",
+            "thickness": thickness,
+            "shell_type": "ShellThick",
+        },
         {
             "id": "a6",
             "kind": "frame_uniform_load",
@@ -127,8 +136,9 @@ def test_model_parses_and_refuses() -> None:
 def test_any_unit_of_the_dimension_parses() -> None:
     parsed = ChangeSetDraft.model_validate(_with(4, thickness={"source": "input", "value": 0.25, "unit": "m"}))
     item = parsed.items[4]
-    assert item.kind == "wall_section"
-    assert (item.thickness.value, item.thickness.unit) == (0.25, "m")  # type: ignore[union-attr]  # B-387: basis arm has no value
+    assert isinstance(item, WallSection)
+    assert isinstance(item.thickness, LengthInput)
+    assert (item.thickness.value, item.thickness.unit) == (0.25, "m")
 
 
 def test_size_limit_is_a_setting() -> None:
