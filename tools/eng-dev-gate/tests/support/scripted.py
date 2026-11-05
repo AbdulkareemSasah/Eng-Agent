@@ -26,7 +26,7 @@ class EnvironmentRunner:
         self.lock = lock
         self.calls: list[tuple[list[str], Path]] = []
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append((list(argv), cwd))
         if argv[:2] == ["uv", "lock"]:
             return ToolResult(exit_code=self.lock, output="lock output")

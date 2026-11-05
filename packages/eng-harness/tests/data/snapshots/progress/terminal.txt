@@ -1,0 +1,11 @@
+<CR><ERASE>run started: w (work_on_copy)
+<CR><ERASE>run 00:00 | step read_model 00:00, no estimate
+<CR><ERASE>done: read_model [0] 00:05
+<CR><ERASE>run 00:05 | step analyze 00:00, expected ~00:50 (00:40 to 01:10, 3 earlier runs)
+<CR><ERASE>waiting for engineer: Apply change, 00:00
+<CR><ERASE>waiting for engineer: Apply change, 00:00
+<CR><ERASE>approval: approve
+<CR><ERASE>run 00:50 | step analyze 00:45, expected ~00:50 (00:40 to 01:10, 3 earlier runs)
+<CR><ERASE>done: analyze [1] 01:00
+<CR><ERASE>model saved: a.edb (revision 1)
+<CR><ERASE>run completed, 01:10
