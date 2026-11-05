@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tool descriptors and allowlist data: `eng_harness.adapters` (`ToolDescriptor`, `Allowlist`, `load_allowlist`, `AllowlistError`) refusing escape-hatch names at load, the packaged CSI allowlist (`adapters/csi/_allowlist.toml`, 35 tools pinned to the S-12 inventory) and the `release` and `release_record` marks on allowlist and `[cli_tools.*]` entries with `unreleased_tools()` (plan 0002 T6, B-125; spec 0002 AC16, AC38).
 - Progress display: `eng_harness.progress` with `ExpectedTimes.build` (read-only journals, median, range and sample floor), `estimate` and `ProgressRenderer` for terminal, plain and JSON modes, with golden snapshots; the sink, heartbeat task and JSON-mode heartbeat follow in T5 (plan 0006 T4, B-178; spec 0006 AC15 to AC17).
 
 - Decision points: `DecisionPoint`, `decision_point`, `Refs`, `PointRegistry` (state field rules of AC2, `schema_sha256`), `check_state_size`, `check_lock`, `write_lock` and `discover()` in `decisions/_points.py`, the empty `decisions.lock.json` and `python -m eng_harness.decisions --write-lock`; `Label` and `DecisionDefinitionError` now live in `_points.py` and stay importable from `decisions.types` (plan 0005 T2, B-166; spec 0005 AC1 to AC4).
