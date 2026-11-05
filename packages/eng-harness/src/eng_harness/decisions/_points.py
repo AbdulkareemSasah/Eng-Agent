@@ -25,6 +25,7 @@ from pydantic import BaseModel, StringConstraints, TypeAdapter, ValidationError
 
 from eng_harness.block import LockFinding
 from eng_harness.decisions._policy import DecisionSettings
+from eng_harness.decisions._redaction import LABEL_BOUND, denied_token
 from eng_harness.errors import BlockRuleViolation
 
 __all__ = [
@@ -46,7 +47,7 @@ __all__ = [
 LOCK_PATH = Path(__file__).resolve().parent.parent / "decisions.lock.json"
 
 # AC2: 1 to 80 characters, no control character, none of / \ @ : (a path, URL or address cannot be a label).
-_LABEL = StringConstraints(min_length=1, max_length=80, pattern=r"^[^\x00-\x1f\x7f-\x9f/\\@:]+$")
+_LABEL = StringConstraints(min_length=1, max_length=LABEL_BOUND, pattern=r"^[^\x00-\x1f\x7f-\x9f/\\@:]+$")
 Label = Annotated[str, _LABEL]
 
 _NAME = re.compile(r"^[a-z][a-z0-9_]{2,63}$")  # AC1
@@ -85,18 +86,20 @@ def _finite(meta: Sequence[object], config: Mapping[str, Any]) -> bool:
     return config.get("allow_inf_nan") is False or any(getattr(m, "allow_inf_nan", None) is False for m in meta)
 
 
-def _check_field(annotation: Any, meta: Sequence[object], config: Mapping[str, Any], path: str) -> None:
+def _check_field(
+    annotation: Any, meta: Sequence[object], config: Mapping[str, Any], path: str, extra: frozenset[str]
+) -> None:
     """Accept one AC2 field type or raise ``DecisionDefinitionError`` naming ``path``."""
     origin = get_origin(annotation)
     if origin is Annotated:
-        head, *extra = get_args(annotation)
-        _check_field(head, [*meta, *extra], config, path)
+        head, *more = get_args(annotation)
+        _check_field(head, [*meta, *more], config, path, extra)
     elif origin is tuple:
         args = get_args(annotation)
         if not args:
             _refuse("state field", f"{path} is an untyped tuple")
         for item in args[:1] if args[-1] is Ellipsis else args:
-            _check_field(item, [], config, path)
+            _check_field(item, [], config, path, extra)
     elif annotation in (bool, int, Quantity, Ref):
         return
     elif annotation is float:
@@ -105,18 +108,21 @@ def _check_field(annotation: Any, meta: Sequence[object], config: Mapping[str, A
     elif (annotation is str and _LABEL in meta) or (isinstance(annotation, type) and issubclass(annotation, StrEnum)):
         return
     elif isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        _check_model(annotation, f"nested model at {path}")
+        _check_model(annotation, f"nested model at {path}", extra)
     else:
         _refuse("state field", f"{path} has type {annotation!r}, which is not allowed")
 
 
-def _check_model(model: object, what: str) -> None:
+def _check_model(model: object, what: str, extra: frozenset[str]) -> None:
     if not (isinstance(model, type) and issubclass(model, BaseModel)):
         _refuse("state", f"{what} must be a Pydantic model")
     if model.model_config.get("frozen") is not True or model.model_config.get("extra") != "forbid":
         _refuse("state", f"{what} must be frozen with extra='forbid'")
     for field_name, info in model.model_fields.items():
-        _check_field(info.annotation, info.metadata, model.model_config, f"{model.__name__}.{field_name}")
+        path = f"{model.__name__}.{field_name}"
+        if (token := denied_token(field_name, extra)) is not None:  # AC32, spec 4.10
+            _refuse("state field", f"{path} has the denied token {token!r}")
+        _check_field(info.annotation, info.metadata, model.model_config, path, extra)
 
 
 def _is_label_tuple(annotation: Any) -> bool:
@@ -162,7 +168,8 @@ def decision_point(
 
     Errors: ``DecisionDefinitionError`` naming the broken rule of AC1 or AC2.
     """
-    limit = (settings or DecisionSettings()).max_options
+    settings = settings or DecisionSettings()
+    limit = settings.max_options
 
     def build(_marker: type) -> DecisionPoint:
         if not _NAME.match(name):
@@ -173,7 +180,7 @@ def decision_point(
             TypeAdapter(Label).validate_python(title)
         except ValidationError as exc:
             raise DecisionDefinitionError(f"title: {title!r} is not a valid Label") from exc
-        _check_model(state, "state")
+        _check_model(state, "state", frozenset(settings.extra_denied_tokens))
         shape = _check_options(options, state, yes_no, limit)
         digest = hashlib.sha256(canonical_json({"options": shape, "state": state.model_json_schema()})).hexdigest()
         return DecisionPoint(name, version, title, options, state, yes_no, digest)
