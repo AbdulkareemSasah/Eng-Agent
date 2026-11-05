@@ -67,7 +67,7 @@ defines its method; values are synthetic and say so.
 
 - AC33. Given the engine amendments of §11 (Q2, Q3, Q5, spec 0004 Q7), then: a workflow with `copy_on_open` gets its
   working copy right after the open step in every mode; a tool step with action `save` journals `model_saved` (role
-  `revision` when `as_new_revision`); an always-ask step is not satisfied by an approval resolved `mode:*`; and
+  `revision`, engine EC2); an always-ask step is not satisfied by an approval resolved `mode:*`; and
   `required_basis` is derived from `basis_fields`. Tests:
   `tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode`, `::test_tool_save_journals_revision`,
   `::test_mode_resolved_approval_not_always_ask`, `::test_required_basis_from_fields`; and a save passed `under=` an
@@ -367,7 +367,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 4 | `ctx.calc("harness.model_diff", {"before": R[k-1], "after": S[k], "basis": B.ref(...)})` | `before` is `stale_ok`, `after` current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
 | 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
-| 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` for the snapshot `P[k]` (§4.5.1); never over an existing file |
+| 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
 | 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
 | 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before": S[k], "after": S', "basis"})`; then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
@@ -390,12 +390,15 @@ journaled proof that nothing changed).
   `p~post.save` after each write (engine §4.7), the step 10 and `pre_analysis` saves, and the engineer's own saves in
   ETABS go into `W` in place.
 - `P[k]`, the snapshot of cycle `k`: step 7 (`as_new_revision`, §4.10) saves `W` in place, copies its files to a new
-  file in the run's copies folder, verifies the copy's hash and journals `model_saved` (role `revision`) with the
-  snapshot's name and hash; the host keeps `W` open. `P[k]` holds `S[k]`, so the engineer's changes are in it. No
+  file in the run's copies folder, verifies the copy's hash, and the engine journals `model_saved` (role `revision`)
+  naming `W` with its hash, which the verified snapshot shares; the snapshot's name and hash are in step 7's result
+  summary `saved_file` (engine §4.6 "Tool saves", review fix B-415), so `model_saved` always names the open file and
+  an engine `restore` reopens `W`, never a snapshot; the host keeps `W` open. `P[k]` holds `S[k]`, so the engineer's changes are in it. No
   tool writes a snapshot: the adapter refuses a write or save whose target is one, and the page tells the engineer to
   edit only the open model. A new approval-void iteration (D-5) makes a new snapshot at its own step 7.
 - `restore_previous` (D-2) runs `csi_open_revision` on this cycle's latest `P[k]`, never on `R[k-1]`: it checks that
-  the snapshot's file hash equals its `model_saved`, copies it to a new working file, opens that file on the bound
+  the snapshot's file hash equals the `saved_file.sha256` of the step 7 result that made it (equal to that step's
+  `model_saved.file_sha256`), copies it to a new working file, opens that file on the bound
   instance without saving `W` (action `open`, `model_bound`, `model_saved` role `revision`), and the new file becomes
   `W`. The writes of the failed apply are gone and the engineer's changes stay (AC34). A snapshot whose hash differs
   (someone saved over it) gives `CONFLICT`: nothing is opened and the run escalates; the engineer decides.
@@ -511,8 +514,9 @@ server tool):
   `model.load_set/1`, `model.joint_restraints/1`, `harness.csi_model_status/1`) plus `harness.csi_name_lists/1`
   (frame section, area section, material, pattern and combination names). Its summary holds the references. A
   section that a read-back gap leaves unreadable is absent, so downstream calcs give `not_read` (spec 0003 §4.8).
-- `csi_open_revision` (effect `write`, action `open`): checks that a snapshot of this run still has the file hash of
-  its `model_saved` (else `CONFLICT`), copies it to a new working file in the run's copies folder, opens that file on
+- `csi_open_revision` (effect `write`, action `open`): checks that a snapshot of this run still has the file hash
+  recorded for it (the `saved_file.sha256` of the save that made it, equal to that save's `model_saved.file_sha256`;
+  else `CONFLICT`), copies it to a new working file in the run's copies folder, opens that file on
   the bound instance without saving the current one, and records `model_saved` (role `revision`); used by D-2
   `restore_previous` (§4.5.1). Amendment B-415: the engine, not the adapter, journals that `model_saved` (engine §4.6
   "Tool saves"): the tool's `ToolInfo.saves_new_file(args)` returns true and its result summary carries `saved_file`
@@ -524,7 +528,8 @@ server tool):
   host keeps the working file open (§4.5.1). The adapter refuses any write or save whose target is a snapshot.
   Amendment B-415 (engine §4.6 "Tool saves", §4.8): with `as_new_revision` true, the CSI `ToolInfo.saves_new_file(args)`
   returns true and the result summary carries `saved_file` (`name`, the snapshot's base name; `sha256`, its verified
-  file hash), from which the engine journals `model_saved` (role `revision`); without it, `saves_new_file` is false and
+  file hash), which the engine checks against the model's file hash before it journals `model_saved` (role
+  `revision`, `file_name` the working file `W`, not the snapshot); without it, `saves_new_file` is false and
   the engine journals the in-place save.
 
 ## 5. Inputs and outputs

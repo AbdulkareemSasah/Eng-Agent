@@ -137,8 +137,12 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
       - "packages/eng-harness/src/eng_harness/ports.py"  # ToolInfo.saves_new_file, engine §4.8 (amendment B-415)
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # calls into the copy-on-open and tool-save hooks (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # resumed tool save: compared with its result's provenance.host, saved_file mismatch, engine §4.6 "At a resume" (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 9 (amendment B-415)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
-    max_changed_lines: 200
+    # Amendment (B-415 review fix, documents only): _hoststate.py and _runner.py added for EC2's resume cases (both
+    # extended from plan 0001 T11b); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
+    max_changed_lines: 300
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode"
@@ -345,7 +349,9 @@ Starts only after the engine spec amendment is merged. Amendment B-415: that ame
 §4.2, §4.6 "Tool saves", §4.7, §4.8 `ToolInfo.saves_new_file`, §4.9; rules EC1 to EC6 of its §3.9, one per test of
 this task, which add no engine criterion: spec AC33 covers them;
 §11 Q26 to Q30). It adds `ports.py` (`saves_new_file`, default false) and `engine/_ctx_impl.py` (only the calls into
-the new hooks) to this task's files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
+the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
+save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11b) to this task's
+files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
 
 **T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules (`rb.pass`,
 `am.clean`) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review.
@@ -391,7 +397,7 @@ uninterrupted run.
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11b (`_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core) |
 | T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models) |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |

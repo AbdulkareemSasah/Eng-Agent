@@ -336,7 +336,8 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC48. `work_on_copy`: given an existing model, then a working copy is made and saved (`model_saved`, role
   `working_copy`) before the first write, and every write goes to the copy's model key. Test:
   `tests/workflow/test_modes.py::test_work_on_copy`.
-- AC49. `approve_each_write`: given a write, then an approval of its ToolPort preview precedes it; a rejection
+- AC49. `approve_each_write`: given a write other than a tool save to a new file that overwrites no original (§4.7
+  exception, EC6; amendment B-415), then an approval of its ToolPort preview precedes it; a rejection
   raises `ApprovalRejected` and the write is not called. Test: `tests/workflow/test_modes.py::test_approve_each_write`.
 - AC50. `autonomous_logged`: given a write, then it is called without approval; given a `ctx.approve` of kind `INFO`,
   then it is resolved by the mode and journaled with `by: "mode:autonomous_logged"`. Test:
@@ -399,8 +400,10 @@ them; each states the cases its test checks.
   `tests/unit/test_engine_edit_cycle_amendments.py::test_copy_on_open_every_mode`.
 - EC2 (tool saves, §4.6 "Tool saves"). Given a tool step with action `save` (or any tool whose
   `ToolInfo.saves_new_file(args)` is true) that completed live, then `model_saved` (role `revision`) is journaled
-  before the next step: for an in-place save with the working file's base name and its `HostPort.model_state`
-  fingerprint and file hash; for a save to a new file with the summary's `saved_file.name` and `saved_file.sha256`;
+  before the next step, with its `HostPort.model_state` fingerprint and file hash and, as `file_name`, the base name
+  of the working file open after the step (`HostPort.model_files`): for an in-place save and for an `as_new_revision`
+  save that working file, never the snapshot, whose name stays in the result's `saved_file`; for a tool that opens a
+  new working file, that new file; a later `restore` reopens the file named by the last `model_saved`;
   given a live new-file save whose `saved_file.sha256` differs from the model's file hash after the save, or a result
   without `provenance.host` or (new file) without `saved_file`, then `ModelIntegrityError` and no `model_saved`.
   Given such a save reconciled `applied` at a resume (§4.5.3), then no model state is read and no `model_saved` is
@@ -899,10 +902,15 @@ the step's model key (`ToolInfo.model_param`) with role `revision`:
 - `model_id` and `revision` from the result's `provenance.host` (contract §4.2.2);
 - `fingerprint` and `file_sha256` from `HostPort.model_state(model_key, instance_id)` of the bound instance, read
   right after the step (a live save only; a save reconciled `applied` follows "At a resume" below);
-- `file_name`: for an in-place save, the base name of the first path of `HostPort.model_files(model_key)`; for a save
-  to a new file (`saves_new_file(args)` true), the base name in the result summary's `saved_file.name`, and the
-  engine checks that the summary's `saved_file.sha256` equals the `file_sha256` just read (the new file is a verified
-  copy of the saved model, spec 0007 §4.10).
+- `file_name`: always the base name of the first path of `HostPort.model_files(model_key)` read right after the step,
+  that is, the working file the host has open after it (review fix B-415). For an in-place save and for a save that
+  also writes a snapshot and keeps the working file open (spec 0007's `csi_save_model` with `as_new_revision`), that
+  is the working file, never the snapshot; for a tool that opens a new working file (spec 0007's `csi_open_revision`),
+  it is that new working file. So the model's last `model_saved` always names the file the host has open, which
+  `restore` (§4.5.4) and an engineer's reopen use. A snapshot's base name and hash are not in `model_saved`: they stay
+  in the step's result summary `saved_file` (journaled with `step_completed`), where spec 0007 finds the snapshot.
+- For a save to a new file (`saves_new_file(args)` true), the engine checks that the summary's `saved_file.sha256`
+  equals the `file_sha256` just read (the new file is a verified copy of the saved model, spec 0007 §4.10).
 
 A result without `provenance.host`, a new-file save whose summary has no `saved_file` (name and SHA-256 hex digest),
 or a `saved_file.sha256` that differs from the model's file hash raises `ModelIntegrityError` (a `StepError`) and no
@@ -1273,4 +1281,4 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q27 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
 | Q28 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6) |
 | Q29 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
-| Q30 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
+| Q30 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
