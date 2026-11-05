@@ -158,6 +158,9 @@ ESCAPE_HATCH_NAMES = (
     "run_baked_tool",
     "batch_execute",
     "run_synapse_command",
+    "revit_accept_bake_suggestion",
+    "revit_dismiss_bake_suggestion",
+    "revit_list_bake_suggestions",
 )
 
 
