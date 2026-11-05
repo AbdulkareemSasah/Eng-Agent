@@ -347,6 +347,7 @@ tasks:
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T14b extends the shared builder with its new fields); T18 binds the defaults.
     # Amendment (B-412 third review, documents only): workflow tests use a fake engine from CliDeps; T17c re-checks AC61 and AC63 with the real engine.
     # Amendment (B-412 fifth review, documents only): the cascade goes into the factory's port set; the merged EnginePorts has no decision field yet, so T16b carries it to the real engine.
+    # Amendment (B-412 sixth review, documents only): the cascade builder is the CliDeps field decision_port_factory (default None, plan 0005 T7 and T10 not merged); test_decision_wiring.py injects a recorder; T18 binds it.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -503,6 +504,7 @@ tasks:
     # Amendment (B-412 second review, documents only): new; the one task that replaces the None defaults of the section 3 rule.
     # Amendment (B-412 fourth review, documents only): the registry is plan 0010 T9's workflows/__init__.py (T18 waits for it); engine factory and freeze are bound by T14 and T15.
     # Amendment (B-412 fifth review, documents only): depends on T16b, so run and resume become available in production only with the full port wiring.
+    # Amendment (B-412 sixth review, documents only): also binds decision_port_factory to the cascade of plan 0005 (waits for plan 0005 T7 and T10).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -671,6 +673,15 @@ decision layer is then not available and `run` and `resume` exit 2 "not availabl
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`. Amendment B-412 fifth review: T14b puts the
 cascade into the engine factory's port set (T14); the merged `EnginePorts` has no decision field until engine plan T14,
 so AC62 is checked on the fake engine's port set, and T16b carries the cascade into the real `EnginePorts`.
+Amendment B-412 sixth review: the cascade code (`eng_harness.decisions.Cascade`, plan 0005 T7, wired to the engine by
+plan 0005 T10) is not merged, so T14b builds the `DecisionPort` through a third `CliDeps` field in `cli/__init__.py`,
+`decision_port_factory` (default `None` under the defaults rule of §3). It takes the runtime that `decision_assembler`
+returns and the run's decision inputs, and returns the decision port that goes into the engine factory's port set; its
+exact parameters follow the `Cascade` construction of spec 0005 §4.5 as plan 0005 T7 and T10 fix it (the `rule_guard`
+there is engine-supplied). While it is `None`, `run` and `resume` stay "not available in this build" (exit 2).
+`test_decision_wiring.py` injects a recording factory and checks that it receives the assembled runtime and that its
+result is the decision port the fake engine receives (AC62); `tests/helpers/cli_deps.py` gains the field. T18 binds
+its default.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 Amendment B-354: `run --no-wait` with required basis fields exits 10 before any run exists, nothing stored (AC47).
@@ -745,7 +756,8 @@ review checks. It is split from T17 to keep each test-only pull request within t
 each `None` default of the §3 rule with the real implementation: the port builder `build_ports` (plan 0002 T19), the calc
 preflight (plan 0003 `HarnessCalcPort.preflight`), the workflow registry of `src/eng_harness/workflows/__init__.py`
 (plan 0010 T9, the one task that creates that module), `load_providers_config` and `assemble_decision_runtime` (plan
-0009 T1 and T10), and `eng_harness.doctor.run` (plan 0002 T18). The engine factory and `freeze` are merged (engine
+0009 T1 and T10), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
+plan 0005 T10; amendment B-412 sixth review), and `eng_harness.doctor.run` (plan 0002 T18). The engine factory and `freeze` are merged (engine
 plan T9 and T9b; plan 0004 T8) and are bound by T14 and T15, not here (amendment B-412 fourth review). It waits for
 all of them, plan 0010 T9 included. No task yet registers the model-edit-cycle workflow of plan 0007 in that module
 (plan 0007's tests drive the engine directly, its §3 T11 row); that gap is a lead item for the owner queue. In
@@ -766,14 +778,15 @@ the real engine.
   the stop check between steps, added to engine T18 by this plan's B-412 pull request; T16b waits for T14, T14b and T18);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0010 T9 for the workflow registry (`workflows/__init__.py`; plan 0007 adds no registry); for T14b (B-098),
-  decision plan T10 (the cascade's `runtime_summary()`), engine plan T14b (`decision_runtime` in the header) and
+  decision plan T7 (the `Cascade`) and T10 (the cascade's `runtime_summary()` and its engine wiring; amendment B-412
+  sixth review: the cascade is the `decision_port_factory` default that T18 binds), engine plan T14b (`decision_runtime` in the header) and
   provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14, T14b and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it. Their real-engine halves are re-checked in T17c (staged engine, below); plan 0009
   section 3 says the same (amendment B-412 third review).
 - `CliDeps` defaults rule (amendment B-412; T14, T14b, T15, T16). Each `CliDeps` collaborator whose real implementation
-  is not merged (port builder, calc preflight, workflow registry, providers loader, decision assembler, doctor
-  callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
+  is not merged (port builder, calc preflight, workflow registry, providers loader, decision assembler, cascade
+  builder `decision_port_factory` (amendment B-412 sixth review), doctor callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
   still builds (what `eng_harness.cli:main` uses with `deps=None`, and what `tests/unit/cli/test_opener.py` calls).
   Tests pass the collaborators explicitly. A command counts as available only when every collaborator it needs is not
   `None`: the handler table (or the handler at dispatch) checks this, so with the default `CliDeps()` that command
@@ -796,6 +809,41 @@ the real engine.
   wiring. T17 waits for engine plan T15 and T18 and for T16b, and re-checks AC9, AC19, AC29 and AC37 with the real
   engine; T17c waits for engine plan T15 and for T16b, and re-checks AC7, AC8, AC42, AC46, AC47, AC61, AC63 and AC64
   (test files only, see T17 and T17c); both go through the production port mapping of T16b. AC33, AC34 and AC35 are built only in T17, with the real engine.
+- Collaborator map (amendment B-412 sixth review; spec §4.2.2, §4.4.5, §4.4.8). Every object the command line builds,
+  injects or binds, with the task that defines its `CliDeps` field (none: built inside `cli/` or `pages/`, no field),
+  the task that binds its real default, and what provides the real code. "Merged" names a module on `build/v1`. This
+  table is the assignment; a writer who finds an object missing from it stops and asks the lead.
+
+| Object (spec step) | `CliDeps` field defined in | Real default bound in | Provided by |
+|---|---|---|---|
+| Configuration, `HarnessConfig` (§4.2.2 step 1) | none (`cli/_config.py`) | not applicable | merged (T3) |
+| Streams, environment, handler table (§4.1) | T3 (`stdout`, `stderr`, `environ`, `handlers`) | T3; handlers registered by T14 (`run`, `resume`) and T16 (`status`, `stop`, `report`, `doctor`) | merged (T3) |
+| Launch-address opener (§4.4.4) | T3b (`opener`) | T3b | merged (`cli/_opener.py`) |
+| Clock and ids (§4.1) | T14 | T14 | merged (`eng_contract.ids`: `SystemClock` and the id helpers) |
+| Providers loader `load_providers_config` (step 1) | T14b (`providers_loader`) | T18 | plan 0009 T1 |
+| Workflow registry (step 1) | T14 | T18 | plan 0010 T9 (`workflows/__init__.py`) |
+| Port builder `build_ports`: tool, host and calc ports (step 1) | T14 | T18 | plan 0002 T19 |
+| Input validation (step 2) | none (engine call) | not applicable | merged (engine plan T9, engine AC16) |
+| `--answers` object and the wrapped `InputPort` (step 2, §4.2.1) | none (`cli/_wiring.py`, T14) | not applicable | T10 (`pages.accept_answers_file`) |
+| Draft (`build_draft`), basis-port factory, `freeze` (step 3) | T15, if they become fields | T15 | merged (plan 0004 T7 and T8: `basis/_build.py`, `_setup.py`, `_freeze.py`) |
+| Basis screen port `PageBasisSetupPort` and the `setup` kind (step 3, §4.4.7) | none (`pages/_ports.py`) | not applicable | T15 |
+| Calc preflight `HarnessCalcPort.preflight` (step 4) | T14 | T18 | plan 0003 |
+| Decision-runtime assembler `assemble_decision_runtime` and `DecisionSettings` from the configuration (step 5) | T14b (`decision_assembler`) | T18 | plan 0009 T10; `DecisionSettings` merged (`decisions/_policy.py`) |
+| Cascade as the `DecisionPort` (step 5) | T14b (`decision_port_factory`) | T18 | plan 0005 T7 (`Cascade`) and T10 (engine wiring); reaches the real `EnginePorts` in T16b (engine plan T14) |
+| `TerminalProgress` as the `ProgressSink` (step 5) | none (built by `cli/_wiring.py`, T14) | not applicable | T5; reaches the real `EnginePorts` in T16b (engine plan T18) |
+| Page server's sink and the fan-out `ProgressSink` (step 5, AC37) | none | not applicable | T7 (page sink), T16b (fan-out) |
+| `FileRunControl` as the `RunControlPort` (step 5, §4.4.8) | none (built by `cli/_wiring.py`, T14) | not applicable | T7 (`cli/_control.py`); reaches the real `EnginePorts` in T16b (engine plan T18) |
+| Page `ApprovalPort` and `InputPort` (step 5) | none (`cli/_wiring.py`, T14) | not applicable | T7 (approval, dispatch), T9 (review screens), T10 (choice and input screens) |
+| Page server `PageServer` (§4.4.1, started lazily) | none | not applicable | merged (`pages/_server.py`, T6) |
+| Page ports' stop check `stop_requested` (§4.4.5 step 2) | none (injected into the page ports, T7) | bound to `FileRunControl` by T14 (`cli/_wiring.py`) | T7 |
+| Page ports' `report` callable (§4.4.3 `GET /report`) | none (injected into the page ports, T7) | bound to `build_report` by T14 (`cli/_wiring.py`) | T13 (`build_report`) |
+| Engine factory (step 5) | T14 | T14 | merged (engine plan T9 and T9b); the full port mapping by T16b |
+| Report at the end (step 6) | none | not applicable | T13 (`build_report`, `write_report`), called by T14 |
+| Stop-file removals (§4.4.8) | none (`cli/_run.py`) | not applicable | T14 |
+| First interrupt writes the stop file (§4.4.8, AC10) | none (`cli/_signals.py`) | not applicable | T14b, through `cli/_control.py` (T7) |
+| `stop` command and `--wait` (§4.4.8, AC9) | none (`cli/_stop.py`) | not applicable | T16, through `cli/_control.py` (T7) |
+| Doctor callable (AC13) | T16 | T18 | plan 0002 T18 (`eng_harness.doctor.run`) |
+
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`; `stop.json` and `heartbeat.json`, Q19), engine §4.9 (`item_reasons`, the choice
   convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here. Amended in this
   plan's B-412 pull request, to agree with the `CliDeps` defaults rule: plan 0009 section 3 (T14b does not wait for

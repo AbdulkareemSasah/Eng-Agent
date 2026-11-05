@@ -397,7 +397,8 @@ Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_htm
 `pages/` folder holds the path-risk floor r3 (`.gate/risk-map.yml`), which is why this spec's plan is r3 throughout.
 The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
 takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener, decision-runtime
-assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
+assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62; the decision-port factory that builds the
+cascade of spec 0005 from the assembled runtime, `decision_port_factory`, B-412), so every test
 runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged is an
 optional field that defaults to `None` until it does (so `CliDeps()` still builds); a command whose collaborators are
 not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation;
@@ -872,7 +873,7 @@ heartbeat task runs on the engine loop.
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
 | AC7, AC9, AC19 (engine half, plan T17), AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client; a task built before the engine it needs uses the staged-engine stand-in below, and plan T17 or T17c re-checks it with the real engine) | `tests/workflow/` |
-| AC8 (staged engine, re-checked in plan T17c), AC35 | Replay (process killed, resumed) | `tests/replay/` |
+| AC8 (staged engine, re-checked in plan T17c), AC9 (stop-file removals, plan T14), AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
