@@ -17,10 +17,10 @@ from typing import Any
 
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
-from eng_contract.envelope import Provenance
+from eng_contract.envelope import FailureEnvelope, Provenance
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
-from fakes.ports import ENVELOPE, FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort
+from fakes.ports import ENVELOPE, FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort, Raise
 from pydantic import JsonValue
 
 from eng_harness import __version__
@@ -30,7 +30,7 @@ from eng_harness.block import BlockDef, Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter, is_locked
 from eng_harness.journal import _events as ev
-from eng_harness.ports import RunClass, ToolInfo
+from eng_harness.ports import CalcInfo, RunClass, ToolInfo
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
 BASIS_REF = "res_" + "0" * 26
@@ -83,6 +83,19 @@ class Host(FakeHost):
         self.locked: list[bool] = []
         self._runs_dir = runs_dir
 
+    def script(self, tool: str, *outcomes: ENVELOPE | Raise) -> None:
+        """Queue outcomes; a retryable failure of a read fails every attempt of one run (the engine retries reads).
+
+        A test that scripted a failure to stop a run at a read keeps that meaning: the failure is queued once for each
+        attempt the default settings allow. `outcomes[tool]` takes exact outcomes.
+        """
+        attempts = 1 + EngineSettings().step_retry_limit
+        for outcome in outcomes:
+            retryable = isinstance(outcome, FailureEnvelope) and outcome.error.retryable
+            self.outcomes[tool].extend(
+                [outcome] * (attempts if retryable and self._tools[tool].effect == "read" else 1)
+            )
+
     def unreleased_tools(self) -> Mapping[str, str]:
         """A copy of `unreleased`."""
         return dict(self.unreleased)
@@ -106,6 +119,9 @@ class Rig:
     inputs: FakeInputPort
     run_class: RunClass = RunClass.PRODUCTION
     log: list[str] = field(default_factory=list)
+    calc_infos: list[CalcInfo] = field(default_factory=list)
+    calc_results: dict[str, ENVELOPE | Raise] = field(default_factory=dict)
+    calc_runs: list[tuple[str, Mapping[str, JsonValue]]] = field(default_factory=list)
 
     def engine(
         self,
@@ -114,7 +130,8 @@ class Rig:
         settings: EngineSettings | None = None,
     ) -> Engine:
         """A new engine over the shared parts that registers `workflows`; its calc port has class `calc_class`."""
-        calc = FakeCalcPort(calc_class or self.run_class, [])
+        calc = FakeCalcPort(calc_class or self.run_class, self.calc_infos)
+        calc.results, calc.runs = self.calc_results, self.calc_runs  # shared by every engine of the rig
         ports = EnginePorts(
             tool=Spy("tool", self.host, self.log),
             host=Spy("host", self.host, self.log),
