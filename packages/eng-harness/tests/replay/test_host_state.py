@@ -1,21 +1,25 @@
-"""The host-state check before live execution, instance binding, and lost or reopened models (plan 0001 T11b).
+"""The host-state check before live execution, instance binding, and lost or reopened models (plan 0001 T11c).
 
 Covers spec 0001 AC34 (the three choices `accept`, `restore`, `abandon`), AC63 (a host crash with a write in flight:
 no reconciliation, `model_not_loaded`, `restore` binds the new instance and reads units against it before any live
 step) and AC64 (the `first_use` binding, and a model reopened in another instance), with the resume order of 4.5.1
 steps 6 to 8. The runs are forged by hand (`workflows/hoststate.py`): the journal holds the steps up to the stop and
 the fake host holds the state the test wants to find; a new engine resumes the run as a new process would. The host's
-call log names the instance of every `read_units` and `model_state`.
+call log names the instance of every `read_units` and `model_state`. A process that dies between the journal writes
+of a restore is forged by making the journal refuse the write (`DiedError`): the next resume must stay safe at each.
 """
 
 import asyncio
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import pytest
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
-from pydantic import JsonValue
+from eng_contract.errors import ErrorCode
+from fakes.ports import failure
+from pydantic import BaseModel, JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
 from workflows.hoststate import (
     INSTANCE,
@@ -40,7 +44,7 @@ from eng_harness.block import BlockDef
 from eng_harness.engine import RunStatus
 from eng_harness.engine._inflight import ResumeIndex
 from eng_harness.engine._steps import op_id
-from eng_harness.journal import EventType
+from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import Reconciliation, UnitsState
 
@@ -66,12 +70,15 @@ def _result(rig: Rig, host: ScriptedHost, revision: int | None = None, *, hosted
     return rig.store.put("harness.run_output/1", {"value": {}}, producer).result_id
 
 
-def _written(root: Path, *, completed: bool = True) -> tuple[Rig, ScriptedHost, str]:
-    """A run of `ORIGINAL` stopped after its write: m1 bound, saved, then written (completed, or still in flight)."""
+def _written(root: Path, *, completed: bool = True, wrote: int | None = None) -> tuple[Rig, ScriptedHost, str]:
+    """A run of `ORIGINAL` stopped after its write: m1 bound, saved, then written (completed, or still in flight).
+
+    The result of a completed write names the host's revision at that time, or `wrote` when given.
+    """
     rig, host = scripted_rig(root)
     host.add_model("m1", INSTANCE)
     steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), bound("m1", INSTANCE), saved(rig, "m1")]
-    steps += [start("1", "write_b", M1, write=True), *([done("1", ref=_result(rig, host))] if completed else [])]
+    steps += [start("1", "write_b", M1, write=True), *([done("1", ref=_result(rig, host, wrote))] if completed else [])]
     return rig, host, forge(rig, chain(ORIGINAL), *steps)
 
 
@@ -305,14 +312,21 @@ def test_units_that_differ_stop_the_run_before_reconciliation(tmp_path: Path) ->
 def test_first_use_binding(tmp_path: Path) -> None:
     rig, host = scripted_rig(tmp_path)
     host.add_model("m1", INSTANCE)  # the engine did not start this instance
-    outcome = asyncio.run(rig.engine(chain(ORIGINAL)).start(request(values={"count": 3})))
-    assert outcome.status is RunStatus.COMPLETED
-    (first,) = _kinds(rig, outcome.run_id, T.MODEL_BOUND)  # once, for the first step addressed to the model
+    host.script("read_c", failure(ErrorCode.HOST_BUSY))  # the run stops after its write, at its last step
+    stopped = asyncio.run(rig.engine(chain(ORIGINAL)).start(request(values={"count": 3})))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    run_id = stopped.run_id
+    (first,) = _kinds(rig, run_id, T.MODEL_BOUND)  # once, for the first step addressed to the model
     assert first == ev.ModelBound(
         model_key="m1", host_key="csi", instance_id="csi-1", reason="first_use", file_names=["m1.edb"]
     )
     named = [c[:2] for c in host.calls if c[1] in ("m1", "write_b")]
     assert named == [("locate", "m1"), ("call", "write_b")]  # located before the write reached the host
+    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
+    assert [c for c in host.calls if c[0] in ("read_units", "model_state")] == [
+        ("read_units", "m1", "csi-1"), ("model_state", "m1", "csi-1"),
+    ]  # fmt: skip  # every later read names the instance of the first use
+    assert len(_kinds(rig, run_id, T.MODEL_BOUND)) == 1  # the binding is not repeated at the resume
 
 
 SECOND: dict[str, JsonValue] = {"n": 2, "model": "m1"}
@@ -425,3 +439,69 @@ def test_the_cut_of_a_restore_leaves_the_new_attempt_to_later_resumes(tmp_path: 
     index.lookup("0", "tool", "read_a", payload_sha256({"n": 0}))
     index.lookup("2", "tool", "read_c", payload_sha256({"n": 2}))
     index.finish()  # every recorded path was visited: nothing hidden, nothing left over
+
+
+class DiedError(Exception):
+    """The process died before a journal write (a test double): that write did not happen."""
+
+
+_RESTORE_WRITES = (T.RUN_RESUMED, T.HOST_STARTED, T.MODEL_BOUND)  # the cut, the instance and the binding of a restore
+
+
+def _die_in_restore(monkeypatch: pytest.MonkeyPatch, host: ScriptedHost, allowed: int) -> None:
+    """Make the process die at the journal write of a restore that follows `allowed` of them (from `restore` on)."""
+    real, seen = JournalWriter.append, 0
+
+    def append(
+        self: JournalWriter,
+        type_: EventType,
+        payload: BaseModel | Mapping[str, object],
+        *,
+        path: str | None = None,
+        attempt: int | None = None,
+    ) -> int:
+        nonlocal seen
+        if type_ in _RESTORE_WRITES and any(call[0] == "restore" for call in host.calls):
+            seen += 1
+            if seen > allowed:
+                raise DiedError
+        return real(self, type_, payload, path=path, attempt=attempt)
+
+    monkeypatch.setattr(JournalWriter, "append", append)
+
+
+@pytest.mark.parametrize("allowed", [0, 1, 2])
+@pytest.mark.parametrize("after_save", ["completed", "in_flight"])
+def test_a_crash_inside_the_restore_is_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, after_save: str, allowed: int
+) -> None:
+    """The process dies after `allowed` of the journal writes of a restore (the cut, `host_started`, `model_bound`).
+
+    The host has restored the saved copy by then. Whatever the journal holds, the next resume never reconciles the
+    write after the save against the restored model, never offers `accept` (the journal holds writes the restored
+    model lacks), and the write after the save runs again as a new attempt (4.5.4).
+    """
+    rig, host, run_id = _written(tmp_path, completed=after_save == "completed", wrote=1)
+    if after_save == "completed":
+        _drift(host)  # the engineer changed the model: the write's result names revision 1, the host is at 5
+    else:
+        host.crash("csi")  # the host crashed with the write in flight: the model is not loaded
+    resume(rig, chain(ORIGINAL), run_id)
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(asked.request_id, answer(asked, "restore", "state"))
+    _die_in_restore(monkeypatch, host, allowed)
+    with pytest.raises(DiedError):
+        resume(rig, chain(ORIGINAL), run_id)
+    monkeypatch.undo()
+    for _ in range(3):
+        outcome = resume(rig, chain(ORIGINAL), run_id)
+        if outcome.status is not RunStatus.NEEDS_ENGINEER:
+            break
+        again = rig.inputs.presented[-1]  # the file the host reopened lacks the write: restore it again or abandon
+        assert options(again, "state") == ["restore", "abandon"]
+        rig.inputs.script(again.request_id, answer(again, "restore", "state"))
+    assert outcome.status is RunStatus.COMPLETED
+    assert all(c[0] != "reconcile" for c in host.calls)  # the restored model is never reconciled
+    assert [(c.tool, c.op_id) for c in host.ledger] == [
+        ("write_b", op_id(run_id, "1", 2)), ("read_c", op_id(run_id, "2", 1)),
+    ]  # fmt: skip
