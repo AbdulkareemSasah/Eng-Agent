@@ -158,7 +158,7 @@
       "properties": {
         "ref": {
           "maxLength": 2000,
-          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#.*)?$",
+          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#[\\s\\S]*)?$",
           "title": "Ref",
           "type": "string"
         }
