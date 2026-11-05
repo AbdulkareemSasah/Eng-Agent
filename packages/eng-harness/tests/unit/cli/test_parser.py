@@ -1,12 +1,15 @@
 """Command-line parser and entry point (spec 0006 AC1, AC65)."""
 
 import io
+import os
 import re
 import subprocess
 import sys
 import tomllib
 from argparse import Namespace
 from pathlib import Path
+
+import pytest
 
 from eng_harness.cli import CliDeps, ExitCode, main
 
@@ -88,6 +91,10 @@ def test_handlers_receive_parsed_arguments() -> None:
 
 
 def test_entry_point_and_root_form() -> None:
+    if not (ROOT / "pyproject.toml").is_file() and "MUTANT_UNDER_TEST" in os.environ:
+        # The gate's mutation step runs the tests in a copy of the package alone; mutmut sets MUTANT_UNDER_TEST in each
+        # of its runs, so only there a missing workspace root skips. Every other run reads both files (B-376).
+        pytest.skip("the workspace root is outside the package copy of the mutation step (B-376); expires 2026-12-31")
     package = tomllib.loads((PACKAGE / "pyproject.toml").read_text(encoding="utf-8"))
     assert package["project"]["scripts"] == {"eng-harness": "eng_harness.cli:main"}
     root = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
