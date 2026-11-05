@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Calc kinds part 2: payload models of `harness.design_summary/1`, `harness.section_size/1`, `harness.placement_comparison/1` and `harness.readback_check/1` registered in `eng_harness.kinds.calcs` (plan 0003 T4b, B-380; spec 0003 AC47).
+- Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
 - Basis draft: `build_draft`, `BasisDraft`, `EngineerValues`, `DetectedValue` in `eng_harness.basis` (precedence engineer, detected, template; sources and citations with the defining ancestor; `detected_differs` warning; pending list; `unused` template paths; draft `sha256`; the values file cannot set `confirmed`) (B-160; spec 0004 AC14 to AC20).
 - Calc kinds part 1: `eng_harness.kinds.calcs` (`CalcMeta`, `harness.model_fingerprint/1`, `harness.model_diff/1`, `harness.expected_effects/1`) registered in `eng_harness._kinds`; `kinds/**` added to the R2 modules (plan 0003 T4, B-143; spec 0003 AC47).
 - approvals.yaml schema and strict loader (`_calc/_approvals.py`, reusing the templates YAML loader and ADR-0004; no second YAML library), status resolution (withdrawn, then exact id, version and hash match, else declared state), `check_approvals` and the shipped empty `calcs/approvals.yaml` (plan 0003 T3, B-142; spec 0003 AC8 to AC10).
