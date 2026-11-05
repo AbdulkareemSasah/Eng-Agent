@@ -116,3 +116,27 @@ def test_constants_and_trace() -> None:
     assert steps["sf"].value == pytest.approx(28.0**0.5, abs=1e-9)
     assert steps["sf"].unit is None
     assert steps["Vc_x_kN"].value == pytest.approx(843.333 / 0.75, abs=_V_KN)
+
+
+def test_rectangular_plan_uses_the_width_across_each_direction() -> None:
+    """Asymmetric hand check: bw = Ly with d_x for X, bw = Lx with d_y for Y (clause spec §4 step 5).
+
+    Common inputs except Lx = 2000 mm, Ly = 3000 mm, d_x = 500 mm, d_y = 450 mm; hand values:
+    q = 1700 / (2.0 * 3.0) = 283.333 kPa; Lc_x = 1000 - 200 - 500 = 300 mm, Vu_x = 3.0 * 0.3 * q = 255.0 kN;
+    Lc_y = 1500 - 200 - 450 = 850 mm, Vu_y = 2.0 * 0.85 * q = 481.667 kN;
+    phiVc_x = 0.75 * 0.17 * sqrt(28) * 3000 * 500 * 0.001 = 1012.000 kN;
+    phiVc_y = 0.75 * 0.17 * sqrt(28) * 2000 * 450 * 0.001 = 607.200 kN. A swapped width or depth fails here.
+    """
+    payload = run(Lx_mm=2000.0, Ly_mm=3000.0, d_x_mm=500.0, d_y_mm=450.0)
+    x, y = payload.verdicts
+    assert x.demand is not None
+    assert x.capacity is not None
+    assert y.demand is not None
+    assert y.capacity is not None
+    assert x.demand.value == pytest.approx(255.0, abs=_V_KN)
+    assert x.capacity.value == pytest.approx(1012.000, abs=_V_KN)
+    assert y.demand.value == pytest.approx(481.667, abs=_V_KN)
+    assert y.capacity.value == pytest.approx(607.200, abs=_V_KN)
+    assert y.governing
+    assert not x.governing
+    assert [x.status, y.status] == [VerdictStatus.PASS, VerdictStatus.PASS]
