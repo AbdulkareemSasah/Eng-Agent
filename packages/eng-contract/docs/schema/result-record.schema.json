@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "FileSource": {
+      "additionalProperties": false,
+      "description": "Input file a result was read from; the base name only, so no personal path is recorded.",
+      "properties": {
+        "name": {
+          "maxLength": 255,
+          "minLength": 1,
+          "pattern": "^[^/\\\\]+$",
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "sha256",
+        "size_bytes"
+      ],
+      "title": "FileSource",
+      "type": "object"
+    },
+    "HostInfo": {
+      "additionalProperties": false,
+      "description": "Host program a result was read from (spec 4.2.2).",
+      "properties": {
+        "model_id": {
+          "pattern": "^mdl_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "model_revision": {
+          "minimum": 0,
+          "title": "Model Revision",
+          "type": "integer"
+        },
+        "program": {
+          "maxLength": 64,
+          "title": "Program",
+          "type": "string"
+        },
+        "version": {
+          "maxLength": 64,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "program",
+        "version",
+        "model_id",
+        "model_revision"
+      ],
+      "title": "HostInfo",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LiteralInput": {
+      "additionalProperties": false,
+      "description": "Input given as a value: `{\"literal\": JsonValue}` (null is a value).",
+      "properties": {
+        "literal": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "literal"
+      ],
+      "title": "LiteralInput",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "description": "How a result was produced (spec 4.2.2). `inputs` never re-types a referenced value.",
+      "properties": {
+        "duration_ms": {
+          "minimum": 0,
+          "title": "Duration Ms",
+          "type": "integer"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/FileSource"
+          },
+          "title": "Files",
+          "type": "array"
+        },
+        "host": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HostInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "inputs": {
+          "patternProperties": {
+            "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*|\\[(0|[1-9][0-9]*)\\])*$": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RefInput"
+                },
+                {
+                  "$ref": "#/$defs/LiteralInput"
+                }
+              ]
+            }
+          },
+          "propertyNames": {
+            "maxLength": 512
+          },
+          "title": "Inputs",
+          "type": "object"
+        },
+        "started_at": {
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+          "title": "Started At",
+          "type": "string"
+        },
+        "tool": {
+          "maxLength": 200,
+          "pattern": "^([a-z0-9][a-z0-9-]*/[a-z0-9_.-]+|engineer|template|harness)$",
+          "title": "Tool",
+          "type": "string"
+        },
+        "tool_version": {
+          "maxLength": 64,
+          "title": "Tool Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tool",
+        "tool_version",
+        "inputs",
+        "started_at",
+        "duration_ms"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "RefInput": {
+      "additionalProperties": false,
+      "description": "Input taken from a stored result: `{\"ref\": RefString}`.",
+      "properties": {
+        "ref": {
+          "maxLength": 2000,
+          "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#.*)?$",
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "title": "RefInput",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One stored result (spec 4.4): exactly one of `payload` and `payload_file` is set.",
+  "properties": {
+    "complete": {
+      "title": "Complete",
+      "type": "boolean"
+    },
+    "contract": {
+      "const": "eng-contract/1",
+      "title": "Contract",
+      "type": "string"
+    },
+    "created_at": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+      "title": "Created At",
+      "type": "string"
+    },
+    "kind": {
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+/[1-9][0-9]{0,3}$",
+      "title": "Kind",
+      "type": "string"
+    },
+    "parents": {
+      "items": {
+        "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+        "type": "string"
+      },
+      "title": "Parents",
+      "type": "array"
+    },
+    "payload": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Payload"
+    },
+    "payload_file": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Payload File"
+    },
+    "payload_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Payload Sha256",
+      "type": "string"
+    },
+    "producer": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "result_id": {
+      "pattern": "^res_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "title": "Result Id",
+      "type": "string"
+    },
+    "units": {
+      "const": "canonical/1",
+      "title": "Units",
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract",
+    "result_id",
+    "kind",
+    "created_at",
+    "units",
+    "complete",
+    "producer",
+    "parents",
+    "payload_sha256"
+  ],
+  "title": "ResultRecord",
+  "type": "object"
+}

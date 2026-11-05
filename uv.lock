@@ -8,6 +8,8 @@ members = [
     "eng-dev-gate",
     "eng-harness",
     "eng-platform",
+    "structural-codes-aci318-14",
+    "structural-codes-core",
 ]
 
 [[package]]
@@ -334,9 +336,11 @@ name = "eng-harness"
 version = "0.1.0.dev0"
 source = { editable = "packages/eng-harness" }
 dependencies = [
+    { name = "anyio" },
     { name = "eng-contract" },
     { name = "mcp" },
     { name = "pydantic" },
+    { name = "ruamel-yaml" },
 ]
 
 [package.dev-dependencies]
@@ -347,9 +351,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.16,<5" },
     { name = "eng-contract", editable = "packages/eng-contract" },
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.14,<3" },
+    { name = "ruamel-yaml", specifier = ">=0.19,<0.20" },
 ]
 
 [package.metadata.requires-dev]
@@ -1017,6 +1023,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ruamel-yaml"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz", hash = "sha256:53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993", size = 142709, upload-time = "2026-01-02T16:50:31.84Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b8/0c/51f6841f1d84f404f92463fc2b1ba0da357ca1e3db6b7fbda26956c3b82a/ruamel_yaml-0.19.1-py3-none-any.whl", hash = "sha256:27592957fedf6e0b62f281e96effd28043345e0e66001f97683aa9a40c667c93", size = 118102, upload-time = "2026-01-02T16:50:29.201Z" },
+]
+
+[[package]]
 name = "ruff"
 version = "0.17.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1105,6 +1120,68 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/48/bb/3d8757f21e9a53d9035c9eb039a777047139a16bfdbedfc7a58241c3d914/starlette-1.10.0.tar.gz", hash = "sha256:b8399098d4c1e3522734f7235dc79b1fc967f96cf139c81e0fa30479e0685f9b", size = 2734356, upload-time = "2026-10-24T15:04:12.342Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/2e/947cfe02def9371c07cd5bf5b6b61c829e9aecb9904db02a66cfafbc1eec/starlette-1.10.0-py3-none-any.whl", hash = "sha256:478c0ab3b4ced6e82719849c118fa406f0278a3499c1a898cd15cd31bdc38ce4", size = 80571, upload-time = "2026-10-24T15:04:10.371Z" },
+]
+
+[[package]]
+name = "structural-codes-aci318-14"
+version = "0.1.0.dev0"
+source = { editable = "packages/structural-codes/aci318-14" }
+dependencies = [
+    { name = "eng-contract" },
+    { name = "structural-codes-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pyyaml" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eng-contract", editable = "packages/eng-contract" },
+    { name = "structural-codes-core", editable = "packages/structural-codes/core" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.170.14" },
+    { name = "pytest", specifier = ">=9.2.0" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+    { name = "types-pyyaml", specifier = ">=6" },
+]
+
+[[package]]
+name = "structural-codes-core"
+version = "0.1.0.dev0"
+source = { editable = "packages/structural-codes/core" }
+dependencies = [
+    { name = "eng-contract" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eng-contract", editable = "packages/eng-contract" },
+    { name = "pydantic", specifier = ">=2.14,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.170.14" },
+    { name = "pytest", specifier = ">=9.2.0" },
+    { name = "types-pyyaml", specifier = ">=6" },
 ]
 
 [[package]]

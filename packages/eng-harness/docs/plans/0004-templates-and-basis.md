@@ -27,10 +27,13 @@ tasks:
     covers: [AC1, AC2, AC3, AC4, AC5, AC6]
     depends_on: []
   - id: T2
+    # Amendment (B-374, documents only): the YAML dependency's ADR (spec Q2, A10) is written in this task, as the
+    # dependency ADRs of mcp, pydantic-ai-slim, keyring and httpx2 were; it stays Proposed for the owner.
     title: "Strict YAML 1.2 loader and the YAML dependency"
     files:
       - "packages/eng-harness/pyproject.toml"
       - "uv.lock"
+      - "packages/eng-harness/docs/adr/0004-ruamel-yaml.md"
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/templates/_yaml.py"
       - "packages/eng-harness/tests/unit/test_template_yaml.py"

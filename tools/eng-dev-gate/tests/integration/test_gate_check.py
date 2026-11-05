@@ -404,3 +404,28 @@ def test_plan_with_clause_spec_directory(repo: Repo) -> None:
     drafts = {f"{CLAUSE_DIR}bp.md": clause_spec("BP-AC1", status="draft")}
     base_draft = make_gate_repo(draft, plan=clause_plan("BP-AC1"), base_files=drafts)
     assert gate_check(draft, _change(draft, base_draft))[0].code == 0
+
+
+def test_empty_test_package_marker_in_scope(repo: Repo) -> None:
+    """AC10c: an empty ``__init__.py`` under a member's ``tests/`` is in scope beside an in-scope neighbour."""
+    globs = ("pkg/tests/helpers/test_*.py", "pkg/tests/full/test_*.py", "pkg/other/tests/test_*.py", "pkg/src/**")
+    base = _scope_repo(repo, globs)
+    files = {
+        "pkg/tests/helpers/__init__.py": "",  # empty, with a neighbour matching a glob: in scope
+        "pkg/tests/helpers/test_a.py": "a = 1\n",
+        "pkg/tests/full/__init__.py": "\n",  # whitespace only is not empty
+        "pkg/tests/full/test_b.py": "b = 1\n",
+        "pkg/tests/lone/__init__.py": "",  # no neighbour
+        "pkg/src/pkg2/__init__.py": "",  # not under tests/ (matches a glob itself)
+        "pkg/other/tests/__init__.py": "",  # tests/ of no workspace member
+        "pkg/other/tests/test_c.py": "c = 1\n",
+        "pkg/tests/helpers/sub/__init__.py": "",  # the neighbour is in another directory
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert _gc008_paths(result.out) == [
+        "pkg/other/tests/__init__.py",
+        "pkg/tests/full/__init__.py",
+        "pkg/tests/helpers/sub/__init__.py",
+        "pkg/tests/lone/__init__.py",
+    ]
+    assert set(errors) == {"GC008"}

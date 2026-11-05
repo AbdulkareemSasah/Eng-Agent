@@ -461,7 +461,7 @@ tasks:
     tests_first:
       - "tools/eng-dev-gate/tests/unit/test_docs.py::test_readme_lists_every_command"
     covers: [AC64]
-    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33, T34]
+    depends_on: [T7, T8, T9, T11, T12, T14, T14b, T15, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T28, T29, T30, T31, T32, T33, T34, T35, T36]
   - id: T26
     title: Base-commit gate (gate root, provenance, head-run rules); built before T6
     files:
@@ -595,6 +595,46 @@ tasks:
       - "tools/eng-dev-gate/tests/integration/test_test_first_run.py::test_new_package_hidden_at_base"
     covers: [AC27a]
     depends_on: [T17]
+  - id: T35
+    title: "root gate.yml: JSON Schema snapshots are generated files (generated_globs)"
+    # Amendment (B-359, documents only): contract T16 (B-025) failed GC009 with 7107 changed lines, almost all of them
+    # the generated docs/schema snapshots that its own files require.
+    files:
+      - ".gate/gate.yml"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 10
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_config.py::test_root_gate_yml_schema_snapshots_are_generated"
+    covers: [AC12c]
+    depends_on: [T3, T30]
+  - id: T36
+    title: "gate-check scope: an empty test package marker next to an in-scope test file"
+    # Amendment (B-363, documents only): interface T6 (B-180) needs an empty tests/helpers/__init__.py for mypy to
+    # resolve a shared test helper, and interface T8 (B-182) added one; neither was in its task's globs (GC008).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_empty_test_package_marker_in_scope"
+    covers: [AC10c]
+    depends_on: [T13, T14b]
+  - id: T37
+    title: "mutation step: the member's other top-level files are copied into mutmut's working folder (also_copy)"
+    # Amendment (B-370, documents only): mutmut copies only the source, tests/, setup.cfg, pyproject.toml and lock files,
+    # so eng-harness's wheel-build test failed MU002 in every pull request that changed eng-harness source (B-369 skips it
+    # inside mutmut runs until this task removes the cause).
+    files:
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/mutation.py"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_package_files_are_copied"
+    covers: [AC53b]
+    depends_on: [T20, T29]
 ---
 
 # Implementation plan: eng-dev-gate 0.1

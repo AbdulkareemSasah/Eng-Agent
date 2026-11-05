@@ -1,0 +1,126 @@
+{
+  "$defs": {
+    "CaseRef": {
+      "additionalProperties": false,
+      "description": "A load pattern, case or combination; `step` is the envelope `Max`/`Min` or step number as the host reports it.",
+      "properties": {
+        "case": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Case",
+          "type": "string"
+        },
+        "case_type": {
+          "$ref": "#/$defs/CaseType"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Step"
+        }
+      },
+      "required": [
+        "case",
+        "case_type"
+      ],
+      "title": "CaseRef",
+      "type": "object"
+    },
+    "CaseType": {
+      "description": "What a `CaseRef` names.",
+      "enum": [
+        "load_pattern",
+        "load_case",
+        "load_combination"
+      ],
+      "title": "CaseType",
+      "type": "string"
+    },
+    "JointReaction": {
+      "additionalProperties": false,
+      "description": "Reaction of one joint for one case, in global axes.",
+      "properties": {
+        "FX_kN": {
+          "title": "Fx Kn",
+          "type": "number",
+          "x-eng-unit": "kN"
+        },
+        "FY_kN": {
+          "title": "Fy Kn",
+          "type": "number",
+          "x-eng-unit": "kN"
+        },
+        "FZ_kN": {
+          "title": "Fz Kn",
+          "type": "number",
+          "x-eng-unit": "kN"
+        },
+        "MX_kNm": {
+          "title": "Mx Knm",
+          "type": "number",
+          "x-eng-unit": "kN.m"
+        },
+        "MY_kNm": {
+          "title": "My Knm",
+          "type": "number",
+          "x-eng-unit": "kN.m"
+        },
+        "MZ_kNm": {
+          "title": "Mz Knm",
+          "type": "number",
+          "x-eng-unit": "kN.m"
+        },
+        "case": {
+          "$ref": "#/$defs/CaseRef"
+        },
+        "joint": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Joint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "joint",
+        "case",
+        "FX_kN",
+        "FY_kN",
+        "FZ_kN",
+        "MX_kNm",
+        "MY_kNm",
+        "MZ_kNm"
+      ],
+      "title": "JointReaction",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "`forces.joint_reactions/1`.",
+  "properties": {
+    "axes": {
+      "const": "global",
+      "title": "Axes",
+      "type": "string"
+    },
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/JointReaction"
+      },
+      "title": "Rows",
+      "type": "array"
+    }
+  },
+  "required": [
+    "axes",
+    "rows"
+  ],
+  "title": "JointReactions",
+  "type": "object"
+}

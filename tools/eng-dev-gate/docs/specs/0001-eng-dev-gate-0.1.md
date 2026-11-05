@@ -79,6 +79,10 @@ gate-check (§4.5)
 - AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each.
 - AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
 - AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008. Each of these gives GC008 as well: a changed `version` field; a package key added, removed or renamed without a count change of an in-scope package; a lowering (`ratchet --update`) of another package's count; a change anchored only by the workspace root (`.`).
+- AC10c. Given an `__init__.py` under a workspace member's `tests/` directory that is added or modified (not renamed),
+  and is empty (0 bytes at head; whitespace only is not empty), when another changed file in the same
+  directory matches a task glob, then no GC008 for it; a non-empty one, a renamed or deleted one, or one without such a neighbour, is GC008
+  (amendment B-363).
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
   spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
@@ -89,6 +93,9 @@ gate-check (§4.5)
 - AC12b. Given the committed root `.gate/gate.yml`, then its `spec_globs` also match the clause specs
   `docs/clauses/<pack>/*.md` of a code-pack package (process/03 "Clause spec"; structural-codes spec 0001), so the
   documents-only pull request of a clause spec is a spec and plan pull request (amendment B-343).
+- AC12c. Given the committed root `.gate/gate.yml`, then its `generated_globs` also match the JSON Schema snapshots
+  `docs/schema/**` of a package (written by the package's schema exporter and checked fresh by its snapshot test), so
+  they do not count toward a task's diff budget (§4.5 step 7); they stay in the task's file scope (amendment B-359).
 - AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
   task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
 - AC13a. Given a plan whose `spec:` names a directory (a path ending in `/`) of clause specs, then every `*.md` file
@@ -178,6 +185,7 @@ check (§4.12)
 - AC52. Given a generated document whose regeneration differs from the committed bytes, then GF001.
 - AC53. Given a changed R1 or R2 module, then mutation tests run on it and a score below `mutation_min` gives MU001.
 - AC53a. Given changed R1 or R2 files for which mutmut produces no mutant, then MU003 and the step passes; given mutants that no test covers, then they count as survivors in the MU001 score (not killed, so they lower it) and are not MU002 (amendment B-336).
+- AC53b. Given a member with files and folders at its top level other than `src/` and `tests/` (for example the `README.md` its build reads), then the mutated test runs see them: the gate lists each of them under mutmut's `also_copy`, except the folders the copy ignores (`.git`, `.venv`, caches, `mutants`) (amendment B-370).
 - AC54. Given a workspace member without `[tool.eng-gate]` (CF006) or a stale `uv.lock` (ST001 on step `lock`), then the
   check fails.
 - AC54a. Given pull-request context and a pull request that adds a third-party dependency (with its stub distribution)
@@ -354,7 +362,10 @@ Checks, in order (all run; findings accumulate):
    adds a justified suppression records it there, and a rise is AW05 for the owner (§4.9; amendment B-088). Any other
    change to that file is GC008: the `version` field, a package key added, removed or renamed without a count change of
    an in-scope package, and counts of other packages, lowerings by `ratchet --update` included (they go in a pull
-   request of their own); the workspace root (`.`) never anchors a change (amendment B-089). Else GC008.
+   request of their own); the workspace root (`.`) never anchors a change (amendment B-089). An `__init__.py`
+   under a member's `tests/` directory, added or modified (not renamed) and 0 bytes at head, is in scope when another changed file in the same directory matches a task glob:
+   it is a test package marker that type checking of shared test helpers needs, and it holds no code (AC10c; amendment
+   B-363). Else GC008.
 7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
    file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
@@ -644,7 +655,7 @@ the step is reported `skipped` with the reason locally and fails in CI if skippe
 least one function, method or lambda body are mutated (a file of module-level constants has no mutant that a test
 reaches); when none remain the step passes with the notice MU003 (amendment B-026). A run in which mutmut produces no mutant at all (for example a file
 whose only functions are decorated methods or module-level lambdas) also passes with MU003; mutants that exist but
-that no test covers count as survivors in the MU001 score; MU002 stays reserved for a backend fault, exit 3, and is never a judgement on coverage (amendment B-336).
+that no test covers count as survivors in the MU001 score; MU002 stays reserved for a backend fault, exit 3, and is never a judgement on coverage (amendment B-336). The gate runs the backend in a copy of the member; mutmut copies only the source, `tests/`, `setup.cfg`, `pyproject.toml` and lock files into its own working folder, so the gate also lists every other top-level file and folder of the member under `also_copy`, and a test that builds the package or reads the package's own files runs as in the tests step (AC53b, amendment B-370). Files outside the member are not in the copy; a member's tests do not read them (BUILD-STATUS OQ-Q39).
 
 ### 4.13 agents render, keys, drift
 
@@ -889,8 +900,9 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 (with AC10a and AC10b), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules` |
+| AC6 to AC11 (with AC10a, AC10b and AC10c), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules`, `test_gate_check.py::test_empty_test_package_marker_in_scope` (T36) |
 | AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
+| AC12c | unit | `test_config.py::test_root_gate_yml_schema_snapshots_are_generated` (T35) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
 | AC12a | unit | `test_config.py::test_root_gate_yml_workflow_specs_are_specs` (T30) |
 | AC19 to AC21b | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27), `::test_in_scope_ratchet_change_does_not_raise_floor` (T33) |
@@ -900,7 +912,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
-| AC47 to AC54 (with AC53a and AC54a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29), `test_tool_steps.py::test_types_resolve_in_judged_environment`, `test_imports.py::test_judged_distribution_map` (T32) |
+| AC47 to AC54 (with AC53a, AC53b and AC54a) | unit and integration | `test_check.py::test_step_order_and_aggregate`, `test_config.py::test_floors`, `::test_weakening_rules`, `test_coverage.py::test_line_and_branch_separate`, `::test_deselection_fails`, `test_licenses.py::test_allowed_unknown_exception`, `test_generated.py::test_freshness`, `test_mutation.py::test_changed_modules_only`, `test_workspace.py::test_member_without_table`, `test_tool_steps.py::test_stale_lock_is_st001`, `test_mutation.py::test_zero_mutants_is_nothing_to_mutate`, `::test_uncovered_mutants_count_as_survivors` (T29), `test_tool_steps.py::test_types_resolve_in_judged_environment`, `test_imports.py::test_judged_distribution_map` (T32), `test_mutation.py::test_package_files_are_copied` (T37) |
 | AC55 to AC58 | unit | `test_agents.py::test_render_byte_exact`, `::test_placeholder_errors`, `::test_template_version`, `::test_keys_skeleton`, `test_agents_drift.py::test_drift_unmanaged_and_pointer` |
 | AC59 to AC63 | unit | `test_ci_files.py::test_jobs_triggers_and_local_actions`, `::test_gate_action_runs_only_check` (T28), `::test_security_and_build_commands`, `::test_windows_job_only_on_push`, `::test_pr_jobs_base_first_steps`, `test_workflows_lint.py::test_pin_permissions_injection_trigger`, `test_review.py::test_prompt_hashes_and_modes`, `test_windows_tests.py::test_declared_paths` |
 | AC64 | CI | the CI run of the last task's pull request |
