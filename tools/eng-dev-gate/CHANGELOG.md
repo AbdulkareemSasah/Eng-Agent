@@ -7,6 +7,7 @@ contains every entry listed below; README documents every command with an exampl
 
 ## Unreleased
 
+- Fix: the `mutation` step bounds `mutmut run` by the new `limits.mutation_run_seconds` (7200 s in the root `.gate/gate.yml`, owner queue), not by the 900 s bound of one tool call; a timeout is MU002 naming the limit; `ToolRunner.run` gains the keyword `timeout_seconds` and a timeout raises `ToolTimeoutError` (B-384, plan task T38, AC53c).
 - Fix: the `mutation` step lists the member's other top-level files and folders (README, LICENSE, docs and so on) under mutmut's `also_copy`, so a mutated test run that builds the package or reads its own files behaves as in the tests step (B-371, plan task T37, AC53b).
 - `gate-check`: an empty (0 bytes at head) `__init__.py`, added or modified, under a workspace member's `tests/` directory is in scope when another changed file in the same directory matches a task glob; a non-empty one, a renamed or deleted one, or one without such a neighbour stays GC008 (B-364, plan task T36, AC10c).
 - Root `.gate/gate.yml`: `generated_globs` gains `**/docs/schema/**`, so JSON Schema snapshots no longer count toward the task diff budget (B-360, plan task T35, AC12c).
