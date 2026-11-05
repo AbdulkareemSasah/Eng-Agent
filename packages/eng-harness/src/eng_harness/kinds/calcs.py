@@ -10,6 +10,7 @@ from collections import Counter
 from collections.abc import Iterable
 from typing import Annotated, Any, Literal, Self
 
+from eng_contract.ids import ModelId, ResultId
 from eng_contract.kinds import NEUTRAL_KINDS
 from eng_contract.refs import RefString
 from eng_contract.trace import Trace
@@ -64,7 +65,7 @@ class FpSection(_P):
     """One hashed section of a fingerprint."""
 
     kind: _Str
-    result_id: _Str
+    result_id: ResultId
     items: _Count
     sha256: _Sha
     complete: StrictBool
@@ -74,7 +75,7 @@ class ModelFingerprint(CalcPayload):
     """`harness.model_fingerprint/1` (4.6)."""
 
     method: Literal["harness.fp/1"]
-    model_id: _Str
+    model_id: ModelId
     model_revision: _Count
     sections: list[FpSection]
     covered: list[_Str]
@@ -95,7 +96,7 @@ class ModelFingerprint(CalcPayload):
 class Side(_P):
     """One side of a comparison."""
 
-    model_id: _Str
+    model_id: ModelId
     model_revision: _Count
     covered: list[_Str]
 
@@ -203,12 +204,11 @@ class Effect(_P):
     def _check(self) -> Self:
         if self.section not in NEUTRAL_KINDS or not self.section.startswith("model."):
             raise ValueError(f"section {self.section!r} is not a neutral model kind")
-        has_value = "value" in self.model_fields_set
-        if self.op == "set" and (self.pointer is None or not has_value):
-            raise ValueError("set needs a pointer and a value")
+        if self.op == "set" and self.pointer is None:
+            raise ValueError("set needs a pointer (a null value is valid)")
         if self.op == "add" and (self.pointer is not None or not isinstance(self.value, dict)):
             raise ValueError("add needs an object value and no pointer")
-        if self.op == "remove" and (self.pointer is not None or has_value):
+        if self.op == "remove" and (self.pointer is not None or self.value is not None):
             raise ValueError("remove takes neither pointer nor value")
         return self
 
@@ -217,7 +217,7 @@ class ExpectedEffects(_P):
     """`harness.expected_effects/1` (4.8): what a change set should have done; made by spec 0007."""
 
     change_set: RefString
-    model_id: _Str
+    model_id: ModelId
     effects: list[Effect]
 
     @model_validator(mode="after")
