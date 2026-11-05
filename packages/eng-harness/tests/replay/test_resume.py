@@ -7,11 +7,13 @@ rig's call log shows which port calls it made; the fake host's ledger shows whic
 
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from fakes.ports import failure
 from workflows.chain import ChainOutput, chain
+from workflows.ctx_flows import answer, flow, need_approval
 from workflows.rig import Rig, hold_lock, make_rig, request, steps
 
 from eng_harness.engine import RunStatus
@@ -185,3 +187,45 @@ def test_resume_holds_the_run_lock(tmp_path: Path) -> None:
     assert second.status is RunStatus.COMPLETED
     assert rig.host.locked[len(calls) :] == [True]  # and holds the lock for the one live call it makes
     assert not is_locked(run_dir)  # until the run returns
+
+
+def test_pause_and_resume(tmp_path: Path) -> None:
+    rig = make_rig(tmp_path)
+
+    async def body(ctx: Any) -> list[str]:
+        refs = []
+        for tool, args in (("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"})):
+            refs.append((await ctx.tool(tool, args)).ref.ref)
+        await need_approval(rig.approvals, "apr_1")  # the test stub of plan task T15's approval
+        refs.append((await ctx.tool("read_c", {"n": 2})).ref.ref)
+        return refs
+
+    workflow = flow(body)
+    paused = asyncio.run(rig.engine(workflow).start(request()))
+    run_id = paused.run_id
+    assert (paused.status, paused.pending) == (RunStatus.PAUSED, ("apr_1",))
+    assert (paused.output, paused.escalation) == (None, None)
+    last = rig.events(run_id)[-1]
+    assert last.type is T.RUN_PAUSED
+    assert last.payload == ev.RunPaused(reason="awaiting_approval", request_ids=["apr_1"])
+    assert not is_locked(rig.run_dir(run_id))  # a paused run holds no lock
+    ledger = list(rig.host.ledger)
+    again = asyncio.run(rig.engine(workflow).resume(run_id))  # no answer yet: paused again, no tool is called
+    assert (again.status, again.pending) == (RunStatus.PAUSED, ("apr_1",))
+    assert rig.host.ledger == ledger
+    rig.approvals.script("apr_1", answer("apr_1"))
+    mark = len(rig.log)
+    done = asyncio.run(rig.engine(workflow).resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    # the recorded steps returned their results with no port call; the run went live at the first unrecorded step (AC27)
+    assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call"]
+    assert [c.tool for c in rig.host.ledger[len(ledger) :]] == ["read_c"]
+    assert isinstance(done.output, ChainOutput)
+    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed"]
+    assert done.output.refs == recorded
+    assert [e.type for e in rig.events(run_id)[-7:]] == [
+        T.RUN_PAUSED, T.RUN_RESUMED, T.RUN_PAUSED, T.RUN_RESUMED, T.STEP_STARTED, T.STEP_COMPLETED, T.RUN_COMPLETED,
+    ]  # fmt: skip
+    reader = JournalReader(rig.run_dir(run_id))
+    assert reader.run().status == "COMPLETED"
+    reader.close()
