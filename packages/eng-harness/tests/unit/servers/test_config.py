@@ -182,3 +182,35 @@ def test_unreadable_and_malformed_files(tmp_path: Path) -> None:
 def test_empty_file_has_no_servers(tmp_path: Path) -> None:
     config = load_servers_config(_write(tmp_path, ""))
     assert (config.servers, config.cli_tools, config.host_programs) == ({}, {}, {})
+
+
+def _cli(extra: str = "") -> str:
+    return f"""
+[cli_tools."dxf-prep/prepare"]
+shell = "/usr/bin/pwsh"
+script = "/opt/tools/prepare.ps1"
+timeout_s = 60
+{extra}
+"""
+
+
+RECORD = 'release_record = "docs/gaps/dxf-prep.md"'
+
+
+def test_cli_tools_release_marks(tmp_path: Path) -> None:
+    """AC38: unreleased [cli_tools.*] entries are exposed with their records; inconsistent marks are refused."""
+    plain = load_servers_config(_write(tmp_path, _cli()))
+    assert plain.cli_tools["dxf-prep/prepare"].release == "released"
+    assert plain.unreleased_tools() == {}
+    marked = load_servers_config(_write(tmp_path, _cli(f'release = "unreleased"\n{RECORD}')))
+    assert marked.unreleased_tools() == {"dxf-prep/prepare": "docs/gaps/dxf-prep.md"}
+    for extra in (
+        'release = "unreleased"',
+        f'release = "released"\n{RECORD}',
+        RECORD,
+        f'release = "draft"\n{RECORD}',
+        'release = "unreleased"\nrelease_record = "/records/y.md"',
+        'release = "unreleased"\nrelease_record = "../y.md"',
+    ):
+        with pytest.raises(ConfigError, match="release"):
+            load_servers_config(_write(tmp_path, _cli(extra)))
