@@ -1,6 +1,6 @@
 """The design basis of a run (spec 0004): the fields a workflow declares, their rules, and the draft built from them.
 
-Purpose: the public surface of `eng_harness.basis`; later plan tasks add the setup view and the freeze.
+Purpose: the public surface of `eng_harness.basis`; the setup view; a later plan task adds the freeze.
 """
 
 from eng_harness.basis._build import (
@@ -14,10 +14,21 @@ from eng_harness.basis._build import (
     build_draft,
 )
 from eng_harness.basis._fields import BasisInvalid, FieldSpec, check_declaration
+from eng_harness.basis._setup import (
+    BasisSetupAnswer,
+    BasisSetupPort,
+    BasisSetupView,
+    SetupRow,
+    SetupSection,
+    build_setup_view,
+)
 
 __all__ = [
     "BasisDraft",
     "BasisInvalid",
+    "BasisSetupAnswer",
+    "BasisSetupPort",
+    "BasisSetupView",
     "DetectedValue",
     "DraftField",
     "DraftTemplate",
@@ -25,6 +36,9 @@ __all__ = [
     "EngineerEntry",
     "EngineerValues",
     "FieldSpec",
+    "SetupRow",
+    "SetupSection",
     "build_draft",
+    "build_setup_view",
     "check_declaration",
 ]

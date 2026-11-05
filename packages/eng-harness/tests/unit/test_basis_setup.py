@@ -33,13 +33,17 @@ METHOD = "analysis.method"
 TITLE = "drawing.title"
 
 
-class _NoParents:
+class _Source:
+    def __init__(self, template: Template) -> None:
+        self._template = template
+
     def find(self, name: str, version: str) -> Template | None:
-        return None
+        meta = self._template.meta
+        return self._template if (name, version) == (meta.name, meta.version) else None
 
 
 def _specs() -> tuple[FieldSpec, ...]:
-    bound = Cited(value=1.0, unit="1", citation="Synthetic bound, not an engineering value")
+    bound = Cited(value=1.0, unit="1", source="Synthetic bound, not an engineering value")
     return (
         FieldSpec(path=TOL, kind="quantity", label="Tolerance", unit="mm"),
         FieldSpec(path=DRIFT, kind="quantity", label="Drift", unit="1", max=bound),
@@ -57,8 +61,9 @@ def _view(status: str = "draft") -> BasisSetupView:
         "ask_each_run": [],
         "limits": {"drift_ratio": {"value": 0.5, "unit": "1", "citation": CITE}},
     }
-    source = _NoParents()
-    template = resolve(Template.from_data(data), source)
+    base = Template.from_data(data)
+    source = _Source(base)
+    template = resolve(base, source)
     draft = build_draft(
         _specs(),
         template,
@@ -94,8 +99,9 @@ def test_view_rows() -> None:
     assert rows[DRIFT].citation == CITE
     assert rows[DRIFT].source == "template:synthetic-base@0.1.0"
     assert rows[DRIFT].label == "Drift"
-    assert rows[DRIFT].max is not None
-    assert rows[DRIFT].max.value == 1.0
+    drift_max = rows[DRIFT].max
+    assert drift_max is not None
+    assert drift_max.value == 1.0
     assert rows[DRIFT].min is None
     assert [r.path for r in sections["analysis"].rows] == [METHOD, STORIES]
 
@@ -113,12 +119,11 @@ def test_approved_template_has_no_draft_banner() -> None:
 
 
 def test_answer_cannot_carry_values() -> None:
-    ok = BasisSetupAnswer(
-        setup_id=SETUP_ID, draft_sha256=SHA, confirmed_sections=("limits",), by="A. Engineer", at=AT
-    )
+    ok = BasisSetupAnswer(setup_id=SETUP_ID, draft_sha256=SHA, confirmed_sections=("limits",), by="A. Engineer", at=AT)
     assert ok.confirmed_sections == ("limits",)
     assert BasisSetupAnswer(setup_id=SETUP_ID, draft_sha256=SHA, rejected="wrong value").rejected == "wrong value"
-    for extra in ({"values": {DRIFT: 0.5}}, {"value": 1}, {"fields": {}}):
+    extras: tuple[dict[str, Any], ...] = ({"values": {DRIFT: 0.5}}, {"value": 1}, {"fields": {}})
+    for extra in extras:
         with pytest.raises(ValueError, match="extra"):
             BasisSetupAnswer.model_validate({"setup_id": SETUP_ID, "draft_sha256": SHA, "rejected": "x", **extra})
     bad_forms: tuple[dict[str, Any], ...] = (
@@ -130,7 +135,7 @@ def test_answer_cannot_carry_values() -> None:
         {"rejected": "x" * 501},
     )
     for bad in bad_forms:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"answer|confirmation|should"):
             BasisSetupAnswer.model_validate({"setup_id": SETUP_ID, "draft_sha256": SHA, **bad})
     assert not [name for name in BasisSetupAnswer.model_fields if "value" in name]
 
