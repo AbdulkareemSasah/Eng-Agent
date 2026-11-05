@@ -109,7 +109,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC11. Given a server that exits during a call, then a read returns `HOST_NOT_CONNECTED` and a write, analysis,
   design or save returns `TIMEOUT_UNKNOWN_OUTCOME`; the session epoch increases; the next call restarts the server
   (at most `max_restarts_per_run`), repeats the build check, re-attaches to the bound instance by process id, and the
-  engine reads units before the next step (engine AC45). Test: `tests/workflow/servers/test_session.py::test_crash_restart`.
+  engine reads units before the next step (engine AC45). Tests: `tests/workflow/servers/test_session.py::test_crash_restart`,
+  `::test_restart_repeats_build_check` (the build check on a restart, plan task T6b; amendment B-413).
 - AC12. Given engine shutdown, then each session closes, each server process is waited for up to its grace time and
   then its job is terminated; no host instance is ended by it. Test:
   `tests/workflow/servers/test_session.py::test_shutdown_leaves_hosts`.

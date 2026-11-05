@@ -154,6 +154,7 @@ tasks:
     # T19, so T6b does not wait for engine T13; the workflow fixture's build pins and the fake's script_enabled join the files.
     # Amendment (B-413, documents only): the check is a ServerManager constructor argument, run by _session.py only on a
     # restart (engine calls preflight at start and resume); the fixture uses sasaah-csi-mcp only for the CSI fake, the PAGED double keeps its adapter.
+    # Amendment (B-413, documents only): test_restart_repeats_build_check covers AC11's build-check clause on a restart.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -172,7 +173,8 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_fingerprint_definition"
       - "packages/eng-harness/tests/unit/servers/test_buildcheck.py::test_each_mismatch"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory"
-    covers: [AC9, AC10]
+      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_restart_repeats_build_check"
+    covers: [AC9, AC10, AC11]
     depends_on: [T6]
   - id: T7
     title: Machine-level host-instance lock and process guard
@@ -561,7 +563,11 @@ configs of the PAGED transport double in `test_session.py` keep the adapter `syn
 so the argv assertions of `test_launch_arguments` and `test_launch_arguments_without_audit_log` stay as they are. The
 existing T5 tests build `ServerManager` without a check, so the restart in
 `test_server_exiting_before_handshake_is_not_connected` runs none and no T5 expectation changes (A4); not through a
-mapping of `synthetic-csi` in `_session.py` (B-413). The workflow test that stops a run through the engine's preflight is T19's (B-413).
+mapping of `synthetic-csi` in `_session.py` (B-413). `test_session.py::test_restart_repeats_build_check` (AC11's
+build-check clause, B-413) builds a `ServerManager` with a check over the CSI fake, kills the server during a call and
+shows that the restart runs the check again before the re-attach (§4.3.5); it fails
+at T6b's base because `servers/_buildcheck.py` and the `ServerManager` check argument do not exist there. The workflow
+test that stops a run through the engine's preflight is T19's (B-413).
 Budget 180 lines. T6b edits `_session.py`,
 so T7 follows it.
 

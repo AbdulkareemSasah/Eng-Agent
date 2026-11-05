@@ -8,6 +8,8 @@ risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendmen
 tasks:
   - id: T1
     title: SAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint
+    # Amendment (B-413, documents only): test_sap2000_build_mismatch_stops_run runs the real engine and build_ports, so T1
+    # starts after plan 0002 T19 (and engine plan 0001 T13, T15, T16, T19); it fails at T1's base for want of the SAP2000 product T1 adds.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -166,7 +168,11 @@ the requested frame name. Every table is `unknown`, so no task reads or writes a
 
 **T1 Product, allowlist, fingerprint** (AC1 to AC3). The `[servers.csi_sap2000]` rules, `.SDB` resolution, the SAP2000
 profile skeleton, the allowlist entries exactly as the coverage table of the spec §4.1 lists them (a test compares
-the two), the pinned fingerprint computed from the S-12 inventory, and the build-mismatch stop.
+the two), the pinned fingerprint computed from the S-12 inventory, and the build-mismatch stop. The stop
+(`test_session.py::test_sap2000_build_mismatch_stops_run`) runs the real engine through `build_ports`, which plan 0002
+T19 adds and which writes the ETABS and SAFE stops into the same file, so T1 starts after 0002 T19; it fails at T1's
+base because the SAP2000 server section, product and pinned fingerprint (`servers/_config.py`, `_allowlist.toml`,
+`products/_sap2000.py`) do not exist there (test-first TF004; B-413).
 
 **T2 Fake mode** (AC19). SAP2000 mode of the test-only fake: schemas from the inventory, `unsupported_by_version` for
 stories, grids, frame details, joint export, story drifts and `csi_new_model`, frame replies without `label` and `story`,
@@ -196,7 +202,8 @@ plan amendment lists its files and budget. If no recording is committed, SP-4 st
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new.
-- Plans: plan 0002 T1, T6 to T15 and T17; plan 0008 T1 (profile registry, config and fingerprint per product), T2
+- Plans: plan 0002 T1, T6 to T15, T17 and T19 (T19 for the SAP2000 engine stop of T1, B-413; it brings in engine plan
+  0001 T13, T15, T16 and T19); plan 0008 T1 (profile registry, config and fingerprint per product), T2
   (fake framework) and T3 (session operations, gap module) before T1 of this plan; plan 0008 T4 (table framework)
   before T4. Specs: `eng-contract` 0.1.0 merged; the column workflow spec (B-083) uses the kinds and gaps here.
 - Owner decisions that do not block T1 to T7: Q1 to Q6 of the spec (the recommendations are implemented).

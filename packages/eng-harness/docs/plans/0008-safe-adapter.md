@@ -8,9 +8,8 @@ risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendmen
 tasks:
   - id: T1
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
-    # Amendment (B-413, documents only): only test_pinned_fingerprint_from_inventory is an existing plan 0002 test it adapts;
-    # test_build_mismatch_stops_run is written later, in plan 0002 T19, which runs the real engine, so the
-    # tests/workflow/servers/test_session.py glob, kept only to adapt it, is dropped.
+    # Amendment (B-413, documents only): test_build_mismatch_stops_run is written later, in plan 0002 T19; the
+    # test_session.py glob and the workflow conftest.py stay to adapt the session-level build-check tests of 0002 T6b to the per-product header.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -25,6 +24,8 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_products.py"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
       - "packages/eng-harness/tests/contract/test_csi_allowlist.py"
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # adapts 0002 T6b's session-level build-check tests to the per-product header (B-413)
+      - "packages/eng-harness/tests/workflow/conftest.py"  # the fixture's build pins, where they read the allowlist header (B-413)
     max_changed_lines: 350
     max_sessions: 3
     tests_first:
@@ -249,6 +250,9 @@ so it starts after those are merged. The existing 0002 test that reads the pinne
 header (the ETABS entry of `[fingerprint]`), never in the value it expects, and it is the regression proof that the
 ETABS fingerprint is unchanged. The ETABS engine-stop test `test_session.py::test_build_mismatch_stops_run` does not
 exist yet when T1 starts: plan 0002 T19 writes it, through the allowlist loader, after the engine tasks it needs (B-413).
+The session-level build-check tests of plan 0002 T6b (`test_session.py`, with the pins of `tests/workflow/conftest.py`)
+build the check from the allowlist header, so `test_session.py` and `tests/workflow/conftest.py` are in T1's files to
+adapt them to the per-product header in the same way, never in what they expect (B-413).
 
 **T2 Fake** (spec §4.1 and 0002 §4.8.3). Test code only: the fake gains a `product` setting; SAFE mode has points, slab
 areas, sections, materials, patterns, combinations, joint loads, the area-spring tables, the result tables with
@@ -323,6 +327,6 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
 ## 5. Rollback
 
 Each task is one squash-merged pull request into `build/v1`; reverting it removes it and its dependants. T1 changes the
-allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite (with the test
+allowlist header shape and the ETABS profile: its revert restores the single fingerprint, and the plan 0002 suite (with the tests
 T1 adapts) is its regression test. Nothing here writes to a host program in CI. A wrong field key is fixed forward in the data file; a SAFE
 build the allowlist was not tested with is refused by the build check rather than run.
