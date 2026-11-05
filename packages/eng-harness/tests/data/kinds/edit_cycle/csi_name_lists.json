@@ -1,0 +1,17 @@
+{
+  "area_sections": [
+    "Slab200"
+  ],
+  "combinations": [],
+  "frame_sections": [
+    "B30",
+    "C40"
+  ],
+  "materials": [
+    "Conc40"
+  ],
+  "patterns": [
+    "Dead",
+    "Live"
+  ]
+}
