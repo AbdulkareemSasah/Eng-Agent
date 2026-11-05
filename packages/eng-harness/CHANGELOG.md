@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ctx calls: `engine/_ctx_impl.py` (`tool` with read retries, `read`, `calc` with the draft mark and `CalcRefused`, `block`, `parallel`, `attempts`, `escalate`), and the pause and escalation outcomes of the run (plan 0001 T10, B-109; spec 0001 AC9, AC11 to AC15, AC27).
 - Windows process listings (`snapshot`, `children`) leave out a process `OpenProcess` refuses with access denied and log its pid; `identity` and `terminate` on that pid raise `ProcessAccessDeniedError`; `LaunchedProcess.close()` documented as ending the Windows job (plan 0002 T3b, B-389; spec 0002 AC7a).
 - Footing kinds: `eng_harness.kinds.footing` (`harness.footing_subjects/1`, `footing_dims/1`, `footing_design/1`, `footing_status/1`, `footing_schedule/1`, `safe_equilibrium/1`; validation only) registered in `eng_harness._kinds` (plan 0010 T1, B-392; spec 0010 AC33).
 - Tool descriptors and allowlist data: `eng_harness.adapters` (`ToolDescriptor`, `Allowlist`, `load_allowlist`, `AllowlistError`) refusing escape-hatch names at load, the packaged CSI allowlist (`adapters/csi/_allowlist.toml`, 35 tools pinned to the S-12 inventory) and the `release` and `release_record` marks on allowlist and `[cli_tools.*]` entries with `unreleased_tools()` (plan 0002 T6, B-125; spec 0002 AC16, AC38).

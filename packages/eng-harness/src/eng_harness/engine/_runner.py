@@ -1,15 +1,13 @@
 """The run engine: `Engine.start` and `Engine.resume` (spec 0001 4.4.4, 4.5.1, 4.5.2; plan 0001 T9, T9b).
 
 Purpose: validate a request, hold the run lock, journal the run header, run the root block and return how it ended.
-Task T9 builds `start` and a minimal `ctx.tool` (live, with no retry, approval or model handle); T9b adds resume (steps
-1 to 3 and 9 of spec 4.5.1: the other steps follow in T11b and T13) and the replay of recorded tool steps, the other ctx
-calls following in T10, so the header records no server check yet and a finished run is never a draft.
+Resume runs steps 1 to 3 and 9 of spec 4.5.1 (the others follow in T11b and T13); the ctx calls are in `_ctx_impl.py`.
 Units: none; durations in ms. Errors: `ContractError`, `RunRefused`, `RunLocked`, `JournalIntegrityError`; a stop of the
-block ends the run as `NEEDS_ENGINEER` and is not raised.
+block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
 
 import re
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
@@ -18,20 +16,18 @@ from typing import Annotated, Any
 
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import canonical_json, payload_sha256
-from eng_contract.envelope import FailureEnvelope, Provenance
-from eng_contract.errors import ContractError, ContractWarning, ErrorCode, ErrorDetail
+from eng_contract.envelope import Provenance
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import Clock, IdSource
-from eng_contract.refs import Ref, RefString
+from eng_contract.refs import RefString
 from eng_contract.store import ResultStore, Workspace
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
-from eng_harness.ctx import ToolResult
-from eng_harness.engine._codec import decode_summary
-from eng_harness.engine._replay import ReplayIndex
-from eng_harness.engine._steps import op_id, root_scope, step
+from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
+from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, HostInstance, HostPort, InputPort, RunClass, ToolPort
@@ -126,76 +122,6 @@ def _parse[M: BaseModel](model: type[M], value: object, what: str) -> M:
         raise ContractError(ErrorCode.INVALID_ARGUMENT, f"{what} is not a valid {model.__name__}", hint=hint) from exc
 
 
-def _tool_result(name: str, done: ev.StepResult) -> ToolResult:
-    """The block's view of a journaled result; a live and a replayed result are built alike (AC11)."""
-    return ToolResult(
-        tool=name,
-        ref=Ref.model_validate({"$ref": done.ref}),
-        summary=decode_summary(done.summary),
-        warnings=tuple(ContractWarning.model_validate(w) for w in done.warnings),
-        complete=done.complete,
-        model=None,
-    )
-
-
-class _Ctx:
-    """The ctx of the root block. Task T9 wires `tool` only; the other calls, retries and handles are task T10."""
-
-    def __init__(self, tools: ToolPort, clock: Clock, run_id: str, writer: JournalWriter, index: ReplayIndex) -> None:
-        """Serve one run: its tool port, clock, id, journal writer and replay index."""
-        self._tools, self._clock, self._run_id, self._writer, self._index = tools, clock, run_id, writer, index
-
-    async def tool(self, name: str, args: Mapping[str, JsonValue] | None = None) -> ToolResult:
-        """Call the host tool `name` as one step, or return what the journal recorded for it (spec 4.3.2).
-
-        Raises:
-            ToolFailed: a failure envelope. `ContractError`: a tool outside the allowlist.
-            BlockRuleViolation: a step started while another is in progress in the same scope.
-            ReplayDivergence, NeedsReconciliation: see `ReplayIndex.lookup`.
-            Any exception of the port itself ends the run with no closing event: the step stays in flight, for the
-            reconciliation of task T11b.
-        """
-        arguments = dict(args or {})
-        return await step(lambda path: self._tool(path, name, arguments))
-
-    async def _tool(self, path: str, name: str, args: dict[str, JsonValue]) -> ToolResult:
-        digest = payload_sha256(args)
-        recorded = self._index.lookup(path, "tool", name, digest)
-        if recorded is not None and recorded.outcome is not None:  # the step is done: replay it
-            if isinstance(recorded.outcome, ev.StepResult):
-                return _tool_result(name, recorded.outcome)
-            if isinstance(recorded.outcome, ErrorDetail):
-                raise errors.ToolFailed(recorded.outcome)
-            raise errors.ReplayDivergence(f"step {path} recorded the harness code {recorded.outcome.harness_code}")
-        attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
-        info = await self._tools.describe(name)
-        op = op_id(self._run_id, path, attempt)
-        model = args.get(info.model_param) if info.model_param else None
-        key = model if isinstance(model, str) else None
-        started = {
-            "kind": "tool", "name": name, "args": args, "args_sha256": digest, "effect": info.effect,
-            "op_id": op if info.effect == "write" else None, "host_key": info.host_key, "model_key": key,
-        }  # fmt: skip
-        self._writer.append(EventType.STEP_STARTED, started, path=path, attempt=attempt)
-        began = self._clock.now_ms()
-        envelope = await self._tools.call(name, args, op_id=op, model=key)
-        millis = self._clock.now_ms() - began
-        if isinstance(envelope, FailureEnvelope):
-            error = envelope.error
-            failed = {"error": error.model_dump(mode="json"), "retryable": error.retryable, "duration_ms": millis}
-            self._writer.append(EventType.STEP_FAILED, failed, path=path, attempt=attempt)
-            raise errors.ToolFailed(error)
-        done = ev.StepResult(
-            ref=envelope.result_id,
-            summary=envelope.summary,
-            warnings=[w.model_dump(mode="json") for w in envelope.warnings],
-            complete=envelope.complete,
-        )
-        completed = ev.StepCompleted(result=done, duration_ms=millis)
-        self._writer.append(EventType.STEP_COMPLETED, completed, path=path, attempt=attempt)
-        return _tool_result(name, done)
-
-
 class Engine:
     """Starts runs and resumes them by replay; an engine holds the lock of one run at a time (spec 4.4.4)."""
 
@@ -204,7 +130,7 @@ class Engine:
         settings: EngineSettings, clock: Clock, ids: IdSource,
     ) -> None:  # fmt: skip
         """Bind the workspace (runs live in `<root>/runs`), the registered workflows, the ports and the sources."""
-        self._runs = workspace.root / "runs"
+        self._runs, self._settings = workspace.root / "runs", settings
         self._registry, self._ports, self._store, self._clock, self._ids = registry, ports, store, clock, ids
         self._settings_sha256 = payload_sha256(settings.model_dump(mode="json"))
 
@@ -250,7 +176,7 @@ class Engine:
             }  # fmt: skip
             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
                 writer.append(EventType.RUN_STARTED, header)
-                return await self._drive(workflow, inp, run_id, writer, ReplayIndex(()))
+                return await self._drive(workflow, inp, run_id, writer, [])
 
     async def resume(self, run_id: str) -> RunOutcome:
         """Resume the run (steps 1 to 3 and 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
@@ -277,7 +203,7 @@ class Engine:
                 except errors.ReplayDivergence as stop:
                     return self._escalate(run_id, writer, "replay_divergence", stop)
                 writer.append(EventType.RUN_RESUMED, self._resumed(workflow, head, events))
-                return await self._drive(workflow, inp, run_id, writer, ReplayIndex(events))  # step 9 (4 to 8: T11b)
+                return await self._drive(workflow, inp, run_id, writer, events)  # step 9 (4 to 8: T11b)
 
     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
@@ -323,16 +249,26 @@ class Engine:
         return outcome
 
     async def _drive(
-        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, index: ReplayIndex
-    ) -> RunOutcome:
-        """Run the root block and journal how it ends: `run_completed`, or `run_escalated` for a stop of the block."""
+        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, events: list[Event]
+    ) -> RunOutcome:  # fmt: skip
+        """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
+        ports = self._ports
+        ctx = Ctx(
+            ports.tool, ports.calc, self._store, self._settings, self._clock, self._producer, run_id, writer, events
+        )
         try:
             with root_scope():
-                out = await workflow.fn(_Ctx(self._ports.tool, self._clock, run_id, writer, index), inp)
+                out = await workflow.fn(ctx, inp)
             if not isinstance(out, workflow.output_model):
                 wanted = workflow.output_model.__name__
                 raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
-            index.finish()
+            ctx.index.finish()
+        except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
+            writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
+            return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
+        except errors.Escalation as stop:
+            reason = "attempts_exhausted" if isinstance(stop, AttemptsExhausted) else "block_escalation"
+            return self._escalate(run_id, writer, reason, stop)
         except (errors.ReplayDivergence, errors.NeedsReconciliation) as stop:  # the reason is the lowercase code
             return self._escalate(run_id, writer, stop.code.value.lower(), stop)
         except errors.BlockRuleViolation as stop:
@@ -341,7 +277,7 @@ class Engine:
             return self._escalate(run_id, writer, "unhandled_error", stop)
         value = out.model_dump(mode="json")
         stored = self._store.put("harness.run_output/1", {"value": value}, self._producer())
-        done = {"output_ref": stored.result_id, "output_sha256": payload_sha256(value), "draft": False}
+        done = {"output_ref": stored.result_id, "output_sha256": payload_sha256(value), "draft": ctx.draft}
         writer.append(EventType.RUN_COMPLETED, done)
         return RunOutcome(run_id, RunStatus.COMPLETED, out)
 
