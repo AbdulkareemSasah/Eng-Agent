@@ -303,6 +303,7 @@ tasks:
     # (AC62, AC63).
     # Amendment (B-412, documents only): cli/__init__.py added (CliDeps fields, run and resume handlers); CliDeps defaults rule of section 3; page report bound to build_report.
     # Amendment (B-412 review, documents only): stop-file removals of spec 4.4.8 in _run.py and their test; budget 340 -> 360.
+    # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (the shared fully set CliDeps builder of section 3).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -310,6 +311,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/cli/_options.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
+      - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/unit/cli/test_options.py"
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
@@ -331,6 +333,7 @@ tasks:
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
     # Amendment (B-412, documents only): cli/__init__.py added (providers_loader and decision_assembler fields); CliDeps defaults rule of section 3.
+    # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T14b extends the shared builder with its new fields); T18 binds the defaults.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -338,6 +341,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_signals.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
+      - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/unit/cli/test_signals.py"
       - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
@@ -354,6 +358,7 @@ tasks:
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
     # Amendment (B-412, documents only): cli/__init__.py, _run.py, _wiring.py, pages/__init__.py and _ports.py added; budget 250 -> 330 (screen, port, setup log and run step 3 share it).
+    # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T15 extends the shared builder with any new basis field).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -363,6 +368,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/pages/__init__.py"
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_basis.py"
+      - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py"
     max_changed_lines: 330
     max_sessions: 2
@@ -376,12 +382,14 @@ tasks:
   - id: T16
     title: "Commands status, stop, report and doctor"
     # Amendment (B-412, documents only): cli/__init__.py added (handlers, doctor field); report and doctor handlers in cli/_status.py; stop test drives a fake engine (real one re-checked in T17).
+    # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T16 extends the shared builder with the doctor field); T18 binds the doctor default.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/cli/_status.py"
       - "packages/eng-harness/src/eng_harness/cli/_stop.py"
+      - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/unit/cli/test_status.py"
       - "packages/eng-harness/tests/unit/cli/test_report_command.py"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py"
@@ -396,20 +404,18 @@ tasks:
     covers: [AC9, AC11, AC12, AC13]
     depends_on: [T14b]
   - id: T17
-    title: "End-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule"
-    # Amendment (B-412, documents only): AGENTS.md re-rendered with agents.yml; waits for engine plan T15 and T18 (real engine, no fakes); re-checks AC9, AC19, AC29 and AC37 with the real engine.
+    title: "End-to-end approval, replay and untrusted-text tests; Arabic environment; real-engine re-checks"
+    # Amendment (B-412, documents only): waits for engine plan T15 and T18 (real engine, no fakes); re-checks AC9, AC19, AC29 and AC37 with the real engine.
+    # Amendment (B-412 second review, documents only): split; T17 holds only test files (a `test(...)` pull request, test-first step 3) and names its re-check nodes; the documentation part is T17b.
     files:
-      - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/docs/local-testing.md"
-      - "packages/eng-harness/.gate/agents.yml"
-      - "packages/eng-harness/AGENTS.md"
       - "packages/eng-harness/tests/property/test_untrusted_text.py"
       - "packages/eng-harness/tests/replay/test_page_resume.py"
       - "packages/eng-harness/tests/windows/test_arabic_environment.py"
       - "packages/eng-harness/tests/workflow/test_cli_stop.py"
       - "packages/eng-harness/tests/workflow/test_page_approval.py"
       - "packages/eng-harness/tests/workflow/test_progress_detach.py"
-    max_changed_lines: 150
+    # Only test files, which are not counted (section 1): the counted budget is nominal; about 450 test lines are expected.
+    max_changed_lines: 20
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/test_page_approval.py::test_per_item_reject_end_to_end"
@@ -417,8 +423,37 @@ tasks:
       - "packages/eng-harness/tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume"
       - "packages/eng-harness/tests/property/test_untrusted_text.py::test_every_screen_and_report_escape"
       - "packages/eng-harness/tests/windows/test_arabic_environment.py::test_arabic_workspace_and_cp1256"
+      - "packages/eng-harness/tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues"
+      - "packages/eng-harness/tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point"
+      - "packages/eng-harness/tests/workflow/test_page_approval.py::test_answer_bound_to_hash_real_engine"
+      - "packages/eng-harness/tests/workflow/test_page_approval.py::test_page_confirms_after_commit_real_engine"
     covers: [AC9, AC19, AC29, AC33, AC34, AC35, AC37, AC48, AC58]
     depends_on: [T15, T16]
+  - id: T17b
+    title: "Local testing list and the agent rule in the package AGENTS.md"
+    # Amendment (B-412 second review, documents only): new; the documentation half of T17 (a `docs(...)` pull request, exempt from test-first).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"
+      - "packages/eng-harness/.gate/agents.yml"
+      - "packages/eng-harness/AGENTS.md"
+    # About 60 lines of local-testing.md, 15 of agents.yml and 10 of CHANGELOG.md; AGENTS.md is generated and not counted.
+    max_changed_lines: 120
+    max_sessions: 1
+    depends_on: [T17]
+  - id: T18
+    title: "Bind the CliDeps defaults to the merged real implementations"
+    # Amendment (B-412 second review, documents only): new; the one task that replaces the None defaults of the section 3 rule.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
+      - "packages/eng-harness/tests/unit/cli/test_default_deps.py"
+    max_changed_lines: 80
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/cli/test_default_deps.py::test_defaults_are_the_real_implementations"
+    covers: [AC13, AC62]
+    depends_on: [T14b, T15, T16]
 ---
 
 # Implementation plan: eng-harness command line, progress, approval page and run report
@@ -444,7 +479,8 @@ lets the rest stack on them:
   source links; T13 adds the marks, the integrity line, the policy and the atomic write.
 - T14 to T16 wire the commands: run and resume first (T14, then T14b for signals, the launch address and the decision
   layer; they exercise everything), then the basis confirmation inside `run`, then status, stop, report and doctor. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
-  environment test, the local testing list and the agent rule.
+  environment test and the real-engine re-checks (test files only); T17b adds the local testing list and the agent
+  rule; T18 binds the `CliDeps` defaults once every real implementation has merged.
 
 No new runtime dependency: `http.server`, `argparse`, `subprocess`, `statistics`, `secrets`, `hmac` and `html` from the
 standard library (spec §2, Q1). Reuse: `JournalReader`, the ports and `Event` from engine T4 and T6; `ResultStore`
@@ -491,9 +527,11 @@ acknowledgement after the sink sees `approval_resolved`, `FileRunControl` (stop 
 Amendment B-412: (1) T7 exports `PageApprovalPort` and `PageInputPort` from `pages/__init__.py`. (2) The stop file is
 the protocol of spec §4.4.8 (`runs/<run_id>/stop.json`, `requested_at` and `by`, written by rename);
 `cli/_control.py` holds `FileRunControl` and the write, read and remove helpers that T14, T14b and T16 call. (3)
-`pages/_ports.py` dispatches `PageApp.screen(kind, id)` on the request kind through a mapping from kind to screen
-builder; a request kind with no registered builder renders a refusal page (no form, no button). T9, T10 and T15
-register their screens in that mapping. (4) The page ports take a `report: Callable[[], str]` behind `PageApp.report()`
+`pages/_ports.py` implements `PageApp.screen(kind, id)`, whose `kind` is the route kind (`request` or `setup`,
+`pages/_routes.py`): `screen('request', id)` looks up the open request by id and dispatches on its approval or request
+kind (`CHANGE_SET`, `PROMOTION`, a choice kind, ...) through a mapping from that kind to a screen builder, and a kind
+with no registered builder renders a refusal page (no form, no button); `screen('setup', id)` goes to the basis
+builder. T9 and T10 register their builders in the mapping, and T15 registers the basis builder for `setup`. (4) The page ports take a `report: Callable[[], str]` behind `PageApp.report()`
 (`GET /report`), by default a fixed "report not available yet" document; T14 binds it. (5) The workflow tests
 (`test_answer_bound_to_hash`, `test_page_confirms_after_commit`) drive `PageApprovalPort` with a test-local stand-in for
 the engine that journals `approval_requested` and `approval_resolved` through the merged `JournalWriter` and feeds the
@@ -547,14 +585,15 @@ assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `D
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
 the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
 `cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they default to `None` (the
-decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and plan 0009 T10 (or a named follow-up) binds the defaults. The
+decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18 binds the defaults once plan 0009 T1 and T10 have merged. The
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 Amendment B-354: `run --no-wait` with required basis fields exits 10 before any run exists, nothing stored (AC47).
 Amendment B-412: step 3 of spec §4.2.2 goes in `cli/_run.py` and `cli/_wiring.py`; `PageBasisSetupPort` is exported
 from `pages/__init__.py`, and its port class and the `setup` kind are registered in the dispatch of `pages/_ports.py`. A
-basis-port factory or `freeze` that becomes a `CliDeps` field goes in `cli/__init__.py` under the defaults rule of §3.
+basis-port factory or `freeze` that becomes a `CliDeps` field goes in `cli/__init__.py` under the defaults rule of §3
+(T18 binds its default).
 Budget 250 to 330: about 120 for the screen, 60 for the port and its registration, 50 for the setup log, 70 for step 3
 and `--no-wait`, and 30 for the wiring (an estimate, not a measurement).
 
@@ -562,23 +601,41 @@ and `--no-wait`, and 30 for the wiring (an estimate, not a measurement).
 `cli/_stop.py` (it writes and waits on the stop file whose protocol lives in `cli/_control.py`, T7),
 the report command, the doctor pass-through. Amendment B-412: the report and doctor handlers live in `cli/_status.py`;
 T16 registers the four handlers in the `CliDeps` handler table in `cli/__init__.py`. The doctor callable is a `CliDeps`
-field under the defaults rule of §3, injected in `test_doctor_command` and bound once plan 0002 T18 merges.
+field under the defaults rule of §3, injected in `test_doctor_command`; T18 binds its default to `eng_harness.doctor.run` once plan 0002 T18 has merged.
 `test_stop_pauses_at_safe_point` drives a fake engine from `CliDeps` that polls `FileRunControl`; the real-engine stop
 is re-checked in T17.
 
 **T17 End to end** (spec §3.4, §3.6, §3.7). Per-item rejection and void flows through the page, the killed-wait replay,
 the all-screens untrusted text property test, the Windows Arabic test (Arabic workspace path, cp1256 console,
-`ar-SA` culture where present), `docs/local-testing.md`, and the rule "approvals are the engineer's; never read or relay
-the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md` re-rendered by `uv run eng-gate agents
-render` in the same pull request (the CI `agents-drift` job fails on a difference; `CLAUDE.md` is only `@AGENTS.md`).
-Amendment B-412: the template has no free-form slot for a package rule, so the rule text (run and resume in the
-background and follow with `status`, or `--no-wait` and tell the engineer; never read or relay the launch address or
-open the page; approvals are the engineer's) is appended to the `one-paragraph purpose` value, and `entry-point` is set
-to `--package eng-harness eng-harness <command>`. T17 waits for engine plan T15 (which brings T9 to T14b) and engine
-plan T18, and uses the real engine, no fakes: it re-checks with the real engine the halves deferred from T5 (AC19, a
-raising `TerminalProgress` renderer is detached and the run continues, in `tests/workflow/test_progress_detach.py`),
-T7 (AC29, AC37, in `test_page_approval.py`) and T16 (AC9, in `test_cli_stop.py`). If T17 is to drive the real
-`CliDeps` defaults, it also waits until they are bound (§3).
+`ar-SA` culture where present). T17 waits for engine plan T15 (which brings T9 to T14b) and engine plan T18, and uses
+the real engine, no fakes: it re-checks with the real engine the halves deferred from T5 (AC19, a raising
+`TerminalProgress` renderer is detached and the run continues:
+`test_progress_detach.py::test_raising_renderer_detached_run_continues`), T7 (AC29 and AC37:
+`test_page_approval.py::test_answer_bound_to_hash_real_engine` and `::test_page_confirms_after_commit_real_engine`) and
+T16 (AC9: `test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point`). It passes the real collaborators to
+`CliDeps` explicitly, so it does not wait for T18. Amendment B-412 second review: everything these tests exercise is
+already merged at T17's merge base, so a `feat` pull request would fail test-first with TF004 (gate spec §4.7 step
+4.3). T17 therefore holds only test files and its pull request is titled `test(eng-harness): ...`: test-first step 3
+checks that no non-test file changed (TF007), and the tests run in the `gate` job, where they must pass at the head.
+Its `tests_first` list names the nodes the review checks; they are not run against the merge base.
+
+**T17b Local testing list and agent rule** (amendment B-412 second review, the documentation half of T17; a
+`docs(eng-harness): ...` pull request, exempt from test-first). `docs/local-testing.md`, and the rule "approvals are
+the engineer's; never read or relay the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
+re-rendered by `uv run eng-gate agents render` in the same pull request (the CI `agents-drift` job fails on a
+difference; `CLAUDE.md` is only `@AGENTS.md`). The template has no free-form slot for a package rule, so the rule text
+(run and resume in the background and follow with `status`, or `--no-wait` and tell the engineer; never read or relay
+the launch address or open the page; approvals are the engineer's) is appended to the `one-paragraph purpose` value,
+and `entry-point` is set to `--package eng-harness eng-harness <command>`.
+
+**T18 Bind the CliDeps defaults** (amendment B-412 second review; spec §4.1, AC13, AC62). The one task that replaces
+each `None` default of the §3 rule with the real implementation: the engine factory (engine plan T9 and T9b), the port
+builder `build_ports` (plan 0002), the calc preflight (plan 0003 `HarnessCalcPort.preflight`), `freeze` (plan 0004
+T8), the workflow registry (plan 0007), `load_providers_config` and `assemble_decision_runtime` (plan 0009 T1 and
+T10), and `eng_harness.doctor.run` (plan 0002 T18). It waits for all of them; if one is still missing long after the
+others, the lead amends this plan to split T18 rather than bind a stub. `test_defaults_are_the_real_implementations`
+checks that each field of `CliDeps()` is the real callable and that `run`, `resume` and `doctor` are then available;
+it fails at the merge base because the defaults are `None`.
 
 ## 3. Dependencies
 
@@ -599,13 +656,16 @@ T7 (AC29, AC37, in `test_page_approval.py`) and T16 (AC9, in `test_cli_stop.py`)
   Tests pass the collaborators explicitly. A command counts as available only when every collaborator it needs is not
   `None`: the handler table (or the handler at dispatch) checks this, so with the default `CliDeps()` that command
   keeps exiting 2 "not available in this build". No stub stands in for a missing implementation in production code.
-  The task that merges the real implementation, or a named follow-up, replaces the `None` default with the real one.
+  T18 replaces every `None` default with the real one once the real implementations have merged; the providing
+  tasks of the other plans do not touch `cli/__init__.py`. Tests build a fully set `CliDeps` through the shared helper
+  `tests/helpers/cli_deps.py`, which T14 creates and T14b, T15 and T16 extend with the fields they add, so that a new
+  field does not turn an earlier task's `run` or `resume` test into exit 2 (amendment B-412 second review).
   (Amendment B-412 review: the earlier wording "no default and required" would make `CliDeps()` raise `TypeError`.)
 - Staged engine (amendment B-412). The engine runner and approvals (engine plan T9 to T15) and progress delivery
   (engine plan T18) are not merged when T5, T7 and T16 may be built. T5 tests the sink alone; T7's workflow tests use a
   test-local engine stand-in that journals through the merged `JournalWriter`; T16's stop test uses a fake engine from
   `CliDeps`. T17 waits for engine plan T15 and T18 and re-checks the deferred halves (AC9, AC19, AC29, AC37) with the
-  real engine.
+  real engine (test files only, see T17).
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`; `stop.json` and `heartbeat.json`, Q19), engine §4.9 (`item_reasons`, the choice
   convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here.
 
@@ -620,7 +680,7 @@ rule "built only from the journal and the store". The second-family review and t
 Windows CI job: `tests/windows/` (Arabic environment) and `tests/perf/` (progress latency). Page tests bind the
 loopback interface only.
 
-Needs local test (listed in `docs/local-testing.md` by T17): (1) the approval page in the owner's real browser: no
+Needs local test (listed in `docs/local-testing.md` by T17b): (1) the approval page in the owner's real browser: no
 Content-Security-Policy violation in the console, Arabic and mixed-direction text from a real drawing and model
 displays correctly, forms submit, a second tab opens by cookie; (2) the report opened and printed from disk: the DRAFT
 watermark and the layout; (3) a workstation with an Arabic regional setting, the Hijri calendar and a cp1256 console:

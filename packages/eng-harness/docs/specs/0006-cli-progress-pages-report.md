@@ -111,7 +111,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   given a run with no live engine, `stop` exits 0, says it is not running and writes no stop file; given a stop file
   left behind, `resume` removes it before the engine starts. Test:
   `tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point` (a fake engine from `CliDeps` that polls
-  `FileRunControl`; the real-engine stop is re-checked in plan T17, B-412). The two removals in `cli/_run.py` are also
+  `FileRunControl`; the real-engine stop is re-checked in plan T17 by
+  `tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point`, B-412). The two removals in `cli/_run.py` are also
   tested by `tests/replay/test_cli_resume.py::test_stop_file_removed_on_return_and_before_resume` (plan T14).
 - AC10. Given an interrupt signal, then the first one is a stop request (as AC9) and the second ends the process at
   once with exit 130; the journal then resumes as after any crash (engine AC30). Test:
@@ -184,7 +185,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   Given a renderer that raises, `emit` raises (the sink does not swallow the failure), so that the engine can detach
   it. Test: `tests/unit/progress/test_sink.py::test_blocked_stream_does_not_block_engine` (the sink alone, no engine).
   The engine half, that a raising sink is detached and the run continues, is engine AC58 (engine plan T18); it is
-  re-checked with `TerminalProgress` and the real engine in plan T17 (B-412).
+  re-checked with `TerminalProgress` and the real engine in plan T17 by
+  `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (B-412).
 - AC20. Given a committed event, then the line is written to the stream in under 200 ms at p95 (11 §10). Test:
   `tests/perf/test_progress_latency.py::test_event_to_line_p95`.
 - AC21. Given any string taken from data (a model name, a message, a file name), then terminal output holds no
@@ -398,8 +400,8 @@ takes its collaborators in `CliDeps` (registry, port factories, clock, ids, stre
 assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
 runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged is an
 optional field that defaults to `None` until it does (so `CliDeps()` still builds); a command whose collaborators are
-not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation
-(plan §3, B-412).
+not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation;
+plan T18 binds every default once the real implementations have merged (plan §3, B-412).
 
 **Invocation from the workspace root (B-354).** The one supported form is
 `uv run --package eng-harness eng-harness <command> [options]`, run in the workspace root. The root project
@@ -444,7 +446,7 @@ journaled (AC46). For `run`, the CLI holds the file's object and wraps the page 
 data request is answered from it once through `pages.accept_answers_file`; every other request, a later data request
 included, goes to the page port unchanged (AC64).
 
-Rule for coding agents, recorded in the package `AGENTS.md` (plan T17): run `run` and `resume` in the background and
+Rule for coding agents, recorded in the package `AGENTS.md` (plan T17b): run `run` and `resume` in the background and
 follow them with `status`, or use `--no-wait` and tell the engineer to resume (a `run` that needs basis confirmation is
 started by the engineer without `--no-wait`, §4.4.7); never read or relay the launch address
 or open the page; the approval is the engineer's. The rule is generated into the package
@@ -866,7 +868,7 @@ heartbeat task runs on the engine loop.
 | AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
-| AC7, AC9, AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
+| AC7, AC9, AC19 (engine half, plan T17), AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client) | `tests/workflow/` |
 | AC8, AC35 | Replay (process killed, resumed) | `tests/replay/` |
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
@@ -877,8 +879,12 @@ heartbeat task runs on the engine loop.
 Staged engine (B-412): a workflow test whose task is built before the engine it needs has merged drives the port
 under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds the
 events to the sink) or with a fake engine from `CliDeps`; this holds for AC29 and AC37 (plan T7) and AC9 (plan T16).
-Plan T17 waits for the real engine with approvals (engine plan T15) and re-checks those criteria, and the engine half
-of AC19, with the real engine.
+Plan T17 waits for the real engine with approvals (engine plan T15) and progress delivery (engine plan T18) and
+re-checks those criteria, and the engine half of AC19, with the real engine:
+`tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point` (AC9),
+`tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (AC19),
+`tests/workflow/test_page_approval.py::test_answer_bound_to_hash_real_engine` (AC29) and
+`::test_page_confirms_after_commit_real_engine` (AC37).
 
 No engineering value is computed here, so there are no golden engineering tests. Tests use the contract's `FixedClock`
 and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
