@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Decision layer types: `eng_harness.decisions.types` (`Label`, `Rationale`, `Pick`, `DecisionDefinitionError`, `DecisionPolicy`), `DecisionPolicy`, `DecisionSettings` and `ShadowRelease` in `decisions/_policy.py` with the 12 section 3 defaults pinned by a golden file, empty `eng_harness.decisions` and `.interfaces` public modules, and the decision R1 modules in the gate configuration (plan 0005 T1, B-165; spec 0005 AC6, AC7).
+
 - Calc kinds part 2: payload models of `harness.design_summary/1`, `harness.section_size/1`, `harness.placement_comparison/1` and `harness.readback_check/1` registered in `eng_harness.kinds.calcs` (plan 0003 T4b, B-380; spec 0003 AC47).
 - Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
 - Basis draft: `build_draft`, `BasisDraft`, `EngineerValues`, `DetectedValue` in `eng_harness.basis` (precedence engineer, detected, template; sources and citations with the defining ancestor; `detected_differs` warning; pending list; `unused` template paths; draft `sha256`; the values file cannot set `confirmed`) (B-160; spec 0004 AC14 to AC20).

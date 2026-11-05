@@ -4,9 +4,10 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter, ValidationError
+
 from eng_harness.decisions._policy import DecisionPolicy, DecisionSettings, ShadowRelease
 from eng_harness.decisions.types import DecisionDefinitionError, Label, Pick, Rationale
-from pydantic import TypeAdapter, ValidationError
 
 GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "decision_policy_defaults.json"
 
@@ -37,7 +38,7 @@ def test_policy_accepts_boundaries_and_is_frozen() -> None:
     assert DecisionPolicy(min_confidence=1.0).min_confidence == 1.0
     assert DecisionPolicy(timeout_ms_model=1).timeout_ms_model == 1
     with pytest.raises(ValidationError):
-        DecisionPolicy().model = False  # type: ignore[misc]  # B-165: mutation must be refused
+        DecisionPolicy().model = False
 
 
 def test_settings_defaults_and_frozen() -> None:
@@ -49,7 +50,7 @@ def test_settings_defaults_and_frozen() -> None:
     assert settings.extra_denied_tokens == ()
     assert dict(settings.shadow_released) == {}
     with pytest.raises(ValidationError):
-        settings.max_options = 5  # type: ignore[misc]  # B-165: mutation must be refused
+        settings.max_options = 5
     with pytest.raises(ValidationError):
         DecisionSettings(max_options=0)
     with pytest.raises(ValidationError):
@@ -85,7 +86,7 @@ def test_rationale_accepts(text: str) -> None:
     assert TypeAdapter(Rationale).validate_python(text) == text
 
 
-@pytest.mark.parametrize("text", ["", "z" * 301, "uses 2 bars", "arabic ٣ digit", "fullwidth ５"])
+@pytest.mark.parametrize("text", ["", "z" * 301, "uses 2 bars", "arabic " + chr(0x663), "full " + chr(0xFF15)])
 def test_rationale_refuses(text: str) -> None:
     with pytest.raises(ValidationError):
         TypeAdapter(Rationale).validate_python(text)
