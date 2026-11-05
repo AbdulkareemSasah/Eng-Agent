@@ -150,7 +150,7 @@ tasks:
     depends_on: []
   - id: T7
     title: Decision points and rules of the edit cycle
-    # Amendment (B-417, documents only): found by spec 0005 discovery (decisions._points.discover() over eng_harness.workflows, decisions._rules.discover() over eng_harness.rules), so no decisions/ file changes; rule tests move to tests/rules/test_edit_cycle.py (spec 0005 AC12).
+    # Amendment (B-417, documents only): found by spec 0005 discovery (decisions._points.discover() over eng_harness.workflows, decisions._rules.discover() over eng_harness.rules), so no decisions/ file changes; rule tests move to tests/rules/test_edit_cycle.py (spec 0005 AC12); the two phase-1 tests of tests/unit/decisions/test_points.py are isolated from the shipped package.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -160,7 +160,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
       - "packages/eng-harness/tests/rules/test_edit_cycle.py"
-    max_changed_lines: 240
+      - "packages/eng-harness/tests/unit/decisions/test_points.py"  # isolates the two phase-1 discovery tests from the shipped points (amendment B-417)
+    max_changed_lines: 260
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_pass_typical"
@@ -200,7 +201,7 @@ tasks:
     depends_on: [T2, T3, T5, T6, T7]
   - id: T9
     title: Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off), the cycle loop and registration
-    # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395.
+    # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -218,7 +219,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
-    max_changed_lines: 395
+      - "packages/eng-harness/tests/unit/test_block.py"  # isolates test_main_writes_the_lock from the shipped blocks (amendment B-417)
+    max_changed_lines: 400
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_registered"
@@ -371,7 +373,15 @@ package marker and lists it in its files: the gate's empty-marker exception (gat
 not `src/`, so the file is in scope only because the task names it. The rule tests are `tests/rules/test_edit_cycle.py` with
 `test_pass_typical`, `test_pass_boundary`, `test_clean_typical` and `test_clean_boundary` (spec AC18, spec 0005 AC12,
 whose `missing_rule_tests` looks for exactly these names); the test module imports `eng_harness.rules.edit_cycle` at
-module level, so it fails at the merge base for the right reason (TF004).
+module level, so it fails at the merge base for the right reason (TF004). Once the three points exist, two merged
+phase-1 tests of `tests/unit/decisions/test_points.py` (plan 0005 T2) would fail, because they pin an empty discovery
+against the real package: `test_discover_is_empty_without_workflows` asserts `discover().points == ()`, and
+`test_main_requires_write_lock_flag_and_writes` runs `main(["--write-lock"])`, which writes `discover()`, and expects an
+empty lock. The task therefore lists that file and rewrites both tests so that they no longer depend on the shipped
+package, keeping what each checks: the first monkeypatches `importlib.util.find_spec` to report `eng_harness.workflows`
+absent and still expects an empty registry (the "empty when the package is absent" branch of spec 0005 §4.2), and the
+second monkeypatches `_points.discover` to return an empty `PointRegistry` and still expects an empty lock. That the real
+discovery finds the three points is checked by `tests/contract/test_decision_lock.py` against the regenerated lock.
 
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the
@@ -394,6 +404,10 @@ avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness
 `tests/contract/test_block_lock.py::test_lock_matches_registry` then covers the `model_edit_cycle` blocks;
 `test_definition.py::test_workflow_registered` checks that `discover()` holds them (the lock part of AC1). The public
 module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 T11 and T13 add their blocks to the same tuple.
+The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main(["--write-lock"])`, which writes
+`discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
+and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
+are is checked by `test_block_lock.py` and `test_workflow_registered`).
 
 **T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
