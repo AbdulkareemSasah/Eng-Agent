@@ -74,11 +74,11 @@ def test_decisions_escalations_reconciliations(run_dir: Path, store: ResultStore
     assert decision.at == "2026-01-01T00:01:47.000Z"
     (escalation,) = model.escalations
     assert (escalation.reason, escalation.detail, escalation.at) == (
-        "needs_reconciliation", "d", "2026-01-01T00:01:39.000Z",
+        "needs_reconciliation", "d", "2026-01-01T00:01:41.700Z",
     )  # fmt: skip
     (reconciled,) = model.reconciliations
     assert (reconciled.op_id, reconciled.outcome, reconciled.decided_by, reconciled.path) == (
-        "op1", "applied", "engineer:x", "2",
+        "op1", "applied", "engineer:x", None,
     )  # fmt: skip
 
 
@@ -108,7 +108,7 @@ def test_missing_stored_result_is_refused(
     )
     with pytest.raises(ContractError) as caught:
         fold_report(JournalReader(run_dir), empty)
-    assert caught.value.code is ErrorCode.REF_NOT_FOUND
+    assert caught.value.detail.code is ErrorCode.REF_NOT_FOUND
 
 
 def test_resolution_before_request_is_refused(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:

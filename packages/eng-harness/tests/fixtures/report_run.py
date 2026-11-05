@@ -116,12 +116,12 @@ def build_report_run(run_dir: Path, store: ResultStore, ids: IdSource, *, open_a
     at(68, kinds.STEP_COMPLETED, done(5_000), "1")
     at(68, kinds.INPUT_REQUESTED, INPUT)
     at(98, kinds.INPUT_PROVIDED, {"request_id": "in1", "answer_ref": base, "by": "engineer:x"})
-    at(99, kinds.RUN_ESCALATED, ESCALATION)
-    at(99.5, kinds.STEP_RECONCILED, RECONCILED, "2")
     at(100, kinds.RUN_RESUMED, {"resume_no": 1, "code_hash_changed": False, "servers": []})
     at(100, kinds.STEP_STARTED, STARTED, "2")
     failure = {"error": {"harness_code": "NEEDS_ENGINEER", "message": "m"}, "retryable": False, "duration_ms": 1_500}
     at(101.5, kinds.STEP_FAILED, failure, "2")
+    at(101.6, kinds.STEP_RECONCILED, RECONCILED)
+    at(101.7, kinds.RUN_ESCALATED, ESCALATION)
     at(102, kinds.INPUT_REQUESTED, DECISION_REQUEST)
     at(107, kinds.DECISION_MADE, DECISION)
     if open_approval:
