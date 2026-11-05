@@ -15,6 +15,7 @@ from eng_contract.params import ParamModel, eng_param
 from eng_contract.quantity import Quantity
 from eng_contract.store import ResultStore
 from eng_contract.units import UnitError, UnitGapError
+from pydantic import JsonValue
 
 from eng_harness.adapters import (
     HostTarget,
@@ -149,7 +150,7 @@ def test_unit_systems_are_checked() -> None:
 
 
 def test_host_arguments_target_units_and_confirm() -> None:
-    args = {"name": "W1", "thickness": 250.0}
+    args: dict[str, JsonValue] = {"name": "W1", "thickness": 250.0}
     sent = host_arguments(_descriptor(confirm="approved"), args, target=TARGET, units_system="kN_mm_C", approved=True)
     assert sent == {
         "name": "W1",

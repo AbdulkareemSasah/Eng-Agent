@@ -66,7 +66,7 @@ def test_limits_and_provenance(store: ResultStore) -> None:
     # provenance: tool, build, host program, model id and revision, inputs as given, timing
     p = envelope.provenance
     assert (p.tool, p.tool_version) == (TOOL, "0123456789ab+fedcba987654")
-    assert (p.host.program, p.host.model_id, p.host.model_revision) == ("ETABS", MODEL, 2)  # type: ignore[union-attr]
+    assert p.host == HOST  # program, model id and revision
     assert (p.inputs, p.started_at, p.duration_ms) == (inputs, "2026-01-01T00:00:01.000Z", 37)
     # parents of the stored result are the results of the resolved references
     assert store.get(envelope.result_id).parents == [rid]
