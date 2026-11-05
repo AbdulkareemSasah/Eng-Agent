@@ -23,6 +23,7 @@ limits:
   max_task_lines: 400
   test_run_seconds: 600
   max_file_bytes: 1048576
+  mutation_run_seconds: 7200
 """
 
 CLEAN_MODULE = (
