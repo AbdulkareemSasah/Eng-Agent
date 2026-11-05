@@ -11,3 +11,8 @@ as done, and every row is run by the owner.
 | PC-1 flexure | SAFE | Strip moment at the column face for the flexure HC-2 footing |
 | PC-1 minimum reinforcement | SAFE | Minimum steel in footing strips |
 | Reaction convention | ETABS or SAFE | Signs of `FX`, `FY`, `MX`, `MY` in `forces.joint_reactions/1`, which FS S2 combines with the reaction height |
+
+## SBC 304-2018 pack (plan 0003)
+
+No item needs a host program in this version: the pack evaluates no SBC equation and every check returns
+`NEEDS_ENGINEER`. Program comparisons are added by the pull request that turns a clause-map row to `inherited`.
