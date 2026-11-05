@@ -444,7 +444,7 @@ rules, `model=False`, `llm=False` (Q8). States hold statuses, booleans and label
 | `column_revit.map_result` | `continue_matched`, `stop` | `has_ambiguous`, `has_unmatched_frames`, `has_conflicts`, `complete` | `map.clean`: all false and `complete` → `continue_matched` |
 | `column_revit.readback_result` | `accept`, `abandon` | `status`, issue codes as labels | `rr.pass`: `PASS` → `accept` |
 
-EC points `edit_cycle.readback_result` and `edit_cycle.analysis_messages` run inside the reused blocks. `hand_edit`
+EC points `edit_cycle_readback_result` and `edit_cycle_analysis_messages` (spec 0007 §4.6, amendment B-417) run inside the reused blocks. `hand_edit`
 starts the next cycle with no change set (EC §4.7). Unmatched Revit elements are normal (the Revit model holds columns
 outside the selection) and are not in the map rule.
 

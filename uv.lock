@@ -10,6 +10,7 @@ members = [
     "eng-platform",
     "structural-codes-aci318-14",
     "structural-codes-core",
+    "structural-codes-sbc304-2018",
 ]
 
 [[package]]
@@ -1181,6 +1182,39 @@ requires-dist = [
 dev = [
     { name = "hypothesis", specifier = ">=6.170.14" },
     { name = "pytest", specifier = ">=9.2.0" },
+    { name = "types-pyyaml", specifier = ">=6" },
+]
+
+[[package]]
+name = "structural-codes-sbc304-2018"
+version = "0.1.0.dev0"
+source = { editable = "packages/structural-codes/sbc304-2018" }
+dependencies = [
+    { name = "eng-contract" },
+    { name = "structural-codes-aci318-14" },
+    { name = "structural-codes-core" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pyyaml" },
+    { name = "types-pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "eng-contract", editable = "packages/eng-contract" },
+    { name = "structural-codes-aci318-14", editable = "packages/structural-codes/aci318-14" },
+    { name = "structural-codes-core", editable = "packages/structural-codes/core" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.170.14" },
+    { name = "pytest", specifier = ">=9.2.0" },
+    { name = "pyyaml", specifier = ">=6,<7" },
     { name = "types-pyyaml", specifier = ">=6" },
 ]
 
