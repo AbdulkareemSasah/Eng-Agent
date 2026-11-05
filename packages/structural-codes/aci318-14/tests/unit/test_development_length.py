@@ -168,10 +168,11 @@ def test_constants_and_trace() -> None:
 def test_rectangular_plan_uses_each_direction_own_bars() -> None:
     """Asymmetric hand check: X uses Lx, cx and the _x bars; Y uses Ly, cy and the _y bars (clause spec §4).
 
-    X: Lx = 3000, cx = 500, db = 25, cover = 40, s = 150: la = 1500 - 250 - 75 = 1175 mm, cb = min(52.5, 75) = 52.5 mm,
-    conf = 2.1, ld = 420 / (1.1 * sqrt(28)) * 25 / 2.1 = 859.010166 mm, ratio 0.731072.
-    Y: Ly = 2000, cy = 300, db = 16, cover = 80, s = 250: la = 1000 - 150 - 75 = 775 mm, cb = min(88, 125) = 88 mm,
-    conf = 2.5 (limit), ld = 461.803865 mm, ratio 0.595876. A swapped direction input fails here.
+    X: Lx = 3000, cx = 500, db = 25, cover = 40, s = 100: la = 1500 - 250 - 75 = 1175 mm, cb = min(52.5, 50) = 50 mm
+    (spacing governs), conf = 2.0, ld = 420 / (1.1 * sqrt(28)) * 25 / 2.0 = 901.960674 mm, ratio 0.767626.
+    Y: Ly = 2000, cy = 300, db = 16, cover = 80, s = 250: la = 1000 - 150 - 75 = 775 mm, cb = min(88, 125) = 88 mm
+    (cover governs), conf = 2.5 (limit), ld = 461.803865 mm, ratio 0.595876. A swapped direction input fails here,
+    including reading s_y in cb_x (cb_x = 52.5 mm, ld_x = 859.010166 mm).
     """
     changes: dict[str, Any] = {
         "Lx_mm": 3000.0,
@@ -180,7 +181,7 @@ def test_rectangular_plan_uses_each_direction_own_bars() -> None:
         "cy_mm": 300.0,
         "db_x_mm": 25.0,
         "db_y_mm": 16.0,
-        "s_x_mm": 150.0,
+        "s_x_mm": 100.0,
         "s_y_mm": 250.0,
         "cover_x_mm": 40.0,
         "cover_y_mm": 80.0,
@@ -192,16 +193,21 @@ def test_rectangular_plan_uses_each_direction_own_bars() -> None:
     assert y.demand is not None
     assert y.capacity is not None
     assert x.demand.unit == x.capacity.unit == "mm"
-    assert x.demand.value == pytest.approx(859.010166, abs=_MM)
+    assert x.demand.value == pytest.approx(901.960674, abs=_MM)
     assert x.capacity.value == pytest.approx(1175.0, abs=_MM)
     assert y.demand.value == pytest.approx(461.803865, abs=_MM)
     assert y.capacity.value == pytest.approx(775.0, abs=_MM)
-    assert x.ratio == pytest.approx(0.731072, abs=_RATIO)
+    assert x.ratio == pytest.approx(0.767626, abs=_RATIO)
     assert y.ratio == pytest.approx(0.595876, abs=_RATIO)
     assert x.governing
     assert not y.governing
     assert x.clause == y.clause == "25.4.2.3"
     assert [x.status, y.status] == [VerdictStatus.PASS, VerdictStatus.PASS]
+    steps = {s.name: s.value for s in payload.traces[0].steps}
+    assert steps["cb_x_mm"] == pytest.approx(50.0, abs=_MM)
+    assert steps["cb_y_mm"] == pytest.approx(88.0, abs=_MM)
+    assert steps["conf_x_ratio"] == pytest.approx(2.0, abs=_RATIO)
+    assert steps["conf_y_ratio"] == pytest.approx(2.5, abs=_RATIO)
 
 
 def test_step_sources_and_uses() -> None:
