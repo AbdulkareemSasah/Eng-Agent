@@ -1,0 +1,92 @@
+{
+  "items": [
+    {
+      "anything": 1,
+      "id": "r1",
+      "kind": "slab_section"
+    },
+    {
+      "id": "r2",
+      "kind": "frame_section_define"
+    },
+    {
+      "id": "r3",
+      "kind": "area_section_define"
+    },
+    {
+      "id": "r4",
+      "kind": "material_define"
+    },
+    {
+      "id": "r5",
+      "kind": "frame_point_load"
+    },
+    {
+      "id": "r6",
+      "kind": "load_pattern_change"
+    },
+    {
+      "id": "r7",
+      "kind": "load_pattern_delete"
+    },
+    {
+      "id": "r8",
+      "kind": "seismic_parameters"
+    },
+    {
+      "direction": "x",
+      "frames": [
+        "F1"
+      ],
+      "id": "r9",
+      "kind": "frame_uniform_load",
+      "pattern": "Dead",
+      "w": {
+        "source": "input",
+        "unit": "kN/m",
+        "value": 5
+      }
+    },
+    {
+      "id": "r10",
+      "kind": "load_pattern_add",
+      "name": "R",
+      "self_weight": {
+        "source": "input",
+        "unit": "1",
+        "value": 0
+      },
+      "type": "roof_live"
+    },
+    {
+      "id": "r11",
+      "kind": "load_pattern_add",
+      "name": "S",
+      "self_weight": {
+        "source": "input",
+        "unit": "1",
+        "value": 0
+      },
+      "type": "superimposed_dead"
+    },
+    {
+      "id": "r12",
+      "items": [
+        {
+          "case": {
+            "case": "Dead",
+            "case_type": "load_pattern"
+          },
+          "scale": {
+            "source": "input",
+            "unit": "1",
+            "value": 1
+          }
+        }
+      ],
+      "kind": "load_combination_set",
+      "name": "C",
+      "type": "range"
+    }
+  ]
+}

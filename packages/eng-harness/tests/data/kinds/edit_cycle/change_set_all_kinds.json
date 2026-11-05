@@ -1,0 +1,112 @@
+{
+  "benchmark_request": "B1-r1",
+  "items": [
+    {
+      "frames": [
+        "F1"
+      ],
+      "id": "i1",
+      "kind": "frame_section",
+      "section": "C40"
+    },
+    {
+      "id": "i2",
+      "kind": "area_section",
+      "section": "Slab200",
+      "select": {
+        "area_kind": "slab",
+        "section": null,
+        "story": "S1"
+      }
+    },
+    {
+      "id": "i3",
+      "kind": "wall_section",
+      "material": "Conc40",
+      "name": "W20",
+      "shell_type": "ShellThick",
+      "thickness": {
+        "source": "input",
+        "unit": "mm",
+        "value": 200
+      }
+    },
+    {
+      "direction": "gravity",
+      "id": "i4",
+      "kind": "frame_uniform_load",
+      "pattern": "Dead",
+      "select": {
+        "section": "B30",
+        "story": "S2"
+      },
+      "w": {
+        "source": "input",
+        "unit": "kN/m",
+        "value": 5
+      }
+    },
+    {
+      "areas": [
+        "A1"
+      ],
+      "direction": "gravity",
+      "id": "i5",
+      "kind": "area_uniform_load",
+      "pattern": "Live",
+      "q": {
+        "path": "loads.live_load",
+        "source": "basis"
+      }
+    },
+    {
+      "id": "i6",
+      "kind": "load_pattern_add",
+      "name": "Snow1",
+      "self_weight": {
+        "source": "input",
+        "unit": "1",
+        "value": 0
+      },
+      "type": "snow"
+    },
+    {
+      "id": "i7",
+      "items": [
+        {
+          "case": {
+            "case": "Dead",
+            "case_type": "load_pattern"
+          },
+          "scale": {
+            "source": "input",
+            "unit": "1",
+            "value": 1.2
+          }
+        }
+      ],
+      "kind": "load_combination_set",
+      "name": "C1",
+      "type": "linear_add"
+    },
+    {
+      "id": "i8",
+      "kind": "load_combination_delete",
+      "name": "Old"
+    },
+    {
+      "id": "i9",
+      "joints": [
+        "J1"
+      ],
+      "kind": "joint_restraints",
+      "rx": false,
+      "ry": false,
+      "rz": false,
+      "ux": true,
+      "uy": true,
+      "uz": true
+    }
+  ],
+  "note": "all v1 kinds"
+}
