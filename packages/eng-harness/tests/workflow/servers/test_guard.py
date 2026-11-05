@@ -270,3 +270,94 @@ def test_helpers_are_terminated_at_server_stop(tmp_path: Path, make_config: Conf
     anyio.run(scenario)
     assert inspector.terminated == [helper]  # the host program is not a helper
     assert 301 in inspector.running
+
+
+class CaseInspector(FakeInspector):
+    """Every job member has one child whose image name differs from the configured host name only in case."""
+
+    def children(self, pid: int) -> list[ProcessIdentity]:
+        """The host program with another letter case."""
+        return [ProcessIdentity(301, "h2", ETABS.lower())]
+
+
+def test_host_name_is_compared_without_case(tmp_path: Path, make_config: ConfigFactory) -> None:
+    inspector = CaseInspector()
+    host = inspector.children(0)[0]
+    inspector.running[301] = host
+    guard = ProcessGuard(inspector, tmp_path / "run", host_exes=[ETABS])
+
+    async def scenario() -> None:
+        async with ServerManager(make_config(), tmp_path / "run", helpers=guard) as manager:
+            await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
+
+    anyio.run(scenario)
+    assert inspector.terminated == []  # a host instance is closed only by `close_started`
+    assert 301 in inspector.running
+
+
+class BrokenChildren(FakeInspector):
+    """An inspector whose child enumeration fails like a failed Win32 call."""
+
+    def children(self, pid: int) -> list[ProcessIdentity]:
+        """Always fail."""
+        raise OSError("enumeration failed")
+
+
+def test_failed_helper_observation_does_not_break_calls_or_stop(tmp_path: Path, make_config: ConfigFactory) -> None:
+    guard = ProcessGuard(BrokenChildren(), tmp_path / "run", host_exes=[ETABS])
+    stopped: list[bool] = []
+
+    async def scenario() -> None:
+        async with ServerManager(make_config(), tmp_path / "run", helpers=guard) as manager:
+            reply = await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
+            assert not reply.is_error
+            stopped.append(True)
+
+    anyio.run(scenario)
+    assert stopped == [True]
+
+
+class DeniedInspector(FakeInspector):
+    """Ending the first process is refused (an elevated host)."""
+
+    def terminate(self, identity: ProcessIdentity) -> bool:
+        """Refuse pid 100, end the others."""
+        if identity.pid == 100:
+            raise PermissionError("access denied")
+        return super().terminate(identity)
+
+
+def test_failed_terminate_is_listed_and_the_rest_is_closed(tmp_path: Path, make_config: ConfigFactory) -> None:
+    inspector = DeniedInspector()
+    guard = ProcessGuard(inspector, tmp_path / "run", host_exes=[ETABS])
+    first = StartedInstance(pid=100, started_at="a", program=ETABS, visible=False)
+    second = StartedInstance(pid=200, started_at="b", program=ETABS, visible=False)
+    inspector.running.update({100: first.identity, 200: second.identity})
+
+    async def scenario() -> None:
+        async with ServerManager(make_config(), tmp_path / "run", helpers=guard) as manager:
+            left = await guard.close_started(Recording(manager), [first, second])
+            assert left == [first]
+
+    anyio.run(scenario)
+    assert inspector.terminated == [second.identity]
+    listed = json.loads((tmp_path / "run" / "hosts" / "left_open.json").read_text())
+    assert listed == [{"pid": 100, "started_at": "a", "program": ETABS}]
+
+
+def test_graceful_exit_clears_an_earlier_left_open(tmp_path: Path, make_config: ConfigFactory) -> None:
+    async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
+        started = await _launch(manager, guard, inspector, visible=True)
+        await manager.call("csi", "main", "csi_attach", {"pid": 9999, "product": "ETABS"}, CallEffect.WRITE)
+        recording = Recording(manager)
+        assert await guard.close_started(recording, [started]) == [started]  # another target is current
+        listing = tmp_path / "run" / "hosts" / "left_open.json"
+        assert listing.exists()
+
+        await manager.call("csi", "main", "csi_launch", {"product": "ETABS", "visible": True}, CallEffect.WRITE)
+        assert await guard.close_started(recording, [started]) == []  # now the current target: exited gracefully
+
+        assert recording.tools[-1] == "csi_exit"
+        assert json.loads(listing.read_text()) == []
+
+    _run(tmp_path, make_config(), body)
