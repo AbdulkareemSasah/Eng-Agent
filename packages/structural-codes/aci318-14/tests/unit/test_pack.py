@@ -3,6 +3,7 @@
 import importlib
 import pkgutil
 from collections.abc import Mapping
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,7 @@ def test_lint_scope_and_citations() -> None:
 
 def test_all_draft() -> None:
     """The shipped approvals file is empty, so every check is draft and production mode refuses it (PK-AC6)."""
+    assert resources.files(PACK.name).joinpath(PACK.approvals).is_file()
     registry = Registry.discover()
     subject = Subject(kind=SubjectKind.FOOTING, id="F1")
     for c in PACK.checks:
