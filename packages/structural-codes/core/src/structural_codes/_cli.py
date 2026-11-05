@@ -30,7 +30,8 @@ class _Parser(argparse.ArgumentParser):
 def _read(root: Path) -> tuple[str, list[str]]:
     """Return the single pack entry-point name and `check_modules` of `root/pyproject.toml`."""
     try:
-        data: dict[str, Any] = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+        with (root / "pyproject.toml").open("rb") as handle:
+            data: dict[str, Any] = tomllib.load(handle)
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise _CliError(f"cannot read pyproject.toml in {root}: {exc}") from exc
     names = data.get("project", {}).get("entry-points", {}).get(ENTRY_POINT_GROUP, {})
@@ -85,7 +86,7 @@ def _hash(root: Path, out: TextIO) -> int:
 
 def main(argv: list[str], out: TextIO, err: TextIO) -> int:
     """Run the command line and return the exit code; output goes to `out`, error lines to `err`."""
-    parser = _Parser(prog="structural_codes", add_help=False)
+    parser = _Parser(add_help=False)
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ("verify", "hash"):
         sub.add_parser(command, add_help=False).add_argument("--pack", required=True, type=Path)

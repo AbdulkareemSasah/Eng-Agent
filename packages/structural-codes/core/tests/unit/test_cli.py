@@ -158,3 +158,110 @@ def test_module_entry_point(env: _Env, capsys: pytest.CaptureFixture[str]) -> No
         runpy.run_module("structural_codes", run_name="__main__")
     assert done.value.code == 0
     assert capsys.readouterr().out.startswith("synthbase.")
+
+
+def _pyproject(env: _Env, name: str, text: str) -> Path:
+    root = env.tmp / f"root_{name}"
+    root.mkdir()
+    (root / "pyproject.toml").write_text(text, encoding="utf-8")
+    return root
+
+
+_ENTRY = '[project.entry-points."structural_codes.packs"]\nsynthbase = "synthbase:PACK"\n'
+_GATE = "[tool.eng-gate]\ncheck_modules = []\n"
+
+
+def test_pyproject_errors_are_exact(env: _Env) -> None:
+    """Each missing table of the pack's pyproject.toml gives its own one-line message and exit 2."""
+    entry_msg = "pyproject.toml needs exactly one entry point in structural_codes.packs, found 0\n"
+    modules_msg = "pyproject.toml has no [tool.eng-gate] check_modules list of strings\n"
+    other = '[project.entry-points.other]\na = "b:C"\n'
+    cases = {
+        "noproject": (_GATE, entry_msg),
+        "noentrypoints": ('[project]\nname = "x"\n' + _GATE, entry_msg),
+        "nogroup": ('[project]\nname = "x"\n' + other + _GATE, entry_msg),
+        "notool": ('[project]\nname = "x"\n' + _ENTRY, modules_msg),
+        "nogate": ('[project]\nname = "x"\n' + _ENTRY + "[tool.other]\na = 1\n", modules_msg),
+        "nolist": ('[project]\nname = "x"\n' + _ENTRY + '[tool.eng-gate]\ncheck_modules = "src"\n', modules_msg),
+        "badlist": ('[project]\nname = "x"\n' + _ENTRY + "[tool.eng-gate]\ncheck_modules = [1]\n", modules_msg),
+    }
+    for name, (text, message) in cases.items():
+        code, out, err = env.run("verify", "--pack", str(_pyproject(env, name, text)))
+        assert (code, out, err) == (2, "", message), name
+        code, out, err = env.run("hash", "--pack", str(_pyproject(env, "h" + name, text)))
+        assert (code, out, err) == (2, "", message), name
+
+
+def test_usage_errors_and_help_are_exit_2(env: _Env) -> None:
+    for argv in (["--help"], ["verify", "--help"], ["hash", "-h"], ["-h"]):
+        code, out, err = env.run(*argv)
+        assert (code, out) == (2, ""), argv
+        assert err.startswith("usage: "), argv
+        assert err.count("\n") == 1, argv
+        assert err.endswith("\n"), argv
+    assert env.run()[2].startswith("usage: ")
+
+
+def test_lint_scope_message_is_exact(env: _Env) -> None:
+    code, out, err = env.run("verify", "--pack", str(env.root("lint", modules=_OTHER_SRC)))
+    assert (code, out) == (2, "")
+    assert (
+        err
+        == "synthbase.6_1.gap: modules outside check_modules: synthbase, synthbase.checks, synthbase.runner_checks\n"
+    )
+
+
+def test_verify_lines_are_exact(env: _Env) -> None:
+    lines = env.run("verify", "--pack", str(env.root()))[1].splitlines()
+    assert (
+        f"{_SIZED} not verified pass=2 fail=0 pending=0 unmet: (4) no listed property test; (5) no review block"
+        in lines
+    )
+    unmet = "synthbase.4_1.two_pre not verified pass=0 fail=0 pending=0 unmet: no case file synthbase.4_1.two_pre.yaml"
+    assert unmet in lines
+
+    failing = _CASES.read_text(encoding="utf-8").replace("value: 0.5,", "value: 0.9,")
+    out = env.run("verify", "--pack", str(env.root("failing", case_text=failing)))[1]
+    line = next(x for x in out.splitlines() if x.startswith(_SIZED + " "))
+    assert line.startswith(f"{_SIZED} not verified pass=1 fail=1 pending=0 unmet: (1) no passing worked_example")
+    assert "; (6) failing cases: WE-1" in line
+
+
+def test_pending_cases_are_counted(env: _Env) -> None:
+    text = _CASES.read_text(encoding="utf-8")
+    head, _, tail = text.partition("program_comparison:\n  not_available:")
+    tail = tail.partition("\n")[2]
+    pending = (
+        "  - id: PC-1\n    kind: program_comparison\n"
+        "    source: {program: SynthProgram, program_version: '1.0', assumption_differences: [synthetic difference],"
+        " status: needs_local_test}\n"
+        "    subject: {kind: section, id: S1}\n    inputs: {width_mm: 10, demand_mm: 50, capacity_mm: 100}\n"
+        "    expected: {status: PASS, values: {}}\n"
+    )
+    out = env.run(
+        "verify",
+        "--pack",
+        str(env.root("pending", case_text=head + tail.replace("review: null", pending + "review: null"))),
+    )[1]
+    pending_line = (
+        f"{_SIZED} not verified pass=2 fail=0 pending=1 unmet: (2) program comparisons not passing or without"
+        " assumption differences: PC-1; (4) no listed property test; (5) no review block"
+    )
+    assert pending_line in out.splitlines(), out
+
+
+def test_overlay_case_file_is_verified_with_the_registry(env: _Env) -> None:
+    env.register(env.base, env.over)
+    root = env.root("synthover", pack="synthover")
+    over_id = "synthover.s3_1.sized_over"
+    text = (
+        _CASES.read_text(encoding="utf-8").replace("value: 0.5,", "value: 0.25,").replace("value: 1.0,", "value: 0.5,")
+    )
+    text = text.replace(f"check_id: {_SIZED}", f"check_id: {over_id}").replace("width_mm: 10, ", "")
+    (root / "tests" / "data" / "golden" / "verification" / f"{over_id}.yaml").write_text(text, encoding="utf-8")
+    code, out, err = env.run("verify", "--pack", str(root))
+    assert (code, err) == (0, "")
+    assert (
+        f"{over_id} not verified pass=2 fail=0 pending=0 unmet: (4) no listed property test; (5) no review block"
+        in out.splitlines()
+    ), out
