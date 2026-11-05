@@ -87,6 +87,7 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("status", _unsorted, "sorted"),
     ("schedule", _set(["footings", 0, "verdict_sets", 0], "not-a-result"), "verdict_sets"),
     ("schedule", _set(["footings", 0, "closure"], "done"), "closure"),
+    ("schedule", _set(["footings", 0, "closure"], "failing"), "closure"),
     ("schedule", _set(["footings", 0, "design", "h_mm"], 0.0), "h_mm"),
     ("safe_equilibrium", _set(["tolerance"], -0.1), "tolerance"),
     ("safe_equilibrium", _set(["patterns", 0, "status"], "NOT_COMPARED"), "self_weight"),

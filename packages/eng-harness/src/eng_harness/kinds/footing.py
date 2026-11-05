@@ -1,9 +1,7 @@
 # ruff: noqa: N815  # B-392: field names with unit capitals are fixed by spec 0010 section 4.2
-"""Payload models of the isolated-footing kinds (spec 0010 section 4.2).
+"""Payload models of the isolated-footing kinds (spec 0010 section 4.2); validation only.
 
-Purpose: the stored form of the footing calc results, validation only (no engineering logic).
-Units: fields with a unit suffix are in the unit the suffix names (`_mm`, `_mm2`, `_kN`); ratios are dimensionless.
-Errors: `pydantic.ValidationError` for every violated rule. Footing ids are the support joint names.
+Units: suffixes name the unit (`_mm`, `_mm2`, `_kN`); ratios are dimensionless. Errors: `pydantic.ValidationError`.
 """
 
 from collections.abc import Iterable
@@ -163,18 +161,27 @@ class FailureState(_P):
     engineer_sized: StrictBool
 
 
-class StatusRow(_P):
+class _Closed(_P):
+    """Family statuses with the closure they imply."""
+
+    families: Families
+    closure: _Closure
+
+    @model_validator(mode="after")
+    def _closure_follows(self) -> Self:
+        if self.closure != self.families.closure():
+            raise ValueError("closure must follow the family statuses")
+        return self
+
+
+class StatusRow(_Closed):
     """Per footing: family statuses, closure and decision state."""
 
     id: _Str
-    families: Families
-    closure: _Closure
     state: FailureState
 
     @model_validator(mode="after")
     def _check(self) -> Self:
-        if self.closure != self.families.closure():
-            raise ValueError("closure must follow the family statuses")
         if any(getattr(self.state, n) != getattr(self.families, n).status for n in _FAMILIES):
             raise ValueError("state statuses must be those of families")
         return self
@@ -191,22 +198,14 @@ class FootingStatus(CalcPayload):
         return self
 
 
-class ScheduleRow(_P):
+class ScheduleRow(_Closed):
     """One footing of the schedule: design, statuses, reasons, references and the clearance neighbour."""
 
     design: DesignRow
-    families: Families
-    closure: _Closure
     reasons: list[_Str]
     verdict_sets: list[_Result]
     decisions: list[_Str]
     neighbour: _Str | None
-
-    @model_validator(mode="after")
-    def _check(self) -> Self:
-        if self.closure != self.families.closure():
-            raise ValueError("closure must follow the family statuses")
-        return self
 
 
 class FootingSchedule(CalcPayload):
