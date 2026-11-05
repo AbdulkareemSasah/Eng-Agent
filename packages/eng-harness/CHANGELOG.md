@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Decision label store: `decisions/_labels.py` (`LabelStore` over `<workspace>/decisions/decisions.sqlite` with append-only `labels` and close-only `pending` tables, `append(label, findings)` storing hash-only on findings, `record_override` (identity passed as `overridden`, spec 0005 gap Q14), `read`, opt-in `export_labels`, `open_pending`, `get_pending`, `close_pending`; `LabeledExample`, `OverriddenDecision`, `PendingRecord`, `StoreWriteError`), exported from `eng_harness.decisions` (plan 0005 T6, B-170; spec 0005 AC35 to AC39, AC44).
 - Decision provider interfaces: `eng_harness.decisions.interfaces` (`ProviderInfo`, `ProviderRequest`, `ChoiceAnswer`, `YesNoAnswer`, `LLMAnswer`, `DecisionProvider`, `LLMProvider`, `ProviderErrorCode`, `OutgoingPlace`, `ProviderError`, `ProviderFailure`) and the port data in `decisions/_record.py` (`DecisionCall` with `sensitive_values`, `EngineerChoice`, `DecisionAnswer`, `PendingAnswer`, `DecisionScreen`, `Suggestion`), with scripted fake providers in `tests/fakes/decision_providers.py` (plan 0005 T5, B-169; spec 0005 AC41).
 
 - CalcPort: `HarnessCalcPort`, `CalcSettings` and `CalcRefusal` in `_calc/_port.py` (`describe` with `ref_rules` from the `x-eng` metadata, `run` with status check by run class, `validate_input` under `require_refs`, `InputMeta` from the records, item limit, `CalcMeta`, draft mark and trace, storage as `harness`; `preflight`; defects as `INTERNAL`), with the calc step workflow test through the real engine (plan 0003 T5, B-144; spec 0003 AC4, AC11 to AC18).
