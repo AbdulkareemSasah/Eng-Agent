@@ -21,10 +21,10 @@ from aci318_14._common import FY_MAX
 __all__ = ["MinReinforcementInputs", "min_flexural_reinforcement"]
 
 _TABLE = "ACI 318-14 Table 8.6.1.1"
-_FY_ROW = Cited(value=420, unit="MPa", source=f"{_TABLE} (row boundary)")
-_R1 = Cited(value=0.0020, unit="1", source=f"{_TABLE} (deformed bars, fy < 420 MPa)")
-_R2 = Cited(value=0.0018, unit="1", source=f"{_TABLE} (deformed bars, fy >= 420 MPa)")
-_R3 = Cited(value=0.0014, unit="1", source=f"{_TABLE} (lower limit, fy >= 420 MPa)")
+_FY_ROW = Cited(value=420, unit="MPa", source="ACI 318-14 Table 8.6.1.1 (row boundary)")
+_R1 = Cited(value=0.0020, unit="1", source="ACI 318-14 Table 8.6.1.1 (deformed bars, fy < 420 MPa)")
+_R2 = Cited(value=0.0018, unit="1", source="ACI 318-14 Table 8.6.1.1 (deformed bars, fy >= 420 MPa)")
+_R3 = Cited(value=0.0014, unit="1", source="ACI 318-14 Table 8.6.1.1 (lower limit, fy >= 420 MPa)")
 _LENGTH = Cited(value=0, unit="mm", source="Geometry: the length of a solid is positive")
 _AREA = Cited(value=0, unit="mm2", source="Geometry: provided reinforcement has a positive area")
 _STRENGTH = Cited(value=0, unit="MPa", source="Mechanics of materials: a strength is positive")
