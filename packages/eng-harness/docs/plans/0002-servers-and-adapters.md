@@ -423,6 +423,7 @@ tasks:
     depends_on: [T7]
   - id: T19
     title: Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes
+    # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16 and T19.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
