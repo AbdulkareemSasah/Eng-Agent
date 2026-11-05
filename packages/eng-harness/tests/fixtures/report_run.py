@@ -40,7 +40,7 @@ WAIT_MS = 60_000 + 30_000 + 5_000
 """Approval 60 s, input 30 s and engine decision 5 s."""
 MACHINE_MS = 2_000 + 5_000
 """Completed steps "0" (2 s) and "1" (5 s); the failed step "2" (1.5 s) is not machine time."""
-EVENT_COUNT = 15
+EVENT_COUNT = 14
 
 
 class ScriptedClock:
@@ -72,7 +72,7 @@ class ReportRun:
 def build_report_run(run_dir: Path, store: ResultStore, ids: IdSource, *, open_approval: bool = False) -> ReportRun:
     """Write the scripted run into `run_dir`; with `open_approval` one more approval stays unanswered at the end."""
     clock = ScriptedClock()
-    writer = JournalWriter(run_dir, store, clock, ids)  # type: ignore[arg-type]  # B-185: str stands for Timestamp
+    writer = JournalWriter(run_dir, store, clock, ids)
 
     def at(seconds: float, type_: EventType, payload: dict[str, Any], path: str | None = None) -> None:
         clock.ms = START_MS + int(seconds * 1000)
