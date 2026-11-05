@@ -344,6 +344,8 @@ tasks:
     depends_on: [T13]
   - id: T14b
     title: ctx.ask and the decision runtime record (run header and reader view)
+    # Amendment (B-414, documents only): the payload field and RunView.decision_runtime were merged with T3 and T4 (B-103);
+    # the journal globs and the reader test are dropped, because a reader-only first-commit test passes at the base (TF004).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.journal, eng_harness.ports (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -351,20 +353,16 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
-      - "packages/eng-harness/src/eng_harness/journal/_events.py"
-      - "packages/eng-harness/src/eng_harness/journal/_reader.py"
       - "packages/eng-harness/tests/fakes/**"
       - "packages/eng-harness/tests/contract/test_ports_conformance.py"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py"
       - "packages/eng-harness/tests/unit/test_runner.py"
-      - "packages/eng-harness/tests/unit/test_journal_reader.py"
     max_changed_lines: 120
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input"
       - "packages/eng-harness/tests/unit/test_ctx_ask.py::test_input_request_markers"
       - "packages/eng-harness/tests/unit/test_runner.py::test_decision_runtime_recorded"
-      - "packages/eng-harness/tests/unit/test_journal_reader.py::test_decision_runtime_view"
     covers: [AC61, AC67, AC69]
     depends_on: [T14]
   - id: T15
@@ -456,6 +454,8 @@ tasks:
     depends_on: [T14b, T17]
   - id: T19
     title: Crash-matrix replay suite with a worker process
+    # Amendment (B-414, documents only): depends on T18, whose ProgressSink.emit is the only public seam right after each
+    # journal commit; the worker crashes through it and through a ToolPort wrapper, and persists the fake ledger to a file.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/replay/test_crash_matrix.py"
@@ -467,7 +467,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/replay/test_crash_matrix.py::test_crash_matrix"
     covers: [AC30]
-    depends_on: [T13, T15, T16]
+    depends_on: [T13, T15, T16, T18]
 ---
 
 # Implementation plan: eng-harness engine
@@ -485,8 +485,9 @@ by `depends_on` (T10, T12, T13, T14, T14b, T15, T16, T17, T18 in that order), so
 shares `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11b and T13 on
 both; T11b follows T11 (the input requests it presents), and T14b follows T14: the tasks from T10 to T18 run one after
 another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
-to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 and T7; T19 beside T17 and T18) share those two
-files only: their lines are merged in pull-request order, and they share no other file.
+to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 and T7) share those two
+files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
+B-414: its worker crashes through T18's progress sink).
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -645,9 +646,11 @@ plan.
 
 **T14b Ask and the decision runtime record** (spec §4.3.2, §4.6 item 4, AC61, AC67, AC69). `ask`: the `data` marker
 (AC67), validation of the answer against `fields`, `input_requested` and the pause, and the answer stored as
-`basis.engineer_input/1` (AC61). Amendment B-098: `DecisionPort.runtime_summary()` (protocol and fake), recorded as
-`decision_runtime` in `run_started` and, when changed, in `run_resumed`, and shown as `RunView.decision_runtime`
-(AC69); the field and the reader view follow the `unreleased_tools` pattern of T3, T4 and T9 (about 30 lines). Budget
+`basis.engineer_input/1` (AC61). Amendment B-098, narrowed by B-414: the payload field and `RunView.decision_runtime`
+were merged with T3 and T4 (B-103) and are tested by `test_journal_reader.py::test_run_class_and_unreleased_tools`, so
+T14b adds only `DecisionPort.runtime_summary()` (protocol, fake and conformance case) and calls it once at start and
+once per resume, recording `run_started.decision_runtime` and `run_resumed.decision_runtime` only when it differs
+(`test_runner.py::test_decision_runtime_recorded`; AC69's runner half). Budget
 120 lines. The original T14 (decisions and inputs: 280 lines at first, 420 with B-068, 450 with B-098) was split by
 B-342 (D-12) so that neither part exceeds the 400-line cap.
 
@@ -674,7 +677,13 @@ overhead benchmark (also listed in `windows_tests`).
 
 **T19 Crash matrix** (spec AC30). A worker process (`tests/replay/_worker.py`) runs a mixed test workflow and calls
 `os._exit` at each of S-10's four crash points for every step; the test resumes each and compares the fake host's
-ledger and the outputs with an uninterrupted run. Almost all of it is test code.
+ledger and the outputs with an uninterrupted run. Almost all of it is test code. Amendment B-414: the worker crashes
+through a recording `ProgressSink` whose `emit` calls `os._exit` on the target event (before_started: on the event
+committed just before the step's `step_started`; after_started: on `step_started`; after_completed: on
+`step_completed` or `step_failed`) and through a wrapper of the fake `ToolPort` that exits right after the call
+returns (after_effect). The wrapper lives in `tests/replay/_worker.py` and appends each applied `op_id` to a ledger
+file in the test's temporary folder, so the resuming process and the comparison see every write the crashed process
+applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
 
 ## 3. Dependencies
 
