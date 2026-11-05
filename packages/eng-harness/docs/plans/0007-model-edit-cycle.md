@@ -155,6 +155,7 @@ tasks:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_points.py"
+      - "packages/eng-harness/src/eng_harness/rules/__init__.py"  # empty package marker; listed because AC10c covers only tests/ (amendment B-417)
       - "packages/eng-harness/src/eng_harness/rules/edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
@@ -365,8 +366,9 @@ imports every module under `eng_harness.workflows`, so the module-level `Decisio
 `workflows/model_edit_cycle/_points.py` enter the real point registry, and `decisions._rules.discover()` imports every
 module under `eng_harness.rules`, so the rules of `rules/edit_cycle.py` enter the real rule registry. The task edits no
 file of `decisions/`; it regenerates `decisions.lock.json` and `rules.lock.json` with
-`uv run python -m eng_harness.decisions --write-lock` (spec 0005 §4.4). An empty `rules/__init__.py` package marker
-beside `rules/edit_cycle.py` is allowed (AC10c). The rule tests are `tests/rules/test_edit_cycle.py` with
+`uv run python -m eng_harness.decisions --write-lock` (spec 0005 §4.4). The task creates `rules/__init__.py` as an empty
+package marker and lists it in its files: the gate's empty-marker exception (gate spec AC10c) covers only `tests/`,
+not `src/`, so the file is in scope only because the task names it. The rule tests are `tests/rules/test_edit_cycle.py` with
 `test_pass_typical`, `test_pass_boundary`, `test_clean_typical` and `test_clean_boundary` (spec AC18, spec 0005 AC12,
 whose `missing_rule_tests` looks for exactly these names); the test module imports `eng_harness.rules.edit_cycle` at
 module level, so it fails at the merge base for the right reason (TF004).
@@ -391,7 +393,7 @@ tuple, and `block.discover()` builds its `Registry` from it, importing `eng_harn
 avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness.block --write-lock`, and
 `tests/contract/test_block_lock.py::test_lock_matches_registry` then covers the `model_edit_cycle` blocks;
 `test_definition.py::test_workflow_registered` checks that `discover()` holds them (the lock part of AC1). The public
-module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 add their blocks to the same tuple.
+module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 T11 and T13 add their blocks to the same tuple.
 
 **T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and

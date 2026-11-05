@@ -257,8 +257,8 @@ Registration (amendment B-417, Q13): the block registry is immutable and has no 
 `block.discover()` is the registry that the block lock test and `python -m eng_harness.block --write-lock` use.
 `workflows/__init__.py` exports the shipped blocks as one tuple (`model_edit_cycle` and its child blocks of §4.1), and
 `discover()` builds its `Registry` from that tuple, importing `eng_harness.workflows` inside the function so that
-`block` and the workflow modules do not import each other at load time. Later workflows (plan 0010, plan 0013) add
-their blocks to the same tuple. Decision points and rules are found by spec 0005's own discovery (§4.6).
+`block` and the workflow modules do not import each other at load time. Later workflows (plan 0010 T9, plan 0013 T11
+and T13) add their blocks to the same tuple. Decision points and rules are found by spec 0005's own discovery (§4.6).
 
 - Input `EditCycleInput`: `model` (the model file as the command line passes it, a `harness.file_input/1` reference,
   spec 0002 §4.7), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
@@ -498,8 +498,10 @@ quantity's unit to be the canonical unit of its path suffix (spec 0004 AC21). A 
 Counts and choices carry no unit and no suffix. The suffixes `_MPa`, `_kN_m3`, `_kN_m` and `_kPa` contain capital
 letters, which the contract's `basis.design_basis/1` path rule does not allow yet (spec 0004 Q1, spec 0003 Q1): a basis
 holding those eight paths (four `compare.*`, four `bounds.*`) cannot be frozen until the contract path rule is amended (Q12). The `compare.*` and
-`checks.readback_relative_tolerance` names also appear, without suffixes, in specs 0003 §4.4 and 0002 §4.5.8; the
-calcs and the adapter read the paths of this table, and those specs are renamed to match (Q12).
+`checks.readback_relative_tolerance` names also appear, without suffixes, in specs 0002 §4.5.8, 0003 §4.4, 0008, 0010,
+0011, 0013 and 0014 and in plans 0011, 0013 and 0014, and `limits.ratio_limit` (renamed `limits.ratio_limit_ratio`)
+appears in specs 0004 (its field proposal for this spec), 0010 and 0013; the calcs and the adapter read the paths of
+this table, and those documents are renamed to match (Q12).
 
 Spec 0004's proposed `modeling.merge_tolerance_mm`, `modeling.snap_tolerance_mm` and
 `modeling.section_rounding_increment_mm` are not used: v1 adds or moves no object and computes no section size.
@@ -632,8 +634,8 @@ start at version 1 with lock entries.
 | Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `am.clean` (an unknown message must not pass silently) |
-| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule is lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008 and 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix | Owner | (a) Amend the contract path rule to the `FieldPath` name rule in a contract minor version, as spec 0004 Q1 recommends, before plan 0007 T2 and T8; (b) and (c) a documents work item that renames those paths in specs 0002, 0003, 0008, 0010, 0011, 0013 and 0014 to the names of §4.8, before plan 0003 T8 and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
-| Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 add their blocks there |
+| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule is lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio` | Owner | (a) Amend the contract path rule to the `FieldPath` name rule in a contract minor version, as spec 0004 Q1 recommends, before plan 0007 T2 and T8; (b), (c) and (d) a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, before plan 0003 T8 and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
+| Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |
