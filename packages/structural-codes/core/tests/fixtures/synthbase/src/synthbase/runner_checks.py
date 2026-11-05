@@ -33,7 +33,7 @@ class SizedInputs(CheckInputs):
     width_mm: float = bounded(ge=_ZERO, le=_HIGH, unit="mm", ref_capable=True, ref_kinds=frozenset({_KIND}))
     demand_mm: float = bounded(ge=_FORCE_LOW, le=_FORCE_HIGH, unit="mm")
     capacity_mm: float = bounded(ge=_FORCE_LOW, le=_FORCE_HIGH, unit="mm")
-    fault: Literal["none", "zero", "overflow", "domain", "nan", "other"] = "none"
+    fault: Literal["none", "zero", "overflow", "domain", "nan", "value", "other"] = "none"
 
 
 def _meta(
@@ -76,6 +76,8 @@ def _fail_by_fault(inp: SizedInputs, t: TraceRecorder) -> None:
         t.step("bad", math.sqrt(-1.0 - inp.width_mm), unit="1", formula="sqrt", source=_SRC, uses=["width_mm"])
     elif inp.fault == "nan":
         t.step("bad", math.nan, unit="1", formula="nan", source=_SRC, uses=["width_mm"])
+    elif inp.fault == "value":
+        raise ValueError("synthetic non-math failure")
     elif inp.fault == "other":
         raise RuntimeError("synthetic unexpected failure")
 

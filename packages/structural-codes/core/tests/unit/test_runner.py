@@ -165,6 +165,10 @@ def test_batch(registry: Registry) -> None:
         assert verdict.ratio is None
         assert any(name in m for m in one.payload.traces[0].messages)
 
+    # A ValueError that is not a math-domain error is a defect in the body and propagates (AC28).
+    with pytest.raises(ValueError, match="synthetic non-math failure"):
+        evaluate(_SIZED, _inputs(fault="value"), subject=_S1, registry=registry)
+
     # Any other exception propagates.
     with pytest.raises(RuntimeError, match="synthetic unexpected failure"):
         evaluate(_SIZED, _inputs(fault="other"), subject=_S1, registry=registry)

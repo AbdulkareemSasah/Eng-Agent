@@ -62,7 +62,8 @@ def _in_process(registry: Registry) -> bytes:
 
 
 def _subprocess(seed: str) -> bytes:
-    env = {**os.environ, "PYTHONHASHSEED": seed}
+    # The child imports the same structural_codes as this process (also under a mutation copy of the sources).
+    env = {**os.environ, "PYTHONHASHSEED": seed, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
     done = subprocess.run(  # noqa: S603  # B-262: fixed interpreter and script text, no user input
         [sys.executable, "-c", _SCRIPT.format(src=str(_SRC))],
         capture_output=True,

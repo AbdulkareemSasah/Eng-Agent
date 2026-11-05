@@ -24,7 +24,6 @@ from eng_contract.params import InputPolicy, ValidatedInput, validate_input
 from eng_contract.records import ResultRecord
 from eng_contract.refs import RecordSource
 from eng_contract.verdicts import Subject, Verdict, VerdictSource, VerdictStatus
-from pydantic import ValidationError
 
 from structural_codes._verdict import assign_governing, build_verdict
 from structural_codes.check import Check
@@ -43,6 +42,9 @@ Mode = Literal["trial", "production"]
 _log = logging.getLogger(__name__)
 _FIELD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _CONTAINED = (ZeroDivisionError, OverflowError, TraceValueError, ValueError)
+# Message forms of the ValueError the math module raises outside a function's domain: "math domain error" (pow, fmod)
+# and "expected <requirement>, got <value>" (sqrt, log, acos, ...). Any other ValueError is a defect in the body.
+_MATH_DOMAIN = re.compile(r"math domain error|expected .+, got .+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +137,8 @@ def _decide(check: Check, inp: Any, t: TraceRecorder, subject: Subject) -> Verdi
         t.note(f"{gap.gap_id} ({gap.clause}): {gap.reason}")
         return VerdictStatus.NEEDS_ENGINEER
     except _CONTAINED as exc:
-        if isinstance(exc, ValidationError):  # a malformed model inside a body is a defect, not an arithmetic failure
+        # Only an arithmetic failure is contained (AC28): a malformed model or any other ValueError is a defect.
+        if isinstance(exc, ValueError) and not _MATH_DOMAIN.fullmatch(str(exc)):  # includes pydantic's ValidationError
             raise
         _log.warning("check item failed", extra={"check_id": meta.check_id, "error": type(exc).__name__})
         t.note(f"verdict ERROR: {type(exc).__name__}: {str(exc)[:500]}")
