@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ctx calls: `engine/_ctx_impl.py` (`tool` with read retries, `read`, `calc` with the draft mark and `CalcRefused`, `block`, `parallel`, `attempts`, `escalate`), and the pause and escalation outcomes of the run (plan 0001 T10, B-109; spec 0001 AC9, AC11 to AC15, AC27).
 - Engine resume and replay: `Engine.resume` (run lock, journal verification, a completed or failed run returned from its record after `close_started` for its journaled hosts, the version rule and the run-class check against the header, `run_resumed` with `code_hash_changed` and a changed `unreleased_tools`) and the replay index `engine/_replay.py` (step events matched by path, kind, name, arguments and child; recorded results and failures replayed without a port call; every divergence stops with `run_escalated` before a live call; retryable failures run again as the next attempt) (plan 0001 T9b, B-425; spec 0001 AC23, AC28, AC29, AC35, AC65, AC68).
 - Decision layer types: `eng_harness.decisions.types` (`Label`, `Rationale`, `Pick`, `DecisionDefinitionError`, `DecisionPolicy`), `DecisionPolicy`, `DecisionSettings` and `ShadowRelease` in `decisions/_policy.py` with the 12 section 3 defaults pinned by a golden file, empty `eng_harness.decisions` and `.interfaces` public modules, and the decision R1 modules in the gate configuration (plan 0005 T1, B-165; spec 0005 AC6, AC7).
 

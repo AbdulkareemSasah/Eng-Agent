@@ -54,7 +54,7 @@ def _started(host_key: str, instance: HostInstance) -> tuple[EventType, dict[str
 
 def test_completed_run(tmp_path: Path) -> None:
     rig = make_rig(tmp_path)
-    rig.host.script("read_c", failure(ErrorCode.HOST_BUSY))  # the first run stops here
+    rig.host.script("read_c", failure(ErrorCode.HOST_BUSY))  # fails every attempt of the first run, which stops here
     workflow = chain(steps("read_a", "write_b", "read_c"))
     first = asyncio.run(rig.engine(workflow).start(request()))
     assert first.status is RunStatus.NEEDS_ENGINEER
@@ -114,7 +114,7 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
     # the resume read the unreleased tools; only the third step went further, to describe and call its tool
     assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call"]
     assert len(rig.host.ledger) == ledger + 1
-    assert (rig.host.ledger[-1].tool, rig.host.ledger[-1].op_id) == ("read_c", op_id(run_id, "2", 2))
+    assert (rig.host.ledger[-1].tool, rig.host.ledger[-1].op_id) == ("read_c", op_id(run_id, "2", 4))
     events = rig.events(run_id)
     assert [e.type for e in events[-5:]] == [
         T.RUN_ESCALATED, T.RUN_RESUMED, T.STEP_STARTED, T.STEP_COMPLETED, T.RUN_COMPLETED,
@@ -123,10 +123,11 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
     assert isinstance(resumed, ev.RunResumed)
     assert (resumed.resume_no, resumed.code_hash_changed, resumed.servers) == (1, False, [])
     assert resumed.restored_to_seq is None
-    assert (started.path, started.attempt) == ("2", 2)  # the recorded retryable failure ran again as attempt 2
+    assert (started.path, started.attempt) == ("2", 4)  # after three failed attempts it ran again as attempt 4
     views = [(s.path, s.attempt, s.status) for s in _steps(rig, run_id)]
     assert views == [
-        ("0", 1, "completed"), ("1", 1, "completed"), ("2", 1, "failed"), ("2", 2, "completed"),
+        ("0", 1, "completed"), ("1", 1, "completed"), ("2", 1, "failed"), ("2", 2, "failed"), ("2", 3, "failed"),
+        ("2", 4, "completed"),
     ]  # fmt: skip
 
 

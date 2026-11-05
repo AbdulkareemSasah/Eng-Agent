@@ -9,6 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import pytest
 from eng_contract.errors import ErrorCode
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
@@ -103,6 +104,27 @@ def test_retries_stop_at_the_limit(tmp_path: Path) -> None:
     small.host.outcomes["read_a"].extend([failure(ErrorCode.HOST_BUSY)] * 5)
     outcome = asyncio.run(small.engine(workflow, settings=EngineSettings(step_retry_limit=1)).start(request()))
     assert (outcome.status, len(small.host.ledger)) == (RunStatus.NEEDS_ENGINEER, 2)
+
+
+@pytest.mark.parametrize(
+    ("tool", "code"),
+    [
+        ("read_a", ErrorCode.NOT_FOUND),  # the contract rule is never
+        ("read_a", ErrorCode.HOST_WEDGED),  # after the wedge clears: spec 4.5.3, not a retry here
+        ("write_b", ErrorCode.HOST_BUSY),  # a write is not retried in the run: no port reports "not sent"
+    ],
+)
+def test_a_step_that_is_not_retried_fails_at_once(tmp_path: Path, tool: str, code: ErrorCode) -> None:
+    rig = make_rig(tmp_path)
+    rig.host.outcomes[tool].append(failure(code))
+
+    async def body(ctx: Any) -> list[str]:
+        result = await ctx.tool(tool, {"n": 0, "model": "m1"} if tool == "write_b" else {"n": 0})
+        return [str(result.ref.ref)]
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert outcome.status is RunStatus.NEEDS_ENGINEER
+    assert len(rig.host.ledger) == 1
 
 
 def test_arguments_are_sent_as_json(tmp_path: Path) -> None:

@@ -17,7 +17,7 @@ from typing import Any
 
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
-from eng_contract.envelope import Provenance
+from eng_contract.envelope import FailureEnvelope, Provenance
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from fakes.ports import ENVELOPE, FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort, Raise
@@ -82,6 +82,19 @@ class Host(FakeHost):
         self.unreleased: dict[str, str] = dict(unreleased or {})
         self.locked: list[bool] = []
         self._runs_dir = runs_dir
+
+    def script(self, tool: str, *outcomes: ENVELOPE | Raise) -> None:
+        """Queue outcomes; a retryable failure of a read fails every attempt of one run (the engine retries reads).
+
+        A test that scripted a failure to stop a run at a read keeps that meaning: the failure is queued once for each
+        attempt the default settings allow. `outcomes[tool]` takes exact outcomes.
+        """
+        attempts = 1 + EngineSettings().step_retry_limit
+        for outcome in outcomes:
+            retryable = isinstance(outcome, FailureEnvelope) and outcome.error.retryable
+            self.outcomes[tool].extend(
+                [outcome] * (attempts if retryable and self._tools[tool].effect == "read" else 1)
+            )
 
     def unreleased_tools(self) -> Mapping[str, str]:
         """A copy of `unreleased`."""
