@@ -169,3 +169,14 @@ def test_port_models_shape() -> None:
         Suggestion.model_validate(
             {"tier": 2, "by": "model:p/m@1", "outcome": "bogus", "choice": None, "latency_ms": 1, "shadow": True}
         )
+
+
+def test_suggestion_serializes_rationale_key_and_accepts_both_names() -> None:
+    """Spec 4.9 names the journal key ``rationale``; dumps use it without by_alias, construction takes either name."""
+    base = {"tier": 2, "by": "model:p/m@1", "outcome": "accepted", "choice": "a", "latency_ms": 1, "shadow": False}
+    by_alias = Suggestion.model_validate({**base, "rationale": "Only depth is short."})
+    by_name = Suggestion.model_validate({**base, "reasoning": "Only depth is short."})
+    assert by_alias == by_name
+    assert by_alias.model_dump()["rationale"] == "Only depth is short."
+    assert "reasoning" not in by_alias.model_dump()
+    assert '"rationale"' in by_alias.model_dump_json()

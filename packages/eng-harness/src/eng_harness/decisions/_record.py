@@ -63,6 +63,8 @@ class SuggestionCode(Frozen):
 class Suggestion(Frozen):
     """One tier's entry in ``decision_made.suggestions``; ``error`` is a class name and code, never a message."""
 
+    model_config = ConfigDict(frozen=True, extra="forbid", serialize_by_alias=True, validate_by_name=True)
+
     tier: Literal[1, 2, 3]
     by: str
     outcome: Literal[
