@@ -262,7 +262,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/tests/replay/test_in_flight.py"
       - "packages/eng-harness/tests/workflows/**"  # the scripted host shared with T11c's tests
-    max_changed_lines: 260
+    max_changed_lines: 300
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
@@ -642,7 +642,7 @@ are in flight), reconciliation before the block runs, `step_rerun` for a read in
 `engine.in_flight` request built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), with the
 empty-summary result when the adapter has no read-back. It builds the part of the resume fold and of `Resume` that
 reconciliation uses (in-flight steps, the rerun index, the `engine.in_flight` request); the host-state part of the
-fold is T11c's. Budget 260 lines (about 220 of `_inflight.py` and its share of `_runner.py`; the original T11b
+fold is T11c's. Budget 300 lines (about 233 of `_inflight.py` and its share of `_runner.py`; the original T11b
 measured 516 and was split by B-427, D-12).
 
 **T11c Host-state check before live execution** (spec §4.5.4; AC34, AC63, AC64). The instance binding (`model_bound`
@@ -654,7 +654,7 @@ built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), th
 and `lacking` (the writes a reopened model lacks), and `ResumeIndex` and `Resume` with the restore cut (a rerun as a
 new attempt, reason `restored`), the `@resume<n>.model_state` and units reads, the `host_state_mismatch` and
 `units_mismatch` stops and the `engine.host_state` request. The first-use binding is a seam in `_hoststate.py` that
-T13 moves before `step_started`. Budget 320 lines (`_hoststate.py`, about 60 of `_inflight.py` and its share of
+T13 moves before `step_started`. Budget 320 lines (`_hoststate.py`, about 51 of `_inflight.py` and its share of
 `_runner.py`; B-427, D-12).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
