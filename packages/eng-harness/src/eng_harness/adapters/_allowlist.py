@@ -12,6 +12,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from eng_harness.adapters._descriptors import ToolDescriptor
+from eng_harness.servers._buildcheck import BuildExpectation
 
 __all__ = ["Allowlist", "AllowlistError", "load_allowlist"]
 
@@ -50,6 +51,15 @@ class Allowlist(BaseModel):
             if entry.name == name:
                 return entry
         raise KeyError(name)
+
+    @property
+    def tool_names(self) -> frozenset[str]:
+        """Every allowlisted tool name, whatever its route."""
+        return frozenset(t.name for t in self.tools)
+
+    def build_expectation(self) -> BuildExpectation:
+        """What the build check compares a started server with (spec 0002 section 4.3.4)."""
+        return BuildExpectation(self.sasaah_commit, self.also_tested_commits, self.tool_fingerprint, self.tool_names)
 
     def unreleased_tools(self) -> dict[str, str]:
         """`{name: release_record}` of the unreleased entries (AC38); empty when there are none."""
