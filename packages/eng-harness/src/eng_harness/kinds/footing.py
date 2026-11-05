@@ -1,3 +1,4 @@
+# ruff: noqa: N815  # B-392: field names with unit capitals are fixed by spec 0010 section 4.2
 """Payload models of the isolated-footing kinds (spec 0010 section 4.2).
 
 Purpose: the stored form of the footing calc results, validation only (no engineering logic).
