@@ -91,7 +91,7 @@ def _answer(draft: BasisDraft, sections: tuple[str, ...] = ALL_SECTIONS) -> Basi
 
 
 def _count(root: Path) -> int:
-    results = root / "ws" / "results"
+    results = root / "ws" / ".eng" / "results"
     return len(list(results.rglob("*.json"))) if results.exists() else 0
 
 
@@ -141,7 +141,7 @@ def test_incomplete_lists_paths(store: ResultStore, clock: FixedClock, tmp_path:
     assert _count(tmp_path) == 0
 
 
-def test_freeze_stores_result(store: ResultStore, clock: FixedClock) -> None:
+def test_freeze_stores_result(store: ResultStore, clock: FixedClock, tmp_path: Path) -> None:
     draft = _draft()
     frozen = freeze(draft, _answer(draft), store, clock)
     assert isinstance(frozen, FrozenBasis)
@@ -149,6 +149,7 @@ def test_freeze_stores_result(store: ResultStore, clock: FixedClock) -> None:
     assert record.kind == "basis.design_basis/1"
     assert frozen.ref == frozen.result_id
     assert frozen.payload_sha256 == record.payload_sha256
+    assert _count(tmp_path) == 1  # the counting helper sees stored results
     basis = DesignBasis.model_validate(store.payload(frozen.result_id))
     assert set(basis.fields) == {TOL, DRIFT, STORIES, METHOD, TITLE}
     assert all(field.confirmed for field in basis.fields.values())
@@ -192,7 +193,7 @@ def test_stored_basis_immutable(store: ResultStore, clock: FixedClock, tmp_path:
         with pytest.raises(BasisInvalid) as caught:
             port.load(ref)
         assert caught.value.reason == reason
-    (path,) = list((tmp_path / "ws" / "results").rglob(f"{first.result_id}.json"))
+    (path,) = list((tmp_path / "ws" / ".eng" / "results").rglob(f"{first.result_id}.json"))
     path.write_bytes(path.read_bytes().replace(b"synthetic-title", b"synthetic-titlX"))
     with pytest.raises(BasisInvalid) as damaged:
         port.load(first.ref)
