@@ -74,6 +74,41 @@ def _fx_remove_value(p: dict[str, Any]) -> None:
     p["effects"][2]["value"] = 1
 
 
+def _fp_trace(p: dict[str, Any]) -> None:
+    p["trace"]["calc_version"] = "2"
+
+
+def _fp_sha(p: dict[str, Any]) -> None:
+    p["calc"]["content_sha256"] = "1" * 64
+
+
+def _fp_complete(p: dict[str, Any]) -> None:
+    p["sections"][0]["complete"] = False
+    p["complete"] = True
+
+
+def _fp_model_id(p: dict[str, Any]) -> None:
+    p["model_id"] = "not-a-model-id"
+
+
+def _diff_changed_empty(p: dict[str, Any]) -> None:
+    row = next(c for c in p["changes"] if c["change"] == "changed")
+    row["properties"] = []
+
+
+def _diff_removed_props(p: dict[str, Any]) -> None:
+    row = next(c for c in p["changes"] if c["change"] == "changed")
+    row["change"] = "removed"
+
+
+def _fx_add_pointer(p: dict[str, Any]) -> None:
+    p["effects"][1]["pointer"] = "/x"
+
+
+def _fx_add_scalar(p: dict[str, Any]) -> None:
+    p["effects"][1]["value"] = 3
+
+
 INVALID: list[tuple[str, Mutation, str]] = [
     ("model_fingerprint", _fp_form, "fp1"),
     ("model_fingerprint", _fp_short, "fp1"),
@@ -86,6 +121,14 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("expected_effects", _fx_duplicate, "duplicate"),
     ("expected_effects", _fx_section, "section"),
     ("expected_effects", _fx_remove_value, "remove"),
+    ("model_fingerprint", _fp_trace, "those of calc"),
+    ("model_fingerprint", _fp_sha, "those of calc"),
+    ("model_fingerprint", _fp_complete, "conjunction"),
+    ("model_fingerprint", _fp_model_id, "model_id"),
+    ("model_diff", _diff_changed_empty, "exactly for a changed"),
+    ("model_diff", _diff_removed_props, "exactly for a changed"),
+    ("expected_effects", _fx_add_pointer, "add needs"),
+    ("expected_effects", _fx_add_scalar, "add needs"),
 ]
 
 
@@ -94,7 +137,9 @@ def test_fixtures() -> None:
     for stem, kind in KINDS.items():
         model = HARNESS_KINDS[kind]
         payload = _load(stem)
-        assert model.model_validate(payload).model_dump(mode="json", exclude_none=False) is not None
+        parsed = model.model_validate(payload)
+        # The result store validates, then stores model_dump(mode="json", exclude_none=False); it must reload.
+        assert model.model_validate(parsed.model_dump(mode="json", exclude_none=False)) == parsed
         with pytest.raises(ValidationError, match="Extra inputs"):
             model.model_validate({**payload, "unknown_field": 1})
     for stem, mutate, fragment in INVALID:
