@@ -347,13 +347,18 @@ def test_confirm_follows_the_descriptor(rig: Rig) -> None:
     assert confirms == [True, None, True]
 
 
+def test_result_kind_needs_a_reader(run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any) -> None:
+    # csi_list_stories names a result kind but no reader is registered: an adapter defect, refused when the port is
+    # built so that no call ever stores a guessed payload under that kind
+    with pytest.raises(ValueError, match="csi_list_stories"):
+        Rig(run_dir, store, ids, clock, readers={})
+
+
 def test_wiring_is_checked_when_the_port_is_built(
     run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any
 ) -> None:
     with pytest.raises(ValueError, match="csi_define_wall_section"):  # no argument model for WallArgs
         Rig(run_dir, store, ids, clock, arg_models={"StoriesArgs": StoriesArgs})
-    with pytest.raises(ValueError, match="csi_list_stories"):  # a result kind and no reader
-        Rig(run_dir, store, ids, clock, readers={})
     long_read = ToolDescriptor.model_validate(
         _entry("csi_long_read", "read", "read", "StoriesArgs", timeout_class="long")
     )
