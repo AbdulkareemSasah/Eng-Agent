@@ -96,6 +96,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
       - "packages/eng-harness/tests/workflow/conftest.py"
+      - "packages/eng-harness/tests/workflow/__init__.py"  # empty package marker: mypy names the root tests/conftest.py (engine T3b) and this folder's conftest.py both "conftest" otherwise (B-377)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
