@@ -9,7 +9,8 @@ import json
 import os
 import signal
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,10 @@ import anyio
 import pytest
 from eng_contract.errors import ErrorCode
 
+from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig
+from eng_harness.servers._buildcheck import BuildExpectation
 from eng_harness.servers._launcher import JobPolicy, LaunchedProcess, LaunchSpec, PosixLauncher
 from eng_harness.servers._procinfo import PosixProcessInspector
 
@@ -96,10 +99,14 @@ def _paged(tmp_path: Path) -> Path:
 
 
 def _run(
-    tmp_path: Path, config: ServersConfig, launcher: RecordingLauncher, body: Callable[[ServerManager], Any]
+    tmp_path: Path,
+    config: ServersConfig,
+    launcher: RecordingLauncher,
+    body: Callable[[ServerManager], Any],
+    check: Mapping[str, BuildExpectation] | None = None,
 ) -> None:
     async def scenario() -> None:
-        async with ServerManager(config, tmp_path / "run", launcher=launcher) as manager:
+        async with ServerManager(config, tmp_path / "run", launcher=launcher, check=check) as manager:
             await body(manager)
 
     anyio.run(scenario)
@@ -398,3 +405,120 @@ def test_launch_arguments_without_audit_log(
 
     _run(tmp_path, make_config(_paged(tmp_path), call_timeout_s=42, audit_log=False), launcher, body)
     assert json.loads((tmp_path / "run" / "argv.json").read_text()) == ["--call-timeout-sec", "42"]
+
+
+def _checks(*, wrong_fingerprint: bool = False) -> dict[str, BuildExpectation]:
+    """The build check of the CSI allowlist for server `csi`; the fingerprint can be made wrong on purpose."""
+    expected = csi_allowlist().build_expectation()
+    return {"csi": replace(expected, tool_fingerprint="0" * 64) if wrong_fingerprint else expected}
+
+
+def test_restart_repeats_build_check(
+    tmp_path: Path,
+    make_config: ConfigFactory,
+    launcher: RecordingLauncher,
+    control: Path,
+    host: LaunchedProcess,
+) -> None:
+    """AC11: a role's first start runs no check; its restart runs it before the re-attach (a wrong pin shows it)."""
+
+    async def body(manager: ServerManager) -> None:
+        # The first start is not checked, although the pinned fingerprint is wrong.
+        await manager.call("csi", "main", "csi_attach", {"pid": host.pid, "product": "ETABS"}, CallEffect.WRITE)
+        manager.bind_instance("csi", pid=host.pid, product="ETABS")
+        _arm(control, {"fault": "crash_during_call", "tool": "csi_list_points"})
+        with pytest.raises(ToolFailed):
+            await manager.call("csi", "main", "csi_list_points", {}, CallEffect.READ)
+        with pytest.raises(ToolFailed) as failure:  # the restart finds the build wrong and does not re-attach
+            await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
+        assert failure.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
+        assert "build check" in failure.value.detail.message
+        assert "fingerprint" in failure.value.detail.message
+        assert manager.server_info("csi", "main") is None  # the role is down
+        assert len(launcher.started) == 2
+        assert launcher.started[1].job_members() == []
+
+    _run(tmp_path, make_config(max_restarts=2), launcher, body, _checks(wrong_fingerprint=True))
+
+
+def test_restart_with_matching_build_reattaches(
+    tmp_path: Path,
+    make_config: ConfigFactory,
+    launcher: RecordingLauncher,
+    control: Path,
+    host: LaunchedProcess,
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        await manager.call("csi", "main", "csi_attach", {"pid": host.pid, "product": "ETABS"}, CallEffect.WRITE)
+        manager.bind_instance("csi", pid=host.pid, product="ETABS")
+        _arm(control, {"fault": "crash_during_call", "tool": "csi_list_points"})
+        with pytest.raises(ToolFailed):
+            await manager.call("csi", "main", "csi_list_points", {}, CallEffect.READ)
+        status = _text(await manager.call("csi", "main", "csi_status", {}, CallEffect.READ))
+        assert status["current_target"] == {"product": "ETABS", "pid": host.pid, "launched": False}
+        assert len(launcher.started) == 2
+
+    _run(tmp_path, make_config(max_restarts=2), launcher, body, _checks())
+
+
+def test_preflight_over_the_csi_fake(tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher) -> None:
+    config = make_config()
+    commit = config.servers["csi"].build.sasaah_commit
+    exe = config.servers["csi"].build.exe_sha256
+
+    async def body(manager: ServerManager) -> None:
+        [check] = await manager.preflight({"csi": commit})
+        assert check.reason is None
+        assert check.ok is True
+        assert (check.server, check.build, check.min_build) == ("csi", f"{commit[:12]}+{exe[:12]}", commit)
+        assert check.fingerprint == check.expected_fingerprint == csi_allowlist().tool_fingerprint
+
+    _run(tmp_path, config, launcher, body, _checks())
+
+
+def test_preflight_reports_each_failure(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        [check] = await manager.preflight({"csi": "e" * 40})  # a minimum that is not a tested build
+        assert check.ok is False
+        assert check.reason is not None
+        assert "minimum" in check.reason
+
+    _run(tmp_path, make_config(), launcher, body, _checks())
+
+
+def test_preflight_without_a_check_is_not_ok(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        [check] = await manager.preflight({})
+        assert check.ok is False
+        assert check.reason is not None
+        assert "no build check" in check.reason
+        assert launcher.started == []  # nothing is started to say so
+
+    _run(tmp_path, make_config(), launcher, body)
+
+
+def test_preflight_wrong_fingerprint(tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher) -> None:
+    async def body(manager: ServerManager) -> None:
+        [check] = await manager.preflight({})
+        assert check.ok is False
+        assert check.reason is not None
+        assert "fingerprint" in check.reason
+        assert check.fingerprint != check.expected_fingerprint
+
+    _run(tmp_path, make_config(), launcher, body, _checks(wrong_fingerprint=True))
+
+
+def test_preflight_of_a_server_that_cannot_start(
+    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
+) -> None:
+    async def body(manager: ServerManager) -> None:
+        [check] = await manager.preflight({})
+        assert check.ok is False
+        assert check.reason is not None
+        assert "cannot start" in check.reason
+
+    _run(tmp_path, make_config(command=str(tmp_path / "no-such-program")), launcher, body, _checks())

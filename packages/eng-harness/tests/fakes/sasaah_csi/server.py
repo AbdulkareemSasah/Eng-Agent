@@ -82,7 +82,7 @@ def _timeout() -> SasaahError:
 
 def _session(name: str, args: dict[str, Any]) -> dict[str, Any]:
     if name == "csi_status":
-        return {"read_only": False, "instances": [], "current_target": STATE.target}
+        return {"read_only": False, "script_enabled": False, "instances": [], "current_target": STATE.target}
     if name in ("csi_attach", "csi_launch"):
         launched = name == "csi_launch"
         STATE.target = {"product": args.get("product", "ETABS"), "pid": args.get("pid", PID), "launched": launched}
