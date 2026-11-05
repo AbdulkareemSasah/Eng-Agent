@@ -147,7 +147,7 @@ task is test-first ([process/05](../../../../design/process/05-testing-and-verif
 
 Start condition: plan 0002 T2 (`_common.py`), T6 (flexure constants) and T9 (pack assembly) are merged before T1; core
 plan 0001 tasks T6, T8, T9, T11 and T12 are merged before T2 to T5 (checks, runner, verification, lifecycle, command
-line). Q12 of plan 0002 (clause-spec folder) applies here unchanged.
+line), and T14a (public modules declared; amendment B-385) before T1. Q12 of plan 0002 (clause-spec folder) applies here unchanged.
 
 ## 2. Tasks
 

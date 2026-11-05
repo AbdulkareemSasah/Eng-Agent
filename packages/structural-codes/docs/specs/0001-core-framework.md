@@ -218,7 +218,7 @@ engineering meaning"`.
 - AC34. Given a fixed `verdicts.set/1` payload, when `render_html` runs, then the output equals the committed golden
   file byte for byte; it shows per trace the inputs (with references), constants with their sources, steps with formula,
   source and uses, and the verdicts; framework labels appear in English with Arabic labels in `<span lang="ar"
-  dir="rtl">`; a `DRAFT` watermark appears when `draft` is true. Test: `tests/golden/test_notes.py::test_golden`
+  dir="rtl">`; a `DRAFT` watermark appears when `draft` is true. Test: `tests/golden/test_notes_golden.py::test_golden`
   (golden file under `tests/data/golden/notes/`).
 - AC35. Given a payload whose step formula contains `<script>` and a payload with `draft: false`, when rendered, then
   the formula is escaped, the output has no `<script>` element and no external URL, there is no watermark, and every
