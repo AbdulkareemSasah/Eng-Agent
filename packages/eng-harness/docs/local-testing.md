@@ -22,5 +22,9 @@ Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 13. `uv run pytest tests/windows` on the owner's machine, with the antivirus and endpoint tools it runs: Job Object nesting under the engineer's terminal or scheduler, and the breakaway case with a real server and host program (none of the tests in `tests/windows` that start real processes has ever run on Windows: the container CI is Linux only and runs only the fake-based ones; the owner runs the whole folder, `uv run pytest tests/windows -m windows`, including the breakaway case (a host program started by a server survives the server's job) and the engine-kill case (every member of a server's job ends when the engine is killed), before relying on the launcher).
 14. `ProcessTransport` and `ServerManager` over the Windows launcher with the real Sasaah server: the MCP handshake on the launcher's pipes (raw handle-backed files, read and written by worker threads), a complete uncached `tools/list`, a call that outlasts the client backstop, a server killed during a call (read and write codes, restart, re-attach by pid), and a shutdown that ends the server on end-of-file of its standard input without ending a running host program (only the Linux fakes have run it).
 
+Plan 0004 (templates and basis; completed by T9). Nothing here runs in CI:
+1. The owner fills a values file and uses the spec 0006 approval page on a real template.
+2. The owner writes a template by hand in the user folder on Windows and checks the path, the encoding and the line endings.
+
 Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 15. `eng_harness.cli._opener.open_address` opens the launch address in the default browser on Windows (`os.startfile`), macOS and Linux with `BROWSER` set to a capture program (it must not run), and `write_to_terminal` reaches the controlling terminal (`CONOUT$`, `/dev/tty`); with no terminal it returns False and nothing is printed on stdout or stderr.
