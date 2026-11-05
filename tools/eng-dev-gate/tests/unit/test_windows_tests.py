@@ -20,7 +20,7 @@ class Recorder:
         self.calls: list[tuple[list[str], Path]] = []
         self._codes = list(exit_codes)
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append((list(argv), cwd))
         return ToolResult(exit_code=self._codes.pop(0) if self._codes else 0, output="1 failed\n")
 
