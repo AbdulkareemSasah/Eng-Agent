@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Journal reader: `JournalReader` (read-only, chain-verifying) with `RunView`, `StepView`, `RequestView`, `ModelSavedView` and `DecisionView`, `follow`, `run_class`, the `unreleased_tools` union and `decision_runtime`; the run lock helper `_runlock` (`RunLock`) and `journal.is_locked` (plan 0001 T4, B-103; spec 0001 AC25, AC68).
 - Journal schema with append-only and gap-free `seq` triggers, the hash-chained append-only writer with per-event durability, and large step arguments stored by reference as `harness.journal_blob/1`: `eng_harness.journal` `JournalWriter` (plan 0001 T3b, B-367; spec 0001 AC20 to AC22, AC24, AC26).
 - Shipped `blank-0.1.0` template (`status: draft`, no value, empty `ask_each_run` because the spec 0007 section 4.8 paths do not meet the suffix and canonical-unit rule of spec 0004 and the contract; a spec amendment is pending) as package data (included in the wheel by the build backend) and the golden pin of its resolved hash in `tests/data/golden/shipped_templates.json` (B-163; spec 0004 AC29).
 - Basis field declaration: `eng_harness.basis` with `FieldSpec`, `BasisInvalid` and `check_declaration` (kind, unit, choices and bounds rules; `required_basis` must equal the required paths) (B-159; spec 0004 AC21).
