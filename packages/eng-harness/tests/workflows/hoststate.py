@@ -52,6 +52,8 @@ class ScriptedHost(Host):
         self.unsupported: set[str] = set()
         self.reconcile_error: ContractError | None = None
         self.restored_units: UnitsState | None = None
+        self.in_place = False
+        self.reconciled_args: list[Mapping[str, JsonValue]] = []
 
     def supports_reconcile(self, tool: str) -> bool:
         """False for the tools in `unsupported`, else as the fake host."""
@@ -60,6 +62,7 @@ class ScriptedHost(Host):
     async def reconcile(self, tool: str, args: Mapping[str, JsonValue], op_id: str) -> Reconciliation:
         """Log the call, raise `reconcile_error` when set, else behave as the fake host."""
         self.calls.append(("reconcile", op_id, None))
+        self.reconciled_args.append(dict(args))
         if self.reconcile_error is not None:
             raise self.reconcile_error
         return await super().reconcile(tool, args, op_id)
@@ -87,6 +90,15 @@ class ScriptedHost(Host):
     async def restore(self, model_key: str, saved: SavedModel) -> HostInstance:
         """Log the call; the units of the restored model are `restored_units` when set."""
         self.calls.append(("restore", model_key, None))
+        if self.in_place:  # the instance that holds the model still runs: the saved state returns in it
+            self.models[model_key] = HostModelState(
+                loaded=True,
+                model_id=saved.model_id,
+                revision=saved.revision,
+                fingerprint=saved.fingerprint,
+                file_sha256=saved.file_sha256,
+            )
+            return next(i for group in self.instances.values() for i in group if i.instance_id == self.bound[model_key])
         instance = await super().restore(model_key, saved)
         if self.restored_units is not None:
             self.units[model_key] = self.restored_units

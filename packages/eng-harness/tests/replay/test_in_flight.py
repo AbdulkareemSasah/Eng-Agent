@@ -8,12 +8,14 @@ answers per `op_id`; its call log and the rig's port-call log show what the resu
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from pydantic import JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
-from workflows.ctx_flows import success
+from workflows.ctx_flows import flow, success
 from workflows.hoststate import (
     INSTANCE,
     OP,
@@ -32,11 +34,13 @@ from workflows.hoststate import (
 )
 from workflows.rig import Rig
 
+from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
+from eng_harness.errors import JournalIntegrityError
 from eng_harness.journal import EventType, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import Reconciliation
+from eng_harness.ports import CalcInfo, Reconciliation
 
 T = EventType
 WRITE_ARGS: dict[str, JsonValue] = {"n": 1, "model": "m1"}
@@ -200,3 +204,56 @@ def test_read_in_flight(tmp_path: Path, attempt: int) -> None:
     assert [(c.tool, c.op_id) for c in host.ledger] == [("read_c", op_id(run_id, "2", attempt))]  # the same attempt
     assert "tool.reconcile" not in rig.log  # a read has no side effect to reconcile
     assert all(c[0] != "reconcile" for c in host.calls)
+
+
+def test_reconciliation_gets_the_full_arguments_of_a_large_write(tmp_path: Path) -> None:
+    big: dict[str, JsonValue] = {"n": 1, "model": "m1", "text": "x" * 20_000}  # stored by reference in the journal
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    workflow = chain([("read_a", {"n": 0}), ("write_b", big), ("read_c", {"n": 2})])
+    steps = (start("0", "read_a", {"n": 0}), done("0"), start("1", "write_b", big, write=True), bound("m1", INSTANCE))
+    run_id = forge(rig, workflow, *steps)
+    started = next(e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepStarted) and e.path == "1")
+    assert started.args is None
+    assert started.args_ref is not None
+    assert resume(rig, workflow, run_id).status is RunStatus.COMPLETED
+    assert host.reconciled_args == [big]
+
+
+def test_a_write_without_an_op_id_is_a_journal_error(tmp_path: Path) -> None:
+    rig, host = scripted_rig(tmp_path)
+    kind, path, attempt, body = start("1", "write_b", WRITE_ARGS, write=True)
+    run_id = forge(rig, chain(ORIGINAL), (kind, path, attempt, body | {"op_id": None}))
+    with pytest.raises(JournalIntegrityError):
+        resume(rig, chain(ORIGINAL), run_id)
+    assert host.calls == []
+
+
+def test_calc_in_flight(tmp_path: Path) -> None:
+    rig, _ = scripted_rig(tmp_path)
+    rig.calc_infos.append(
+        CalcInfo(
+            id="harness.demo", version=1, content_sha256="c" * 64, status=CalcStatus.APPROVED,
+            engineering_params=(), basis_fields=(), ref_rules={},
+        )
+    )  # fmt: skip
+    rig.calc_results["harness.demo"] = success(rig, {"y": 1})
+
+    async def body(ctx: Any) -> list[str]:
+        return [(await ctx.calc("harness.demo", {"a": 1})).ref.ref]
+
+    args: dict[str, JsonValue] = {"a": 1}
+    cut = (
+        T.STEP_STARTED,
+        "0",
+        1,
+        {"kind": "calc", "name": "harness.demo", "args": args, "args_sha256": payload_sha256(args), "effect": "none"},
+    )
+    run_id = forge(rig, flow(body), cut)
+    before = len(rig.events(run_id))
+    assert resume(rig, flow(body), run_id).status is RunStatus.COMPLETED
+    assert trace(rig, run_id, before) == [
+        ("run_resumed", None, None), ("step_rerun", "0", 1), ("step_started", "0", 1),
+        ("step_completed", "0", 1), ("run_completed", None, None),
+    ]  # fmt: skip
+    assert rig.calc_runs == [("harness.demo", args)]

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from pydantic import JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
@@ -35,7 +36,9 @@ from workflows.hoststate import (
 )
 from workflows.rig import Rig, request
 
+from eng_harness.block import BlockDef
 from eng_harness.engine import RunStatus
+from eng_harness.engine._inflight import ResumeIndex
 from eng_harness.engine._steps import op_id
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
@@ -220,6 +223,14 @@ def test_units_after_a_restore_that_differ_stop_the_run(tmp_path: Path) -> None:
     assert stopped.escalation is not None
     assert stopped.escalation.reason == "units_mismatch"
     assert host.ledger == []  # no live step ran on a model whose units differ
+    resume(rig, chain(ORIGINAL), run_id)  # the restore is journaled: the next resume reads the restored instance
+    assert [p.resume_no for p in _kinds(rig, run_id, T.RUN_RESUMED)] == [
+        1,
+        2,
+        2,
+        3,
+    ]  # the cut shares its resume's number
+    assert "@resume3.units.m1" in _housekeeping(rig, run_id, 3)
 
 
 def test_units_that_differ_stop_the_run_before_reconciliation(tmp_path: Path) -> None:
@@ -247,21 +258,37 @@ def test_first_use_binding(tmp_path: Path) -> None:
     assert named == [("locate", "m1"), ("call", "write_b")]  # located before the write reached the host
 
 
-@pytest.mark.parametrize("after_save", ["none", "completed", "in_flight"])
-def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
-    rig, host = scripted_rig(tmp_path)
+SECOND: dict[str, JsonValue] = {"n": 2, "model": "m1"}
+TWO_WRITES: list[tuple[str, dict[str, JsonValue]]] = [
+    ("read_a", {"n": 0}),
+    ("write_b", M1),
+    ("write_b", SECOND),
+    ("read_c", {"n": 3}),
+]
+
+
+def _reopened(root: Path, after_save: str) -> tuple[Rig, ScriptedHost, BlockDef[Any, Any], str]:
+    """A run stopped after its first write and a save of m1, then a second write (none, completed or in flight).
+
+    The engineer closed the host and reopened the model's last saved file: a new instance holds the saved state.
+    """
+    rig, host = scripted_rig(root)
     host.add_model("m1", INSTANCE)
     host.models["m1"] = host.models["m1"].model_copy(update={"revision": 1, "fingerprint": "fp1"})  # the first write
-    second: dict[str, JsonValue] = {"n": 2, "model": "m1"}
-    workflow = chain([("read_a", {"n": 0}), ("write_b", M1), ("write_b", second), ("read_c", {"n": 3})])
+    workflow = chain(TWO_WRITES)
     steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), start("1", "write_b", M1, write=True), done("1")]
     steps += [bound("m1", INSTANCE), saved(rig, "m1")]
     if after_save != "none":
-        steps += [start("2", "write_b", second, write=True), *([done("2")] if after_save == "completed" else [])]
+        steps += [start("2", "write_b", SECOND, write=True), *([done("2")] if after_save == "completed" else [])]
     run_id = forge(rig, workflow, *steps)
-    # the engineer closed the host and reopened the model's last saved file: a new instance holds the saved state
     host.bound["m1"] = REOPENED.instance_id
     host.instances["csi"].append(REOPENED)
+    return rig, host, workflow, run_id
+
+
+@pytest.mark.parametrize("after_save", ["none", "completed", "in_flight"])
+def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
+    rig, host, workflow, run_id = _reopened(tmp_path, after_save)
     outcome = resume(rig, workflow, run_id)
     rebound = [p for p in _kinds(rig, run_id, T.MODEL_BOUND) if p.reason == "reopened"]
     assert [(p.model_key, p.instance_id) for p in rebound] == [("m1", "csi-2")]  # journaled in every case
@@ -283,3 +310,61 @@ def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
     asked = rig.inputs.presented[-1]
     assert options(asked, "state") == ["restore", "abandon"]
     assert host.ledger == []
+    again = resume(rig, workflow, run_id)  # a resume with no answer yet finds the same difference: nothing runs on
+    assert again.escalation is not None
+    assert (again.escalation.reason, again.escalation.request_id) == ("host_state_mismatch", asked.request_id)
+    assert all(c[0] != "reconcile" for c in host.calls)
+    assert host.ledger == []
+
+
+def test_units_of_a_reopened_model_that_differ_stop_the_run(tmp_path: Path) -> None:
+    rig, host, workflow, run_id = _reopened(tmp_path, "none")
+    host.units["m1"] = UnitsState(loaded=True, ok=False, present="unit-system-b", expected="unit-system-a")
+    stopped = resume(rig, workflow, run_id)
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
+    assert ("read_units", "m1", "csi-2") in host.calls  # read against the new binding
+    assert rig.inputs.presented == []
+    assert host.ledger == []
+
+
+def test_restore_in_the_instance_that_holds_the_model(tmp_path: Path) -> None:
+    rig, host, workflow, run_id = _reopened(tmp_path, "completed")
+    host.in_place = True  # the reopened instance still runs: restore does not start another
+    resume(rig, workflow, run_id)
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(asked.request_id, answer(asked, "restore", "state"))
+    outcome = resume(rig, workflow, run_id)
+    assert outcome.status is RunStatus.COMPLETED
+    assert _kinds(rig, run_id, T.HOST_STARTED) == []  # the engine started no instance
+    assert [(p.reason, p.instance_id) for p in _kinds(rig, run_id, T.MODEL_BOUND)] == [
+        ("first_use", "csi-1"), ("reopened", "csi-2"), ("restored", "csi-2"),
+    ]  # fmt: skip
+    assert [(c.tool, c.op_id) for c in host.ledger][:1] == [("write_b", op_id(run_id, "2", 2))]  # a new attempt
+
+
+def test_a_lost_model_without_a_save_offers_only_abandon(tmp_path: Path) -> None:
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    run_id = forge(rig, chain(ORIGINAL), start("1", "write_b", M1, write=True), bound("m1", INSTANCE))
+    host.crash("csi")  # nothing was saved: there is no state to restore
+    resume(rig, chain(ORIGINAL), run_id)
+    assert options(rig.inputs.presented[-1], "state") == ["abandon"]
+    assert all(c[0] != "reconcile" for c in host.calls)
+
+
+def test_the_cut_of_a_restore_leaves_the_new_attempt_to_later_resumes(tmp_path: Path) -> None:
+    rig, host, run_id = _written(tmp_path)
+    _drift(host)
+    resume(rig, chain(ORIGINAL), run_id)
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(asked.request_id, answer(asked, "restore", "state"))
+    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
+    index = ResumeIndex(rig.events(run_id))
+    found = index.lookup("1", "tool", "write_b", payload_sha256(M1))
+    assert found is not None
+    assert found.attempt == 2  # the write after the restore, not the one the cut superseded
+    assert isinstance(found.outcome, ev.StepResult)
+    index.lookup("0", "tool", "read_a", payload_sha256({"n": 0}))
+    index.lookup("2", "tool", "read_c", payload_sha256({"n": 2}))
+    index.finish()  # every recorded path was visited: nothing hidden, nothing left over

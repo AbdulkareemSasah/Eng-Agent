@@ -75,11 +75,12 @@ class Fold:
         ]
         self.steps: dict[str, Step] = {}
         self.bound: dict[str, ev.ModelBound] = {}
+        self.bound_at: dict[str, int] = {}
         self.saved: dict[str, tuple[int, ev.ModelSaved]] = {}
         for e in events:
             p, path = e.payload, e.path
             if isinstance(p, ev.ModelBound):
-                self.bound[p.model_key] = p
+                self.bound[p.model_key], self.bound_at[p.model_key] = p, e.seq
             elif isinstance(p, ev.ModelSaved) and not any(a < e.seq < b for a, b in cuts):
                 self.saved[p.model_key] = (e.seq, p)
             elif path is None or e.attempt is None or path.startswith("@") or "~host." in path:
@@ -99,16 +100,27 @@ class Fold:
         """The steps in flight: started, not closed, not marked for a rerun, in order of their start."""
         return sorted((s for s in self.steps.values() if s.closing is None and s.rerun is None), key=lambda s: s.seq)
 
-    def writes(self, key: str | None = None) -> list[Step]:
-        """The write steps on a model (`key`, or any), not cut by a restore."""
+    def writes(self, key: str | None = None, *, live: bool = True) -> list[Step]:
+        """The write steps on a model (`key`, or any); `live`: only those a restore did not cut."""
         return [
             s for s in self.steps.values()
-            if s.began.effect == "write" and s.began.model_key and key in (None, s.began.model_key) and s.rerun != 1
+            if s.began.effect == "write" and s.began.model_key and key in (None, s.began.model_key)
+            and (s.rerun != 1 or not live)
         ]  # fmt: skip
 
     def written(self) -> list[str]:
-        """The keys of the models the run wrote to, sorted."""
-        return sorted({s.began.model_key for s in self.writes() if s.began.model_key})
+        """The keys of the models the run wrote to, sorted (a restore does not make a model unwritten)."""
+        return sorted({s.began.model_key for s in self.writes(live=False) if s.began.model_key})
+
+    def lacking(self, key: str) -> list[Step]:
+        """The writes a reopened model lacks: made after its last save, before it was bound again (4.5.4).
+
+        Derived from the journal, so the answer is the same at every resume until a restore cuts those writes.
+        """
+        if key not in self.bound or self.bound[key].reason != "reopened":
+            return []
+        after = self.saved[key][0] if key in self.saved else 0
+        return [s for s in self.writes(key) if after < s.seq < self.bound_at[key]]
 
 
 class ResumeIndex(ReplayIndex):

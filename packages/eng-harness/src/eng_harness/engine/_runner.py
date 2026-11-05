@@ -215,9 +215,8 @@ class Engine:
                     self._ids, produce, writer,
                 )  # fmt: skip
                 try:  # steps 4 and 5: T13; step 6 only for the models the run wrote; 7 and 8: spec 4.5.3, 4.5.4
-                    lost, reopened = await _hoststate.locate_models(rt)
-                    await _inflight.reconcile(rt, lost | reopened)
-                    await _hoststate.check(rt, reopened)
+                    await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
+                    await _hoststate.check(rt)
                 except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
                     status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
                     return RunOutcome(run_id, status, escalation=stop.escalated)

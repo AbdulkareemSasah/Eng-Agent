@@ -82,13 +82,14 @@ async def _units(rt: Resume, kind: str, key: str, instance_id: str, *, must_load
     return units
 
 
-async def locate_models(rt: Resume) -> tuple[set[str], set[str]]:
+async def locate_models(rt: Resume) -> set[str]:
     """Step 6 of a resume (4.5.1): read the units of each model the run wrote in its bound instance.
 
     A model that instance does not have is bound again when another instance holds it (reopened, units read there) and
-    is lost when none does. Returns the lost and the reopened model keys.
+    is lost when none does. Returns the models not to reconcile: the lost ones, and the reopened ones whose reopened
+    file lacks writes (a reconciler could report `not_applied` for an edit that is only gone from memory).
     """
-    f, lost, reopened = Fold(rt.events()), set[str](), set[str]()
+    f, lost = Fold(rt.events()), set[str]()
     for key in (k for k in f.written() if k in f.bound):
         if (await _units(rt, "units", key, f.bound[key].instance_id)).loaded:
             continue
@@ -97,8 +98,8 @@ async def locate_models(rt: Resume) -> tuple[set[str], set[str]]:
             continue
         bind(rt.writer, rt.host, key, f.bound[key].host_key, found.instance_id, "reopened")
         await _units(rt, "units_reopened", key, found.instance_id, must_load=True)
-        reopened.add(key)
-    return lost, reopened
+    f = Fold(rt.events())
+    return lost | {key for key in f.written() if f.lacking(key)}
 
 
 def _reconciled(f: Fold, key: str, after: int) -> list[tuple[int, str]]:
@@ -110,17 +111,21 @@ def _reconciled(f: Fold, key: str, after: int) -> list[tuple[int, str]]:
     ]  # fmt: skip
 
 
-def _difference(rt: Resume, f: Fold, key: str, state: HostModelState, reopened: bool) -> tuple[str, str] | None:
+def _difference(rt: Resume, f: Fold, key: str, state: HostModelState) -> tuple[str, str] | None:
     """Why the host's state of `key` is not the journal's (reason, detail), or None when they agree (4.5.4)."""
     if not state.loaded:
         return "model_not_loaded", f"{key} is not loaded in its host"
+    if lost := f.lacking(key):
+        return (
+            "model_reopened",
+            f"{key} was reopened from its last save, which lacks {len(lost)} write(s) made after it",
+        )
     if key not in f.saved:
         return None  # nothing was saved: there is no state to compare with
     seq, saved = f.saved[key]
-    if reopened and any(s.seq > seq for s in f.writes(key)):
-        return "model_reopened", f"{key} was reopened from its last save, which lacks the writes made after it"
     want: tuple[str | None, int | None, str | None] = (saved.model_id, saved.revision, saved.fingerprint)
-    if refs := _reconciled(f, key, seq):  # a write reconciled `applied` after the save: the host holds its result
+    since = max(seq, f.bound_at[key] if f.bound[key].reason == "reopened" else 0)  # a reopened file starts at its save
+    if refs := _reconciled(f, key, since):  # a write reconciled `applied` after that: the host holds its result
         info = rt.store.get(max(refs)[1]).producer.host
         want = (info.model_id, info.model_revision, None) if info else (None, None, None)
     found = (state.model_id, state.revision, state.fingerprint)
@@ -129,7 +134,7 @@ def _difference(rt: Resume, f: Fold, key: str, state: HostModelState, reopened: 
     return "model_differs", f"{key} is at revision {state.revision} ({state.fingerprint}), the journal has {want[1]}"
 
 
-async def check(rt: Resume, reopened: set[str]) -> None:
+async def check(rt: Resume) -> None:
     """Step 8 of a resume (4.5.4): compare each model the run wrote with the journal; on a difference ask the engineer.
 
     The state is read from the bound instance as `@resume<n>.model_state.<key>`. A model without a binding was never
@@ -145,7 +150,7 @@ async def check(rt: Resume, reopened: set[str]) -> None:
             key,
             {"loaded": state.loaded, "revision": state.revision, "instance_id": f.bound[key].instance_id},
         )
-        if (found := _difference(rt, f, key, state, key in reopened)) is not None:
+        if (found := _difference(rt, f, key, state)) is not None:
             await _resolve(rt, f, key, *found)
 
 
