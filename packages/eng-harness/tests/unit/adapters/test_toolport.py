@@ -21,7 +21,7 @@ from eng_contract.params import ParamModel, eng_param
 from eng_contract.store import ResultStore
 from mcp import types
 
-from eng_harness.adapters import Allowlist
+from eng_harness.adapters import Allowlist, ToolDescriptor
 from eng_harness.adapters._args import HostTarget
 from eng_harness.adapters._ledger import LedgerEntry, WriteLedger
 from eng_harness.adapters._toolport import AdapterToolPort, Binding
@@ -78,7 +78,6 @@ def _entry(name: str, kind: str, effect: str, args_model: str, **over: Any) -> d
 def _allowlist() -> Allowlist:
     tools = [
         _entry("csi_list_stories", "read", "read", "StoriesArgs", result_kind="harness.run_output/1"),
-        _entry("csi_list_points", "read", "read", "StoriesArgs", result_kind="harness.run_output/1"),
         _entry("csi_define_wall_section", "write", "write", "WallArgs", units="token"),
         _entry("csi_save_model", "session", "write", "StoriesArgs", action="save", confirm="approved"),
         _entry("csi_exit", "session", "write", "StoriesArgs", confirm="owned"),
@@ -95,8 +94,8 @@ def _allowlist() -> Allowlist:
     )
 
 
-def _config(*, cli_unreleased: bool = False) -> ServersConfig:
-    server = {
+def _config(*, cli_unreleased: bool = False, long_role: bool = True) -> ServersConfig:
+    server: dict[str, Any] = {
         "adapter": "test-adapter",
         "command": os.path.abspath(os.sep + "opt"),
         "client_grace_s": 5,
@@ -107,6 +106,8 @@ def _config(*, cli_unreleased: bool = False) -> ServersConfig:
             "long": {"classes": ["long"], "call_timeout_s": 900},
         },
     }
+    if not long_role:
+        server["roles"].pop("long")
     cli = {"shell": server["command"], "script": server["command"], "timeout_s": 60}
     if cli_unreleased:
         cli |= {"release": "unreleased", "release_record": "docs/gaps/cli-gap.md"}
@@ -181,8 +182,8 @@ class Rig:
         producer = Provenance(
             tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0
         )
-        rid = self.store.put("harness.run_input/1", {"value": {"t": value}}, producer).result_id
-        return {"$ref": f"{rid}#/value/t"}
+        rid = self.store.put("harness.run_input/1", {"value": {"thickness_mm": value}}, producer).result_id
+        return {"$ref": f"{rid}#/value/thickness_mm"}
 
     def wall(self) -> dict[str, Any]:
         return {"model": "main", "name": "W1", "thickness_mm": self.thickness_ref()}
@@ -257,7 +258,12 @@ def test_read_call_makes_an_envelope_and_no_ledger_entry(rig: Rig) -> None:
 def test_write_is_ledgered_and_fsynced_before_the_send(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
     synced: list[int] = []
     real = os.fsync
-    monkeypatch.setattr("eng_harness.adapters._ledger.os.fsync", lambda fd: (synced.append(fd), real(fd))[1])
+
+    def recording(fd: int) -> None:
+        synced.append(fd)
+        real(fd)
+
+    monkeypatch.setattr(os, "fsync", recording)
     args = rig.wall()
 
     envelope = rig.call("csi_define_wall_section", args, op_id="op-7")
@@ -296,11 +302,8 @@ def test_ledger_appends_one_line_per_write(rig: Rig) -> None:
     assert entry.target == TARGET
 
 
-def test_ledger_failure_means_nothing_is_sent(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> None:
-    def broken(_: int) -> None:
-        raise OSError("disk full")
-
-    monkeypatch.setattr("eng_harness.adapters._ledger.os.fsync", broken)
+def test_ledger_failure_means_nothing_is_sent(rig: Rig) -> None:
+    rig.ledger.path.parent.write_text("not a folder")  # the ledger folder cannot be made
     envelope = rig.call("csi_define_wall_section", rig.wall())
 
     assert isinstance(envelope, FailureEnvelope)
@@ -309,13 +312,14 @@ def test_ledger_failure_means_nothing_is_sent(rig: Rig, monkeypatch: pytest.Monk
     assert rig.caller.calls == []
 
 
-@pytest.mark.parametrize("literal", [250.0, {"$ref": "res_01ARZ3NDEKTSV4RRFFQ69G5FAX#/value/t"}])
+@pytest.mark.parametrize("literal", [250.0, {"$ref": "res_01ARZ3NDEKTSV4RRFFQ69G5FAX#/value/thickness_mm"}])
 def test_invalid_arguments_send_and_ledger_nothing(rig: Rig, literal: object) -> None:
     # a literal engineering quantity (11 section 6 item 2) and an unknown reference fail before any host contact
     envelope = rig.call("csi_define_wall_section", {"model": "main", "name": "W1", "thickness_mm": literal})
     assert isinstance(envelope, FailureEnvelope)
     assert envelope.error.code in (ErrorCode.INVALID_ARGUMENT, ErrorCode.REF_NOT_FOUND)
-    assert rig.caller.calls == [] and not rig.ledger.path.exists()
+    assert rig.caller.calls == []
+    assert not rig.ledger.path.exists()
 
 
 def test_a_lost_write_keeps_its_ledger_entry(rig: Rig) -> None:
@@ -343,8 +347,17 @@ def test_confirm_follows_the_descriptor(rig: Rig) -> None:
     assert confirms == [True, None, True]
 
 
-def test_result_kind_needs_a_reader(rig: Rig) -> None:
-    # csi_list_points names a result kind but the adapter registered no reader: an adapter defect, not a stored guess
-    envelope = rig.call("csi_list_points", {"model": "main"})
-    assert isinstance(envelope, FailureEnvelope)
-    assert envelope.error.code is ErrorCode.INTERNAL
+def test_wiring_is_checked_when_the_port_is_built(
+    run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any
+) -> None:
+    with pytest.raises(ValueError, match="csi_define_wall_section"):  # no argument model for WallArgs
+        Rig(run_dir, store, ids, clock, arg_models={"StoriesArgs": StoriesArgs})
+    with pytest.raises(ValueError, match="csi_list_stories"):  # a result kind and no reader
+        Rig(run_dir, store, ids, clock, readers={})
+    long_read = ToolDescriptor.model_validate(
+        _entry("csi_long_read", "read", "read", "StoriesArgs", timeout_class="long")
+    )
+    with_long = _allowlist().model_copy(update={"tools": (*_allowlist().tools, long_read)})
+    Rig(run_dir, store, ids, clock, allowlist=with_long)  # the long role serves it
+    with pytest.raises(ValueError, match="csi_long_read"):  # no role serves the class
+        Rig(run_dir, store, ids, clock, allowlist=with_long, config=_config(long_role=False))
