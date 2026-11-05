@@ -192,3 +192,39 @@ def test_refs_not_sent() -> None:
     # the sent state passes the value check; the model itself is not changed
     assert check_state(out, ()) == ()
     assert state.anchor.ref == _RES
+
+
+class Note(BaseModel):
+    model_config = _STRICT
+    note: str
+
+
+@pytest.mark.parametrize(
+    ("bad", "path"),
+    [
+        (Note(note="C:/secret/acme@x"), "$"),
+        ({"a": b"acme"}, "a"),
+        ({"a": {"b": [1, {2, 3}]}}, "a.b.1"),
+        ({"a": [Note(note="x")]}, "a.0"),
+        ({1: "fine"}, "$"),
+        (("ok", object()), "1"),
+        (b"acme", "$"),
+    ],
+)
+def test_runtime_check_refuses_non_json(bad: Any, path: str) -> None:
+    """A value that is not JSON is refused with a typed error naming the path; it is never passed as clean."""
+    with pytest.raises(TypeError) as caught:
+        check_state(bad, ("acme",))
+    assert f"'{path}'" in str(caught.value)
+    assert "acme" not in str(caught.value)
+    assert "secret" not in str(caught.value)
+
+
+def test_url_needs_a_scheme_form() -> None:
+    """Plain text with a colon is no URL; a scheme with '//' or a known scheme word is (spec 0005 section 4.10)."""
+    assert _found({"a": "Note: enlarge", "b": "ratio 1:2", "c": "step one: rebar"}) == set()
+    assert _found({"a": "ftp://host"}) == {("a", "url")}
+    assert _found({"a": "see custom+x://h"}) == {("a", "url")}
+    assert _found({"a": "mailto:someone"}) == {("a", "url")}
+    assert _found({"a": "FILE:x"}) == {("a", "url")}
+    assert _found({"a": "tel:123"}) == {("a", "url")}
