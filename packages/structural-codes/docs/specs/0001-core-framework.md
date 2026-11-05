@@ -468,12 +468,22 @@ the entry points as `tests/unit/test_registry.py` does). Each of these exits 2 w
 error stream: a missing or unreadable `pyproject.toml`, a missing or ambiguous entry point or `check_modules` key, a pack
 not found by discovery, a `CheckDefinitionError`, a `VerificationDataError`; argparse usage errors also exit 2.
 
-- `verify` exits 2 on a non-empty `lint_scope_violations(check, check_modules)` for any check of the pack, then runs
-  `verify_pack(pack, P / "tests/data/golden/verification")` and prints one line per report in check_id order: the
-  check_id, `verified` or `not verified`, the `pass`, `fail` and `pending` case counts, then the unmet requirements. It
-  exits 1 if any case fails, else 0.
+- The pack's check set is every check of the discovered registry whose `meta.pack` is the pack's name, in check_id
+  order. For a pack without an overlay this is `pack.checks`. For an overlay pack it also holds the inherited checks
+  the registry derives (§4.11), which `pack.checks` (only the `Overridden` and `Added` checks) does not hold, and
+  `verify_pack` cannot be used for it: it builds `Registry.of([pack])`, which raises `CheckDefinitionError` for an
+  overlay whose base pack is absent, and it loops over `pack.checks` only (amendment B-419, review of #234).
+- `verify` exits 2 on a non-empty `lint_scope_violations(check, check_modules)` for any check in `pack.checks` (an
+  inherited check's modules belong to the base pack, whose own `verify` checks them). For a pack without an
+  overlay it then runs `verify_pack(pack, P / "tests/data/golden/verification")`. For an overlay pack it calls
+  `verify_check(check, CaseFile.load(path), registry=registry)` with the discovered registry for each check of the
+  check set, where `path` is `P / "tests/data/golden/verification" / "<check_id>.yaml"`; a missing file gives the same
+  not-verified report `verify_pack` gives (no case results, unmet `no case file <check_id>.yaml`). It prints one line
+  per report in check_id order: the check_id, `verified` or `not verified`, the `pass`, `fail` and `pending` case
+  counts, then the unmet requirements. It exits 1 if any case fails, else 0.
 - `hash` uses the same resolution but does not check lint scope; it prints `<check_id> <content_hash>`, one line per
-  check in check_id order, and exits 0, or 2 on any error.
+  check of the check set in check_id order (so an overlay pack's inherited checks get the hash their
+  `inherited-confirmed` approvals need, §4.8), and exits 0, or 2 on any error.
 
 #### 4.9.4 Conditions for `verified` (10 §6)
 
@@ -610,5 +620,5 @@ content-hash format is a major change of the core and resets every approval (17 
 | Q14 | At runtime a `verified`, unapproved check resolves to `draft` (watermarked), because case files are not installed | Owner | Keep; 10 §4 makes both trial-only. Shipping case files as package data would only remove the watermark |
 | Q15 | `CheckMeta.unconditional` lets a check declare no precondition beyond member scope | Owner | Accept; the clause-spec reviewer confirms the stated section |
 | Q16 | `unbounded()` is **[added]** (B-097); nothing in code stops a bounded quantity being declared unbounded | Owner | Keep; the clause-spec and source-check review lists and checks each unbounded field |
-| Q17 | The command line's `--pack P` (a pack project root path), its output lines and the exit codes of `hash` are **[added]** (§4.9.3, amendment B-419) | Owner | Accept: the case files and `check_modules` live only in the pack project, not in the installed package |
+| Q17 | The command line's `--pack P` (a pack project root path), its output lines, the exit codes of `hash`, and how an overlay pack is verified and hashed (its check set includes the derived inherited checks; the command line runs `verify_check` per check with the discovered registry, because `verify_pack` builds `Registry.of([pack])` and loops over `pack.checks` only) are **[added]** (§4.9.3, amendment B-419) | Owner | Accept: the case files and `check_modules` live only in the pack project, not in the installed package; giving `verify_pack` a registry parameter instead would need a new core task that owns `verification.py` |
 | G-1 | No worked examples from books or code examples exist here for any check; every case in this build is a labeled hand check | Owner | Owner supplies book, edition, page and example per check (pack specs list them) |

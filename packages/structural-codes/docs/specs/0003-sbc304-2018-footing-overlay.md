@@ -117,7 +117,8 @@ first hand-check case (its case file under `aci318_14`); they are used only to r
   JSON of the payloads is byte-identical. Test: `tests/replay/test_pack_determinism.py::test_identical_across_hash_seeds`.
 - AC17. Given the pack, when `python -m structural_codes verify --pack P` runs with `P` the pack project root
   `packages/structural-codes/sbc304-2018/` (CF §4.9.3, amendment B-419), then it exits 0, every
-  `boundary` case passes, and every check is reported not `verified` (no worked example, G-WE). Test:
+  `boundary` case passes, and every check, the inherited ones included (CF §4.9.3 check set), is reported not
+  `verified` (no worked example, G-WE). Test:
   `tests/unit/test_verify_cli.py::test_verify_reports_unverified`.
 
 ## 4. Design

@@ -193,7 +193,7 @@ tasks:
     depends_on: [T9, T10]
   - id: T12
     title: Command line (verify and hash)
-    # Amendment (B-419, documents only): `--pack P` is the pack project root (spec 4.9.3); test_cli.py builds its pack roots in tmp_path, so no fixture file is committed.
+    # Amendment (B-419, documents only): `--pack P` is the pack project root (spec 4.9.3); an overlay pack's check set includes its inherited checks (verify_check per check, not verify_pack); test_cli.py builds its pack roots in tmp_path, so no fixture file is committed.
     files:
       - "packages/structural-codes/core/src/structural_codes/__main__.py"
       - "packages/structural-codes/core/src/structural_codes/_cli.py"
@@ -349,15 +349,23 @@ also reads the pack's `check_modules` with `tomllib` and exits 2 on a lint-scope
 `pyproject.toml`), resolved as spec §4.9.3 states: the single entry-point name under
 `[project.entry-points."structural_codes.packs"]` and `[tool.eng-gate] check_modules` are read from that
 `pyproject.toml`, the `Pack` of that name is taken from `Registry.discover().packs`, and `verify` calls
-`verify_pack(pack, P / "tests/data/golden/verification")`. The output lines and every exit-2 case (resolution errors,
+`verify_pack(pack, P / "tests/data/golden/verification")` for a pack without an overlay. For an overlay pack (review of
+#234) the check set is every discovered check whose `meta.pack` is the pack's name, which includes the inherited checks
+the registry derives; `verify` calls `verify_check(check, CaseFile.load(...), registry=registry)` with the discovered
+registry for each of them (a missing case file gives `verify_pack`'s not-verified report), because `verify_pack` builds
+`Registry.of([pack])`, which rejects an overlay without its base, and loops over `pack.checks` only; `hash` prints the
+content hash of that same check set, and the lint-scope check covers `pack.checks`. The output lines and every exit-2 case (resolution errors,
 `CheckDefinitionError`, `VerificationDataError`, lint-scope violations, argparse usage errors; `hash` exits 0 or 2 and
 skips the lint-scope check) are those of spec §4.9.3. `tests/unit/test_cli.py` builds each pack root in pytest's
 `tmp_path` at run time (a `pyproject.toml` with the entry point and `check_modules`, and the case YAML under
 `tests/data/golden/verification/`), points `sys.path` at `tests/fixtures/synthbase/src` and monkeypatches the entry
 points as `tests/unit/test_registry.py` does; it builds one root each for exit 0, exit 1 (a failing case) and exit 2 (a
-lint-scope violation, bad case data, an unknown pack). No fixture file is committed, so the task stays inside its three
-files. The 150-line budget covers `_cli.py` and `__main__.py` only (argument parsing, the `pyproject.toml` resolution,
-two commands and their output); the test lines do not count.
+lint-scope violation, bad case data, an unknown pack), and one overlay root on `tests/fixtures/synthover/src` (with
+`synthbase` also registered) for `test_overlay_includes_inherited`, which expects the inherited check
+`synthover.s4_1.two_pre` in both the `verify` report and the `hash` output, and exit 0. No fixture file is committed, so
+the task stays inside its three files. The 150-line budget covers `_cli.py` and `__main__.py` only (argument parsing,
+the `pyproject.toml` resolution, the check-set selection with its overlay branch of a few lines, two commands and their
+output); the test lines do not count, so 150 lines remain enough.
 
 **T13 Notes.** `render_html` and the label table; golden file committed under `tests/data/golden/notes/` (a protected
 test oracle; the owner reviews it). Can run in parallel with T9 to T12 once T8 is merged.
