@@ -115,8 +115,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point`, B-412). The two removals in `cli/_run.py` are also
   tested by `tests/replay/test_cli_resume.py::test_stop_file_removed_on_return_and_before_resume` (plan T14).
 - AC10. Given an interrupt signal, then the first one is a stop request (as AC9) and the second ends the process at
-  once with exit 130; the journal then resumes as after any crash (engine AC30). Test:
-  `tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop`.
+  once with exit 130; the journal then resumes as after any crash (engine AC30). While the run id is not yet known or
+  its run folder does not exist yet (§4.4.8, B-412), there is no live engine to pause, and the first interrupt ends the
+  process as the second does (exit 130, no stop file). Test:
+  `tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop` (both cases).
 - AC11. Given journals in each state (live, interrupted, paused, needs engineer, completed, failed, altered), when
   `status` runs, then the table and the JSON show the `RunView` status, the step in progress, the pending requests (kind
   and title), the escalation, the heartbeat age and the next command to run; an altered journal exits 5 naming the first
@@ -185,8 +187,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   Given a renderer that raises, `emit` raises (the sink does not swallow the failure), so that the engine can detach
   it. Test: `tests/unit/progress/test_sink.py::test_blocked_stream_does_not_block_engine` (the sink alone, no engine).
   The engine half, that a raising sink is detached and the run continues, is engine AC58 (engine plan T18); it is
-  re-checked with `TerminalProgress` and the real engine in plan T17 by
-  `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (B-412).
+  re-checked in plan T17 by `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues`
+  (B-412), with `TerminalProgress` installed directly as the real engine's only sink. Through the production wiring the
+  fan-out of plan T16b detaches a failing member itself and the engine never sees the failure, so that path is tested
+  by plan T16b (`test_failing_sink_detached_alone`), not here.
 - AC20. Given a committed event, then the line is written to the stream in under 200 ms at p95 (11 §10). Test:
   `tests/perf/test_progress_latency.py::test_event_to_line_p95`.
 - AC21. Given any string taken from data (a model name, a message, a file name), then terminal output holds no
@@ -255,7 +259,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `BlockRuleViolation` (engine AC56). Test: `tests/workflow/test_page_approval.py::test_per_item_reject_end_to_end`.
 - AC34. Given an approved change set whose model changed (the fake host is edited) after the answer and before the first
   write, then `ApprovalVoid` is raised before the write (engine AC55), nothing is written, and the page shows the
-  request as voided with the engine's message. Test: `tests/workflow/test_page_approval.py::test_void_after_model_change`.
+  request as voided with the engine's message. Test: `tests/workflow/test_page_approval.py::test_void_after_model_change`
+  (plan T17, real engine). The page half (§4.4.5: a `step_failed` with code `APPROVAL_VOID` marks the approved request
+  voided) is tested by `tests/unit/pages/test_void.py::test_void_shown_on_resolved_request` (plan T7b, B-412).
 - AC35. Given a run waiting at an approval whose process is killed, when it is resumed, then the same request id with
   the same preview hash is shown again, an answer completes the run, and no `approval_resolved` exists for the killed
   wait. Test: `tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume`.
@@ -464,7 +470,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
    `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
-4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3.
+4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3. The calc port is built
+   with the run's store, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`, read before
+   `Engine.resume`), the clock and the ids; the calc registry, the approvals file of spec 0003 (`src/eng_harness/calcs/approvals.yaml`) and the calc
+   settings are those of spec 0003 §4.12 (B-412).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
    `DecisionSettings` (spec 0005 §4.3; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
    standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
@@ -540,7 +549,9 @@ dictionary reads.
 
 **Heartbeat.** An asyncio task in the run process (not a thread, so a stalled event loop stops it) wakes every
 `heartbeat_s`, prints `heartbeat: <step> still running, <elapsed>, <expected>, journal seq N`, and rewrites
-`<run>/heartbeat.json` (`pid`, `at`, `step`, `step_started_at`, `seq`) by temporary file and rename. The file is
+`<run>/heartbeat.json` (`pid`, `at`, `step`, `step_started_at`, `seq`) by temporary file and rename. The run folder
+is read at each beat from the run-id cell of §4.4.8 (B-412); while the cell is empty or the folder does not exist yet,
+the beat prints its line and writes no file, and it never creates the folder. The file is
 process information, not a journal event: the journal has one writer and is not the place for liveness. `status` combines
 `journal.is_locked`, the file and its age (`read_liveness`): locked and fresh is "running"; locked and older than
 `stale_after_heartbeats` intervals is "no heartbeat, possibly stuck"; not locked is the `RunView` status
@@ -657,7 +668,12 @@ decides alone.
 
 The binding to the model state is the engine's: the page shows it, and the engine re-reads the model just before the
 first write under the approval and voids the approval on a mismatch (engine §4.9, AC34). Approval of a change set is
-single use and ends at the first `check_model` of a bound model.
+single use and ends at the first `check_model` of a bound model. No journal event names a void: `ApprovalVoid` is a
+`StepError`, journaled as `step_failed` with code `APPROVAL_VOID`, and it carries no request id (Q21). When the page
+sink sees such a `step_failed`, the page marks as voided the most recent approved `CHANGE_SET` or `PROMOTION` request
+resolved in this process, and its screen shows "voided" with the error's message (an untrusted `field`), no form and
+no button (AC34, B-412). With no such request in this process (the answer was given before a resume), the message is
+shown on the index page as a run message.
 
 #### 4.4.6 Screens
 
@@ -716,17 +732,31 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
   its content; the page ports' wait (§4.4.5 step 2) polls the same check. `eng_harness.pages` may not import
   `eng_harness.cli` (§4.1), so the page ports take the check by injection (`stop_requested: Callable[[], bool]`), and
   `cli/_wiring.py` binds it to `FileRunControl` for the run.
-- The run id behind the page ports' bindings (B-412 review). The page ports' `stop_requested` and `report`
-  (`GET /report`, §4.4.3) take no argument, but both need the run id, and for `run` the run id does not exist when
-  `cli/_wiring.py` builds the page ports: `Engine.start` creates it and returns it only in `RunOutcome`, and
-  `InputRequest` and the journal `Event` do not carry it. `cli/_wiring.py` therefore keeps the run id in a cell,
-  empty for `run` and filled at once with the known run id for `resume`. For `run` it is filled from the first
-  `ApprovalRequest.run_id` that the wrapped page `ApprovalPort` receives, and, once the progress sink reaches the real
-  engine, from the `run_started` event (`RunHeader.run_id`) that the sink receives, whichever comes first; a later
-  value that differs is a defect and raises. While the cell is empty, `stop_requested` returns false and `report`
-  returns the fixed "report not available yet" document; the engine's own `RunControlPort` is not affected, since it
-  receives `stop_requested(run_id)`. Letting `Engine.start` take a run id chosen by the caller would remove the cell;
-  that is an engine spec change and not made here.
+- The run id behind the run-folder bindings (B-412 review; extended by the eighth review). The page ports'
+  `stop_requested` and `report` (`GET /report`, §4.4.3) take no argument, but both need the run id, and for `run` the
+  run id does not exist when `cli/_wiring.py` builds its collaborators: `Engine.start` creates it and returns it only
+  in `RunOutcome`, and `InputRequest` and the journal `Event` do not carry it. `cli/_wiring.py` therefore keeps the
+  run id in one cell, empty for `run` and filled at once with the known run id for `resume`. For `run` it is filled
+  from the first `ApprovalRequest.run_id` that the wrapped page `ApprovalPort` receives, and, once the progress sink
+  reaches the real engine, from the `run_started` event (`RunHeader.run_id`) that the sink receives, whichever comes
+  first; a later value that differs is a defect and raises. The cell is the one source of the run id for every
+  collaborator that needs the run folder `<workspace>/runs/<run_id>`, and each states what it does while the cell is
+  empty:
+  - the page ports: `stop_requested` returns false and `report` returns the fixed "report not available yet"
+    document; the engine's own `RunControlPort` is not affected, since it receives `stop_requested(run_id)`;
+  - the first interrupt (`cli/_signals.py`, AC10): with the cell filled and the run folder present it writes
+    `stop.json` with `by` = `signal`; while the cell is empty or the folder does not exist yet, no engine can be
+    paused (steps 1 to 4 of §4.2.2, the basis screen included, or the start of `Engine.start`), so the first
+    interrupt ends the process as the second does (exit 130); nothing is buffered, and a run already created resumes
+    as after a crash (engine AC30);
+  - the heartbeat (§4.3): prints its line and writes no file;
+  - the tool and host ports: spec 0002 `build_ports(config, workspace, store, run_dir, clock, ids)` needs the run
+    folder, the engine takes its ports at construction, and it calls `ToolPort.unreleased_tools()` for the run header
+    before `run_started` is journaled, so for `run` no fill of the cell comes early enough. The `CliDeps` port builder
+    takes the run folder as a callable that reads the cell (and raises while it is empty), so its field does not
+    depend on the answer, and binding its real default waits for Q20.
+  Letting `Engine.start` take a run id chosen by the caller (Q20, recommended) would fill the cell at once for `run`
+  too, before step 1 builds anything; that is an engine spec change and not made here.
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -880,7 +910,7 @@ heartbeat task runs on the engine loop.
 |---|---|---|
 | AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62, AC65 | Unit | `tests/unit/cli/` |
 | AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
-| AC22 to AC28, AC30 to AC32, AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
+| AC22 to AC28, AC30 to AC32, AC34 (page half, plan T7b), AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
 | AC2, AC58 (rule), AC60 | Rules (static) | `tests/rules/` |
 | AC7, AC9, AC19 (engine half, plan T17), AC29, AC33, AC34, AC37, AC42, AC46, AC47, AC61 (address on no stream), AC63, AC64 | Fake-host workflow (real engine, fake ports, real SQLite, page client; a task built before the engine it needs uses the staged-engine stand-in below, and plan T17 or T17c re-checks it with the real engine) | `tests/workflow/` |
@@ -895,13 +925,15 @@ Staged engine (B-412): a workflow or replay test whose task is built before the 
 port under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds
 the events to the sink) or with a fake engine from `CliDeps`. This holds for every such criterion: AC29 and AC37 (plan
 T7), AC42 (plan T9), AC7, AC8, AC46 and AC64 (plan T14), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
-T16). AC33, AC34 and AC35 are built only in plan T17, with the real engine. Plans T17 and T17c wait for the real engine
+T16). AC33, AC34 and AC35 are tested end to end only in plan T17, with the real engine; the page's voided display that
+AC34 needs is built and unit-tested in plan T7b, so T17 adds tests only. Plans T17 and T17c wait for the real engine
 with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery and the
 run-control check between steps (engine plan T18; the run-control half is added to it by amendment B-412). Until the
 engine's `EnginePorts` holds the decision, progress and run-control fields (engine plan T14 and T18), `cli/_wiring.py`
 builds those ports and gives them to the `CliDeps` engine factory, whose default passes the real engine only the
 fields `EnginePorts` holds; plan T16b completes that mapping, and plans T17 and T17c depend on it, so they re-check each
-staged criterion, and the engine half of AC19, with the real engine through the production wiring. Plan T17:
+staged criterion with the real engine through the production wiring; the engine half of AC19 is the one exception,
+re-checked with `TerminalProgress` as the real engine's only sink (AC19). Plan T17:
 `tests/workflow/test_cli_stop.py::test_stop_real_engine_pauses_at_safe_point` (AC9),
 `tests/workflow/test_progress_detach.py::test_raising_renderer_detached_run_continues` (AC19),
 `tests/workflow/test_page_approval.py::test_answer_bound_to_hash_real_engine` (AC29) and
@@ -955,4 +987,6 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q17 | Amendment B-354 (spec 0007 Q7; `LOCAL-TESTING.md` open points 5 and 13). The first change set could reach a run only by `resume --answers`, and the interim route `run --no-wait` could not start a workflow that needs basis confirmation, because a `--no-wait` run does not serve the basis page and no run exists to resume | Owner | Decided **[added]**: `run --answers FILE` pre-answers the first data request only, through `accept_answers_file` (AC64); a workflow with required basis fields starts only with a waiting `run` (§4.4.7, AC47); the `run --no-wait` route is withdrawn. No answer path is widened: the file still answers data requests only, and the change set is still approved on the page |
 | Q18 | Amendment B-354 (`LOCAL-TESTING.md` open point 6). How the owner invokes the command from the workspace root. The decision rests on uv's documented command-line options (`uv run --package`, `uv sync` being exact) and a check on this workspace with uv 0.11; the uv workspace documentation page was not reachable from the authoring session | Owner | Decided: `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the owner may confirm it against docs.astral.sh. `LOCAL-TESTING.md` should use this form for every `eng-harness` command |
 | Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
+| Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py` |
+| Q21 | Amendment B-412 (eighth review). `ApprovalVoid` carries no request id, so the page ties a void to the most recent approved `CHANGE_SET` or `PROMOTION` request of the process (§4.4.5); with nested approvals in force that may name the wrong one | Owner | Add the approval's `request_id` to the `ApprovalVoid` detail (engine §4.9, §6) at the engine's next amendment; the page then marks that request. Until then the rule of §4.4.5 holds, and the message itself is always shown |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |
