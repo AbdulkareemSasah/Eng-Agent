@@ -33,9 +33,13 @@ _LOCAL = {
     "conf_max": Cited(value=2.5, unit="1", source="ACI 318-14 25.4.2.3 (limit on (cb + Ktr)/db)"),
     "Ktr": Cited(value=0, unit="mm", source="ACI 318-14 25.4.2.3 (Ktr = 0 permitted as a design simplification)"),
     "ld_min": Cited(value=300, unit="mm", source="ACI 318-14 25.4.2.1(b)"),
-    "psi_t_bottom": Cited(value=1.0, unit="1", source=f"{_T} (casting position, other than top bars)"),
-    "psi_e_uncoated": Cited(value=1.0, unit="1", source=f"{_T} (uncoated reinforcement)"),
-    "psi_s_used": Cited(value=1.0, unit="1", source=f"{_T} (No. 22 and larger row, used for all sizes, plan Q10)"),
+    "psi_t_bottom": Cited(
+        value=1.0, unit="1", source="ACI 318-14 Table 25.4.2.4 (casting position, other than top bars)"
+    ),
+    "psi_e_uncoated": Cited(value=1.0, unit="1", source="ACI 318-14 Table 25.4.2.4 (uncoated reinforcement)"),
+    "psi_s_used": Cited(
+        value=1.0, unit="1", source="ACI 318-14 Table 25.4.2.4 (No. 22 and larger row, used for all sizes, plan Q10)"
+    ),
     "psi_te_max": Cited(value=1.7, unit="1", source="ACI 318-14 25.4.2.4 (limit on the product psi_t*psi_e)"),
 }
 _HALF = Cited(value=2, unit="1", source="Geometry: bar center at db/2; half spacing s/2; column face at c/2")
@@ -66,34 +70,22 @@ class Coating(StrEnum):
     ZINC_EPOXY_DUAL = "zinc_epoxy_dual"
 
 
-def _length() -> Any:
-    return bounded(gt=_LENGTH, unit="mm", ref_capable=True)
-
-
-def _cover() -> Any:
-    return bounded(ge=_COVER, unit="mm", ref_capable=True, engineering_quantity=True)
-
-
-def _strength() -> Any:
-    return bounded(gt=_STRENGTH, unit="MPa", ref_capable=True, engineering_quantity=True)
-
-
 class DevelopmentLengthInputs(CheckInputs):
     """Footing plan, column size, bars per direction, covers and materials (clause spec §3)."""
 
-    Lx_mm: float = _length()
-    Ly_mm: float = _length()
-    cx_mm: float = _length()
-    cy_mm: float = _length()
-    db_x_mm: float = _length()
-    db_y_mm: float = _length()
-    s_x_mm: float = _length()
-    s_y_mm: float = _length()
-    cover_x_mm: float = _cover()
-    cover_y_mm: float = _cover()
-    end_cover_mm: float = _cover()
-    fc_MPa: float = _strength()
-    fy_MPa: float = _strength()
+    Lx_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    Ly_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    cx_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    cy_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    db_x_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    db_y_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    s_x_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    s_y_mm: float = bounded(gt=_LENGTH, unit="mm", ref_capable=True)
+    cover_x_mm: float = bounded(ge=_COVER, unit="mm", ref_capable=True, engineering_quantity=True)
+    cover_y_mm: float = bounded(ge=_COVER, unit="mm", ref_capable=True, engineering_quantity=True)
+    end_cover_mm: float = bounded(ge=_COVER, unit="mm", ref_capable=True, engineering_quantity=True)
+    fc_MPa: float = bounded(gt=_STRENGTH, unit="MPa", ref_capable=True, engineering_quantity=True)
+    fy_MPa: float = bounded(gt=_STRENGTH, unit="MPa", ref_capable=True, engineering_quantity=True)
     concrete_class: ConcreteClass
     coating: Coating
 
