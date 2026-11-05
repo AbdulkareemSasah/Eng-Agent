@@ -322,6 +322,7 @@ tasks:
     depends_on: [T11b, T12]
   - id: T14
     title: ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4)
+    # Amendment (B-412, documents only): the DecisionPort field T14 adds to EnginePorts defaults to None (section 3 rule; plan 0006 T16b binds it in production).
     # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
     # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
     # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
@@ -434,7 +435,8 @@ tasks:
     covers: [AC18, AC19]
     depends_on: [T16]
   - id: T18
-    title: Resource limits, progress sink and the overhead benchmark
+    title: Resource limits, progress sink, run control and the overhead benchmark
+    # Amendment (B-412, documents only): adds the ProgressSink and RunControlPort fields of EnginePorts (None defaults, section 3) and the stop check between steps (spec 4.8 RunControlPort row); budget 220 -> 250.
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -443,12 +445,15 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_resources.py"
       - "packages/eng-harness/tests/unit/test_progress.py"
+      - "packages/eng-harness/tests/unit/test_run_control.py"
       - "packages/eng-harness/tests/perf/test_overhead.py"
-    max_changed_lines: 220
+    # About 30 lines for the run-control field and the check between steps (an estimate, not a measurement).
+    max_changed_lines: 250
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_resources.py::test_limits"
       - "packages/eng-harness/tests/unit/test_progress.py::test_sink_order_and_failure"
+      - "packages/eng-harness/tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps"
       - "packages/eng-harness/tests/perf/test_overhead.py::test_engine_overhead_p95"
     covers: [AC58, AC59, AC60]
     depends_on: [T14b, T17]
@@ -673,7 +678,14 @@ budget 250 lines with it, B-068), and the AST rules test over fixture modules an
 specs add blocks).
 
 **T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the
-overhead benchmark (also listed in `windows_tests`).
+overhead benchmark (also listed in `windows_tests`). Amendment B-412 (spec 0006 pre-flight): no other task wires the
+`RunControlPort`, so T18 adds the `progress` and `run_control` fields to `EnginePorts` (both `None` by default, §3) and
+the check of spec §4.8's `RunControlPort` row: between steps the runner calls `stop_requested(run_id)` when a port is
+given, and true pauses the run with `run_paused`, reason `stop_requested` (spec §4.4.2 event table), returning a paused
+`RunOutcome`. `tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps` uses the fake
+`RunControlPort` of T6 (about 30 lines, hence 220 to 250). No engine acceptance criterion names this behaviour yet;
+adding one is a lead item for the next engine spec amendment. Plan 0006 T16b passes `FileRunControl` here in
+production.
 
 **T19 Crash matrix** (spec AC30). A worker process (`tests/replay/_worker.py`) runs a mixed test workflow and calls
 `os._exit` at each of S-10's four crash points for every step; the test resumes each and compares the fake host's
@@ -697,6 +709,13 @@ applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
   ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19. T14 waits for decision plan T1, T4
   and T5 (the decision port types, spec §4.8), which wait for this plan's T6 and T7; decision plan T7 and T10 wait for
   T14 (T10 also for T14b, the run header's decision runtime), so the order has no cycle.
+- `EnginePorts` fields added after T9 (amendment B-412, from the spec 0006 pre-flight): the merged `EnginePorts` holds
+  tool, host, calc, basis, approvals and inputs. T14 adds `decision` and T18 adds `progress` and `run_control`; each
+  defaults to `None`, so an `EnginePorts` built before the field existed (plan 0006 `cli/_wiring.py`, tests) still
+  builds. `progress` `None` means no sink; `run_control` `None` means no stop request; `decision` `None` means
+  `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
+  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T16b passes
+  all three in production once T14, T14b and T18 have merged.
 
 ## 4. Verification
 

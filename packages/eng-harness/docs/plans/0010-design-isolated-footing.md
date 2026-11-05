@@ -369,7 +369,8 @@ seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sb
 `uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
 allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
 approvals per mode, and registration in `workflows/__init__.py`
-(the module through which the command line of plan 0006 T14 finds workflows; if that task names another module, this
+(the module through which the command line of plan 0006 finds workflows: plan 0006 T14 defines the `CliDeps`
+workflow-registry field and plan 0006 T18 binds its default, amendment B-412; if those tasks name another module, this
 task follows it and the file list is amended).
 
 **T10 SAFE calcs** (spec §4.9 items 2 and 6). Matching, negation, missing patterns, combinations to add; equilibrium by
