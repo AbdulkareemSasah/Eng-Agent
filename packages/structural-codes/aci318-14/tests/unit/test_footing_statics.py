@@ -216,3 +216,91 @@ def test_signs_of_moments_do_not_change_pressures() -> None:
         results.append((steps["q_max_kPa"], steps["q_min_kPa"]))
     assert math.isclose(results[0][0], results[1][0], abs_tol=_EXACT)
     assert math.isclose(results[0][1], results[1][1], abs_tol=_EXACT)
+
+
+# Plan 0002 §2 T2b case R1 (synthetic): Lx != Ly, cx != cy, d_x != d_y, so X and Y are not interchangeable.
+_RECT = {
+    **_FACTORED,
+    "FZ_kN": 1500.0,
+    "Lx_mm": 2000.0,
+    "Ly_mm": 3000.0,
+    "cx_mm": 400.0,
+    "cy_mm": 600.0,
+    "d_x_mm": 450.0,
+    "d_y_mm": 500.0,
+}
+
+
+@pytest.mark.parametrize(
+    ("case", "changes", "mbx", "mby", "q_max", "q_min"),
+    [
+        # R1: q_bend = 100/3.0 + 150/2.0 = 108.333333 kPa (the swapped pairing 100/2.0 + 150/3.0 gives 100 kPa).
+        ("R1", {"MX_kNm": -100.0, "MY_kNm": -150.0}, 100.0, 150.0, 358.333333, 141.666667),
+        # MX only: q_bend = 100/3.0 = 33.333333 kPa (paired with Sy it would be 50 kPa).
+        ("R1-MX", {"MX_kNm": -100.0}, 100.0, 0.0, 283.333333, 216.666667),
+        # MY only: q_bend = 150/2.0 = 75 kPa (paired with Sx it would be 50 kPa).
+        ("R1-MY", {"MY_kNm": -150.0}, 0.0, 150.0, 325.0, 175.0),
+        # R2: Mbx = 0.5*(-100) = -50, Mby = -0.5*200 = -100 kN.m; q_bend = 50/3.0 + 100/2.0 = 66.666667 kPa.
+        ("R2", {"FX_kN": 200.0, "FY_kN": -100.0, "reaction_height_mm": 500.0}, -50.0, -100.0, 316.666667, 183.333333),
+    ],
+)
+def test_rectangular_statics(
+    case: str, changes: dict[str, float], mbx: float, mby: float, q_max: float, q_min: float
+) -> None:
+    """S1, S2 and S5 on a rectangular footing equal the hand values of plan 0002 §2 T2b (PK-AC10)."""
+    model, t = recorder(_Strength, **{**_RECT, **changes})
+    statics(model, t)
+    steps = _steps(t)
+    assert steps["A_mm2"] == pytest.approx(6.0e6, rel=_EXACT)
+    assert steps["Sx_mm3"] == pytest.approx(3.0e9, rel=_EXACT)  # Lx*Ly^2/6 = 2000*3000^2/6
+    assert steps["Sy_mm3"] == pytest.approx(2.0e9, rel=_EXACT)  # Ly*Lx^2/6 = 3000*2000^2/6
+    assert steps["Ix_mm4"] == pytest.approx(4.5e12, rel=_EXACT)  # Lx*Ly^3/12
+    assert steps["Iy_mm4"] == pytest.approx(2.0e12, rel=_EXACT)  # Ly*Lx^3/12
+    assert steps["Mbx_kNm"] == pytest.approx(mbx, abs=_M_KNM), case
+    assert steps["Mby_kNm"] == pytest.approx(mby, abs=_M_KNM), case
+    assert steps["q_avg_kPa"] == pytest.approx(250.0, abs=_P_KPA)  # 1500 kN / 6.0 m2
+    assert steps["q_max_kPa"] == pytest.approx(q_max, abs=_P_KPA), case
+    assert steps["q_min_kPa"] == pytest.approx(q_min, abs=_P_KPA), case
+
+
+@pytest.mark.parametrize(
+    ("case", "changes", "vu", "mu"),
+    [
+        # R1: X uses width Ly, |Mby| and Iy; Y uses width Lx, |Mbx| and Ix (plan 0002 §2 T2b).
+        ("R1", {"MX_kNm": -100.0, "MY_kNm": -150.0}, (327.46875, 385.777778), (292.8, 395.2)),
+        # MX only: X is uniform, Vu_x = 3.0*0.35*250, Mu_x = 3.0*250*0.8^2/2; Y as R1.
+        ("R1-MX", {"MX_kNm": -100.0}, (262.5, 385.777778), (240.0, 395.2)),
+        # MY only: X as R1; Y is uniform, Vu_y = 2.0*0.7*250, Mu_y = 2.0*250*1.2^2/2.
+        ("R1-MY", {"MY_kNm": -150.0}, (327.46875, 350.0), (292.8, 360.0)),
+        # R2 (e = 500 mm, MX = MY = 0): the integrals read the base moments of FS S2, Mbx = -50 and Mby = -100 kN.m
+        # (one-way and flexure specs §4 step 3), not the raw reaction moments, which are zero here.
+        # Vu_x = 3.0*0.35*(250 + 100*0.825/2.0); Vu_y = 2.0*0.7*(250 + 50*1.15/4.5);
+        # Mu_x = 3.0*(250*0.8^2/2 + (100/2.0)*0.234667); Mu_y = 2.0*(250*1.2^2/2 + (50/4.5)*0.792), where
+        # 0.234667 and 0.792 m^3 are the integrals of x*(x - c/2) from the face to the edge.
+        (
+            "R2",
+            {"FX_kN": 200.0, "FY_kN": -100.0, "reaction_height_mm": 500.0},
+            (305.8125, 367.888889),
+            (275.2, 377.6),
+        ),
+    ],
+)
+def test_rectangular_integrals(
+    case: str, changes: dict[str, float], vu: tuple[float, float], mu: tuple[float, float]
+) -> None:
+    """Both integrals in both directions on a rectangular footing equal the hand values (PK-AC10)."""
+    model, t = recorder(_Strength, **{**_RECT, **changes})
+    statics(model, t)
+    assert one_way_shears(t) == pytest.approx(vu, abs=_V_KN), case
+    model, t_m = recorder(_Strength, **{**_RECT, **changes})  # each integral records c_half on its own trace
+    statics(model, t_m)
+    assert face_moments(t_m) == pytest.approx(mu, abs=_M_KNM), case
+    steps = {**_steps(t), **_steps(t_m)}
+    assert steps["Lc_x_mm"] == pytest.approx(350.0, abs=_EXACT)  # 1000 - 200 - 450
+    assert steps["Lc_y_mm"] == pytest.approx(700.0, abs=_EXACT)  # 1500 - 300 - 500
+    assert steps["xbar_x_mm"] == pytest.approx(825.0, abs=_EXACT)  # (200 + 450 + 1000)/2
+    assert steps["xbar_y_mm"] == pytest.approx(1150.0, abs=_EXACT)  # (300 + 500 + 1500)/2
+    assert steps["Lp_x_mm"] == pytest.approx(800.0, abs=_EXACT)  # 1000 - 200
+    assert steps["Lp_y_mm"] == pytest.approx(1200.0, abs=_EXACT)  # 1500 - 300
+    assert (steps["Vu_x_kN"], steps["Vu_y_kN"]) == pytest.approx(vu, abs=_V_KN), case
+    assert (steps["Mu_x_kNm"], steps["Mu_y_kNm"]) == pytest.approx(mu, abs=_M_KNM), case
