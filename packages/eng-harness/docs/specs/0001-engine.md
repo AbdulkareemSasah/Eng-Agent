@@ -867,6 +867,17 @@ the same `CalcInfo` (its `status` is the check's lifecycle state) and is subject
 run refuses a check that is not `approved` with `CalcRefused`. Block code imports no pack: blocks reach code-pack
 checks only through `ctx.calc`.
 
+**Synchronous and asynchronous methods; the shapes left open above** (amendment B-390, as built by engine T6, B-105).
+A method that waits on a host program or a person is `async`: every `ToolPort` method except `unreleased_tools` and
+`supports_reconcile`, every `HostPort` method except `session_epoch` and `model_files`, and the `ApprovalPort` and
+`InputPort` methods. `CalcPort`, `BasisPort`, `ProgressSink` and `RunControlPort` are synchronous, as is
+`DecisionPort.runtime_summary`; the rest of `DecisionPort` is settled by engine T14. `ModelKey` is a plain `str`, and
+`ToolPort.call`'s `model` is a model key or `None` (not `ModelHandle`, which belongs to `eng_harness.ctx`, a module the
+ports must not import). `HostLease` is (`host_key`, `lease_id`). `UnitsState.present` and `expected` are unit-system
+names (strings). `ApprovalRequest` carries, beside the fields of §4.9, `preview_ref`, `shown_sha256`, `binding` (a tuple
+of `ModelBinding`) and `items`. `ApprovalAnswer` checks that each rejected item has a reason and every reason's length
+(§4.9); that each key of `item_reasons` names an item of the request is checked by the engine, which holds the request.
+
 **Decision port types.** `DecisionCall`, `EngineerChoice`, `DecisionAnswer` and `PendingAnswer` have one owner: spec
 0005 §4.5, built in `eng_harness.decisions.interfaces` (decision plan T5), with `DecisionCall.sensitive_values`
 (§4.9.1). `eng_harness.ports` imports them from there for the `DecisionPort` signature and re-exports them; it defines
