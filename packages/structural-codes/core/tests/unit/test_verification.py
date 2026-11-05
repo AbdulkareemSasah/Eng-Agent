@@ -1,5 +1,6 @@
 """Tests of the case files, the tolerance and the verification runner (plan 0001 T9; spec 0001 AC30 to AC32, 4.9)."""
 
+import dataclasses
 import importlib
 import sys
 from collections.abc import Iterator
@@ -383,6 +384,22 @@ def test_boundary_paths(registry: Registry) -> None:
     assert [u[:3] for u in report.unmet] == ["(3)"]
     assert "G-3" in report.unmet[0]
     assert _unmet(doc(_GAP, covering("BD-G3", "G-3", width=10, status="NEEDS_ENGINEER")), registry, _GAP) == []
+
+
+def test_verify_check_requires_the_registry_to_hold_that_check(registry: Registry) -> None:
+    sized = registry.get(_SIZED)
+    other = dataclasses.replace(sized, preconditions=())  # same id, a different copy
+    cases = _load(_verified_doc(registry))
+    with pytest.raises(VerificationDataError, match="registry does not hold"):
+        verify_check(other, cases, registry=registry)
+    with pytest.raises(VerificationDataError, match="registry does not hold"):
+        verify_check(sized, cases, registry=Registry.of([]))
+
+
+def test_covers_is_for_boundary_cases_only() -> None:
+    for kind, source in (("hand_check", {"derivation": "by hand"}), ("worked_example", _BOOK)):
+        with pytest.raises(VerificationDataError, match="covers is only for boundary"):
+            _load(_doc(_case("C-1", kind, source=source, covers=["P1"])))
 
 
 def test_verify_pack(registry: Registry) -> None:
