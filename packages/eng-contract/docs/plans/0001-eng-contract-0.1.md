@@ -315,6 +315,36 @@ tasks:
     tests_first: ["packages/eng-contract/tests/contract/test_schema_snapshots.py::test_fresh"]
     covers: [AC51, AC52, AC53]
     depends_on: [T15, T11b, T14b]
+  - id: T17
+    title: "Regression tests: Quantity equality with a non-Quantity and the dimension in the hash (spec 4.8 rules 3, 5)"
+    # Amendment (B-391, documents only): the B-015 review found two surviving mutants. The tests pass against the merged
+    # code, so this is a test-only pull request (title type test: no non-test file, no failing-first run; gate spec
+    # 4.7). It replaces part of PR 151 (B-095), which mixed spec, code and tests without a plan task.
+    files:
+      - "packages/eng-contract/tests/unit/test_quantity.py"
+    max_changed_lines: 10
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-contract/tests/unit/test_quantity.py::test_eq_with_non_quantity_is_not_implemented"
+      - "packages/eng-contract/tests/unit/test_quantity.py::test_hash_includes_dimension"
+    covers: [AC35a]
+    depends_on: [T16]
+  - id: T18
+    title: "RefInput validates with RefString; make_success documents CanonicalJsonError; the quantity comment cites rule 4"
+    # Amendment (B-391, documents only): follow-ups of the B-017 review (RefInput kept a local pattern without newlines
+    # in the pointer), the B-016 review (make_success raises CanonicalJsonError undocumented) and the B-015 review (the
+    # comment on the comparison key predates amendment B-069), with the changelog corrections of PR 151 (B-084, B-095).
+    files:
+      - "packages/eng-contract/src/eng_contract/envelope.py"
+      - "packages/eng-contract/src/eng_contract/quantity.py"
+      - "packages/eng-contract/docs/schema/**"
+      - "packages/eng-contract/tests/unit/test_envelope.py"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-contract/tests/unit/test_envelope.py::test_ref_input_uses_ref_string"
+    covers: [AC9a]
+    depends_on: [T16]
 ---
 
 # Implementation plan: eng-contract 0.1

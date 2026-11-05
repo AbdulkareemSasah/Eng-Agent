@@ -38,7 +38,7 @@ class FakeCoverage:
         self.json_exit = json_exit
         self.calls: list[tuple[list[str], Path]] = []
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append((list(argv), cwd))
         if "json" in argv:
             if self.json_exit == 0:

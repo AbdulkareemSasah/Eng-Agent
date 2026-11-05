@@ -30,7 +30,7 @@ class FakeRunner:
             return "types"
         return "format" if "format" in argv else "lint"
 
-    def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+    def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
         self.calls.append((list(argv), cwd))
         return ToolResult(exit_code=self.codes.get(self.key(argv), 0), output=self.output)
 
@@ -106,7 +106,7 @@ def test_tool_crash_is_an_environment_error(repo: Repo) -> None:
     assert _run(repo, FakeRunner({"types": 2})).code == 3
 
     class Missing:
-        def run(self, argv: Sequence[str], cwd: Path) -> ToolResult:
+        def run(self, argv: Sequence[str], cwd: Path, *, timeout_seconds: float | None = None) -> ToolResult:
             raise EnvironmentFaultError(f"{argv[0]} is not installed")
 
     assert repo.run(["check"], {"check": make_handler(Missing())}).code == 3
