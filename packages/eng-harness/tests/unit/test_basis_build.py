@@ -14,6 +14,7 @@ from eng_harness.basis import (
     BasisDraft,
     BasisInvalid,
     DetectedValue,
+    EngineerEntry,
     EngineerValues,
     FieldSpec,
     build_draft,
@@ -68,7 +69,7 @@ def _specs(**changes: Any) -> tuple[FieldSpec, ...]:
 
 
 def _values(path: str, value: Any, unit: str | None = None) -> EngineerValues:
-    return EngineerValues(name="syn", values={path: {"value": value, "unit": unit}})
+    return EngineerValues(name="syn", values={path: EngineerEntry(value=value, unit=unit)})
 
 
 def _detected(path: str, value: Any, unit: str | None = None) -> DetectedValue:
