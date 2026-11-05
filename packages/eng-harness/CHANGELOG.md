@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Edit-cycle kinds: `eng_harness.kinds.edit_cycle` (`harness.change_set_check/1`, `harness.analysis_summary/1`, `harness.csi_name_lists/1`) registered in `eng_harness._kinds` (plan 0007 T1a, B-195; spec 0007 AC3).
 - Basis setup interface: `BasisSetupView`, `BasisSetupAnswer` (confirmed sections or a rejection, no member that carries a value, extra members refused), `BasisSetupPort` and `build_setup_view` in `eng_harness.basis` (plan 0004 T7, B-161; spec 0004 AC26, AC27).
 - ctx types and the result codec: `eng_harness.ctx` (`ToolResult`, `ReadResult`, `CalcResult`, `Decision`, `Answered`, `Approval`, `ApprovalKind`, `Preview`, `PreviewItem`, `Attempt`, `ModelHandle`, `Promotion`, `ArgValue`, `DecisionRequest`, `BasisCount` and `BasisView` with `ref`, `quantity`, `count`, `choice`) and `engine/_codec.py` (canonical round trip, then `Quantity` rebuilt); the `Ctx` protocol follows with the calls (plan 0001 T7, B-106; spec 0001 AC11, AC17).
 - Calc kinds part 2: payload models of `harness.design_summary/1`, `harness.section_size/1`, `harness.placement_comparison/1` and `harness.readback_check/1` registered in `eng_harness.kinds.calcs` (plan 0003 T4b, B-380; spec 0003 AC47).

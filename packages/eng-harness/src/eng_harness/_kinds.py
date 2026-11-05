@@ -4,6 +4,7 @@ from eng_contract.kinds import NEUTRAL_KINDS
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness.kinds.calcs import CALC_KINDS
+from eng_harness.kinds.edit_cycle import EDIT_CYCLE_KINDS
 
 
 class Value(BaseModel):
@@ -20,12 +21,16 @@ class ApprovalPreview(BaseModel):
     model_config = ConfigDict(extra="allow", allow_inf_nan=False)
 
 
-HARNESS_KINDS = NEUTRAL_KINDS.extend(
-    {
-        "harness.journal_blob/1": Value,
-        "harness.run_input/1": Value,
-        "harness.run_output/1": Value,
-        "harness.approval_preview/1": ApprovalPreview,
-    }
-).extend(CALC_KINDS)
-"""The neutral kinds, the four harness kinds and the calc kinds (spec 0003 4.6 to 4.11)."""
+HARNESS_KINDS = (
+    NEUTRAL_KINDS.extend(
+        {
+            "harness.journal_blob/1": Value,
+            "harness.run_input/1": Value,
+            "harness.run_output/1": Value,
+            "harness.approval_preview/1": ApprovalPreview,
+        }
+    )
+    .extend(CALC_KINDS)
+    .extend(EDIT_CYCLE_KINDS)
+)
+"""The neutral kinds, the four harness kinds and the calc kinds (spec 0003 4.6 to 4.11) and the edit-cycle kinds."""
