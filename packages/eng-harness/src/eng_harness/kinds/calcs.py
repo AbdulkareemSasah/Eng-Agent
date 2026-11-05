@@ -8,6 +8,7 @@ Errors: `pydantic.ValidationError` for every violated rule.
 
 from collections import Counter
 from collections.abc import Iterable
+from fractions import Fraction
 from typing import Annotated, Any, Literal, Self
 
 from eng_contract.ids import ModelId, ResultId
@@ -15,7 +16,7 @@ from eng_contract.kinds import NEUTRAL_KINDS
 from eng_contract.quantity import Quantity
 from eng_contract.refs import RefString
 from eng_contract.trace import Trace
-from eng_contract.verdicts import VerdictStatus
+from eng_contract.verdicts import HOST_CHECK_ID, SubjectKind, VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from eng_harness.calc import CalcStatus
@@ -288,10 +289,13 @@ class ReadbackCheck(CalcPayload):
         return self
 
 
+_CheckId = Annotated[str, StringConstraints(pattern=HOST_CHECK_ID, max_length=200)]
+
+
 class _Key(_P):
-    subject_kind: _Str
+    subject_kind: SubjectKind
     subject_id: _Str
-    check_id: _Str
+    check_id: _CheckId
 
 
 class VerdictRow(_Key):
@@ -302,6 +306,15 @@ class VerdictRow(_Key):
     ratio: _Ratio
     ratio_limit: Annotated[float, Field(gt=0)]
     status: VerdictStatus
+
+    @model_validator(mode="after")
+    def _ratio_agrees(self) -> Self:
+        if self.status in (VerdictStatus.PASS, VerdictStatus.FAIL):
+            if self.ratio is None:
+                raise ValueError(f"status {self.status.value} requires a ratio")
+            if (self.ratio <= self.ratio_limit) != (self.status is VerdictStatus.PASS):
+                raise ValueError(f"status {self.status.value} contradicts ratio and ratio_limit")
+        return self
 
 
 class Member(_Key):
@@ -323,9 +336,15 @@ class MemberChange(_Key):
 class GroupRow(_P):
     """The governing verdict of one subject kind and check id."""
 
-    subject_kind: _Str
-    check_id: _Str
+    subject_kind: SubjectKind
+    check_id: _CheckId
     row: VerdictRow
+
+    @model_validator(mode="after")
+    def _row_in_group(self) -> Self:
+        if (self.row.subject_kind, self.row.check_id) != (self.subject_kind, self.check_id):
+            raise ValueError("row does not match its group (subject_kind, check_id)")
+        return self
 
 
 class SubjectRef(_P):
@@ -405,6 +424,7 @@ class DesignSummary(CalcPayload):
         if ratios != sorted(ratios, reverse=True):
             raise ValueError("failing must be sorted by ratio, descending")
         _ordered([(m.subject_kind, m.subject_id, m.check_id) for m in self.members], "members")
+        _ordered([(g.subject_kind, g.check_id) for g in self.governing_by_group], "governing_by_group")
         _ordered(self.not_designed, "not_designed")
         _ordered([(s.kind, s.id) for s in self.failing_members], "failing_members")
         if c[VerdictStatus.FAIL]:
@@ -431,6 +451,13 @@ class SectionSize(CalcPayload):
     def _check(self) -> Self:
         if {self.required.unit, self.increment.unit, self.size.unit} != {"mm"}:
             raise ValueError("required, increment and size must be in mm")
+        required, increment, size = (Fraction(q.value) for q in (self.required, self.increment, self.size))
+        if size != self.multiple * increment:
+            raise ValueError("size must be multiple times increment (N2)")
+        if size < required:
+            raise ValueError("size must be at least required (N2)")
+        if size - required >= increment:
+            raise ValueError("size must be less than required plus increment (N2)")
         return self
 
 
