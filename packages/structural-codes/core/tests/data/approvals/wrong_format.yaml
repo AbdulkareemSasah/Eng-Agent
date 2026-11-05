@@ -1,0 +1,21 @@
+format: structural-codes-approvals/2
+approvals:
+  - check_id: synthbase.3_1.sized
+    content_sha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    kind: approved
+    approver: owner
+    date: 2026-11-05
+    verification_record: docs/verification/synthbase/synthbase.3_1.sized.md
+    pull_request: https://example.invalid/pull/1
+  - check_id: synthover.s4_1.two_pre
+    content_sha256: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    kind: inherited-confirmed
+    approver: owner
+    date: "2026-11-06"
+    verification_record: docs/verification/synthover/synthover.s4_1.two_pre.md
+    pull_request: https://example.invalid/pull/2
+withdrawn:
+  - check_id: synthbase.4_1.two_pre
+    reason: synthetic withdrawal reason
+    issue: https://example.invalid/issues/3
+    date: 2026-11-07
