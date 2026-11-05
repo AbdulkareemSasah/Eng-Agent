@@ -77,7 +77,8 @@ class Suggestion(Frozen):
     ]
     choice: str | None
     confidence: float | None = Field(default=None, ge=0.0, le=1.0, allow_inf_nan=False)
-    rationale: Rationale | None = None
+    # Serialized as "rationale" (spec 4.9); gate rule FB006 accepts only a bare Rationale type on that name.
+    reasoning: Rationale | None = Field(default=None, alias="rationale")
     latency_ms: int = Field(ge=0)
     shadow: bool
     code: SuggestionCode | None = None

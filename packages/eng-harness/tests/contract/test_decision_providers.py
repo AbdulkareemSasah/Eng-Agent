@@ -163,7 +163,8 @@ def test_port_models_shape() -> None:
     assert set(PendingAnswer.model_fields) == {"request_id", "batch_id", "screen", "rejected"}
     assert set(EngineerChoice.model_fields) == {"choice", "by", "answered_at"}
     assert "items" in DecisionScreen.model_fields
-    assert set(Suggestion.model_fields) >= {"tier", "by", "outcome", "choice", "confidence", "rationale", "shadow"}
+    assert {"tier", "by", "outcome", "choice", "confidence", "reasoning", "shadow"} <= set(Suggestion.model_fields)
+    assert Suggestion.model_fields["reasoning"].alias == "rationale"
     with pytest.raises(ValidationError):
         Suggestion.model_validate(
             {"tier": 2, "by": "model:p/m@1", "outcome": "bogus", "choice": None, "latency_ms": 1, "shadow": True}
