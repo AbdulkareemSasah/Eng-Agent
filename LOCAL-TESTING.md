@@ -45,9 +45,9 @@ Today you can run section 1, section 2 (the spikes) and the items in section 7 t
 |---|---|---|
 | `uv sync`, `uv run pytest`, `uv run eng-gate check` | the workspace root and `tools/eng-dev-gate` | yes |
 | `uv run --script spikes/S-02-.../s02_run.py`, same for S-04 (spikes: small test scripts, see 'Spike' above) | [spikes/](spikes/) | yes |
-| `eng-harness doctor` | [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §4.9, [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1 | no |
+| `eng-harness doctor` | [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §4.9, [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.2.1 | the command exists; it answers "not available in this build" (exit 2) |
 | Record mode | [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §4.8 | no |
-| `eng-harness run`, `resume`, `status`, `stop`, `report` | spec 0006 | no |
+| `eng-harness run`, `resume`, `status`, `stop`, `report` | spec 0006 | the command exists (parser, configuration, exit codes); each answers "not available in this build" (exit 2) |
 | The workflow `model_edit_cycle` | [spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) | no |
 
 ---
@@ -313,7 +313,7 @@ S-08 IDEA ([spec 0014](packages/eng-harness/docs/specs/0014-idea-adapter.md) §1
 
 ## 3. The harness settings and the environment check
 
-*(Everything in this section is used by `eng-harness`, which is not merged yet. Nothing here is needed for section 2.)*
+*(Everything in this section is used by `eng-harness`. The `eng-harness` command exists on `build/v1` (plan 0006 task T3), but every command answers "not available in this build" until its task has merged. Nothing here is needed for section 2.)*
 
 ### 3.1 The workspace and `harness.toml`
 
@@ -376,8 +376,8 @@ Things to know:
 
 ### 3.2 The environment check (`doctor`)
 
-*(Available once eng-harness plan 0002 task T18 and plan 0006 tasks T3 and T16 have merged; check BUILD-STATUS.md.
-The `eng-harness` command does not exist on `build/v1` yet.)*
+*(Available once eng-harness plan 0002 task T18 and plan 0006 task T16 have merged; check BUILD-STATUS.md.
+The `eng-harness` command exists on `build/v1` (plan 0006 task T3), but `doctor` answers "command doctor is not available in this build" with exit code 2 until then.)*
 
 `doctor` checks that the machine is ready. It changes nothing. Per [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md)
 §4.9 it reports one line per check, each `ok`, `warn`, `fail` or `skip`:
@@ -776,10 +776,11 @@ handled as a `type/bug` issue labeled `risk/r1-engineering` ([process/10](design
 
 ## 7. Everything marked "needs local test", by package
 
-Each package keeps its detailed list in its own `docs/local-testing.md`. Two exist now:
-[packages/eng-contract/docs/local-testing.md](packages/eng-contract/docs/local-testing.md) and
-[tools/eng-dev-gate/docs/local-testing.md](tools/eng-dev-gate/docs/local-testing.md). The files for eng-harness and
-structural-codes do not exist yet; their plan tasks create them. Until then the sources below are the specs and plans (Open points, item 11). If you find an
+Each package keeps its detailed list in its own `docs/local-testing.md`. All four exist now:
+[packages/eng-contract/docs/local-testing.md](packages/eng-contract/docs/local-testing.md),
+[tools/eng-dev-gate/docs/local-testing.md](tools/eng-dev-gate/docs/local-testing.md),
+[packages/eng-harness/docs/local-testing.md](packages/eng-harness/docs/local-testing.md) and
+[packages/structural-codes/docs/local-testing.md](packages/structural-codes/docs/local-testing.md). Where a package list does not cover a plan yet, the sources below are the specs and plans (Open points, item 11). If you find an
 item in this list that is wrong or missing, tell the agent.
 
 Marker: **[H]** needs a host program, **[N]** needs the network or a key only, **[M]** needs your machine only (disk,
@@ -794,9 +795,15 @@ CI" section. Two steps cannot run there. Run them on your machine before `build/
 - [N] The dependency audit. From the repository folder, run `uv audit --locked`. What you should see: no known
   vulnerability reported. It needs the network: it asks the OSV vulnerability database (osv.dev), which the build
   container may not contact. If it reports a vulnerability, send its output to the agent.
-- [M] The windows job. From the repository folder, run `uv sync --all-packages`, then `uv run eng-gate windows-tests`.
-  What you should see: the command ends without a failed test (exit code 0). It runs the Windows-only tests of every
-  package, the ones marked `windows`. If a test fails, report it as section 6 describes.
+- [M] The windows job. From the repository folder, run `uv sync --all-packages`, then `uv run eng-gate windows-tests`,
+  then `uv run --script spikes/S-10-replay/windows_check.py` (the job's second step, the Windows spike checks). What you
+  should see: each command ends without a failed test or case (exit code 0). `eng-gate windows-tests` runs the
+  Windows-only tests of every package, the ones marked `windows`. A `SKIPPED` line from the spike script means it did
+  not run on Windows: it is not a Windows result. If a test or case fails, report it as section 6 describes.
+  For eng-harness the job currently stops with ST001 (`windows_tests path 'tests/perf' does not exist`) before running
+  anything, and it never runs the run-lock test in `tests/unit`. Until that is fixed, run
+  `uv run pytest tests/windows -m windows` and `uv run pytest tests/unit/test_journal_reader.py -m windows` from
+  `packages/eng-harness` (7.3).
 
 If GitHub Actions works again, you can instead re-run CI on the final `build/v1` on GitHub: the `windows` job runs on
 pushes to `build/v1`.
@@ -808,31 +815,67 @@ Source: [packages/eng-contract/docs/local-testing.md](packages/eng-contract/docs
 - [M] The Windows workspace probe: `ENG_WORKSPACE` inside OneDrive (also a Files On-Demand folder) is refused; a
   mapped network drive or UNC path is refused; a fixed local drive resolves as local. From the repository folder (the one where you ran `uv sync`), run
   `uv run pytest -m windows packages/eng-contract/tests/windows`. What you should see: no test reported as failed. A
-  local drive that is refused shows up as a failed test: report the drive type and file system.
+  local drive that is refused shows up as a failed test: report the drive type and file system. With `ENG_WORKSPACE`
+  unset, the default workspace `%LOCALAPPDATA%\eng\workspaces\default` (classified by the real Windows probe) must also
+  resolve as local; if it is refused, report the path and the refusal reason.
   See also [spec 0001](packages/eng-contract/docs/specs/0001-eng-contract-0.1.md) Q2 and
   [plan 0001](packages/eng-contract/docs/plans/0001-eng-contract-0.1.md).
+- [M] The result store and the model state on a real Windows disk: from the repository folder run
+  `uv run pytest packages/eng-contract/tests/unit/test_store.py packages/eng-contract/tests/unit/test_model_state.py`.
+  What you should see: no test reported as failed. A record is committed with `os.rename` (refuses an existing file), a
+  state file is rewritten with `os.replace`; a virus scanner or indexer holding a freshly written file is retried (0.05,
+  0.1, 0.2 s), and a persistent lock gives `StoreWriteError`. If a test fails, report it as section 6 describes.
+- [M] The schema snapshots on a Windows clone: from the repository folder run
+  `uv run pytest packages/eng-contract/tests/contract/test_schema_snapshots.py`. What you should see: no test reported
+  as failed. A clone with `core.autocrlf=true` (the Git for Windows default) has CRLF line endings in `docs/schema`, and
+  `test_fresh` then fails; if it does, report it with the output of `git config core.autocrlf`.
 - [H] Meaning of `Ton` in the CSI unit names (metric tonne-force or short ton-force). Until confirmed from CSI
-  documentation or a live check, those four unit systems are refused:
-  [spec 0001](packages/eng-contract/docs/specs/0001-eng-contract-0.1.md), gap G-1.
+  documentation or a live check, those three unit systems (`Ton_mm_C`, `Ton_m_C`, `Ton_cm_C`) are refused:
+  [spec 0001](packages/eng-contract/docs/specs/0001-eng-contract-0.1.md), gap G-1;
+  [units verification](packages/eng-contract/docs/verification/units.md).
 
 ### 7.2 tools/eng-dev-gate
 
-Source: [tools/eng-dev-gate/docs/local-testing.md](tools/eng-dev-gate/docs/local-testing.md). No host program. Almost
-all items need a real GitHub Actions run, not your machine: the composite actions, the `windows` job, the security
-job, the `gate-check`, `test-first`, `review` jobs, the base-commit gate, and the mutation step (which refuses to run
-on Windows, ADR-0002). The merge of `build/v1` into `main` is yours after the local tests
+Source: [tools/eng-dev-gate/docs/local-testing.md](tools/eng-dev-gate/docs/local-testing.md). No host program. Most items
+need a real GitHub Actions run, not your machine: the composite actions and the jobs (`gate`, `gate-check`,
+`risk-floor`, `test-first`, `ci-review`, `security`, `build`, `agents-drift`, `windows`), the base-commit gate, and the
+approvals port with bootstrap off (not wired in the CI files yet). GitHub Actions has not run for this repository since
+2026-11-04 (7.0). Local CI ran the same commands in the build container ([BUILD-STATUS.md](BUILD-STATUS.md) D-23), so
+what is left is how Actions itself runs them. Two items are for your Windows machine:
+
+- [M] The gate on Windows (spec 4.1: it runs on Linux and Windows, the owner's machine). Every test of this package ran
+  on Linux only; none carries the `windows` marker and the package declares no `windows_tests`, so neither the
+  `windows` job nor `uv run eng-gate windows-tests` covers it. From the repository folder run
+  `uv sync --all-packages`, then `uv run eng-gate check --all`, then `uv run pytest tools/eng-dev-gate/tests`. What you
+  should see: `check --all` ends without a failed step, and the tests end without a failed test. Differences to watch
+  for (spec section 8): path separators in findings; CRLF line endings in the checkout (the repository has no
+  `.gitattributes`); the temporary `git worktree` of `test-first`; the `PYTHONPATH` of its base run (joined with
+  `os.pathsep`). Report a failing step or test as section 6 describes.
+- [M] The mutation step on Windows (ADR-0002). The `windows` job never runs the mutation step, so no CI job can confirm
+  the Windows statement. After a change to an R1 or R2 module of a package, run
+  `uv run eng-gate mutation --package <name> --base <commit>`. What you should see: the notice MU002 "mutmut has no
+  native Windows support (ADR-0002)" without a failure; with the environment variable `CI` set, exit code 3. This shows
+  only the gate's own branch; mutmut's own refusal on Windows was not run.
+
+The merge of `build/v1` into `main` is yours after the local tests
 ([spec](tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) AW06).
 
 ### 7.3 eng-harness
 
-Package list (to be created): `packages/eng-harness/docs/local-testing.md`. Sources by area:
+Package list: [packages/eng-harness/docs/local-testing.md](packages/eng-harness/docs/local-testing.md) (exists now; so far it holds plans 0001, 0002 and 0004 and the opener of plan 0006). Sources by area, including the plans it does not cover yet:
 
 **Engine** ([plan 0001](packages/eng-harness/docs/plans/0001-engine.md) §4 "Needs local test"; the last item below comes from [spec 0001](packages/eng-harness/docs/specs/0001-engine.md) Q11):
 - [M] The overhead benchmark and the fsync cost on your disk with antivirus active, against the engine target.
-- [M] The run lock is released after killing the engine from Task Manager.
+- [M] The run lock on Windows. From `packages/eng-harness`, run `uv run pytest tests/unit/test_journal_reader.py -m windows`.
+  What you should see: no failed test (a second holder is refused, release frees the lock, `is_locked` agrees). This
+  test lives in `tests/unit`, so the `windows` job of 7.0 does not run it, and it has never run on Windows. Then kill the
+  engine from Task Manager and check that the lock is released (`is_locked` is False and a new `RunLock` can be taken).
+- [M] The journal on a Windows run folder whose path has a drive letter, spaces and Arabic characters: `JournalReader` (a
+  read-only SQLite URI built from the path) opens a journal that a `JournalWriter` in another process is writing in WAL
+  mode, verifies the chain, and sees new events. Only POSIX temporary paths were tested.
 - [M] A resume after a forced power-off of a virtual machine.
 - [M] File-copy promotion onto a folder you use, including a target file open in another program.
-- [H] Reconciliation by model reads after a crash during a write on a Sasaah server, where the repeated write could apply twice without idempotency ([spec 0001](packages/eng-harness/docs/specs/0001-engine.md) §8, Risks; S-10 open risk). Availability: eng-harness engine code is not merged yet; the crash path is [plan 0001](packages/eng-harness/docs/plans/0001-engine.md) (AC30) and the per-tool reconciliation rules are [plan 0002](packages/eng-harness/docs/plans/0002-servers-and-adapters.md) task T14.
+- [H] Reconciliation by model reads after a crash during a write on a Sasaah server, where the repeated write could apply twice without idempotency ([spec 0001](packages/eng-harness/docs/specs/0001-engine.md) §8, Risks; S-10 open risk). Availability: the journal, run lock, ports and result codec are merged; the crash path is [plan 0001](packages/eng-harness/docs/plans/0001-engine.md) (AC30) and the per-tool reconciliation rules are [plan 0002](packages/eng-harness/docs/plans/0002-servers-and-adapters.md) task T14, and neither is merged yet.
 - [M] Saving the working copy after every write step may cost seconds on ETABS ([spec 0001](packages/eng-harness/docs/specs/0001-engine.md) Q11; measure with S-02).
 
 **Servers and adapters, CSI/ETABS** ([spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §12, items 1 to 13):
@@ -854,6 +897,19 @@ Package list (to be created): `packages/eng-harness/docs/local-testing.md`. Sour
     build-artifact hash (needs AutoCAD and Python; see the [S-12 report](spikes/S-12-sasaah-tool-inventory/REPORT.md)).
 12. [H] `eng-harness doctor` on your machine, including the integrity level and installed products.
 13. [H] Record mode on a copy, and your review of the recordings before commit.
+- [M] The Windows launcher and process inspector (package list, item 13). From `packages/eng-harness`, run
+  `uv run pytest tests/windows -m windows`. What you should see: no failed test. These tests start real processes in real
+  Job Objects, and they have never run on Windows (the container ran only the fake-kernel32 ones). They cover: suspended
+  create, assign and resume; kill-on-close; the breakaway cases (a process started by a server with silent breakaway
+  survives the job closing and the engine ending); a tool job refusing breakaway; independent jobs; process identity by
+  pid and creation time; `terminate` refusing a wrong start time; children and snapshot. Run them with your antivirus
+  and endpoint tools active, from your usual terminal or scheduler (Job Object nesting).
+- [H] `ProcessTransport` and `ServerManager` on Windows with the real Sasaah server (package list, item 14): the MCP
+  handshake on the launcher's pipes, a complete uncached `tools/list`, a call that outlasts the client backstop, a
+  server killed during a call (read and write codes, restart, re-attach by pid), and a shutdown that ends the server on
+  end-of-file of its standard input without ending a running host program. Only the Linux fakes have run it.
+  Availability: `ServerManager` builds `PosixLauncher()` when no launcher is passed (`servers/_session.py`), and nothing
+  in `src` selects the Windows launcher yet, so this check waits for the engine wiring in a later task of plan 0002.
 Also: gap H-G2, load directions other than gravity ([spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md) §11).
 
 **Calcs** ([spec 0003](packages/eng-harness/docs/specs/0003-calcs.md) L-1 to L-3, [plan 0003](packages/eng-harness/docs/plans/0003-calcs.md) §4):
@@ -864,7 +920,10 @@ Also: gap H-G2, load directions other than gravity ([spec 0002](packages/eng-har
 
 **Templates and basis** ([plan 0004](packages/eng-harness/docs/plans/0004-templates-and-basis.md) §4):
 - [M] A values file and the approval page used on a real template.
-- [M] A template written by hand in the user folder (path, encoding, line endings on Windows).
+- [M] A template written by hand in the user folder (path, encoding, line endings on Windows), and one whose file name
+  differs from its `meta.name` only in case (for example `Blank-0.1.0.template.yaml` holding `name: blank`). NTFS ignores
+  case, so `TemplateRepository.get` finds that file while `list` refuses it as `meta_invalid`. Report what each does. The
+  build tested a case-sensitive file system only.
 
 **Decisions** ([plan 0005](packages/eng-harness/docs/plans/0005-decisions.md) §4):
 - [M] The rule-decision timing and the cost of a label write on your disk with antivirus active.
@@ -879,6 +938,13 @@ Also: gap H-G2, load directions other than gravity ([spec 0002](packages/eng-har
    `report`.
 4. [H] Expected times and the heartbeat on a real analysis run (needs spec 0007 and the Sasaah servers).
 5. [M] Opening the launch address through the default browser when the default is not Chromium-based.
+6. [M] The launch-address opener (spec 0006 AC61): on Windows it opens the address in your default browser
+   (`os.startfile`) and ignores a `BROWSER` variable set to another program; the address is written only to your console
+   window (`CONOUT$`), and with no console nothing is printed on standard output or error. Only fakes were tested.
+   See the package list, item 15.
+7. [M] `harness.toml` written by hand on Windows: saved from Notepad as UTF-8 with and without a byte-order mark, and
+   with CRLF line endings. `eng-harness status` must not answer `configuration error` (until plan 0006 adds the
+   commands it answers that the command is not available in this build). Only UTF-8 files without a mark were tested.
 
 **Model edit cycle** ([spec 0007](packages/eng-harness/docs/specs/0007-model-edit-cycle.md) §12; section 5 of this guide):
 1. [H] A full cycle on a copy of a real model with ETABS 22 and the pinned `sasaah-csi-mcp` build ([plan 0007](packages/eng-harness/docs/plans/0007-model-edit-cycle.md), live acceptance), with the reply fields of `csi_design_results` (steel and concrete) and
@@ -951,15 +1017,26 @@ programs (rows marked `PC-1`, "program comparison") are listed here; each clause
 | Punching shear | SAFE | Punching ratio of the HC-1 footing | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.22_6_5_2.punching_shear.md) |
 | Flexure at the column face | SAFE | Strip moment at the column face | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.13_2_7_1.flexure_at_column_face.md) |
 | Minimum flexural reinforcement | SAFE | Minimum steel in footing strips | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.8_6_1_1.min_flexural_reinforcement.md) |
-| Reaction sign convention | ETABS or SAFE | Signs of `FX`, `FY`, `MX`, `MY` in joint reactions | [plan 0002](packages/structural-codes/docs/plans/0002-aci318-14-footing-checks.md) §4 |
+| Development length, bottom bars | SAFE or ETABS | Confirm (from the program documentation or a live look) that neither program reports a development length for footing bars, so the case file may state `program_comparison.not_available` (plan 0002 §6 Q11); if one does, a PC-1 comparison is owed | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.25_4_2_3.development_length_bottom_bars.md) |
+| Reaction sign convention | ETABS or SAFE | Signs of `FZ` (positive upward under gravity, so `N = FZ` is compression) and of `FX`, `FY`, `MX`, `MY` in joint reactions, which the merged shared footing statics (`aci318_14._footing`, FS S2 and S3) combine with the reaction height | [plan 0002](packages/structural-codes/docs/plans/0002-aci318-14-footing-checks.md) §4; [bearing clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.13_3_1_1.bearing_pressure_service.md) §4.1 |
 | Maximum axial strength | ETABS | Axial capacity of the common section | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.22_4_2_1.max_axial_strength.md) |
 | Axial-flexure, uniaxial | ETABS | Capacity ratio of a short uniaxial column | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.22_4_1_1.axial_flexure_uniaxial.md) |
 | Longitudinal reinforcement limits | ETABS | Ratio limits applied by concrete frame design | [clause](packages/structural-codes/docs/clauses/aci318_14/aci318_14.10_6_1_1.longitudinal_reinforcement_limits.md) |
 | Force sign convention | ETABS | Sign of `P` and axes of `M2`, `M3` | [plan 0004](packages/structural-codes/docs/plans/0004-aci318-14-column-checks.md) §4 |
 
-These rows exist so that you can compare a worked check with the program. They cannot be run until the packs and a
-way to run a check against a host model exist (not on `build/v1` yet). The checks stay draft until you approve them
-([BUILD-STATUS.md](BUILD-STATUS.md) owner queue).
+These rows exist so that you can compare a worked check with the program. They cannot be run until the pack checks
+([plan 0002](packages/structural-codes/docs/plans/0002-aci318-14-footing-checks.md) T3 to T8,
+[plan 0004](packages/structural-codes/docs/plans/0004-aci318-14-column-checks.md)) and a way to run a check against a
+host model exist. Neither is on `build/v1` yet; only the shared footing statics, the verification runner and the
+`needs_local_test` case state are (the `verify` command, core plan T12, is not). The checks stay draft until you approve
+them ([BUILD-STATUS.md](BUILD-STATUS.md) owner queue).
+
+A comparison row becomes evidence only through its case file: the case of kind `program_comparison` stays `pending`
+("needs local test") while its `source.status` is `needs_local_test`; after your run it names `program`,
+`program_version`, a `record` (the path of a live acceptance record, [process/05](design/process/05-testing-and-verification.md)
+§6) and its `assumption_differences`, with the program's numbers as the expected values. Until every such case passes,
+the check is not reported `verified` (core [spec 0001](packages/structural-codes/docs/specs/0001-core-framework.md)
+§4.9.4, condition 2). No acceptance script writes these records yet (Open points, item 14).
 
 ### 7.5 Spikes
 
@@ -967,8 +1044,8 @@ way to run a check against a host model exist (not on `build/v1` yet). The check
 |---|---|---|
 | S-02 | Section 2.1 of this guide | [README](spikes/S-02-analysis-design/README.md) |
 | S-04 | Section 2.2 of this guide | [README](spikes/S-04-model-state/README.md) |
-| S-10 | Windows evidence came from a CI run. Open: a run on a local workstation with antivirus; the journal speed on your disk (`bench.py`); host programs leaving a server's job | [report](spikes/S-10-replay/REPORT.md), Open risks |
-| S-12 | The static inventory must be compared with a live `tools/list` at the first local run; the poll behaviour during analysis; session state after a worker recycle; the frame load direction codes; the late-bound `spec` keys; table keys for read-backs; bridge-plugin unit handling; the double send on a Revit bridge error; regenerate the inventory with the Sasaah Agent tool-manifest exporter and compare it with the static inventory ([BUILD-STATUS.md](BUILD-STATUS.md) OQ-Q5) | [report](spikes/S-12-sasaah-tool-inventory/REPORT.md) |
+| S-10 | Windows evidence came from a CI run (2026-11-03, `windows-latest`). Open: run `uv run --script spikes/S-10-replay/windows_check.py` on your workstation with antivirus and check that the engine-exit cases of `assign_after` and `suspended` report processes tracked (on the runner they tracked 0, which proves nothing, and the script still passes when nothing is tracked); the journal speed on your disk (`bench.py`); host programs leaving a server's job (no case in `windows_check.py` yet). Power loss and reconciliation on a real Sasaah server: see 7.3, Engine | [report](spikes/S-10-replay/REPORT.md), Open risks |
+| S-12 | The static inventory must be compared with a live `tools/list` at the first local run, including the `serverInfo` that MCP initialize returns by default (the CSI server sets none); the poll behaviour during analysis; session state after a worker recycle; the frame load direction codes and the unmapped direction of `csi_set_frame_load_point`; the units left unrestored after a timeout (S12-G9); whether `csi_results_*` marks the model modified (SelectOutput); the late-bound `spec` keys; table keys for read-backs, including `Analysis Messages` and `Project Information`; bridge-plugin unit handling; the double send on a Revit bridge error; the Revit `code` toolset user setting; `tools/dxf-prep/prepare.ps1` (needs AutoCAD 2023 `accoreconsole` and Python on the PATH); regenerate the inventory with the Sasaah Agent tool-manifest exporter and compare it with the static inventory ([BUILD-STATUS.md](BUILD-STATUS.md) OQ-Q5) | [report](spikes/S-12-sasaah-tool-inventory/REPORT.md) |
 | S-05, S-07, S-08 | Revit, Jev and IDEA readiness: see 7.3 | specs 0011, 0009, 0014 |
 
 ### 7.6 products/
@@ -1019,8 +1096,10 @@ Each is something this guide needs but the documents do not define, with the fil
 10. **Run class for acceptance.** Calcs ship draft; `production` refuses them; this guide uses `trial`. The owner's
     approval route (`approvals.yaml`) and when to switch to `production` is for the owner.
     [spec 0003](packages/eng-harness/docs/specs/0003-calcs.md) Q10; [spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) Q7.
-11. **Package `docs/local-testing.md` files.** The files for eng-harness and structural-codes do not exist yet;
-    section 7 must be reconciled with them when their plan tasks create them.
+11. **Package `docs/local-testing.md` files.** All four exist. The eng-harness file holds so far plans 0001, 0002 and
+    0004 and the opener of plan 0006; section 7.3 must be reconciled with it as the remaining plan tasks add their parts.
+    The structural-codes file lacks the four column rows of section 7.4, which
+    [plan 0004](packages/structural-codes/docs/plans/0004-aci318-14-column-checks.md) T5 adds.
 12. **Committing recordings.** The repository documents do not say how the owner commits recordings to the protected
     path `acceptance/recordings/` (git installation, branch `build/v1`, the commit message form, the push). Git is not
     listed in 1.2 because no document requires you to use it. Until this is defined, the agent states the procedure at
@@ -1028,3 +1107,7 @@ Each is something this guide needs but the documents do not define, with the fil
 13. **`--no-wait` and basis confirmation.** Resolved by amendment B-354: there is no deferred basis confirmation; a
     workflow with required basis fields is started by a waiting `run`, and `--no-wait` exits 10 and stores nothing
     ([spec 0006](packages/eng-harness/docs/specs/0006-cli-progress-pages-report.md) §4.4.7, AC47).
+14. **Acceptance records for program comparisons.** A `program_comparison` case points to an acceptance record that a
+    live acceptance script writes ([process/05](design/process/05-testing-and-verification.md) §6), but no script or
+    procedure for the PC-1 rows of section 7.4 is planned. [plan 0002](packages/structural-codes/docs/plans/0002-aci318-14-footing-checks.md)
+    §4 and [plan 0004](packages/structural-codes/docs/plans/0004-aci318-14-column-checks.md) §4.
