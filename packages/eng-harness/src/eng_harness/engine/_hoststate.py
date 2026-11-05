@@ -164,16 +164,20 @@ async def _resolve(rt: Resume, f: Fold, key: str, reason: str, detail: str) -> N
 
 
 async def _restore(rt: Resume, f: Fold, key: str, seq: int) -> None:
-    """Restore the last save of `key` (journaled at `seq`); the steps after it run again as new attempts."""
+    """Restore the last save of `key` (journaled at `seq`); the steps after it run again as new attempts.
+
+    The cut is journaled first: a process that dies after the host restored the model finds the steps after the save
+    undone whatever else was journaled, so none is reconciled against or compared with the restored model (4.5.4).
+    """
     was, old = f.saved[key][1], f.bound[key]
     kept = was.model_dump(include={"model_id", "revision", "fingerprint", "file_sha256", "file_name"})
     instance = await rt.host.restore(key, SavedModel.model_validate(kept))
-    if instance.instance_id != old.instance_id:  # an instance the server started for the restore
-        rt.writer.append(EventType.HOST_STARTED, {"host_key": old.host_key, **instance.model_dump(mode="json")})
-    bind(rt.writer, rt.host, key, old.host_key, instance.instance_id, "restored")
     # a second `run_resumed` with this resume's number cuts the steps after the save (the first came before the check)
     cut = {"resume_no": rt.number, "code_hash_changed": False, "servers": [], "restored_to_seq": seq}
     rt.writer.append(EventType.RUN_RESUMED, cut)
+    if instance.instance_id != old.instance_id:  # an instance the server started for the restore
+        rt.writer.append(EventType.HOST_STARTED, {"host_key": old.host_key, **instance.model_dump(mode="json")})
+    bind(rt.writer, rt.host, key, old.host_key, instance.instance_id, "restored")
     await _units(rt, "units_restored", key, instance.instance_id, must_load=True)
     for step in f.pending():  # a write in flight after the save is never reconciled against the restored model
         if step.seq > seq and step.began.model_key == key:
