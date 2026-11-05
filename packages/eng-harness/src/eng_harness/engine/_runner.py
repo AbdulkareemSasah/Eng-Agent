@@ -1,7 +1,8 @@
 """The run engine: `Engine.start` and `Engine.resume` (spec 0001 4.4.4, 4.5.1, 4.5.2; plan 0001 T9, T9b).
 
 Purpose: validate a request, hold the run lock, journal the run header, run the root block and return how it ended.
-Resume runs steps 1 to 3 and 9 of spec 4.5.1 (the others follow in T11b and T13); the ctx calls are in `_ctx_impl.py`.
+Resume runs steps 1 to 3, 7 and 9 of spec 4.5.1 (the others follow in T11c and T13); the ctx calls are in
+`_ctx_impl.py`.
 Units: none; durations in ms. Errors: `ContractError`, `RunRefused`, `RunLocked`, `JournalIntegrityError`; a stop of the
 block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
@@ -26,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
+from eng_harness.engine import _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
@@ -179,7 +181,10 @@ class Engine:
                 return await self._drive(workflow, inp, run_id, writer, [])
 
     async def resume(self, run_id: str) -> RunOutcome:
-        """Resume the run (steps 1 to 3 and 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
+        """Resume the run (steps 1 to 3, 7 and 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
+
+        A write in flight is reconciled and a read in flight gets `step_rerun` before the block runs; a stop for the
+        engineer returns `NEEDS_ENGINEER`, an abandoned run `FAILED`.
 
         Raises:
             ContractError: `INVALID_ARGUMENT` for a run id that names no run, or a workflow that is not registered.
@@ -203,7 +208,17 @@ class Engine:
                 except errors.ReplayDivergence as stop:
                     return self._escalate(run_id, writer, "replay_divergence", stop)
                 writer.append(EventType.RUN_RESUMED, self._resumed(workflow, head, events))
-                return await self._drive(workflow, inp, run_id, writer, events)  # step 9 (4 to 8: T11b)
+                ports = self._ports
+                rt = _inflight.Resume(
+                    run_dir, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
+                    writer,
+                )  # fmt: skip
+                try:  # steps 4 to 6 and 8: T13 and T11c; step 7: spec 4.5.3
+                    await _inflight.reconcile(rt)
+                except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
+                    status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
+                    return RunOutcome(run_id, status, escalation=stop.escalated)
+                return await self._drive(workflow, inp, run_id, writer, rt.events())  # step 9
 
     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
@@ -256,6 +271,7 @@ class Engine:
         ctx = Ctx(
             ports.tool, ports.calc, self._store, self._settings, self._clock, self._producer, run_id, writer, events
         )
+        ctx.index = _inflight.ResumeIndex(events)
         try:
             with root_scope():
                 out = await workflow.fn(ctx, inp)
