@@ -4,8 +4,8 @@
 Units: suffixes name the unit (`_mm`, `_mm2`, `_kN`); ratios are dimensionless. Errors: `pydantic.ValidationError`.
 """
 
-from collections.abc import Iterable
-from typing import Annotated, Literal, Self
+from collections.abc import Iterable, Sequence
+from typing import Annotated, Any, Literal, Self
 
 from eng_contract.verdicts import VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
@@ -99,26 +99,25 @@ class DesignRow(DimRow):
     reaction_height_mm: Annotated[float, Field(ge=0)]
 
 
-class FootingDims(CalcPayload):
+class _ByFooting(CalcPayload):
+    footings: Sequence[Any]
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        _ordered((f.id for f in self.footings), "footings")
+        return self
+
+
+class FootingDims(_ByFooting):
     """`harness.footing_dims/1`."""
 
     footings: list[DimRow]
 
-    @model_validator(mode="after")
-    def _check(self) -> Self:
-        _ordered((f.id for f in self.footings), "footings")
-        return self
 
-
-class FootingDesign(CalcPayload):
+class FootingDesign(_ByFooting):
     """`harness.footing_design/1`."""
 
     footings: list[DesignRow]
-
-    @model_validator(mode="after")
-    def _check(self) -> Self:
-        _ordered((f.id for f in self.footings), "footings")
-        return self
 
 
 class Family(_P):
@@ -187,15 +186,10 @@ class StatusRow(_Closed):
         return self
 
 
-class FootingStatus(CalcPayload):
+class FootingStatus(_ByFooting):
     """`harness.footing_status/1`."""
 
     footings: list[StatusRow]
-
-    @model_validator(mode="after")
-    def _check(self) -> Self:
-        _ordered((f.id for f in self.footings), "footings")
-        return self
 
 
 class ScheduleRow(_Closed):
