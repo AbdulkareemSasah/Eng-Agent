@@ -9,13 +9,14 @@ from eng_contract.envelope import FailureEnvelope, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
-from eng_harness.calcs.footing.subjects import BASIS_FIELDS, SubjectsInput, footing_subjects
+from pydantic import JsonValue
 
 from eng_harness._calc._approvals import ApprovalsFile
 from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.footing.subjects import BASIS_FIELDS, SubjectsInput, footing_subjects
 from eng_harness.kinds.footing import FootingSubjects
 from eng_harness.ports import RunClass
 
@@ -151,7 +152,9 @@ def test_run_through_the_calc_port(tmp_path: Path) -> None:
     store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
     producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0)
     case = load_cases("subjects")["subjects-basic"]
-    args = {name: {"$ref": store.put(kind, case.input[name], producer).result_id} for name, kind in KINDS.items()}
+    args: dict[str, JsonValue] = {
+        name: {"$ref": store.put(kind, case.input[name], producer).result_id} for name, kind in KINDS.items()
+    }
     approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
     port = HarnessCalcPort(
         REGISTRY,

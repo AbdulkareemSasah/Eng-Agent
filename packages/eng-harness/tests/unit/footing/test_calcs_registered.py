@@ -7,12 +7,12 @@ from types import ModuleType
 
 import pytest
 from eng_contract.cited import Cited
-from eng_harness.calcs.footing import FOOTING_CALCS
-from eng_harness.calcs.footing import subjects as subjects_module
 
 from eng_harness._calc import _hash
 from eng_harness.calc import CalcStatus
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.footing import FOOTING_CALCS
+from eng_harness.calcs.footing import subjects as subjects_module
 
 ROOT = Path(__file__).resolve().parents[3]
 CALCS = {  # calc id -> (module, output kind, spec section naming its method)

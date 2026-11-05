@@ -1,4 +1,10 @@
 {
-  "calcs": [],
+  "calcs": [
+    {
+      "content_sha256": "c0eb4153af2c85338c4a464fbabb71a4fac907bb15bdb73903f0016a2b5f6033",
+      "id": "harness.footing_subjects",
+      "version": 1
+    }
+  ],
   "schema": 1
 }

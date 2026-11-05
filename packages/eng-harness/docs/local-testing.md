@@ -28,3 +28,6 @@ Plan 0004 (templates and basis; completed by T9). Nothing here runs in CI:
 
 Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 15. `eng_harness.cli._opener.open_address` opens the launch address in the default browser on Windows (`os.startfile`), macOS and Linux with `BROWSER` set to a capture program (it must not run), and `write_to_terminal` reaches the controlling terminal (`CONOUT$`, `/dev/tty`); with no terminal it returns False and nothing is printed on stdout or stderr.
+
+Plan 0010 T3 (footing subjects; spec 0010 section 12 L2). Needs the real ETABS model; nothing here runs in CI:
+16. `harness.footing_subjects` on a copy of a real model: which of a rectangular column section's `b_mm` and `h_mm` lies along local axis 2 at rotation zero (the calc maps `cx = b`, `cy = h` for rotations near 0 and 180 degrees), the `rotation_deg` values the adapter reports for rotated columns, and which joints report reactions.
