@@ -189,7 +189,14 @@ def test_stored_basis_immutable(store: ResultStore, clock: FixedClock, tmp_path:
     assert port.load(third.ref).basis.fields[DRIFT].value == 0.25
     producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=AT, duration_ms=0)
     blob = store.put("harness.journal_blob/1", {"value": 1}, producer)
-    for ref, reason in ((blob.result_id, "not_a_basis"), (UNKNOWN_ID, "not_found"), ("nonsense", "not_found")):
+    inside = f"{first.result_id}#/fields/x"
+    cases = (
+        (blob.result_id, "not_a_basis"),
+        (inside, "not_found"),
+        (UNKNOWN_ID, "not_found"),
+        ("nonsense", "not_found"),
+    )
+    for ref, reason in cases:
         with pytest.raises(BasisInvalid) as caught:
             port.load(ref)
         assert caught.value.reason == reason

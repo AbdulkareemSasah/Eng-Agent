@@ -8,6 +8,8 @@ Errors: `BasisNotConfirmed` (reasons `draft_changed`, `section_incomplete`, `not
 `BasisIncomplete` (`paths`), `BasisInvalid` (`field_invalid`); all carry contract code INVALID_ARGUMENT.
 """
 
+# ruff: noqa: N818  # B-162: names fixed by spec 0004 section 6
+
 from typing import Annotated, Literal
 
 from eng_contract.envelope import LiteralInput, Provenance
@@ -26,7 +28,7 @@ NotConfirmedReason = Literal["draft_changed", "section_incomplete", "nothing_con
 KIND = "basis.design_basis/1"
 
 
-class BasisNotConfirmed(ContractError):  # noqa: N818  # B-162: the name is fixed by spec 0004 section 6
+class BasisNotConfirmed(ContractError):
     """The answer does not confirm this draft; `reason` is the key."""
 
     def __init__(self, reason: NotConfirmedReason) -> None:
@@ -35,7 +37,7 @@ class BasisNotConfirmed(ContractError):  # noqa: N818  # B-162: the name is fixe
         super().__init__(ErrorCode.INVALID_ARGUMENT, f"basis not confirmed: {reason}")
 
 
-class BasisIncomplete(ContractError):  # noqa: N818  # B-162: the name matches the engine code BASIS_INCOMPLETE
+class BasisIncomplete(ContractError):
     """A required field is missing or a present field is unconfirmed; `paths` lists them."""
 
     def __init__(self, paths: tuple[str, ...]) -> None:
