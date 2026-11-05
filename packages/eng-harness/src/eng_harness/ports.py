@@ -1,14 +1,11 @@
 """Ports of the run engine and their data types (spec 0001 sections 4.8, 4.9, 4.9.1).
 
-Purpose: every port is a `typing.Protocol`; adapters (spec 0002), calcs (0003), the basis (0004) and the pages (0006)
-implement them, and the in-memory fakes of `tests/fakes/` stand in for them in tests. Results of host tools are
-contract `Envelope`s. Port data types are frozen Pydantic models with `extra="forbid"`.
-Units: none here; model state carries counters and hashes only. Time stamps are contract `Timestamp`s.
-Errors: methods raise `ContractError` for contract conditions (for example `INVALID_ARGUMENT` for a tool outside the
-allowlist); a `CalcPort` raises `CalcRefused`; invalid data raises `pydantic.ValidationError`.
-Async: methods that wait on a host, a person or the store are `async`; methods that read held state are synchronous.
-Not here: `DecisionPort` (plan task T14, after the decision types exist) and `ToolPort.preview` (needs `Preview` of
-`eng_harness.ctx`, plan task T7).
+Purpose: each port is a `typing.Protocol` implemented by adapters (0002), calcs (0003), the basis (0004) and the pages
+(0006); fakes in `tests/fakes/` stand in for tests. Host results are contract `Envelope`s; data types are frozen
+Pydantic models. Units: none (counters, hashes, `Timestamp`s). Errors: `ContractError` for contract conditions,
+`CalcRefused` from a CalcPort, `pydantic.ValidationError` for invalid data. Methods that wait on a host or a person
+are `async`; methods that read held state are synchronous. Not here: `DecisionPort` (plan T14) and `ToolPort.preview`
+(needs `Preview` of `eng_harness.ctx`, plan T7).
 """
 
 from collections.abc import Mapping, Sequence
@@ -26,32 +23,14 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints,
 from eng_harness.calc import CalcStatus
 from eng_harness.journal import Event
 
+# fmt: off
 __all__ = [
-    "ApprovalAnswer",
-    "ApprovalPort",
-    "ApprovalRequest",
-    "BasisPort",
-    "CalcInfo",
-    "CalcPort",
-    "HostInstance",
-    "HostLease",
-    "HostModelState",
-    "HostPort",
-    "InputAnswer",
-    "InputPort",
-    "InputRequest",
-    "LoadedBasis",
-    "ModelBinding",
-    "ProgressSink",
-    "Reconciliation",
-    "RunClass",
-    "RunControlPort",
-    "SavedModel",
-    "ServerCheck",
-    "ToolInfo",
-    "ToolPort",
-    "UnitsState",
+    "ApprovalAnswer", "ApprovalPort", "ApprovalRequest", "BasisPort", "CalcInfo", "CalcPort", "HostInstance",
+    "HostLease", "HostModelState", "HostPort", "InputAnswer", "InputPort", "InputRequest", "LoadedBasis",
+    "ModelBinding", "ProgressSink", "Reconciliation", "RunClass", "RunControlPort", "SavedModel", "ServerCheck",
+    "ToolInfo", "ToolPort", "UnitsState",
 ]
+# fmt: on
 
 _Sha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 _Obj = Mapping[str, JsonValue]
@@ -266,27 +245,21 @@ class ToolPort(Protocol):
 
     async def describe(self, tool: str) -> ToolInfo:
         """Return the tool's info; `ContractError` `INVALID_ARGUMENT` for a tool outside the allowlist."""
-        ...
 
     def unreleased_tools(self) -> Mapping[str, str]:
         """Tool name to the record of its project-lane work (ADR-0026 section 3); empty when all are released."""
-        ...
 
     async def call(self, tool: str, args: _Obj, *, op_id: str, model: str | None) -> Envelope:
         """Call `tool` for the model `model` (a model key or `None`); `op_id` makes the call reconcilable."""
-        ...
 
     def supports_reconcile(self, tool: str) -> bool:
         """True when `reconcile` can decide the outcome of a lost call of `tool`."""
-        ...
 
     async def reconcile(self, tool: str, args: _Obj, op_id: str) -> Reconciliation:
         """Decide whether the call with `op_id` took effect."""
-        ...
 
     async def read_back(self, tool: str, args: _Obj) -> Envelope | None:
         """Read the state a write would produce, or `None` when the adapter has no read-back for `tool`."""
-        ...
 
 
 class HostPort(Protocol):
@@ -294,59 +267,45 @@ class HostPort(Protocol):
 
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
         """Check each server against its minimum build."""
-        ...
 
     async def acquire(self, host_key: str) -> HostLease:
         """Lease the host's server group; `HOST_LOCKED` when held elsewhere."""
-        ...
 
     async def release(self, lease: HostLease) -> None:
         """Release a lease."""
-        ...
 
     def session_epoch(self, host_key: str) -> int:
         """Counter that grows on timeout, crash, restart or reconnect of the host's servers."""
-        ...
 
     async def locate(self, model_key: str) -> HostInstance | None:
         """The bound instance that holds the model, or `None`."""
-        ...
 
     async def model_state(self, model_key: str, instance_id: str) -> HostModelState:
         """State in `instance_id`; never raises for an instance that lacks the model: `loaded` is false."""
-        ...
 
     async def check_model(self, model_key: str) -> Envelope:
         """Run the model check (`issues.model_check/1`)."""
-        ...
 
     async def save(self, model_key: str, role: str) -> SavedModel:
         """Save the model under `role`."""
-        ...
 
     async def read_units(self, model_key: str, instance_id: str) -> UnitsState:
         """Units of the model in `instance_id`; never raises for an instance that lacks the model."""
-        ...
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         """Copy the model into `folder`, open the copy and return its model key."""
-        ...
 
     async def restore(self, model_key: str, saved: SavedModel) -> HostInstance:
         """Open `saved` for `model_key` and return the instance that holds it."""
-        ...
 
     def model_files(self, model_key: str) -> tuple[Path, ...]:
         """The files of the model."""
-        ...
 
     async def started_instances(self, host_key: str) -> list[HostInstance]:
         """Instances this run started on the host."""
-        ...
 
     async def close_started(self, host_key: str, instances: Sequence[HostInstance]) -> None:
         """Close the given instances."""
-        ...
 
 
 class CalcPort(Protocol):
@@ -355,15 +314,12 @@ class CalcPort(Protocol):
     @property
     def run_class(self) -> RunClass:
         """The run class given at construction; it does not change."""
-        ...
 
     def describe(self, calc_id: str) -> CalcInfo:
         """Return the calc's info."""
-        ...
 
     def run(self, calc_id: str, args: _Obj) -> Envelope:
         """Run a calc; raises `CalcRefused` for a calc not approved in a production run, or withdrawn."""
-        ...
 
 
 class BasisPort(Protocol):
@@ -371,7 +327,6 @@ class BasisPort(Protocol):
 
     def load(self, basis_ref: str) -> LoadedBasis:
         """Load the `basis.design_basis/1` result named by `basis_ref`."""
-        ...
 
 
 class ApprovalPort(Protocol):
@@ -379,11 +334,9 @@ class ApprovalPort(Protocol):
 
     async def present(self, request: ApprovalRequest) -> None:
         """Show the request."""
-        ...
 
     async def answer(self, request_id: str, *, wait: bool) -> ApprovalAnswer | None:
         """The answer, or `None` when there is none (the engine pauses)."""
-        ...
 
 
 class InputPort(Protocol):
@@ -391,11 +344,9 @@ class InputPort(Protocol):
 
     async def present(self, request: InputRequest) -> None:
         """Show the request."""
-        ...
 
     async def answer(self, request_id: str, *, wait: bool) -> InputAnswer | None:
         """The answer, or `None` when there is none (the engine pauses)."""
-        ...
 
 
 class ProgressSink(Protocol):
@@ -403,7 +354,6 @@ class ProgressSink(Protocol):
 
     def emit(self, event: Event) -> None:
         """Synchronous; must not block."""
-        ...
 
 
 class RunControlPort(Protocol):
@@ -411,4 +361,3 @@ class RunControlPort(Protocol):
 
     def stop_requested(self, run_id: str) -> bool:
         """True when the run should pause (checked between steps)."""
-        ...

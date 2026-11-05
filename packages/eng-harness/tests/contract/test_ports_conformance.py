@@ -269,3 +269,28 @@ def test_data_types_enforce_spec_rules() -> None:
     )
     assert SavedModel.model_fields.keys() >= {"model_id", "revision", "fingerprint", "file_sha256", "file_name"}
     assert [c.value for c in RunClass] == ["trial", "production"]
+
+
+def test_model_rules_boundaries() -> None:
+    """Spec 4.8 and 4.9: boundaries of the data-type rules, the schema hash and the default `overwrites_original`."""
+    assert ToolInfo(name="t", effect="read", action="plain", host_key="h").overwrites_original({"a": 1}) is False
+    loaded = HostModelState(loaded=True, model_id="mdl_" + "0" * 26, revision=0, fingerprint="f", file_sha256=SHA)
+    assert loaded.revision == 0
+    assert UnitsState(loaded=False, ok=True, present=None, expected="u").loaded is False
+    with pytest.raises(ValidationError):
+        UnitsState(loaded=False, ok=True, present="u", expected="u")
+    longest = ApprovalAnswer(
+        request_id="a", shown_sha256=SHA, decision="reject", rejected_items=("x",), item_reasons={"x": "r" * 500},
+        by="engineer:a",
+    )  # fmt: skip
+    assert longest.rejected_items == ("x",)
+    with pytest.raises(ValidationError):
+        ApprovalAnswer(
+            request_id="a", shown_sha256=SHA, decision="reject", rejected_items=("x",), item_reasons={"x": "r" * 501},
+            by="engineer:a",
+        )  # fmt: skip
+    one = InputRequest(request_id="i", kind="block", title="t", fields_schema={"x-eng-input": "data"})
+    two = InputRequest(request_id="i", kind="block", title="t", fields_schema={"x-eng-input": "choice"})
+    assert one.fields_schema_sha256 != two.fields_schema_sha256
+    assert len(one.fields_schema_sha256) == 64
+    assert InputAnswer(request_id="i", shown_sha256=SHA, by="e", choices={"q": "a"}).values is None
