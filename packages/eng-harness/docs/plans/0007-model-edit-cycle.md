@@ -43,10 +43,12 @@ tasks:
     depends_on: [T1a]
   - id: T2
     title: Calc harness.change_set_check (resolve, validate, conflicts, refused kinds)
+    # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2, no discovery); the bounds paths are the unit-suffixed names of spec 4.8.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.change_set_check (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
@@ -63,10 +65,12 @@ tasks:
     depends_on: [T1b]
   - id: T3
     title: Calc harness.expected_effects (projection of a resolved change set)
+    # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2); after T2, which edits the same file.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/expected_effects.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.expected_effects.md"
@@ -82,10 +86,12 @@ tasks:
     depends_on: [T2]
   - id: T4
     title: Calcs harness.host_design_verdicts and harness.analysis_summary
+    # Amendment (B-417, documents only): calcs/__init__.py registers both calcs in REGISTRY (spec 0003 4.2); depends on T3 so that T2, T3 and T4 edit the shared registry files in turn; reads limits.ratio_limit_ratio (spec 4.8).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.analysis_summary and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/host_design_verdicts.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/analysis_summary.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
@@ -101,7 +107,7 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases"
     covers: [AC30]
-    depends_on: [T1b]
+    depends_on: [T3]
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
     # Amendment (B-415, documents only): the CSI ToolInfo implements saves_new_file (true for as_new_revision and
@@ -157,28 +163,35 @@ tasks:
     depends_on: []
   - id: T7
     title: Decision points and rules of the edit cycle
+    # Amendment (B-417, documents only): found by spec 0005 discovery (decisions._points.discover() over eng_harness.workflows, decisions._rules.discover() over eng_harness.rules), so no decisions/ file changes; rule tests move to tests/rules/test_edit_cycle.py (spec 0005 AC12); the two phase-1 tests of tests/unit/decisions/test_points.py and two of tests/unit/decisions/test_rules.py are isolated from the shipped package; point and rule names follow spec 0005 AC1 and AC9.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.edit_cycle, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_points.py"
+      - "packages/eng-harness/src/eng_harness/rules/__init__.py"  # empty package marker; listed because AC10c covers only tests/ (amendment B-417)
       - "packages/eng-harness/src/eng_harness/rules/edit_cycle.py"
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
-      - "packages/eng-harness/tests/unit/edit_cycle/test_rules.py"
-    max_changed_lines: 240
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py"
+      - "packages/eng-harness/tests/unit/decisions/test_points.py"  # isolates the two phase-1 discovery tests from the shipped points (amendment B-417)
+      - "packages/eng-harness/tests/unit/decisions/test_rules.py"  # isolates two phase-1 discovery tests from the shipped rules and points (amendment B-417)
+    max_changed_lines: 260
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/unit/edit_cycle/test_rules.py::test_rules_typical_and_boundary"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_pass_typical"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_pass_boundary"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_typical"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_boundary"
     covers: [AC18]
     depends_on: [T1b]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
+    # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
-      - "packages/eng-harness/src/eng_harness/blocks.lock.json"
       - "packages/eng-harness/src/eng_harness/templates/shipped/blank-0.1.0.template.yaml"
       - "packages/eng-harness/tests/data/golden/shipped_templates.json"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
@@ -201,10 +214,13 @@ tasks:
     covers: [AC1, AC2, AC10, AC11, AC13, AC17, AC24]
     depends_on: [T2, T3, T5, T6, T7]
   - id: T9
-    title: Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop
+    title: Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off), the cycle loop and registration
+    # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/block.py"
+      - "packages/eng-harness/src/eng_harness/workflows/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_finish.py"
@@ -216,9 +232,12 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py"
-    max_changed_lines: 380
+      - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
+      - "packages/eng-harness/tests/unit/test_block.py"  # isolates test_main_writes_the_lock from the shipped blocks (amendment B-417)
+    max_changed_lines: 400
     max_sessions: 3
     tests_first:
+      - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_registered"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py::test_one_cycle_step_sequence"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py::test_cycle_limit"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval"
@@ -234,7 +253,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_promote_and_conflict"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode"
-    covers: [AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23, AC34]
+    covers: [AC1, AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23, AC34]
     depends_on: [T4, T8]
   - id: T10
     title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
@@ -281,17 +300,18 @@ tasks:
     depends_on: [T9, T10]
   - id: T12
     title: Replay test and crash matrix of the workflow (A6)
+    # Amendment (B-417, documents only): folder renamed from tests/replay/edit_cycle/ so that its package name differs from tests/unit/edit_cycle/ (mypy duplicate module); no tests/replay/__init__.py.
     files:
       - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/tests/replay/edit_cycle/__init__.py"
-      - "packages/eng-harness/tests/replay/edit_cycle/test_replay.py"
-      - "packages/eng-harness/tests/replay/edit_cycle/test_crash_matrix.py"
+      - "packages/eng-harness/tests/replay/edit_cycle_replay/__init__.py"
+      - "packages/eng-harness/tests/replay/edit_cycle_replay/test_replay.py"
+      - "packages/eng-harness/tests/replay/edit_cycle_replay/test_crash_matrix.py"
       - "packages/eng-harness/tests/data/journals/edit_cycle/**"
     max_changed_lines: 60
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/replay/edit_cycle/test_crash_matrix.py::test_every_step"
-      - "packages/eng-harness/tests/replay/edit_cycle/test_replay.py::test_recorded_journal_replays"
+      - "packages/eng-harness/tests/replay/edit_cycle_replay/test_crash_matrix.py::test_every_step"
+      - "packages/eng-harness/tests/replay/edit_cycle_replay/test_replay.py::test_recorded_journal_replays"
     covers: [AC27, AC28]
     depends_on: [T9]
 ---
@@ -330,14 +350,20 @@ the former T1 is split because it measured 562 lines against 320 (B-195).
 **T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names,
 duplicates, bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources, conflicts with
 engineer changes, and every refused kind with its gap id. A verification record from the spec 0003 template, for the
-owner. Calc ships `draft`.
+owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through `calcs/__init__.py`
+(spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it; the bounds are the
+unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`, `bounds.area_load_min_kPa`,
+`bounds.ratio_min_ratio` and their `_max` pairs).
 
 **T3 `harness.expected_effects`** (spec §4.4.2). The projection per kind, golden cases per kind and a property test
-for item order. Ships `draft`.
+for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTRY` through `calcs/__init__.py`,
+after T2.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
-`limits.ratio_limit`; concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
-EC-G3). Golden cases with synthetic replies whose field names follow the S-12 inventory. Ship `draft`.
+`limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
+EC-G3). Golden cases with synthetic replies whose field names follow the S-12 inventory. Ship `draft`. Amendment
+(B-417): registers both calcs in `REGISTRY` through `calcs/__init__.py`; it depends on T3 so that T2, T3 and T4 edit
+`calcs/__init__.py`, `calcs/edit_cycle/__init__.py` and `calcs.lock.json` one after another.
 
 **T5 Adapter additions** (spec §4.10, Q1). `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages`
 and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no escape hatch: each composes allowlisted
@@ -358,21 +384,63 @@ Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`,
 package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
 `tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
 
-**T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules (`rb.pass`,
-`am.clean`) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review.
+**T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules
+(`edit_cycle_readback_result.pass`, `edit_cycle_analysis_messages.clean`; the point names `edit_cycle_readback_result`,
+`edit_cycle_analysis_messages` and `edit_cycle_engineer_turn` pass spec 0005 AC1, which allows no dot, and each rule id
+starts with its point name, spec 0005 AC9; amendment B-417) with typical and boundary tests, lock entries. Rules ship `draft` for the owner's review. Amendment
+(B-417): the points and rules are found by the discovery of spec 0005 (amendment B-411): `decisions._points.discover()`
+imports every module under `eng_harness.workflows`, so the module-level `DecisionPoint` objects of
+`workflows/model_edit_cycle/_points.py` enter the real point registry, and `decisions._rules.discover()` imports every
+module under `eng_harness.rules`, so the rules of `rules/edit_cycle.py` enter the real rule registry. The task edits no
+file of `decisions/`; it regenerates `decisions.lock.json` and `rules.lock.json` with
+`uv run python -m eng_harness.decisions --write-lock` (spec 0005 §4.4). The task creates `rules/__init__.py` as an empty
+package marker and lists it in its files: the gate's empty-marker exception (gate spec AC10c) covers only `tests/`,
+not `src/`, so the file is in scope only because the task names it. The rule tests are `tests/rules/test_edit_cycle.py` with
+`test_pass_typical`, `test_pass_boundary`, `test_clean_typical` and `test_clean_boundary` (spec AC18, spec 0005 AC12,
+whose `missing_rule_tests` looks for exactly these names); the test module imports `eng_harness.rules.edit_cycle` at
+module level, so it fails at the merge base for the right reason (TF004). Once the three points exist, two merged
+phase-1 tests of `tests/unit/decisions/test_points.py` (plan 0005 T2) would fail, because they pin an empty discovery
+against the real package: `test_discover_is_empty_without_workflows` asserts `discover().points == ()`, and
+`test_main_requires_write_lock_flag_and_writes` runs `main(["--write-lock"])`, which writes `discover()`, and expects an
+empty lock. The task therefore lists that file and rewrites both tests so that they no longer depend on the shipped
+package, keeping what each checks: the first monkeypatches `importlib.util.find_spec` to report `eng_harness.workflows`
+absent and still expects an empty registry (the "empty when the package is absent" branch of spec 0005 §4.2), and the
+second monkeypatches `_points.discover` to return an empty `PointRegistry` and still expects an empty lock. For the same reason
+two merged tests of `tests/unit/decisions/test_rules.py` (plan 0005 T4) would fail once the two rules exist:
+`test_discover_is_empty_without_rules_package` asserts `discover().rules == ()`, and
+`test_write_lock_command_writes_both_and_refuses_a_bump` runs `command.main(["--write-lock"])`, which writes
+`_points.discover()` and `_rules.discover()`, and expects both locks empty. The task lists that file too and rewrites
+both tests the same way, keeping their expectations: the first monkeypatches `importlib.util.find_spec` to report
+`eng_harness.rules` absent and still expects an empty registry (spec 0005 §4.4), and the second monkeypatches
+`_points.discover` and `_rules.discover` to return empty registries before the first write and still expects both
+locks empty. That the real discovery finds the three points and the two rules is checked by
+`tests/contract/test_decision_lock.py` and `tests/contract/test_rule_lock.py` against the regenerated locks.
 
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the
-blank template's `ask_each_run` list (paths only, no value, spec 0004 §4.8). If plan 0004 T9 has already pinned the
-template, the new pin is a golden change: the pull request carries the golden diff report and the change goes to the
-owner queue (process/05 §5); if T9 has not merged yet, T9 takes the list from spec §4.8 and this task does not touch
-the template. Tests drive the child blocks through test
+blank template's `ask_each_run` list (paths only, no value, spec 0004 §4.8). Amendment (B-417): plan 0004 T9 has pinned
+the template with an empty `ask_each_run`; this task fills it with the unit-suffixed paths of spec §4.8, and the new pin
+is a golden change: the pull request carries the golden diff report and the change goes to the owner queue
+(process/05 §5). The same paths are the `FieldSpec`s of `basis_fields` (spec 0004 AC21). Registration of the workflow
+is T9's (this task is at its 400-line cap): `block.discover()` stays empty here and `blocks.lock.json` is unchanged, so
+`test_workflow_definition` checks the definition and not the lock. Tests drive the child blocks through test
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
 
 **T9 Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7). `run_and_summarize` (analysis, design, results, D-3,
 summaries; D-2 and D-3 are never open together, spec §4.6), the engineer turn, the cycle loop, promotion and sign-off in
 `_finish.py`, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
 stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched with T15.
+Amendment (B-417): this task registers the shipped workflow (spec §4.2): `workflows/__init__.py` exports the blocks of
+`model_edit_cycle` (the workflow and its child blocks, `run_and_summarize` and those of `_finish.py` included) as one
+tuple, and `block.discover()` builds its `Registry` from it, importing `eng_harness.workflows` inside the function to
+avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness.block --write-lock`, and
+`tests/contract/test_block_lock.py::test_lock_matches_registry` then covers the `model_edit_cycle` blocks;
+`test_definition.py::test_workflow_registered` checks that `discover()` holds them (the lock part of AC1). The public
+module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 T11 and T13 add their blocks to the same tuple.
+The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main(["--write-lock"])`, which writes
+`discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
+and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
+are is checked by `test_block_lock.py` and `test_workflow_registered`).
 
 **T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
@@ -398,13 +466,13 @@ uninterrupted run.
 | Task | Needs merged |
 |---|---|
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
-| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`) |
+| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment of spec Q12 (a) (owner question OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it (owner queue, no work item yet) |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
-| T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) |
+| T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11b (`_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
-| T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core) |
-| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models) |
+| T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
+| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment (owner question OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
@@ -430,6 +498,7 @@ uninterrupted run.
 ## 5. Rollback
 
 Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 and T9 depend
-on T2 to T7). Until T8 merges, nothing registers the workflow. Calcs, points, rules and blocks are versioned with lock
+on T2 to T7). Until T9 merges, nothing registers the workflow (amendment B-417: `block.discover()` reads `workflows/__init__.py`,
+which T9 creates). Calcs, points, rules and blocks are versioned with lock
 files, so a fix after runs have been journaled is a new version; old journals keep replaying against the version they
 recorded (engine §4.2) or stop with `ReplayDivergence`, never silently.

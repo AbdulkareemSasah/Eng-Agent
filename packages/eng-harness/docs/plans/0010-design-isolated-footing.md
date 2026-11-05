@@ -187,6 +187,7 @@ tasks:
   - id: T9
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
     # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
+    # Amendment (B-417, documents only): starts after plan 0007 T9, which creates the shipped-workflow registry in workflows/__init__.py and makes block.discover() read it; this task adds its blocks to that registry
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
@@ -369,7 +370,8 @@ seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sb
 `uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist in `_calc/_code_packs.py`, with their
 allowlist cases in `tests/unit/calcs/test_code_pack_route.py`, moved here from T2 by amendment B-418),
 approvals per mode, and registration in `workflows/__init__.py`
-(the module through which the command line of plan 0006 T14 finds workflows; if that task names another module, this
+(the module through which the command line of plan 0006 finds workflows: plan 0006 T14 defines the `CliDeps`
+workflow-registry field and plan 0006 T18 binds its default, amendment B-412; if those tasks name another module, this
 task follows it and the file list is amended).
 
 **T10 SAFE calcs** (spec §4.9 items 2 and 6). Matching, negation, missing patterns, combinations to add; equilibrium by
@@ -401,7 +403,7 @@ determinism. The non-test lines are at most a test-support helper.
 | T3 to T6, T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
 | T7 | plan 0005 T1 to T4, T7 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
-| T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19; plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
+| T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19; plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); plan 0007 T9 (shipped-workflow registry in `workflows/__init__.py` and `block.discover()`, amendment B-417); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
 | T10 | plan 0008 T5 (`harness.joint_loads/1`, points) |
 | T11 | plan 0008 T6, T7 (load import, analysis, soil pressures, reactions) |
 | T12 | plan 0006 T11 to T13 (report); plan 0007 T10 (audits); SC T13 (calculation notes) |

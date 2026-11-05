@@ -1,0 +1,52 @@
+[project]
+name = "structural-codes-sbc304-2018"
+version = "0.1.0.dev0"
+description = "SBC 304-2018 overlay pack of the structural-codes folder of the Eng-Agent platform: footing checks."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["structural-codes-core", "structural-codes-aci318-14", "eng-contract"]
+
+# Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the
+# workspace root's dev group. The approvals test reads YAML (test-only import), typed by types-PyYAML.
+[dependency-groups]
+dev = ["pytest>=9.2.0", "hypothesis>=6.170.14", "pyyaml>=6,<7", "types-pyyaml>=6"]
+
+[tool.uv.sources]
+eng-contract = { workspace = true }
+structural-codes-core = { workspace = true }
+structural-codes-aci318-14 = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "sbc304_2018"
+
+[tool.ruff]
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+    "windows: needs Windows; runs in the Windows CI job",
+]
+
+# Plan 0003 T1: check_modules is the whole pack source (core spec 4.5); every module is R1.
+[tool.eng-gate]
+profile = "codes"
+layer = 3
+import_names = ["sbc304_2018"]
+check_modules = ["src/sbc304_2018/**/*.py"]
+coverage_line = 95
+coverage_branch = 90
+mutation_min = 80
+r1_modules = ["src/sbc304_2018/**/*.py"]
