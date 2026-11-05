@@ -105,6 +105,7 @@ tasks:
     depends_on: [T4]
   - id: T5
     title: HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test
+    # Amendment (B-416, documents only): engine plan T10 (and so T9) is merged before this task; see section 3.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/_calc/_port.py"
@@ -174,6 +175,7 @@ tasks:
     depends_on: [T5, T6]
   - id: T8
     title: Calc 2, difference report, with the tolerance-comparison helper
+    # Amendment (B-416, documents only): engine plan T12 is merged before this task (section 3); adds T5's test block file.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_diff (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -186,6 +188,7 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_diff.py"
       - "packages/eng-harness/tests/property/test_diff.py"
       - "packages/eng-harness/tests/workflow/test_calc_step.py"
+      - "packages/eng-harness/tests/workflows/calc_test_blocks.py"
       - "packages/eng-harness/tests/contract/test_calc_lock.py"
       - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/diff-*.json"
@@ -373,7 +376,8 @@ verification record, lock entry and `REGISTRY` line. T7 adds `_state.py` (sectio
 table) and builds `REGISTRY` with `removed=removed_ids(read_lock())`, so a removed id is refused at import time as
 well as by the contract test (spec AC2; amendment B-388, B-141 review). T8 adds `_compare.py` (D3 and D4, exact `Fraction` comparison) and extends `_state.py` with the unnamed-row
 keys of D2. T8 also adds the older-revision workflow test (spec AC48, a test block that reads, writes and reads
-again through fake tool ports) and the `stale_ok` contract test (spec AC49), which compares each registered calc's
+again through fake tool ports; its test block goes in `tests/workflows/calc_test_blocks.py`, next to T5's, amendment
+B-416) and the `stale_ok` contract test (spec AC49), which compares each registered calc's
 input schema with `tests/data/calcs/stale_ok.json`, the spec §4.13 table; T9 to T12 add their calc's row to that
 file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 add the live items of §4 to
 `docs/local-testing.md`.
@@ -383,9 +387,11 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
 - Runtime: a safe YAML parser, through a package ADR (T3, spec Q9), shared with plan 0004. Nothing else beyond the
   engine's `eng-contract` and `pydantic`.
 - Development: the shared group (`pytest`, `pytest-cov`, `hypothesis`, `mypy`, `ruff`). No new development dependency.
-- Other plans: engine plan T2 (errors), T3 (`_kinds.py`), T6 (ports and fakes) and T10 (`ctx.calc`) are merged before
-  T1, T4 and T5 respectively. The engine-spec amendment of spec Q11 (engine invariant 3 builds each argument's
-  `RefRule` from `CalcInfo.ref_rules`) is merged before T8, whose workflow test (spec AC48) depends on it.
+- Other plans: engine plan T2 (errors) is merged before T1; engine T3 (`_kinds.py`) before T4; engine T6 (ports and
+  fakes) and engine T10 (`ctx.calc`, and so engine T9) before T5. T7 to T12 inherit this through `depends_on`.
+  The engine-spec amendment of spec Q11 is merged (engine spec section 4.6 invariant 3, Q17, Q18). Engine plan T12
+  (invariant 3 with `CalcInfo.ref_rules`) is merged before T8, whose workflow test (spec AC48) needs the staleness
+  check. Amendment (B-416).
   `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
   and host verdicts that the workflow passes. Spec 0007 (B-066) supplies `harness.expected_effects/1`. Neither blocks
   this plan: its tests use synthetic records of the neutral kinds.
