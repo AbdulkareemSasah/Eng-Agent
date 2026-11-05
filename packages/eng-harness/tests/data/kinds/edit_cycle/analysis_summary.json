@@ -1,0 +1,44 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.analysis_summary",
+    "status": "draft",
+    "version": 1
+  },
+  "counts": {
+    "error": 0,
+    "info": 2,
+    "unclassified": 0,
+    "warning": 1
+  },
+  "draft": true,
+  "exceeding": [
+    {
+      "case": "EQX",
+      "direction": "X",
+      "ratio": 0.012,
+      "story": "S3"
+    }
+  ],
+  "governing_drift": {
+    "X": {
+      "case": "EQX",
+      "ratio": 0.012,
+      "story": "S3"
+    }
+  },
+  "has_errors": false,
+  "has_unclassified": false,
+  "limit_ratio": 0.01,
+  "limit_ref": "res_00000000000000000000000002#/limits/drift_ratio",
+  "status": "NEEDS_ENGINEER",
+  "trace": {
+    "calc_id": "harness.analysis_summary",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
