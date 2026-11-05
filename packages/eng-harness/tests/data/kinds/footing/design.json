@@ -1,0 +1,46 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.footing_layout",
+    "status": "draft",
+    "version": 1
+  },
+  "draft": true,
+  "footings": [
+    {
+      "As_x_mm2": 2010.0,
+      "As_y_mm2": 2010.0,
+      "Lx_mm": 2000.0,
+      "Ly_mm": 2000.0,
+      "cover_mm": 50.0,
+      "d_mm": 434.0,
+      "d_x_mm": 442.0,
+      "d_y_mm": 426.0,
+      "db_mm": 16.0,
+      "depth_at_max": false,
+      "end_cover_mm": 50.0,
+      "h_mm": 500.0,
+      "id": "J1",
+      "n_x": 10,
+      "n_y": 10,
+      "plan_at_max": false,
+      "reaction_height_mm": 500.0,
+      "reason": null,
+      "s_mm": 200.0,
+      "s_x_mm": 150.0,
+      "s_y_mm": 150.0,
+      "source": "calc",
+      "spacing_at_min": false,
+      "status": "OK"
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.footing_layout",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  }
+}
