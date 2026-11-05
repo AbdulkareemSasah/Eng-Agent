@@ -75,21 +75,23 @@ def test_member_scope() -> None:
 def test_two_directions_on_a_rectangular_footing() -> None:
     """X uses the width Ly and As_x, Y uses Lx and As_y (clause spec §4, direction rule).
 
-    Hand values: Lx = 2000, Ly = 3000, h = 500, As_x = As_y = 2000, fy = 420; Ag_x = 3000 * 500 = 1.5e6 mm2,
-    As_min_x = 0.0018 * 1.5e6 = 2700 mm2 (ratio 1.35, FAIL); Ag_y = 2000 * 500 = 1.0e6 mm2, As_min_y = 1800 mm2
-    (ratio 0.9, PASS). A swapped width fails here.
+    Hand values: Lx = 2000, Ly = 3000, h = 500, As_x = 2000, As_y = 2500, fy = 420; Ag_x = 3000 * 500 = 1.5e6 mm2,
+    As_min_x = 0.0018 * 1.5e6 = 2700 mm2 (ratio 2700 / 2000 = 1.35, FAIL); Ag_y = 2000 * 500 = 1.0e6 mm2,
+    As_min_y = 1800 mm2 (ratio 1800 / 2500 = 0.72, PASS). A swapped width or a swapped capacity fails here.
     """
-    payload = run(Lx_mm=2000.0, Ly_mm=3000.0, h_mm=500.0, As_x_mm2=2000.0, As_y_mm2=2000.0)
+    payload = run(Lx_mm=2000.0, Ly_mm=3000.0, h_mm=500.0, As_x_mm2=2000.0, As_y_mm2=2500.0)
     x, y = payload.verdicts
     assert x.demand is not None
     assert x.capacity is not None
     assert y.demand is not None
+    assert y.capacity is not None
     assert x.demand.value == pytest.approx(2700.0, abs=_AREA)
     assert x.demand.unit == "mm2"
     assert x.capacity.value == pytest.approx(2000.0, abs=_AREA)
     assert y.demand.value == pytest.approx(1800.0, abs=_AREA)
+    assert y.capacity.value == pytest.approx(2500.0, abs=_AREA)
     assert x.ratio == pytest.approx(1.35, abs=_RATIO)
-    assert y.ratio == pytest.approx(0.9, abs=_RATIO)
+    assert y.ratio == pytest.approx(0.72, abs=_RATIO)
     assert [x.status, y.status] == [VerdictStatus.FAIL, VerdictStatus.PASS]
     assert x.governing
     assert x.clause == y.clause == "8.6.1.1"
