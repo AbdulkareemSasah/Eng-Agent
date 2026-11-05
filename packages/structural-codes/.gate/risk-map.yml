@@ -18,3 +18,7 @@
 - paths:
     - "aci318-14/src/aci318_14/**"
   risk: r1
+# Every module of the SBC 304-2018 pack is r1 (plan 0003 T1).
+- paths:
+    - "sbc304-2018/src/sbc304_2018/**"
+  risk: r1
