@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc kinds part 1: `eng_harness.kinds.calcs` (`CalcMeta`, `harness.model_fingerprint/1`, `harness.model_diff/1`, `harness.expected_effects/1`) registered in `eng_harness._kinds`; `kinds/**` added to the R2 modules (plan 0003 T4, B-143; spec 0003 AC47).
 - approvals.yaml schema and strict loader (`_calc/_approvals.py`, reusing the templates YAML loader and ADR-0004; no second YAML library), status resolution (withdrawn, then exact id, version and hash match, else declared state), `check_approvals` and the shipped empty `calcs/approvals.yaml` (plan 0003 T3, B-142; spec 0003 AC8 to AC10).
 - Blocks and workflows: `eng_harness.block` (decorators, `BlockDef`, `WorkflowDef`, immutable `Registry`, code hash, `check_lock`, `write_lock`, `--write-lock`) and the empty `blocks.lock.json` (plan 0001 T5, B-104; spec 0001 AC2 to AC4).
 - Calc content hash over the static import closure (`_calc/_hash.py`: `ast` and file lookup, no import run; LF-normalized sources, metadata, both schemas, contract version), refusal of unhashable calcs, the `calcs.lock.json` lock with its writer (`uv run python -m eng_harness._calc._hash --write-lock`) and `removed` ids in `CalcRegistry`; `_calc/**` added to the R1 modules (plan 0003 T2, B-141).
