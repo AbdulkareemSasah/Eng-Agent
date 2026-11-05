@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Blocks and workflows: `eng_harness.block` (decorators, `BlockDef`, `WorkflowDef`, immutable `Registry`, code hash, `check_lock`, `write_lock`, `--write-lock`) and the empty `blocks.lock.json` (plan 0001 T5, B-104; spec 0001 AC2 to AC4).
 - Calc content hash over the static import closure (`_calc/_hash.py`: `ast` and file lookup, no import run; LF-normalized sources, metadata, both schemas, contract version), refusal of unhashable calcs, the `calcs.lock.json` lock with its writer (`uv run python -m eng_harness._calc._hash --write-lock`) and `removed` ids in `CalcRegistry`; `_calc/**` added to the R1 modules (plan 0003 T2, B-141).
 - Journal schema with append-only and gap-free `seq` triggers, the hash-chained append-only writer with per-event durability, and large step arguments stored by reference as `harness.journal_blob/1`: `eng_harness.journal` `JournalWriter` (plan 0001 T3b, B-367; spec 0001 AC20 to AC22, AC24, AC26).
 - Shipped `blank-0.1.0` template (`status: draft`, no value, empty `ask_each_run` because the spec 0007 section 4.8 paths do not meet the suffix and canonical-unit rule of spec 0004 and the contract; a spec amendment is pending) as package data (included in the wheel by the build backend) and the golden pin of its resolved hash in `tests/data/golden/shipped_templates.json` (B-163; spec 0004 AC29).
