@@ -207,13 +207,16 @@ tasks:
     files:
       - "packages/structural-codes/core/src/structural_codes/notes.py"
       - "packages/structural-codes/core/src/structural_codes/_labels.py"
-      - "packages/structural-codes/core/tests/golden/test_notes.py"
+      - "packages/structural-codes/core/tests/golden/test_notes_golden.py"
       - "packages/structural-codes/core/tests/unit/test_notes.py"
       - "packages/structural-codes/core/tests/data/golden/notes/**"
+    # Amendment (B-385, documents only): the golden test was tests/golden/test_notes.py, the same basename as the unit
+    # test; the core tests have no __init__.py, so pytest stopped with an import file mismatch and mypy with a duplicate
+    # module (B-267). The golden test is renamed; no test package marker is added.
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
-      - "packages/structural-codes/core/tests/golden/test_notes.py::test_golden"
+      - "packages/structural-codes/core/tests/golden/test_notes_golden.py::test_golden"
       - "packages/structural-codes/core/tests/unit/test_notes.py::test_escaping_watermark_and_values"
     covers: [AC34, AC35]
     depends_on: [T8]
