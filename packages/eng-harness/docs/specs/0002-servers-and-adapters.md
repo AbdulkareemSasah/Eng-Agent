@@ -345,8 +345,9 @@ Rules:
    false for a server without it (IDEA: an unknown argument would only be warned about and ignored, spec 0014 §4.2
    rule 4). `route` (string) names one of the routes the adapter's allowlist header declares (§4.5.1); it is required
    for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI). A `route` on a section
-   whose adapter declares no routes (CSI) is an allowlist load error (AC41; amendment B-413); a missing `route` for an
-   adapter that requires one stays a configuration load error (spec 0014 AC1).
+   whose adapter declares no routes (CSI), and a missing or undeclared `route` for an adapter that declares routes, are
+   allowlist load errors (AC41; amendment B-413); the configuration loader adds no route rule of its own here. Spec 0014
+   AC1 adds the IDEA section's own configuration check for a missing `route` (plan 0014 T1).
 
 ### 4.3 Server lifecycle
 
@@ -410,7 +411,11 @@ timeout (`timeout`) is expected first and the client one is a backstop (§4.5.6)
 #### 4.3.4 Build check (11 §6 item 8)
 
 `ServerManager.preflight(min_builds) -> list[ServerCheck]`, run at run start and at every resume and restart, before
-any write. Per server:
+any write. The engine calls `preflight` at run start and at every resume; the `ServerManager` runs the same check
+itself on a restart (§4.3.5), never on a role's first start. The check is given to the `ServerManager` by its caller
+(`build_ports` builds it from each server section's adapter allowlist, as it does the launcher); a `ServerManager` built
+without one answers `preflight` with `ok` false for every server and runs no check on a restart (only tests that drive
+the transport alone build one so; amendment B-413). Per server:
 
 1. SHA-256 of `command` equals `build.exe_sha256`.
 2. `client.server_info` is recorded (name, version); if `build.server_info_version` is set, it must equal it (Sasaah

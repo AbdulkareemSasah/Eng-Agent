@@ -152,6 +152,8 @@ tasks:
     title: Build check, tool-list fingerprint pinned from the inventory, and ServerCheck
     # Amendment (B-413, documents only): test_build_mismatch_stops_run (the engine stop of AC9, engine AC44) moves to
     # T19, so T6b does not wait for engine T13; the workflow fixture's build pins and the fake's script_enabled join the files.
+    # Amendment (B-413, documents only): the check is a ServerManager constructor argument, run by _session.py only on a
+    # restart (engine calls preflight at start and resume); the fixture uses sasaah-csi-mcp only for the CSI fake, the PAGED double keeps its adapter.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -453,7 +455,8 @@ tasks:
   - id: T20
     title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
     # Amendment (B-413, documents only): test_route_key leaves tests_first (no config-level route rule fails at the base;
-    # AC41 makes every route rule an allowlist load error); a route on a CSI section is covered in test_route_filter.
+    # AC41 makes every route rule of the framework an allowlist load error; the IDEA section's configuration check for a
+    # missing route is plan 0014 T1's, spec 0014 AC1); a route on a CSI section is covered in test_route_filter.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.servers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -545,10 +548,20 @@ AC38's load side (B-068): the `release` and `release_record` keys on allowlist e
 **T6b Build check** (§4.5.1). The fingerprint of the tool list computed from the inventory and pinned in the allowlist
 header (`fingerprint_source = "s12-inventory"`, `_allowlist.py` and `_allowlist.toml`), the build check and
 `ServerCheck`; the workflow fixture's build pins become the real ones (the SHA-256 of `sys.executable` and the
-allowlist's `sasaah_commit`) and the fake's `csi_status` reports `script_enabled: false`, so the session's build check
-passes on start and restart. The fixture reaches the CSI allowlist through the adapter name `sasaah-csi-mcp`, with
-`--disable-script` in its args (the configuration rule of spec §4.2 rule 3; the fake reads no command-line options), not
-through a mapping of `synthetic-csi` in `_session.py` (B-413). The workflow test that stops a run through the engine's preflight is T19's (B-413).
+allowlist's `sasaah_commit`) and the fake's `csi_status` reports `script_enabled: false`, so the build check passes when
+`preflight` runs over the CSI fake and when a role of it restarts. Where the check runs (spec §4.3.4, B-413): the engine
+calls `ServerManager.preflight` at run start and resume; `_session.py` runs the check itself only on a restart
+(§4.3.5), never on a role's first start. The check reaches the `ServerManager` as a constructor argument beside the
+launcher (`build_ports`, wired in T19, builds it from the adapter allowlist, so `servers` needs no import of
+`adapters`); a `ServerManager`
+built without one answers `preflight` with `ok` false and runs no check on a restart. The fixture `make_config` names
+the CSI allowlist's adapter `sasaah-csi-mcp`, with `--disable-script` in its args (spec §4.2 rule 3; the fake reads no
+command-line options), only when its script is the CSI fake, through a fixture parameter that follows the script; the
+configs of the PAGED transport double in `test_session.py` keep the adapter `synthetic-csi` and no `--disable-script`,
+so the argv assertions of `test_launch_arguments` and `test_launch_arguments_without_audit_log` stay as they are. The
+existing T5 tests build `ServerManager` without a check, so the restart in
+`test_server_exiting_before_handshake_is_not_connected` runs none and no T5 expectation changes (A4); not through a
+mapping of `synthetic-csi` in `_session.py` (B-413). The workflow test that stops a run through the engine's preflight is T19's (B-413).
 Budget 180 lines. T6b edits `_session.py`,
 so T7 follows it.
 
