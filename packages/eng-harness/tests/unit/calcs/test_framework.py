@@ -1,6 +1,8 @@
 """Trace builder and framework surface (plan 0003 T1; spec 0003 AC5, 4.1, 4.2)."""
 
 import importlib.util
+import os
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -93,3 +95,49 @@ def test_gap_and_codes_are_the_harness_ones() -> None:
     assert NotImplementedGap is errors.NotImplementedGap
     refused = errors.CalcRefused(errors.HarnessCode.CALC_WITHDRAWN, "x")
     assert refused.code == errors.HarnessCode.CALC_WITHDRAWN
+
+
+_CHILD = """
+import importlib.util, sys
+from pathlib import Path
+from eng_contract.canonical import canonical_json
+from eng_contract.envelope import Provenance
+from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.store import LocationClass, ResultStore, Workspace
+from eng_harness._calc._approvals import ApprovalsFile
+from eng_harness._calc._port import CalcSettings, HarnessCalcPort
+from eng_harness.calc import CalcRegistry
+from eng_harness.ports import RunClass
+
+spec = importlib.util.spec_from_file_location("port_calcs", sys.argv[1])
+fx = importlib.util.module_from_spec(spec)
+sys.modules["port_calcs"] = fx
+spec.loader.exec_module(fx)
+clock = FixedClock(1_767_225_600_000, 1)
+ids = SeededIdSource(b"harness", clock)
+kinds = fx.kinds()
+store = ResultStore(Workspace(root=Path(sys.argv[2]), classification=LocationClass.LOCAL), kinds, ids, clock)
+producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=clock.now(), duration_ms=0)
+rid = store.put(fx.SOURCE_KIND, {"value": {"span_mm": 500.0}}, producer).result_id
+registry = CalcRegistry(kinds, [fx.port_sum], hasher=lambda _: "cd" * 32)
+approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
+port = HarnessCalcPort(registry, approvals, store, CalcSettings(max_items=10), RunClass.TRIAL, clock, ids)
+out = port.run(fx.CALC_ID, {"span_mm": {"$ref": rid + "#/value/span_mm"}, "offset": 2.5})
+sys.stdout.buffer.write(canonical_json(store.payload(out.result_id)))
+"""
+
+
+def test_deterministic_across_processes(tmp_path: Path) -> None:
+    """Two interpreter processes with different hash seeds store byte-identical canonical payloads (AC4)."""
+    fixture = Path(__file__).resolve().parents[2] / "data" / "calcs" / "port_calcs.py"
+    outputs = []
+    for seed in ("1", "2"):
+        done = subprocess.run(  # noqa: S603  # B-144: fixed argv, our own interpreter, no shell
+            [sys.executable, "-c", _CHILD, str(fixture), str(tmp_path / seed)],
+            capture_output=True,
+            check=True,
+            env={**os.environ, "PYTHONHASHSEED": seed},
+        )
+        outputs.append(done.stdout)
+    assert outputs[0] == outputs[1]
+    assert b'"total":502.5' in outputs[0]
