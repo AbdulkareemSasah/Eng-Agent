@@ -104,6 +104,8 @@ class Case(_Strict):
             self.kind != "program_comparison" and self.source.assumption_differences
         ):
             raise ValueError(f"case {self.id}: source fields {sorted(given)} do not fit kind {self.kind}")
+        if self.covers and self.kind != "boundary":
+            raise ValueError(f"case {self.id}: covers is only for boundary cases")
         return self
 
 
@@ -277,11 +279,14 @@ def verify_check(check: Check, cases: CaseFile, *, registry: Registry | None = N
     """Run every case of `cases` against `check` (AC32); `registry` must hold it, `None` uses `Registry.discover()`.
 
     Raises:
-        VerificationDataError: the case file names another check.
+        VerificationDataError: the case file names another check, or `registry` does not hold this very `check`
+            (the cases run against the registry's check, so another copy would leave the report unrelated to it).
     """
     if cases.check_id != check.meta.check_id:
         raise VerificationDataError(f"case file is for {cases.check_id}, not {check.meta.check_id}")
-    known = registry or Registry.discover()
+    known = Registry.discover() if registry is None else registry
+    if all(c is not check for c in known.checks):
+        raise VerificationDataError(f"the registry does not hold this {check.meta.check_id} (another copy or none)")
     results = tuple(_run_case(check.meta.check_id, c, known) for c in cases.cases)
     digest = content_hash(check)
     return VerificationReport(check.meta.check_id, digest, results, _unmet(check, cases, results, digest))
