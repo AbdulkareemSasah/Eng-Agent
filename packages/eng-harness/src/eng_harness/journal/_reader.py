@@ -174,7 +174,8 @@ class JournalReader:
                 paused = e.type is _T.RUN_PAUSED
             if e.type is _T.RUN_RESUMED:
                 tools.update(getattr(p, "unreleased_tools", None) or {})
-                runtime = getattr(p, "decision_runtime", None) or runtime
+                if isinstance(p, ev.RunResumed) and p.decision_runtime is not None:
+                    runtime = dict(p.decision_runtime)
                 escalation = None
             if isinstance(p, ev.RunEscalated):
                 escalation = p
@@ -202,13 +203,19 @@ class JournalReader:
 
     @staticmethod
     def _requests(events: list[ev.Event]) -> list[RequestView]:
-        answers: dict[str, BaseModel] = {}
+        answers: dict[tuple[_T, str], BaseModel] = {}
         for e in events:
             rid = getattr(e.payload, "request_id", None)
             if rid is not None and e.type in (_T.APPROVAL_RESOLVED, _T.INPUT_PROVIDED, _T.DECISION_MADE):
-                answers.setdefault(rid, e.payload)
-        return [
-            RequestView(e.payload.request_id, e.payload.kind, e.payload.title, answers.get(e.payload.request_id))
-            for e in events
-            if isinstance(e.payload, ev.ApprovalRequested | ev.InputRequested)
-        ]
+                answers.setdefault((e.type, rid), e.payload)  # the first answer of each type wins
+        views: list[RequestView] = []
+        for e in events:
+            p = e.payload
+            if isinstance(p, ev.ApprovalRequested):
+                answer_type = _T.APPROVAL_RESOLVED
+            elif isinstance(p, ev.InputRequested):
+                answer_type = _T.DECISION_MADE if p.kind == "engine.decision" else _T.INPUT_PROVIDED
+            else:
+                continue
+            views.append(RequestView(p.request_id, p.kind, p.title, answers.get((answer_type, p.request_id))))
+        return views
