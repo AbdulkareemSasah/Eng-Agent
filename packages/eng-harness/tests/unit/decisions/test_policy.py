@@ -30,7 +30,7 @@ def test_defaults_match_golden() -> None:
 )
 def test_policy_bounds(bad: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
-        DecisionPolicy(**bad)  # type: ignore[arg-type]  # B-165: deliberately invalid values
+        DecisionPolicy.model_validate(bad)
 
 
 def test_policy_accepts_boundaries_and_is_frozen() -> None:
@@ -54,7 +54,7 @@ def test_settings_defaults_and_frozen() -> None:
     with pytest.raises(ValidationError):
         DecisionSettings(max_options=0)
     with pytest.raises(ValidationError):
-        DecisionSettings(unknown=1)  # type: ignore[call-arg]  # B-165: deliberately unknown field
+        DecisionSettings.model_validate({"unknown": 1})
 
 
 def test_shadow_release_rules() -> None:
@@ -63,7 +63,7 @@ def test_shadow_release_rules() -> None:
     with pytest.raises(ValidationError):
         ShadowRelease(point_version=0, basis="owner", record="x")
     with pytest.raises(ValidationError):
-        ShadowRelease(point_version=1, basis="agent", record="x")  # type: ignore[arg-type]  # B-165: invalid basis
+        ShadowRelease.model_validate({"point_version": 1, "basis": "agent", "record": "x"})
     with pytest.raises(ValidationError):
         ShadowRelease(point_version=1, basis="evaluation", record="")
     settings = DecisionSettings(shadow_released={"p": release})
@@ -94,8 +94,9 @@ def test_rationale_refuses(text: str) -> None:
 
 def test_pick_holds_option_and_is_frozen() -> None:
     assert Pick(2).option == 2
+    attribute = "option"
     with pytest.raises(AttributeError):
-        Pick(2).option = 3  # type: ignore[misc]  # B-165: mutation must be refused
+        setattr(Pick(2), attribute, 3)
 
 
 def test_definition_error_is_value_error() -> None:
