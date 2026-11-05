@@ -11,11 +11,19 @@ import sys
 from ctypes import c_void_p, sizeof
 from dataclasses import dataclass
 from functools import partial
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from eng_harness.servers._procinfo import FILETIME, PROCESSENTRY32W, ProcessIdentity, WindowsProcessInspector
+from eng_harness.servers import _procinfo
+from eng_harness.servers._procinfo import (
+    FILETIME,
+    PROCESSENTRY32W,
+    PosixProcessInspector,
+    ProcessIdentity,
+    WindowsProcessInspector,
+)
 
 # winnt.h access rights and winerror.h codes, restated here as the oracle of the fake.
 PROCESS_TERMINATE = 0x0001
@@ -330,6 +338,38 @@ def test_a_failed_enumeration_is_raised() -> None:
     kernel32.enumeration_error = ERROR_BAD_LENGTH
     with pytest.raises(OSError, match="Process32NextW"):
         inspector.snapshot(["etabs.exe"])
+
+
+def _fake_proc(root: Path, pid: int, comm: str) -> None:
+    (root / str(pid)).mkdir()
+    fields = ["S", "1", "1"] + ["0"] * 16 + ["77"]  # state, ppid, pgrp, ..., field 22 (start ticks)
+    (root / str(pid) / "stat").write_text(f"{pid} ({comm}) {' '.join(fields)}\n", encoding="utf-8")
+
+
+def test_listing_skips_unreadable_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A /proc entry another user hides (hidepid) is left out of listings; identity on it still raises (AC7a)."""
+
+    for pid, comm in ((2, "hidden"), (3, "shown")):
+        _fake_proc(tmp_path, pid, comm)
+    monkeypatch.setattr(_procinfo, "_PROC", tmp_path)
+    real_read_text = Path.read_text
+
+    def read_text(self: Path, *args: Any, **kwargs: Any) -> str:
+        if self.parent.name == "2":
+            raise PermissionError(13, "hidepid", str(self))
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    inspector = PosixProcessInspector()
+    with caplog.at_level("DEBUG"):
+        assert [i.pid for i in inspector.children(1)] == [3]
+        assert [i.pid for i in inspector.snapshot(["hidden", "shown"])] == [3]
+        assert [i.pid for i in inspector.group_members(1)] == [3]
+    assert "2" in caplog.text
+    with pytest.raises(PermissionError):
+        inspector.identity(2)
 
 
 if sys.platform == "win32":
