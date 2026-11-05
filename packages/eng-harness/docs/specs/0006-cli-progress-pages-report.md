@@ -107,9 +107,11 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   with `run_paused`; and a later `resume` without `--no-wait`, answered on the page, completes the run without
   repeating a write. Test: `tests/replay/test_cli_resume.py::test_no_wait_then_resume`.
 - AC9. Given a live run in a long fake step, when `stop <run_id>` is called, then the run pauses at the next safe point
-  with `run_paused` (reason `stop_requested`), `run` exits 12 and the request file is removed; given a run with no live
-  engine, `stop` exits 0 and says it is not running; given a stop file left behind, `resume` clears it before the
-  engine starts. Test: `tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point`.
+  with `run_paused` (reason `stop_requested`), `run` exits 12 and the run process removes the stop file (§4.4.8);
+  given a run with no live engine, `stop` exits 0, says it is not running and writes no stop file; given a stop file
+  left behind, `resume` removes it before the engine starts. Test:
+  `tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point` (a fake engine from `CliDeps` that polls
+  `FileRunControl`; the real-engine stop is re-checked in plan T17, B-412).
 - AC10. Given an interrupt signal, then the first one is a stop request (as AC9) and the second ends the process at
   once with exit 130; the journal then resumes as after any crash (engine AC30). Test:
   `tests/unit/cli/test_signals.py::test_first_interrupt_requests_stop`.
@@ -178,8 +180,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `tests/unit/progress/test_heartbeat.py::test_heartbeat_without_events`.
 - AC19. Given an output stream whose writes block, then `emit` returns within 10 ms, the engine is not delayed, and
   when the bounded queue is full the oldest lines are dropped and a count is printed later; the journal stays complete.
-  Given a renderer that raises, the sink is detached by the engine (engine AC58) and the run continues. Test:
-  `tests/unit/progress/test_sink.py::test_blocked_stream_does_not_block_engine`.
+  Given a renderer that raises, `emit` raises (the sink does not swallow the failure), so that the engine can detach
+  it. Test: `tests/unit/progress/test_sink.py::test_blocked_stream_does_not_block_engine` (the sink alone, no engine).
+  The engine half, that a raising sink is detached and the run continues, is engine AC58 (engine plan T18); it is
+  re-checked with `TerminalProgress` and the real engine in plan T17 (B-412).
 - AC20. Given a committed event, then the line is written to the stream in under 200 ms at p95 (11 §10). Test:
   `tests/perf/test_progress_latency.py::test_event_to_line_p95`.
 - AC21. Given any string taken from data (a model name, a message, a file name), then terminal output holds no
@@ -391,7 +395,8 @@ Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_htm
 The entry point is `[project.scripts] eng-harness = "eng_harness.cli:main"` and `python -m eng_harness`. `main`
 takes its collaborators in `CliDeps` (registry, port factories, clock, ids, streams, launch-address opener, decision-runtime
 assembler: `eng_harness.providers.assemble_decision_runtime` by default, AC62), so every test
-runs without a host, a browser or the real clock.
+runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged has no
+default until it does, and a command that needs it stays "not available in this build" (plan §3, B-412).
 
 **Invocation from the workspace root (B-354).** The one supported form is
 `uv run --package eng-harness eng-harness <command> [options]`, run in the workspace root. The root project
@@ -462,7 +467,7 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `Engine.start`.
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
-`resume` is steps 1, 5 and 6 with `Engine.resume`; it clears a stale stop file first. The page server starts lazily at
+`resume` is steps 1, 5 and 6 with `Engine.resume`; it removes a stale stop file first (§4.4.8). The page server starts lazily at
 the first `present` (never when `--no-wait` is given or no request opens) and stops when the process returns.
 
 #### 4.2.3 Exit codes
@@ -624,8 +629,8 @@ process of the same user that has the terminal, reads the opener's command line 
    binding and the items, then calls `ApprovalPort.present(request)`. The page registers the request with its view and
    renders from the stored `harness.approval_preview/1` result after checking that its hash equals `shown_sha256`
    (else the screen says the preview is damaged and offers no button).
-2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file every
-   second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
+2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file
+   (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
    (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
 3. A POST that passes §4.4.2 and the answer checks (below) is parsed into an `ApprovalSubmission` (the validated form),
    turned into an `ApprovalAnswer` (an `InputAnswer` for a choice) and handed to the waiting `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
@@ -692,6 +697,25 @@ engineer with `run` without `--no-wait`, in a terminal, and the basis is confirm
 `--no-wait` there exits 10 with a message saying so (AC47). For the first change set of spec 0007, `run --answers
 FILE` (AC64) replaces the interim `run --no-wait` route that spec 0007 Q7 had proposed: one `run` confirms the basis,
 takes the change set from the file and waits at the change-set approval on the page.
+
+#### 4.4.8 The stop file (B-412)
+
+The stop request is one file, `<workspace>/runs/<run_id>/stop.json`, a JSON object with exactly two members:
+`requested_at` (a contract `Timestamp`, shown as in §4.7) and `by` (`cli` for the `stop` command, `signal` for the
+first interrupt of AC10). The writer writes a temporary file in the same folder and renames it over `stop.json`, so a
+reader never sees a partial file. `cli/_control.py` holds the protocol:
+
+- `FileRunControl.stop_requested(run_id)` (the engine's `RunControlPort`) returns true while the file exists, whatever
+  its content; the page ports' wait (§4.4.5 step 2) polls the same check.
+- `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
+  and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
+  seconds pass.
+- The run process (`cli/_run.py`) removes the file when `Engine.start` or `Engine.resume` returns with `run_paused`
+  reason `stop_requested`, or with any other outcome while the file exists.
+- `resume` removes a stale file before `Engine.resume` (AC9).
+
+The file is process information, like `heartbeat.json`, not a journal event. It is an addition to the run folder of
+engine §4.4.1 (Q19).
 
 ### 4.5 HTML, escaping and the templating choice
 
@@ -847,6 +871,12 @@ heartbeat task runs on the engine loop.
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
+Staged engine (B-412): a workflow test whose task is built before the engine it needs has merged drives the port
+under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds the
+events to the sink) or with a fake engine from `CliDeps`; this holds for AC29 and AC37 (plan T7) and AC9 (plan T16).
+Plan T17 waits for the real engine with approvals (engine plan T15) and re-checks those criteria, and the engine half
+of AC19, with the real engine.
+
 No engineering value is computed here, so there are no golden engineering tests. Tests use the contract's `FixedClock`
 and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
 (process/05 §2); mutation score at least 80% on `pages/_security.py`, `pages/_answers.py`, `pages/_ports.py`,
@@ -885,4 +915,5 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q16 | Amendment B-098 (spec 0009 Q7). (a) Spec 0009 names `assemble_decision_runtime` and its result (providers, verified releases, summary) but not its arguments; §4.2.2 step 5 reads them as the `ProvidersConfig`, the `DecisionSettings`, the workspace and the point policies of `verify_releases` **[added]**. (b) Release findings (spec 0009 §4.10: "findings go to the run report as warnings") reach standard error only, because the report reads the journal and the store only (§4.6.1) and the summary of spec 0009 AC29 does not hold them. (c) The report's Status section does not yet show `decision_runtime` | Owner | (a) Fix the signature in plan 0009 T10 to these inputs. (b) Add the dropped releases (`point`, `reason`) to the summary in an amendment of spec 0009 AC29, so they are journaled with it. (c) Show the providers and released points of `RunHeader.decision_runtime` in the Status section at the next amendment of §4.6.1 (report plan T13) |
 | Q17 | Amendment B-354 (spec 0007 Q7; `LOCAL-TESTING.md` open points 5 and 13). The first change set could reach a run only by `resume --answers`, and the interim route `run --no-wait` could not start a workflow that needs basis confirmation, because a `--no-wait` run does not serve the basis page and no run exists to resume | Owner | Decided **[added]**: `run --answers FILE` pre-answers the first data request only, through `accept_answers_file` (AC64); a workflow with required basis fields starts only with a waiting `run` (§4.4.7, AC47); the `run --no-wait` route is withdrawn. No answer path is widened: the file still answers data requests only, and the change set is still approved on the page |
 | Q18 | Amendment B-354 (`LOCAL-TESTING.md` open point 6). How the owner invokes the command from the workspace root. The decision rests on uv's documented command-line options (`uv run --package`, `uv sync` being exact) and a check on this workspace with uv 0.11; the uv workspace documentation page was not reachable from the authoring session | Owner | Decided: `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the owner may confirm it against docs.astral.sh. `LOCAL-TESTING.md` should use this form for every `eng-harness` command |
+| Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

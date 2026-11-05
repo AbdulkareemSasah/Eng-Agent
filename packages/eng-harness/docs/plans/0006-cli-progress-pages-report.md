@@ -103,9 +103,11 @@ tasks:
     depends_on: [T1]
   - id: T5
     title: "Non-blocking progress sink, heartbeat task and liveness reader"
+    # Amendment (B-412, documents only): progress/__init__.py added for the public names of spec 4.1; AC19 here is the sink alone (the engine detach is engine AC58, re-checked in T17).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.progress (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/progress/__init__.py"
       - "packages/eng-harness/src/eng_harness/progress/_sink.py"
       - "packages/eng-harness/src/eng_harness/progress/_heartbeat.py"
       - "packages/eng-harness/tests/unit/progress/test_sink.py"
@@ -150,9 +152,11 @@ tasks:
     depends_on: [T2]
   - id: T7
     title: "Answer models and checks, approval and input ports, durable wait, stop-file run control"
+    # Amendment (B-412, documents only): pages/__init__.py added; stop-file protocol of spec 4.4.8; dispatch mapping with refusal fallback; report callable; engine stand-in in workflow tests.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli, eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/pages/__init__.py"
       - "packages/eng-harness/src/eng_harness/pages/_answers.py"
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_wait.py"
@@ -194,10 +198,12 @@ tasks:
     depends_on: [T1]
   - id: T9
     title: "Approval screens: change set, promotion, info and sign-off"
+    # Amendment (B-412, documents only): pages/_ports.py added to register the four screens in the PageApp dispatch; the AC42 test injects a stub report callable.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/pages/_labels.py"
+      - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_approval.py"
       - "packages/eng-harness/tests/golden/test_screens.py"
       - "packages/eng-harness/tests/data/snapshots/screens/**"
@@ -212,9 +218,13 @@ tasks:
     depends_on: [T2, T7, T8]
   - id: T10
     title: "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate"
+    # Amendment (B-412, documents only): depends on T9 (_labels.py); pages/__init__.py, _labels.py and _ports.py added.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/pages/__init__.py"
+      - "packages/eng-harness/src/eng_harness/pages/_labels.py"
+      - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_choice.py"
       - "packages/eng-harness/src/eng_harness/pages/_answers_file.py"
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py"
@@ -227,7 +237,7 @@ tasks:
       - "packages/eng-harness/tests/unit/pages/test_choice_screen.py::test_engine_requests_choices"
       - "packages/eng-harness/tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests"
     covers: [AC43, AC44, AC45, AC46]
-    depends_on: [T2, T7]
+    depends_on: [T2, T7, T9]
   - id: T11
     title: "Report model: fold the journal and the store; timings, waiting and machine time"
     files:
@@ -244,6 +254,7 @@ tasks:
     depends_on: [T8]
   - id: T12
     title: "Report sections: changes, results, sources, decisions; renderer registry; value cells with sources"
+    # Amendment (B-412, documents only): _sections.py renders sections 2 to 7 of spec 4.6.1; the snapshot covers that fragment (T13 extends it).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -262,14 +273,18 @@ tasks:
     depends_on: [T2, T11]
   - id: T13
     title: "Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write"
+    # Amendment (B-412, documents only): report/__init__.py added; the report snapshot extended to the whole document (AC51).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/report/__init__.py"
       - "packages/eng-harness/src/eng_harness/report/_document.py"
       - "packages/eng-harness/src/eng_harness/report/_write.py"
       - "packages/eng-harness/tests/unit/report/test_build_report.py"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py"
       - "packages/eng-harness/tests/unit/report/test_write.py"
+      - "packages/eng-harness/tests/golden/test_report.py"
+      - "packages/eng-harness/tests/data/snapshots/report/**"
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
@@ -277,7 +292,7 @@ tasks:
       - "packages/eng-harness/tests/unit/report/test_build_report.py::test_tampered_refused_live_banner"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py::test_draft_signed_and_sources"
       - "packages/eng-harness/tests/unit/report/test_write.py::test_utf8_lf_atomic"
-    covers: [AC50, AC53, AC57, AC59]
+    covers: [AC50, AC51, AC53, AC57, AC59]
     depends_on: [T12]
   - id: T14
     title: "Commands run and resume: wiring, generated options, answers file, outcome mapping"
@@ -285,9 +300,11 @@ tasks:
     # lead decision D-12: split. T14 keeps the run and resume wiring (AC6, AC7, AC8, AC14, AC46); T14b keeps signal
     # handling, the launch address on the terminal only (AC10, AC61) and the decision layer of amendment B-098
     # (AC62, AC63).
+    # Amendment (B-412, documents only): cli/__init__.py added (CliDeps fields, run and resume handlers); CliDeps defaults rule of section 3; page report bound to build_report.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/cli/_options.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
@@ -310,9 +327,11 @@ tasks:
     depends_on: [T3, T3b, T5, T7, T9, T10, T13]
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
+    # Amendment (B-412, documents only): cli/__init__.py added (providers_loader and decision_assembler fields); CliDeps defaults rule of section 3.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_signals.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
@@ -331,12 +350,18 @@ tasks:
     depends_on: [T14]
   - id: T15
     title: "Basis confirmation screen, setup log and its place in run"
+    # Amendment (B-412, documents only): cli/__init__.py, _run.py, _wiring.py, pages/__init__.py and _ports.py added; budget 250 -> 330 (screen, port, setup log and run step 3 share it).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
+      - "packages/eng-harness/src/eng_harness/cli/_run.py"
+      - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
+      - "packages/eng-harness/src/eng_harness/pages/__init__.py"
+      - "packages/eng-harness/src/eng_harness/pages/_ports.py"
       - "packages/eng-harness/src/eng_harness/pages/_screens_basis.py"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py"
-    max_changed_lines: 250
+    max_changed_lines: 330
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_basis_confirmation_flow"
@@ -347,9 +372,11 @@ tasks:
     depends_on: [T14b]
   - id: T16
     title: "Commands status, stop, report and doctor"
+    # Amendment (B-412, documents only): cli/__init__.py added (handlers, doctor field); report and doctor handlers in cli/_status.py; stop test drives a fake engine (real one re-checked in T17).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/cli/_status.py"
       - "packages/eng-harness/src/eng_harness/cli/_stop.py"
       - "packages/eng-harness/tests/unit/cli/test_status.py"
@@ -367,14 +394,18 @@ tasks:
     depends_on: [T14b]
   - id: T17
     title: "End-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule"
+    # Amendment (B-412, documents only): AGENTS.md re-rendered with agents.yml; waits for engine plan T15 and T18 (real engine, no fakes); re-checks AC9, AC19, AC29 and AC37 with the real engine.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/.gate/agents.yml"
+      - "packages/eng-harness/AGENTS.md"
       - "packages/eng-harness/tests/property/test_untrusted_text.py"
       - "packages/eng-harness/tests/replay/test_page_resume.py"
       - "packages/eng-harness/tests/windows/test_arabic_environment.py"
+      - "packages/eng-harness/tests/workflow/test_cli_stop.py"
       - "packages/eng-harness/tests/workflow/test_page_approval.py"
+      - "packages/eng-harness/tests/workflow/test_progress_detach.py"
     max_changed_lines: 150
     max_sessions: 2
     tests_first:
@@ -383,7 +414,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume"
       - "packages/eng-harness/tests/property/test_untrusted_text.py::test_every_screen_and_report_escape"
       - "packages/eng-harness/tests/windows/test_arabic_environment.py::test_arabic_workspace_and_cp1256"
-    covers: [AC33, AC34, AC35, AC48, AC58]
+    covers: [AC9, AC19, AC29, AC33, AC34, AC35, AC37, AC48, AC58]
     depends_on: [T15, T16]
 ---
 
@@ -440,7 +471,11 @@ form `uv run --package eng-harness eng-harness` needs no change to the root `pyp
 `ProgressRenderer` for the three modes, with text snapshots.
 
 **T5 Sink and heartbeat** (spec §4.3). The bounded queue and writer thread, `TerminalProgress.emit`, the heartbeat
-task and `heartbeat.json`, `read_liveness`, and the 200 ms latency test.
+task and `heartbeat.json`, `read_liveness`, and the 200 ms latency test. Amendment B-412: T5 exports `TerminalProgress`,
+`Heartbeat`, `Liveness` and `read_liveness` from `progress/__init__.py` (spec §4.1). AC19 is tested on the sink alone:
+`emit` returns within 10 ms on a blocking stream, the oldest lines are dropped and counted when the queue is full, and a
+renderer that raises makes `emit` raise so that the engine can detach the sink; the detach itself is engine AC58
+(engine plan T18) and is re-checked with the real engine in T17.
 
 **T6 Server and security** (spec §4.4.1 to §4.4.3). `PageServer`, launch code, session cookie `eh_<port>_session`, CSRF
 token with the per-route inputs of spec §4.4.2 (approval, choice, setup; the test is parametrized over the three), Host,
@@ -450,53 +485,94 @@ is the loopback client used by all page tests. Security lens review.
 **T7 Answers and ports** (spec §4.4.5). `ApprovalSubmission` and the answer models in `pages/_answers.py` (no value members), the checks,
 `PageApprovalPort` and `PageInputPort` (present, awaitable answer, `wait=False`, stop, timeout), the per-request lock,
 acknowledgement after the sink sees `approval_resolved`, `FileRunControl` (stop file). Security lens review.
+Amendment B-412: (1) T7 exports `PageApprovalPort` and `PageInputPort` from `pages/__init__.py`. (2) The stop file is
+the protocol of spec §4.4.8 (`runs/<run_id>/stop.json`, `requested_at` and `by`, written by rename);
+`cli/_control.py` holds `FileRunControl` and the write, read and remove helpers that T14, T14b and T16 call. (3)
+`pages/_ports.py` dispatches `PageApp.screen(kind, id)` on the request kind through a mapping from kind to screen
+builder; a request kind with no registered builder renders a refusal page (no form, no button). T9, T10 and T15
+register their screens in that mapping. (4) The page ports take a `report: Callable[[], str]` behind `PageApp.report()`
+(`GET /report`), by default a fixed "report not available yet" document; T14 binds it. (5) The workflow tests
+(`test_answer_bound_to_hash`, `test_page_confirms_after_commit`) drive `PageApprovalPort` with a test-local stand-in for
+the engine that journals `approval_requested` and `approval_resolved` through the merged `JournalWriter` and feeds the
+events to the page sink; the real-engine half of AC29 and AC37 is re-checked in T17.
 
 **T8 Release marks** (spec §4.6.3). `ReleaseMarks`, `unreleased_dependencies` with the breadth-first closure over
 `parents` and provenance inputs, the depth limit, and the package skeleton of `report/`. The property test compares
 with an independent reachability oracle on random graphs.
 
 **T9 Approval screens** (spec §4.4.6). Change set, promotion, info and sign-off with the exception and
-acknowledgement rules; `_labels.py` catalog; snapshots.
+acknowledgement rules; `_labels.py` catalog; snapshots. Amendment B-412: T9 registers the `CHANGE_SET`, `PROMOTION`,
+`INFO` and `SIGN_OFF` builders in the dispatch mapping of `pages/_ports.py` (T7); the AC42 test injects a stub
+`report` callable.
 
 **T10 Choice screens** (spec §4.4.6). Choice sets from the request's JSON Schema (engineer turn, batched decisions,
 engine requests) and the read-only input screen; `pages.accept_answers_file`, the only way a file becomes an
 `InputAnswer`: it accepts a `block` request with `x-eng-input: data` and refuses `engine.*`, choice and unmarked
-requests.
+requests. Amendment B-412: T10 follows T9 and adds its labels (the engineer-turn options including the `hand_edit`
+wording, and the engine-request option labels) to `pages/_labels.py`; it exports `accept_answers_file` from
+`pages/__init__.py` and registers the choice and input screens in the dispatch mapping of `pages/_ports.py`.
 
 **T11 Report model** (spec §4.6.1 sections 5 to 7). Folding `JournalReader` views and store records into a
 `ReportModel`; waiting and machine time. A shared fixture run (`tests/fixtures/report_run.py`) is reused by T12 and T13.
 
 **T12 Report sections** (spec §4.6.1). Renderer registry, generic bounded renderer, `value_cell(value, source)` with
-the mandatory source, the sources table, changes and results; snapshot.
+the mandatory source, the sources table, changes and results; snapshot. Amendment B-412: `_sections.py` renders
+sections 2 to 7 of spec §4.6.1 (timings and run events included), and `test_report_snapshot` snapshots that rendered
+fragment; T13 extends the snapshot to the whole document.
 
 **T13 Report document** (spec §4.6.2). Status banner and marks, integrity line, policy meta, `build_report`,
-`write_report`.
+`write_report`. Amendment B-412: T13 exports `build_report` and `write_report` from `report/__init__.py` and extends
+`tests/golden/test_report.py::test_report_snapshot` and its snapshot to the whole document from `build_report`, which
+completes AC51.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
 tests. Budget 340 lines. The original T14 (430 lines) was split by B-342 (D-12). Amendment B-354: `run --answers
 FILE` (AC64): the object is checked in step 2 and the page `InputPort` is wrapped in `_wiring.py` so that the first data
-request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340).
+request is answered from it once through `pages.accept_answers_file` (about 30 lines, hence 310 to 340). Amendment
+B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
+`resume` handlers there; `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
+and store.
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
 Amendment B-098: the decision layer is built from `[providers.*]` through `load_providers_config` and the `CliDeps`
 assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
-the 120. T15 and T16 follow T14b.
+the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
+`cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they have no default and are
+required, AC62 is tested through injected recorders, and plan 0009 T10 (or a named follow-up) binds the defaults. The
+first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`.
 
 **T15 Basis confirmation** (spec §4.4.7). The screen, the answer, the setup log and the early steps of `run`.
 Amendment B-354: `run --no-wait` with required basis fields exits 10 before any run exists, nothing stored (AC47).
+Amendment B-412: step 3 of spec §4.2.2 goes in `cli/_run.py` and `cli/_wiring.py`; `PageBasisSetupPort` is exported
+from `pages/__init__.py`, and its port class and the `setup` kind are registered in the dispatch of `pages/_ports.py`. A
+basis-port factory or `freeze` that becomes a `CliDeps` field goes in `cli/__init__.py` under the defaults rule of §3.
+Budget 250 to 330: about 120 for the screen, 60 for the port and its registration, 50 for the setup log, 70 for step 3
+and `--no-wait`, and 30 for the wiring (an estimate, not a measurement).
 
 **T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the `stop` command in
 `cli/_stop.py` (it writes and waits on the stop file whose protocol lives in `cli/_control.py`, T7),
-the report command, the doctor pass-through.
+the report command, the doctor pass-through. Amendment B-412: the report and doctor handlers live in `cli/_status.py`;
+T16 registers the four handlers in the `CliDeps` handler table in `cli/__init__.py`. The doctor callable is a `CliDeps`
+field under the defaults rule of §3, injected in `test_doctor_command` and bound once plan 0002 T18 merges.
+`test_stop_pauses_at_safe_point` drives a fake engine from `CliDeps` that polls `FileRunControl`; the real-engine stop
+is re-checked in T17.
 
 **T17 End to end** (spec §3.4, §3.6, §3.7). Per-item rejection and void flows through the page, the killed-wait replay,
 the all-screens untrusted text property test, the Windows Arabic test (Arabic workspace path, cp1256 console,
 `ar-SA` culture where present), `docs/local-testing.md`, and the rule "approvals are the engineer's; never read or relay
-the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md` and `CLAUDE.md` re-rendered by
-`eng-gate agents render` when that tool exists, otherwise by the first task after it exists.
+the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md` re-rendered by `uv run eng-gate agents
+render` in the same pull request (the CI `agents-drift` job fails on a difference; `CLAUDE.md` is only `@AGENTS.md`).
+Amendment B-412: the template has no free-form slot for a package rule, so the rule text (run and resume in the
+background and follow with `status`, or `--no-wait` and tell the engineer; never read or relay the launch address or
+open the page; approvals are the engineer's) is appended to the `one-paragraph purpose` value, and `entry-point` is set
+to `--package eng-harness eng-harness <command>`. T17 waits for engine plan T15 (which brings T9 to T14b) and engine
+plan T18, and uses the real engine, no fakes: it re-checks with the real engine the halves deferred from T5 (AC19, a
+raising `TerminalProgress` renderer is detached and the run continues, in `tests/workflow/test_progress_detach.py`),
+T7 (AC29, AC37, in `test_page_approval.py`) and T16 (AC9, in `test_cli_stop.py`). If T17 is to drive the real
+`CliDeps` defaults, it also waits until they are bound (§3).
 
 ## 3. Dependencies
 
@@ -510,6 +586,18 @@ the launch address" in `packages/eng-harness/.gate/agents.yml`, with `AGENTS.md`
   provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14, T14b and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it.
+- `CliDeps` defaults rule (amendment B-412; T14, T14b, T15, T16). Each `CliDeps` collaborator whose real implementation
+  is not merged (engine factory, port builder, calc preflight, `freeze`, workflow registry, providers loader, decision
+  assembler, doctor callable) has no default and is required when `CliDeps` is built with it. The default `CliDeps()`
+  (what `eng_harness.cli:main` uses with `deps=None`) registers no handler for a command whose collaborators are
+  missing, so that command keeps exiting 2 "not available in this build". No stub stands in for a missing
+  implementation in production code. The task that merges the real implementation, or a named follow-up, binds the
+  default and registers the handler.
+- Staged engine (amendment B-412). The engine runner and approvals (engine plan T9 to T15) and progress delivery
+  (engine plan T18) are not merged when T5, T7 and T16 may be built. T5 tests the sink alone; T7's workflow tests use a
+  test-local engine stand-in that journals through the merged `JournalWriter`; T16's stop test uses a fake engine from
+  `CliDeps`. T17 waits for engine plan T15 and T18 and re-checks the deferred halves (AC9, AC19, AC29, AC37) with the
+  real engine.
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`), engine §4.9 (`item_reasons`, the choice
   convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here.
 
