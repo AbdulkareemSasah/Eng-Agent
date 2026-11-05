@@ -4,7 +4,7 @@ issue: "B-075"
 spec: packages/eng-harness/docs/specs/0010-design-isolated-footing.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r2, r3]       # binding for every pull request of this plan; r2 from T1 (kinds), r3 from T2 (pyproject.toml, uv.lock)
+risk: [r1, r2, r3]       # binding for every pull request of this plan; r2 from T1 (kinds), r3 from T2 and T9 (pyproject.toml, uv.lock)
 tasks:
   - id: T1
     title: Footing kinds and their registration
@@ -22,6 +22,8 @@ tasks:
     covers: [AC33]
     depends_on: []
   - id: T2
+    # Amendment (B-418, documents only): T2 adds only the core and ACI workspace dependencies (sbc304-2018 moves to T9,
+    # which already waits for SBC T3); tests/unit/calcs/fixtures/__init__.py added; the C4 (B-405) gate is in section 3
     title: Code-pack route of the CalcPort and the structural-codes workspace dependencies
     files:
       - "packages/eng-harness/CHANGELOG.md"
@@ -30,6 +32,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/_calc/_code_packs.py"
       - "packages/eng-harness/src/eng_harness/_calc/_port.py"
       - "packages/eng-harness/tests/unit/calcs/test_code_pack_route.py"
+      - "packages/eng-harness/tests/unit/calcs/fixtures/__init__.py"  # package marker so mypy names the test pack calcs.fixtures.code_pack (B-418)
       - "packages/eng-harness/tests/unit/calcs/fixtures/code_pack/**"
     max_changed_lines: 320
     max_sessions: 3
@@ -131,6 +134,7 @@ tasks:
     covers: [AC10, AC11]
     depends_on: [T3]
   - id: T7
+    # Amendment (B-418, documents only): no workflows/__init__.py marker here; footing T9 registers the workflow in it (section 2)
     title: Decision points footing_fix_strategy and footing_review, and the footing rules
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.footing, eng_harness.workflows and more (amendment B-356)
@@ -181,9 +185,12 @@ tasks:
     covers: [AC15, AC16, AC17, AC18, AC19, AC20]
     depends_on: [T2, T4, T5, T6, T7]
   - id: T9
+    # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
+    # allowlist ids (moved from T2); uv.lock added
     title: Workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs)
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.isolated_footing (amendment B-356); structural-codes-sbc304-2018 dependency (B-418)
+      - "uv.lock"   # workspace root lock file: the sbc304-2018 dependency (B-418)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/isolated_footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/__init__.py"
@@ -320,11 +327,15 @@ labelled so; no case reproduces a project.
 No logic beyond validation.
 
 **T2 Code-pack route** (spec §4.3, Q10, Q11). `CodePackRoute` (describe, run, item limit, storage as `verdicts.set/1`,
-run-class refusal) and its use by `HarnessCalcPort`; the three `structural-codes` workspace packages as dependencies.
-Tests use a small test pack built with `Registry.of` in `tests/unit/calcs/fixtures/code_pack/`, so the task does not wait
-for the ACI pack. Starts only after the documents pull request that amends engine §4.8 and calcs §4.12 (spec Q10).
+run-class refusal) and its use by `HarnessCalcPort`; the workspace packages `structural-codes-core` and
+`structural-codes-aci318-14` as dependencies, with the six ACI footing ids in the allowlist. The third,
+`structural-codes-sbc304-2018`, and the SBC ids that `check_id_for` gives are added by T9, which already waits for SBC
+T3 (amendment B-418: the SBC package is created by SBC T1 and `check_id_for` by SBC T3, so T2 does not wait for them).
+Tests use a small test pack built with `Registry.of` in `tests/unit/calcs/fixtures/code_pack/` (with a
+`tests/unit/calcs/fixtures/__init__.py` marker, so the pack module is `calcs.fixtures.code_pack` for mypy and the test
+alike), so the task does not wait for the ACI pack. Starts only after the documents pull request that amends engine §4.8 and calcs §4.12 (spec Q10).
 Spec 0013 §4.5 defines the same route (spec C3): if plan 0013 T6 has merged when T2 starts, T2 adds the footing ids,
-the `items` argument and its tests to that route (the dependencies are then already in place), and the lead records
+the `items` argument and its tests to that route (the core and ACI dependencies are then already in place), and the lead records
 which by a plan amendment; otherwise T2 builds the route with both workflows' ids and plan 0013 T6 extends it. T2 also
 starts only after the documents pull request that settles spec C4 (an id outside the allowlist gives `NOT_FOUND`, spec
 0013 AC13 amended); T2 never changes an expectation of a merged test of that file to meet this spec (A4). Provenance is
@@ -342,14 +353,18 @@ minimality and monotonicity properties run with Hypothesis.
 distances, assembled schedule.
 
 **T7 Points and rules** (spec §4.5). Two points with their state models, five rules with typical and boundary tests, lock
-entries; the rules' review table goes to the owner (spec 0005 §4.4).
+entries; the rules' review table goes to the owner (spec 0005 §4.4). T7 creates no `workflows/__init__.py`: the merged
+gate type-checks a package folder without one, that module is the workflow registry of plan 0007 T8 (amendment B-417),
+and footing T9 registers this workflow in it (amendment B-418).
 
 **T8 Block** (spec §4.6). The rounds loop with `ctx.attempts`, the six batched checks through the route of T2 with the
 ACI pack, `decide_many`, engineer dimensions, resize and closures. Tests drive the block through a test workflow in
 `tests/workflow/footing/conftest.py`.
 
 **T9 Workflow** (spec §4.2, §4.7, §4.8). Definition, input and output models, `basis_fields`, steps 1 to 13 and 15, the
-seismic refusal, the SAFE-source gap, the SBC run, approvals per mode, and registration in `workflows/__init__.py`
+seismic refusal, the SAFE-source gap, the SBC run (with the `structural-codes-sbc304-2018` workspace dependency, its
+`uv.lock` entry and the SBC ids from `check_id_for` in the route's allowlist, moved here from T2 by amendment B-418),
+approvals per mode, and registration in `workflows/__init__.py`
 (the module through which the command line of plan 0006 T14 finds workflows; if that task names another module, this
 task follows it and the file list is amended).
 
@@ -369,19 +384,20 @@ determinism. The non-test lines are at most a test-support helper.
 
 ## 3. Dependencies
 
-- Runtime: the workspace packages `structural-codes-core`, `structural-codes-aci318-14` and
-  `structural-codes-sbc304-2018` (T2; no third-party package, so no ADR, spec Q11). Development: none new.
+- Runtime: the workspace packages `structural-codes-core` and `structural-codes-aci318-14` (T2) and
+  `structural-codes-sbc304-2018` (T9, after SBC T1 and T3; amendment B-418); no third-party package, so no ADR, spec
+  Q11. Development: none new.
 - Work items of other plans that must be merged before each task (plan ids as in their files; "SC" is the
   structural-codes core plan, "ACI" its plan 0002, "SBC" its plan 0003):
 
 | Task | Needs merged |
 |---|---|
 | T1 | eng-contract T11, T12 (kinds); plan 0001 T3 (`_kinds.py`); plan 0003 T4 |
-| T2 | plan 0003 T5 (CalcPort); SC T8, T11 (evaluate, lifecycle); the documents pull request of spec Q10 |
+| T2 | plan 0003 T5 (CalcPort); SC T8, T11 (evaluate, lifecycle); the documents pull requests of spec Q10 and C4 (B-405) |
 | T3 to T6, T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
 | T7 | plan 0005 T1 to T4, T7 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
-| T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19; plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); SBC T3 |
+| T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19; plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
 | T10 | plan 0008 T5 (`harness.joint_loads/1`, points) |
 | T11 | plan 0008 T6, T7 (load import, analysis, soil pressures, reactions) |
 | T12 | plan 0006 T11 to T13 (report); plan 0007 T10 (audits); SC T13 (calculation notes) |
@@ -410,5 +426,5 @@ determinism. The non-test lines are at most a test-support helper.
 Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 depends on T2 and
 T4 to T7; T9 on T8; T11 on T9 and T10). Until T9 merges, nothing registers the workflow. Calcs, points, rules and blocks
 are versioned with lock files, so a fix after runs have been journaled is a new version; old journals keep replaying
-against the version they recorded or stop with `ReplayDivergence`, never silently. Reverting T2 removes the
-`structural-codes` dependencies with it.
+against the version they recorded or stop with `ReplayDivergence`, never silently. Reverting T2 removes the core and ACI
+`structural-codes` dependencies with it; reverting T9 removes the SBC one.
