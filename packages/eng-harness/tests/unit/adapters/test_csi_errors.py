@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ErrorCode
-from eng_contract.ids import SeededIdSource
+from eng_contract.ids import FixedClock, SeededIdSource
 
 from eng_harness.adapters._errors import ErrorReply
 from eng_harness.adapters.csi._errors import CSI_ERROR_TABLE, CSI_NOT_FOUND_TEXTS, CsiErrorMapper
@@ -38,13 +38,13 @@ ROWS: list[tuple[str, CallEffect, dict[str, Any] | None, ErrorCode, bool, str | 
     ("generic_invoke_disabled", R, None, C.INTERNAL, False, None, None),
     ("unsupported_operation", W, None, C.INTERNAL, False, None, None),
     ("csi_error", W, {"member": "SapObject.Foo", "return_code": 7}, C.HOST_ERROR, False, "7", "SapObject.Foo"),
-    ("csi_error", R, {"member": "SapModel.Bar", "hresult": -2147467259}, C.HOST_ERROR, False, "-2147467259", "SapModel.Bar"),
-    ("csi_error", R, {"member": "SapModel.Baz"}, C.INVALID_ARGUMENT, False, None, None),
+    ("csi_error", R, {"member": "M.Bar", "hresult": -2147467259}, C.HOST_ERROR, False, "-2147467259", "M.Bar"),
+    ("csi_error", R, {"member": "SapModel.Baz"}, C.HOST_ERROR, False, None, "SapModel.Baz"),  # data.member alone
 ]  # fmt: skip
 
 
 def _mapper() -> CsiErrorMapper:
-    return CsiErrorMapper(SeededIdSource(b"errors"))
+    return CsiErrorMapper(SeededIdSource(b"errors", FixedClock(1_767_225_600_000, 1)))
 
 
 def _map(code: str | None, effect: CallEffect, data: dict[str, Any] | None = None, message: str = "m") -> Any:
@@ -61,7 +61,8 @@ def test_mapping_table(
     assert detail.code is want
     assert detail.retryable is retryable
     assert (detail.host_code, detail.host_method) == (host_code, host_method)
-    assert code in detail.message and "original text" in detail.message  # the original code and message are kept
+    assert code in detail.message
+    assert "original text" in detail.message  # the original code and message are kept
     assert (detail.incident_id is not None) is (want is C.INTERNAL)
     assert detail.precondition is None
     # the op_id travels with an unknown outcome so that the engine reconciles that operation
@@ -80,8 +81,8 @@ def test_csi_error_without_data_not_found_texts(text: str) -> None:
     assert _map("csi_error", W, {}, text).code is C.NOT_FOUND
 
 
-def test_csi_error_without_data_other_text_is_invalid_argument() -> None:
-    assert _map("csi_error", W, None, "name must not be empty").code is C.INVALID_ARGUMENT
+def test_csi_error_without_such_data_other_text_is_invalid_argument() -> None:
+    assert _map("csi_error", W, {"product": "ETABS"}, "name must not be empty").code is C.INVALID_ARGUMENT
 
 
 def test_unexpected_text_is_internal_with_fresh_incident_ids() -> None:
@@ -92,7 +93,9 @@ def test_unexpected_text_is_internal_with_fresh_incident_ids() -> None:
     first = mapper.map(reply, effect=R, tool="t", op_id="o")
     second = mapper.map(reply, effect=W, tool="t", op_id="o")
     assert first.code is second.code is C.INTERNAL
-    assert first.incident_id and second.incident_id and first.incident_id != second.incident_id
+    assert first.incident_id
+    assert second.incident_id
+    assert first.incident_id != second.incident_id
 
 
 def test_no_code_text_that_says_timed_out_on_a_write_is_unknown_outcome() -> None:

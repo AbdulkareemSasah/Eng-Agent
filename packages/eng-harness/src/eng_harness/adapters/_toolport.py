@@ -2,7 +2,9 @@
 
 Purpose: validate, build host arguments, ledger a write before sending it (4.5.7), answer an envelope. Units: canonical
 in and stored, the token's units on the wire. Errors: a tool outside the allowlist raises `INVALID_ARGUMENT`; any other
-contract failure is a failure envelope. Not here: error mapping, preconditions, `reconcile`, `read_back` (T9 on).
+contract failure is a failure envelope. Host error replies are mapped by the adapter's `HostErrorMapper` and a
+timeout or lost session wedges the host until `HostHealth.reconciled` (T9). Not here: preconditions, `reconcile`,
+`read_back`.
 """
 
 import logging
@@ -11,7 +13,7 @@ from typing import Any, Protocol
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Envelope, HostInfo, make_failure
-from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from eng_contract.ids import Clock, IdSource
 from eng_contract.params import ParamModel, ParamSpec
 from eng_contract.refs import RefString
@@ -23,6 +25,7 @@ from eng_harness.adapters._allowlist import Allowlist
 from eng_harness.adapters._args import HostTarget, convert_quantities, host_arguments, validate_call
 from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._envelope import make_envelope, parse_reply
+from eng_harness.adapters._errors import WEDGING_CODES, HostErrorMapper, HostHealth, parse_error_reply
 from eng_harness.adapters._ledger import LedgerEntry, WriteLedger
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ServerCheck, ToolInfo
@@ -97,8 +100,14 @@ class AdapterToolPort:
         arg_models: Mapping[str, type[ParamModel]],
         builders: Mapping[str, Builder] | None = None,
         readers: Mapping[str, Reader] | None = None,
+        health: HostHealth | None = None,
+        errors: HostErrorMapper | None = None,
     ) -> None:
-        """Wire the port; `ValueError` when a tool lacks its argument model, a serving role or a needed reader."""
+        """Wire the port; `ValueError` when a tool lacks its argument model, a serving role or a needed reader.
+
+        `errors` maps host error replies (without it an error reply is `HOST_ERROR` with the host's code).
+        """
+        self._health, self._errors = health or HostHealth(), errors
         self._allowlist, self._config, self._server = allowlist, config, server
         self._caller, self._binder, self._store, self._ledger = caller, binder, store, ledger
         self._clock, self._ids, self._check, self._models = clock, ids, check, arg_models
@@ -148,8 +157,17 @@ class AdapterToolPort:
         except (ContractError, ToolFailed) as error:
             return make_failure(error.detail)
 
+    def _lost(self, detail: ErrorDetail, host_key: str, op_id: str, *, bump_epoch: bool) -> ToolFailed:
+        """The failure to return; a timeout or lost session wedges the host and an unknown outcome names `op_id`."""
+        if detail.code in WEDGING_CODES:
+            self._health.mark_wedged(host_key, op_id, bump_epoch=bump_epoch)
+        if detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME and detail.op_id is None:
+            detail = detail.model_copy(update={"op_id": op_id})
+        return ToolFailed(detail)
+
     async def _call(self, descriptor: ToolDescriptor, args: _Obj, op_id: str, model: str | None) -> Envelope:
         server = self._config.servers[self._server]
+        self._health.check(server.host_key)  # a wedged host gets nothing until the engine has reconciled
         role = next(name for name, r in server.roles.items() if descriptor.timeout_class in r.classes)
         started, began = self._clock.now(), self._clock.now_ms()
         cls = self._models[descriptor.args_model]
@@ -182,8 +200,15 @@ class AdapterToolPort:
                 raise ContractError(
                     ErrorCode.INTERNAL, f"{descriptor.name} not sent, ledger: {error}", incident_id=incident
                 ) from error
-        result = await self._caller.call(self._server, role, descriptor.name, sent, effect)
-        reply = parse_reply(result.model_dump(by_alias=True, mode="json"))
+        try:
+            result = await self._caller.call(self._server, role, descriptor.name, sent, effect)
+        except ToolFailed as error:  # the session lost the host and increased its epoch itself
+            raise self._lost(error.detail, server.host_key, op_id, bump_epoch=False) from error
+        dumped = result.model_dump(by_alias=True, mode="json")
+        if self._errors is not None and (failure := parse_error_reply(dumped)) is not None:
+            detail = self._errors.map(failure, effect=effect, tool=descriptor.name, op_id=op_id)
+            raise self._lost(detail, server.host_key, op_id, bump_epoch=True)
+        reply = parse_reply(dumped)
         reader = self._readers.get(descriptor.name)
         payload, summary = reader(reply, binding) if reader else ({"value": reply}, {})
         return make_envelope(

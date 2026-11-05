@@ -73,7 +73,9 @@ def test_backstop_on_a_read_is_no_effect(run_dir: Path, store: ResultStore, ids:
     assert health.wedged("csi") is not None
 
 
-def test_wedged_host_refuses_without_sending(run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any) -> None:
+def test_wedged_host_refuses_without_sending(
+    run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: Any
+) -> None:
     rig, health = _rig(run_dir, store, ids, clock)
     rig.call(WALL, rig.wall(), op_id="op-w")
     sent = len(rig.caller.calls)
