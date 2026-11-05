@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+from collections.abc import Callable
 from dataclasses import replace
 from typing import Any
 
@@ -46,12 +47,13 @@ def test_fingerprint_ignores_order_and_descriptions_only() -> None:
     reworded["csi_beta"]["description"] = "Another text."
     reworded["csi_beta"]["properties"]["count"]["title"] = "Number"
     assert tool_list_fingerprint(reworded) == base
-    for change in (
+    changes: list[Callable[[dict[str, Any]], object]] = [
         lambda s: s["csi_beta"]["properties"]["count"].update(minimum=2),
         lambda s: s["csi_beta"]["properties"].update(extra={"type": "string"}),
         lambda s: s["csi_beta"]["properties"].pop("description"),
         lambda s: s.pop("csi_alpha"),
-    ):
+    ]
+    for change in changes:
         changed = copy.deepcopy(SCHEMAS)
         change(changed)
         assert tool_list_fingerprint(changed) != base
