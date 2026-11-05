@@ -186,7 +186,7 @@ section is optional and may be empty. Only these keys exist (AC3).
   (`{name, edition}` or null; recorded, not checked until phase 2), `status` (`draft` or `approved`; default `draft`),
   `synthetic` (bool, default false), `extends` (`"<name>@<version>"` or null).
 - A section is a tree of groups (mappings) whose leaves are **entries**. A mapping is an entry exactly when it has the
-  key `citation` **[added]**; any other mapping is a group. Group and leaf keys follow
+  key `citation` or the key `value` **[added; `value` amended by B-378]**, so an entry that lacks its citation is refused (AC2) instead of being read as a group; any other mapping is a group. Group and leaf keys follow
   the path-segment rule of the contract (Q1). The path of a leaf is the dotted key path from the section, for example
   `materials.concrete.<grade>.fc_MPa`; it is the key of the basis field.
 - Entry: `value` (JSON: number, integer, string, bool, or a list or mapping of those for catalogs and combination sets;
