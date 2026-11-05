@@ -23,6 +23,7 @@ PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 SYNCHRONIZE = 0x00100000
 ERROR_ACCESS_DENIED = 5
 ERROR_INVALID_PARAMETER = 87
+ERROR_INVALID_HANDLE = 6
 ERROR_NO_MORE_FILES = 18
 ERROR_BAD_LENGTH = 24
 WAIT_OBJECT_0, WAIT_TIMEOUT = 0, 0x102
@@ -52,6 +53,7 @@ class _FakeKernel32:
     def __init__(self, table: dict[int, _Process]) -> None:
         self.table = table
         self.denied: set[int] = set()
+        self.open_error: int | None = None  # a last error every OpenProcess fails with
         self.fail: dict[str, int] = {}  # function name -> the last error it sets while returning failure
         self.terminate_fails = False
         self.exits_before_terminate = False
@@ -79,6 +81,9 @@ class _FakeKernel32:
         return name in self.fail
 
     def open_process(self, rights: int, inherit: bool, pid: int) -> int | None:
+        if self.open_error is not None:
+            self._error = self.open_error
+            return None
         if pid in self.denied:
             self._error = ERROR_ACCESS_DENIED
             return None
@@ -294,7 +299,16 @@ def test_listing_skips_inaccessible(caplog: pytest.LogCaptureFixture) -> None:
     assert "13" in caplog.text
     with pytest.raises(OSError, match=r"OpenProcess\(11\)"):
         inspector.identity(11)
-    assert set(range(1000, 1000 + len(kernel32.opened))) <= set(kernel32.closed)
+    assert sorted(set(kernel32.closed)) == [*range(1000, 1000 + len(kernel32.opened)), 5000]  # 5000: the snapshot
+
+
+def test_other_open_errors_are_raised_during_a_listing() -> None:
+    """Only access denied is left out of a listing; any other OpenProcess error is raised (AC7a)."""
+    inspector, kernel32 = _inspector({10: _Process(CREATED, path="C:\\a\\Etabs.exe")})
+    kernel32.open_error = ERROR_INVALID_HANDLE
+    with pytest.raises(OSError, match=r"OpenProcess\(10\)") as raised:
+        inspector.snapshot(["etabs.exe"])
+    assert not isinstance(raised.value, PermissionError)
 
 
 @pytest.mark.parametrize("call", ["GetProcessTimes", "QueryFullProcessImageNameW", "CreateToolhelp32Snapshot"])
