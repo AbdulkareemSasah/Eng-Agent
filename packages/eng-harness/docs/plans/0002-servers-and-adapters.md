@@ -96,7 +96,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/servers/_session.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"
       - "packages/eng-harness/tests/workflow/conftest.py"
-      - "packages/eng-harness/tests/workflow/__init__.py"  # empty package marker: mypy names the root tests/conftest.py (engine T3b) and this folder's conftest.py both "conftest" otherwise (B-377)
+      - "packages/eng-harness/tests/workflow/__init__.py"  # empty package marker: without it mypy names this folder's conftest.py "conftest", as it does every bare conftest module (engine T3b's tests/conftest.py, tools/eng-dev-gate/tests/conftest.py) (B-377, B-378)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -354,7 +354,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py::test_prepare_outputs_hashed"
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py::test_build_config_and_pins"
-    covers: [AC31, AC32]
+    covers: [AC6, AC31, AC32]  # AC6: a timed-out tool step fails TIMEOUT_NO_EFFECT (B-378)
     depends_on: [T14]
   - id: T17
     title: Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings
