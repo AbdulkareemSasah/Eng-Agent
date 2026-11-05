@@ -42,6 +42,38 @@ tasks:
       - "packages/structural-codes/aci318-14/tests/unit/test_common.py::test_shared_preconditions"
     covers: [BP-AC5, PK-AC2]
     depends_on: [T1]
+  - id: T2b
+    title: "Regression tests: rectangular, asymmetric footing statics and integrals in both directions"
+    # Amendment (B-421, documents only): the retroactive verification of T2 (B-271) found every statics and integral
+    # case square, so X/Y swaps in S1, S2, the S5 modulus pairing or the _AXES table pass every test. The tests pass
+    # against the merged code, so this is a test-only pull request (title type test: no non-test file, no
+    # failing-first run; gate spec 4.7). Hand values: §2 T2b.
+    files:
+      - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py"
+    # Budget: the task statement of B-421 set 10; two cases (R1, R2) with about 25 hand-value assertions (PK-AC10)
+    # do not fit, so the review of B-421 raised it to 60, pending the lead's confirmation.
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py::test_rectangular_statics"
+      - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py::test_rectangular_integrals"
+    covers: [PK-AC10]
+    depends_on: [T2]
+  - id: T2c
+    title: "Shared constants carry the clause specs' citation texts, asserted by test"
+    # Amendment (B-421, documents only): fix of the same verification. The shared constants of _common.py take the
+    # citation texts of §1.1 (c_half changes; sf_max gains its Cited.note), the module docstring cites §6 Q6 as
+    # amended, and a test compares each shared constant with its rows in the clause specs §5.
+    files:
+      - "packages/structural-codes/aci318-14/src/aci318_14/_common.py"
+      - "packages/structural-codes/aci318-14/tests/unit/test_footing_statics.py"
+      - "packages/structural-codes/aci318-14/tests/unit/test_common.py"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/structural-codes/aci318-14/tests/unit/test_common.py::test_shared_sources_match_clause_specs"
+    covers: [PK-AC11]
+    depends_on: [T2]
   - id: T3
     title: Check bearing_pressure_service (13.3.1.1)
     files:
@@ -216,6 +248,44 @@ are merged before T2; T9 (verification) before T3 to T8 (their case files are ru
 CF §4.1 and §4.2 amended to `docs/clauses/<pack>/`, or these clause specs moved to the folder the core resolves, so
 that PK-AC3 finds every `CheckMeta.spec` file.
 
+### 1.1 Shared constants (amendment B-421)
+
+A constant of `aci318_14._common` is recorded once per trace under one `Cited`, and the same `Cited` enters the trace
+of every check that uses it (the footing statics record `k_m`, `c_S` and `c_I` in the trace of each check whose
+`COMPRESSION` runs them; one-way shear and flexure share `c_half` between the statics integrals and their own steps).
+A trace constant must cite its spec's §5 (bearing BP-AC3), so per-spec citation texts would need one `Cited` per spec
+for the same name in the same trace, which the recorder refuses (a name recorded twice). Decision: **one citation text
+per shared constant**, the `Cited.source` below, written verbatim (plain text, no code formatting) in the Citation
+cell of the constant's row in §5 of every clause spec that uses it. Where a text must cover several uses, it lists
+them (`c_half`) or names every clause that sets the same value (`sf_max`); each spec's §4 says which use or clause
+applies. A check whose constant is not the shared one keeps its own `Cited` and its own row text (development length's
+`c_half`, recorded by that check alone; it never runs the statics). No value changes.
+
+| Name | Value | Unit | `Cited.source` (and `Cited.note`) | Clause specs whose §5 cite it |
+|---|---|---|---|---|
+| `phi_v` | 0.75 | 1 | ACI 318-14 Table 21.2.1, row (b) shear | one-way, punching |
+| `lambda_nw` | 1.0 | 1 | ACI 318-14 19.2.4.2 (normalweight concrete) | one-way, punching, development |
+| `sf_max` | 8.3 | 1 | ACI 318-14 22.5.3.1, 22.6.3.1, 25.4.1.4 (limit on sqrt f'c); note: true unit MPa^0.5; stored as 1 because the eng-contract unit table has no MPa^0.5 (plan 0002 §6 Q6) | one-way, punching, development |
+| `fc_min` | 17 | MPa | ACI 318-14 Table 19.2.1.1 (minimum f'c, general row) | one-way, punching, flexure, development, axial |
+| `fy_max` | 550 | MPa | ACI 318-14 Table 20.2.2.4(a) (not special seismic) | flexure, minimum reinforcement, development, axial |
+| `k_m` | 0.001 | 1 | SI prefix milli: m per mm (EC §4.7.3) | bearing, one-way, punching, flexure |
+| `k_kN` | 0.001 | 1 | SI prefix kilo: kN per N (EC §4.7.3) | one-way, punching (trace name `k_kilo`), axial |
+| `k_kNm` | 1.0e-6 | 1 | SI prefixes kilo and milli: kN.m per N.mm (EC §4.7.3) | flexure (trace name `k_kilo_milli`), axial |
+| `c_S` | 6 | 1 | Mechanics of materials: section modulus of a rectangle, b*h^2/6 | bearing, one-way, punching, flexure |
+| `c_I` | 12 | 1 | Mechanics of materials: second moment of a rectangle, b*h^3/12 | bearing, one-way, punching, flexure |
+| `c_half` | 2 | 1 | Statics and geometry: factor 2 of a half or a pair (L/2 and c/2 of a centered footing and column, the midpoint xbar, the resultant at a/2, the integral Lp^2/2, mid-depth h/2, the bisection midpoint, two side bars per inner layer) | one-way, flexure, axial (plan 0004 T1 moves the column constants into `_common.py`) |
+| `c_third` | 3 | 1 | Statics: integral of u^2 du over a cantilever, Lp^3/3 | flexure |
+
+Every text except `c_half` is the source merged in T2 (B-271), so only `c_half` and the `sf_max` note change in code
+(T2c). The texts start with the prefixes of PK-AC4.
+
+Constants that become shared later fall under the same rule. Plan 0004 T1 moves the stress-block and `φ` constants of
+the flexure module (`phi_tc`, `eps_tc`, `eps_cu`, `alpha_1`, `beta1_hi`, `beta1_slope`, `beta1_step`, `fc_beta_lo`,
+`fc_beta_hi`, `beta1_lo`) into `_common.py`, and they then become keys of `CITED` that the T2c test checks. Their rows
+in the flexure and axial-flexure specs §5 are therefore already aligned (B-421) to one plain-text Citation cell equal
+to the source merged in `checks/flexure.py` (B-275), with the values of the flexure spec; plan 0004 T1 moves the
+`Cited` objects unchanged and needs no clause spec change.
+
 ## 2. Tasks
 
 **T1 Skeleton.** Creates `packages/structural-codes/aci318-14/` as a uv workspace member (D-10):
@@ -235,6 +305,45 @@ integrals of the one-way shear and flexure specs. `_common.py`: the `Cited` cons
 `NORMALWEIGHT`, `FC_MIN`, `FY_MAX`, `COMPRESSION`, `FULL_CONTACT` with their clauses. `FC_MIN` uses the general row
 of Table 19.2.1.1 and carries the recorded SDC assumption of the clause specs (§6 Q16). R1 module; reviewed with the
 source-check lens.
+
+**T2b Rectangular statics tests** (amendment B-421, test-only). Adds to `tests/unit/test_footing_statics.py` cases with
+`Lx ≠ Ly`, `cx ≠ cy`, `d_x ≠ d_y` and a moment about each axis, asserting both directions, so that swapping X and Y
+in S1, S2, the S5 modulus pairing or the `_AXES` table fails a test. Hand values (strength form, `N = FZ`), derived
+from the bearing spec §4.1, the one-way spec §4 steps 2 and 3 and the flexure spec §4 steps 2 and 3; synthetic inputs,
+no project values:
+
+- Case R1: `Lx = 2000`, `Ly = 3000`, `cx = 400`, `cy = 600`, `d_x = 450`, `d_y = 500` (mm), `FZ = 1500 kN`,
+  `MX = −100 kN.m`, `MY = −150 kN.m`, `FX = FY = 0`, `reaction_height = 0`.
+  S1: `A = 2000·3000 = 6.0e6 mm2`; `Sx = 2000·3000²/6 = 3.0e9 mm3`; `Sy = 3000·2000²/6 = 2.0e9 mm3`;
+  `Ix = 2000·3000³/12 = 4.5e12 mm4`; `Iy = 3000·2000³/12 = 2.0e12 mm4`. S2: `Mbx = −(−100) = 100 kN.m`,
+  `Mby = −(−150) = 150 kN.m`. S5: `q_avg = 1500/6.0 = 250 kPa`; `q_bend = 100/3.0 + 150/2.0 = 108.333333 kPa`;
+  `q_max = 358.333333 kPa`, `q_min = 141.666667 kPa` (the swapped pairing `100/2.0 + 150/3.0` gives 100 kPa).
+  One-way X (span `Lx`, width `Ly`, `Mby`, `Iy`): `Lc_x = 1000 − 200 − 450 = 350 mm`;
+  `x̄_x = (200 + 450 + 1000)/2 = 825 mm`; `Vu_x = 3.0·0.35·(250 + 150·0.825/2.0) = 1.05·311.875 = 327.46875 kN`
+  (pairing `Mbx`, `Ix` instead would give 281.75 kN).
+  One-way Y (span `Ly`, width `Lx`, `Mbx`, `Ix`): `Lc_y = 1500 − 300 − 500 = 700 mm`;
+  `x̄_y = (300 + 500 + 1500)/2 = 1150 mm`; `Vu_y = 2.0·0.7·(250 + 100·1.15/4.5) = 350 + 35.777778 = 385.777778 kN`.
+  Flexure X: `Lp_x = 1000 − 200 = 800 mm`, `a = 0.2 m`, `|Mby|/Iy = 75 kPa/m`;
+  `Mu_x = 3.0·[250·0.8²/2 + 75·(0.8³/3 + 0.2·0.8²/2)] = 3.0·[80 + 75·0.234667] = 3.0·97.6 = 292.8 kN.m`.
+  Flexure Y: `Lp_y = 1500 − 300 = 1200 mm`, `a = 0.3 m`, `|Mbx|/Ix = 100/4.5 kPa/m`;
+  `Mu_y = 2.0·[250·1.2²/2 + (100/4.5)·(1.2³/3 + 0.3·1.2²/2)] = 2.0·[180 + (100/4.5)·0.792] = 2.0·197.6 = 395.2 kN.m`.
+- Case R2 (S2 pairing): R1 geometry with `MX = MY = 0`, `FX = 200 kN`, `FY = −100 kN`, `reaction_height = 500 mm`.
+  S2: `Mbx = 0 + 0.5·(−100) = −50 kN.m`, `Mby = 0 − 0.5·200 = −100 kN.m`; S5: `q_bend = 50/3.0 + 100/2.0 =
+  66.666667 kPa`, `q_max = 316.666667 kPa`, `q_min = 183.333333 kPa` (pairing `FX` with `Mbx` would give 58.333333 kPa).
+
+Tolerances as the existing statics tests (exact steps to floating-point rounding; the absolute kN and kN.m tolerances
+of the one-way and flexure hand checks for `Vu` and `Mu`).
+
+**T2c Shared citation texts** (amendment B-421). `_common.py`: `c_half` takes the source of §1.1, `sf_max` gains the
+`Cited.note` of §1.1, and the module docstring says "`sf_max` in MPa^0.5 stored with unit 1, plan §6 Q6" (Q6 now
+records that decision). Test `test_shared_sources_match_clause_specs` in `tests/unit/test_common.py` reads §5 of every
+clause spec under `packages/structural-codes/docs/clauses/aci318_14/` and, for each row whose Symbol is a key of
+`CITED`, asserts the Citation cell equals `CITED[name].source`, the Value cell equals its value and the Unit cell its
+unit (a key added later, such as the plan 0004 T1 constants of §1.1, is checked the same way with no test change);
+it also asserts every key of `CITED` has at least one such row and that the `sf_max` note is the text of §1.1.
+A development-length row named `c_half` is that check's own constant (§1.1) and is excluded by name. It fails at the
+base because the merged `c_half` source and the missing `sf_max` note differ from the specs. `test_footing_statics.py`
+may assert that the constants recorded by `statics`, `one_way_shears` and `face_moments` are the `CITED` objects.
 
 **T3 to T8 Checks.** One check per task, each with its unit tests, its hand-check case file
 (`tests/data/golden/verification/<check_id>.yaml`, a protected test oracle, CF §4.9.1), its golden test (runs
@@ -276,6 +385,13 @@ of each clause spec.
 - PK-AC9. Given the package, when the gate runs, then line coverage ≥ 95%, branch ≥ 90%, mutation ≥ 80% on the R1
   modules (process/05 §2), and imports are limited to `structural_codes`, `eng_contract` and the standard library.
   Evidence: the CI `gate` job (T9 pull request).
+- PK-AC10. Given the rectangular cases R1 and R2 of §2 T2b, when the shared statics and both integrals run, then
+  `Sx`, `Sy`, `Ix`, `Iy`, `Mbx`, `Mby`, `q_max`, `q_min`, and in both directions `Lc`, `x̄`, `Vu`, `Lp`, `Mu` equal
+  the hand values. Tests: `tests/unit/test_footing_statics.py::test_rectangular_statics`,
+  `tests/unit/test_footing_statics.py::test_rectangular_integrals`.
+- PK-AC11. Given the clause specs §5 and `CITED`, when compared, then every shared constant's source, value and unit
+  equal its rows in each clause spec that cites it (§1.1), and `sf_max` carries the note of §1.1. Test:
+  `tests/unit/test_common.py::test_shared_sources_match_clause_specs`.
 
 No fake-host workflow test applies: the checks touch no host. The footing workflow's fake-host and replay tests belong
 to B-075.
@@ -323,7 +439,7 @@ to B-075.
 | Q3 | Punching with moment transfer (punching G-4): whether the Chapter 8 eccentric-shear rule applies to footings through 13.3.3.1 | Confirm at C3; then implement it as a new check version, since most real footings carry a base moment |
 | Q4 | Strength checks use the net factored pressure from the column load only (footing and soil weights excluded) | Accept: the uniform self-weight pressure is balanced by the weight itself and causes no shear or moment in the footing |
 | Q5 | Punching uses one effective depth `d` | B-075 passes the mean of `d_x` and `d_y`; confirm |
-| Q6 | √MPa-valued steps (`sf`) are recorded with unit null because `UNITS` has no such unit | Accept; the formula names the unit |
+| Q6 | √MPa-valued steps (`sf`) are recorded with unit null because `UNITS` has no such unit. Amended (B-421): the constant `sf_max` (8.3, a limit on √f'c, true unit MPa^0.5) is stored with unit `1` for the same reason, its true unit in `Cited.note` ("true unit MPa^0.5; stored as 1 because the eng-contract unit table has no MPa^0.5 (plan 0002 §6 Q6)"); likewise the pack's √MPa coefficients (`c_vc` 0.17 of eq. 22.5.5.1, `c_a` 0.33, `c_b` 0.17 and `c_c` 0.083 of Table 22.6.5.2, `c_ld` 1.1 of eq. 25.4.2.3a) are stored with unit `1`, their true unit named in the citation ("..., coefficient in MPa^0.5"), as the merged checks already record them; only steps (`sf`) keep unit null; ratios of like units (`k_m` m per mm, `k_kN` kN per N, `k_kNm` kN.m per N.mm) are recorded with unit `1`, the ratio named in the citation. The clause specs' §5 unit columns say `1` for these rows | Accept; the formula (steps) or the note and citation (constants) name the unit |
 | Q7 | Detailing clauses not checked: band rule for rectangular footings, bar spacing limits | Add detailing checks in a later version; B-075 uses uniform spacing on square footings until then |
 | Q8 | `FY_MAX` uses the row for members that are not part of a special seismic system | B-075 refuses footings of special seismic systems until seismic checks exist |
 | Q9 | Minimum flexural reinforcement: two-way slab minimum through 13.3.3.1, or also a beam-type minimum | Slab minimum (8.6.1.1), as specified; owner confirms |

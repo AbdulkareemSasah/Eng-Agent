@@ -7,6 +7,9 @@ size: large
 risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
+    # Amendment (B-418, documents only): external gate on plan 0002 written on depends_on; servers/_session.py added (the
+    # build check takes the server's product); pre-start grep of the shared modules for ETABS-only names, each hit a
+    # lead plan amendment adding the file here before T1 starts, no lint exclusions (section 2)
     title: Product profile, per-product fingerprint, SAFE server section and product resolution
     # Amendment (B-413, documents only): test_build_mismatch_stops_run is written later, in plan 0002 T19; the
     # test_session.py glob and the workflow conftest.py stay to adapt the session-level build-check tests of 0002 T6b to the per-product header.
@@ -15,6 +18,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
+      - "packages/eng-harness/src/eng_harness/servers/_session.py"  # ServerCheck passes the server product to the build check (0002 T6b)
       - "packages/eng-harness/src/eng_harness/adapters/_allowlist.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"
@@ -36,7 +40,7 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_products.py::test_no_product_branches_in_shared"
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_tool_not_served_for_product"
     covers: [AC1, AC2, AC3, AC4]
-    depends_on: []
+    depends_on: []  # external: plan 0002 T1, T6, T6b, T7 to T14 (with T8b) merged first; T3 also 0002 T15; T8 also 0002 T17
   - id: T2
     title: Synthetic SAFE mode of the CSI fake and its schema check
     files:
@@ -49,6 +53,7 @@ tasks:
     covers: [AC28]
     depends_on: [T1]
   - id: T3
+    # Amendment (B-418, documents only): T3 holds the SG-1 to SG-9 ids and messages in _gaps.py but wires only SG-1 (AC8)
     title: SAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries
     # Amendment (B-413, documents only): test_safe_build_mismatch_stops_run (AC4's stop, engine AC44) moves to plan 0002
     # T19, which adds build_ports and runs the real engine, so T3 does not wait for engine plan 0001 T13.
@@ -148,6 +153,7 @@ tasks:
     covers: [AC14, AC15, AC16, AC17, AC18, AC19, AC20]
     depends_on: [T5]
   - id: T7
+    # Amendment (B-418, documents only): T7 wires SG-2, SG-3, SG-4, SG-5 and SG-9 to their steps (AC24, AC25) and SG-6
     title: SAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
@@ -244,8 +250,17 @@ keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
 **T1 Separation** (spec §4.1). `ProductProfile` and the registry in `products/__init__.py`; `_etabs.py` reduced to its
 profile (behavior unchanged, the 0002 suite still passes); `[servers.<name>].product` and `[host_programs.safe]` in
 `ServersConfig`; the allowlist header table `[fingerprint]` with one entry per product and the loader's `products` filter;
-the build check takes the server's product; product by model extension. Touches files that plan 0002 T1, T6, T6b and T11 create,
-so it starts after those are merged. The existing 0002 test that reads the pinned fingerprint
+the build check takes the server's product (in `_buildcheck.py` and in `ServerCheck` of `servers/_session.py`, its
+caller since plan 0002 T6b, which picks the fingerprint entry by the server's product); product by model extension.
+Touches files that plan 0002 creates or changes, so it starts only after plan 0002 T1, T6, T6b, T7, T8, T8b, T9, T10,
+T11, T12, T13 and T14 are merged on `build/v1` (amendment B-418; the gate is written as a comment on T1's `depends_on`,
+and T3 also waits for 0002 T15 or drops `csi_unlock_model`, T8 for 0002 T17). Before starting, the writer checks with
+`git ls-tree` that the 0002 files T1 lists exist, then greps the shared modules (`adapters/_hostport.py`,
+`adapters/csi/_session_ops.py`, `_state.py`, `_replies.py`, `_edits.py`, `_tools.py`, `_checks.py`, `_reconcile.py`)
+for `ETABS` or `.EDB`. Every hit is reported to the lead before T1 starts, and the lead adds that file to T1's files by
+a plan amendment, so that T1 makes it ask the profile; T1 starts only when the grep finds no hit outside T1's files.
+`test_no_product_branches_in_shared` carries no exclusions: no later task lists `test_products.py`, and `_state.py`,
+`_replies.py` and `_edits.py` are in no other task of this plan, so an exclusion could never be removed in scope. The existing 0002 test that reads the pinned fingerprint
 (`test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`) is in T1's files: it changes only in how it reads the
 header (the ETABS entry of `[fingerprint]`), never in the value it expects, and it is the regression proof that the
 ETABS fingerprint is unchanged. The ETABS engine-stop test `test_session.py::test_build_mismatch_stops_run` does not
@@ -266,8 +281,11 @@ configurable row counts and truncation, `csi_new_model` returning `unsupported_b
 `csi_add_load_combo`, `csi_delete_load_combo`, `csi_assign_area_section`, `csi_run_analysis`, `csi_analysis_status`,
 `csi_results_base_reactions`, `csi_results_joint_reactions`, `csi_unlock_model` once plan 0002 T15 has landed) each with
 kind, class, effect, action, units, args model, confirm and read-back helper; the SAFE fingerprint computed from the
-inventory and pinned; `working_copy` and `restore` for `.FDB` through the 0002 session operations; the gap registry
-(`NotImplementedGap` with ids SG-1 to SG-9); the isolation test with two servers. `csi_db_tables_apply`, `csi_delete_object`,
+inventory and pinned; `working_copy` and `restore` for `.FDB` through the 0002 session operations; the gap registry in
+`_gaps.py` holds the SG-1 to SG-9 ids and messages (`NotImplementedGap`), and T3 wires only SG-1 (AC8) to a step.
+SG-7 and SG-8 are raised in T6 (AC16, AC15), SG-6 (`LIMIT_EXCEEDED`) in T7, and T7 wires SG-2, SG-3, SG-4, SG-5 and
+SG-9 to their steps (AC24, AC25); T3 does not wire those, so T7's first-commit tests fail at its base (amendment
+B-418). T3 also adds the isolation test with two servers. `csi_db_tables_apply`, `csi_delete_object`,
 `csi_new_model`, `csi_new_blank_model`, `csi_define_*`, `csi_design_*` and `csi_results_story_drifts` are not SAFE entries.
 
 **T4 Tables** (spec §4.5). `read_table` with units labelling and `truncated` handling, the field-map data with the three
@@ -284,7 +302,9 @@ mapping including `SuperDead`.
 
 **T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group` (rows carry `step_type` and `case_type`; a non-unique key is `INTERNAL`), the
 base-reaction and joint-reaction readers, analysis status, the `Analysis Messages` read as a `NotImplementedGap` until recorded, and the explicit gaps for
-slab design.
+slab design. T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their registry entries (AC24, AC25; amendment
+B-418). AC25's parametrized cases include SG-8, which T6 already raises and which is green at T7's base; this is
+acceptable because the test-first gate counts the test red while any case fails.
 
 **T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the
 crash matrix at each write step, the recorded-reply contract tests (skipped with a reason until the owner commits SAFE recordings), the
