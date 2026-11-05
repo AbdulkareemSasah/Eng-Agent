@@ -19,7 +19,7 @@ _SECRET_KEYS = frozenset({"key", "api_key", "token", "secret", "password", "auth
 _NAME = r"^[a-z][a-z0-9_-]{0,31}$"
 _PATH = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _TABLES = ("decision", "llm")
-Millis = Annotated[int, Field(strict=True, ge=1)]  # unit: ms
+PositiveInt = Annotated[int, Field(strict=True, ge=1)]  # unit set on each field
 
 
 def _loopback(host: str | None) -> bool:
@@ -42,7 +42,7 @@ class _Provider(BaseModel):
     model_version: str = Field(min_length=1, max_length=40)
     key_ref: str | None = Field(default=None, pattern=_NAME)
     local: bool = Field(default=False, strict=True)
-    request_timeout_ms: Millis
+    request_timeout_ms: PositiveInt  # unit: ms
 
     @model_validator(mode="after")
     def _endpoint(self) -> _Provider:
@@ -72,7 +72,7 @@ class DecisionProviderConfig(_Provider):
 class LLMProviderConfig(_Provider):
     """`[providers.llm]`: the language-model tier."""
 
-    max_output_tokens: Millis  # unit: tokens
+    max_output_tokens: PositiveInt  # unit: tokens
 
 
 class ConfigWarning(BaseModel):
@@ -139,7 +139,7 @@ def load_providers_config(providers: Mapping[str, Any] | None) -> ProvidersConfi
         if "name" not in raw:
             raw["name"] = (
                 str(raw["backend"])
-                if table == "decision" and "backend" in raw
+                if table == "decision" and raw.get("backend") in ("openrouter", "typesafe")
                 else ("openrouter" if table == "decision" else "llm")
             )
         try:

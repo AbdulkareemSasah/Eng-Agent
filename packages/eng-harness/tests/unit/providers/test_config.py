@@ -73,6 +73,9 @@ def test_valid_tables_and_refusals() -> None:
     )
     assert _field({"decision": {k: v for k, v in DECISION.items() if k != "key_ref"}}) == "providers.decision.key_ref"
     assert _field({"decision": {**DECISION, "backend": "other"}}) == "providers.decision.backend"
+    no_name = {k: v for k, v in DECISION.items() if k != "name"}
+    for bad in ("OpenRouter", 5):
+        assert _field({"decision": {**no_name, "backend": bad}}) == "providers.decision.backend"
     assert _field({"decision": {**DECISION, "name": "Bad Name"}}) == "providers.decision.name"
     assert _field({"decision": {**DECISION, "model": ""}}) == "providers.decision.model"
     assert _field({"decision": {**DECISION, "model_version": "x" * 41}}) == "providers.decision.model_version"
