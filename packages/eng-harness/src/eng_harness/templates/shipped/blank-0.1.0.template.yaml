@@ -1,5 +1,5 @@
 # The blank template (spec 0004 section 4.8): structure only, no engineering value, so nothing to cite.
-# Every engineering value is asked at run start. The paths to ask follow from spec 0007 and arrive with it.
+# Every engineering value is asked at run start. ask_each_run stays empty: the spec 0007 section 4.8 paths do not meet the suffix and canonical-unit rule (spec 0004, contract); a spec amendment is pending.
 schema: eng-template/1
 meta:
   name: blank
