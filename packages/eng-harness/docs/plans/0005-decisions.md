@@ -111,7 +111,7 @@ tasks:
     covers: [AC41]
     depends_on: [T2, T4]
   - id: T6
-    # Amendment (B-411, documents only): pending API open_pending/get_pending/close_pending with batch_id and outcomes (spec 4.11), round-trip test.
+    # Amendment (B-411, documents only): pending API open_pending/get_pending/close_pending with batch_id and outcomes (spec 4.11, AC44); append(label, findings) stores hash-only on passed findings.
     title: Label store, pending store, override and opt-in export
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
@@ -128,10 +128,10 @@ tasks:
       - "packages/eng-harness/tests/unit/decisions/test_labels.py::test_override_label"
       - "packages/eng-harness/tests/unit/decisions/test_labels.py::test_export_is_opt_in"
       - "packages/eng-harness/tests/unit/decisions/test_labels.py::test_pending_round_trip"
-    covers: [AC35, AC36, AC37, AC38, AC39]
+    covers: [AC35, AC36, AC37, AC38, AC39, AC44]
     depends_on: [T3, T5]
   - id: T7
-    # Amendment (B-411, documents only): redaction findings over settings and call sensitive values (spec 4.5 step 1); Ref fields on the screen (AC34).
+    # Amendment (B-411, documents only): redaction findings over settings and call sensitive values (spec 4.5 step 1), passed to append(label, findings); Ref fields on the screen (AC34).
     title: Cascade core (validation, tier 1, engineer tier, pending, record)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
@@ -282,13 +282,21 @@ spec §4.9.1 and Q19). About 40 more lines; the budget of 300 holds.
 idempotent insert by `request_id`, override and opt-in export. A write failure raises `StoreWriteError`. Amendment
 B-411: the pending API is fixed here so T9 needs no change to `_labels.py`: `open_pending(request_id, batch_id, screen,
 outcomes)` (idempotent by `request_id`), `get_pending(request_id)` returning `None` or `screen`, `batch_id`, `outcomes`
-and `created_at`, and `close_pending(request_id, closed_at)`; `test_pending_round_trip` asserts that `batch_id` and a
-non-empty `outcomes` object round-trip unchanged and that only `closed_at` changes on close.
+and `created_at`, and `close_pending(request_id, closed_at)`; `test_pending_round_trip` (AC44) asserts that `batch_id`
+and a non-empty `outcomes` object round-trip unchanged and that only `closed_at` changes on close. The label append is
+fixed here too, so T7 needs no change to `_labels.py`: `append(label, findings)` takes the findings of T3's check as
+the cascade computed them (spec §4.5 step 1, over the union of §4.10) and does not re-run the value check; when the
+findings are non-empty it keeps `state_sha256` and stores `state` as null (AC36). `test_unredactable_state_hash_only`
+builds its findings with T3's check over a value supplied only as a call's sensitive value (absent from the store's
+`DecisionSettings`) and asserts the hash-only label. `record_override` stores `state` as null always (AC38); where it
+finds the overridden decision's identity is spec Q14: build it against the store's labels and pending rows and leave
+the rest as the recorded gap.
 
 **T7 Cascade core** (spec §4.5 steps 1 to 4 and 6). Call validation, rule evaluation under `rule_guard`, pending and
 answered flow, label append, record building. Provider tiers are absent here, which is the phase 1 deployment (AC17).
 Amendment B-411: step 1 computes the redaction findings once over `settings.sensitive_values ∪ call.sensitive_values`
-(T8 consumes them for the tier skips; here they decide the hash-only label, AC36), and
+(T8 consumes them for the tier skips; here they are passed to T6's `append(label, findings)`, which makes the label
+hash-only, AC36), and
 `test_phase1_rules_then_engineer` also asserts that `Ref` fields appear on the screen as references (AC34).
 
 **T8 Tiers 2 and 3** (spec §4.5 step 5, §4.6). Effective shadow, concurrent shadow calls, acceptance rules,
