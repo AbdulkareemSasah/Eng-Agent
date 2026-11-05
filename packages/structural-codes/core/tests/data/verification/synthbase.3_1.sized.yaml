@@ -1,0 +1,26 @@
+# Synthetic case file for the verification tests (plan 0001 T9): labels for the machinery, no engineering meaning.
+format: structural-codes-verification/1
+check_id: synthbase.3_1.sized
+program_comparison:
+  not_available: "synthetic fixture: no host program computes this quantity"
+cases:
+  - id: WE-1
+    kind: worked_example
+    source:
+      code_example: {document: "Synthetic Code", edition: "1", example: "E1"}
+    subject: {kind: section, id: S1}
+    inputs: {width_mm: 10, demand_mm: 50, capacity_mm: 100}
+    expected:
+      status: PASS
+      values:
+        ratio: {value: 0.5, unit: "1", abs_tol: 1.0e-9}
+        demand: {value: 50, unit: mm, abs_tol: 1.0e-9}
+  - id: BD-1
+    kind: boundary
+    subject: {kind: section, id: S1}
+    inputs: {width_mm: 10, demand_mm: 100, capacity_mm: 100}
+    expected:
+      status: PASS
+      values:
+        ratio: {value: 1.0, unit: "1", abs_tol: 1.0e-9}
+review: null
