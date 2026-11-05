@@ -17,13 +17,8 @@ from eng_contract.store import ResultStore
 from eng_contract.units import UnitError, UnitGapError
 from pydantic import JsonValue
 
-from eng_harness.adapters import (
-    HostTarget,
-    ToolDescriptor,
-    convert_quantities,
-    host_arguments,
-    validate_call,
-)
+from eng_harness.adapters import ToolDescriptor
+from eng_harness.adapters._args import HostTarget, convert_quantities, host_arguments, validate_call
 
 MODEL = "mdl_01ARZ3NDEKTSV4RRFFQ69G5FAV"
 WHY = "Synthetic bounds for the test model, not a code value"

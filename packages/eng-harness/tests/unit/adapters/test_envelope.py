@@ -14,7 +14,7 @@ from eng_contract.envelope import HostInfo, LiteralInput, Provenance, RefInput
 from eng_contract.errors import ContractError, ErrorCode, WarningCode
 from eng_contract.store import ResultStore
 
-from eng_harness.adapters import HostReply, make_envelope, parse_reply
+from eng_harness.adapters._envelope import make_envelope, parse_reply
 from eng_harness.ports import ServerCheck
 
 MODEL = "mdl_01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -43,7 +43,7 @@ def _make(store: ResultStore, value: dict[str, Any], *, truncated: bool = False,
         "kind": KIND,
         "payload": {"value": value},
         "summary": {"count": 1},
-        "reply": HostReply(data={}, truncated=truncated),
+        "reply": {"items": [], "truncated": truncated},
         "check": CHECK,
         "host": HOST,
         "inputs": {},
@@ -122,12 +122,14 @@ def test_file_input_kind_is_registered(store: ResultStore) -> None:
 
 
 def test_parse_reply() -> None:
-    assert parse_reply(_result({"items": [1, 2], "truncated": False})) == HostReply(
-        data={"items": [1, 2], "truncated": False}, truncated=False
-    )
-    assert parse_reply(_result({"items": [], "truncated": True})).truncated is True
-    assert parse_reply(_result({"items": []})).truncated is False
-    assert parse_reply(_result({"truncated": "yes"})).truncated is False  # only the JSON true counts
+    body = {"items": [1, 2], "truncated": False}
+    assert parse_reply(_result(body)) == body
+
+
+def test_only_the_json_true_marks_a_reply_truncated(store: ResultStore) -> None:
+    assert _make(store, {}, reply={"items": []}).complete is True
+    assert _make(store, {}, reply={"truncated": "yes"}).complete is True
+    assert _make(store, {}, reply={"truncated": True}).complete is False
 
 
 @pytest.mark.parametrize(

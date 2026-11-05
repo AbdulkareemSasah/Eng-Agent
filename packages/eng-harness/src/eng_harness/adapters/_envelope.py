@@ -1,22 +1,17 @@
-"""Host replies as contract envelopes with limits and provenance (plan 0002 T8; spec 0002 section 4.5.3, AC19).
+"""Host replies as contract envelopes (plan 0002 T8; spec 0002 section 4.5.3, AC19).
 
-Purpose: parse the one JSON text block a Sasaah server sends, store the canonical-unit payload, and answer with a
-success envelope: summary at most 4096 bytes, inline data only up to 16384 bytes (else in the store), `complete` false
-with `PARTIAL_DATA` when the server reported `truncated`, and provenance with the tool, the build (from the
-`ServerCheck`), the host program, the model id and revision, and the inputs as references.
-Units: sizes in bytes, durations in milliseconds; payloads are already canonical. Errors: `ContractError`:
-`HOST_ERROR` (host code `UNEXPECTED_REPLY`, spec 0002 A3) for a reply that is not one JSON object, `HOST_ERROR`
-for an error reply that reached this layer (the error table of plan task T9 maps those first), `LIMIT_EXCEEDED` for
-a summary over the limit, and the store's `INVALID_ARGUMENT` for a payload that is not valid for its kind.
+Purpose: parse a Sasaah reply (one JSON text block), store the canonical payload and answer with an envelope: summary
+at most 4096 bytes, inline data up to 16384 bytes, `PARTIAL_DATA` on `truncated`, provenance with the build.
+Units: bytes and milliseconds. Errors: `ContractError` `HOST_ERROR` (host code `UNEXPECTED_REPLY`, spec 0002 A3, or
+the server's code for an error reply, which T9's table maps first), `LIMIT_EXCEEDED`, `INVALID_ARGUMENT` (payload).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Any
 
 from eng_contract.canonical import canonical_json
 from eng_contract.envelope import (
     SUMMARY_LIMIT_BYTES,
-    FileSource,
     HostInfo,
     LiteralInput,
     Provenance,
@@ -27,46 +22,28 @@ from eng_contract.envelope import (
 from eng_contract.errors import ContractError, ContractWarning, ErrorCode, WarningCode
 from eng_contract.ids import Timestamp
 from eng_contract.mcp import extract_raw_reply
+from eng_contract.refs import parse_ref
 from eng_contract.store import ResultStore
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import JsonValue
 
-from eng_harness.adapters._args import referenced_results
 from eng_harness.ports import ServerCheck
 
-__all__ = ["HostReply", "make_envelope", "parse_reply"]
 
-_HOST_CODE_MAX = 200
-
-
-class HostReply(BaseModel):
-    """A successful reply: its JSON object, and whether the server reported `truncated: true` (lists stop at 2000)."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    data: dict[str, JsonValue]
-    truncated: bool
-
-
-def parse_reply(result: Mapping[str, Any]) -> HostReply:
-    """Parse an MCP tool result of a Sasaah server: exactly one text block holding a JSON object.
+def parse_reply(result: Mapping[str, Any]) -> dict[str, JsonValue]:
+    """The JSON object of a tool result that holds exactly one text block and no error.
 
     Raises:
-        ContractError: `HOST_ERROR` with the server's `code` as `host_code` for an `isError` reply, or with host code
+        ContractError: `HOST_ERROR` with the server's `code` for an `isError` reply, else with host code
             `UNEXPECTED_REPLY` for any other shape.
     """
     raw = extract_raw_reply(result)
     body = raw.json_texts[0] if raw.json_texts else None
-    if raw.is_error:
-        code = body.get("code") if isinstance(body, dict) else None
-        host_code = code[:_HOST_CODE_MAX] if isinstance(code, str) else None
+    if raw.is_error or len(raw.texts) != 1 or raw.other_blocks or not isinstance(body, dict):
+        code = (body.get("code") if raw.is_error and isinstance(body, dict) else None) or "UNEXPECTED_REPLY"
         raise ContractError(
-            ErrorCode.HOST_ERROR, "the host replied with an error", retryable=False, host_code=host_code
+            ErrorCode.HOST_ERROR, "the host reply is not a success", retryable=False, host_code=str(code)[:200]
         )
-    if len(raw.texts) != 1 or raw.other_blocks or not isinstance(body, dict):
-        raise ContractError(
-            ErrorCode.HOST_ERROR, "the reply is not one JSON object", retryable=False, host_code="UNEXPECTED_REPLY"
-        )
-    return HostReply(data=body, truncated=body.get("truncated") is True)
+    return body
 
 
 def make_envelope(
@@ -76,21 +53,19 @@ def make_envelope(
     kind: str,
     payload: dict[str, JsonValue],
     summary: dict[str, JsonValue],
-    reply: HostReply,
+    reply: Mapping[str, JsonValue],
     check: ServerCheck,
     host: HostInfo | None,
     inputs: Mapping[str, RefInput | LiteralInput],
     started_at: Timestamp,
     duration_ms: int,
-    files: Sequence[FileSource] = (),
 ) -> SuccessEnvelope:
-    """Store `payload` (canonical units) as a `kind` result and return its success envelope.
+    """Store `payload` (canonical units) as a `kind` result; `tool` is `<adapter>/<tool>`, the build is `check.build`.
 
-    `tool` is `<adapter>/<tool>`; the build in the provenance is `check.build`; the parents of the result are the
-    results `inputs` refer to.
+    A `reply` with `truncated: true` makes the result incomplete, with `PARTIAL_DATA` (lists stop at 2000).
 
     Raises:
-        ContractError: `LIMIT_EXCEEDED` (summary over 4096 bytes), `INVALID_ARGUMENT` (payload not valid for `kind`).
+        ContractError: `LIMIT_EXCEEDED` (summary over 4096 bytes), `INVALID_ARGUMENT` (payload invalid for `kind`).
     """
     if len(canonical_json(summary)) > SUMMARY_LIMIT_BYTES:
         raise ContractError(ErrorCode.LIMIT_EXCEEDED, f"summary exceeds {SUMMARY_LIMIT_BYTES} bytes")
@@ -98,13 +73,13 @@ def make_envelope(
         tool=tool,
         tool_version=check.build,
         host=host,
-        files=list(files),
         inputs=dict(inputs),
         started_at=started_at,
         duration_ms=duration_ms,
     )
-    record = store.put(kind, payload, producer, parents=referenced_results(inputs), complete=not reply.truncated)
-    partial = ContractWarning(
-        code=WarningCode.PARTIAL_DATA, message="the host reply was truncated: lists are capped at 2000 with no paging"
-    )
-    return make_success(record, summary, [partial] if reply.truncated else [])
+    truncated = reply.get("truncated") is True
+    parents = dict.fromkeys(parse_ref(i.ref)[0] for i in inputs.values() if isinstance(i, RefInput))
+    record = store.put(kind, payload, producer, parents=list(parents), complete=not truncated)
+    note = "the host reply was truncated: lists stop at 2000 with no paging"
+    warnings = [ContractWarning(code=WarningCode.PARTIAL_DATA, message=note)] if truncated else []
+    return make_success(record, summary, warnings)
