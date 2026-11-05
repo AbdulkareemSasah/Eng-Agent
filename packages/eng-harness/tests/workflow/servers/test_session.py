@@ -374,16 +374,30 @@ def test_handshake_timeout_is_not_connected(
     tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher
 ) -> None:
     async def body(manager: ServerManager) -> None:
-        await _fails_as_not_connected(manager)()  # the server never answers; the backstop (2 s) bounds the handshake
-        assert launcher.started[0].job_members() == []  # the stuck process was ended
+        await _fails_as_not_connected(manager)()  # the server never answers; the backstop (4 s) bounds the handshake
+        stuck = launcher.started[0]
+        assert stuck.wait(10) is not None  # the stuck process was ended, whatever the load delays the end by
+        assert stuck.job_members() == []
 
-    config = make_config(_paged(tmp_path), call_timeout_s=1, client_grace_s=1, env={"NO_HANDSHAKE": "1"})
+    # The backstop is the behavior under test and the server never answers, so a larger bound only costs time (P-54).
+    config = make_config(_paged(tmp_path), call_timeout_s=3, client_grace_s=1, env={"NO_HANDSHAKE": "1"})
     _run(tmp_path, config, launcher, body)
 
 
-@pytest.mark.parametrize("mode", ["error", "raise", "stall"])
+@pytest.mark.parametrize(
+    ("mode", "call_timeout_s", "client_grace_s"),
+    # The backstop bounds the handshake as well as the attach. An attach that fails at once leaves the backstop
+    # unused, so it is generous and a slow start of the server cannot let the handshake time out first. Only the
+    # stalled attach waits for the backstop: 10 s, about five times what a loaded start of the server took (P-54).
+    [("error", 30, 30), ("raise", 30, 30), ("stall", 8, 2)],
+)
 def test_attach_failure_marks_role_down(
-    tmp_path: Path, make_config: ConfigFactory, launcher: RecordingLauncher, mode: str
+    tmp_path: Path,
+    make_config: ConfigFactory,
+    launcher: RecordingLauncher,
+    mode: str,
+    call_timeout_s: int,
+    client_grace_s: int,
 ) -> None:
     async def body(manager: ServerManager) -> None:
         manager.bind_instance("csi", pid=4242, product="ETABS")
@@ -393,7 +407,9 @@ def test_attach_failure_marks_role_down(
         assert manager.session_epoch("csi") == before + 1
         assert launcher.started[0].job_members() == []
 
-    config = make_config(_paged(tmp_path), call_timeout_s=1, client_grace_s=1, env={"ATTACH": mode})
+    config = make_config(
+        _paged(tmp_path), call_timeout_s=call_timeout_s, client_grace_s=client_grace_s, env={"ATTACH": mode}
+    )
     _run(tmp_path, config, launcher, body)
 
 
