@@ -7,12 +7,12 @@ size: large
 risk: [r1, r3]           # binding for every pull request of this plan; r3 for providers/** and pyproject.toml, r1 for the golden files
 tasks:
   - id: T1
+    # Amendment (B-411, documents only): plan 0005 T5 builds the provider error types; interfaces.py leaves T1 and test_error_shape stays as a regression test, not first.
     title: Dependencies, provider errors, configuration, network guard
     files:
       - "packages/eng-harness/pyproject.toml"
       - "uv.lock"
       - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/src/eng_harness/decisions/interfaces.py"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"
       - "packages/eng-harness/src/eng_harness/providers/_config.py"
       - "packages/eng-harness/tests/conftest.py"
@@ -27,7 +27,6 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_config.py::test_endpoint_rules"
       - "packages/eng-harness/tests/unit/providers/test_config.py::test_secret_keys_refused"
       - "packages/eng-harness/tests/unit/providers/test_config.py::test_timeout_ceiling"
-      - "packages/eng-harness/tests/unit/providers/test_errors.py::test_error_shape"
       - "packages/eng-harness/tests/contract/test_no_network.py::test_non_loopback_connect_is_refused"
       - "packages/eng-harness/tests/contract/test_provider_dependencies.py::test_declared_and_locked"
     covers: [AC1, AC2, AC3, AC4, AC5, AC36, AC46]
@@ -243,12 +242,14 @@ and `_outgoing.py`, `_credentials.py`, `_http.py`, `evaluation.py` and `_evalsto
 ## 2. Tasks
 
 **T1 Dependencies, errors, configuration, network guard** (spec §4.2, §4.3, §4.11). Adds the three runtime dependencies
-with their package ADRs (`docs/adr/0001` to `0003`, status Proposed, owner review), `ProviderErrorCode`, `ProviderError`,
-`ProviderFailure` and `OutgoingPlace` to `decisions/interfaces.py`, the `[providers.*]` models with endpoint, secret-key and timeout
+with their package ADRs (`docs/adr/0001` to `0003`, status Proposed, owner review), the `[providers.*]` models with endpoint, secret-key and timeout
 rules, and the autouse fixture that refuses non-loopback connections and PydanticAI model requests for the whole test
 tree. The only task that touches `pyproject.toml` and `uv.lock` (risk floor r3). The lock must show `pydantic-ai-slim`
 at an exact version; the HTTP library is the one the pinned `pydantic-ai-slim` and `openai` resolve to (ADR-0003 names
-`httpx2`; if the lock differs, the ADR is amended in this pull request).
+`httpx2`; if the lock differs, the ADR is amended in this pull request). Amendment B-411: `ProviderErrorCode`,
+`ProviderError`, `ProviderFailure` and `OutgoingPlace` are built by plan 0005 T5 (spec 0005 §10), which the cascade's
+AC22 needs before this plan runs; T1 no longer touches `decisions/interfaces.py`. `test_errors.py::test_error_shape`
+(AC5) stays in T1 as a regression test of those types, not a first-commit test, because it passes at T1's base.
 
 **T2 Credentials** (spec §4.4). `CredentialStore`, `KeyringCredentialStore` with the allow-list and the direct use of
 one concrete backend (class names confirmed against the pinned `keyring`), `FakeCredentialStore` in `tests/fakes/`,
@@ -306,7 +307,7 @@ Q16).
 - Development: none new (Hypothesis, pytest and the coverage plugin from engine plan T1; PydanticAI's test models and
   `httpx2.MockTransport` ship with the runtime dependencies).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9
-  (`decide_many`) and T10 (engine wiring) merged before the tasks that need them (T1 needs T5 for `interfaces.py`; T8
+  (`decide_many`) and T10 (engine wiring) merged before the tasks that need them (T1 needs T5, which builds the provider error types in `interfaces.py`, amendment B-411; T8
   needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14b for the header field of AC48; spec 0006
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7), built by plan 0006 T14b,
   which in turn needs this plan's T1 and T10. Spike S-07 is not a dependency of this plan; it gates the later

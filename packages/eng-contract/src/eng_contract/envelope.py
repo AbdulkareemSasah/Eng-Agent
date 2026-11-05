@@ -13,6 +13,7 @@ from eng_contract._types import FieldPath, KindName, Sha256Hex
 from eng_contract.canonical import CanonicalJsonError, canonical_json
 from eng_contract.errors import ContractError, ContractWarning, ErrorDetail, WarningCode
 from eng_contract.ids import ModelId, ResultId, Timestamp
+from eng_contract.refs import RefString
 
 if TYPE_CHECKING:
     from eng_contract.records import ResultRecord
@@ -23,8 +24,6 @@ INLINE_DATA_LIMIT_BYTES = 16384
 """Largest canonical inline `data` (spec 4.2.5 rule 2)."""
 
 _MODEL = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False, strict=False)
-# Local form of `RefString` (spec 4.6.1): a result id, optionally followed by `#` and a pointer.
-_RefText = Annotated[str, StringConstraints(pattern=r"^res_[0-7][0-9A-HJKMNP-TV-Z]{25}(#.*)?$", max_length=2000)]
 _Tool = Annotated[
     str,
     StringConstraints(max_length=200, pattern=r"^([a-z0-9][a-z0-9-]*/[a-z0-9_.-]+|engineer|template|harness)$"),
@@ -57,7 +56,7 @@ class RefInput(BaseModel):
 
     model_config = _MODEL
 
-    ref: _RefText
+    ref: RefString
 
 
 class LiteralInput(BaseModel):
@@ -152,6 +151,7 @@ def make_success(
 
     Raises:
         pydantic.ValidationError: the summary is too large or the warnings contradict `record.complete`.
+        CanonicalJsonError: the record's payload cannot be written as canonical JSON.
     """
     payload = record.payload
     inline = payload is not None and len(canonical_json(payload)) <= INLINE_DATA_LIMIT_BYTES

@@ -353,7 +353,9 @@ def test_listing_skips_unreadable_entry(
 
     for pid, comm in ((2, "hidden"), (3, "shown")):
         _fake_proc(tmp_path, pid, comm)
+    (tmp_path / "boot_id").write_text("fake-boot-id\n", encoding="ascii")
     monkeypatch.setattr(_procinfo, "_PROC", tmp_path)
+    monkeypatch.setattr(_procinfo, "_BOOT_ID", tmp_path / "boot_id")
     real_read_text = Path.read_text
 
     def read_text(self: Path, *args: Any, **kwargs: Any) -> str:
