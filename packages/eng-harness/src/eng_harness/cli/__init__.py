@@ -12,6 +12,7 @@ from typing import TextIO
 from eng_harness.cli._config import HarnessConfig, load_config, resolve_config_path
 from eng_harness.cli._encoding import configure_streams
 from eng_harness.cli._exit import ExitCode
+from eng_harness.cli._opener import open_address
 from eng_harness.cli._parser import UsageError, build_parser
 from eng_harness.servers import ConfigError
 
@@ -26,15 +27,15 @@ class CliDeps:
         stdout: Standard output.
         stderr: Standard error.
         environ: The environment.
-        opener: Opens a launch address; returns False on failure (never `webbrowser`, spec 4.4.4). None until the
-            launch-address opener arrives (plan 0006 T3b).
+        opener: Opens a launch address with `BROWSER` removed; returns False on failure (never `webbrowser`,
+            spec 4.4.4). Defaults to the platform opener.
         handlers: Command name to handler; a command without one is reported as not available.
     """
 
     stdout: TextIO = field(default_factory=lambda: sys.stdout)
     stderr: TextIO = field(default_factory=lambda: sys.stderr)
     environ: Mapping[str, str] = field(default_factory=lambda: os.environ)
-    opener: Callable[[str], bool] | None = None
+    opener: Callable[[str], bool] = open_address
     handlers: Mapping[str, Handler] = field(default_factory=dict)
 
 
