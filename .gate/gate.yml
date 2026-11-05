@@ -21,6 +21,7 @@ limits:  # max_task_lines: process/04 section 4. The others are gate settings pr
   max_task_lines: 400
   test_run_seconds: 600
   max_file_bytes: 1048576
+  mutation_run_seconds: 7200
 license_exceptions: []
 secrets:
   allow:
