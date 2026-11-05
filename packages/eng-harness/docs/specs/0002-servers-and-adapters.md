@@ -101,7 +101,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   them different, or an allowlisted tool missing, or a script or generic-invoke tool listed, then `ok` false with the
   reason, and the engine stops before any write (engine AC44). Tests:
   `tests/unit/servers/test_buildcheck.py::test_fingerprint_definition`, `::test_each_mismatch`,
-  `tests/workflow/servers/test_session.py::test_build_mismatch_stops_run`.
+  `tests/workflow/servers/test_session.py::test_build_mismatch_stops_run` (the engine clause; it runs the real engine,
+  plan task T19a; amendment B-413).
 - AC10. Given the S-12 inventory, when the fingerprint of the CSI allowlist is computed from it, then it equals the
   value pinned in the allowlist data (`fingerprint_source = "s12-inventory"`). Test:
   `tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`.
@@ -156,7 +157,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   epoch increases. Test: `tests/unit/adapters/test_timeouts.py::test_timeout_mapping`.
 - AC22. Given a timeout on a host whose units were left changed (synthetic fault `units_left_changed`), when the next
   step on that host runs, then `read_units` reports the mismatch and the engine stops with `PRECONDITION_FAILED`
-  (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`.
+  (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`
+  (it runs the real engine, plan task T19a; amendment B-413).
 - AC23. Given a write in flight, when reconciled, then the adapter reads the object's state and answers `applied`,
   `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result; given an analysis or design
   in flight with no proof of end of the abandoned call (v1), then the answer is `unknown` whatever the host answers,
@@ -224,7 +226,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC37. Given `eng-harness doctor`, then it reports uv and Python, each server executable and its hash against the
   pin, each live tool-list fingerprint, installed host programs, the integrity level (warning when not medium), and
   the workspace class, as a table and as JSON with base names only, exit code 0 without failures and 1 with any.
-  Tests: `tests/unit/test_doctor.py::test_checks_and_output`, `tests/windows/test_doctor.py::test_integrity_level`.
+  Tests: `tests/unit/test_doctor.py::test_checks_and_output`, `tests/windows/test_doctor_windows.py::test_integrity_level`
+  (amendment B-413: a distinct base name, since mypy names a test module by its base name without an `__init__.py`).
 - AC38. Given an allowlist or `[cli_tools.*]` entry with `release = "unreleased"` and a `release_record`, then
   `ToolPort.unreleased_tools()` returns it with its record; an `unreleased` entry without a record, or a record on a
   `released` entry, is refused at load; with no such entry the mapping is empty. Tests:
@@ -248,7 +251,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. `build_ports`
   loads each adapter's allowlist for its server section's `route`. Tests:
   `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter`,
-  `tests/unit/servers/test_config.py::test_route_key`,
+  `::test_route_filter` also covers a `route` on a CSI section (amendment B-413: every route rule is decided at
+  allowlist load, none by the configuration loader),
   `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data).
 - AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
   loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
@@ -341,7 +345,8 @@ Rules:
 5. **[added: B-085]** `audit_log` (boolean, default true) says whether the server has Sasaah's `--audit-log` option;
    false for a server without it (IDEA: an unknown argument would only be warned about and ignored, spec 0014 §4.2
    rule 4). `route` (string) names one of the routes the adapter's allowlist header declares (§4.5.1); it is required
-   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI).
+   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI). The configuration loader
+   reads `route` as an optional string only; both refusals are allowlist load errors (AC41; amendment B-413).
 
 ### 4.3 Server lifecycle
 
