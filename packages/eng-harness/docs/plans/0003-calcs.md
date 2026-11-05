@@ -334,8 +334,9 @@ earlier), `CalcStatus` and `CalcRegistry`. It also adds `CalcRefused` and the co
 `tests/data/calcs/` (test doubles, never registered in `REGISTRY`). The content hash is a stub raising
 `NotImplementedError` until T2, and registration tests use the fixture hash.
 
-**T2 Content hash and lock** (spec §4.5). `_calc/_hash.py` builds the static import closure with `ast` and
-`importlib.util.find_spec` (no import executed). It hashes the LF-normalized sources, the metadata and both schemas,
+**T2 Content hash and lock** (spec §4.5). `_calc/_hash.py` builds the static import closure with `ast` and a
+file lookup under the `eng_harness` source root (no import executed; `find_spec` would run parent `__init__` modules,
+amendment B-388). It hashes the LF-normalized sources, the metadata and both schemas,
 with `payload_sha256` over the object of spec §4.5. `calcs.lock.json` starts empty, and the contract test compares it
 with `REGISTRY`. The lock writer is a module entry point (`uv run python -m eng_harness._calc._hash --write-lock`).
 
@@ -369,7 +370,8 @@ verification record template goes in `docs/verification/calcs/README.md`. Almost
 
 **T7 to T12 The calcs** (spec §4.6 to §4.11). One calc per task, each with its golden files, unit and property tests,
 verification record, lock entry and `REGISTRY` line. T7 adds `_state.py` (section keys and canonical order, spec §4.6
-table). T8 adds `_compare.py` (D3 and D4, exact `Fraction` comparison) and extends `_state.py` with the unnamed-row
+table) and builds `REGISTRY` with `removed=removed_ids(read_lock())`, so a removed id is refused at import time as
+well as by the contract test (spec AC2; amendment B-388, B-141 review). T8 adds `_compare.py` (D3 and D4, exact `Fraction` comparison) and extends `_state.py` with the unnamed-row
 keys of D2. T8 also adds the older-revision workflow test (spec AC48, a test block that reads, writes and reads
 again through fake tool ports) and the `stale_ok` contract test (spec AC49), which compares each registered calc's
 input schema with `tests/data/calcs/stale_ok.json`, the spec §4.13 table; T9 to T12 add their calc's row to that

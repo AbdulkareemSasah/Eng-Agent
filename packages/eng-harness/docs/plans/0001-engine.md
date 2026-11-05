@@ -358,10 +358,13 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/ports.py"  # ToolPort.preview (amendment B-388)
       - "packages/eng-harness/tests/unit/test_approvals.py"
       - "packages/eng-harness/tests/replay/test_resume.py"
       - "packages/eng-harness/tests/workflow/test_pause.py"
       - "packages/eng-harness/tests/workflows/**"
+      - "packages/eng-harness/tests/fakes/**"
+      - "packages/eng-harness/tests/contract/test_ports_conformance.py"
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -627,7 +630,9 @@ plan.
 120 lines. The original T14 (decisions and inputs: 280 lines at first, 420 with B-068, 450 with B-098) was split by
 B-342 (D-12) so that neither part exceeds the 400-line cap.
 
-**T15 Approvals** (spec §4.9). Request ids, previews as results, binding, single use, refusal and re-presentation,
+**T15 Approvals** (spec §4.9). It adds `ToolPort.preview(tool, args) -> Preview` (spec §4.8; T6 left it out because
+`Preview` lives in `eng_harness.ctx`, T7) to the port, the fake host and the AC57 conformance case (amendment B-388,
+B-105 review). Request ids, previews as results, binding, single use, refusal and re-presentation,
 re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
 `acknowledged_unreleased` (journaled as given; the page decides when it is required, spec §4.9), `signed_off`, pause
 and the

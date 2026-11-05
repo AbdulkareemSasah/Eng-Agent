@@ -208,8 +208,9 @@ assembly (T9), which registers the pack and runs the pack-level tests. Each task
 `test:` with the tests of `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9).
 
-Start condition: core plan 0001 tasks T1 (shared folder files), T6 (checks and registry) and T8 (runner) are merged
-before T2; T9 (verification) before T3 to T8 (their case files are run through `verify_check`); T11 and T12
+Start condition: core plan 0001 tasks T1 (shared folder files), T6 (checks and registry), T8 (runner) and T14a (the
+public modules declared, without which every import of `structural_codes` from the pack fails IM002; amendment B-385)
+are merged before T2; T9 (verification) before T3 to T8 (their case files are run through `verify_check`); T11 and T12
 (lifecycle, command line) before T9. T1 needs core T1 only. T9 also needs the clause-spec folder settled (§6 Q12):
 CF §4.1 and §4.2 amended to `docs/clauses/<pack>/`, or these clause specs moved to the folder the core resolves, so
 that PK-AC3 finds every `CheckMeta.spec` file.
