@@ -391,6 +391,7 @@ references; exact tolerance comparison; `matched`, `no_section_in_model`, `ambig
 `describe` from `CheckMeta`, `run` building `BatchItem`s with references and calling `evaluate_batch` in the run's
 mode, storage of the `verdicts.set/1` payload, refusal in `production`. If a merged plan already provides a code-pack
 route when T6 starts, T6 adds the three ids to it and its tests instead; the lead records which by a plan amendment.
+T6 starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
