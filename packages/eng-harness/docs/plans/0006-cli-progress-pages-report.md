@@ -315,6 +315,7 @@ tasks:
     # Amendment (B-412 third review, documents only): workflow and replay tests use a fake engine from CliDeps; T17c re-checks AC7, AC8, AC46 and AC64 with the real engine.
     # Amendment (B-412 fourth review, documents only): T14 binds the engine-factory default to the merged Engine and adds the workflow-registry field (T18 binds it after plan 0010 T9).
     # Amendment (B-412 fifth review, documents only): the engine factory takes the full port set; its default maps only the fields the merged EnginePorts holds (T16b completes it); the page ports' stop check bound to FileRunControl.
+    # Amendment (B-412 seventh review, documents only): run-id cell behind the page ports' stop check and report (spec 4.4.8) and its test; calc-port factory field; AC9 in covers; budget 360 -> 390.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -325,21 +326,24 @@ tasks:
       - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/unit/cli/test_options.py"
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py"
+      - "packages/eng-harness/tests/unit/cli/test_run_id_binding.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/replay/test_cli_resume.py"
     # Amendment B-354: `run --answers FILE` (AC64), about 30 lines; budget 310 -> 340.
-    max_changed_lines: 360
+    # Amendment B-412 seventh review: the run-id cell, about 30 lines; budget 360 -> 390.
+    max_changed_lines: 390
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
+      - "packages/eng-harness/tests/unit/cli/test_run_id_binding.py::test_page_bindings_before_and_after_run_id"
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_completes_and_writes_report"
       - "packages/eng-harness/tests/replay/test_cli_resume.py::test_no_wait_then_resume"
       - "packages/eng-harness/tests/replay/test_cli_resume.py::test_stop_file_removed_on_return_and_before_resume"
       - "packages/eng-harness/tests/unit/cli/test_options.py::test_generated_options_exclude_quantities"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request"
-    covers: [AC6, AC7, AC8, AC14, AC46, AC64]
+    covers: [AC6, AC7, AC8, AC9, AC14, AC46, AC64]
     depends_on: [T3, T3b, T5, T7, T9, T10, T13]
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
@@ -423,16 +427,18 @@ tasks:
   - id: T16b
     title: "Production wiring: the decision, progress and run-control ports reach the real engine"
     # Amendment (B-412 fifth review, documents only): new; waits for engine plan T14, T14b and T18 (EnginePorts gains the decision, progress and run-control fields); the one non-test task that completes cli/_wiring.py for them.
+    # Amendment (B-412 seventh review, documents only): the fan-out isolates each sink; run_started fills the run-id cell of T14; second test node; budget 100 -> 130.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/tests/unit/cli/test_production_wiring.py"
-    # About 30 lines for the port mapping, 25 for the two-sink fan-out and 15 in _run.py (an estimate, not a measurement).
-    max_changed_lines: 100
+    # About 30 lines for the port mapping, 50 for the isolating fan-out and the run-id fill, and 15 in _run.py (an estimate, not a measurement).
+    max_changed_lines: 130
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_production_wiring.py::test_engine_ports_carry_stop_progress_and_cascade"
+      - "packages/eng-harness/tests/unit/cli/test_production_wiring.py::test_failing_sink_detached_alone"
     covers: [AC9, AC37, AC62]
     depends_on: [T14b, T16]
   - id: T17
@@ -599,7 +605,9 @@ builder. T9 and T10 register their builders in the mapping, and T15 registers th
 (`GET /report`), by default a fixed "report not available yet" document; T14 binds it. The page ports also take the
 stop check by injection (`stop_requested: Callable[[], bool]`, polled by the wait of `pages/_wait.py`), because
 `eng_harness.pages` may not import `eng_harness.cli` (spec §4.1); `test_stop_ends_wait` injects it, and T14 binds it in
-`cli/_wiring.py` to `FileRunControl` for the run (amendment B-412 fifth review). (5) The workflow tests
+`cli/_wiring.py` to `FileRunControl` for the run (amendment B-412 fifth review). Both callables take no argument;
+for `run` the run id does not exist when the page ports are built, so T14 binds them through the run-id cell of spec
+§4.4.8 (amendment B-412 seventh review), and T7's ports need nothing beyond the two injected callables. (5) The workflow tests
 (`test_answer_bound_to_hash`, `test_page_confirms_after_commit`) drive `PageApprovalPort` with a test-local stand-in for
 the engine that journals `approval_requested` and `approval_resolved` through the merged `JournalWriter` and feeds the
 events to the page sink; the real-engine half of AC29 and AC37 is re-checked in T17. The stand-in lives in the shared
@@ -660,7 +668,21 @@ decision, progress and run-control ports do not reach the real engine; T18, whic
 with the default `CliDeps()`, follows T16b, so production never runs without them. T14 also owns the stop-file removals of spec §4.4.8 in `cli/_run.py`: the run process removes `stop.json`
 when `Engine.start` or `Engine.resume` returns while the file exists, and `resume` removes a stale one before
 `Engine.resume`; `test_stop_file_removed_on_return_and_before_resume` checks both with a fake engine from `CliDeps`
-(about 20 lines, hence 340 to 360). AC9 stays covered by T16, whose stop test relies on these removals.
+(about 20 lines, hence 340 to 360). AC9 is covered by T16 (the stop command) and by T14 (these removals).
+Amendment B-412 seventh review: (a) the page ports' `stop_requested` and `report` need the run id, which for `run`
+exists only once `Engine.start` has created it; `_wiring.py` binds both through the run-id cell of spec §4.4.8,
+filled at once for `resume` and, for `run`, from the first `ApprovalRequest.run_id` that the wrapped page
+`ApprovalPort` receives (T16b adds the `run_started` fill once the progress sink reaches the real engine); while it is
+empty, `stop_requested` returns false and `report` returns the "report not available yet" document.
+`test_run_id_binding.py::test_page_bindings_before_and_after_run_id` checks both callables before and after the cell
+is filled, and that `resume` fills it at once (about 30 lines, hence 360 to 390). (b) The engine's `CalcPort` is
+`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` (spec 0003 §4), not merged (plan 0003
+T5); T14 adds the `CliDeps` field `calc_port_factory` (default `None` under the defaults rule of §3), which
+`_wiring.py` calls with the page `ApprovalPort` and the run's store to build the calc port; step 4's preflight is
+that port's `preflight`, so no separate preflight field exists. `build_ports` (spec 0002) builds only the tool and
+host ports. The engine's `BasisPort` is the merged `StoreBasisPort` over the run's `ResultStore` (plan 0004 T8),
+built in `_wiring.py` with no field; the `Workspace`, the `ResultStore` and the `EngineSettings` that `Engine(...)`
+takes are built in `_wiring.py` too (collaborator map of §3).
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
@@ -707,8 +729,13 @@ is re-checked in T17.
 approval and input ports; engine plan T14 adds the `DecisionPort` field and engine plan T18 the `ProgressSink` and
 `RunControlPort` fields (engine plan §3, amendment B-412). T16b waits for engine plan T14, T14b and T18 and completes
 the default engine factory's mapping in `cli/_wiring.py`: the cascade as the decision port, `TerminalProgress` and the
-page server's sink behind one fan-out `ProgressSink` (a failure of one sink is the engine's detachment case of engine
-AC58), and `FileRunControl` as the run-control port; `cli/_run.py` takes any change the mapping needs.
+page server's sink behind one fan-out `ProgressSink`, and `FileRunControl` as the run-control port; `cli/_run.py` takes
+any change the mapping needs. The fan-out isolates its members (amendment B-412 seventh review): it catches a member's
+failure, detaches that member itself and keeps delivering to the others, and it raises (so that the engine detaches
+it under engine AC58) only when every member has failed. A raising terminal renderer (AC19) therefore does not cut
+the page off from `approval_resolved` (AC37); `test_failing_sink_detached_alone` checks this. The fan-out also fills
+the run-id cell of T14 from the `run_started` event (`RunHeader.run_id`, spec §4.4.8), which
+`test_engine_ports_carry_stop_progress_and_cascade` checks too.
 `test_engine_ports_carry_stop_progress_and_cascade` builds the production `EnginePorts` through the default mapping and
 checks those three fields; it fails at the merge base, where the default mapping leaves them out. It is the only
 non-test task that touches these fields, so T17 and T17c, which depend on it, re-check through the production path.
@@ -753,8 +780,9 @@ with a recording decision assembler, as in T14b) and AC64
 review checks. It is split from T17 to keep each test-only pull request within two sessions.
 
 **T18 Bind the CliDeps defaults** (amendment B-412 second review; spec §4.1, AC13, AC62). The one task that replaces
-each `None` default of the §3 rule with the real implementation: the port builder `build_ports` (plan 0002 T19), the calc
-preflight (plan 0003 `HarnessCalcPort.preflight`), the workflow registry of `src/eng_harness/workflows/__init__.py`
+each `None` default of the §3 rule with the real implementation: the port builder `build_ports` (plan 0002 T19), the calc-port
+factory `calc_port_factory` (plan 0003 T5 `HarnessCalcPort`, whose `preflight` serves step 4; amendment B-412 seventh
+review), the workflow registry of `src/eng_harness/workflows/__init__.py`
 (plan 0010 T9, the one task that creates that module), `load_providers_config` and `assemble_decision_runtime` (plan
 0009 T1 and T10), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
 plan 0005 T10; amendment B-412 sixth review), and `eng_harness.doctor.run` (plan 0002 T18). The engine factory and `freeze` are merged (engine
@@ -776,7 +804,7 @@ the real engine.
 - Other plans: engine plan T4 (reader), T6 (ports), T9 and T9b (runner start, resume; split by B-424), T14 (the
   `DecisionPort` field of `EnginePorts`), T15 (approvals), T18 (progress delivery, and the `RunControlPort` field with
   the stop check between steps, added to engine T18 by this plan's B-412 pull request; T16b waits for T14, T14b and T18);
-  plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 `HarnessCalcPort` and `preflight`; plan 0004
+  plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 T5 (`HarnessCalcPort` and its `preflight`, the `calc_port_factory` default); plan 0004
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0010 T9 for the workflow registry (`workflows/__init__.py`; plan 0007 adds no registry); for T14b (B-098),
   decision plan T7 (the `Cascade`) and T10 (the cascade's `runtime_summary()` and its engine wiring; amendment B-412
   sixth review: the cascade is the `decision_port_factory` default that T18 binds), engine plan T14b (`decision_runtime` in the header) and
@@ -785,7 +813,7 @@ the real engine.
   implementation missing states it. Their real-engine halves are re-checked in T17c (staged engine, below); plan 0009
   section 3 says the same (amendment B-412 third review).
 - `CliDeps` defaults rule (amendment B-412; T14, T14b, T15, T16). Each `CliDeps` collaborator whose real implementation
-  is not merged (port builder, calc preflight, workflow registry, providers loader, decision assembler, cascade
+  is not merged (port builder, calc-port factory `calc_port_factory` (its port serves the preflight; amendment B-412 seventh review), workflow registry, providers loader, decision assembler, cascade
   builder `decision_port_factory` (amendment B-412 sixth review), doctor callable) is an optional field of the frozen dataclass that defaults to `None`, so `CliDeps()`
   still builds (what `eng_harness.cli:main` uses with `deps=None`, and what `tests/unit/cli/test_opener.py` calls).
   Tests pass the collaborators explicitly. A command counts as available only when every collaborator it needs is not
@@ -822,21 +850,27 @@ the real engine.
 | Clock and ids (§4.1) | T14 | T14 | merged (`eng_contract.ids`: `SystemClock` and the id helpers) |
 | Providers loader `load_providers_config` (step 1) | T14b (`providers_loader`) | T18 | plan 0009 T1 |
 | Workflow registry (step 1) | T14 | T18 | plan 0010 T9 (`workflows/__init__.py`) |
-| Port builder `build_ports`: tool, host and calc ports (step 1) | T14 | T18 | plan 0002 T19 |
+| Workspace, `eng_contract.store.Workspace` (step 1, amendment B-412 seventh review) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
+| `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
+| `EngineSettings` from the `[engine]` limits of the configuration, engine §4.10 defaults otherwise (step 5, spec §4.2.4) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`engine/_runner.py`) |
+| Port builder `build_ports`: tool and host ports only (step 1) | T14 | T18 | plan 0002 T19 |
+| Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` (steps 4 and 5) | T14 (`calc_port_factory`) | T18 | plan 0003 T5 |
+| Engine `BasisPort`, `StoreBasisPort` over the `ResultStore` (step 5) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`basis/_port.py`, plan 0004 T8) |
 | Input validation (step 2) | none (engine call) | not applicable | merged (engine plan T9, engine AC16) |
 | `--answers` object and the wrapped `InputPort` (step 2, §4.2.1) | none (`cli/_wiring.py`, T14) | not applicable | T10 (`pages.accept_answers_file`) |
 | Draft (`build_draft`), basis-port factory, `freeze` (step 3) | T15, if they become fields | T15 | merged (plan 0004 T7 and T8: `basis/_build.py`, `_setup.py`, `_freeze.py`) |
 | Basis screen port `PageBasisSetupPort` and the `setup` kind (step 3, §4.4.7) | none (`pages/_ports.py`) | not applicable | T15 |
-| Calc preflight `HarnessCalcPort.preflight` (step 4) | T14 | T18 | plan 0003 |
+| Calc preflight (step 4) | none: `preflight` of the calc port built by `calc_port_factory` | T18 (through `calc_port_factory`) | plan 0003 T5 |
 | Decision-runtime assembler `assemble_decision_runtime` and `DecisionSettings` from the configuration (step 5) | T14b (`decision_assembler`) | T18 | plan 0009 T10; `DecisionSettings` merged (`decisions/_policy.py`) |
 | Cascade as the `DecisionPort` (step 5) | T14b (`decision_port_factory`) | T18 | plan 0005 T7 (`Cascade`) and T10 (engine wiring); reaches the real `EnginePorts` in T16b (engine plan T14) |
 | `TerminalProgress` as the `ProgressSink` (step 5) | none (built by `cli/_wiring.py`, T14) | not applicable | T5; reaches the real `EnginePorts` in T16b (engine plan T18) |
-| Page server's sink and the fan-out `ProgressSink` (step 5, AC37) | none | not applicable | T7 (page sink), T16b (fan-out) |
+| Page server's sink and the fan-out `ProgressSink` (step 5, AC37) | none | not applicable | T7 (page sink), T16b (fan-out that isolates each member) |
+| Run-id cell behind the page ports' `stop_requested` and `report` (§4.4.8) | none (`cli/_wiring.py`, T14) | not applicable | T14 (filled for `resume` and from `ApprovalRequest.run_id`); T16b (filled from `run_started`) |
 | `FileRunControl` as the `RunControlPort` (step 5, §4.4.8) | none (built by `cli/_wiring.py`, T14) | not applicable | T7 (`cli/_control.py`); reaches the real `EnginePorts` in T16b (engine plan T18) |
 | Page `ApprovalPort` and `InputPort` (step 5) | none (`cli/_wiring.py`, T14) | not applicable | T7 (approval, dispatch), T9 (review screens), T10 (choice and input screens) |
 | Page server `PageServer` (§4.4.1, started lazily) | none | not applicable | merged (`pages/_server.py`, T6) |
-| Page ports' stop check `stop_requested` (§4.4.5 step 2) | none (injected into the page ports, T7) | bound to `FileRunControl` by T14 (`cli/_wiring.py`) | T7 |
-| Page ports' `report` callable (§4.4.3 `GET /report`) | none (injected into the page ports, T7) | bound to `build_report` by T14 (`cli/_wiring.py`) | T13 (`build_report`) |
+| Page ports' stop check `stop_requested` (§4.4.5 step 2) | none (injected into the page ports, T7) | bound to `FileRunControl` through the run-id cell by T14 (`cli/_wiring.py`) | T7 |
+| Page ports' `report` callable (§4.4.3 `GET /report`) | none (injected into the page ports, T7) | bound to `build_report` through the run-id cell by T14 (`cli/_wiring.py`) | T13 (`build_report`) |
 | Engine factory (step 5) | T14 | T14 | merged (engine plan T9 and T9b); the full port mapping by T16b |
 | Report at the end (step 6) | none | not applicable | T13 (`build_report`, `write_report`), called by T14 |
 | Stop-file removals (§4.4.8) | none (`cli/_run.py`) | not applicable | T14 |

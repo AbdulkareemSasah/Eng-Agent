@@ -716,6 +716,17 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
   its content; the page ports' wait (§4.4.5 step 2) polls the same check. `eng_harness.pages` may not import
   `eng_harness.cli` (§4.1), so the page ports take the check by injection (`stop_requested: Callable[[], bool]`), and
   `cli/_wiring.py` binds it to `FileRunControl` for the run.
+- The run id behind the page ports' bindings (B-412 review). The page ports' `stop_requested` and `report`
+  (`GET /report`, §4.4.3) take no argument, but both need the run id, and for `run` the run id does not exist when
+  `cli/_wiring.py` builds the page ports: `Engine.start` creates it and returns it only in `RunOutcome`, and
+  `InputRequest` and the journal `Event` do not carry it. `cli/_wiring.py` therefore keeps the run id in a cell,
+  empty for `run` and filled at once with the known run id for `resume`. For `run` it is filled from the first
+  `ApprovalRequest.run_id` that the wrapped page `ApprovalPort` receives, and, once the progress sink reaches the real
+  engine, from the `run_started` event (`RunHeader.run_id`) that the sink receives, whichever comes first; a later
+  value that differs is a defect and raises. While the cell is empty, `stop_requested` returns false and `report`
+  returns the fixed "report not available yet" document; the engine's own `RunControlPort` is not affected, since it
+  receives `stop_requested(run_id)`. Letting `Engine.start` take a run id chosen by the caller would remove the cell;
+  that is an engine spec change and not made here.
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
