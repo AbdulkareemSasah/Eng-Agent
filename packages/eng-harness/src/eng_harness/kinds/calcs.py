@@ -451,12 +451,13 @@ class SectionSize(CalcPayload):
     def _check(self) -> Self:
         if {self.required.unit, self.increment.unit, self.size.unit} != {"mm"}:
             raise ValueError("required, increment and size must be in mm")
-        required, increment, size = (Fraction(q.value) for q in (self.required, self.increment, self.size))
-        if size != self.multiple * increment:
-            raise ValueError("size must be multiple times increment (N2)")
-        if size < required:
+        required, increment = Fraction(self.required.value), Fraction(self.increment.value)
+        exact = self.multiple * increment
+        if self.size.value != float(exact):
+            raise ValueError("size must be multiple times increment, converted to float once (N2)")
+        if exact < required:
             raise ValueError("size must be at least required (N2)")
-        if size - required >= increment:
+        if exact - required >= increment:
             raise ValueError("size must be less than required plus increment (N2)")
         return self
 

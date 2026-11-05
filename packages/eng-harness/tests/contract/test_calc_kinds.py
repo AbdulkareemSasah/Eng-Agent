@@ -346,6 +346,27 @@ def _size_valid(p: dict[str, Any]) -> None:
     p["required"]["value"] = 450.0
 
 
+def _size_nondyadic(p: dict[str, Any]) -> None:
+    # N1/N2: required 0.25, increment 0.1, n = 3, size = float(3 x 0.1) = 0.30000000000000004
+    p["required"]["value"] = 0.25
+    p["increment"]["value"] = 0.1
+    p["multiple"] = 3
+    p["size"]["value"] = 0.30000000000000004
+
+
+def _size_nondyadic_wrong(p: dict[str, Any]) -> None:
+    _size_nondyadic(p)
+    p["size"]["value"] = 0.3
+
+
+def _sum_ratio_none(p: dict[str, Any]) -> None:
+    p["failing"][0]["ratio"] = None
+
+
+def _sum_counts_missing(p: dict[str, Any]) -> None:
+    del p["counts"]["ERROR"]
+
+
 def _size_below(p: dict[str, Any]) -> None:
     p["size"]["value"] = 400.0
     p["multiple"] = 8
@@ -399,6 +420,9 @@ REPORT_INVALID: list[tuple[str, Mutation, str]] = [
     ("design_summary", _sum_group_kind, "does not match its group"),
     ("design_summary", _sum_group_check, "does not match its group"),
     ("design_summary", _sum_group_twice, "governing_by_group must be sorted and unique"),
+    ("design_summary", _sum_ratio_none, "requires a ratio"),
+    ("design_summary", _sum_counts_missing, "counts needs one entry per status"),
+    ("section_size", _size_nondyadic_wrong, "size must be multiple times increment"),
     ("section_size", _size_unit, "must be in mm"),
     ("section_size", _size_multiple, "greater than or equal to 1"),
     ("section_size", _size_below, "size must be at least required"),
@@ -420,6 +444,7 @@ REPORT_VALID: list[tuple[str, Mutation]] = [
     ("design_summary", _sum_attention),
     ("design_summary", _sum_failing_sorted),
     ("section_size", _size_valid),
+    ("section_size", _size_nondyadic),
 ]
 
 
