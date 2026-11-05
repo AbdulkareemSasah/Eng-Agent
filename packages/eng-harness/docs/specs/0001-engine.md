@@ -39,6 +39,9 @@ The decision port's data types stay owned by spec 0005 (`eng_harness.decisions.i
 route of spec 0010 §4.3 and spec 0013 §4.5, named in §4.8 ("Code-pack checks"). It is listed in §11 (Q25); it adds no
 criterion here (the route's criteria are spec 0010 AC3, AC4 and spec 0013 AC13).
 
+**Amendment B-427.** The B-349 writer's questions are listed in §11 (Q26 to Q29) as draft decisions; AC34 is amended to
+match; it adds no criterion.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -242,7 +245,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   step is treated as in flight at once: no further step on that host is sent until reconciliation. Test:
   `tests/workflow/test_honest_outcomes.py::test_unknown_outcome_reconciled_first`.
 - AC34. Given a run that wrote a model, when it resumes and the model's identity, revision or fingerprint differs
-  from the last `model_saved`, then the run stops with the three choices of 11 §5; `accept` saves and records a new
+  from the last `model_saved` (or, when a write on it completed or was reconciled `applied` after that save, its
+  identity or revision differs from the latest such result's `provenance.host`, §4.5.4; draft decision B-427, owner
+  queue, Q27 and Q28), then the run stops with the three choices of 11 §5; `accept` saves and records a new
   baseline and continues; `restore` restores the saved copy and replays from the step after its `model_saved` (§4.5.4);
   `abandon` records `run_failed`. Test: `tests/replay/test_host_state.py::test_three_choices`.
 - AC35. Given a completed run, when it is resumed, then it returns the recorded output with no ToolPort, CalcPort,
@@ -630,7 +635,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `check_enforced` | `invariant` (1 to 10), `model_key` or `host_key`, `outcome` (`pass`, `fail`), `ref` | NORMAL |
 | `model_saved` | `model_key`, `model_id`, `revision`, `fingerprint`, `file_sha256`, `file_name` (base name only), `role` (`working_copy`, `revision`, `pre_analysis`, `baseline`, `promoted`), `origin_sha256` and `origin_file_names` (base names of the original's files; working copies) | FULL |
 | `run_paused` | `reason` (`awaiting_approval`, `awaiting_input`, `stop_requested`), `request_ids` | NORMAL |
-| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq`, `unreleased_tools` (only when it differs from the last recorded mapping), `decision_runtime` (only when it differs from the last recorded object) | NORMAL |
+| `run_resumed` | `resume_no`, `code_hash_changed`, `servers`, `restored_to_seq` (set only in a second `run_resumed` with the same `resume_no`, appended after a `restore`, §4.5.4; that second event is not a new resume: readers count and list distinct `resume_no` values; draft decision B-427, owner queue), `unreleased_tools` (only when it differs from the last recorded mapping), `decision_runtime` (only when it differs from the last recorded object) | NORMAL |
 | `run_escalated` | `reason` (`replay_divergence`, `needs_reconciliation`, `host_state_mismatch`, `units_mismatch`, `attempts_exhausted`, `block_escalation`, `block_rule_violation`, `unhandled_error`), `detail`, `evidence`, `request_id` | NORMAL |
 | `run_completed` | `output_ref`, `output_sha256`, `draft` | FULL |
 | `run_failed` | `reason` (`abandoned`), `by` | FULL |
@@ -750,8 +755,9 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 For every model the run wrote to, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
-last `model_saved`, or, when a write on it was reconciled `applied` after that save (§4.5.1 step 7), with the revision
-and fingerprint of the reconciled result's `provenance.host`. A model with `HostModelState.loaded` false (a lost model,
+last `model_saved`, or, when a write on it completed or was reconciled `applied` after that save (§4.5.1 step 7), with
+the model identity and revision of the latest such result's `provenance.host` (the contract's `HostInfo` has no
+fingerprint, so against a result the fingerprint is not compared; draft decision B-427, owner queue). A model with `HostModelState.loaded` false (a lost model,
 §4.5.1 step 6) is a mismatch with reason `model_not_loaded`. A reopened model is compared with its last `model_saved`
 only, never with a reconciled result, and any write on it after that save (completed, reconciled or in flight) is a
 mismatch with reason `model_reopened`: the reopened file cannot hold it. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
@@ -762,8 +768,9 @@ request (`engine.host_state`) offering three choices (11 §5):
   no state to accept) or a `model_reopened` mismatch (the journal would hold writes the model lacks) **[added]**.
 - `restore`: `HostPort.restore(model_key, saved)` reopens the last saved working copy and returns the instance that
   holds it (the bound instance if it still runs, else one spec 0002 starts, which is journaled as `host_started`); the
-  engine journals `model_bound` (reason `restored`) for it before any other call on the model; `run_resumed` records
-  `restored_to_seq` (the `seq` of that `model_saved`), and the replay index ignores every step event after it, so those
+  engine journals `model_bound` (reason `restored`) for it before any other call on the model; a second `run_resumed`
+  with the same `resume_no`, appended after the restore, records `restored_to_seq` (the `seq` of that `model_saved`;
+  it is not a new resume: readers count and list distinct `resume_no` values; draft decision B-427, owner queue), and the replay index ignores every step event after it, so those
   steps run live again as new attempts (`step_rerun`, reason `restored`) with new `op_id`s. Offered only when no other
   model was written after that `seq` **[added: otherwise a restore would repeat writes on the other model]**. After the
   restore and before any live step on that model, the engine reads units again against the new binding
@@ -892,7 +899,7 @@ instance of a model is the `instance_id` of its last `model_bound`. The engine j
 `first_use` before the first step of the run addressed to the model, from `HostPort.locate(model_key)`, whether or not
 the engine started that instance (for a tool with action `open` or for `working_copy`, after that step instead, since
 the model is not open before it; `locate` returning `None` before any other step refuses the step with `ContractError`
-`PRECONDITION_FAILED`, condition `model_loaded`); (b) with reason `restored` after `HostPort.restore` (§4.5.4); (c)
+`PRECONDITION_FAILED`, condition `model_open`, the contract's `Precondition` name; draft decision B-427, owner queue); (b) with reason `restored` after `HostPort.restore` (§4.5.4); (c)
 with reason `reopened` at resume (§4.5.1 step 6). `HostPort.read_units` and `HostPort.model_state` take the bound
 `instance_id` and never raise when that instance does not have the model open or is not running: they return
 `loaded: false` (spec 0002 starts no host program to answer them). A server that cannot be reached fails the preflight (invariant 8).
@@ -1102,3 +1109,7 @@ defaults to empty.
 | Q23 | Spec 0006 Q5: the engine records `unreleased_tools` from `ToolPort.unreleased_tools()` (spec 0002 §4.5.1 descriptors) in `run_started`, and in `run_resumed` when it changed; the report marks the union, so a later release cannot unmark a result | Owner | Accept (§4.4.2, AC68); spec 0006 §4.6.3 reads the journal and keeps `[project_lane]` only as a fallback at its next amendment |
 | Q24 | Spec 0009 Q7: the run header records the decision runtime (`DecisionRuntime.summary`: per provider name, model, version, locality, tier and status; per released point its release). The engine takes it from `DecisionPort.runtime_summary()` and journals it as an opaque JSON object, so the engine imports nothing from `eng_harness.providers` (spec 0009 §4.1) and a provider or release change between pause and resume is visible in `run_resumed` | Owner | Accept (§4.4.2, §4.4.5, §4.8, AC69); the cascade of spec 0005 returns what spec 0006 built it with (spec 0005 §4.12) |
 | Q25 | Spec 0010 Q10 and C2: code-pack checks reach the `CalcPort` through the one code-pack route (`_calc/_code_packs.py`, spec 0010 §4.3, spec 0013 §4.5), consulted for ids that do not start with `harness.`; an id outside its allowlist is `NOT_FOUND`; the run class applies as to calcs | Owner | Accept (§4.8, amendment B-405; draft until the owner approves) |
+| Q26 | B-349: how `restored_to_seq` reaches the journal, since the resume's `run_resumed` is appended (§4.5.1 step 3) before the host-state check that may restore | Owner | Draft decision B-427, owner queue: a second `run_resumed` with the same `resume_no`, appended after the restore (as built; §4.4.2, §4.5.4); it is not a new resume: readers count and list distinct `resume_no` values (follow-up: spec 0006 AC56 and the report model deduplicate by `resume_no`) |
+| Q27 | B-349: what the host-state check compares a model with when a write on it completed (not reconciled) after its last save | Owner | Draft decision B-427, owner queue: the latest completed or reconciled-`applied` result's `provenance.host`, as for a reconciled write (§4.5.4; AC34 amended to match) |
+| Q28 | B-349: the contract's `HostInfo` has no fingerprint, and `Precondition` has `model_open`, not `model_loaded` | Owner | Draft decision B-427, owner queue: against a result compare identity and revision only, and use `model_open`; no contract change (§4.5.4, §4.8; AC34 amended to match) |
+| Q29 | B-349: who refuses a step when `locate` returns `None`, where `first_use` `model_bound` lands, and which models resume step 6 covers | Owner | Draft decision B-427, owner queue: engine plan T13 refuses (`PRECONDITION_FAILED`, `model_open`), moves the seam so `model_bound` lands before `step_started`, and covers every model the journal addressed (§4.5.1, §4.8) |
