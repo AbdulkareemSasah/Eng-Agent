@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from eng_harness import __version__
 from eng_harness._calc._approvals import ApprovalsFile, resolve_status
+from eng_harness._calc._code_packs import CodePackRoute
 from eng_harness.calc import CalcDef, CalcInput, CalcRegistry, CalcStatus, InputMeta, RefMeta, TraceBuilder
 from eng_harness.errors import CalcRefused, HarnessCode, StepError
 from eng_harness.kinds.calcs import CalcMeta
@@ -63,7 +64,8 @@ class HarnessCalcPort:
     """The engine's `CalcPort` for the calcs of the registry (spec 0003 4.12).
 
     `basis_fields` maps a calc id to the basis paths it reads (`CalcInfo.basis_fields`); the calc declaration has no
-    such field yet, so a calc that reads the basis is listed by its caller.
+    such field yet, so a calc that reads the basis is listed by its caller. `code_packs` is the route that serves an
+    id that does not start with `harness.` (spec 0003 4.12 item 4); without it such an id is unknown.
     """
 
     def __init__(  # B-144: the seven collaborators of spec 0003 4.12, plus the basis map
@@ -77,8 +79,16 @@ class HarnessCalcPort:
         ids: IdSource,
         *,
         basis_fields: Mapping[str, Sequence[str]] | None = None,
+        code_packs: CodePackRoute | None = None,
     ) -> None:
-        """Hold the collaborators; the run class does not change."""
+        """Hold the collaborators; the run class does not change.
+
+        Raises:
+            ValueError: the route has another run class than the port.
+        """
+        if code_packs is not None and code_packs.run_class is not run_class:
+            raise ValueError("the code-pack route and the port must have the same run class")
+        self._packs = code_packs
         self._registry, self._approvals, self._store, self._settings = registry, approvals, store, settings
         self._run_class, self._clock, self._ids = run_class, clock, ids
         self._basis = dict(basis_fields or {})
@@ -87,6 +97,10 @@ class HarnessCalcPort:
     def run_class(self) -> RunClass:
         """The run class given at construction."""
         return self._run_class
+
+    def _routed(self, calc_id: str) -> CodePackRoute | None:
+        """The code-pack route for an id that does not start with `harness.`, else `None`."""
+        return None if calc_id.startswith("harness.") else self._packs
 
     def _find(self, calc_id: str) -> tuple[CalcDef, str, CalcStatus]:
         if calc_id not in self._registry:
@@ -107,8 +121,14 @@ class HarnessCalcPort:
         Raises:
             ContractError: `NOT_FOUND` for an unknown id.
         """
-        found = [(i, self._find(i)[2]) for i in calc_ids]
-        return [r for i, status in found if (r := self._refusal(i, status)) is not None]
+        refused: list[CalcRefusal] = []
+        for calc_id in calc_ids:
+            if (route := self._routed(calc_id)) is not None:
+                if (hit := route.refusal(calc_id)) is not None:
+                    refused.append(CalcRefusal(calc_id, *hit))
+            elif (refusal := self._refusal(calc_id, self._find(calc_id)[2])) is not None:
+                refused.append(refusal)
+        return refused
 
     def describe(self, calc_id: str) -> CalcInfo:
         """Return the calc's info; `ref_rules` come from the `x-eng` metadata of the input schema (AC13).
@@ -116,6 +136,8 @@ class HarnessCalcPort:
         Raises:
             ContractError: `NOT_FOUND` for an unknown id.
         """
+        if (route := self._routed(calc_id)) is not None:
+            return route.describe(calc_id)
         definition, digest, status = self._find(calc_id)
         properties = self._input_type(definition).model_json_schema()["properties"]
         rules = {
@@ -147,6 +169,8 @@ class HarnessCalcPort:
             CalcRefused: the calc is withdrawn, or not approved in a production run.
             NotImplementedGap: the calc reached a path marked not implemented.
         """
+        if (route := self._routed(calc_id)) is not None:
+            return route.run(calc_id, args)
         try:
             return self._run(calc_id, args)
         except ContractError as exc:

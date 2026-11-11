@@ -12,5 +12,7 @@ io_modules:  # FB004: modules that block and rule modules never import (11 secti
   [os, sys, io, pathlib, shutil, tempfile, socket, ssl, http, urllib, subprocess, sqlite3, time, datetime, random, secrets, uuid, requests, httpx]
 cited:  # FB005 form A1: callables whose first argument is a literal with a source string (10 section 3)
   callables: [Cited]
+versioned:  # FB005 form A4: callables whose version= keyword is an integer identity (spec 4.8, amendment B-438)
+  callables: [calc, CheckMeta]
 rationale:  # FB006: types that already forbid digits in a rationale (12 section 1)
   types: [Rationale]

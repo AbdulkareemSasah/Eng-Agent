@@ -55,8 +55,20 @@ def _is_len(unit: Unit, node: ast.AST) -> bool:
     return isinstance(node, ast.Call) and unit.qualname(node.func) == "len"
 
 
+def _version_literals(unit: Unit, versioned: set[str]) -> set[int]:
+    """A4: ids of integer literals given directly as ``version=`` of a callable in ``versioned`` (spec 4.8)."""
+    found: set[int] = set()
+    for node in ast.walk(unit.tree):
+        if not (isinstance(node, ast.Call) and _last(unit.qualname(node.func)) in versioned):
+            continue
+        for keyword in node.keywords:
+            if keyword.arg == "version" and (const := _literal(keyword.value)) and type(const.value) is int:
+                found.add(id(const))
+    return found
+
+
 def _allowed(unit: Unit, config: ForbiddenConfig) -> set[int]:
-    """Return the ids of the constants in the forms A1 (cited value), A2 (index or bound) and A3 (against ``len``)."""
+    """Return the ids of the constants in forms A1 (cited), A2 (index), A3 (against ``len``) and A4 (version)."""
     allowed: set[int] = set()
     cited = set(config.cited.callables)
     for node in ast.walk(unit.tree):
@@ -84,7 +96,7 @@ def _allowed(unit: Unit, config: ForbiddenConfig) -> set[int]:
                 for number, other in ((left, right), (right, left)):
                     if (c := _literal(number)) and type(c.value) is int and _is_len(unit, other):
                         allowed.add(id(c))
-    return allowed
+    return allowed | _version_literals(unit, set(config.versioned.callables))
 
 
 def _annotations(tree: ast.Module) -> Iterator[ast.AST]:
@@ -98,7 +110,7 @@ def _annotations(tree: ast.Module) -> Iterator[ast.AST]:
 
 
 def fb005(unit: Unit, config: ForbiddenConfig) -> list[Finding]:
-    """FB005: a numeric literal in check, calc, block and rule modules, except the forms A1 to A3 and annotations."""
+    """FB005: a numeric literal in check, calc, block and rule modules, except the forms A1 to A4 and annotations."""
     if not unit.modules.covers(unit.local, "check", "calc", "block", "rule"):
         return []
     skipped = {id(n) for root in _annotations(unit.tree) for n in ast.walk(root)}

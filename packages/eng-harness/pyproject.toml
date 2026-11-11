@@ -10,6 +10,8 @@ dependencies = [
     "mcp>=2.3,<3",
     "pydantic>=2.14,<3",
     "ruamel-yaml>=0.19,<0.20",
+    "structural-codes-aci318-14",
+    "structural-codes-core",
 ]
 
 # Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the
@@ -22,6 +24,8 @@ eng-harness = "eng_harness.cli:main"
 
 [tool.uv.sources]
 eng-contract = { workspace = true }
+structural-codes-core = { workspace = true }
+structural-codes-aci318-14 = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
