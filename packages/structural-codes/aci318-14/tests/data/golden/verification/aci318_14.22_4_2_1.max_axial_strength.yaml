@@ -1,0 +1,127 @@
+# Case file of aci318_14.22_4_2_1.max_axial_strength (clause spec §8; plan 0004 T2). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (0.001 kN on forces, 1e-6 on ratios), with rel_tol 0 so that the absolute tolerance alone applies.
+format: structural-codes-verification/1
+check_id: aci318_14.22_4_2_1.max_axial_strength
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4, tied column, common inputs of §8 with Pu = 3000 kN"}
+    subject: {kind: frame, id: C1}
+    inputs: &common
+      Pu_kN: 3000
+      b_mm: 500
+      h_mm: 500
+      Ast_mm2: 4000
+      fc_MPa: 28
+      fy_MPa: 420
+      transverse_kind: tied
+      k_factor: 1
+      lu_mm: 3000
+    expected:
+      status: PASS
+      values:
+        Ag_mm2: {value: 250000, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        Po_kN: {value: 7534.8, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Pn_max_kN: {value: 6027.84, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        phi_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phiPn_max_kN: {value: 3918.096, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.765678, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4, spiral column, common inputs of §8 with Pu = 3000 kN"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, transverse_kind: spiral}
+    expected:
+      status: PASS
+      values:
+        Pn_max_kN: {value: 6404.58, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        phi_ratio: {value: 0.75, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phiPn_max_kN: {value: 4803.435, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.624553, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4, failing demand, common inputs with Pu = 4000 kN"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 4000}
+    expected:
+      status: FAIL
+      values:
+        ratio: {value: 1.020904, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.a
+    kind: boundary
+    covers: [SHORT_COLUMN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, lu_mm: 3300}
+    expected:
+      status: PASS
+      values:
+        kl_r_ratio: {value: 22, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 0.765678, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.b
+    kind: boundary
+    covers: [SHORT_COLUMN, G-2]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, lu_mm: 3301}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.a
+    kind: boundary
+    covers: [AXIAL_COMPRESSION]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 0}
+    expected:
+      status: PASS
+      values:
+        ratio: {value: 0, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-2.b
+    kind: boundary
+    covers: [AXIAL_COMPRESSION, G-1]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: -1}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.c
+    kind: boundary
+    covers: [STEEL_IN_SECTION]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Ast_mm2: 250000}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.a
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fy_MPa: 550}
+    expected:
+      status: PASS
+      values:
+        ratio: {value: 0.765678, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-3.b
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fy_MPa: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.c
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fc_MPa: 16}
+    expected: {status: NEEDS_ENGINEER}
+  - id: WE-1
+    kind: worked_example
+    source: {derivation: "owner-supplied book example (plan §6 G-WE)"}
+    subject: {kind: frame, id: C1}
+    inputs: *common
+    expected: {status: gap}
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: ETABS
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: frame, id: C1}
+    inputs: *common
+    expected:
+      status: PASS
+      values:
+        phiPn_max_kN: {value: 3918.096, unit: kN, abs_tol: 0.001, rel_tol: 0}
+review: null
