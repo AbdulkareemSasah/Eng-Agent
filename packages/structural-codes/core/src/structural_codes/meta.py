@@ -7,7 +7,7 @@ import re
 from typing import Annotated, Any, Self
 
 from eng_contract.verdicts import CODE_PACK_CHECK_ID, SubjectKind
-from pydantic import BaseModel, ConfigDict, StringConstraints, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, ValidationError, model_validator
 
 from structural_codes.errors import CheckDefinitionError
 
@@ -53,7 +53,10 @@ class GapDecl(_Frozen):
 
 
 class CheckMeta(_Frozen):
-    """Metadata of a check (spec 4.2); `check_id` is `<pack>.<clause_token(clauses[0])>.<short_name>`."""
+    """Metadata of a check (spec 4.2); `check_id` is `<pack>.<clause_token(clauses[0])>.<short_name>`.
+
+    `version` is the check's own integer version (>= 1), carried by a calc route as `CalcInfo.version`.
+    """
 
     check_id: Annotated[str, StringConstraints(max_length=200)]
     pack: Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
@@ -67,6 +70,7 @@ class CheckMeta(_Frozen):
     gaps: tuple[GapDecl, ...] = ()
     assumptions: tuple[Annotated[str, StringConstraints(max_length=500)], ...] = ()
     unconditional: Annotated[str, StringConstraints(min_length=1, max_length=500)] | None = None
+    version: Annotated[int, Field(strict=True, ge=1)] = 1
 
     @model_validator(mode="after")
     def _rules(self) -> Self:

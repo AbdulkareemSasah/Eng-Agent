@@ -7,6 +7,7 @@ After a restart or a context compaction, read this file and `git log origin/buil
 - Mode: bootstrap (ADR-0028 §4). Checks that need the owner or another identity report `awaiting owner`.
 - Live steps: [LOCAL-TESTING.md](LOCAL-TESTING.md). Nothing that needs a host program is claimed as working.
 - **Paused for a handoff on 2026-11-11 (owner's request): resume from [HANDOFF.md](HANDOFF.md).** The remaining work is in `ops/remaining-tasks.json`; local CI is `ops/localci.py` (D-23).
+- **Second pause, 2026-11-11 about 16:45 UTC:** B-438 merged (#267); B-437 (#260), B-440 (#270) and B-330 (#269) reviewed and fixed, waiting for local CI; the build moves to a cloud session (HANDOFF.md section 0, D-29).
 
 ## 1. Environment facts (recorded at the start)
 
@@ -374,7 +375,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-325 | Y.T1 | Pack skeleton, empty approvals file, workspace member, local-testing section | sonnet, low | opus, medium | [#246](https://github.com/AbdulkareemSasah/Eng-Agent/pull/246) | done (91308bf) |
 | B-326 | Y.T2 | Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check | opus, medium | opus, medium | — | not started or in writing |
 | B-327 | Y.T3 | Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage | opus, medium | opus, medium | — | not started or in writing |
-| B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | — | not started or in writing |
+| B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | [#269](https://github.com/AbdulkareemSasah/Eng-Agent/pull/269) | open |
 | B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | not started or in writing |
 | B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | not started or in writing |
 | B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | — | not started or in writing |
@@ -433,7 +434,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-390 | docs | Engine spec 4.8: synchronous and asynchronous port methods and the port shapes T6 settled | lead | opus, low | [#199](https://github.com/AbdulkareemSasah/Eng-Agent/pull/199) | done (f3db469) |
 | B-391 | docs | eng-contract follow-ups as spec text and plan tasks T17 (B-095) and T18 (B-084) | lead | opus, low | [#200](https://github.com/AbdulkareemSasah/Eng-Agent/pull/200) | done (a9cc248) |
 | B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | [#203](https://github.com/AbdulkareemSasah/Eng-Agent/pull/203) | done (3a11744) |
-| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | — | not started or in writing |
+| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | [#268](https://github.com/AbdulkareemSasah/Eng-Agent/pull/268) | open |
 | B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | [#256](https://github.com/AbdulkareemSasah/Eng-Agent/pull/256) | open |
 | B-395 | X.T4 | Calcs harness.footing_plan_size and harness.footing_resize | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-396 | X.T5 | Calc harness.footing_layout | sonnet, high | opus, medium + verifiers | — | not started or in writing |
@@ -469,20 +470,21 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-431 | I.T17b | Local testing list and the agent rule in the package AGENTS.md | sonnet, medium | opus, medium | — | not started or in writing |
 | B-432 | I.T17c | Real-engine re-checks of the screens and the run and resume commands | sonnet, medium | opus, medium | — | not started or in writing |
 | B-433 | I.T18 | Bind the CliDeps defaults to the merged real implementations (port builder waits for spec 0006 Q20) | sonnet, high | opus, medium | — | not started or in writing |
-| B-434 | docs (DOC.ET12) | Engine T12 gains _runner.py and the step_started action; inserted check and save steps decisions | opus, medium | opus, low + verifiers | [#263](https://github.com/AbdulkareemSasah/Eng-Agent/pull/263) | open |
-| B-435 | docs (DOC.HTMLFRAG) | Interface plan: new T2b (fragment links), report T12 inputs, the report resume count to T13 | opus, medium | opus, low + verifiers | [#261](https://github.com/AbdulkareemSasah/Eng-Agent/pull/261) | open |
-| B-436 | I.T2b | In-page fragment links in the HTML builder | sonnet, medium | opus, medium | — | not started or in writing |
+| B-434 | docs (DOC.ET12) | Engine T12 gains _runner.py and the step_started action; inserted check and save steps decisions | opus, medium | opus, low + verifiers | [#263](https://github.com/AbdulkareemSasah/Eng-Agent/pull/263) | done (c63e663) |
+| B-435 | docs (DOC.HTMLFRAG) | Interface plan: new T2b (fragment links), report T12 inputs, the report resume count to T13 | opus, medium | opus, low + verifiers | [#261](https://github.com/AbdulkareemSasah/Eng-Agent/pull/261) | done (3bc101e) |
+| B-436 | I.T2b | In-page fragment links in the HTML builder | sonnet, medium | opus, medium | [#265](https://github.com/AbdulkareemSasah/Eng-Agent/pull/265) | done (f7264f2) |
 | B-437 | docs (DOC.CALCRULES) | Calc-module import rules, recursive rules test, lock test under mutation testing, calcs T7 scope | opus, medium | opus, low + verifiers | [#260](https://github.com/AbdulkareemSasah/Eng-Agent/pull/260) | open |
-| B-438 | docs (DOC.GATEA4) | Gate FB005 form A4 (integer version keyword of a listed callable) and gate plan T39 | opus, medium | opus, low + verifiers | — | not started or in writing |
+| B-438 | docs (DOC.GATEA4) | Gate FB005 form A4 (integer version keyword of a listed callable) and gate plan T39 | opus, medium | opus, low + verifiers | [#267](https://github.com/AbdulkareemSasah/Eng-Agent/pull/267) | open |
 | B-439 | G.T39 | FB005 form A4 in eng-dev-gate | sonnet, high | opus, medium | — | not started or in writing |
 | B-440 | docs (DOC.PROVT1) | Providers T1 carries its license evidence (proposed ADR 0005, gate license exceptions for cffi and regex) | opus, medium | opus, low + verifiers | — | not started or in writing |
-| B-442 | docs (DOC.Q20) | CheckMeta.version (integer, default 1) settles footing Q20 and column Q13; core plan T15 | opus, medium | opus, low + verifiers | [#264](https://github.com/AbdulkareemSasah/Eng-Agent/pull/264) | open |
-| B-443 | K.T15 | CheckMeta.version in structural-codes core | sonnet, medium | opus, medium | — | not started or in writing |
+| B-442 | docs (DOC.Q20) | CheckMeta.version (integer, default 1) settles footing Q20 and column Q13; core plan T15 | opus, medium | opus, low + verifiers | [#264](https://github.com/AbdulkareemSasah/Eng-Agent/pull/264) | done (07d8c2d) |
+| B-443 | K.T15 | CheckMeta.version in structural-codes core | sonnet, medium | opus, medium | [#266](https://github.com/AbdulkareemSasah/Eng-Agent/pull/266) | done (4f8a2f1) |
 
 ## 4. Decisions by the lead
 
 | Id | Decision | Why |
 |---|---|---|
+| D-29 | **Delegated writers and where CI runs** (2026-11-11, owner's instruction): code and documents may be written by Cursor CLI (`cursor-agent -p`, models chosen per task: Composer 2.5, Grok 4.7 low to high); the lead reviews every diff, commits, pushes, runs the gate and local CI and merges; writers never push or touch pull requests. On the owner's Windows workstation Cursor runs edit-only (the session's permission classifier refuses `--force`), local CI runs in WSL, and GitHub over IPv6 does not answer there (git pinned to IPv4 through a repository-local `http.curloptResolve`). A full gate run (mutation, about 15 minutes) froze the workstation and the WSL VM (CreateVm timeout) while the owner needed AutoCAD, so the build moves to a cloud session (HANDOFF.md section 0). Cursor is outside AGENTS.md section 9: recorded for the owner's audit (owner queue OQ-Q49) | The owner asked for cheaper writers and a lead that reviews; the workstation must stay usable |
 | D-1 | Tasks are tracked in this file (`B-NNN`), not GitHub issues, during bootstrap; pull requests name `Work-Item: B-NNN` and `Plan-Task:` | One identity; no notifications; the gate reads the plan files |
 | D-2 | Phase 0 spikes live in the root `spikes/` folder | Their target package (`eng-harness`) is created when phase 1 starts (19, R4) |
 | D-3 | Commits carry `Assisted-by: anthropic/claude` (family and model line, no version identifiers) | process/04 §3 trailer, without model version identifiers in the repository |
@@ -631,6 +633,7 @@ option and continued.
 | OQ-Q41 | Settled in draft by lead amendments, for the owner's approval: footing workflow Q10 and C2 to C4 (one code-pack route; `NOT_FOUND` outside its allowlist; B-405); the engine ports' synchronous and asynchronous methods and open shapes as built by T6 (B-390); the edit-cycle change-set settings default `max_items` (B-387 states it) | Accept as built; each is recorded in its spec as a draft decision |
 | OQ-Q42 | mutmut 3.8.1 reads an empty `also_copy=` as one entry `""`, which is the current folder, and copies the member into `mutants/` once more (harmless, wasteful) | A one-line gate fix (omit the key when the list is empty) in a later gate task |
 | OQ-Q43 | Report model (B-185, spec 0006): (1) AC56 machine time sums every completed step, so a block step and its children are both counted: leaf steps only? (2) §4.6.1 item 7: no journal event closes a host instance, so "left open" means "the run has no terminal event": intended? (3) a decision request is an `input_requested`, so its wait counts as an input wait under AC56: confirm | Leaf steps only for machine time (block time is the sum of its children plus its own overhead), as a spec amendment before T12; accept (2) and (3) as built |
+| OQ-Q49 | Cursor CLI (Composer 2.5, Grok 4.7) wrote the fixes of B-437, B-438, B-440 and B-330 on the owner's instruction; Cursor is not in AGENTS.md section 9 (allowed services) | Add it to section 9 through `.gate/agents.yml` (protected path, owner) if the owner keeps using it; otherwise the cloud session writes with Anthropic models only |
 | OQ-Q48 | A failed build check on a server restart surfaces as `HOST_NOT_CONNECTED` (retry rule always) rather than a `SERVER_CHECK_FAILED` stop (S.T6b, B-351) | Keep `HOST_NOT_CONNECTED` until S.T19 shows how the engine handles it (`ToolFailed` carries contract codes only) |
 | OQ-Q47 | Draft decisions of wave 7: engine `step_started` carries the tool action, inserted steps are kind `read`, hash path keys, dirty models checked before a parallel (B-434); FB005 form A4 for the `version=` keyword, amending Q5 'no further exceptions' (B-438); license exceptions for cffi (MIT-0) and regex (Apache-2.0 AND CNRI-Python) with a proposed ADR (B-440); `CheckMeta.version` integer default 1 (B-442) | Accept as recorded in each amendment |
 | OQ-Q46 | Engine spec Q26 to Q29 (B-427): restored_to_seq in a second run_resumed; completed writes compared with provenance.host; identity and revision only against a result (no contract change); T13 owns the PRECONDITION_FAILED refusal | Accept |

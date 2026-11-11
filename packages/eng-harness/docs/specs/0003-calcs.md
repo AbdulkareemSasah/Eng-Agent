@@ -68,7 +68,8 @@ proposed project value.
   `removed: true` and cannot be registered again. Tests: `tests/contract/test_calc_lock.py::test_lock_matches_registry`,
   `tests/unit/calcs/test_registry.py::test_removed_id_not_reused`.
 - AC3. Given every module under `src/eng_harness/calcs/`, when the calc-module rules test runs, then each imports only
-  the modules allowed by §4.3, reads no file, clock, environment or random source, uses no `global` or mutable
+  the modules allowed by §4.3, reads no file (except `calcs/__init__.py` reading `calcs.lock.json` through `read_lock`,
+  §4.3), clock, environment or random source, uses no `global` or mutable
   module-level state, imports nothing inside a function, and contains no numeric literal outside gate FB005's allowed
   forms. Test: `tests/rules/test_calc_modules.py::test_calc_module_rules`.
 - AC4. Given a calc and an input, when it runs twice in two interpreter processes, then the stored payloads are
@@ -248,7 +249,7 @@ proposed project value.
 
 | Module | Public names | Who may import |
 |---|---|---|
-| `eng_harness.calc` | `calc` (decorator), `CalcDef`, `CalcInput`, `InputMeta`, `RefMeta`, `TraceBuilder`, `CalcStatus`, `CalcRegistry`, `CalcRegistryError`, `NotImplementedGap` (re-exported from `eng_harness.errors`) | calc modules, CalcPort, tests |
+| `eng_harness.calc` | `calc` (decorator), `CalcDef`, `CalcInput`, `InputMeta`, `RefMeta`, `TraceBuilder`, `CalcStatus`, `CalcRegistry`, `CalcRegistryError`, `NotImplementedGap` (re-exported from `eng_harness.errors`), `read_lock`, `removed_ids` (re-exported from `eng_harness._calc._hash`, 4.3) | calc modules, CalcPort, tests |
 | `eng_harness.kinds.calcs` | the payload models of §4.6 to §4.11, `harness.expected_effects/1`, `CalcMeta` | calc modules, spec 0006 (page, report), spec 0007 |
 | `eng_harness.calcs` | `REGISTRY` (the `CalcRegistry` of the shipped calcs), `same_state` | CalcPort, spec 0002 (fingerprint comparison), tests |
 
@@ -304,8 +305,13 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.cited`, `eng_contract.trace`, `eng_contract.canonical`, `eng_contract.units` (`kind_for_field`, `unit`),
 `eng_contract.refs` (`RefString`, `JsonPointer`), `eng_contract.errors` (`ContractError`, `ErrorCode`),
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
-`enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`. Everything else is refused by
-the rules test (AC3). Imports are top level only (AC7).
+`enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
+(`eng_param`, for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs). `calcs/__init__.py` may import
+`read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
+Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
+
+The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
+including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).
 
 ### 4.4 Design-basis fields
 
@@ -791,7 +797,10 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 
 Replay of calc steps (a completed calc step is not run again) is engine AC35. No program comparison applies: no host
 computes these quantities (10 §6 item 2). Coverage floors 85% line and 75% branch. Mutation score at least 80% on
-`calcs/**` and `_calc/**` (R1). Live checks are in §11 and in the plan §4.
+`calcs/**` and `_calc/**` (R1). Live checks are in §11 and in the plan §4. Under mutation testing (environment
+variable `MUTANT_UNDER_TEST` set) `tests/contract/test_calc_lock.py` skips the lock-versus-registry comparison with an
+issue reference and an expiry (the B-369 pattern), because mutants change the hashed source by design. Amendment
+(B-437).
 
 ## 10. Version impact
 

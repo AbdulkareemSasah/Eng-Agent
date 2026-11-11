@@ -2,8 +2,8 @@
 
 Text enters markup only as `Text` (sanitized, then escaped) or `Trusted` (a literal written in this package).
 Untrusted data enters only through `field`, as an escaped, truncated `<bdi dir="auto">` value under a fixed label.
-Attributes accept a `SafeToken`, an enumerated value or an `Href` built from tokens: a data string is never placed
-in an attribute, a URL, a class name, an id or a style.
+Attributes accept a `SafeToken`, an enumerated value or an `Href` built from tokens (a path, or an in-page `#token`
+for href only): a data string is never placed in an attribute, a URL, a class name, an id or a style.
 
 Raises:
     HtmlError: every refusal of this module (a value outside the rules above, an unknown tag or attribute).
@@ -67,6 +67,13 @@ def href(*segments: SafeToken) -> Href:
         if not isinstance(segment, SafeToken) or segment in {".", ".."}:
             raise HtmlError("a URL segment must be a SafeToken other than . and ..")
     return Href("/" + "/".join(segments), _MINT)
+
+
+def fragment(token: SafeToken) -> Href:
+    """Return an in-page link `#token`, accepted for `href` only. Raises: HtmlError for a non-token."""
+    if not isinstance(token, SafeToken):
+        raise HtmlError("a fragment must be a SafeToken")
+    return Href("#" + token, _MINT)
 
 
 class Node:
@@ -161,9 +168,14 @@ def _attr(name: str, value: object) -> str:
     if key not in _ATTRS:
         raise HtmlError("attribute not allowed")
     if key in _URL_ATTRS:
-        if type(value) is not Href or _PATH.fullmatch(value.value) is None:
+        if type(value) is not Href:
             raise HtmlError("a URL attribute takes an Href")
         text = value.value
+        if key == "href" and text.startswith("#"):
+            if _TOKEN.fullmatch(text[1:]) is None:
+                raise HtmlError("a fragment holds a token")
+        elif _PATH.fullmatch(text) is None:
+            raise HtmlError("a URL attribute takes an Href")
     elif isinstance(value, SafeToken):
         text = str(value)
     elif isinstance(value, StrEnum) and _TOKEN.fullmatch(value.value) is not None:

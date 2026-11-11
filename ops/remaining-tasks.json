@@ -1,49 +1,7 @@
 {
- "generated_from": "lead task registry, build/v1 at adfc396",
- "count": 148,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1",
+ "count": 143,
  "tasks": [
-  {
-   "id": "B-434",
-   "task": "DOC.ET12",
-   "plan": null,
-   "planTask": null,
-   "kind": "docs",
-   "title": "Engine plan T12 gains _runner.py and the step_started action; spec 4.3.1, 4.4.2, 4.6 decisions on inserted check and save steps",
-   "branch": "docs/b434-engine-t12-runner-and-inserted-steps",
-   "prTitle": "docs(eng-harness): engine T12 file scope and the inserted-step decisions (B-434)",
-   "risk": "r0",
-   "pending_deps": [],
-   "writer": "opus, medium",
-   "reviewer": "opus, low",
-   "verifier_lenses": [
-    "consistency",
-    "implementable"
-   ],
-   "open_pr": 263,
-   "branch_pushed": true,
-   "instructions": "Documents-only amendment (bootstrap: draft; decisions to the owner queue). The B-111 writer could not build engine plan packages/eng-harness/docs/plans/0001-engine.md T12 inside its files. Make exactly these edits:\n1. T12 files += packages/eng-harness/src/eng_harness/engine/_runner.py (two edits only: pass ports.host into Ctx as a constructor parameter; inside _drive's try block, after the root block returns, await a new Ctx.finish() that runs the p~end.check_model steps for models still dirty, spec 4.6 #1, AC37) and packages/eng-harness/src/eng_harness/journal/_events.py (StepStarted gains an optional `action` field, absent in older journals). Say in T12's paragraph that T13 still owns the rest of _runner.py. Budget stays 380 (estimate about 310).\n2. Spec 0001 4.4.2: step_started carries the tool's action (optional, so earlier journals read unchanged), which makes a removed inserted save step detectable at replay (AC47). Draft decision B-434 (recommended option of the writer).\n3. Spec 0001 4.3.1 and 4.6: engine-inserted check_model and save steps are journaled with step kind `read` (names check_model and save), so that in-flight reconciliation (T11b) reruns them; the path key of a model key outside the key grammar is its hash form (state the form the writer gave: the first 12 hex characters of the SHA-256 of the key, prefixed `h`); a parallel's children read no model the parent left dirty: the engine checks dirty models before the parallel starts (p~pre.check_model on the parallel's path).\n4. Spec 0001 section 11: Q rows for items 2 and 3, each 'draft decision B-434, owner queue', and a one-line 'Amendment B-434' preamble paragraph like B-427's.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
-  },
-  {
-   "id": "B-435",
-   "task": "DOC.HTMLFRAG",
-   "plan": null,
-   "planTask": null,
-   "kind": "docs",
-   "title": "Interface plan 0006: new T2b (fragment links in _html.py) before T12; T12 inputs; the report resume count",
-   "branch": "docs/b435-report-fragment-links",
-   "prTitle": "docs(eng-harness): fragment links for the report sources (T2b) and the report section inputs (B-435)",
-   "risk": "r0",
-   "pending_deps": [],
-   "writer": "opus, medium",
-   "reviewer": "opus, low",
-   "verifier_lenses": [
-    "consistency",
-    "implementable"
-   ],
-   "open_pr": 261,
-   "branch_pushed": true,
-   "instructions": "Documents-only amendment. The B-186 writer could not meet AC52 (every value cell links to its sources-table row) inside report T12: the HTML builder _html.py (T2's file) can build no in-page link. Make exactly these edits in packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md and specs/0006-cli-progress-pages-report.md:\n1. New task T2b 'In-page fragment links in the HTML builder': `fragment(token: SafeToken) -> Href` renders `#<token>` and `_attr` accepts it for href only. Files: packages/eng-harness/CHANGELOG.md, src/eng_harness/_html.py, tests/unit/test_html.py. max_changed_lines 60, max_sessions 1, depends_on [T2], tests_first tests/unit/test_html.py::test_fragment_href, covers [AC52]. A YAML amendment comment and a short paragraph.\n2. T12 depends_on += T2b; its paragraph says value cells link with fragment() to `id=\"src-N\"` rows, and that _sections.py functions take (ReportModel, JournalReader, ResultStore): the Changes section (AC55) reads model_saved revisions and approval items from the JournalReader because ReportModel (T11) does not hold them.\n3. Spec 0006 AC52 names the in-page fragment link; AC56 counts resumes as distinct resume_no values (engine Q26: a restore appends a second run_resumed with the same resume_no). The merged report/_model.py makes one entry per run_resumed: give the fix to T13 (add packages/eng-harness/src/eng_harness/report/_model.py to T13's files, with a test) and say so in T13's paragraph.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
-  },
   {
    "id": "B-437",
    "task": "DOC.CALCRULES",
@@ -82,8 +40,8 @@
     "consistency",
     "implementable"
    ],
-   "open_pr": null,
-   "branch_pushed": false,
+   "open_pr": 267,
+   "branch_pushed": true,
    "instructions": "Documents-only amendment of tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md and plans/0001-eng-dev-gate-0.1.md. Calcs, rules and code-pack checks carry an integer identity version (`@calc(..., version=1)`, `CheckMeta(version=...)`), which FB005 refuses as a numeric literal; a version is identity, not an engineering quantity, and cannot carry a threshold. Make exactly these edits:\n1. Spec 4.8: new form A4: an integer literal given directly as the `version=` keyword argument of a call to a callable named in the policy list `versioned.callables` of .gate/forbidden.yml (initially `calc` and `CheckMeta`). A new AC for it.\n2. Spec section 11: the Q5 row records that the owner's 'no further exceptions' is amended by draft decision B-438 (owner queue), with the reason above.\n3. Plan: new task T39 'FB005 form A4': files tools/eng-dev-gate/CHANGELOG.md, src/eng_dev_gate/checks/forbidden/rules_b.py, src/eng_dev_gate/checks/forbidden/engine.py (the policy model), .gate/forbidden.yml, the forbidden-check unit test file the plan already names for FB005; max_changed_lines 120, max_sessions 1, depends_on the last forbidden-check task, tests_first a test that `calc(version=1)` passes and `calc(limit=1)` and `other(version=1)` are refused. A YAML amendment comment and a paragraph.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
   },
   {
@@ -108,27 +66,6 @@
    "instructions": "Documents-only amendment of packages/eng-harness/docs/plans/0009-providers.md. The B-220 review found the gate's licenses step refuses two transitive dependencies of the provider runtime: cffi (MIT-0) and regex (Apache-2.0 AND CNRI-Python). Both licenses are permissive but not on the gate's allow list, and an exception needs an accepting ADR (.gate/gate.yml license_exceptions: distribution, license, adr). Make exactly these edits:\n1. T1 files += .gate/gate.yml (license_exceptions entries only) and packages/eng-harness/docs/adr/0005-transitive-licenses.md (a new ADR, status Proposed, accepting cffi MIT-0 and regex Apache-2.0 AND CNRI-Python as transitive dependencies of ADR-0001 and ADR-0003, owner queue). A YAML amendment comment on T1 and one sentence in its paragraph.\n2. T1's paragraph: an empty tests/unit/providers/__init__.py marker is allowed by gate AC10c without listing (it avoids mypy's duplicate module name test_config).\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
   },
   {
-   "id": "B-442",
-   "task": "DOC.Q20",
-   "plan": null,
-   "planTask": null,
-   "kind": "docs",
-   "title": "Structural-codes core: CheckMeta.version (integer, default 1); footing spec 0010 Q20 and column spec 0013 Q13 decided; core plan T15",
-   "branch": "docs/b442-check-version-q20",
-   "prTitle": "docs: CheckMeta.version settles footing Q20 and column Q13; structural-codes core plan T15 (B-442)",
-   "risk": "r0",
-   "pending_deps": [],
-   "writer": "opus, medium",
-   "reviewer": "opus, low",
-   "verifier_lenses": [
-    "consistency",
-    "implementable"
-   ],
-   "open_pr": 264,
-   "branch_pushed": true,
-   "instructions": "Documents-only amendment. Footing plan 0010 T2 (B-393) and column plan 0013 T6 wait for spec 0010 Q20 / spec 0013 Q13: how a code-pack check's CalcInfo.version is set. Draft decision (the writers' recommendation): an integer `version` field in structural_codes CheckMeta, default 1, raised when a check's behaviour changes; the route passes it as CalcInfo.version; the pack's string version stays in the trace. Make exactly these edits:\n1. packages/structural-codes/docs/specs/0001-core-framework.md: CheckMeta gains `version: int = 1` with that meaning (the section that defines CheckMeta), and an AC; a Q row 'draft decision B-442, owner queue'.\n2. packages/structural-codes/docs/plans/0001-core-framework.md: new task T15 'CheckMeta.version': files packages/structural-codes/core/src/structural_codes/meta.py (or the module that defines CheckMeta), its unit test, CHANGELOG; max_changed_lines 60, max_sessions 1, depends_on [T14b], tests_first a test that the default is 1 and a non-positive version is refused.\n3. packages/eng-harness/docs/specs/0010-design-isolated-footing.md Q20 and specs/0013-column-workflow.md Q13: decided as above (draft, B-442); plan 0010 T2 and plan 0013 T6 start conditions name structural-codes core T15 instead of the open question.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
-  },
-  {
    "id": "B-111",
    "task": "E.T12",
    "plan": "packages/eng-harness/docs/plans/0001-engine.md",
@@ -138,9 +75,7 @@
    "branch": "feat/b111-harness-et12-invariants-1-2-3",
    "prTitle": "feat(eng-harness): invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis) (B-111)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "DOC.ET12"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -565,10 +500,7 @@
    "branch": "feat/b186-harness-it12-report-sections-changes-results",
    "prTitle": "feat(eng-harness): report sections: changes, results, sources, decisions; renderer registry; value cells with sources (B-186)",
    "risk": "r3",
-   "pending_deps": [
-    "DOC.HTMLFRAG",
-    "I.T2b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
@@ -816,25 +748,6 @@
    "lead_notes": [
     "binding the port_builder default waits for the owner's answer to spec 0006 Q20; if Q20 is still open when you start, bind every other default and report DONE_WITH_CONCERNS naming the open binding (do not invent one).\nSuppression comments: `# noqa: CODE  # B-NNN: reason` (a second comment; `# type: ignore[code]  # B-NNN: reason` for mypy). Avoid new suppressions; a justified one raises its package's count in .gate/ratchet.json, which is then in your scope (gate spec 4.5 step 6, B-088 and B-089; the rise is AW05 for the owner). Test-first rejects a first-commit test that passes at the merge base (TF004): a static rule test (for example under tests/rules/) passes trivially while the code it guards does not exist, so make it import the module it protects at module level, which makes it fail at the base for the right reason. Never put dependency or configuration changes in the first test commit (TF003). A new public module goes into public_modules in the package pyproject.toml in the implementation commit.\neng-contract is complete on build/v1. If your task needs a part of another plan that is not on build/v1 when you start, stop and report BLOCKED naming it; do not stub, copy or re-implement it."
    ]
-  },
-  {
-   "id": "B-436",
-   "task": "I.T2b",
-   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
-   "planTask": "T2b",
-   "kind": "impl",
-   "title": "In-page fragment links in the HTML builder: fragment(SafeToken) renders #token, accepted for href only",
-   "branch": "feat/b436-harness-it2b-html-fragment-links",
-   "prTitle": "feat(eng-harness): in-page fragment links in the HTML builder (B-436)",
-   "risk": "r3",
-   "pending_deps": [
-    "DOC.HTMLFRAG"
-   ],
-   "writer": "sonnet, medium",
-   "reviewer": "opus, low",
-   "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false
   },
   {
    "id": "B-146",
@@ -1610,25 +1523,6 @@
    "branch_pushed": false
   },
   {
-   "id": "B-443",
-   "task": "K.T15",
-   "plan": "packages/structural-codes/docs/plans/0001-core-framework.md",
-   "planTask": "T15",
-   "kind": "impl",
-   "title": "CheckMeta.version: an integer check version, default 1, carried to the route as CalcInfo.version",
-   "branch": "feat/b443-codes-kt15-checkmeta-version",
-   "prTitle": "feat(structural-codes): CheckMeta.version, the integer check version (B-443)",
-   "risk": "r1, r2, r3",
-   "pending_deps": [
-    "DOC.Q20"
-   ],
-   "writer": "sonnet, medium",
-   "reviewer": "opus, low",
-   "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false
-  },
-  {
    "id": "B-326",
    "task": "Y.T2",
    "plan": "packages/structural-codes/docs/plans/0003-sbc304-2018-footing-overlay.md",
@@ -1689,7 +1583,7 @@
     "source",
     "oracle"
    ],
-   "open_pr": null,
+   "open_pr": 269,
    "branch_pushed": true,
    "lead_notes": [
     "your earlier session left three commits on branch feat/b330-codes-zt1-shared-column-section-model (8a2d529 tests, 28c346b feat, c2a527e refactor), now pushed by the lead. Continue on it: merge origin/build/v1 (never rebase), run the full package gate including mutation, and open the pull request."
@@ -2043,15 +1937,12 @@
    "branch": "feat/b393-harness-xt2-code-pack-route",
    "prTitle": "feat(eng-harness): code-pack route of the CalcPort and the structural-codes workspace dependencies (B-393)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "DOC.Q20",
-    "K.T15"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false,
+   "open_pr": 268,
+   "branch_pushed": true,
    "lead_notes": [
     "spec 0010 Q20 is settled by B-442 (CheckMeta.version, integer, default 1) and core T15 (B-443) adds the field; pass it as CalcInfo.version."
    ]
