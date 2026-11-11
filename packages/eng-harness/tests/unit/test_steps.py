@@ -15,6 +15,7 @@ from workflows.ctx_flows import flow
 from workflows.rig import make_rig, request
 
 from eng_harness.engine import RunStatus
+from eng_harness.engine._invariants import path_key
 from eng_harness.engine._steps import (
     MAX_PATH_LENGTH,
     Scope,
@@ -146,6 +147,13 @@ def test_inserted_and_housekeeping_paths() -> None:
         inserted_path("1", "post", "check_model", "bad key")
     with pytest.raises(ValueError, match="step path"):
         inserted_path("1", "post", "check_model", "k" * 201)
+
+
+def test_path_key_hashes_a_model_outside_the_grammar() -> None:
+    """A model key that is not a path key becomes `h` and the first 12 hex digits of its SHA-256 (spec 4.3.1)."""
+    assert path_key("mod_1") == "mod_1"
+    raw = "bad key"
+    assert path_key(raw) == "h" + hashlib.sha256(raw.encode()).hexdigest()[:12]
 
 
 def test_path_length_limit() -> None:
@@ -415,6 +423,33 @@ def test_sibling_model_conflict(tmp_path: Path, earlier: str, later: str) -> Non
     assert outcome.escalation is not None
     assert outcome.escalation.reason == "block_rule_violation"
     assert [entry.tool for entry in rig.host.ledger] == [earlier]  # the later sibling made no port call
+
+
+def test_sibling_reads_share_a_model(tmp_path: Path) -> None:
+    """Two children may read the same model; both port calls happen (AC5)."""
+    rig = make_rig(tmp_path)
+    rig.host._tools["read_m"] = ToolInfo(
+        name="read_m", effect="read", action="plain", host_key="csi", model_param="model"
+    )
+
+    async def body(ctx: Any) -> list[str]:
+        gate = asyncio.Event()
+
+        async def lead() -> str:
+            found = await ctx.tool("read_m", {"model": "m1"})
+            gate.set()
+            return found.ref.ref
+
+        async def trail() -> str:
+            await gate.wait()
+            return (await ctx.tool("read_m", {"model": "m1"})).ref.ref
+
+        await ctx.parallel(lead(), trail())
+        return []
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert outcome.status is RunStatus.COMPLETED
+    assert [entry.tool for entry in rig.host.ledger] == ["read_m", "read_m"]
 
 
 def test_attempts_overlapping_a_step_is_refused() -> None:

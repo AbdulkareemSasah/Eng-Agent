@@ -164,6 +164,21 @@ def test_engineering_literal_rejected(tmp_path: Path) -> None:
     assert rig.calc_runs == []
 
 
+def test_engineering_ref_is_accepted(tmp_path: Path) -> None:
+    """An engineering parameter that is a reference reaches the port (AC38)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    span = Ref.model_validate({"$ref": "res_" + "1" * 26})
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("size_it", {"span": span})
+        return []
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert outcome.status is RunStatus.COMPLETED
+    assert [entry.tool for entry in rig.host.ledger] == ["size_it"]
+
+
 def _hosted(rig: Any, model_id: str, revision: int) -> Provenance:
     host = HostInfo(program="csi", version="1", model_id=model_id, model_revision=revision)
     return Provenance(tool="harness", tool_version="t", host=host, inputs={}, started_at=rig.clock.now(), duration_ms=0)
