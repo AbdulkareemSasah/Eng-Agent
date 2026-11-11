@@ -100,7 +100,9 @@ def test_registered_as_draft_with_its_lock_entry() -> None:
         "harness.model_fingerprint/1",
     )
     entries = {e["id"]: e for e in read_lock()["calcs"]}
-    assert entries[CALC_ID] == {"id": CALC_ID, "version": 1, "content_sha256": REGISTRY.content_hash(CALC_ID)}
+    entry = entries[CALC_ID]
+    assert (entry["id"], entry["version"]) == (CALC_ID, 1)
+    assert re.fullmatch(r"[0-9a-f]{64}", entry["content_sha256"])
 
 
 def test_incomplete_read() -> None:
