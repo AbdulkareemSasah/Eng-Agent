@@ -9,7 +9,7 @@ rules the ctx calls of plan task T10 will exercise (a parallel size, an approval
 import asyncio
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from eng_contract.canonical import payload_sha256
@@ -282,11 +282,12 @@ def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
     An unrecorded inserted path going live is the open question Q35, not asserted here.
     """
     rig = make_rig(tmp_path)
-    for name, effect, action in (
+    specs: tuple[tuple[str, Literal["read", "write"], Literal["plain", "analysis"]], ...] = (
         ("write_m", "write", "plain"),
         ("read_m", "read", "plain"),
         ("analyze", "read", "analysis"),
-    ):
+    )
+    for name, effect, action in specs:
         rig.host._tools[name] = ToolInfo(name=name, effect=effect, action=action, host_key="csi", model_param="model")
     instance = HostInstance(instance_id="i-1", pid=7, process_started_at=rig.clock.now(), program="csi")
     rig.host.add_model("m1", instance)
@@ -302,10 +303,14 @@ def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
     workflow = flow(body)
     first = asyncio.run(rig.engine(workflow).start(request()))
     assert first.status is RunStatus.NEEDS_ENGINEER
-    started = [e for e in rig.events(first.run_id) if isinstance(e.payload, ev.StepStarted)]
-    inserted = [e for e in started if e.payload.name in ("check_model", "save")]
+    inserted = [
+        e
+        for e in rig.events(first.run_id)
+        if isinstance(e.payload, ev.StepStarted) and e.payload.name in ("check_model", "save")
+    ]
     assert [e.path for e in inserted] == ["1~pre.check_model.m1", "2~pre.save.m1"]
-    assert [(e.payload.kind, e.payload.effect, e.payload.op_id) for e in inserted] == [("read", "read", None)] * 2
+    payloads = [e.payload for e in inserted if isinstance(e.payload, ev.StepStarted)]
+    assert [(e.kind, e.effect, e.op_id) for e in payloads] == [("read", "read", None)] * 2
     mark = len(rig.log)
     outcome = asyncio.run(rig.engine(workflow).resume(first.run_id))
     assert outcome.status is RunStatus.COMPLETED
@@ -313,7 +318,11 @@ def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
     assert "host.save" not in rig.log[mark:]
 
     fresh = make_rig(tmp_path / "removed")
-    for name, effect, action in (("write_m", "write", "plain"), ("read_m", "read", "plain")):
+    pair: tuple[tuple[str, Literal["read", "write"], Literal["plain"]], ...] = (
+        ("write_m", "write", "plain"),
+        ("read_m", "read", "plain"),
+    )
+    for name, effect, action in pair:
         fresh.host._tools[name] = ToolInfo(name=name, effect=effect, action=action, host_key="csi", model_param="model")
     fresh.host.script("read_c", failure(ErrorCode.HOST_BUSY))
 

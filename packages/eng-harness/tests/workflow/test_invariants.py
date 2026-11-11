@@ -8,7 +8,7 @@ analysis or design tool is preceded by a save.
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
@@ -30,20 +30,27 @@ _SHA = "ab" * 32
 Body = Callable[[Any], Awaitable[Sequence[str]]]
 
 
+def _tool(
+    host: Any,
+    name: str,
+    effect: Literal["read", "write"],
+    action: Literal["plain", "analysis", "design"],
+    model: str | None,
+    params: tuple[str, ...] = (),
+) -> None:
+    """Register one tool on the fake host."""
+    host._tools[name] = ToolInfo(
+        name=name, effect=effect, action=action, host_key="csi", model_param=model, engineering_params=params
+    )
+
+
 def _tools(host: Any) -> None:
     """Model-addressed tools and one tool with an engineering parameter, on the fake host."""
-    specs = (
-        ("write_m", "write", "plain", ("model",), ()),
-        ("read_m", "read", "plain", ("model",), ()),
-        ("analyze", "read", "analysis", ("model",), ()),
-        ("design", "write", "design", ("model",), ()),
-        ("size_it", "read", "plain", (None,), ("span",)),
-    )
-    for name, effect, action, model, params in specs:
-        host._tools[name] = ToolInfo(
-            name=name, effect=effect, action=action, host_key="csi",
-            model_param=model[0], engineering_params=params,
-        )  # fmt: skip
+    _tool(host, "write_m", "write", "plain", "model")
+    _tool(host, "read_m", "read", "plain", "model")
+    _tool(host, "analyze", "read", "analysis", "model")
+    _tool(host, "design", "write", "design", "model")
+    _tool(host, "size_it", "read", "plain", None, ("span",))
 
 
 def _open(rig: Any, *keys: str) -> None:
@@ -255,9 +262,11 @@ def test_save_before_analysis(tmp_path: Path) -> None:
     done = asyncio.run(rig.engine(flow(body)).start(request()))
     assert done.status is RunStatus.COMPLETED
     events = rig.events(done.run_id)
-    saves = [e for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.name == "save"]
-    assert [e.path for e in saves] == ["0~pre.save.m1", "1~pre.save.m1"]
-    assert [(s.payload.kind, s.payload.effect, s.payload.op_id) for s in saves] == [("read", "read", None)] * 2
+    saves = [e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.name == "save"]
+    assert [e.path for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.name == "save"] == [
+        "0~pre.save.m1", "1~pre.save.m1",
+    ]  # fmt: skip
+    assert [(s.kind, s.effect, s.op_id) for s in saves] == [("read", "read", None)] * 2
     recorded = [e.payload for e in events if isinstance(e.payload, ev.ModelSaved)]
     assert [s.role for s in recorded] == ["pre_analysis", "pre_analysis"]
     assert {s.model_key for s in recorded} == {"m1"}

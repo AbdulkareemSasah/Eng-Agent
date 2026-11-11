@@ -3,7 +3,7 @@
 import asyncio
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Literal
 
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
@@ -45,7 +45,8 @@ def _unchecked(events: list[Event]) -> str | None:
 
 def _run(root: Path, program: list[tuple[str, str]]) -> str | None:
     rig = make_rig(root)
-    for name, effect in (("write_m", "write"), ("read_m", "read")):
+    specs: tuple[tuple[str, Literal["read", "write"]], ...] = (("write_m", "write"), ("read_m", "read"))
+    for name, effect in specs:
         rig.host._tools[name] = ToolInfo(name=name, effect=effect, action="plain", host_key="csi", model_param="model")
     rig.calc_infos.append(
         CalcInfo(

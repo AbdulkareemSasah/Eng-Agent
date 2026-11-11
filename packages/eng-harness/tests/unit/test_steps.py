@@ -8,7 +8,7 @@ import asyncio
 import hashlib
 from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from workflows.ctx_flows import flow
@@ -400,7 +400,8 @@ def test_attempts_body_error_releases_the_scope() -> None:
 def test_sibling_model_conflict(tmp_path: Path, earlier: str, later: str) -> None:
     """A sibling that reads or writes a model another child wrote never reaches its port call (AC5)."""
     rig = make_rig(tmp_path)
-    for name, effect in (("write_m", "write"), ("read_m", "read")):
+    specs: tuple[tuple[str, Literal["read", "write"]], ...] = (("write_m", "write"), ("read_m", "read"))
+    for name, effect in specs:
         rig.host._tools[name] = ToolInfo(name=name, effect=effect, action="plain", host_key="csi", model_param="model")
 
     async def body(ctx: Any) -> list[str]:
@@ -409,11 +410,11 @@ def test_sibling_model_conflict(tmp_path: Path, earlier: str, later: str) -> Non
         async def lead() -> str:
             found = await ctx.tool(earlier, {"model": "m1"})
             gate.set()
-            return found.ref.ref
+            return str(found.ref.ref)
 
         async def trail() -> str:
             await gate.wait()
-            return (await ctx.tool(later, {"model": "m1"})).ref.ref
+            return str((await ctx.tool(later, {"model": "m1"})).ref.ref)
 
         await ctx.parallel(lead(), trail())
         return []
@@ -438,11 +439,11 @@ def test_sibling_reads_share_a_model(tmp_path: Path) -> None:
         async def lead() -> str:
             found = await ctx.tool("read_m", {"model": "m1"})
             gate.set()
-            return found.ref.ref
+            return str(found.ref.ref)
 
         async def trail() -> str:
             await gate.wait()
-            return (await ctx.tool("read_m", {"model": "m1"})).ref.ref
+            return str((await ctx.tool("read_m", {"model": "m1"})).ref.ref)
 
         await ctx.parallel(lead(), trail())
         return []
