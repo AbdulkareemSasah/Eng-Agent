@@ -1,4 +1,4 @@
-"""FB005 (spec 4.8, AC33): numeric literals in check, calc, block and rule modules, and the allowed forms A1 to A3."""
+"""FB005 (spec 4.8, AC33): numeric literals in check, calc, block and rule modules, and the allowed forms A1 to A4."""
 
 from __future__ import annotations
 
@@ -107,3 +107,33 @@ def test_annotations_and_docstrings_are_not_scanned() -> None:
 def test_type_alias_value_is_an_annotation() -> None:
     assert scan_b("type Level = Literal[1, 2]\nX = (1)\n", "src/pkg/calc/c.py")[0].line == 2
     assert len(scan_b("type Level = Literal[1, 2]\nX = (1)\n", "src/pkg/calc/c.py")) == 1
+
+
+def test_version_keyword_of_versioned_callable() -> None:
+    """AC33a (spec 4.8 form A4): an integer ``version=`` of a listed callable is not FB005.
+
+    The same literal under another keyword, on a callable outside ``versioned.callables``, as a float, as a
+    positional argument, or inside an expression stays FB005. A leading minus belongs to the literal (spec 4.8).
+    """
+    allowed = """\
+calc(version=1)
+CheckMeta(version=1)
+foo.calc(version=1)
+from pkg.decorators import calc as define
+define(version=-1)
+
+@calc(name="beam", version=1)
+def beam() -> None:
+    return None
+"""
+    assert scan_b(allowed, "src/pkg/calc/c.py") == []
+    assert lines(scan_b("calc(limit=1)\nother(version=1)\n", "src/pkg/calc/c.py"), "FB005") == [1, 2]
+    assert lines(scan_b("calc(version=1.0)\ncalc(1)\ncalc(version=1 + 0)\n", "src/pkg/calc/c.py"), "FB005") == [
+        1,
+        2,
+        3,
+        3,
+    ]
+    mixed = scan_b("calc(version=1, limit=2)\n", "src/pkg/calc/c.py")
+    assert lines(mixed, "FB005") == [1]
+    assert mixed[0].message.startswith("numeric literal 2:")
