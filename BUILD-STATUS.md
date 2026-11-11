@@ -374,7 +374,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-325 | Y.T1 | Pack skeleton, empty approvals file, workspace member, local-testing section | sonnet, low | opus, medium | [#246](https://github.com/AbdulkareemSasah/Eng-Agent/pull/246) | done (91308bf) |
 | B-326 | Y.T2 | Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check | opus, medium | opus, medium | — | not started or in writing |
 | B-327 | Y.T3 | Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage | opus, medium | opus, medium | — | not started or in writing |
-| B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | — | not started or in writing |
+| B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | [#269](https://github.com/AbdulkareemSasah/Eng-Agent/pull/269) | open |
 | B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | not started or in writing |
 | B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | not started or in writing |
 | B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | — | not started or in writing |
@@ -433,7 +433,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-390 | docs | Engine spec 4.8: synchronous and asynchronous port methods and the port shapes T6 settled | lead | opus, low | [#199](https://github.com/AbdulkareemSasah/Eng-Agent/pull/199) | done (f3db469) |
 | B-391 | docs | eng-contract follow-ups as spec text and plan tasks T17 (B-095) and T18 (B-084) | lead | opus, low | [#200](https://github.com/AbdulkareemSasah/Eng-Agent/pull/200) | done (a9cc248) |
 | B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | [#203](https://github.com/AbdulkareemSasah/Eng-Agent/pull/203) | done (3a11744) |
-| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | — | not started or in writing |
+| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | [#268](https://github.com/AbdulkareemSasah/Eng-Agent/pull/268) | open |
 | B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | [#256](https://github.com/AbdulkareemSasah/Eng-Agent/pull/256) | open |
 | B-395 | X.T4 | Calcs harness.footing_plan_size and harness.footing_resize | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-396 | X.T5 | Calc harness.footing_layout | sonnet, high | opus, medium + verifiers | — | not started or in writing |
@@ -469,15 +469,15 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-431 | I.T17b | Local testing list and the agent rule in the package AGENTS.md | sonnet, medium | opus, medium | — | not started or in writing |
 | B-432 | I.T17c | Real-engine re-checks of the screens and the run and resume commands | sonnet, medium | opus, medium | — | not started or in writing |
 | B-433 | I.T18 | Bind the CliDeps defaults to the merged real implementations (port builder waits for spec 0006 Q20) | sonnet, high | opus, medium | — | not started or in writing |
-| B-434 | docs (DOC.ET12) | Engine T12 gains _runner.py and the step_started action; inserted check and save steps decisions | opus, medium | opus, low + verifiers | [#263](https://github.com/AbdulkareemSasah/Eng-Agent/pull/263) | open |
-| B-435 | docs (DOC.HTMLFRAG) | Interface plan: new T2b (fragment links), report T12 inputs, the report resume count to T13 | opus, medium | opus, low + verifiers | [#261](https://github.com/AbdulkareemSasah/Eng-Agent/pull/261) | open |
-| B-436 | I.T2b | In-page fragment links in the HTML builder | sonnet, medium | opus, medium | — | not started or in writing |
+| B-434 | docs (DOC.ET12) | Engine T12 gains _runner.py and the step_started action; inserted check and save steps decisions | opus, medium | opus, low + verifiers | [#263](https://github.com/AbdulkareemSasah/Eng-Agent/pull/263) | done (c63e663) |
+| B-435 | docs (DOC.HTMLFRAG) | Interface plan: new T2b (fragment links), report T12 inputs, the report resume count to T13 | opus, medium | opus, low + verifiers | [#261](https://github.com/AbdulkareemSasah/Eng-Agent/pull/261) | done (3bc101e) |
+| B-436 | I.T2b | In-page fragment links in the HTML builder | sonnet, medium | opus, medium | [#265](https://github.com/AbdulkareemSasah/Eng-Agent/pull/265) | done (f7264f2) |
 | B-437 | docs (DOC.CALCRULES) | Calc-module import rules, recursive rules test, lock test under mutation testing, calcs T7 scope | opus, medium | opus, low + verifiers | [#260](https://github.com/AbdulkareemSasah/Eng-Agent/pull/260) | open |
-| B-438 | docs (DOC.GATEA4) | Gate FB005 form A4 (integer version keyword of a listed callable) and gate plan T39 | opus, medium | opus, low + verifiers | — | not started or in writing |
+| B-438 | docs (DOC.GATEA4) | Gate FB005 form A4 (integer version keyword of a listed callable) and gate plan T39 | opus, medium | opus, low + verifiers | [#267](https://github.com/AbdulkareemSasah/Eng-Agent/pull/267) | open |
 | B-439 | G.T39 | FB005 form A4 in eng-dev-gate | sonnet, high | opus, medium | — | not started or in writing |
 | B-440 | docs (DOC.PROVT1) | Providers T1 carries its license evidence (proposed ADR 0005, gate license exceptions for cffi and regex) | opus, medium | opus, low + verifiers | — | not started or in writing |
-| B-442 | docs (DOC.Q20) | CheckMeta.version (integer, default 1) settles footing Q20 and column Q13; core plan T15 | opus, medium | opus, low + verifiers | [#264](https://github.com/AbdulkareemSasah/Eng-Agent/pull/264) | open |
-| B-443 | K.T15 | CheckMeta.version in structural-codes core | sonnet, medium | opus, medium | — | not started or in writing |
+| B-442 | docs (DOC.Q20) | CheckMeta.version (integer, default 1) settles footing Q20 and column Q13; core plan T15 | opus, medium | opus, low + verifiers | [#264](https://github.com/AbdulkareemSasah/Eng-Agent/pull/264) | done (07d8c2d) |
+| B-443 | K.T15 | CheckMeta.version in structural-codes core | sonnet, medium | opus, medium | [#266](https://github.com/AbdulkareemSasah/Eng-Agent/pull/266) | done (4f8a2f1) |
 
 ## 4. Decisions by the lead
 
