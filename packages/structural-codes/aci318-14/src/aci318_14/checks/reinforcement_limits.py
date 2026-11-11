@@ -1,9 +1,6 @@
-"""Check `aci318_14.10_6_1_1.longitudinal_reinforcement_limits`: column bar area limits (clause spec, plan 0004 T4). R1.
+"""Check `aci318_14.10_6_1_1.longitudinal_reinforcement_limits`: column bar area limits (plan 0004 T4). R1.
 
-Purpose: per plan direction, the total longitudinal reinforcement against `0.01·Ag <= Ast <= 0.08·Ag` of 10.6.1.1.
-Two verdicts, minimum then maximum; no load input.
-Units: mm2 inputs; areas in mm2; ratios unitless.
-Errors: none of its own; a failed `STEEL_IN_SECTION` precondition gives `NEEDS_ENGINEER`.
+Compares Ast to 0.01·Ag and 0.08·Ag (10.6.1.1); two verdicts; `STEEL_IN_SECTION` failure -> `NEEDS_ENGINEER`.
 """
 
 from eng_contract.cited import Cited
@@ -54,22 +51,9 @@ def longitudinal_reinforcement_limits(inp: LongitudinalReinforcementLimitsInputs
     """Record `As_min`, `As_max`, `rho_ratio`, then the minimum and maximum verdicts (clause spec §4)."""
     ag, ast = t.value("Ag_mm2"), t.value("Ast_mm2")
     rho_min, rho_max = t.const("rho_min", _RHO_MIN), t.const("rho_max", _RHO_MAX)
-    t.step(
-        "As_min_mm2",
-        rho_min * ag,
-        unit="mm2",
-        formula="rho_min * Ag_mm2",
-        source=f"ACI 318-14 {_CLAUSE}",
-        uses=["rho_min", "Ag_mm2"],
-    )
-    t.step(
-        "As_max_mm2",
-        rho_max * ag,
-        unit="mm2",
-        formula="rho_max * Ag_mm2",
-        source=f"ACI 318-14 {_CLAUSE}",
-        uses=["rho_max", "Ag_mm2"],
-    )
+    src = f"ACI 318-14 {_CLAUSE}"
+    t.step("As_min_mm2", rho_min * ag, unit="mm2", formula="rho_min * Ag_mm2", source=src, uses=["rho_min", "Ag_mm2"])
+    t.step("As_max_mm2", rho_max * ag, unit="mm2", formula="rho_max * Ag_mm2", source=src, uses=["rho_max", "Ag_mm2"])
     t.step(
         "rho_ratio",
         ast / ag,
