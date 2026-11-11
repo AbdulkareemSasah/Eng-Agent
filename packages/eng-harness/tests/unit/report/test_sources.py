@@ -2,10 +2,13 @@
 
 import re
 from pathlib import Path
+from typing import cast
 
+import pytest
 from eng_contract.ids import SeededIdSource
 from eng_contract.store import ResultStore
 from golden.test_report import load_sections_run
+from pydantic import JsonValue
 
 _CELL = re.compile(r'<td class="v"><a href="(#src-\d+)">(.*?)</a></td>')
 _ROW = re.compile(r'<tr id="(src-\d+)">(.*?)</tr>')
@@ -42,3 +45,23 @@ def test_every_value_has_source(run_dir: Path, store: ResultStore, ids: SeededId
     assert any("A. Engineer" in row and "2026-01-15 10:30:00 UTC" in row for row in engineer)
     assert "hidden-leaf" not in html
     assert ">1 more<" in html
+
+
+def test_generic_renderer_bounds_and_required_source() -> None:
+    """The generic table stops at 200 rows (spec 0006 4.6.1) and a value cell refuses a missing source."""
+    from eng_harness._html import HtmlError
+    from eng_harness.report._sections import CellSource, SourceBook, _render_generic, value_cell
+
+    book = SourceBook()
+    with pytest.raises(HtmlError, match="source"):
+        value_cell("x", cast(CellSource, None), book)
+    with pytest.raises(HtmlError, match="source"):
+        value_cell("x", CellSource("", "/"), book)
+    wide: dict[str, JsonValue] = {f"k{index}": index for index in range(201)}
+    html = "".join(node.render() for node in _render_generic(wide, "res_wide", book))
+    assert "k0" in html
+    assert "k199" in html
+    assert "k200" not in html
+    assert ">1 more<" in html
+    long = value_cell("y" * 600, CellSource("res_wide", "/n"), SourceBook())
+    assert "(600 characters)" in long.render()

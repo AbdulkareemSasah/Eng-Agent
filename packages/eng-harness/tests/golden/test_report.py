@@ -220,6 +220,10 @@ def load_sections_run(run_dir: Path, store: ResultStore, ids: SeededIdSource) ->
         "point": "cycle.turn", "options": ["accept", "more_edits"], "choice": "accept",
         "decided_by": "engineer:ada", "confidence": None, "latency_ms": 0, "state_sha256": SHA, "suggestions": [],
     })  # fmt: skip
+    add(kinds.RUN_ESCALATED, {
+        "reason": "needs_reconciliation", "detail": "host moved", "evidence": [], "request_id": None,
+    })  # fmt: skip
+    add(kinds.STEP_RECONCILED, {"op_id": "op1", "outcome": "applied", "decided_by": "engineer:ada", "evidence": []})
     add(kinds.RUN_RESUMED, {"resume_no": 1, "code_hash_changed": False, "servers": []})
     add(kinds.MODEL_SAVED, _saved(
         3, "fp-promoted", "promoted.edb", "promoted", origin_sha256=SHA, origin_file_names=["original.edb"],
