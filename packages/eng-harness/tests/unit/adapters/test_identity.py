@@ -9,8 +9,7 @@ from pathlib import Path
 
 from eng_contract.errors import WarningCode
 from eng_contract.ids import FixedClock, SeededIdSource
-from eng_contract.store import ModelStateStore, Workspace
-from eng_contract.store._workspace import LocationClass
+from eng_contract.store import LocationClass, ModelStateStore, Workspace
 
 
 def _sha(path: Path) -> str:

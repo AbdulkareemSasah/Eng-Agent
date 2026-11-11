@@ -15,8 +15,7 @@ import anyio
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import Clock, FixedClock, IdSource, SeededIdSource
-from eng_contract.store import ModelStateStore, Workspace
-from eng_contract.store._workspace import LocationClass
+from eng_contract.store import LocationClass, ModelStateStore, Workspace
 from mcp import types
 
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig
