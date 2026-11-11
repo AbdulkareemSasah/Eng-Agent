@@ -68,7 +68,8 @@ proposed project value.
   `removed: true` and cannot be registered again. Tests: `tests/contract/test_calc_lock.py::test_lock_matches_registry`,
   `tests/unit/calcs/test_registry.py::test_removed_id_not_reused`.
 - AC3. Given every module under `src/eng_harness/calcs/`, when the calc-module rules test runs, then each imports only
-  the modules allowed by §4.3, reads no file, clock, environment or random source, uses no `global` or mutable
+  the modules allowed by §4.3, reads no file (except `calcs/__init__.py` reading `calcs.lock.json` through `read_lock`,
+  §4.3), clock, environment or random source, uses no `global` or mutable
   module-level state, imports nothing inside a function, and contains no numeric literal outside gate FB005's allowed
   forms. Test: `tests/rules/test_calc_modules.py::test_calc_module_rules`.
 - AC4. Given a calc and an input, when it runs twice in two interpreter processes, then the stored payloads are
