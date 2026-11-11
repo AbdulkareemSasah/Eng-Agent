@@ -197,7 +197,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-108 | E.T9 | Engine start and resume, run lock, run header, replay index and divergence | sonnet, xhigh | opus, medium | [#225](https://github.com/AbdulkareemSasah/Eng-Agent/pull/225) | done (8e24eb7) |
 | B-109 | E.T10 | ctx implementation of tool, read, calc, block, parallel, attempts, escalate | sonnet, high | opus, medium | [#231](https://github.com/AbdulkareemSasah/Eng-Agent/pull/231) | done (0b1063b) |
 | B-110 | E.T11 | Input requests (the x-eng-input marker, choice schemas, answer checks) and the escalation request | sonnet, xhigh | opus, medium | [#236](https://github.com/AbdulkareemSasah/Eng-Agent/pull/236) | done (e00ea75) |
-| B-111 | E.T12 | Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis) | sonnet, high | opus, medium | — | not started or in writing |
+| B-111 | E.T12 | Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis) | sonnet, high | opus, medium | [#279](https://github.com/AbdulkareemSasah/Eng-Agent/pull/279) | open (reviewed, full gate pass) |
 | B-112 | E.T13 | Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases) | sonnet, high | opus, medium | — | not started or in writing |
 | B-113 | E.T14 | ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4) | sonnet, medium | opus, medium | — | not started or in writing |
 | B-114 | E.T15 | Approvals (binding, single use, re-check before the write, items, pause and re-presentation) | sonnet, high | opus, medium | — | not started or in writing |
@@ -214,23 +214,23 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-126 | S.T7 | Machine-level host-instance lock and process guard | sonnet, high | opus, medium | [#254](https://github.com/AbdulkareemSasah/Eng-Agent/pull/254) | done (adfc396) |
 | B-127 | S.T8 | Adapter framework - arguments and references, envelopes with limits and provenance | sonnet, high | opus, medium | [#255](https://github.com/AbdulkareemSasah/Eng-Agent/pull/255) | done (bf1c65b) |
 | B-128 | S.T9 | Error and timeout mapping, the CSI error table (interim model_locked) | sonnet, medium | opus, medium | [#259](https://github.com/AbdulkareemSasah/Eng-Agent/pull/259) | done (4a28da7) |
-| B-129 | S.T10 | Harness-side model identity (ADR-0032), CSI session operations, HostPort file and instance methods | sonnet, high | opus, medium | [#276](https://github.com/AbdulkareemSasah/Eng-Agent/pull/276) | open |
+| B-129 | S.T10 | Harness-side model identity (ADR-0032), CSI session operations, HostPort file and instance methods | sonnet, high | opus, medium | [#276](https://github.com/AbdulkareemSasah/Eng-Agent/pull/276) | done (73c20d8) |
 | B-130 | S.T11 | CSI model-state reader, model kinds, fingerprint and units read | sonnet, high | opus, medium | — | not started or in writing |
 | B-131 | S.T12 | CSI edit kinds, read-back helpers and check_model | sonnet, high | opus, medium | — | not started or in writing |
 | B-132 | S.T13 | CSI analysis, design and results through the long role | sonnet, high | opus, medium | — | not started or in writing |
 | B-133 | S.T14 | Reconciliation by reading model state, preview and read_back | sonnet, high | opus, medium | — | not started or in writing |
 | B-135 | S.T16 | Command-line tool adapter (dxf-prep, etabs-model build) | sonnet, medium | opus, medium | — | not started or in writing |
 | B-136 | S.T17 | Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings | sonnet, high | opus, medium | — | not started or in writing |
-| B-137 | S.T18 | eng-harness doctor | sonnet, medium | opus, medium | — | not started or in writing |
+| B-137 | S.T18 | eng-harness doctor | sonnet, medium | opus, medium | [#281](https://github.com/AbdulkareemSasah/Eng-Agent/pull/281) | done (3d0b4fb) |
 | B-138 | S.T19 | Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes | sonnet, high | opus, medium | — | not started or in writing |
-| B-139 | S.T20 | Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085) | sonnet, medium | opus, medium | [#273](https://github.com/AbdulkareemSasah/Eng-Agent/pull/273) | open |
+| B-139 | S.T20 | Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085) | sonnet, medium | opus, medium | [#273](https://github.com/AbdulkareemSasah/Eng-Agent/pull/273) | done (3968ae7) |
 | B-140 | C.T1 | Calc decorator, registry, inputs, input metadata, trace builder, statuses and harness codes | sonnet, medium | opus, medium | [#141](https://github.com/AbdulkareemSasah/Eng-Agent/pull/141) | done (3a39971) |
 | B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | [#147](https://github.com/AbdulkareemSasah/Eng-Agent/pull/147) | done (33fa492) |
 | B-142 | C.T3 | approvals.yaml schema, loader, status resolution and the YAML parser ADR | sonnet, medium | opus, medium | [#182](https://github.com/AbdulkareemSasah/Eng-Agent/pull/182) | done (5eedf37) |
 | B-143 | C.T4 | Calc kinds and their registration | sonnet, medium | opus, medium | [#184](https://github.com/AbdulkareemSasah/Eng-Agent/pull/184) | done (99cc7fe) |
 | B-144 | C.T5 | HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test | sonnet, medium | opus, medium | [#238](https://github.com/AbdulkareemSasah/Eng-Agent/pull/238) | done (31a4350) |
 | B-145 | C.T6 | Calc-module rules test, golden data loader and golden file lint, verification record template | sonnet, low | opus, medium | [#148](https://github.com/AbdulkareemSasah/Eng-Agent/pull/148) | done (205dfd5) |
-| B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | opus, medium | opus, medium | — | not started or in writing |
+| B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | opus, medium | opus, medium | — | branch, mutation fix in writing |
 | B-147 | C.T8 | Calc 2, difference report, with the tolerance-comparison helper | opus, medium | opus, medium | — | not started or in writing |
 | B-148 | C.T9 | Calc 3, read-back check | opus, medium | opus, medium | — | not started or in writing |
 | B-149 | C.T10 | Calc 4, design results summary | opus, medium | opus, medium | — | not started or in writing |
@@ -267,7 +267,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-183 | I.T9 | Approval screens: change set, promotion, info and sign-off | sonnet, medium | opus, medium | — | not started or in writing |
 | B-184 | I.T10 | Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate | sonnet, medium | opus, medium | — | not started or in writing |
 | B-185 | I.T11 | Report model: fold the journal and the store; timings, waiting and machine time | sonnet, medium | opus, low | [#220](https://github.com/AbdulkareemSasah/Eng-Agent/pull/220) | done (b249f7c) |
-| B-186 | I.T12 | Report sections: changes, results, sources, decisions; renderer registry; value cells with sources | sonnet, medium | opus, low | — | not started or in writing |
+| B-186 | I.T12 | Report sections: changes, results, sources, decisions; renderer registry; value cells with sources | sonnet, medium | opus, low | [#277](https://github.com/AbdulkareemSasah/Eng-Agent/pull/277) | open (reviewed, full gate pass) |
 | B-187 | I.T13 | Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write | sonnet, medium | opus, low | — | not started or in writing |
 | B-188 | I.T14 | Commands run and resume: wiring, generated options, answers file, outcome mapping | sonnet, high | opus, medium | — | not started or in writing |
 | B-189 | I.T15 | Basis confirmation screen, setup log and its place in run | sonnet, medium | opus, low | — | not started or in writing |
@@ -293,7 +293,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-215 | F.T6 | Joint-load import, pattern and combination edits for SAFE, read-back, SAFE check_model, point-load reconciliation | sonnet, medium | opus, medium | — | not started or in writing |
 | B-216 | F.T7 | SAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps | sonnet, medium | opus, medium | — | not started or in writing |
 | B-217 | F.T8 | Recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list | sonnet, medium | opus, medium | — | not started or in writing |
-| B-220 | P.T1 | Dependencies, provider errors, configuration, network guard | sonnet, medium | opus, medium | [#274](https://github.com/AbdulkareemSasah/Eng-Agent/pull/274) | open (replaces #253, closed) |
+| B-220 | P.T1 | Dependencies, provider errors, configuration, network guard | sonnet, medium | opus, medium | [#274](https://github.com/AbdulkareemSasah/Eng-Agent/pull/274) | open (license exceptions landed first as B-446; local CI rerun) |
 | B-221 | P.T2 | Credential store, backend allow-list, key management entry point | sonnet, medium | opus, medium | — | not started or in writing |
 | B-222 | P.T3 | Shared HTTP client, error mapping, outgoing guard | sonnet, medium | opus, medium | — | not started or in writing |
 | B-223 | P.T4 | Jev adapter over a format boundary; formats not implemented until S-07 | sonnet, medium | opus, medium | — | not started or in writing |
@@ -348,7 +348,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-276 | Q.T7 | Check min_flexural_reinforcement (8.6.1.1) | opus, medium | opus, medium | [#226](https://github.com/AbdulkareemSasah/Eng-Agent/pull/226) | done (d92d2ce) |
 | B-277 | Q.T8 | Check development_length_bottom_bars (25.4.2.3) | opus, medium | opus, medium | [#227](https://github.com/AbdulkareemSasah/Eng-Agent/pull/227) | done (3e7c2b9) |
 | B-278 | Q.T9 | Pack assembly, registration, pack-level tests, README usage | sonnet, low | opus, medium | [#250](https://github.com/AbdulkareemSasah/Eng-Agent/pull/250) | done (a9eed8e) |
-| B-280 | G.T1 | Column workflow kinds and request models | sonnet, medium | opus, medium | — | not started or in writing |
+| B-280 | G.T1 | Column workflow kinds and request models | sonnet, medium | opus, medium | — | branch, kinds only after B-447 |
 | B-281 | G.T2 | Calc harness.column_select with golden and property tests | opus, medium | opus, medium | — | not started or in writing |
 | B-282 | G.T3 | Calc harness.column_demands (sign, axes, length, layout, not-checked reasons) | opus, medium | opus, medium | — | not started or in writing |
 | B-283 | G.T4 | Calc harness.column_review (members, governing references, changes) | opus, medium | opus, medium | — | not started or in writing |
@@ -376,9 +376,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-326 | Y.T2 | Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check | opus, medium | opus, medium | — | not started or in writing |
 | B-327 | Y.T3 | Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage | opus, medium | opus, medium | — | not started or in writing |
 | B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | [#269](https://github.com/AbdulkareemSasah/Eng-Agent/pull/269) | done (4d30d43) |
-| B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | not started or in writing |
-| B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | not started or in writing |
-| B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | — | not started or in writing |
+| B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | branch, review round 1 |
+| B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | branch, review round 1 (oracle verified) |
+| B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | — | branch, reviewed |
 | B-334 | Z.T5 | Register the column checks, pack-level tests, changelog and local-testing rows | sonnet, medium | opus, medium | — | not started or in writing |
 | B-336 | docs | docs(eng-dev-gate): risk of none-reason pull requests, zero-mutant runs, and plan tasks T27 to T29 (B-336) | sonnet, low | opus, low | [#100](https://github.com/AbdulkareemSasah/Eng-Agent/pull/100) | done |
 | B-337 | T27 | risk-floor: a none-reason pull request records its risk from the body Risk line | sonnet, medium | opus, medium | [#107](https://github.com/AbdulkareemSasah/Eng-Agent/pull/107) | done |
@@ -434,7 +434,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-390 | docs | Engine spec 4.8: synchronous and asynchronous port methods and the port shapes T6 settled | lead | opus, low | [#199](https://github.com/AbdulkareemSasah/Eng-Agent/pull/199) | done (f3db469) |
 | B-391 | docs | eng-contract follow-ups as spec text and plan tasks T17 (B-095) and T18 (B-084) | lead | opus, low | [#200](https://github.com/AbdulkareemSasah/Eng-Agent/pull/200) | done (a9cc248) |
 | B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | [#203](https://github.com/AbdulkareemSasah/Eng-Agent/pull/203) | done (3a11744) |
-| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | [#268](https://github.com/AbdulkareemSasah/Eng-Agent/pull/268) | open (reviewed; local CI next) |
+| B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | [#268](https://github.com/AbdulkareemSasah/Eng-Agent/pull/268) | done (3d879dd) |
 | B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | [#256](https://github.com/AbdulkareemSasah/Eng-Agent/pull/256) | open |
 | B-395 | X.T4 | Calcs harness.footing_plan_size and harness.footing_resize | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-396 | X.T5 | Calc harness.footing_layout | sonnet, high | opus, medium + verifiers | — | not started or in writing |
@@ -480,13 +480,17 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-442 | docs (DOC.Q20) | CheckMeta.version (integer, default 1) settles footing Q20 and column Q13; core plan T15 | opus, medium | opus, low + verifiers | [#264](https://github.com/AbdulkareemSasah/Eng-Agent/pull/264) | done (07d8c2d) |
 | B-443 | K.T15 | CheckMeta.version in structural-codes core | sonnet, medium | opus, medium | [#266](https://github.com/AbdulkareemSasah/Eng-Agent/pull/266) | done (4f8a2f1) |
 | B-444 | Q.T9 fix | chore(structural-codes): the pack test skips its clause-spec files only in the mutation step's copy (MU002 on every aci318-14 source change since B-278; D-15 lead fix, skip expires 2026-12-31) | lead | sonnet (subagent) | [#272](https://github.com/AbdulkareemSasah/Eng-Agent/pull/272) | done (90ad73d) |
-| B-445 | docs (DOC.ET12END) | Engine plan T12 owns the journal assertions that gain the root block's ~end.check_model steps (spec 4.6 #1, AC37) | lead | sonnet (subagent) | [#275](https://github.com/AbdulkareemSasah/Eng-Agent/pull/275) | open |
+| B-445 | docs (DOC.ET12END) | Engine plan T12 owns the journal assertions that gain the root block's ~end.check_model steps (spec 4.6 #1, AC37) | lead | sonnet (subagent) | [#275](https://github.com/AbdulkareemSasah/Eng-Agent/pull/275) | done (2d89e8c) |
+| B-446 | P.T1 part | chore(eng-harness): license exceptions for cffi and regex with proposed ADR-0005, landed before #274 because the gate judges a pull request with the base commit's policy | lead (content from B-220) | sonnet (subagent) | [#278](https://github.com/AbdulkareemSasah/Eng-Agent/pull/278) | done (e1ff854) |
+| B-447 | docs (DOC.GT1SPLIT) | Column workflow plan T1 split into kinds (T1) and request models (T1b) (D-12) | lead | sonnet (subagent) | [#280](https://github.com/AbdulkareemSasah/Eng-Agent/pull/280) | done (d04f542) |
+| B-448 | G.T1b | Column workflow request models | composer-2.5 | lead | — | not started (after G.T1) |
 
 ## 4. Decisions by the lead
 
 | Id | Decision | Why |
 |---|---|---|
 | D-30 | **Cloud session way of working** (2026-11-11): Cursor writers (Composer 2.5, Grok 4.7 low to xhigh) run in worktrees under `.claude/worktrees/` and run the gate with `--skip mutation`; the lead reviews each diff, sends findings back to the same Cursor chat (`--resume`), runs the full gate (mutation included, at most two at once), pushes with a local pre-push guard (`LEAD_PUSH=1`), opens the pull request and runs local CI one at a time. A writer whose connection drops is restarted in a fresh chat on its branch. Lead-written fixes and amendments get an independent subagent review (A7) | The owner's instruction for this session (D-29); mutation runs are the machine's bottleneck |
+| D-31 | **Writer model** (2026-11-12, owner's instruction): every Cursor writer, new or resumed, runs on `deepseek-v41-flash-1017-high`, with `composer-2.5` when it fails; no Grok model writes any more. DeepSeek is refused by the plan's weekly usage ("not included"), so the launcher tries it and falls back to Composer 2.5 on every run. A license exception, like any gate policy, is judged from the base commit: it lands in its own pull request before the change that needs it (B-446) | The owner's instruction; the gate reads `.gate/gate.yml` from `.gate-base` |
 | D-29 | **Delegated writers and where CI runs** (2026-11-11, owner's instruction): code and documents may be written by Cursor CLI (`cursor-agent -p`, models chosen per task: Composer 2.5, Grok 4.7 low to high); the lead reviews every diff, commits, pushes, runs the gate and local CI and merges; writers never push or touch pull requests. On the owner's Windows workstation Cursor runs edit-only (the session's permission classifier refuses `--force`), local CI runs in WSL, and GitHub over IPv6 does not answer there (git pinned to IPv4 through a repository-local `http.curloptResolve`). A full gate run (mutation, about 15 minutes) froze the workstation and the WSL VM (CreateVm timeout) while the owner needed AutoCAD, so the build moves to a cloud session (HANDOFF.md section 0). Cursor is outside AGENTS.md section 9: recorded for the owner's audit (owner queue OQ-Q49) | The owner asked for cheaper writers and a lead that reviews; the workstation must stay usable |
 | D-1 | Tasks are tracked in this file (`B-NNN`), not GitHub issues, during bootstrap; pull requests name `Work-Item: B-NNN` and `Plan-Task:` | One identity; no notifications; the gate reads the plan files |
 | D-2 | Phase 0 spikes live in the root `spikes/` folder | Their target package (`eng-harness`) is created when phase 1 starts (19, R4) |
@@ -642,6 +646,7 @@ option and continued.
 | OQ-Q52 | B-129 (S.T10): ADR-0032 decision 3 reading. "A known content hash gives its identity" versus "a content hash known under two identities (the same file copied into two locations) resolves to the identity whose path hash matches, else to a new identity with `derived_from` the older one". The implementation gives a known content at an unknown path a new identity `derived_from` the older one (a copy or a move is a new model with lineage) | Accept (never treats two files as one model); if the owner wants a moved file to keep its identity, a follow-up amends ADR-0032 and the store |
 | OQ-Q53 | B-220 (#274): the lock resolves `regex` 2026.11.9 and `openai` 3.49.0, newer than the versions measured in ADR-0001 (pydantic-ai-slim) (2026.9.29, 3.45.0); ADR-0005 (proposed) carries the license exceptions for `cffi` (MIT-0, also reached through `mcp -> pyjwt[crypto] -> cryptography` on every OS) and `regex` (Apache-2.0 AND CNRI-Python) | Accept ADR-0005; a follow-up documents amendment refreshes the measured versions of ADR-0001 (pydantic-ai-slim) |
 | OQ-Q54 | AW05: `packages/structural-codes/aci318-14` skip count 1 -> 2 (B-444): `test_pack.py::test_registry_and_specs` skips its clause-file loop only in the mutation step's copy of the member, which lacks the clause specs; expires 2026-12-31 | Accept until the split (ADR-0028), when the clause specs move into the pack or the mutation step copies them |
+| OQ-Q55 | AW05: `packages/eng-harness` noqa 11 -> 12 (B-137): `eng-harness doctor` probes `uv --version` with `subprocess.run` by absolute path and fixed arguments (`# noqa: S603`) | Accept (same pattern as `cli/_opener.py`, B-362) |
 | OQ-Q48 | A failed build check on a server restart surfaces as `HOST_NOT_CONNECTED` (retry rule always) rather than a `SERVER_CHECK_FAILED` stop (S.T6b, B-351) | Keep `HOST_NOT_CONNECTED` until S.T19 shows how the engine handles it (`ToolFailed` carries contract codes only) |
 | OQ-Q47 | Draft decisions of wave 7: engine `step_started` carries the tool action, inserted steps are kind `read`, hash path keys, dirty models checked before a parallel (B-434); FB005 form A4 for the `version=` keyword, amending Q5 'no further exceptions' (B-438); license exceptions for cffi (MIT-0) and regex (Apache-2.0 AND CNRI-Python) with a proposed ADR (B-440); `CheckMeta.version` integer default 1 (B-442) | Accept as recorded in each amendment |
 | OQ-Q46 | Engine spec Q26 to Q29 (B-427): restored_to_seq in a second run_resumed; completed writes compared with provenance.host; identity and revision only against a result (no contract change); T13 owns the PRECONDITION_FAILED refusal | Accept |

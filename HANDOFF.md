@@ -36,15 +36,15 @@ Notes for the cloud session:
 
 ## 1. Where the build stands
 
-- Resume commit: `4d30d43 feat(structural-codes): shared column section model, column preconditions, shared constants moved to _common.py (B-330) (#269)` on `build/v1` (cloud session, 2026-11-11).
-- Plan tasks merged: 151 of 290 (52.1 %), plus 86 documents amendments and lead fixes.
+- Resume commit: `3d0b4fb feat(eng-harness): eng-harness doctor (B-137) (#281)` on `build/v1` (cloud session, 2026-11-12).
+- Plan tasks merged: 155 of 291 (53.3 %; B-447 split column T1 into T1 and T1b), plus 89 documents amendments and lead fixes.
 
 | Package | Merged | Total |
 |---|---|---|
 | eng-contract | 19 | 19 |
 | eng-dev-gate | 40 | 41 |
 | structural-codes | 30 | 36 |
-| eng-harness | 62 | 194 |
+| eng-harness | 66 | 195 |
 
 Phases: 0 done; 1 (engine, edit cycle) and 2 (codes, SAFE, providers, footing workflow) in progress; 3 and 4 (Revit,
 SAP2000, columns, IDEA) started only in structural-codes (column checks skeleton). Nothing that needs a host program is
@@ -79,31 +79,27 @@ Framework or the earlier Sasaah Agent design system, no MCP server built for a h
 the Sasaah servers, ADR-0024), Sasaah is read-only (changes only through a branch and pull request there, never merged
 by an agent).
 
-## 3. In flight (cloud session, 2026-11-11)
+## 3. In flight (cloud session, 2026-11-12)
 
-Merged this session: B-437 (#260), B-440 (#270), B-439 (#271), B-444 (#272, lead fix: the aci318-14 pack test under
-mutation), B-330 (#269).
+Merged this session: B-437 (#260), B-440 (#270), B-439 (#271), B-444 (#272), B-330 (#269), B-445 (#275), B-393 (#268),
+B-139 (#273), B-129 (#276), B-446 (#278), B-447 (#280), B-137 (#281).
 
 | Work item | Task | State | What is left |
 |---|---|---|---|
-| B-445 | DOC.ET12END engine plan T12 owns four journal-pinning test files | PR #275, reviewed (APPROVE) | local CI, merge; then B-111 updates the nine journal assertions |
-| B-111 | E.T12 invariants 1, 2, 3, 7 | branch, worktree `b111` (Cursor chat 656f1ef6) | after B-445: update the nine journal assertions (only the added `~end.check_model` steps), full gate, PR |
-| B-393 | X.T2 code-pack route | PR #268, reviewed (APPROVE) | local CI, merge |
-| B-139 | S.T20 IDEA framework additions | PR #273, reviewed, full gate pass | local CI, merge |
-| B-220 | P.T1 providers T1 (replaces #253, closed) | PR #274, reviewed, full gate pass | local CI, merge |
-| B-129 | S.T10 model identity, CSI session operations | PR #276, reviewed, full gate pass | local CI, merge |
-| B-186 | I.T12 report sections | branch, worktree `b186`, reviewed | full gate, PR, local CI |
-| B-137 | S.T18 doctor | branch, worktree `b137` | over budget (481 of 350): a fresh Cursor chat is fitting it; else split by plan amendment (D-12) |
-| B-146 | C.T7 calc 1 | branch, worktree `b146` (Cursor, grok-4.7-xhigh) | writing; then engineering review, full gate, PR |
-| B-280 | G.T1 column workflow kinds | worktree `b280` (Cursor) | writing |
-| B-331, B-332, B-333 | Z.T2, Z.T3, Z.T4 ACI column checks | worktrees (Cursor, grok-4.7-xhigh) | writing; engineering review with hand recomputation |
+| B-220 | P.T1 providers T1 | PR #274, reviewed | local CI rerun (its license exceptions landed first as B-446), merge |
+| B-111 | E.T12 invariants | PR #279, reviewed, full gate pass | local CI, merge |
+| B-186 | I.T12 report sections | PR #277, reviewed, full gate pass | local CI, merge |
+| B-146 | C.T7 calc 1 | worktree `b146` | writer fixing the mutation failure (lock hash comparison stays with the lock test); then full gate, PR |
+| B-280 | G.T1 column kinds | worktree `b280` | writer dropping the request models (B-447); request-model copies in `.claude/worktrees/b280-requests-stash/` for B-448 |
+| B-331, B-332, B-333 | Z.T2, Z.T3, Z.T4 | worktrees | B-331 and B-332: review round 1 (non-square cases, phi rows, G-4 case, ratchet counts); B-333 reviewed, full gate next |
 | B-394 | X.T3 footing subjects calc | PR #256 | after C.T7 (B-146) |
 
 Notes:
-- Lead tooling of this session (not in the repository): PR body, local CI and merge helpers. `.git/hooks/pre-push`
-  refuses a push unless `LEAD_PUSH=1` (writers never push). The `Risk:` line must be the bare risk set (RF002); the gate
-  plan's `risk` is a scalar (`r3`).
-- A Cursor run can end with "Connection stalled" after committing: read the branch, then restart in a fresh chat.
+- Writers run on `deepseek-v41-flash-1017-high`, falling back to `composer-2.5` (D-31). Cursor runs often end with
+  "Connection stalled"; read the branch and restart in a fresh chat with a continuation note.
+- `git fetch` can stall on loose objects: `git repack -d`.
+- Lead tooling of this session (outside the repository): PR body, local CI, merge and brief helpers;
+  `.git/hooks/pre-push` refuses a push unless `LEAD_PUSH=1`. The `Risk:` line is the bare risk set (RF002).
 
 ## 4. Order of the remaining work
 
