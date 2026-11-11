@@ -296,6 +296,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
       - "packages/eng-harness/src/eng_harness/engine/_steps.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # two edits only: ports.host into Ctx, await Ctx.finish() (B-434)
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"  # StepStarted.action, optional (B-434)
       - "packages/eng-harness/tests/unit/test_steps.py"
       - "packages/eng-harness/tests/workflow/test_invariants.py"
       - "packages/eng-harness/tests/property/test_check_after_write.py"
@@ -667,7 +669,11 @@ the before-`step_started` part. Budget 320 lines (`_hoststate.py`, about 51 of `
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
 engineering-parameter check, the staleness check with `resolve_ref` and each calc argument's `RefRule` from
 `CalcInfo.ref_rules` (default `stale_ok` false), the property test over generated step programs,
-and the test that inserted steps are replayed.
+and the test that inserted steps are replayed. Amendment B-434: T12 makes two edits in `engine/_runner.py`: it passes
+`ports.host` into `Ctx` as a constructor parameter, and inside `_drive`'s `try` block, after the root block returns,
+awaits a new `Ctx.finish()` that runs the `~end.check_model` steps for the models still dirty (spec §4.6 #1, AC37);
+T13 still owns the rest of `_runner.py`. In `journal/_events.py`, `StepStarted` gains an optional `action` field,
+absent in older journals (spec §4.4.2). Budget stays 380 lines (estimate about 310).
 
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
 reconciliation pending, server checks at start and resume, unit reads (first contact, every resume, after epoch
