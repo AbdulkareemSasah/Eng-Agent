@@ -87,7 +87,7 @@ def _report(doctor: Any, tmp_path: Path, tokens: Any, running: list[ProcessIdent
                 f"command = {json.dumps(str(exe))}",
                 'args = ["--disable-script"]',
                 "client_grace_s = 5",
-                f'build = {{ sasaah_commit = "{"a" * 40}", exe_sha256 = "{"b" * 64} }}',
+                f'build = {{ sasaah_commit = "{"a" * 40}", exe_sha256 = "{"b" * 64}" }}',
                 'host_key = "csi"',
                 "",
                 "[servers.csi.roles.main]",
