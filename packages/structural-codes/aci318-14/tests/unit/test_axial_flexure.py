@@ -118,9 +118,7 @@ def step_map(payload: Any) -> dict[str, Any]:
         ({"lu_mm": 3301.0}, "SHORT_COLUMN", "G-2", VerdictStatus.NEEDS_ENGINEER),
     ],
 )
-def test_preconditions(
-    changes: dict[str, Any], precondition: str, gap: str | None, status: VerdictStatus
-) -> None:
+def test_preconditions(changes: dict[str, Any], precondition: str, gap: str | None, status: VerdictStatus) -> None:
     """BD-1 to BD-3: the stated outcomes; the body does not run when a precondition fails (AF-AC4)."""
     payload = run(**changes)
     assert [v.status for v in payload.verdicts] == [status]
@@ -145,7 +143,7 @@ def test_bracketing_gap() -> None:
         return 1.0
 
     with pytest.raises(NotImplementedGap) as exc:
-        bracket_demand_ray(3.0, 100, g)
+        bracket_demand_ray(3.0, 100, g, two=2.0, one=1.0)
     assert exc.value.gap_id == "G-4"
 
 

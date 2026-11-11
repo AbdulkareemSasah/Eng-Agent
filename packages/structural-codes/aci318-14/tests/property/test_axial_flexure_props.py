@@ -37,7 +37,9 @@ def _eval(inputs: dict[str, Any]) -> tuple[float, float, float, float]:
     payload = evaluate(CHECK_ID, inputs, subject=FRAME, registry=REGISTRY).payload
     v = payload.verdicts[0]
     assert v.status in (VerdictStatus.PASS, VerdictStatus.FAIL)
-    assert v.demand is not None and v.capacity is not None and v.ratio is not None
+    assert v.demand is not None
+    assert v.capacity is not None
+    assert v.ratio is not None
     steps = {s.name: float(s.value) for s in payload.traces[0].steps if not isinstance(s.value, bool)}
     return v.demand.value, v.capacity.value, v.ratio, steps["phiPn_max_kN"]
 
