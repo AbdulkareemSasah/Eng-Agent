@@ -51,6 +51,15 @@ cases:
       status: FAIL
       values:
         ratio_2: {value: 1.00005, unit: "1", abs_tol: 1.0e-9, rel_tol: 0}
+  - id: BD-G1
+    kind: boundary
+    covers: [G-1]
+    subject: {kind: frame, id: C1}
+    inputs: *common
+    expected:
+      status: PASS
+      values:
+        As_min_mm2: {value: 2500, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-3
     kind: boundary
     covers: [STEEL_IN_SECTION]
