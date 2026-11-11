@@ -695,10 +695,10 @@ coincident frames (`ambiguous`).
    `CheckMeta.version` (spec 0010 Q20, draft decision B-442). The run-class rule of §4.5 applies unchanged: in
    `production` only `approved` checks run and any other is refused with `CalcRefused` before evaluation; a `withdrawn`
    check is refused in both run classes with `CalcRefused` `CALC_WITHDRAWN` before evaluation (so the pack's
-   `CheckNotUsable` is never reached); in `trial` a check that is not `approved` runs with `draft: true`. Results are stored as
-   `verdicts.set/1` with provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks themselves,
-   their content hash and their approvals belong to the packs (CF), not to this spec's `approvals.yaml`. Criteria and
-   tests: spec 0010 AC3, AC4 and spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py`).
+   `CheckNotUsable` is never reached); in `trial` a check that is not `approved` runs with `draft: true`. Results are
+   stored as `verdicts.set/1` with provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks
+   themselves, their content hash and their approvals belong to the packs (CF), not to this spec's `approvals.yaml`.
+   Criteria and tests: spec 0010 AC3, AC4 and spec 0013 AC13 (`tests/unit/calcs/test_code_pack_route.py`).
 
 The kinds of §4.6 to §4.11 and `harness.expected_effects/1` are registered with `KindRegistry.extend` beside the
 engine's harness kinds (engine plan T3, `_kinds.py`). The CalcPort stores calc results with `producer.host` null:
