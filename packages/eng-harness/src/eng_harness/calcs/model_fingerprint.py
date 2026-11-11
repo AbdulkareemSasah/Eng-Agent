@@ -22,7 +22,7 @@ from eng_contract.kinds.model import (
     Sections,
     Stories,
 )
-from eng_contract.params import eng_param  # B-146: not in the spec 4.3 list; see the pull request
+from eng_contract.params import eng_param
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc

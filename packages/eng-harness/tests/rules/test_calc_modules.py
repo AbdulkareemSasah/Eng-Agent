@@ -1,4 +1,4 @@
-"""Calc-module rules (plan 0003 T6; spec 0003 AC3, 4.3): imports, purity, no module state, FB005 literal forms."""
+"""Calc-module rules (plan 0003 T6, T7; spec 0003 AC3, 4.3): imports, purity, no module state, FB005."""
 
 import ast
 import itertools
@@ -9,7 +9,23 @@ import pytest
 import eng_harness.calcs as calcs_package
 
 CALCS = Path(calcs_package.__file__).resolve().parent
-MODULES = sorted(CALCS.glob("*.py"))
+# Form A4 (amendment B-438): the same callables as `.gate/forbidden.yml` `versioned`.
+_VERSIONED = frozenset({"CheckMeta", "calc"})
+
+
+def calc_modules(root: Path) -> list[Path]:
+    """Every Python module under `root`, subpackages included (spec 0003 4.3)."""
+    return sorted(path for path in root.rglob("*.py") if path.is_file())
+
+
+def _may_read_lock(path: str) -> bool:
+    """`read_lock` is the one file read, and only `calcs/__init__.py` may call it (spec 4.3)."""
+    file = Path(path)
+    return file.name == "__init__.py" and file.parent.name == "calcs"
+
+
+def _callee(func: ast.expr) -> str:
+    return func.attr if isinstance(func, ast.Attribute) else getattr(func, "id", "")
 
 
 ALLOWED_MODULES = (
@@ -33,11 +49,13 @@ ALLOWED_MODULES = (
     "functools",
     "operator",
     "__future__",
+    "eng_harness.kinds.footing",
 )
 ALLOWED_NAMES = {
     "eng_contract.units": {"kind_for_field", "unit"},
     "eng_contract.refs": {"RefString", "JsonPointer"},
     "eng_contract.errors": {"ContractError", "ErrorCode"},
+    "eng_contract.params": {"eng_param"},
 }
 FORBIDDEN_CALLS = {"open", "input", "eval", "exec", "compile", "__import__", "globals", "vars", "setattr", "breakpoint"}
 MUTABLE_CALLS = {"list", "dict", "set", "bytearray", "defaultdict", "deque", "Counter"}
@@ -56,15 +74,19 @@ def _numeric(node: ast.AST) -> ast.Constant | None:
 
 
 def _allowed_literals(tree: ast.Module) -> set[int]:
-    """Constants in the FB005 forms A1 (cited value with a source), A2 (index or bound) and A3 (against len)."""
+    """Constants in FB005 forms A1 (cited), A2 (index or bound), A3 (against len) and A4 (version)."""
     ok: set[int] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", "")) == "Cited":
+        if isinstance(node, ast.Call) and _callee(node.func) == "Cited":
             keywords = {k.arg: k.value for k in node.keywords}
             value = node.args[0] if node.args else keywords.get("value")
             source = node.args[1] if len(node.args) > 1 else keywords.get("source")
             if value is not None and (c := _numeric(value)) and isinstance(source, ast.Constant) and source.value:
                 ok.add(id(c))
+        elif isinstance(node, ast.Call) and _callee(node.func) in _VERSIONED:
+            for keyword in node.keywords:
+                if keyword.arg == "version" and (c := _numeric(keyword.value)) and type(c.value) is int:
+                    ok.add(id(c))
         elif isinstance(node, ast.Subscript):
             sl = node.slice
             for part in [sl.lower, sl.upper] if isinstance(sl, ast.Slice) else [sl]:
@@ -136,8 +158,8 @@ def _import_problems(node: ast.Import | ast.ImportFrom, top: set[int]) -> list[s
     return found
 
 
-def check_source(source: str) -> list[str]:
-    """Return the rule violations of one calc module's source (spec 0003 AC3 and 4.3; FB005 forms A1 to A3)."""
+def check_source(source: str, *, path: str = "") -> list[str]:
+    """Return the rule violations of one calc module's source (spec 0003 AC3 and 4.3; FB005 forms A1 to A4)."""
     tree = ast.parse(source)
     top = {id(n) for n in tree.body}
     found: list[str] = []
@@ -146,8 +168,17 @@ def check_source(source: str) -> list[str]:
             found += _import_problems(node, top)
         elif isinstance(node, ast.Global):
             found.append(f"{node.lineno}: global statement")
-        elif isinstance(node, ast.Call) and (name := getattr(node.func, "id", "")) in FORBIDDEN_CALLS:
-            found.append(f"{node.lineno}: call of {name} (open, clock, environment and random reads are refused)")
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
+            found.append(
+                f"{node.lineno}: call of {node.func.id} (open, clock, environment and random reads are refused)"
+            )
+        elif (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "read_lock"
+            and not _may_read_lock(path)
+        ):
+            found.append(f"{node.lineno}: read_lock is only for calcs/__init__.py (spec 4.3)")
     for stmt in _state_statements(tree.body):
         if _mutable(stmt.value) and not _is_all(stmt):
             found.append(f"{stmt.lineno}: mutable module-level state")
@@ -178,6 +209,9 @@ VIOLATIONS = {
     "X = 0.5": "FB005",
     "def f(a):\n    return a * 2": "FB005",
     "from eng_contract.cited import Cited\nX = Cited(3, '')": "FB005",
+    "from eng_contract.params import ParamModel": "import",
+    "@calc(version=1.5)\ndef f():\n    return None\n": "FB005",
+    "read_lock()\n": "read_lock",
 }
 ALLOWED = [
     "import math\nfrom fractions import Fraction\nfrom pydantic import BaseModel",
@@ -188,13 +222,37 @@ ALLOWED = [
     "from eng_contract.cited import Cited\nX = Cited(value=3, source='spec')",
     "def f(a: list[int]) -> bool:\n    return len(a) == 2 and a[-1] > a[0]",
     "REGISTRY = Registry(kinds)",
+    "from eng_contract.params import eng_param",
+    "from eng_harness.kinds.footing import X",
+    "from eng_harness.calc import calc\n@calc(version=1)\ndef f():\n    return None\n",
 ]
 
 
 def test_calc_module_rules() -> None:
-    assert MODULES, "the calcs package holds at least its __init__"
-    found = [f"{m.name}: {v}" for m in MODULES for v in check_source(m.read_text(encoding="utf-8"))]
+    modules = calc_modules(CALCS)
+    assert modules, "the calcs package holds at least its __init__"
+    found = [
+        f"{m.relative_to(CALCS).as_posix()}: {v}"
+        for m in modules
+        for v in check_source(m.read_text(encoding="utf-8"), path=m.as_posix())
+    ]
     assert found == []
+
+
+def test_module_scan_includes_subpackages(tmp_path: Path) -> None:
+    nested = tmp_path / "footing"
+    nested.mkdir()
+    (tmp_path / "__init__.py").write_text("", encoding="utf-8")
+    (nested / "check.py").write_text("import math\n", encoding="utf-8")
+    found = [path.relative_to(tmp_path).as_posix() for path in calc_modules(tmp_path)]
+    assert found == ["__init__.py", "footing/check.py"]
+
+
+def test_only_the_package_init_reads_the_lock() -> None:
+    source = "from eng_harness.calc import read_lock, removed_ids\nremoved_ids(read_lock())\n"
+    assert check_source(source, path="src/eng_harness/calcs/__init__.py") == []
+    refused = check_source(source, path="src/eng_harness/calcs/model_fingerprint.py")
+    assert any("read_lock" in item for item in refused)
 
 
 @pytest.mark.parametrize(("source", "word"), VIOLATIONS.items())
