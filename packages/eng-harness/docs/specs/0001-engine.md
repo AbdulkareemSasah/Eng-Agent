@@ -1044,8 +1044,8 @@ route of [spec 0010](0010-design-isolated-footing.md) §4.3 and [spec 0013](0013
 any other id is `ContractError` `NOT_FOUND`, as an unknown calc id (spec 0003 §6). A code-pack check is described by
 the same `CalcInfo` (its `status` is the check's lifecycle state; its `version` is the check's `CheckMeta.version`,
 spec 0010 Q20, draft B-442) and is subject to the same run class: a `production` run refuses a check that is not
-`approved`, and every run refuses a `withdrawn` check, with `CalcRefused`. Block code imports no pack: blocks reach code-pack
-checks only through `ctx.calc`.
+`approved`, and every run refuses a `withdrawn` check, with `CalcRefused`. Block code imports no pack: blocks reach
+code-pack checks only through `ctx.calc`.
 
 **Synchronous and asynchronous methods; the shapes left open above** (amendment B-390, as built by engine T6, B-105).
 A method that waits on a host program or a person is `async`: every `ToolPort` method except `unreleased_tools` and
