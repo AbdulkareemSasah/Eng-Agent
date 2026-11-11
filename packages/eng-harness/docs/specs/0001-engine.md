@@ -567,9 +567,11 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   (before step `p`), `p~post.<kind>.<key>` (after it), `p~end.<kind>.<key>` (before the block at `p` returns; the root
   block uses `~end...`). They are decided only from the block's own steps, so they are part of the replayed sequence
   (AC47). Steps triggered by a host event (a session epoch change or an observed timeout, invariant 9) take
-  `p~host.<kind>.<key>`; they are journaled but not part of the replayed sequence (§4.5.2 rule 5). Inserted
-  `check_model` and `save` steps are journaled with step kind `read` (names `check_model` and `save`), so in-flight
-  reconciliation (§4.5.3) reruns them; the path key of a model key outside the `key` grammar is its hash form: `h`
+  `p~host.<kind>.<key>`; they are journaled but not part of the replayed sequence (§4.5.2 rule 5). The `<kind>`
+  segment of an inserted or housekeeping path is the step's name, not its journaled step kind. Inserted
+  `check_model` and `save` steps are journaled with step kind `read`, effect `read` and no `op_id` (names
+  `check_model` and `save`), so in-flight reconciliation (§4.5.3, Read row) reruns them; the §4.5.3 Write row's
+  "save" is a tool save, not these steps (Q36). The path key of a model key outside the `key` grammar is its hash form: `h`
   followed by the first 12 hex characters of the SHA-256 of the key (draft decision B-434, owner queue).
 - Housekeeping steps of a resume (host-state reads, server checks) take paths `@resume<n>.<kind>.<key>` and are not
   replayed: each resume runs them again.
@@ -900,7 +902,7 @@ crash loses at most one step.
 The engine tracks, per model key: dirty flag, current revision (from the last result's `provenance.host` or
 `model_state`), last `model_saved`, and approval bindings; per host key: lease, session epoch, reconciliation pending.
 Inserted steps are journaled like other steps and emit `check_enforced`; inserted `check_model` and `save` steps
-take step kind `read` (§4.3.1, draft decision B-434). No ctx parameter, block attribute or setting
+take step kind `read` and effect `read` (§4.3.1, draft decision B-434). No ctx parameter, block attribute or setting
 turns an invariant off (AC37); in every case the block's call raises before any port call when the invariant fails.
 
 | # | Where and how | Raises | Tests |
@@ -1313,4 +1315,4 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q33 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
 | Q34 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
 | Q35 | B-111: how a replay detects a removed inserted save step (invariant 7, AC47) | Owner | Draft decision B-434, owner queue: `step_started` carries the tool's `action`, optional, so earlier journals read unchanged (§4.4.2). This records the data only: §4.5.2 has no rule that reads `action`, and an unrecorded `p~pre.save` path goes live (rule 4), so the divergence rule is open, owner queue (writer's proposal, not adopted here: a recorded step whose `action` is `analysis` or `design` with no recorded `p~pre.save.<model_key>` is `ReplayDivergence`, raised before any live call) |
-| Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read` (names `check_model` and `save`), so in-flight reconciliation reruns them; the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |
+| Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read`, effect `read` and no `op_id` (names `check_model` and `save`, the path's `<kind>` segment), so in-flight reconciliation reruns them by the §4.5.3 Read row; the §4.5.3 Write row text "including save" was not amended (D-28) and reads as tool saves only, owner to confirm (a rerun of an inserted save saves the model again); the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |
