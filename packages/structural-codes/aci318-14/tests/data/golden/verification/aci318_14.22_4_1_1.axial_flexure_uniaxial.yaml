@@ -1,0 +1,189 @@
+# Case file of aci318_14.22_4_1_1.axial_flexure_uniaxial (clause spec §8; plan 0004 T3). Protected test oracle.
+# Hand checks repeat the spec's own equations (§4) and are not independent evidence. Tolerances are the spec's §8
+# absolute ones (1e-4 mm, 0.001 kN and kN.m, 1e-6 on ratios, strains and phi), with rel_tol 0.
+format: structural-codes-verification/1
+check_id: aci318_14.22_4_1_1.axial_flexure_uniaxial
+cases:
+  - id: HC-1
+    kind: hand_check
+    source: {derivation: "clause spec §4, compression-controlled, common section §8"}
+    subject: {kind: frame, id: C1}
+    inputs: &common
+      Pu_kN: 1500
+      Mu_kNm: 300
+      Mu_other_kNm: 0
+      b_mm: 500
+      h_mm: 500
+      d_prime_mm: 60
+      n_bars_b: 3
+      n_bars_h: 3
+      A_bar_mm2: 500
+      fc_MPa: 28
+      fy_MPa: 420
+      transverse_kind: tied
+      k_factor: 1
+      lu_mm: 3000
+    expected:
+      status: PASS
+      values:
+        c_mm: {value: 276.801365, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        Pn_kN: {value: 2921.612179, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Mn_kNm: {value: 584.322436, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        eps_t_ratio: {value: 0.00176876, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phi_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        capM_kNm: {value: 379.809583, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.789869, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-2
+    kind: hand_check
+    source: {derivation: "clause spec §4, pure flexure: common with Pu = 0, Mu = 200"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 0, Mu_kNm: 200}
+    expected:
+      status: PASS
+      values:
+        c_mm: {value: 82.819562, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        Pn_kN: {value: 0, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Mn_kNm: {value: 339.976865, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        eps_t_ratio: {value: 0.01293826, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phi_ratio: {value: 0.90, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        capM_kNm: {value: 305.979179, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.653639, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-3
+    kind: hand_check
+    source: {derivation: "clause spec §4, transition: common with Pu = 1200, Mu = 400"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 1200, Mu_kNm: 400}
+    expected:
+      status: PASS
+      values:
+        c_mm: {value: 188.620229, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        eps_t_ratio: {value: 0.00399819, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phi_ratio: {value: 0.81363698, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        Pn_kN: {value: 1660.655323, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Mn_kNm: {value: 553.551774, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        capM_kNm: {value: 450.390193, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.888119, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-4
+    kind: hand_check
+    source: {derivation: "clause spec §4 step 5, axial cap: Pu = 3800, Mu = 50"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 3800, Mu_kNm: 50}
+    expected:
+      status: PASS
+      values:
+        capM_kNm: {value: 51.553895, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.969859, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-5
+    kind: hand_check
+    source: {derivation: "clause spec CS S5 spiral row: HC-1 inputs with transverse_kind spiral"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, transverse_kind: spiral}
+    expected:
+      status: PASS
+      values:
+        phi_ratio: {value: 0.75, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phiPn_max_kN: {value: 4803.435, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        capM_kNm: {value: 438.241827, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.684554, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-6
+    kind: hand_check
+    source: {derivation: "clause spec §4, failing: Pu = 300, Mu = 400"}
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 300, Mu_kNm: 400}
+    expected:
+      status: FAIL
+      values:
+        c_mm: {value: 100.564414, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        phi_ratio: {value: 0.90, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        capM_kNm: {value: 353.447742, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 1.131709, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.a
+    kind: boundary
+    covers: [SHORT_COLUMN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, lu_mm: 3300}
+    expected: {status: PASS}
+  - id: BD-1.b
+    kind: boundary
+    covers: [SHORT_COLUMN, G-2]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, lu_mm: 3301}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.a
+    kind: boundary
+    covers: [UNIAXIAL, G-1]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Mu_other_kNm: 1}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-2.b
+    kind: boundary
+    covers: [FLEXURE_PRESENT]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Mu_kNm: 0}
+    expected: {status: NOT_APPLICABLE}
+  - id: BD-2.c
+    kind: boundary
+    covers: [AXIAL_COMPRESSION, G-3]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: -1}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.a
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fy_MPa: 550}
+    expected: {status: PASS}
+  - id: BD-3.b
+    kind: boundary
+    covers: [FY_MAX]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fy_MPa: 600}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.c
+    kind: boundary
+    covers: [FC_MIN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fc_MPa: 16}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.d
+    kind: boundary
+    covers: [BAR_LAYOUT]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, d_prime_mm: 250}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-3.e
+    kind: boundary
+    covers: [STEEL_IN_SECTION]
+    subject: {kind: frame, id: C1}
+    inputs:
+      <<: *common
+      b_mm: 60
+      h_mm: 60
+      d_prime_mm: 20
+      A_bar_mm2: 1000
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-4
+    kind: boundary
+    covers: [G-4]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common}
+    expected: {status: PASS}
+  - id: PC-1
+    kind: program_comparison
+    source:
+      program: ETABS
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 1500, Mu_kNm: 300}
+    expected: {status: PASS}
+  - id: PC-1.alt
+    kind: program_comparison
+    source:
+      program: ETABS
+      program_version: "recorded at the local test"
+      status: needs_local_test
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, Pu_kN: 1200, Mu_kNm: 400}
+    expected: {status: PASS}
+review: null
