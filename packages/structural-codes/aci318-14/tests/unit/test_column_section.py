@@ -208,9 +208,22 @@ def test_column_preconditions() -> None:
         assert SHORT_COLUMN.test(model, t) is ok
         assert t.value("kl_r_ratio") == pytest.approx(lu / 150.0, abs=_RATIO)
     assert not _passes(SHORT_COLUMN, _Axial, **{**AXIAL, "b_mm": 400.0, "lu_mm": 3000.0})
+    for values in ({**AXIAL, "b_mm": 400.0, "lu_mm": 3000.0}, {**AXIAL, "h_mm": 400.0, "lu_mm": 3000.0}):
+        model, t = recorder(_Axial, **values)
+        assert SHORT_COLUMN.test(model, t) is False
+        assert t.value("kl_r_ratio") == pytest.approx(25.0, abs=_RATIO)
     compression = axial_compression("G-1")
     for pu, ok in ((-1.0, False), (0.0, True), (1.0, True)):
         assert _passes(compression, _Axial, **{**AXIAL, "Pu_kN": pu}) is ok
+
+
+def test_displaced_concrete_boundary() -> None:
+    """CS S3 removes displaced concrete only for bars with `d_j < a` (strict): `d_1 == a` stays outside."""
+    sec, _ = _section()
+    point = sec.at(250.0 / sec.v["beta1_ratio"])
+    assert point.a == pytest.approx(250.0, abs=_LEN)
+    assert point.force[1] == pytest.approx(1000.0 * point.fs[1], abs=1e-6)
+    assert point.force[0] == pytest.approx(1500.0 * (point.fs[0] - 0.85 * 28.0), abs=1e-6)
 
 
 def test_declarations() -> None:
