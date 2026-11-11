@@ -25,6 +25,7 @@ from eng_harness.errors import ToolFailed
 from eng_harness.ports import ServerCheck
 from eng_harness.servers._buildcheck import BuildExpectation, Observed, check_build, tool_list_fingerprint
 from eng_harness.servers._config import RoleConfig, ServerConfig, ServersConfig
+from eng_harness.servers._launch_args import launch_argv
 from eng_harness.servers._launcher import (
     JobPolicy,
     LaunchedProcess,
@@ -308,11 +309,9 @@ class ServerManager:
             return live
 
     def _spec(self, role: _Role) -> LaunchSpec:
-        """The launch of spec section 4.3.2: the adapter's two options follow the configured arguments."""
+        """The launch of spec section 4.3.2: `launch_argv` adds the timeout and, when set, the audit log."""
         servers = self._run_dir / "servers"
-        argv = [role.config.command, *role.config.args, "--call-timeout-sec", str(role.role.call_timeout_s)]
-        if role.config.audit_log:
-            argv += ["--audit-log", str(servers / f"{role.server}-{role.name}-audit.jsonl")]
+        argv = launch_argv(role.config, role.server, role.name, role.role, self._run_dir)
         env = {**get_default_environment(), **role.config.env}
         stderr = servers / f"{role.server}-{role.name}.stderr.log"
         return LaunchSpec(argv=argv, env=env, cwd=self._run_dir, stderr_path=stderr, job=JobPolicy.SERVER)
