@@ -248,7 +248,7 @@ proposed project value.
 
 | Module | Public names | Who may import |
 |---|---|---|
-| `eng_harness.calc` | `calc` (decorator), `CalcDef`, `CalcInput`, `InputMeta`, `RefMeta`, `TraceBuilder`, `CalcStatus`, `CalcRegistry`, `CalcRegistryError`, `NotImplementedGap` (re-exported from `eng_harness.errors`) | calc modules, CalcPort, tests |
+| `eng_harness.calc` | `calc` (decorator), `CalcDef`, `CalcInput`, `InputMeta`, `RefMeta`, `TraceBuilder`, `CalcStatus`, `CalcRegistry`, `CalcRegistryError`, `NotImplementedGap` (re-exported from `eng_harness.errors`), `read_lock`, `removed_ids` (re-exported from `eng_harness._calc._hash`, 4.3) | calc modules, CalcPort, tests |
 | `eng_harness.kinds.calcs` | the payload models of §4.6 to §4.11, `harness.expected_effects/1`, `CalcMeta` | calc modules, spec 0006 (page, report), spec 0007 |
 | `eng_harness.calcs` | `REGISTRY` (the `CalcRegistry` of the shipped calcs), `same_state` | CalcPort, spec 0002 (fingerprint comparison), tests |
 
