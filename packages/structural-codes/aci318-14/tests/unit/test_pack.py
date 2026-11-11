@@ -1,6 +1,7 @@
 """Pack-level tests (plan 0002 T9; PK-AC3, PK-AC4, PK-AC6)."""
 
 import importlib
+import os
 import pkgutil
 from collections.abc import Mapping
 from importlib import resources
@@ -33,12 +34,18 @@ _MODULES = ["src/aci318_14/**/*.py"]
 
 
 def test_registry_and_specs() -> None:
-    """Discovery finds the pack with exactly the six checks, each naming an existing clause spec (PK-AC3)."""
+    """Discovery finds the pack with exactly the six checks, each naming an existing clause spec (PK-AC3).
+
+    The clause specs sit outside the member; mutmut's copy of it (``MUTANT_UNDER_TEST`` set) lacks them, so only there,
+    after the registry assertions, a missing folder skips; in every other run it fails (as B-369 and B-423).
+    """
     registry = Registry.discover()
     pack = next(p for p in registry.packs if p.name == "aci318_14")
     assert pack is PACK
     assert (pack.code, pack.edition, pack.version) == ("ACI 318-14", "2014", aci318_14.__version__)
     assert [c.meta.check_id for c in registry.checks if c.meta.pack == "aci318_14"] == _IDS
+    if not _CLAUSES.is_dir() and "MUTANT_UNDER_TEST" in os.environ:
+        pytest.skip("the clause specs are outside the copy the mutation step runs (B-444); expires 2026-12-31")
     for c in pack.checks:
         assert (_CLAUSES / c.meta.spec).is_file(), c.meta.spec
 

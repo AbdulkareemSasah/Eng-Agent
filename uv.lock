@@ -342,6 +342,8 @@ dependencies = [
     { name = "mcp" },
     { name = "pydantic" },
     { name = "ruamel-yaml" },
+    { name = "structural-codes-aci318-14" },
+    { name = "structural-codes-core" },
 ]
 
 [package.dev-dependencies]
@@ -357,6 +359,8 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3,<3" },
     { name = "pydantic", specifier = ">=2.14,<3" },
     { name = "ruamel-yaml", specifier = ">=0.19,<0.20" },
+    { name = "structural-codes-aci318-14", editable = "packages/structural-codes/aci318-14" },
+    { name = "structural-codes-core", editable = "packages/structural-codes/core" },
 ]
 
 [package.metadata.requires-dev]
