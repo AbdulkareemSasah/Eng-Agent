@@ -401,7 +401,7 @@ T6 starts only after the documents pull request B-405 has merged (amendment B-41
 so that an id outside the allowlist gives `ContractError` `NOT_FOUND` (spec 0010 C4), and
 `test_code_pack_route.py::test_only_listed_checks` is written to that text, never to `RegistryError`. Otherwise footing
 T2 (plan 0010) could not add its ids without changing a merged expectation (A4).
-T6 also starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
+T6 also starts only after structural-codes core plan T15 (`CheckMeta.version`, spec Q13 and spec 0010 Q20, B-442) has merged.
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
