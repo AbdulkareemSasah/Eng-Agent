@@ -149,6 +149,7 @@ tasks:
     depends_on: [T1]
   - id: T7
     title: Calc 1, model fingerprint, with the canonical-state helper
+    # Amendment (B-437, documents only): rules test, lock test, calc.py re-export (spec 4.3, 9); budget 250 -> 270.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_fingerprint (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -161,7 +162,10 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_fingerprint.py"
       - "packages/eng-harness/tests/property/test_fingerprint.py"
       - "packages/eng-harness/tests/data/golden/calcs/fingerprint-*.json"
-    max_changed_lines: 250
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"
+      - "packages/eng-harness/tests/contract/test_calc_lock.py"
+      - "packages/eng-harness/src/eng_harness/calc.py"  # re-export of read_lock and removed_ids (spec 4.3)
+    max_changed_lines: 270
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent"
@@ -392,6 +396,7 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
   The engine-spec amendment of spec Q11 is merged (engine spec section 4.6 invariant 3, Q17, Q18). Engine plan T12
   (invariant 3 with `CalcInfo.ref_rules`) is merged before T8, whose workflow test (spec AC48) needs the staleness
   check. Amendment (B-416).
+  The gate's T39 (B-439, FB005 form A4, the `version=` keyword of `calc(...)`) is merged before T7. Amendment (B-437).
   `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
   and host verdicts that the workflow passes. Spec 0007 (B-066) supplies `harness.expected_effects/1`. Neither blocks
   this plan: its tests use synthetic records of the neutral kinds.

@@ -304,8 +304,13 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.cited`, `eng_contract.trace`, `eng_contract.canonical`, `eng_contract.units` (`kind_for_field`, `unit`),
 `eng_contract.refs` (`RefString`, `JsonPointer`), `eng_contract.errors` (`ContractError`, `ErrorCode`),
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
-`enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`. Everything else is refused by
-the rules test (AC3). Imports are top level only (AC7).
+`enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
+(`eng_param`, for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs). `calcs/__init__.py` may import
+`read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
+Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
+
+The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
+including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).
 
 ### 4.4 Design-basis fields
 
@@ -791,7 +796,10 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 
 Replay of calc steps (a completed calc step is not run again) is engine AC35. No program comparison applies: no host
 computes these quantities (10 §6 item 2). Coverage floors 85% line and 75% branch. Mutation score at least 80% on
-`calcs/**` and `_calc/**` (R1). Live checks are in §11 and in the plan §4.
+`calcs/**` and `_calc/**` (R1). Live checks are in §11 and in the plan §4. Under mutation testing (environment
+variable `MUTANT_UNDER_TEST` set) `tests/contract/test_calc_lock.py` skips the lock-versus-registry comparison with an
+issue reference and an expiry (the B-369 pattern), because mutants change the hashed source by design. Amendment
+(B-437).
 
 ## 10. Version impact
 
