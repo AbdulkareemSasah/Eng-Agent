@@ -350,7 +350,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   report holds the sections of §4.6.1 and matches the snapshot. Test:
   `tests/golden/test_report.py::test_report_snapshot`.
 - AC52. Given any report, then every value cell (class `v`) holds a link to a row of the sources table (result id and
-  pointer, kind, producer and version, or the basis `source` string with its confirmation) and the link target exists.
+  pointer, kind, producer and version, or the basis `source` string with its confirmation) through an in-page
+  fragment link (`href="#src-N"`), and the link target exists.
   Test: `tests/unit/report/test_sources.py::test_every_value_has_source`.
 - AC53. Given a run without `signed_off`, then the report carries the mark DRAFT (banner, title prefix, watermark);
   given `signed_off`, the banner shows the name and time and the unsigned mark is gone; given `run_completed.draft`
@@ -368,7 +369,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `tests/unit/report/test_changes.py::test_changes_decisions_revisions`.
 - AC56. Given the events of a run, then the timings section gives for each step its start and duration, the time the
   engineer waited (the sum of `approval_resolved.at - approval_requested.at` and the same for inputs), the machine
-  time (the sum of completed step durations) and the number of resumes; the sums equal the sums over the fixture. Test:
+  time (the sum of completed step durations) and the number of resumes, counted as distinct `resume_no` values (a
+  restore appends a second `run_resumed` with the same `resume_no`, engine Q26); the sums equal the sums over the
+  fixture. Test:
   `tests/unit/report/test_timings.py::test_wait_and_run_times`.
 - AC57. Given an altered journal, then no report is built (`JournalIntegrityError`); given a live engine, the report
   states "run in progress as of seq N". Test: `tests/unit/report/test_build_report.py::test_tampered_refused_live_banner`.
