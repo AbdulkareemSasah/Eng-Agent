@@ -2,6 +2,7 @@
 
 import ast
 import itertools
+import os
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,29 @@ _VERSIONED = frozenset({"CheckMeta", "calc"})
 def calc_modules(root: Path) -> list[Path]:
     """Every Python module under `root`, subpackages included (spec 0003 4.3)."""
     return sorted(path for path in root.rglob("*.py") if path.is_file())
+
+
+def _under_mutation() -> bool:
+    """True while mutmut is running: it rewrites the sources this test reads (trampoline and mutant dicts)."""
+    return "MUTANT_UNDER_TEST" in os.environ
+
+
+def _mutation_import(node: ast.Import | ast.ImportFrom) -> bool:
+    """The import mutmut inserts so a rewritten module can select the active mutant."""
+    if not _under_mutation():
+        return False
+    if isinstance(node, ast.Import):
+        return all(alias.name == "mutmut" or alias.name.startswith("mutmut.") for alias in node.names)
+    module = node.module or ""
+    return module == "mutmut" or module.startswith("mutmut.")
+
+
+def _mutation_dict(stmt: ast.Assign | ast.AnnAssign) -> bool:
+    """A `mutants_*__mutmut: MutantDict = {}` assignment, which exists only in a rewritten module."""
+    if not _under_mutation():
+        return False
+    targets = stmt.targets if isinstance(stmt, ast.Assign) else [stmt.target]
+    return all("__mutmut" in getattr(target, "id", "") for target in targets)
 
 
 def _may_read_lock(path: str) -> bool:
@@ -165,7 +189,8 @@ def check_source(source: str, *, path: str = "") -> list[str]:
     found: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import | ast.ImportFrom):
-            found += _import_problems(node, top)
+            if not _mutation_import(node):
+                found += _import_problems(node, top)
         elif isinstance(node, ast.Global):
             found.append(f"{node.lineno}: global statement")
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
@@ -180,7 +205,7 @@ def check_source(source: str, *, path: str = "") -> list[str]:
         ):
             found.append(f"{node.lineno}: read_lock is only for calcs/__init__.py (spec 4.3)")
     for stmt in _state_statements(tree.body):
-        if _mutable(stmt.value) and not _is_all(stmt):
+        if _mutable(stmt.value) and not _is_all(stmt) and not _mutation_dict(stmt):
             found.append(f"{stmt.lineno}: mutable module-level state")
     skip = _annotation_nodes(tree) | _allowed_literals(tree)
     found += [
@@ -246,6 +271,16 @@ def test_module_scan_includes_subpackages(tmp_path: Path) -> None:
     (nested / "check.py").write_text("import math\n", encoding="utf-8")
     found = [path.relative_to(tmp_path).as_posix() for path in calc_modules(tmp_path)]
     assert found == ["__init__.py", "footing/check.py"]
+
+
+def test_mutation_runner_instrumentation_is_not_calc_code(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = (
+        "from mutmut.mutation.trampoline import wrap_in_trampoline as _mutmut_mutated, MutantDict\n"
+        "mutants_x_item_count__mutmut: MutantDict = {}\n"
+    )
+    assert any("import" in item or "mutable" in item for item in check_source(source))
+    monkeypatch.setenv("MUTANT_UNDER_TEST", "x")
+    assert check_source(source, path="src/eng_harness/calcs/_state.py") == []
 
 
 def test_only_the_package_init_reads_the_lock() -> None:
