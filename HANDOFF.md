@@ -8,10 +8,36 @@ owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `
 - Remaining work, machine-readable: [ops/remaining-tasks.json](ops/remaining-tasks.json) (one entry per unmerged work item).
 - Local CI (the definition of done while GitHub Actions is unavailable, D-23): [ops/localci.py](ops/localci.py), described in [ops/README.md](ops/README.md).
 
+## 0. Resume prompt for a cloud agent (2026-11-11, second pause)
+
+The owner moved the build to a cloud machine: local CI (mutation runs of 15 minutes and more) froze the owner's
+workstation, which also runs AutoCAD. Paste this as the first message of a cloud Claude Code session on this repository:
+
+> You are the lead engineer resuming the v1 build of the Eng-Agent platform (repository AbdulkareemSasah/Eng-Agent,
+> branch `build/v1`). Talk to the owner in Arabic; write code, commits and documents in English. Read HANDOFF.md
+> (all of it, section 0 first), AGENTS.md, BUILD-STATUS.md, ops/README.md and ops/remaining-tasks.json, then
+> `git log origin/build/v1 -15`. Work the order of HANDOFF.md sections 3 and 4 without stopping: for each item, write it
+> (or have a subagent write it) on its entry's branch with a `test:` first commit, review the full diff yourself
+> (scope, budget, test-first; engineering content: every constant cited, expected values recomputed by hand from the
+> clause spec, X/Y swaps and boundary sides), run `uv run eng-gate check --package <package>`, open the pull request
+> with Work-Item, Plan-Task and the plan's full Risk line, record the review in its body, run
+> `python3 ops/localci.py start --pr-json <file>` and `wait` until PASS on the current head, write the summary under
+> "Local CI", squash-merge as `<prTitle> (#N)`. At most two full gate runs at once. Never invent an engineering
+> number; stop and ask the owner only for AGENTS.md section 7 items and the open questions of HANDOFF.md section 5
+> (queue them in BUILD-STATUS section 6 and continue with other items meanwhile). At each pause update HANDOFF.md and
+> BUILD-STATUS.md, commit them as docs(build), push, and tell the owner the percentage done and what comes next.
+
+Notes for the cloud session:
+- The pull requests in section 3 were opened, reviewed and fixed on the owner's workstation (writers: Cursor CLI with
+  Composer 2.5 and Grok 4.7; reviews by the lead). What each still needs is in section 3.
+- `ops/localci.py` needs Linux (`fcntl`, `bash`); the gate's mutation step does not run on Windows (ADR-0002).
+- A Windows workstation is not a place for local CI (D-29 in BUILD-STATUS). If the owner's machine is used again, run
+  only light work there.
+
 ## 1. Where the build stands
 
-- Resume commit: `4f8a2f1 feat(structural-codes): CheckMeta.version, the integer check version (B-443) (#266)` on `build/v1`.
-- Plan tasks merged: 149 of 290 (51.4 %), plus 83 documents amendments.
+- Resume commit: `602968c docs(eng-dev-gate): FB005 form A4, an integer version keyword of a listed callable; plan T39 (B-438) (#267)` on `build/v1`.
+- Plan tasks merged: 149 of 290 (51.4 %), plus 84 documents amendments.
 
 | Package | Merged | Total |
 |---|---|---|
@@ -57,43 +83,42 @@ by an agent).
 
 | Work item | Task | State | What is left |
 |---|---|---|---|
-| B-437 | DOC.CALCRULES Calcs spec 0003 4.3 and plan 0003 T7: allowed imports, recursive rules | PR #260 | one fix round (notes below), re-review, verifiers, local CI, merge |
-| B-438 | DOC.GATEA4 Gate spec 4.8 FB005 form A4 (version keyword of versioned callables) a | PR #267 | one fix round (notes below), re-review, verifiers, local CI, merge |
-| B-440 | DOC.PROVT1 Providers plan 0009 T1: the license evidence for cffi and regex (propo | not started | write it |
+| B-438 | DOC.GATEA4 Gate spec 4.8 FB005 form A4 | merged (#267, 602968c) | done |
+| B-437 | DOC.CALCRULES Calcs spec 0003 4.3 and plan 0003 T7: allowed imports, recursive rules | PR #260 | convergence round done (3de8b96, reviewed: APPROVE); record the review in the body, local CI, merge |
+| B-440 | DOC.PROVT1 Providers plan 0009 T1: the license exceptions of cffi and regex | PR #270 | written and reviewed (APPROVE, recorded in the body); local CI, merge |
 | B-146 | C.T7 Calc 1, model fingerprint, with the canonical-state helper | branch pushed | continue on the branch (lead note); waits for DOC.CALCRULES, G.T39 |
 | B-220 | P.T1 Dependencies, provider errors, configuration, network guard | PR #253 superseded | restart on the fresh branch of its entry (section 5), then close #253; waits for DOC.PROVT1 |
 | B-439 | G.T39 FB005 form A4: an integer literal as the version keyword of a listed v | not started | write it; waits for DOC.GATEA4 |
-| B-330 | Z.T1 Shared column section model, column preconditions, shared constants mo | PR #269 | finish review, verifiers and local CI, then merge |
+| B-330 | Z.T1 Shared column section model, column preconditions, shared constants mo | PR #269 | lead review with sources and oracle lenses done (notes below), fix 502a2a8 pushed; record the review in the body, local CI, merge |
 | B-393 | X.T2 Code-pack route of the CalcPort and the structural-codes workspace dep | PR #268 | finish review, verifiers and local CI, then merge |
 | B-394 | X.T3 Calc harness.footing_subjects and the footing calc package | PR #256 | finish review, verifiers and local CI, then merge; waits for C.T7 |
 
-### Amendments that stopped at verification (run one D-28 convergence round each)
+### Notes on the items in flight (second pause)
 
-- **B-437 (DOC.CALCRULES, branch `docs/b437-calc-module-rules-and-lock-test`)**: three verifier rounds; left: (HIGH) spec 0003
-  AC3 says each module under `calcs/` "reads no file", but 4.3 now lets `calcs/__init__.py` call `read_lock` (it reads
-  `calcs.lock.json`): add that one exception to AC3; (MEDIUM) its references to FB005 form A4 and gate T39 resolve only
-  once B-438 merges, so merge B-438 first; (LOW) the T7 amendment comment should cite the gate spec 4.5 step 6 ratchet
-  rule. Then C.T7 (B-146) can continue.
-- **B-438 (DOC.GATEA4, PR #267, branch `docs/b438-gate-fb005-form-a4`)**: reviewed APPROVE; the implementability verifier
-  approved; the consistency verifier left two items and the fix round was stopped by the pause: (HIGH) add `versioned`
-  to the `.gate/forbidden.yml` key list in the gate spec's list of root `.gate/` files (about line 840), since the
-  policy model rejects unknown keys; (MEDIUM) the section 10 traceability row "AC29 to AC37" should name AC33a and
-  T39's test `test_forbidden_fb005.py::test_version_keyword_of_versioned_callable`. Fix both, re-review, re-verify,
-  local CI, merge. Then gate T39 (B-439), then B-437.
-- **B-440 (DOC.PROVT1)**: its writer had only started when the pause came; start it fresh from its entry in
-  `ops/remaining-tasks.json`. Then providers T1 (B-220) on its fresh branch.
-- **B-330 (Z.T1, PR #269)**: opened at the pause with the earlier session's commits and two gate fixes (mypy strict on
-  the section model, an undeclared pydantic import in a test). Next: review, sources and oracle verifiers, local CI,
-  merge.
-- **B-393 (X.T2, PR #268)**: written and reviewed with no blocking finding; its merge step was stopped by the pause. Next:
-  record the review in the body, local CI, merge.
+- **B-437 (PR #260)**: the D-28 convergence round fixed the three verifier findings (AC3 now names the
+  `calcs/__init__.py` lock-file exception; the T7 comment cites gate spec 4.5 step 6, AC10b; B-438 is merged, so its
+  FB005 form A4 references resolve). Lead review: APPROVE. Merge it, then C.T7 (B-146) can continue once gate T39
+  (B-439) merges.
+- **B-440 (PR #270)**: plan-only amendment; the section 3 sentence that called the license exceptions a precondition
+  outside every task was aligned with T1's new file list. Owner note in the body: two package ADRs share number 0001.
+- **B-330 (PR #269)**: lead review of `_column.py` against the axial-flexure and maximum-axial clause specs: every
+  constant matches its cited clause (Es 20.2.2.2; Table 21.2.2 phi rows; Table 22.4.2.1; 6.2.5(a) and 6.2.5.1(b);
+  Table 22.2.2.4.3); SP-1, CS S6, CS S7 and the CP boundaries recomputed by hand agree with the tests to the last digit.
+  Two oracle findings fixed by test-only commit 502a2a8: the `SHORT_COLUMN` test had only `b < h`, so a mutant using
+  `b_mm` alone passed (mirrored `h < b` case added); the `d_j < a` boundary of the displaced concrete had no test (added
+  at `a == d_1 == 250`). LOW for Z.T2: the column inputs need `n_bars_h >= 2` (CS S1 divides by `n_bars_h - 1`).
+  Record this review in the body (the writer was the earlier session), then local CI and merge.
+- **B-393 (PR #268)**: written and reviewed with no blocking finding in the earlier session; its body has no Review
+  section yet. Record a review (read the diff again: `_calc/_code_packs.py`, `_calc/_port.py`), local CI, merge.
+- **Ready to write now** (every dependency merged): B-111 (E.T12), B-129 (S.T10), B-137 (S.T18), B-139 (S.T20), B-186
+  (I.T12), B-280 (G.T1) and B-439 (G.T39, gate FB005 form A4, unblocked by B-438). Cursor writers were started on the
+  workstation and stopped before writing anything; nothing of them is on GitHub.
 
 ## 4. Order of the remaining work
 
-1. The documents amendments of section 3 that are not merged yet (each entry in `ops/remaining-tasks.json` with kind
-   `docs` carries its full instructions): B-438 first, then B-437 and B-440. Already merged at the pause: B-434 (engine
-   T12 scope), B-435 (fragment links, report inputs), B-442 (`CheckMeta.version`).
-2. Gate T39 (B-439, FB005 form A4) after B-438. Already merged: B-436 (I.T2b fragment links) and B-443 (K.T15
+1. Merge the open pull requests of section 3: B-437 (#260), B-440 (#270), B-330 (#269), B-393 (#268). B-438 is merged
+   (#267).
+2. Gate T39 (B-439, FB005 form A4), now unblocked. Already merged: B-436 (I.T2b fragment links) and B-443 (K.T15
    `CheckMeta.version`).
 3. The tasks that were blocked, each with a lead note in its entry: B-111 (E.T12, ready now), B-186 (I.T12, ready
    now), B-393 (X.T2, PR #268, reviewed: local CI and merge), B-330 (Z.T1, PR #269: review), B-146 (C.T7, work on its
