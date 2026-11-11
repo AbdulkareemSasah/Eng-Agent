@@ -278,6 +278,7 @@ def test_mutation_runner_instrumentation_is_not_calc_code(monkeypatch: pytest.Mo
         "from mutmut.mutation.trampoline import wrap_in_trampoline as _mutmut_mutated, MutantDict\n"
         "mutants_x_item_count__mutmut: MutantDict = {}\n"
     )
+    monkeypatch.delenv("MUTANT_UNDER_TEST", raising=False)
     assert any("import" in item or "mutable" in item for item in check_source(source))
     monkeypatch.setenv("MUTANT_UNDER_TEST", "x")
     assert check_source(source, path="src/eng_harness/calcs/_state.py") == []
