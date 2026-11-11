@@ -8,7 +8,6 @@ from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
 
-from eng_harness.kinds.column_design import _P, _model
 from eng_harness.kinds.edit_cycle import NONEMPTY, Label
 from eng_harness.workflows.model_edit_cycle._change_set import BasisValue, LengthValue, _InputValue
 
@@ -69,17 +68,22 @@ class ColumnLayoutRequest(_M):
     sections: Annotated[list[_Layout], Field(min_length=NONEMPTY)]
 
 
-def _row(model_name: str, /, **fields: object) -> type[BaseModel]:
-    return _model(model_name, _P, **fields)
+class _Rect(_M):
+    b: LengthValue
+    h: LengthValue
 
 
-_Rect = _row("_Rect", b=LengthValue, h=LengthValue)
-_Circ = _row("_Circ", D=LengthValue)
-_Proposal = _row("_Proposal", frame_id=Label, required=_Rect.__or__(_Circ))
+class _Circ(_M):
+    D: LengthValue
+
+
+class _Proposal(_M):
+    frame_id: Label
+    required: _Rect | _Circ
 
 
 class ColumnProposalRequest(_M):
-    columns: Annotated[list[_Proposal], Field(min_length=NONEMPTY)]  # type: ignore[valid-type]  # B-280: built model
+    columns: Annotated[list[_Proposal], Field(min_length=NONEMPTY)]
 
 
 def request_refusal(answer: BaseModel) -> tuple[str, str] | None:
