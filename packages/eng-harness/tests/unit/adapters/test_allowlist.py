@@ -314,6 +314,8 @@ def test_unit_header_entries() -> None:
     for table in bad:
         with pytest.raises(AllowlistError):
             load_allowlist(_text(_tool()) + table, "test.toml")
+    with pytest.raises(AllowlistError, match="unit_header"):
+        _load(_tool(unit_header=[]))
 
 
 def test_unit_header_missing_on_unserved_tool() -> None:

@@ -69,12 +69,10 @@ class Allowlist(BaseModel):
                 raise ValueError(f"{entry.tool}: a {entry.unit_status} unit must name an allowlisted tool")
             if entry.tool in names:
                 grouped[entry.tool] = (*grouped.get(entry.tool, ()), entry)
-        if not grouped or all(tool.unit_header == grouped.get(tool.name, ()) for tool in self.tools):
+        # Each descriptor's header is exactly that tool's [[unit]] rows, including when there are none (AC42).
+        if all(tool.unit_header == grouped.get(tool.name, ()) for tool in self.tools):
             return self
-        tools = tuple(
-            tool.model_copy(update={"unit_header": grouped[tool.name]}) if tool.name in grouped else tool
-            for tool in self.tools
-        )
+        tools = tuple(tool.model_copy(update={"unit_header": grouped.get(tool.name, ())}) for tool in self.tools)
         return self.model_copy(update={"tools": tools})
 
     def descriptor(self, name: str) -> ToolDescriptor:

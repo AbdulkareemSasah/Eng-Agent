@@ -54,7 +54,15 @@ class ToolDescriptor(ReleaseMarked):
     readback: str | None = Field(default=None, min_length=1)  # read-back helper name
     products: tuple[str, ...] = Field(min_length=1)
     routes: tuple[str, ...] | None = None  # required, and drawn from the header, when the header declares routes
-    unit_header: tuple[UnitHeader, ...] = ()  # this tool's [[unit]] entries (AC42); empty when it has none
+    unit_header: tuple[UnitHeader, ...] = ()  # filled from [[unit]] by the loader (AC42); not a tool-entry field
+
+    @model_validator(mode="before")
+    @classmethod
+    def _unit_header_not_in_the_entry(cls, data: object) -> object:
+        """A tool entry does not carry `unit_header`; those rows are the file's `[[unit]]` entries (AC42)."""
+        if isinstance(data, dict) and "unit_header" in data:
+            raise ValueError("unit_header is taken from [[unit]] entries, not from the tool entry")
+        return data
 
     @model_validator(mode="after")
     def _write_has_readback(self) -> Self:
