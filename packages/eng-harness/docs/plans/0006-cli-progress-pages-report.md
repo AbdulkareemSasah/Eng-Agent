@@ -317,7 +317,7 @@ tasks:
     title: "Report document: DRAFT and completeness marks, integrity line, policy meta, timings and run events sections, atomic UTF-8 write"
     # Amendment (B-412, documents only): report/__init__.py added; the report snapshot extended to the whole document (AC51).
     # Amendment (B-412 fifth review, documents only): sections 6 and 7 of spec 4.6.1 (timings, run events) rendered here, from T12; budget 300 -> 380.
-    # Amendment (B-435, documents only): report/_model.py added: resumes counted and listed by distinct resume_no (AC56, engine Q26).
+    # Amendment (B-435, documents only): report/_model.py, test_timings.py and its fixture added: resumes counted and listed by distinct resume_no (AC56, engine Q26).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -328,6 +328,8 @@ tasks:
       - "packages/eng-harness/tests/unit/report/test_build_report.py"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py"
       - "packages/eng-harness/tests/unit/report/test_write.py"
+      - "packages/eng-harness/tests/unit/report/test_timings.py"
+      - "packages/eng-harness/tests/fixtures/report_run.py"
       - "packages/eng-harness/tests/golden/test_report.py"
       - "packages/eng-harness/tests/data/snapshots/report/**"
     # About 80 more lines for sections 6 and 7 (an estimate, not a measurement).
@@ -338,7 +340,8 @@ tasks:
       - "packages/eng-harness/tests/unit/report/test_build_report.py::test_tampered_refused_live_banner"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py::test_draft_signed_and_sources"
       - "packages/eng-harness/tests/unit/report/test_write.py::test_utf8_lf_atomic"
-    covers: [AC50, AC51, AC53, AC57, AC59]
+      - "packages/eng-harness/tests/unit/report/test_timings.py::test_wait_and_run_times"
+    covers: [AC50, AC51, AC53, AC56, AC57, AC59]
     depends_on: [T12]
   - id: T14
     title: "Commands run and resume: wiring, generated options, answers file, outcome mapping"
@@ -724,7 +727,9 @@ engineer waiting time against machine time, resumes) and 7 (run events: resumes,
 spec §4.6.1 in `_document.py` from T11's `ReportModel`, through T12's escaped cells; budget 300 to 380 (about 40 lines
 per section, an estimate, not a measurement). Amendment B-435: T13 also fixes `report/_model.py`, which makes one
 resume entry per `run_resumed`; it counts and lists distinct `resume_no` values (a restore appends a second
-`run_resumed` with the same `resume_no`, engine Q26), with a test in `tests/unit/report/test_build_report.py` (AC56).
+`run_resumed` with the same `resume_no`, engine Q26). T13 extends
+`tests/unit/report/test_timings.py::test_wait_and_run_times`, the test spec AC56 names, with a restore that appends a
+second `run_resumed` with the same `resume_no` (fixture `tests/fixtures/report_run.py`), and covers AC56.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay
