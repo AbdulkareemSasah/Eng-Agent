@@ -1,7 +1,8 @@
 """The run engine: `Engine.start` and `Engine.resume` (spec 0001 4.4.4, 4.5.1, 4.5.2; plan 0001 T9, T9b).
 
 Purpose: validate a request, hold the run lock, journal the run header, run the root block and return how it ended.
-Resume runs steps 1 to 3 and 9 of spec 4.5.1 (the others follow in T11b and T13); the ctx calls are in `_ctx_impl.py`.
+Resume runs steps 1 to 3 and 6 to 9 of spec 4.5.1 (4 and 5 follow in T13); the ctx calls are in
+`_ctx_impl.py`.
 Units: none; durations in ms. Errors: `ContractError`, `RunRefused`, `RunLocked`, `JournalIntegrityError`; a stop of the
 block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
@@ -26,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
+from eng_harness.engine import _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
@@ -179,7 +181,10 @@ class Engine:
                 return await self._drive(workflow, inp, run_id, writer, [])
 
     async def resume(self, run_id: str) -> RunOutcome:
-        """Resume the run (steps 1 to 3 and 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
+        """Resume the run (steps 1 to 3 and 6 to 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
+
+        A write in flight is reconciled, a read in flight gets `step_rerun` and the host state of each written model is
+        checked before the block runs; a stop for the engineer returns `NEEDS_ENGINEER`, an abandoned run `FAILED`.
 
         Raises:
             ContractError: `INVALID_ARGUMENT` for a run id that names no run, or a workflow that is not registered.
@@ -202,8 +207,20 @@ class Engine:
                     workflow, inp = self._admit(head)
                 except errors.ReplayDivergence as stop:
                     return self._escalate(run_id, writer, "replay_divergence", stop)
-                writer.append(EventType.RUN_RESUMED, self._resumed(workflow, head, events))
-                return await self._drive(workflow, inp, run_id, writer, events)  # step 9 (4 to 8: T11b)
+                resumed = self._resumed(workflow, head, events)
+                writer.append(EventType.RUN_RESUMED, resumed)
+                ports = self._ports
+                rt = _inflight.Resume(
+                    run_dir, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
+                    writer, resumed.resume_no, ports.host,
+                )  # fmt: skip
+                try:  # steps 4 and 5: T13; step 6 only for the models the run wrote; 7 and 8: spec 4.5.3, 4.5.4
+                    await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
+                    await _hoststate.check(rt)
+                except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
+                    status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
+                    return RunOutcome(run_id, status, escalation=stop.escalated)
+                return await self._drive(workflow, inp, run_id, writer, rt.events())  # step 9
 
     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
@@ -220,15 +237,16 @@ class Engine:
         except ContractError as exc:
             raise errors.ReplayDivergence("the stored run input no longer fits the input model") from exc
 
-    def _resumed(self, workflow: WorkflowDef[Any, Any], head: ev.RunHeader, events: list[Event]) -> dict[str, object]:
+    def _resumed(self, workflow: WorkflowDef[Any, Any], head: ev.RunHeader, events: list[Event]) -> ev.RunResumed:
         """The `run_resumed` payload; `unreleased_tools` only when it differs from the last recorded mapping (AC68)."""
-        recorded = [e.payload.unreleased_tools for e in events if isinstance(e.payload, ev.RunResumed)]
-        last = [head.unreleased_tools, *(m for m in recorded if m is not None)][-1]
+        seen = [e.payload for e in events if isinstance(e.payload, ev.RunResumed)]
+        last = [head.unreleased_tools, *(p.unreleased_tools for p in seen if p.unreleased_tools is not None)][-1]
         changed = workflow.code_sha256 != head.block.code_sha256  # a warning, not a divergence (AC29)
-        payload: dict[str, object] = {"resume_no": len(recorded) + 1, "code_hash_changed": changed, "servers": []}
-        if (now := dict(self._ports.tool.unreleased_tools())) != last:
-            payload["unreleased_tools"] = now
-        return payload
+        number = max((p.resume_no for p in seen), default=0) + 1  # a restore adds a second event with the same number
+        now: dict[str, JsonValue] = dict(self._ports.tool.unreleased_tools())
+        return ev.RunResumed(
+            resume_no=number, code_hash_changed=changed, servers=[], unreleased_tools=now if now != last else None
+        )
 
     async def _ended(self, run_id: str, head: ev.RunHeader, events: list[Event], last: object) -> RunOutcome:
         """The recorded outcome of an ended run, after `close_started` for its journaled host instances (AC35)."""
@@ -253,9 +271,9 @@ class Engine:
     ) -> RunOutcome:  # fmt: skip
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports = self._ports
-        ctx = Ctx(
-            ports.tool, ports.calc, self._store, self._settings, self._clock, self._producer, run_id, writer, events
-        )
+        tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
+        ctx = Ctx(tools, ports.calc, self._store, self._settings, self._clock, self._producer, run_id, writer, events)
+        ctx.index = _inflight.ResumeIndex(events)
         try:
             with root_scope():
                 out = await workflow.fn(ctx, inp)
