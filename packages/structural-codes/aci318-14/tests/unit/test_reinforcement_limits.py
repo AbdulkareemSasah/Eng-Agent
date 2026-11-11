@@ -72,14 +72,16 @@ def test_member_scope() -> None:
 
 
 def test_gross_area_not_from_plan_dimensions() -> None:
-    """Limits use `Ag_mm2` directly (400 mm × 625 mm = 250000 mm2), not an implicit b·h swap.
+    """Limits use `Ag_mm2` directly (400 mm x 625 mm = 250000 mm2), not an implicit b·h swap.
 
     Hand values: Ag = 400 * 625 = 250000, Ast = 5000; As_min = 2500, As_max = 20000; rho = 0.02; ratios 0.5 and 0.25.
-  """
+    """
     payload = run(Ag_mm2=250000.0, Ast_mm2=5000.0)
     vmin, vmax = payload.verdicts
-    assert vmin.demand is not None and vmin.capacity is not None
-    assert vmax.demand is not None and vmax.capacity is not None
+    assert vmin.demand is not None
+    assert vmin.capacity is not None
+    assert vmax.demand is not None
+    assert vmax.capacity is not None
     assert vmin.demand.value == pytest.approx(2500.0, abs=_AREA)
     assert vmin.capacity.value == pytest.approx(5000.0, abs=_AREA)
     assert vmax.demand.value == pytest.approx(5000.0, abs=_AREA)
