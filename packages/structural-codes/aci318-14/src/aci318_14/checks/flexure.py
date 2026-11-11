@@ -17,7 +17,7 @@ from structural_codes.inputs import bounded
 from structural_codes.meta import CheckMeta, GapDecl
 from structural_codes.trace import TraceRecorder
 
-from aci318_14._column import beta1
+from aci318_14._column import beta1 as _beta1
 from aci318_14._common import CITED, FC_MIN, FY_MAX, const
 from aci318_14._footing import COMPRESSION, FootingLoads, _step, face_moments, full_contact
 
@@ -80,13 +80,13 @@ def flexure_at_column_face(inp: FlexureInputs, t: TraceRecorder) -> None:
     phi, eps_tc, eps_cu, alpha = (const(t, n) for n in ("phi_tc", "eps_tc", "eps_cu", "alpha_1"))
     # The shared k_kNm cannot be recorded under its own name: the suffix _kNm would fix the unit kN.m (core AC10).
     k_knm, half = t.const("k_kilo_milli", CITED["k_kNm"]), t.value("c_half")
-    b1 = beta1(t)
+    beta1 = _beta1(t)
     fc, fy = t.value("fc_MPa"), t.value("fy_MPa")
     for s, width, depth, steel in _DIRECTIONS:
         a_s, d = t.value(steel), t.value(depth)
         f_a = f"{steel} * fy_MPa / (alpha_1 * fc_MPa * {width})"
         a = _step(t, f"a_{s}_mm", a_s * fy / (alpha * fc * t.value(width)), f_a, "ACI 318-14 22.2.2.4.1, b = width")
-        c = _step(t, f"c_{s}_mm", a / b1, f"a_{s}_mm / beta1_ratio", "ACI 318-14 22.2.2.4.1 (a = beta1*c)")
+        c = _step(t, f"c_{s}_mm", a / beta1, f"a_{s}_mm / beta1_ratio", "ACI 318-14 22.2.2.4.1 (a = beta1*c)")
         f_e = f"eps_cu * ({depth} - c_{s}_mm) / c_{s}_mm"
         eps_t = _step(t, f"eps_t_{s}_ratio", eps_cu * (d - c) / c, f_e, "ACI 318-14 22.2.2.1, dt = d")
         if eps_t < eps_tc:

@@ -25,21 +25,26 @@ from aci318_14._footing import _step
 __all__ = ["BAR_LAYOUT", "COLUMN_CITED", "SHORT_COLUMN", "STEEL_IN_SECTION", "ColumnSection", "SectionPoint"]
 __all__ += ["TransverseKind", "axial_cap", "axial_compression", "beta1", "column_section", "record_point"]
 
-_CC_SPIRAL = "ACI 318-14 Table 21.2.2 (compression-controlled, spiral per 25.7.3)"
-_SWAY = "ACI 318-14 6.2.5(a) (columns not braced against sidesway; used for every column, CP)"
-_CORNER = "Geometry: four corner bars counted twice in `2·n_bars_b + 2·n_bars_h`"
 COLUMN_CITED = MappingProxyType(
     {
         "Es": Cited(value=200000, unit="MPa", source="ACI 318-14 20.2.2.2"),
         "phi_cc_tied": Cited(value=0.65, unit="1", source="ACI 318-14 Table 21.2.2 (compression-controlled, other)"),
-        "phi_cc_spiral": Cited(value=0.75, unit="1", source=_CC_SPIRAL),
+        "phi_cc_spiral": Cited(
+            value=0.75, unit="1", source="ACI 318-14 Table 21.2.2 (compression-controlled, spiral per 25.7.3)"
+        ),
         "phi_tr_tied": Cited(value=0.25, unit="1", source="ACI 318-14 Table 21.2.2 (transition, other)"),
         "phi_tr_spiral": Cited(value=0.15, unit="1", source="ACI 318-14 Table 21.2.2 (transition, spiral)"),
         "pnmax_tied": Cited(value=0.80, unit="1", source="ACI 318-14 Table 22.4.2.1 (a), nonprestressed, ties"),
         "pnmax_spiral": Cited(value=0.85, unit="1", source="ACI 318-14 Table 22.4.2.1 (b), nonprestressed, spirals"),
-        "kl_r_sway": Cited(value=22, unit="1", source=_SWAY),
+        "kl_r_sway": Cited(
+            value=22,
+            unit="1",
+            source="ACI 318-14 6.2.5(a) (columns not braced against sidesway; used for every column, CP)",
+        ),
         "r_factor": Cited(value=0.30, unit="1", source="ACI 318-14 6.2.5.1(b) (rectangular columns)"),
-        "c_corner": Cited(value=4, unit="1", source=_CORNER),
+        "c_corner": Cited(
+            value=4, unit="1", source="Geometry: four corner bars counted twice in `2·n_bars_b + 2·n_bars_h`"
+        ),
     }
 )
 _ALL = {**CITED, **SECTION_CITED, **COLUMN_CITED, "k_kilo": CITED["k_kN"], "k_kilo_milli": CITED["k_kNm"]}
@@ -65,12 +70,8 @@ def beta1(t: TraceRecorder) -> float:
     """Record `beta1_ratio` from the three rows of Table 22.2.2.4.3 (CS S2; flexure spec §4 step 4)."""
     c = {n: _c(t, n) for n in ("beta1_hi", "beta1_slope", "beta1_step", "fc_beta_lo", "fc_beta_hi", "beta1_lo")}
     fc = t.value("fc_MPa")
-    if fc <= c["fc_beta_lo"]:
-        value = c["beta1_hi"]
-    elif fc >= c["fc_beta_hi"]:
-        value = c["beta1_lo"]
-    else:
-        value = c["beta1_hi"] - c["beta1_slope"] * (fc - c["fc_beta_lo"]) / c["beta1_step"]
+    between = c["beta1_hi"] - c["beta1_slope"] * (fc - c["fc_beta_lo"]) / c["beta1_step"]
+    value = c["beta1_hi"] if fc <= c["fc_beta_lo"] else c["beta1_lo"] if fc >= c["fc_beta_hi"] else between
     formula = "beta1_hi if fc_MPa <= fc_beta_lo else beta1_lo if fc_MPa >= fc_beta_hi"
     formula += " else beta1_hi - beta1_slope * (fc_MPa - fc_beta_lo) / beta1_step"
     return _step(t, "beta1_ratio", value, formula, "ACI 318-14 Table 22.2.2.4.3")
