@@ -1,17 +1,19 @@
 """Server roles, MCP sessions, crash detection, restart and shutdown (plan 0002 T5; spec 0002 sections 4.3.2 to 4.3.5).
 
 `ServerManager` starts each role (one server process) lazily, keeps one MCP `Client` per role and maps a lost session
-to the contract codes of spec section 4.5.6 (`ToolFailed`). The build check of section 4.3.4 follows in task T6b.
+to the contract codes of spec section 4.5.6 (`ToolFailed`). The build check (4.3.4) runs in `preflight` and on restarts.
 """
 
+import hashlib
+import json
 import logging
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import anyio
 import anyio.abc
@@ -20,6 +22,8 @@ from mcp import Client, MCPError, types
 from mcp.client.stdio import get_default_environment
 
 from eng_harness.errors import ToolFailed
+from eng_harness.ports import ServerCheck
+from eng_harness.servers._buildcheck import BuildExpectation, Observed, check_build, tool_list_fingerprint
 from eng_harness.servers._config import RoleConfig, ServerConfig, ServersConfig
 from eng_harness.servers._launcher import (
     JobPolicy,
@@ -29,6 +33,7 @@ from eng_harness.servers._launcher import (
     PosixLauncher,
     ProcessLauncher,
 )
+from eng_harness.servers._procinfo import ProcessIdentity
 from eng_harness.servers._transport import ProcessTransport
 
 logger = logging.getLogger(__name__)
@@ -42,6 +47,28 @@ class CallEffect(StrEnum):
 
     READ = "read"
     WRITE = "write"  # write, analysis, design, save or unlock
+
+
+class HelperTracker(Protocol):
+    """Port: records helper processes a server's job lets go and ends them when the server stops (spec 4.4.2)."""
+
+    def observe_helpers(self, key: str, members: Sequence[ProcessIdentity]) -> None:
+        """Record the helpers among the children of the job `members` of role `key` (`server/role`)."""
+
+    def terminate_helpers(self, key: str) -> None:
+        """End the recorded helpers of role `key` that still match their identity."""
+
+
+def reply_body(result: types.CallToolResult) -> dict[str, Any] | None:
+    """The JSON object in the one text block of a Sasaah reply, or None when the reply has none."""
+    block = result.content[0] if result.content else None
+    if not isinstance(block, types.TextContent):
+        return None
+    try:
+        body = json.loads(block.text)
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
 
 
 @dataclass
@@ -83,8 +110,18 @@ class ServerManager:
     instance is ended by it.
     """
 
-    def __init__(self, config: ServersConfig, run_dir: Path, *, launcher: ProcessLauncher | None = None) -> None:
-        """Prepare roles from `config`; servers run in the run folder `run_dir`, logging under `servers/`."""
+    def __init__(
+        self,
+        config: ServersConfig,
+        run_dir: Path,
+        *,
+        launcher: ProcessLauncher | None = None,
+        check: Mapping[str, BuildExpectation] | None = None,
+        helpers: HelperTracker | None = None,
+    ) -> None:
+        """Prepare roles from `config`, run in `run_dir`; `check` maps a server to what its allowlist pins."""
+        self._config, self._check, self._helpers = config, dict(check or {}), helpers
+        self._min_builds: dict[str, str] = {}
         self._run_dir = run_dir
         self._launcher = launcher or PosixLauncher()
         self._roles = {
@@ -93,6 +130,7 @@ class ServerManager:
             for role, role_config in server.roles.items()
         }
         self._epochs: defaultdict[str, int] = defaultdict(int)
+        self._sessions: defaultdict[tuple[str, str], int] = defaultdict(int)  # role -> launch-ownership counter
         self._bound: dict[str, tuple[int, str]] = {}  # host key -> (pid, product) of the bound instance
         self._group: anyio.abc.TaskGroup  # opened by `__aenter__`, which needs the running event loop
 
@@ -112,6 +150,19 @@ class ServerManager:
     def session_epoch(self, host_key: str) -> int:
         """Return the counter that increases whenever a session to the host is lost or re-established."""
         return self._epochs[host_key]
+
+    def role_session(self, server: str, role: str) -> int:
+        """Return the role's session counter: it grows with every loss of the role's session (spec 4.4.2).
+
+        A crash, a client backstop and a restart increase it here; a server `timeout` reply is seen by `call`, and a
+        reconnect is reported by the adapter through `invalidate_session`. A role holds launch ownership of an instance
+        only while the counter is what it was at `csi_launch`.
+        """
+        return self._sessions[server, role]
+
+    def invalidate_session(self, server: str, role: str) -> None:
+        """Increase the role's session counter (the host server dropped its cached session, or the role reconnected)."""
+        self._sessions[server, role] += 1
 
     def bind_instance(self, host_key: str, *, pid: int, product: str) -> None:
         """Record the instance a restarted or later-started role re-attaches to by process id."""
@@ -139,6 +190,60 @@ class ServerManager:
 
         return await self._request(self._roles[server, role], CallEffect.READ, "tools/list", read)
 
+    async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
+        """Check each server's build on its first role (spec 4.3.4); `min_builds` maps a server to its minimum."""
+        self._min_builds = dict(min_builds)
+        checks: list[ServerCheck] = []
+        for name, server in self._config.servers.items():
+            role = self._roles[name, next(iter(server.roles))]
+            if (expected := self._check.get(name)) is None:
+                checks.append(self._unchecked(role, "no build check is configured for this server"))
+                continue
+            try:
+                checks.append(await self._verify(role, await self._ensure(role), expected))
+            except ToolFailed as error:
+                checks.append(self._unchecked(role, error.detail.message))
+        return checks
+
+    def _unchecked(self, role: _Role, reason: str) -> ServerCheck:
+        pin, minimum = role.config.build, self._min_builds.get(role.server, "")
+        build = f"{pin.sasaah_commit[:12]}+{pin.exe_sha256[:12]}"
+        return ServerCheck(
+            server=role.server,
+            build=build,
+            min_build=minimum,
+            fingerprint="",
+            expected_fingerprint="",
+            ok=False,
+            reason=reason,
+        )
+
+    async def _verify(self, role: _Role, live: _Live, expected: BuildExpectation) -> ServerCheck:
+        """Read the build off a started role and compare it with the allowlist's pin."""
+        client, backstop_s = live.client, role.backstop_s
+        tools: list[types.Tool] = []
+        cursor: str | None = None
+        try:
+            exe = hashlib.sha256(await anyio.Path(role.config.command).read_bytes()).hexdigest()
+            with anyio.fail_after(backstop_s):  # also ends an endless listing
+                while True:
+                    page = await client.list_tools(cursor=cursor)
+                    tools += page.tools
+                    if (cursor := page.next_cursor) is None:
+                        break
+                reply = await client.call_tool("csi_status", {}, read_timeout_seconds=backstop_s)
+            block = reply.content[0] if reply.content else None
+            status = json.loads(block.text) if isinstance(block, types.TextContent) and not reply.is_error else None
+            if not isinstance(status, dict):
+                raise ValueError("csi_status gave no JSON object")
+        except (TimeoutError, MCPError, OSError, ValueError) as error:
+            return self._unchecked(role, f"the build cannot be read: {error}")
+        seen = Observed(exe, client.server_info, {t.name: t.input_schema for t in tools}, status)
+        logger.info(
+            "%s/%s %s, tool list %s", role.server, role.name, seen.server_info, tool_list_fingerprint(seen.tools)
+        )
+        return check_build(role.server, role.config.build, expected, seen, self._min_builds.get(role.server, ""))
+
     async def call(
         self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
     ) -> types.CallToolResult:
@@ -152,7 +257,13 @@ class ServerManager:
         async def send(client: Client, backstop_s: float) -> types.CallToolResult:
             return await client.call_tool(tool, dict(arguments), read_timeout_seconds=backstop_s)
 
-        return await self._request(self._roles[server, role], effect, tool, send)
+        found = self._roles[server, role]
+        result = await self._request(found, effect, tool, send)
+        if result.is_error and (body := reply_body(result)) is not None and body.get("code") == "timeout":
+            self.invalidate_session(server, role)  # the server invalidated its session (S-12 section 5)
+        if self._helpers is not None and found.live is not None:
+            self._helpers.observe_helpers(f"{server}/{role}", found.live.launched.job_members())
+        return result
 
     async def _request[T](
         self, role: _Role, effect: CallEffect, tool: str, send: Callable[[Client, float], Awaitable[T]]
@@ -185,6 +296,9 @@ class ServerManager:
             live = await self._start(role)
             role.live = live
             try:
+                expected = self._check.get(role.server) if role.starts > 1 else None  # a restart repeats the check
+                if expected and not (result := await self._verify(role, live, expected)).ok:
+                    raise _fail(ErrorCode.HOST_NOT_CONNECTED, f"{role.server}: build check failed: {result.reason}")
                 await self._attach(role, live)
             except ToolFailed:
                 await self._lose(role, live)
@@ -244,8 +358,14 @@ class ServerManager:
                 task_status.started(error)  # reported to the caller of `_start`
         finally:
             if launched is not None:
-                launched.terminate_job()
-                launched.close()
+                try:
+                    if self._helpers is not None:
+                        self._helpers.observe_helpers(f"{role.server}/{role.name}", launched.job_members())
+                finally:  # a failed observation must not leave the job running or the handles open
+                    launched.terminate_job()
+                    if self._helpers is not None:
+                        self._helpers.terminate_helpers(f"{role.server}/{role.name}")
+                    launched.close()
             if live is not None:
                 live.finished.set()
 
@@ -267,6 +387,7 @@ class ServerManager:
         if role.live is not live:
             return
         role.live = None
+        self._sessions[role.server, role.name] += 1
         live.launched.terminate_job()
         live.stop.set()
         await live.finished.wait()

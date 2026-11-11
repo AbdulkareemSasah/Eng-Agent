@@ -100,3 +100,15 @@ def test_allowlist_is_served_by_the_fake() -> None:
 
     served = {t["name"] for t in _load(SCHEMAS)["tools"]}
     assert {tool.name for tool in csi_allowlist().tools} <= served
+
+
+def test_pinned_fingerprint_from_inventory() -> None:
+    """AC10: the fingerprint of the allowlisted tools, computed from the S-12 inventory, is the pinned one."""
+    from eng_harness.adapters.csi import csi_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = csi_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in allowlist.tool_names}
+    assert set(schemas) == {tool.name for tool in allowlist.tools}
+    assert tool_list_fingerprint(schemas) == allowlist.tool_fingerprint

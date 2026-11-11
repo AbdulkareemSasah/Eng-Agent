@@ -7,6 +7,7 @@ contains every entry listed below; README documents every command with an exampl
 
 ## Unreleased
 
+- `forbidden`: FB005 form A4 admits an integer literal given directly as the `version=` keyword of a callable named in `versioned.callables` of `.gate/forbidden.yml` (initially `calc` and `CheckMeta`). A version is an identity, so it carries no threshold (B-439, plan task T39, AC33a).
 - Fix: the `mutation` step bounds `mutmut run` by the new `limits.mutation_run_seconds` (7200 s in the root `.gate/gate.yml`, owner queue), not by the 900 s bound of one tool call; a timeout is MU002 naming the limit; `ToolRunner.run` gains the keyword `timeout_seconds` and a timeout raises `ToolTimeoutError` (B-384, plan task T38, AC53c).
 - Fix: the `mutation` step lists the member's other top-level files and folders (README, LICENSE, docs and so on) under mutmut's `also_copy`, so a mutated test run that builds the package or reads its own files behaves as in the tests step (B-371, plan task T37, AC53b).
 - `gate-check`: an empty (0 bytes at head) `__init__.py`, added or modified, under a workspace member's `tests/` directory is in scope when another changed file in the same directory matches a task glob; a non-empty one, a renamed or deleted one, or one without such a neighbour stays GC008 (B-364, plan task T36, AC10c).

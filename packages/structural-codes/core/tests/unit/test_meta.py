@@ -233,3 +233,15 @@ def test_error_types() -> None:
     assert err.detail.hint == "state: draft"
     assert err.detail.retryable is False
     assert "synthbase.22_6_5_2.shear_one_way" in err.detail.message
+
+
+def test_check_version() -> None:
+    assert _meta().version == 1
+    assert _meta(version=3).version == 3
+    for bad in (0, -1):
+        with pytest.raises(CheckDefinitionError, match="version"):
+            _meta(version=bad)
+    with pytest.raises(CheckDefinitionError, match="version"):
+        _meta(version="2")
+    with pytest.raises(CheckDefinitionError, match="version"):
+        _meta(version=1.5)

@@ -61,6 +61,8 @@ engineering meaning"`.
 - AC2. Given metadata missing `code`, `edition`, `clauses`, `title` or `members`, with a member type that is not a
   `SubjectKind`, or with a `spec` path that is not a relative POSIX path ending in `.md`, when defined, then
   `CheckDefinitionError`. Test: `tests/unit/test_meta.py::test_metadata_fields`.
+- AC2a. Given metadata without `version`, when defined, then `version` is 1; given a `version` of 0 or less, then
+  `CheckDefinitionError` (amendment B-442). Test: `tests/unit/test_meta.py::test_check_version`.
 - AC3. Given an input model that is not a `CheckInputs` subclass, has a field that is not a scalar (float, int, bool,
   `StrEnum`/`Literal`), or a numeric field with neither physical bounds and `bounds_source` nor an unbounded reason
   (`unbounded(reason=...)`, §4.3), when a check uses it, then `CheckDefinitionError`. Test:
@@ -274,7 +276,9 @@ each 1 to 40); `title` and optional `title_ar` (our own words, 1 to 200; no clau
 set of `SubjectKind`); `spec` (relative path of the clause spec under `docs/clauses/`); `gaps` (tuple of
 `GapDecl{id: ^G-[0-9]+$, clause, reason}`); `assumptions` (tuple of `str`, each max 500); `unconditional` (`str`
 1 to 500, or null: the clause-spec section stating that the clause has no applicability limit beyond `members`, §4.4)
-**[added]**.
+**[added]**; `version` (`int` ≥ 1, default 1: the check's own version, raised when the check's behaviour changes; a
+calc route passes it as `CalcInfo.version`, while the pack's string version stays the trace's `calc_version`, AC9)
+**[added: amendment B-442, §11 Q18]**.
 
 `clause_token(clause)`: lower-case, each run of characters outside `[0-9a-z]` replaced by `_`, leading and trailing
 `_` removed **[added: 10 §3 shows only the dotted case]**. `check_id` must equal
@@ -586,7 +590,7 @@ payload (EC §4.10.2) and HTML notes. Inputs of each check are defined in its cl
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC6 (with AC4a, AC4b, AC5a, AC5b), AC8 to AC14, AC16 to AC25 (with AC22a, AC24a), AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
+| AC1 to AC6 (with AC2a, AC4a, AC4b, AC5a, AC5b), AC8 to AC14, AC16 to AC25 (with AC22a, AC24a), AC27 to AC33, AC35, AC36, AC38 | Unit | `tests/unit/` |
 | AC15, AC26 | Contract (against eng-contract models) | `tests/contract/` |
 | AC7 | Replay (determinism across runs and processes) | `tests/replay/` |
 | AC34 | Golden | `tests/golden/`, `tests/data/golden/notes/` |
@@ -621,4 +625,5 @@ content-hash format is a major change of the core and resets every approval (17 
 | Q15 | `CheckMeta.unconditional` lets a check declare no precondition beyond member scope | Owner | Accept; the clause-spec reviewer confirms the stated section |
 | Q16 | `unbounded()` is **[added]** (B-097); nothing in code stops a bounded quantity being declared unbounded | Owner | Keep; the clause-spec and source-check review lists and checks each unbounded field |
 | Q17 | The command line's `--pack P` (a pack project root path), its output lines, the exit codes of `hash`, and how an overlay pack is verified and hashed (its check set includes the derived inherited checks; the command line runs `verify_check` per check with the discovered registry, because `verify_pack` builds `Registry.of([pack])` and loops over `pack.checks` only) are **[added]** (§4.9.3, amendment B-419) | Owner | Accept: the case files and `check_modules` live only in the pack project, not in the installed package; giving `verify_pack` a registry parameter instead would need a new core task that owns `verification.py` |
+| Q18 | `CheckMeta.version` (§4.2) is **[added]**: the integer `CalcInfo.version` of a code-pack check (eng-harness spec 0010 Q20, spec 0013 Q13) | Owner | Draft decision B-442, owner queue: accept |
 | G-1 | No worked examples from books or code examples exist here for any check; every case in this build is a labeled hand check | Owner | Owner supplies book, edition, page and example per check (pack specs list them) |

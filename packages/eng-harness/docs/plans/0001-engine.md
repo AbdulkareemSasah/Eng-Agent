@@ -249,26 +249,45 @@ tasks:
     covers: [AC67]
     depends_on: [T10]
   - id: T11b
-    title: In-flight reconciliation and the host-state check before live execution
+    title: In-flight reconciliation at resume (the journal fold, step_rerun, the adapter outcomes, engine.in_flight)
+    # Amendment (B-427, documents only): the original T11b measured 516 lines (B-349) against its 300 and
+    # limits.max_task_lines (400, gate GC005); lead decision D-12: split. T11b keeps the in-flight reconciliation
+    # (`_inflight.py`); T11c keeps the host-state check (`_hoststate.py`) and extends T11b's resume fold in
+    # `_inflight.py` (bindings, saves, restored cuts, `lacking`, the restore cut in `ResumeIndex`).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the reconcile item against a real adapter
       - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
-      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/tests/replay/test_in_flight.py"
-      - "packages/eng-harness/tests/replay/test_host_state.py"
-      - "packages/eng-harness/tests/workflows/**"
+      - "packages/eng-harness/tests/workflows/**"  # the scripted host shared with T11c's tests
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_write_in_flight"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_read_in_flight"
+    covers: [AC31, AC32]
+    depends_on: [T11]
+  - id: T11c
+    title: Host-state check before live execution (model binding, lost and reopened models, the three choices)
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/docs/local-testing.md"  # the host-crash, reopen and restore items
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # the resume fold's host-state part (B-427)
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"
+      - "packages/eng-harness/tests/workflows/**"  # the scripted host shared with T11b's tests
+    max_changed_lines: 320
+    max_sessions: 2
+    tests_first:
       - "packages/eng-harness/tests/replay/test_host_state.py::test_three_choices"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_host_crash_with_write_in_flight"
       - "packages/eng-harness/tests/replay/test_host_state.py::test_reopened_in_new_instance"
-    covers: [AC31, AC32, AC34, AC63, AC64]
-    depends_on: [T11]
+    covers: [AC34, AC63, AC64]  # AC64 shared with T13, which completes the first-use ordering (B-427)
+    depends_on: [T11b]
   - id: T12
     title: Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis)
     files:
@@ -277,6 +296,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
       - "packages/eng-harness/src/eng_harness/engine/_steps.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # two edits only: ports.host into Ctx, await Ctx.finish() (B-434)
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"  # StepStarted.action, optional (B-434)
       - "packages/eng-harness/tests/unit/test_steps.py"
       - "packages/eng-harness/tests/workflow/test_invariants.py"
       - "packages/eng-harness/tests/property/test_check_after_write.py"
@@ -293,7 +314,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_save_before_analysis"
       - "packages/eng-harness/tests/replay/test_divergence.py::test_inserted_steps_are_replayed"
     covers: [AC5, AC37, AC38, AC39, AC43, AC47]
-    depends_on: [T10, T11b]
+    depends_on: [T10, T11c]  # T11c, not T11b, since the B-427 split
   - id: T13
     title: Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases)
     files:
@@ -302,10 +323,12 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # the binding seam and resume step 6 (B-427)
       - "packages/eng-harness/tests/workflow/test_invariants.py"
       - "packages/eng-harness/tests/workflow/test_honest_outcomes.py"
       - "packages/eng-harness/tests/replay/test_in_flight.py"
       - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"  # the binding seam and resume step 6 (B-427)
       - "packages/eng-harness/tests/workflows/**"
     max_changed_lines: 400
     max_sessions: 3
@@ -318,10 +341,11 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_host_lease_and_close"
       - "packages/eng-harness/tests/replay/test_resume.py::test_close_started_after_resume"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_resume_order_guards_reconciliation"
-    covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62]
-    depends_on: [T11b, T12]
+    covers: [AC33, AC41, AC42, AC44, AC45, AC46, AC62, AC64]  # AC64 shared with T11c: the first-use ordering (B-427)
+    depends_on: [T11c, T12]  # T11c, not T11b, since the B-427 split
   - id: T14
     title: ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4)
+    # Amendment (B-412, documents only): the DecisionPort field T14 adds to EnginePorts defaults to None (section 3 rule; plan 0006 T16b binds it in production).
     # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
     # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
     # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
@@ -434,7 +458,8 @@ tasks:
     covers: [AC18, AC19]
     depends_on: [T16]
   - id: T18
-    title: Resource limits, progress sink and the overhead benchmark
+    title: Resource limits, progress sink, run control and the overhead benchmark
+    # Amendment (B-412, documents only): adds the ProgressSink and RunControlPort fields of EnginePorts (None defaults, section 3) and the stop check between steps (spec 4.8 RunControlPort row); budget 220 -> 250.
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -443,12 +468,15 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_resources.py"
       - "packages/eng-harness/tests/unit/test_progress.py"
+      - "packages/eng-harness/tests/unit/test_run_control.py"
       - "packages/eng-harness/tests/perf/test_overhead.py"
-    max_changed_lines: 220
+    # About 30 lines for the run-control field and the check between steps (an estimate, not a measurement).
+    max_changed_lines: 250
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_resources.py::test_limits"
       - "packages/eng-harness/tests/unit/test_progress.py::test_sink_order_and_failure"
+      - "packages/eng-harness/tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps"
       - "packages/eng-harness/tests/perf/test_overhead.py::test_engine_overhead_p95"
     covers: [AC58, AC59, AC60]
     depends_on: [T14b, T17]
@@ -477,13 +505,14 @@ tasks:
 The engine is built bottom-up in the order its own imports require: errors, the journal (the most safety-relevant
 storage, built and tested before anything writes to it), the reader, blocks and the registry, ports with their fakes,
 the ctx types and codec, step paths, then the run loop with replay and divergence, the ctx calls, the input-request
-builders, in-flight reconciliation and the host-state check, the invariants, decisions and inputs, approvals, permission modes and
+builders, in-flight reconciliation (T11b) and the host-state check (T11c), the invariants, decisions and inputs, approvals, permission modes and
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9b) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
 by `depends_on` (T10, T12, T13, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
-shares `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11b and T13 on
-both; T11b follows T11 (the input requests it presents), and T14b follows T14: the tasks from T10 to T18 run one after
+and T11c share `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11c and
+T13 on both; T11b follows T11 (the input requests it presents), T11c follows T11b (B-427), and T14b follows T14: the
+tasks from T10 to T18 run one after
 another. Every task adds a `CHANGELOG.md` line, and some add `public_modules` entries
 to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 and T7) share those two
 files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
@@ -614,24 +643,49 @@ from the CalcPort becomes a failed step (AC13).
 request (from `_runner.py`) is built with it, and `tests/unit/test_inputs.py` covers the marker, the refusals, the
 answer-shape check and that request. Budget 140 lines (the original T11 measured 440 and was split by B-342, D-12).
 
-**T11b In-flight and host state** (spec §4.5.3, §4.5.4). Reconciliation at resume before the block runs, the engineer
-request `engine.in_flight`, `step_rerun`, the host-state check with its three choices and the replay cut for
-`restore`, the instance binding (`model_bound` at first use, after a restore and for a reopened model), and lost or
-reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding, AC63,
-AC64), with `model_bound.file_names` from `HostPort.model_files`. The `engine.in_flight` and `engine.host_state`
-requests are built with T11's `_inputs.py`, and their tests assert the `choice` marker of AC67. Budget 300 lines (the
-original 440 less T11's 140).
+**T11b In-flight reconciliation at resume** (spec §4.5.3; AC31, AC32). The journal fold for a resume (which steps
+are in flight), reconciliation before the block runs, `step_rerun` for a read in flight, and the adapter outcomes:
+`applied` and `not_applied` as `step_reconciled`; `partial`, `unknown`, no reconciler or a reconciler error as an
+`engine.in_flight` request built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), with the
+empty-summary result when the adapter has no read-back. It builds the part of the resume fold and of `Resume` that
+reconciliation uses (in-flight steps, the rerun index, the `engine.in_flight` request); the host-state part of the
+fold is T11c's. Budget 300 lines (about 229 of `_inflight.py` and its share of `_runner.py`; the original T11b
+measured 516 and was split by B-427, D-12).
+
+**T11c Host-state check before live execution** (spec §4.5.4; AC34, AC63, AC64). The instance binding (`model_bound`
+at first use, after a restore and for a reopened model, with `model_bound.file_names` from `HostPort.model_files`),
+lost or reopened models (no reconciliation, `model_not_loaded`, `model_reopened`, units read against the new binding),
+the three-way comparison with the choices `accept`, `restore` and `abandon` through an `engine.host_state` request
+built with T11's `_inputs.py` (its tests assert the `choice` marker of AC67), the restore with its replay cut, and the
+`accept` baseline. It extends T11b's resume fold in `_inflight.py` with the model bindings, saves and restored cuts
+and `lacking` (the writes a reopened model lacks), and `ResumeIndex` and `Resume` with the restore cut (a rerun as a
+new attempt, reason `restored`), the `@resume<n>.model_state` and units reads, the `host_state_mismatch` and
+`units_mismatch` stops and the `engine.host_state` request. The first-use binding is a seam in `_hoststate.py` that
+T13 moves before `step_started`: T11c's AC64 test asserts the instance naming and the reopened case, and T13 completes
+the before-`step_started` part. Budget 320 lines (`_hoststate.py`, about 51 of `_inflight.py` and its share of
+`_runner.py`; B-427, D-12).
 
 **T12 Invariants 1, 2, 3, 7** (spec §4.6, §4.3.1 "Models in parallel children"). The model tracker with per-child
 dirty flags and the sibling model-conflict check, inserted `check_model` and `save` steps, the
 engineering-parameter check, the staleness check with `resolve_ref` and each calc argument's `RefRule` from
 `CalcInfo.ref_rules` (default `stale_ok` false), the property test over generated step programs,
-and the test that inserted steps are replayed.
+and the test that inserted steps are replayed. Amendment B-434: T12 makes two edits in `engine/_runner.py`: it passes
+`ports.host` into `Ctx` as a constructor parameter, and inside `_drive`'s `try` block, after the root block returns,
+awaits a new `Ctx.finish()` that runs the `~end.check_model` steps for the models still dirty (spec §4.6 #1, AC37);
+T13 still owns the rest of `_runner.py`. In `journal/_events.py`, `StepStarted` gains an optional `action` field,
+absent in older journals (spec §4.4.2). Budget stays 380 lines (estimate about 310).
 
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
 reconciliation pending, server checks at start and resume, unit reads (first contact, every resume, after epoch
 changes and observed timeouts), host leases, `host_started` journaling and `close_started` from the journal at run
-end, and the resume order of spec §4.5.1 (preflight, leases and units before T11b's reconciliation, AC62).
+end, and the resume order of spec §4.5.1 (preflight, leases and units before T11b's reconciliation, AC62). Draft
+decision B-427 (spec §11 Q29): T13 owns the `PRECONDITION_FAILED` refusal (condition `model_open`) when `locate` returns
+`None` before a step, and moves the seam in its `_ctx_impl.py` so the `first_use` `model_bound` lands before that
+step's `step_started`; its resume step 6 reads units for every model key the journal addressed (T11c runs it for the
+models the run wrote, as built by B-349). Both changes edit T11c's `_hoststate.py` (T13 replaces its first-use binding
+seam and widens `locate_models`) and its `tests/replay/test_host_state.py`, which are in T13's files; T13 extends
+`test_host_state.py::test_reopened_in_new_instance` to assert `model_bound` before `step_started` (AC64, shared with
+T11c).
 
 **T14 Decisions** (spec §4.3.2, §4.6 item 4). `decide` and `decide_many` over the ports; option and answer validation;
 `decision_made`; engineer-tier pauses; the `DecisionPort` protocol in `ports.py` over the types of
@@ -673,7 +727,14 @@ budget 250 lines with it, B-068), and the AST rules test over fixture modules an
 specs add blocks).
 
 **T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the
-overhead benchmark (also listed in `windows_tests`).
+overhead benchmark (also listed in `windows_tests`). Amendment B-412 (spec 0006 pre-flight): no other task wires the
+`RunControlPort`, so T18 adds the `progress` and `run_control` fields to `EnginePorts` (both `None` by default, §3) and
+the check of spec §4.8's `RunControlPort` row: between steps the runner calls `stop_requested(run_id)` when a port is
+given, and true pauses the run with `run_paused`, reason `stop_requested` (spec §4.4.2 event table), returning a paused
+`RunOutcome`. `tests/unit/test_run_control.py::test_stop_requested_pauses_between_steps` uses the fake
+`RunControlPort` of T6 (about 30 lines, hence 220 to 250). No engine acceptance criterion names this behaviour yet;
+adding one is a lead item for the next engine spec amendment. Plan 0006 T16b passes `FileRunControl` here in
+production.
 
 **T19 Crash matrix** (spec AC30). A worker process (`tests/replay/_worker.py`) runs a mixed test workflow and calls
 `os._exit` at each of S-10's four crash points for every step; the test resumes each and compares the fake host's
@@ -697,6 +758,13 @@ applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
   ports; their plans depend on this plan's T6 (ports) and, for workflows, on T19. T14 waits for decision plan T1, T4
   and T5 (the decision port types, spec §4.8), which wait for this plan's T6 and T7; decision plan T7 and T10 wait for
   T14 (T10 also for T14b, the run header's decision runtime), so the order has no cycle.
+- `EnginePorts` fields added after T9 (amendment B-412, from the spec 0006 pre-flight): the merged `EnginePorts` holds
+  tool, host, calc, basis, approvals and inputs. T14 adds `decision` and T18 adds `progress` and `run_control`; each
+  defaults to `None`, so an `EnginePorts` built before the field existed (plan 0006 `cli/_wiring.py`, tests) still
+  builds. `progress` `None` means no sink; `run_control` `None` means no stop request; `decision` `None` means
+  `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
+  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T16b passes
+  all three in production once T14, T14b and T18 have merged.
 
 ## 4. Verification
 
@@ -705,14 +773,16 @@ applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
   coverage. The pull request links its CI run; local output is not evidence (process/05 §8).
 - Windows: `tests/windows/` and `tests/perf/` run in the Windows CI job (run lock on NTFS, overhead on the Windows
   runner's disk).
-- Needs local test (listed in `docs/local-testing.md` by T1, completed by T16 and T19; nothing here needs a host
-  program, but these need the owner's machine): (1) the overhead benchmark and the fsync cost on the owner's
+- Needs local test (listed in `docs/local-testing.md` by T1, completed by T11b, T11c, T16 and T19; items 1 to 4 need
+  no host program, but they need the owner's machine): (1) the overhead benchmark and the fsync cost on the owner's
   workstation disk, with antivirus active, against the 20 ms target; (2) the run lock released after killing the engine
   from Task Manager; (3) a resume after a forced power-off of a virtual machine (power loss is not covered by tests);
-  (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program. Every
-  step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
+  (4) file-copy promotion onto a folder the engineer uses, including a target file open in another program; (5) T11b
+  and T11c against a real host and adapter, once spec 0002's `HostPort` exists: the adapter's `reconcile` after the
+  host is killed during a write (T11b), and the host-crash, reopen and restore items (T11c). Only the fakes run them
+  here; every other step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T12, T13, T15 and T16 additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T15 and T16 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16 and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 

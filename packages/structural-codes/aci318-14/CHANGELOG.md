@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: `test_registry_and_specs` skips its clause-spec file assertions only in the mutation step's copy of the member (`MUTANT_UNDER_TEST` set, folder missing), which lacks the clause specs; MU002 stopped every pack source change (B-444).
+- Pack assembly: `PACK` with the six footing checks, entry point `structural_codes.packs`, README usage, pack-level tests (B-278).
 - Package skeleton: `pyproject.toml`, empty `approvals.yaml`, `__version__`, empty `checks` package (B-270).
 - Shared footing statics FS S1 to S5, the one-way shear and flexure integrals, shared constants and preconditions (B-271).
 - Check `aci318_14.13_3_1_1.bearing_pressure_service` (13.3.1.1), draft: service soil pressure against the permissible gross pressure of the design basis; gaps G-1 (partial contact) and G-2 (net allowable) give `NEEDS_ENGINEER` (B-272).

@@ -235,11 +235,13 @@ tasks:
     depends_on: [T1]
   - id: T11
     title: Workflow column_design part 1 - definition, basis fields, scope, review cycle (steps 1 to 10 and 15)
+    # Amendment (B-417, documents only): registers column_design by adding its blocks to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2); T12's blocks reach it through the same column_design export.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_cycle.py"
+      - "packages/eng-harness/src/eng_harness/workflows/__init__.py"  # shipped-workflow registry (amendment B-417)
       - "packages/eng-harness/src/eng_harness/blocks.lock.json"
       - "packages/eng-harness/tests/unit/column_design/__init__.py"
       - "packages/eng-harness/tests/unit/column_design/test_definition.py"
@@ -282,11 +284,13 @@ tasks:
     depends_on: [T5, T11]
   - id: T13
     title: Workflow column_revit_update (steps R1 to R9)
+    # Amendment (B-417, documents only): adds column_revit_update to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_revit.py"
+      - "packages/eng-harness/src/eng_harness/workflows/__init__.py"  # shipped-workflow registry (amendment B-417)
       - "packages/eng-harness/src/eng_harness/blocks.lock.json"
       - "packages/eng-harness/tests/unit/column_design/test_definition.py"
       - "packages/eng-harness/tests/workflow/column_design/conftest.py"
@@ -397,7 +401,7 @@ T6 starts only after the documents pull request B-405 has merged (amendment B-41
 so that an id outside the allowlist gives `ContractError` `NOT_FOUND` (spec 0010 C4), and
 `test_code_pack_route.py::test_only_listed_checks` is written to that text, never to `RegistryError`. Otherwise footing
 T2 (plan 0010) could not add its ids without changing a merged expectation (A4).
-T6 also starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
+T6 also starts only after structural-codes core plan T15 (`CheckMeta.version`, spec Q13 and spec 0010 Q20, B-442) has merged.
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
@@ -419,14 +423,17 @@ unchanged (only its imports may change).
 **T11 Review cycle** (WS steps 1 to 10 and 15). The definitions and basis fields of `column_design`, the scope and
 layout requests, the cycle with selection, analysis and design through the edit cycle's `run_and_summarize`, the frame
 forces read, host verdicts, demands, the code checks through T6, the review, the engineer turn, and the finish. The
-CSI fake gains a column scenario (test data): frames, sections, combinations, frame forces and steel design ratios.
+CSI fake gains a column scenario (test data): frames, sections, combinations, frame forces and steel design ratios. Amendment
+(B-417): the task registers `column_design` by adding its blocks to the shipped-workflow tuple of
+`workflows/__init__.py`, which `block.discover()` reads (plan 0007 T9); `blocks.lock.json` is regenerated from it.
 
 **T12 Proposal and apply** (WS steps 11 to 14). The proposal request, rounding per dimension, matching, `decide_many`,
 the generated change set, `apply_change_set`, and the design record after promotion.
 
 **T13 Revit run** (WS steps R1 to R9). Mode refusal, the ETABS fingerprint gate, the Revit working copy and reads,
 the map and its decision, the update plan, the approval, the ordered writes with references, the read-back and its
-decision, sign-off; the Revit fake gains a column scenario with families, types and role parameters.
+decision, sign-off; the Revit fake gains a column scenario with families, types and role parameters. Amendment (B-417):
+the task adds `column_revit_update` to the same tuple of `workflows/__init__.py` (plan 0007 T9).
 
 **T14 Report and audits** (spec §4.10). Renderers for both runs (verdict sources, size chain, map, plan, read-back,
 unsaved-document notice, draft marks), `audit_verdict_sources`, and the column section of `docs/local-testing.md`

@@ -5,11 +5,13 @@ No host program is involved. These checks need the owner's machine (plan 0001 se
 2. The run lock is released after killing the engine from Task Manager (`uv run pytest tests/unit/test_journal_reader.py tests/windows/test_run_lock_windows.py -m windows`; the second file starts a holder process, kills it, and checks that the engine's lock refuses a second process while a run is under way; the Windows job runs only `tests/windows`, so also run `tests/replay/test_resume.py::test_resume_holds_the_run_lock` there: the same for `Engine.resume`).
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
+5. Plan 0001 T11b (spec 0001 AC31, AC32) against a real host and adapter, once spec 0002's `ToolPort` adapters exist: kill the host program during a write and resume (the adapter's `reconcile` for each outcome `applied`, `not_applied`, `partial` and `unknown`, and a tool without a reconciler), the engineer's answer to the `engine.in_flight` request, the adapter's `read_back` for a write found applied (its result, and a failure while the host is busy), and a read killed in flight. Only the fakes have run these.
+6. Plan 0001 T11c (spec 0001 AC34, AC63, AC64) against a real host and adapter, once spec 0002's `HostPort` exists: close the host and reopen the model's last saved file in a new instance (`locate`, units read against the new instance, the comparison with the last save, a model reopened with writes after that save); kill the host program and resume (`model_not_loaded`, `restore` and the instance `HostPort.restore` returns, `host_started`, units read against it before the first live step); `accept` of an engineer's change to the model. Only the fakes have run these.
 
 Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 1. `csi_launch` on the owner's machine: which process is the ETABS parent, the pid the reply names, and that the instance survives the server job's closure.
 2. A second server (`long` role) attaching by pid to a server-launched instance.
-3. The live `tools/list` fingerprint against the allowlist's.
+3. The live `tools/list` fingerprint against the allowlist's, and that the real `csi_status` reports `read_only` and `script_enabled` false (the build check requires both).
 4. The `serverInfo` the Sasaah server reports.
 5. Every table key and reply field of spec 0002 sections 4.6.2 and 4.6.4, and the reply fields of every mapped list tool.
 6. A server `timeout` during a write and during an analysis, the units afterwards, each reconciliation rule, `locked` after a completed analysis, and a proof-of-end mechanism for an abandoned analysis call; after a `timeout` on a role, re-attachment with `launched: false`, `csi_exit` refused, and what `csi_status` reports.
