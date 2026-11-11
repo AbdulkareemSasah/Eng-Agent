@@ -48,6 +48,32 @@ cases:
       status: FAIL
       values:
         ratio: {value: 1.020904, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-4
+    kind: hand_check
+    source:
+      {
+        derivation:
+          "clause spec §4, tied, b = 400 mm and h = 600 mm (not square); Ag = 240000 mm2; Po = (0.85*28*236000 + 420*4000)*0.001 = 7296.8 kN; Pn_max = 0.80*7296.8 = 5837.44 kN; phiPn_max = 0.65*5837.44 = 3794.336 kN; ratio = Pu/phiPn_max = 3000/3794.336",
+      }
+    subject: {kind: frame, id: C1}
+    inputs: &nonsquare
+      Pu_kN: 3000
+      b_mm: 400
+      h_mm: 600
+      Ast_mm2: 4000
+      fc_MPa: 28
+      fy_MPa: 420
+      transverse_kind: tied
+      k_factor: 1
+      lu_mm: 2000
+    expected:
+      status: PASS
+      values:
+        Ag_mm2: {value: 240000, unit: mm2, abs_tol: 1.0e-6, rel_tol: 0}
+        Po_kN: {value: 7296.8, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Pn_max_kN: {value: 5837.44, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        phiPn_max_kN: {value: 3794.336, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.790652172, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-1.a
     kind: boundary
     covers: [SHORT_COLUMN]
@@ -63,6 +89,22 @@ cases:
     covers: [SHORT_COLUMN, G-2]
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, lu_mm: 3301}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-1.c
+    kind: boundary
+    covers: [SHORT_COLUMN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *nonsquare, lu_mm: 2640}
+    expected:
+      status: PASS
+      values:
+        kl_r_ratio: {value: 22, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        ratio: {value: 0.790652172, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.d
+    kind: boundary
+    covers: [SHORT_COLUMN, G-2]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *nonsquare, lu_mm: 2641}
     expected: {status: NEEDS_ENGINEER}
   - id: BD-2.a
     kind: boundary

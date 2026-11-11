@@ -17,8 +17,11 @@ CASE_IDS = (
     "HC-1",
     "HC-2",
     "HC-3",
+    "HC-4",
     "BD-1.a",
     "BD-1.b",
+    "BD-1.c",
+    "BD-1.d",
     "BD-2.a",
     "BD-2.b",
     "BD-2.c",
@@ -29,7 +32,7 @@ CASE_IDS = (
 
 
 def test_hand_checks() -> None:
-    """HC-1 to HC-3, BD-1 to BD-3 pass within tolerance; WE-1 and PC-1 stay unmet (MA-AC1)."""
+    """HC-1 to HC-4, BD-1 to BD-3 pass within tolerance; WE-1 and PC-1 stay unmet (MA-AC1)."""
     pack = Pack(
         "aci318_14", "ACI 318-14", "2014", "0.1.0.dev0", checks=(max_axial_strength,), approvals="approvals.yaml"
     )
