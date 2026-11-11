@@ -1,5 +1,6 @@
 """Package skeleton tests (plan 0001 task K.T1), public API declaration (T14a, T14b) and package-level checks (T14)."""
 
+import ast
 import tomllib
 from pathlib import Path
 
@@ -68,3 +69,24 @@ def test_public_modules() -> None:
     }
     assert _declared_modules() == _SPEC_41_MODULES
     assert existing == _SPEC_41_MODULES
+
+
+def test_no_engineering_constants() -> None:
+    """AC36: every Cited source starts with a design document name, and no core module defines a check."""
+    allowed = ("04-tool-contract", "10-structural-codes")
+    src = Path(__file__).resolve().parents[2] / "src" / "structural_codes"
+    cited = 0
+    for path in sorted(src.glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "Cited":
+                for kw in node.keywords:
+                    if kw.arg == "source":
+                        assert isinstance(kw.value, ast.Constant), f"{path.name}:{node.lineno} source not a literal"
+                        assert str(kw.value.value).startswith(allowed), f"{path.name}:{node.lineno} source"
+                        cited += 1
+            if isinstance(node, ast.FunctionDef):
+                for deco in node.decorator_list:
+                    target = deco.func if isinstance(deco, ast.Call) else deco
+                    name = target.id if isinstance(target, ast.Name) else getattr(target, "attr", "")
+                    assert name != "check", f"{path.name}:{node.lineno} defines a check"
+    assert cited > 0
