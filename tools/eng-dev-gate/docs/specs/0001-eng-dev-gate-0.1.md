@@ -150,6 +150,9 @@ forbidden (§4.8)
   rationale field that does not forbid digits; AC35. FB007 flags `print`; AC36. FB008 flags pytest collection hooks and
   options that deselect tests. In each case the rule flags the construct, does not flag its permitted neighbour, and
   names the rule id, file and line.
+- AC33a. Given an integer literal passed directly as the `version=` keyword argument of a call to a callable named in
+  `versioned.callables` (`calc(..., version=1)`), then FB005 does not flag it; the same literal under another keyword
+  (`calc(limit=1)`) or in a call to a callable not in the list (`other(version=1)`) is FB005 (amendment B-438).
 - AC37. Given spike code, tests (except for FB008) and strings in comments or docstrings, then no rule flags them; a
   file that does not parse is a failure (FB000); no inline waiver exists.
 
@@ -474,6 +477,10 @@ FB005 allowed forms (everything else is flagged, including `0`, `1`, `1.0`, sign
   (`Cited(0.75, "ACI 318-14 Table 21.2.1(b)")`) and [11 §3](../../../../design/docs/architecture/11-harness-engine.md) rule 3. The gate checks that a source string is present, not that it is true; reviewers do that.
 - **A2.** An integer literal used directly as a subscript index or slice bound (`x[0]`, `x[-1]`, `x[1:]`).
 - **A3.** An integer literal compared directly with a `len(...)` call.
+- **A4.** An integer literal given directly as the `version=` keyword argument of a call to a callable named in
+  `versioned.callables` (initially `calc` and `CheckMeta`). Calcs, rules and code-pack checks carry an integer
+  identity version (`@calc(..., version=1)`, `CheckMeta(version=...)`); a version is identity, not an engineering
+  quantity, and cannot carry a threshold. Amendment B-438 (draft decision, owner queue, §11 Q5).
 - Annotations (`Literal[...]`) and docstrings are not constants of the code and are not scanned.
 
 A2 and A3 are structure, not quantities; they cannot carry a threshold. Both are listed for the owner's confirmation
@@ -936,7 +943,7 @@ Every workspace package pins the gate as a workspace member during incubation.
 | Q2. Process/05 §2 has no row for development tools. The gate uses 95 and 90 for itself and 80 for any declared `mutation_min`. Add a `tool` row to process/05 §2? | Owner | Recommend: yes, with these values |
 | Q3. Process changes this spec relies on (not made here, since this change touches two files): risk as a set in plan and spec front matter and templates; `ci`, `release` and spike-only exemptions and the `test:` handling in process/05 §9; the `Plan-Task: none (<reason>)` forms in the pull request template; `pragma: no branch` in the ratchet bucket; composite actions in place of reusable workflows in process/11 §4 and §5; `.gate/gate.yml` and `.gate/forbidden.yml` in process/11 §1. Propose them as a process pull request | Lead, owner | Recommend: one process change after this spec is reviewed; list every repository whose `AGENTS.md` needs re-rendering (rule 7) |
 | Q4. Mutation backend: mutmut or cosmic-ray, and whether either runs on Windows (not verified here). If neither does, mutation runs on Linux CI only and the local step reports `skipped` | Lead (task T20) | Recommend: decide in T20 with a short check, record it in a package ADR |
-| Q5. FB005 exceptions A2 (integer index) and A3 (integer compared with `len`), and ruling out any exception for `ctx.attempts(n)`, exponents and input bounds. Align the callable name `Cited` with the `eng-contract` spec | Owner | Recommend: keep A2 and A3, no further exceptions; `eng-contract` and `eng-harness` specs add cited callables to `cited.callables` |
+| Q5. FB005 exceptions A2 (integer index) and A3 (integer compared with `len`), and ruling out any exception for `ctx.attempts(n)`, exponents and input bounds. Align the callable name `Cited` with the `eng-contract` spec | Owner | Recommend: keep A2 and A3, no further exceptions; `eng-contract` and `eng-harness` specs add cited callables to `cited.callables`. Amended by draft decision B-438 (owner queue): A4 admits an integer `version=` keyword of a callable in `versioned.callables`, because a version is identity, not an engineering quantity, and cannot carry a threshold |
 | Q6. The "bandit subset" of process/11 §3 is undefined. The gate selects all S rules and ignores `S101` in tests | Owner | Recommend: accept; refine when the first findings show which S rules are noise |
 | Q7. During bootstrap, how does the owner approve a spec or plan? A pull request that sets `approved` fails (GC014) | Owner | Recommend: the owner commits the status change directly to the gate branch (pushes run `gate`, not `gate-check`), or switches bootstrap off first |
 | Q8. The gate of the base commit judges every pull request (lead decision, §4.16). The workflow file itself is still loaded from the pull request. Should the owner add a repository ruleset or branch protection with the job ids as required checks once identities exist (process/11 §6)? | Owner | Recommend: yes; WF005 and protected paths are the controls until then |
