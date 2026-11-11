@@ -7,9 +7,14 @@ runner exists.
 import asyncio
 import hashlib
 from collections.abc import Awaitable, Callable, Sequence
+from pathlib import Path
+from typing import Any
 
 import pytest
+from workflows.ctx_flows import flow
+from workflows.rig import make_rig, request
 
+from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import (
     MAX_PATH_LENGTH,
     Scope,
@@ -34,6 +39,7 @@ from eng_harness.errors import (
     ReplayDivergence,
     StepError,
 )
+from eng_harness.ports import ToolInfo
 
 RUN_ID = "run_01ARZ3NDEKTSV4RRFFQ69G5FAV"
 
@@ -377,6 +383,38 @@ def test_attempts_body_error_releases_the_scope() -> None:
             return await step(execute)
 
     assert asyncio.run(scenario()) == "1"
+
+
+@pytest.mark.parametrize(
+    ("earlier", "later"),
+    [("write_m", "read_m"), ("read_m", "write_m"), ("write_m", "write_m")],
+)
+def test_sibling_model_conflict(tmp_path: Path, earlier: str, later: str) -> None:
+    """A sibling that reads or writes a model another child wrote never reaches its port call (AC5)."""
+    rig = make_rig(tmp_path)
+    for name, effect in (("write_m", "write"), ("read_m", "read")):
+        rig.host._tools[name] = ToolInfo(name=name, effect=effect, action="plain", host_key="csi", model_param="model")
+
+    async def body(ctx: Any) -> list[str]:
+        gate = asyncio.Event()
+
+        async def lead() -> str:
+            found = await ctx.tool(earlier, {"model": "m1"})
+            gate.set()
+            return found.ref.ref
+
+        async def trail() -> str:
+            await gate.wait()
+            return (await ctx.tool(later, {"model": "m1"})).ref.ref
+
+        await ctx.parallel(lead(), trail())
+        return []
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert outcome.status is RunStatus.NEEDS_ENGINEER
+    assert outcome.escalation is not None
+    assert outcome.escalation.reason == "block_rule_violation"
+    assert [entry.tool for entry in rig.host.ledger] == [earlier]  # the later sibling made no port call
 
 
 def test_attempts_overlapping_a_step_is_refused() -> None:
