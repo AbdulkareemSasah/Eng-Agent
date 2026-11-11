@@ -7,8 +7,11 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
     "anyio>=4.16,<5",
     "eng-contract",
+    "httpx2>=2.16,<3",
+    "keyring>=25.7,<26",
     "mcp>=2.3,<3",
     "pydantic>=2.14,<3",
+    "pydantic-ai-slim[openai]==2.65.0",
     "ruamel-yaml>=0.19,<0.20",
 ]
 
@@ -54,7 +57,7 @@ markers = [
 profile = "harness"
 layer = 4
 import_names = ["eng_harness"]
-public_modules = ["eng_harness", "eng_harness.errors", "eng_harness.servers", "eng_harness.pages", "eng_harness.calc", "eng_harness.calcs", "eng_harness.templates", "eng_harness.basis", "eng_harness.journal", "eng_harness.block", "eng_harness.report", "eng_harness.cli", "eng_harness.kinds", "eng_harness.kinds.calcs", "eng_harness.ports", "eng_harness.ctx", "eng_harness.engine", "eng_harness.decisions", "eng_harness.decisions.types", "eng_harness.decisions.interfaces", "eng_harness.progress", "eng_harness.adapters", "eng_harness.adapters.csi", "eng_harness.kinds.footing", "eng_harness.kinds.edit_cycle", "eng_harness.workflows", "eng_harness.workflows.model_edit_cycle"]          # each later task adds the public modules it creates
+public_modules = ["eng_harness", "eng_harness.errors", "eng_harness.servers", "eng_harness.pages", "eng_harness.calc", "eng_harness.calcs", "eng_harness.templates", "eng_harness.basis", "eng_harness.journal", "eng_harness.block", "eng_harness.report", "eng_harness.cli", "eng_harness.kinds", "eng_harness.kinds.calcs", "eng_harness.ports", "eng_harness.ctx", "eng_harness.engine", "eng_harness.decisions", "eng_harness.decisions.types", "eng_harness.decisions.interfaces", "eng_harness.progress", "eng_harness.adapters", "eng_harness.adapters.csi", "eng_harness.kinds.footing", "eng_harness.kinds.edit_cycle", "eng_harness.workflows", "eng_harness.workflows.model_edit_cycle", "eng_harness.providers"]          # each later task adds the public modules it creates
 coverage_line = 85                        # process/05 section 2
 coverage_branch = 75
 r1_modules = [
