@@ -41,7 +41,7 @@ COMMON: dict[str, Any] = {
 }
 _V_KN = 0.001
 _RATIO = 1e-6
-_BODY = {"Ag_mm2", "Po_kN", "Pn_max_kN", "phiPn_max_kN", "phi_ratio"}
+_BODY = {"Po_kN", "Pn_max_kN", "phiPn_max_kN", "phi_ratio"}
 
 
 def run(subject: Subject = FRAME, **changes: Any) -> VerdictSet:

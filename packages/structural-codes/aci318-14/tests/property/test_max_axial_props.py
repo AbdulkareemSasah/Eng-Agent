@@ -52,6 +52,8 @@ def columns(draw: st.DrawFn) -> dict[str, Any]:
     ast = draw(st.floats(2000.0, ag * 0.075))
     fy = draw(st.floats(max(300.0, _ALPHA_FC + 1.0), 550.0))
     pu = draw(st.floats(0.0, 2500.0))
+    lu_max = 22.0 * 0.30 * min(b, h)
+    lu = draw(st.floats(500.0, lu_max * 0.95))
     return {
         "Pu_kN": pu,
         "b_mm": b,
@@ -61,7 +63,7 @@ def columns(draw: st.DrawFn) -> dict[str, Any]:
         "fy_MPa": fy,
         "transverse_kind": "tied",
         "k_factor": 1.0,
-        "lu_mm": 3000.0,
+        "lu_mm": lu,
     }
 
 

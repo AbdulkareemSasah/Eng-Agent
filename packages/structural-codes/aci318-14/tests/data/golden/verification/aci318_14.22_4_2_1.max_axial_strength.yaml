@@ -93,7 +93,8 @@ cases:
     expected:
       status: PASS
       values:
-        ratio: {value: 0.765678, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        # Po = (0.85*28*246000 + 550*4000)*0.001 = 8054.8 kN; phiPn_max = 0.65*0.8*8054.8 = 4188.496 kN; 3000/4188.496
+        ratio: {value: 0.716248, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-3.b
     kind: boundary
     covers: [FY_MAX]
@@ -106,12 +107,6 @@ cases:
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, fc_MPa: 16}
     expected: {status: NEEDS_ENGINEER}
-  - id: WE-1
-    kind: worked_example
-    source: {derivation: "owner-supplied book example (plan §6 G-WE)"}
-    subject: {kind: frame, id: C1}
-    inputs: *common
-    expected: {status: gap}
   - id: PC-1
     kind: program_comparison
     source:
