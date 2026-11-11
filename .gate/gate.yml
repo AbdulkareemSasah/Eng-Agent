@@ -22,7 +22,9 @@ limits:  # max_task_lines: process/04 section 4. The others are gate settings pr
   test_run_seconds: 600
   max_file_bytes: 1048576
   mutation_run_seconds: 7200
-license_exceptions: []
+license_exceptions:  # B-440: cffi (ADR-0001 (mcp-python-sdk), ADR-0002) and regex (ADR-0001 (pydantic-ai-slim)), recorded in ADR-0005
+  - {distribution: cffi, license: MIT-0, adr: packages/eng-harness/docs/adr/0005-transitive-licenses.md}
+  - {distribution: regex, license: Apache-2.0 AND CNRI-Python, adr: packages/eng-harness/docs/adr/0005-transitive-licenses.md}
 secrets:
   allow:
     # Reviewed false positive: the JOBS table maps the command name "secrets" to the job name "security".
