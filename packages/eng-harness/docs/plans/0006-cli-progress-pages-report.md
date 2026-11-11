@@ -36,6 +36,19 @@ tasks:
       - "packages/eng-harness/tests/unit/test_html.py::test_attributes_accept_only_tokens"
     covers: [AC49]
     depends_on: [T1]
+  - id: T2b
+    title: "In-page fragment links in the HTML builder"
+    # Amendment (B-435, documents only): new; T12 cannot link a value cell to its sources row (AC52) without it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/_html.py"
+      - "packages/eng-harness/tests/unit/test_html.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_html.py::test_fragment_href"
+    covers: [AC52]
+    depends_on: [T2]
   - id: T3
     title: "Command line shell: parser, exit codes, configuration, output encoding, entry point"
     # Amendment (B-359): split; the launch-address opener moves to T3b (the task measured 418 lines against the 400-line cap, D-12).
@@ -283,6 +296,7 @@ tasks:
     title: "Report sections: changes, results, sources, decisions; renderer registry; value cells with sources"
     # Amendment (B-412, documents only): the snapshot covers the fragment _sections.py renders (T13 extends it).
     # Amendment (B-412 fifth review, documents only): sections 6 and 7 (timings, run events) move to T13; T12 keeps sections 2 to 5 and its 390 budget.
+    # Amendment (B-435, documents only): depends on T2b (fragment links for AC52); section inputs (ReportModel, JournalReader, ResultStore).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -298,20 +312,24 @@ tasks:
       - "packages/eng-harness/tests/unit/report/test_changes.py::test_changes_decisions_revisions"
       - "packages/eng-harness/tests/golden/test_report.py::test_report_snapshot"
     covers: [AC51, AC52, AC55]
-    depends_on: [T2, T11]
+    depends_on: [T2, T2b, T11]
   - id: T13
     title: "Report document: DRAFT and completeness marks, integrity line, policy meta, timings and run events sections, atomic UTF-8 write"
     # Amendment (B-412, documents only): report/__init__.py added; the report snapshot extended to the whole document (AC51).
     # Amendment (B-412 fifth review, documents only): sections 6 and 7 of spec 4.6.1 (timings, run events) rendered here, from T12; budget 300 -> 380.
+    # Amendment (B-435, documents only): report/_model.py, test_timings.py and its fixture added: resumes counted and listed by distinct resume_no (AC56, engine Q26).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/__init__.py"
       - "packages/eng-harness/src/eng_harness/report/_document.py"
+      - "packages/eng-harness/src/eng_harness/report/_model.py"
       - "packages/eng-harness/src/eng_harness/report/_write.py"
       - "packages/eng-harness/tests/unit/report/test_build_report.py"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py"
       - "packages/eng-harness/tests/unit/report/test_write.py"
+      - "packages/eng-harness/tests/unit/report/test_timings.py"
+      - "packages/eng-harness/tests/fixtures/report_run.py"
       - "packages/eng-harness/tests/golden/test_report.py"
       - "packages/eng-harness/tests/data/snapshots/report/**"
     # About 80 more lines for sections 6 and 7 (an estimate, not a measurement).
@@ -322,7 +340,8 @@ tasks:
       - "packages/eng-harness/tests/unit/report/test_build_report.py::test_tampered_refused_live_banner"
       - "packages/eng-harness/tests/unit/report/test_draft_mark.py::test_draft_signed_and_sources"
       - "packages/eng-harness/tests/unit/report/test_write.py::test_utf8_lf_atomic"
-    covers: [AC50, AC51, AC53, AC57, AC59]
+      - "packages/eng-harness/tests/unit/report/test_timings.py::test_wait_and_run_times"
+    covers: [AC50, AC51, AC53, AC56, AC57, AC59]
     depends_on: [T12]
   - id: T14
     title: "Commands run and resume: wiring, generated options, answers file, outcome mapping"
@@ -599,6 +618,9 @@ time directives.
 **T2 HTML builder** (spec §4.5). `Text`, `Trusted`, `SafeToken`, `field(label, value)` with `<bdi dir="auto">`,
 element builder, style element and its SHA-256 for the policy. Property tests on escaping.
 
+**T2b In-page fragment links** (spec §4.5, AC52; amendment B-435). `fragment(token: SafeToken) -> Href` renders
+`#<token>`; `_attr` accepts a fragment `Href` for `href` only, so that T12's value cells can link to their sources row.
+
 **T3 Shell** (spec §4.1, §4.2.1, §4.2.3, §4.2.4, §4.4.4). `main(argv, deps)`, six subcommands registered as stubs that
 call into later modules, `ExitCode`, `HarnessConfig` with strict sections, stream encoding setup, the launch-address
 `CliDeps` with an opener slot; `[project.scripts]`,
@@ -692,7 +714,10 @@ the mandatory source, the sources table, changes and results; snapshot. Amendmen
 sections 2 to 5 of spec §4.6.1 (changes, results summary, sources, decisions), and `test_report_snapshot` snapshots
 that rendered fragment; T13 extends the snapshot to the whole document. Sections 6 (timings) and 7 (run events) are
 rendered by T13 (amendment B-412 fifth review): T12's 390 lines leave no room for them under the 400 cap, and T11's
-`ReportModel` already holds their data.
+`ReportModel` already holds their data. Amendment B-435 (T12 depends on T2b): each value cell links with `fragment()`
+to its sources-table row `id="src-N"` (AC52). The `_sections.py` functions take `(ReportModel, JournalReader,
+ResultStore)`: the changes section (AC55) reads the `model_saved` revisions and the approval items from the
+`JournalReader`, because T11's `ReportModel` does not hold them.
 
 **T13 Report document** (spec §4.6.2). Status banner and marks, integrity line, policy meta, `build_report`,
 `write_report`. Amendment B-412: T13 exports `build_report` and `write_report` from `report/__init__.py` and extends
@@ -700,7 +725,11 @@ rendered by T13 (amendment B-412 fifth review): T12's 390 lines leave no room fo
 completes AC51. Amendment B-412 fifth review: T13 also renders sections 6 (timings: per step start and duration,
 engineer waiting time against machine time, resumes) and 7 (run events: resumes, host starts, instances left open) of
 spec §4.6.1 in `_document.py` from T11's `ReportModel`, through T12's escaped cells; budget 300 to 380 (about 40 lines
-per section, an estimate, not a measurement).
+per section, an estimate, not a measurement). Amendment B-435: T13 also fixes `report/_model.py`, which makes one
+resume entry per `run_resumed`; it counts and lists distinct `resume_no` values (a restore appends a second
+`run_resumed` with the same `resume_no`, engine Q26). T13 extends
+`tests/unit/report/test_timings.py::test_wait_and_run_times`, the test spec AC56 names, with a restore that appends a
+second `run_resumed` with the same `resume_no` (fixture `tests/fixtures/report_run.py`), and covers AC56.
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, `--answers` through `pages.accept_answers_file`, report at the end. Fake-host workflow and replay

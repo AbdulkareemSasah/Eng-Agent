@@ -266,6 +266,19 @@ tasks:
       - "packages/structural-codes/core/tests/unit/test_package.py::test_version_constant"
     covers: [AC36, AC37, AC38]
     depends_on: [T12, T13, T14a, T14b]
+  - id: T15
+    title: CheckMeta.version
+    # Amendment (B-442, documents only): new task; eng-harness spec 0010 Q20 and spec 0013 Q13 need a check's integer CalcInfo.version.
+    files:
+      - "packages/structural-codes/core/src/structural_codes/meta.py"
+      - "packages/structural-codes/core/tests/unit/test_meta.py"
+      - "packages/structural-codes/core/CHANGELOG.md"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/structural-codes/core/tests/unit/test_meta.py::test_check_version"
+    covers: [AC2a]
+    depends_on: [T14b]
 ---
 
 # Implementation plan: structural-codes core framework
@@ -394,6 +407,10 @@ the release bump belongs to the release lane. Test order: the first commit holds
 fails while `notes` is undeclared) and the rewritten `test_version_constant` (fails while `__all__` is
 `["__version__"]`); `test_no_engineering_constants` (AC36) comes in a later commit of the same task as a regression
 guard, because the core source already meets AC36 and the test would pass at the base (test-first rule TF004).
+
+**T15 `CheckMeta.version` (amendment B-442).** Adds `version: int = 1` (≥ 1) to `CheckMeta` (spec §4.2) with a
+changelog line. Its first commit adds `test_meta.py::test_check_version`: the default is 1 and a version of 0 or less
+is refused with `CheckDefinitionError` (AC2a).
 
 ## 3. Dependencies
 
