@@ -691,9 +691,9 @@ coincident frames (`ambiguous`).
    and [spec 0013](0013-column-workflow.md) §4.5, which `HarnessCalcPort` consults for an id that does not start with
    `harness.` (every calc id of this spec does). The route runs only the ids of its fixed allowlist; any other id is
    `NOT_FOUND` (§6), and no exception of `structural_codes` reaches the engine as such. Its `CalcInfo` has the fields of
-   item 1, with `status` the check's lifecycle state (the four values of a calc status) and `version` as spec 0010 Q20
-   settles (open: a merged check has no integer version). The run-class rule of §4.5 applies unchanged: in `production`
-   only `approved` checks run and any other is refused with `CalcRefused` before evaluation; a `withdrawn` check is
+   item 1, with `status` the check's lifecycle state (the four values of a calc status) and `version` the check's
+   `CheckMeta.version` (spec 0010 Q20, draft decision B-442). The run-class rule of §4.5 applies unchanged: in
+   `production` only `approved` checks run and any other is refused with `CalcRefused` before evaluation; a `withdrawn` check is
    refused in both run classes with `CalcRefused` `CALC_WITHDRAWN` before evaluation (so the pack's `CheckNotUsable` is
    never reached); in `trial` a check that is not `approved` runs with `draft: true`. Results are stored as
    `verdicts.set/1` with provenance `tool: "structural-codes"` (not `harness`, item 2). The code-pack checks themselves,
