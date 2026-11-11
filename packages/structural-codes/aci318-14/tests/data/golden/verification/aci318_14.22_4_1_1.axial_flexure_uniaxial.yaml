@@ -65,12 +65,16 @@ cases:
         ratio: {value: 0.888119, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: HC-4
     kind: hand_check
-    source: {derivation: "clause spec §4 step 5, axial cap: Pu = 3800, Mu = 50"}
+    source:
+      derivation: >-
+        clause spec §4 step 5 axial cap: Pu = 3800, Mu = 50; phiPn at the ray exceeds phiPn_max so capM = Mu*phiPn_max/Pu
+        = 50*3918.096/3800 = 51.553895 kN.m; c from the bracket bisection at heavy compression (CS S3–S5).
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, Pu_kN: 3800, Mu_kNm: 50}
     expected:
       status: PASS
       values:
+        c_mm: {value: 582.591979, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
         capM_kNm: {value: 51.553895, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 0.969859, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: HC-5
@@ -97,6 +101,55 @@ cases:
         phi_ratio: {value: 0.90, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
         capM_kNm: {value: 353.447742, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 1.131709, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-7
+    kind: hand_check
+    source:
+      derivation: >-
+        non-square §8: b = 400, h = 600, n_bars_b = 3, n_bars_h = 4, lu = 2600; Ast = 500*(2*3+2*4-4) = 5000 mm2;
+        beta1 = 0.85, eps_ty = 420/200000 = 0.0021; kl/r = 2600/(0.30*400) = 21.667 <= 22; Pu = 1200, Mu = 250 kN.m;
+        demand ray root and CS S3–S5 at c give the expected trace (b governs width, depth layers along h).
+    subject: {kind: frame, id: C1}
+    inputs:
+      Pu_kN: 1200
+      Mu_kNm: 250
+      Mu_other_kNm: 0
+      b_mm: 400
+      h_mm: 600
+      d_prime_mm: 60
+      n_bars_b: 3
+      n_bars_h: 4
+      A_bar_mm2: 500
+      fc_MPa: 28
+      fy_MPa: 420
+      transverse_kind: tied
+      k_factor: 1
+      lu_mm: 2600
+    expected:
+      status: PASS
+      values:
+        Ast_mm2: {value: 5000, unit: mm2, abs_tol: 1.0e-4, rel_tol: 0}
+        kl_r_ratio: {value: 21.666667, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        c_mm: {value: 366.099986, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        Pn_kN: {value: 3322.136967, unit: kN, abs_tol: 0.001, rel_tol: 0}
+        Mn_kNm: {value: 692.111868, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        phi_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        capM_kNm: {value: 449.872714, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.555713, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-8
+    kind: hand_check
+    source:
+      derivation: >-
+        Table 22.2.2.4.3 middle row: fc = 40 MPa gives beta1 = 0.85 - 0.05*(40-28)/7 = 0.764286; common layout with
+        Pu = 1500, Mu = 280 kN.m; §4 root search and CS S3–S5 at c.
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fc_MPa: 40, Pu_kN: 1500, Mu_kNm: 280}
+    expected:
+      status: PASS
+      values:
+        beta1_ratio: {value: 0.764286, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        c_mm: {value: 285.90126, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        capM_kNm: {value: 471.249443, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.594165, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-1.a
     kind: boundary
     covers: [SHORT_COLUMN]
@@ -108,6 +161,21 @@ cases:
     covers: [SHORT_COLUMN, G-2]
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, lu_mm: 3301}
+    expected: {status: NEEDS_ENGINEER}
+  - id: BD-1.c
+    kind: boundary
+    covers: [SHORT_COLUMN]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, b_mm: 400, h_mm: 600, lu_mm: 2640}
+    expected:
+      status: PASS
+      values:
+        kl_r_ratio: {value: 22.0, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-1.d
+    kind: boundary
+    covers: [SHORT_COLUMN, G-2]
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, b_mm: 400, h_mm: 600, lu_mm: 2641}
     expected: {status: NEEDS_ENGINEER}
   - id: BD-2.a
     kind: boundary
@@ -156,18 +224,53 @@ cases:
     covers: [STEEL_IN_SECTION]
     subject: {kind: frame, id: C1}
     inputs:
-      <<: *common
-      b_mm: 60
-      h_mm: 60
+      Pu_kN: 1500
+      Mu_kNm: 300
+      Mu_other_kNm: 0
+      b_mm: 80
+      h_mm: 80
       d_prime_mm: 20
-      A_bar_mm2: 1000
+      n_bars_b: 2
+      n_bars_h: 2
+      A_bar_mm2: 1700
+      fc_MPa: 28
+      fy_MPa: 420
+      transverse_kind: tied
+      k_factor: 1
+      lu_mm: 500
     expected: {status: NEEDS_ENGINEER}
-  - id: BD-4
+  - id: BD-4.a
+    kind: hand_check
+    subject: {kind: frame, id: C1}
+    source:
+      derivation: >-
+        CS S5 at eps_t just below eps_tc = 0.005: Pu = 835, Mu = 344; eps_t = 0.003*(540-c)/c with dt = h-d' = 540 mm;
+        phi = 0.90 when eps_t >= 0.005, here eps_t = 0.0050 (transition side) gives phi < 0.90.
+    inputs: {<<: *common, Pu_kN: 835, Mu_kNm: 344}
+    expected:
+      status: PASS
+      values:
+        eps_t_ratio: {value: 0.004999959, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phi_ratio: {value: 0.899996432, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: BD-4.b
+    kind: hand_check
+    subject: {kind: frame, id: C1}
+    source:
+      derivation: >-
+        CS S5 tension-controlled limit eps_t = 0.005 inclusive: Pu = 835, Mu = 346; phi = phi_tc = 0.90 (Table 21.2.2).
+    inputs: {<<: *common, Pu_kN: 835, Mu_kNm: 346}
+    expected:
+      status: PASS
+      values:
+        eps_t_ratio: {value: 0.005025337, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        phi_ratio: {value: 0.90, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  # BD-5: Ast = 1500*(2*3+2*3-4) = 12000 mm2; Pu = 3800, Mu = 200; §4.2 step 3 grid crossings_up = 2, down = 1 → G-4.
+  - id: BD-5
     kind: boundary
     covers: [G-4]
     subject: {kind: frame, id: C1}
-    inputs: {<<: *common}
-    expected: {status: PASS}
+    inputs: {<<: *common, Pu_kN: 3800, Mu_kNm: 200, A_bar_mm2: 1500}
+    expected: {status: NEEDS_ENGINEER}
   - id: PC-1
     kind: program_comparison
     source:

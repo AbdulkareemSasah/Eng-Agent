@@ -40,7 +40,6 @@ _LENGTH = Cited(value=0, unit="mm", source="Geometry: the length of a solid is p
 _AREA = Cited(value=0, unit="mm2", source="Geometry: a provided bar area is positive")
 _STRENGTH = Cited(value=0, unit="MPa", source="Mechanics of materials: a strength is positive")
 _COUNT = Cited(value=0, unit="1", source="Geometry: a bar count is at least two per face")
-_N_GRID_SOURCE = "Numerical method: bracketing grid of AF clause spec §4.2 step 3 (not an engineering value; C-5)"
 _CLAUSE = "22.4.1.1"
 _ASSUMPTIONS = (
     "nonprestressed column; rectangular section bent about the axis parallel to b",
@@ -252,7 +251,9 @@ def axial_flexure_uniaxial(inp: AxialFlexureInputs, t: TraceRecorder) -> None:
     c_full = sec.c_full
     two = t.value("c_half")
     one = two / two
-    g = lambda c: demand_ray_g(sec, c, pu_n, mu_nmm)  # noqa: E731  # B-332: closure over sec and demand
+
+    def g(c: float) -> float:
+        return demand_ray_g(sec, c, pu_n, mu_nmm)
 
     def _crossings(up: int, down: int) -> None:
         f_up = "up-crossings on the bracketing grid"

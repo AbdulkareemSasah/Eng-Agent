@@ -130,7 +130,7 @@ def test_preconditions(changes: dict[str, Any], precondition: str, gap: str | No
 
 
 def test_bracketing_gap() -> None:
-    """BD-5: a stub `g` with two up-crossings raises `NotImplementedGap` G-4 (AF-AC4)."""
+    """BD-5 (unit, stub `g`): two up-crossings raise `NotImplementedGap` G-4 (AF-AC4; golden BD-5 uses real inputs)."""
 
     def g(c: float) -> float:
         # Two up-crossings on [0, 3]: negative until 0.5, positive until 1.5, negative until 2.5, positive after
@@ -176,10 +176,20 @@ def test_axial_cap_uses_phi_pn_max_in_capm() -> None:
     payload = run(Pu_kN=3800.0, Mu_kNm=50.0)
     assert [v.status for v in payload.verdicts] == [VerdictStatus.PASS]
     found = steps(payload)
+    assert found["c_mm"] == pytest.approx(582.591979, abs=_LEN)
     assert found["capM_kNm"] == pytest.approx(51.553895, abs=_KNM)
     assert payload.verdicts[0].ratio == pytest.approx(0.969859, abs=_RATIO)
     cap = step_map(payload)["capM_kNm"]
     assert "phiPn_max_kN" in cap.uses
+    on_cap = next(s for s in payload.traces[0].steps if s.name == "on_cap")
+    assert on_cap.value is True
+
+
+def test_g4_from_heavy_steel_and_high_pu() -> None:
+    """BD-5: crossings_up = 2 on the grid raises one NEEDS_ENGINEER verdict naming G-4 (AF §8 BD-5)."""
+    payload = run(Pu_kN=3800.0, Mu_kNm=200.0, A_bar_mm2=1500.0)
+    assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
+    assert any(m.startswith("G-4 (AF §4.2 step 3)") for m in payload.traces[0].messages)
 
 
 def test_member_scope_not_applicable() -> None:
