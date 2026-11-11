@@ -149,7 +149,8 @@ tasks:
     depends_on: [T1]
   - id: T7
     title: Calc 1, model fingerprint, with the canonical-state helper
-    # Amendment (B-437, documents only): rules test, lock test, calc.py re-export (spec 4.3, 9); budget 250 -> 270.
+    # Amendment (B-437, documents only): rules test, lock test, calc.py re-export, ratchet skip count (spec 4.3, 9);
+    # budget 250 -> 285 (273 counted on the B-146 branch, plus the re-export, the B-388 registry line, the ratchet).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_fingerprint (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -165,7 +166,8 @@ tasks:
       - "packages/eng-harness/tests/rules/test_calc_modules.py"
       - "packages/eng-harness/tests/contract/test_calc_lock.py"
       - "packages/eng-harness/src/eng_harness/calc.py"  # re-export of read_lock and removed_ids (spec 4.3)
-    max_changed_lines: 270
+      - ".gate/ratchet.json"  # eng-harness skip count 2 -> 3 for the lock-test skip (spec 9)
+    max_changed_lines: 285
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent"
