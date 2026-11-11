@@ -416,6 +416,8 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
     { name = "ruamel-yaml" },
+    { name = "structural-codes-aci318-14" },
+    { name = "structural-codes-core" },
 ]
 
 [package.dev-dependencies]
@@ -434,6 +436,8 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.14,<3" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = "==2.65.0" },
     { name = "ruamel-yaml", specifier = ">=0.19,<0.20" },
+    { name = "structural-codes-aci318-14", editable = "packages/structural-codes/aci318-14" },
+    { name = "structural-codes-core", editable = "packages/structural-codes/core" },
 ]
 
 [package.metadata.requires-dev]

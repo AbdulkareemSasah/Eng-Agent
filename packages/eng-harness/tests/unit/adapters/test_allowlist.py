@@ -1,4 +1,7 @@
-"""Allowlist data, descriptors, escape-hatch refusal and release marks (plan 0002 T6; spec 0002 AC16, AC38)."""
+"""Allowlist data, descriptors, escape-hatch refusal and release marks.
+
+Plan 0002 T6 and T20; spec 0002 AC16, AC38, AC41 and AC42.
+"""
 
 import json
 from typing import Any
@@ -43,8 +46,18 @@ def _text(*tools: dict[str, Any], header: str = HEADER) -> str:
     return f"{header}tool = [\n{rows}\n]\n"
 
 
-def _load(*tools: dict[str, Any], header: str = HEADER) -> Allowlist:
-    return load_allowlist(_text(*tools, header=header), "test.toml")
+def _load(*tools: dict[str, Any], header: str = HEADER, route: str | None = None) -> Allowlist:
+    text = _text(*tools, header=header)
+    if route is None:
+        return load_allowlist(text, "test.toml")
+    return load_allowlist(text, "test.toml", route=route)
+
+
+def _unit(tool: str, field: str, status: str, unit: str | None = None) -> str:
+    lines = ["[[unit]]", f'tool = "{tool}"', f'field = "{field}"', f'unit_status = "{status}"']
+    if unit is not None:
+        lines.append(f'unit = "{unit}"')
+    return "\n".join(lines) + "\n"
 
 
 def test_entries_complete() -> None:
@@ -221,3 +234,98 @@ def test_packaged_allowlist_has_no_unreleased_tool() -> None:
     allowlist = csi_allowlist()
     assert allowlist.adapter == "sasaah-csi-mcp"
     assert allowlist.unreleased_tools() == {}
+
+
+ROUTES = HEADER + 'routes = ["native", "rest"]\n'
+
+
+def test_routes_declared() -> None:
+    """AC41: a header that declares routes requires every entry's routes to be a non-empty subset of them."""
+    native = _tool(name="read_native", routes=["native"])
+    both = _tool(name="read_both", routes=["native", "rest"])
+    rest = _tool(name="read_rest", routes=["rest"])
+    by_rest = _load(native, both, rest, header=ROUTES, route="rest")
+    by_native = _load(native, both, rest, header=ROUTES, route="native")
+    assert by_rest.routes == by_native.routes == ("native", "rest")
+    assert {tool.name: tool.routes for tool in (*by_rest.tools, *by_native.tools)} == {
+        "read_native": ("native",),
+        "read_both": ("native", "rest"),
+        "read_rest": ("rest",),
+    }
+    refused = (
+        _tool(name="read_native"),
+        _tool(name="read_native", routes=[]),
+        _tool(name="read_native", routes=["other"]),
+        _tool(name="read_native", routes=["native", "other"]),
+    )
+    for tool in refused:
+        with pytest.raises(AllowlistError, match="routes"):
+            _load(tool, header=ROUTES, route="native")
+    with pytest.raises(AllowlistError, match="routes"):
+        _load(_tool(routes=["native"]))
+    with pytest.raises(AllowlistError, match="routes"):
+        _load(_tool(), header=HEADER + "routes = []\n", route="native")
+
+
+def test_route_filter() -> None:
+    """AC41: one route is served; another route is refused; a route on an allowlist with none is a load error."""
+    native = _tool(name="read_native", routes=["native"])
+    both = _tool(name="read_both", routes=["native", "rest"])
+    rest = _tool(name="read_rest", routes=["rest"])
+    loaded = _load(native, both, rest, header=ROUTES, route="native")
+    assert [tool.name for tool in loaded.tools] == ["read_native", "read_both"]
+    assert loaded.tool_names == frozenset({"read_native", "read_both", "read_rest"})
+    assert loaded.build_expectation().tool_names == loaded.tool_names
+    assert loaded.descriptor("read_native").name == "read_native"
+    with pytest.raises(KeyError, match="read_rest"):
+        loaded.descriptor("read_rest")
+    with pytest.raises(AllowlistError, match="route"):
+        _load(native, both, rest, header=ROUTES)
+    with pytest.raises(AllowlistError, match="route"):
+        _load(native, both, rest, header=ROUTES, route="other")
+    with pytest.raises(AllowlistError, match="route"):
+        _load(_tool(), route="native")
+
+
+def test_unit_header_entries() -> None:
+    """AC42: [[unit]] entries are on Allowlist.units and on the descriptor of an allowlisted tool."""
+    tables = (
+        _unit("csi_list_frames", "length", "declared", "mm")
+        + _unit("csi_list_frames", "force", "confirmed", "kN")
+        + _unit("csi_list_frames", "note", "missing")
+    )
+    loaded = load_allowlist(_text(_tool()) + tables, "test.toml")
+    assert [(item.tool, item.field, item.unit, item.unit_status) for item in loaded.units] == [
+        ("csi_list_frames", "length", "mm", "declared"),
+        ("csi_list_frames", "force", "kN", "confirmed"),
+        ("csi_list_frames", "note", None, "missing"),
+    ]
+    assert loaded.descriptor("csi_list_frames").unit_header == loaded.units
+    bad = (
+        _unit("csi_list_frames", "length", "guessed", "mm"),
+        _unit("csi_list_frames", "length", "missing", "mm"),
+        _unit("csi_list_frames", "length", "declared"),
+        _unit("csi_list_frames", "length", "confirmed"),
+        _unit("not_a_tool", "length", "declared", "mm"),
+        _unit("not_a_tool", "length", "confirmed", "kN"),
+        _unit("idea_run_script", "body", "missing"),
+        _unit("host_script_tool", "body", "missing"),
+    )
+    for table in bad:
+        with pytest.raises(AllowlistError):
+            load_allowlist(_text(_tool()) + table, "test.toml")
+    with pytest.raises(AllowlistError, match="unit_header"):
+        _load(_tool(unit_header=[]))
+
+
+def test_unit_header_missing_on_unserved_tool() -> None:
+    """AC42: status missing may name a tool the allowlist does not serve; it is on no descriptor."""
+    loaded = load_allowlist(_text(_tool()) + _unit("host_set_loads", "force", "missing"), "test.toml")
+    assert [(item.tool, item.field, item.unit, item.unit_status) for item in loaded.units] == [
+        ("host_set_loads", "force", None, "missing"),
+    ]
+    assert loaded.descriptor("csi_list_frames").unit_header == ()
+    assert [tool.name for tool in loaded.tools] == ["csi_list_frames"]
+    assert loaded.tool_names == frozenset({"csi_list_frames"})
+    with pytest.raises(KeyError, match="host_set_loads"):
+        loaded.descriptor("host_set_loads")

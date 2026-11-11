@@ -17,24 +17,12 @@ from structural_codes.inputs import bounded
 from structural_codes.meta import CheckMeta, GapDecl
 from structural_codes.trace import TraceRecorder
 
-from aci318_14._common import CITED, FC_MIN, FY_MAX
+from aci318_14._column import beta1 as _beta1
+from aci318_14._common import CITED, FC_MIN, FY_MAX, const
 from aci318_14._footing import COMPRESSION, FootingLoads, _step, face_moments, full_contact
 
 __all__ = ["FlexureInputs", "flexure_at_column_face"]
 
-_T22 = "ACI 318-14 Table 22.2.2.4.3"
-_CITED = {
-    "phi_tc": Cited(value=0.90, unit="1", source="ACI 318-14 Table 21.2.2 (tension-controlled), via Table 21.2.1 (a)"),
-    "eps_tc": Cited(value=0.005, unit="1", source="ACI 318-14 Table 21.2.2 (tension-controlled strain limit)"),
-    "eps_cu": Cited(value=0.003, unit="1", source="ACI 318-14 22.2.2.1"),
-    "alpha_1": Cited(value=0.85, unit="1", source="ACI 318-14 22.2.2.4.1 (stress-block concrete stress 0.85 f'c)"),
-    "beta1_hi": Cited(value=0.85, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
-    "beta1_slope": Cited(value=0.05, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
-    "beta1_step": Cited(value=7, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
-    "fc_beta_lo": Cited(value=28, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
-    "fc_beta_hi": Cited(value=55, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
-    "beta1_lo": Cited(value=0.65, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
-}
 _LENGTH = Cited(value=0, unit="mm", source="Geometry: the length of a solid is positive")
 _AREA = Cited(value=0, unit="mm2", source="Geometry: a provided bar area is positive")
 _STRENGTH = Cited(value=0, unit="MPa", source="Mechanics of materials: a strength is positive")
@@ -81,21 +69,6 @@ _META = CheckMeta(
 )
 
 
-def _beta1(t: TraceRecorder) -> float:
-    """Record `beta1_ratio` from the three rows of Table 22.2.2.4.3 (clause spec §4 step 4)."""
-    c = {name: t.const(name, cited) for name, cited in _CITED.items() if name.startswith(("beta1", "fc_beta"))}
-    fc = t.value("fc_MPa")
-    if fc <= c["fc_beta_lo"]:
-        beta1 = c["beta1_hi"]
-    elif fc >= c["fc_beta_hi"]:
-        beta1 = c["beta1_lo"]
-    else:
-        beta1 = c["beta1_hi"] - c["beta1_slope"] * (fc - c["fc_beta_lo"]) / c["beta1_step"]
-    formula = "beta1_hi if fc_MPa <= fc_beta_lo else beta1_lo if fc_MPa >= fc_beta_hi"
-    formula += " else beta1_hi - beta1_slope * (fc_MPa - fc_beta_lo) / beta1_step"
-    return _step(t, "beta1_ratio", beta1, formula, _T22)
-
-
 @check(meta=_META, inputs=FlexureInputs, preconditions=(FC_MIN, FY_MAX, COMPRESSION, full_contact("G-1")))
 def flexure_at_column_face(inp: FlexureInputs, t: TraceRecorder) -> None:
     """Record `Mu`, `beta1`, `a`, `c`, `eps_t`, `Mn` and `phiMn` per direction and one verdict each, X then Y.
@@ -104,7 +77,7 @@ def flexure_at_column_face(inp: FlexureInputs, t: TraceRecorder) -> None:
         NotImplementedGap: G-2 when `eps_t < eps_tc` in a direction (the section is not tension-controlled).
     """
     face_moments(t)
-    phi, eps_tc, eps_cu, alpha = (t.const(n, _CITED[n]) for n in ("phi_tc", "eps_tc", "eps_cu", "alpha_1"))
+    phi, eps_tc, eps_cu, alpha = (const(t, n) for n in ("phi_tc", "eps_tc", "eps_cu", "alpha_1"))
     # The shared k_kNm cannot be recorded under its own name: the suffix _kNm would fix the unit kN.m (core AC10).
     k_knm, half = t.const("k_kilo_milli", CITED["k_kNm"]), t.value("c_half")
     beta1 = _beta1(t)
