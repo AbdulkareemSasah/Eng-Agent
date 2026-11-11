@@ -25,26 +25,21 @@ from aci318_14._footing import _step
 __all__ = ["BAR_LAYOUT", "COLUMN_CITED", "SHORT_COLUMN", "STEEL_IN_SECTION", "ColumnSection", "SectionPoint"]
 __all__ += ["TransverseKind", "axial_cap", "axial_compression", "beta1", "column_section", "record_point"]
 
+_CC_SPIRAL = "ACI 318-14 Table 21.2.2 (compression-controlled, spiral per 25.7.3)"
+_SWAY = "ACI 318-14 6.2.5(a) (columns not braced against sidesway; used for every column, CP)"
+_CORNER = "Geometry: four corner bars counted twice in `2·n_bars_b + 2·n_bars_h`"
 COLUMN_CITED = MappingProxyType(
     {
         "Es": Cited(value=200000, unit="MPa", source="ACI 318-14 20.2.2.2"),
         "phi_cc_tied": Cited(value=0.65, unit="1", source="ACI 318-14 Table 21.2.2 (compression-controlled, other)"),
-        "phi_cc_spiral": Cited(
-            value=0.75, unit="1", source="ACI 318-14 Table 21.2.2 (compression-controlled, spiral per 25.7.3)"
-        ),
+        "phi_cc_spiral": Cited(value=0.75, unit="1", source=_CC_SPIRAL),
         "phi_tr_tied": Cited(value=0.25, unit="1", source="ACI 318-14 Table 21.2.2 (transition, other)"),
         "phi_tr_spiral": Cited(value=0.15, unit="1", source="ACI 318-14 Table 21.2.2 (transition, spiral)"),
         "pnmax_tied": Cited(value=0.80, unit="1", source="ACI 318-14 Table 22.4.2.1 (a), nonprestressed, ties"),
         "pnmax_spiral": Cited(value=0.85, unit="1", source="ACI 318-14 Table 22.4.2.1 (b), nonprestressed, spirals"),
-        "kl_r_sway": Cited(
-            value=22,
-            unit="1",
-            source="ACI 318-14 6.2.5(a) (columns not braced against sidesway; used for every column, CP)",
-        ),
+        "kl_r_sway": Cited(value=22, unit="1", source=_SWAY),
         "r_factor": Cited(value=0.30, unit="1", source="ACI 318-14 6.2.5.1(b) (rectangular columns)"),
-        "c_corner": Cited(
-            value=4, unit="1", source="Geometry: four corner bars counted twice in `2·n_bars_b + 2·n_bars_h`"
-        ),
+        "c_corner": Cited(value=4, unit="1", source=_CORNER),
     }
 )
 _ALL = {**CITED, **SECTION_CITED, **COLUMN_CITED, "k_kilo": CITED["k_kN"], "k_kilo_milli": CITED["k_kNm"]}
@@ -126,10 +121,8 @@ def axial_compression(gap_id: str) -> Precondition:
     if not re.fullmatch(r"G-[0-9]+", gap_id):
         raise CheckDefinitionError(f"gap id {gap_id!r} must match G-<n>")
 
-    def test(inp: Any, t: TraceRecorder) -> bool:
-        return t.value("Pu_kN") >= -t.value(
-            "Pu_kN"
-        )  # Pu >= 0 without a numeric literal (gate FB005), exact for a finite float
+    def test(inp: Any, t: TraceRecorder) -> bool:  # Pu >= 0 without a numeric literal (gate FB005), exact if finite
+        return t.value("Pu_kN") >= -t.value("Pu_kN")
 
     text = f"Pu_kN must be at least zero; axial tension (22.4.3) is gap {gap_id}, not implemented"
     return Precondition("AXIAL_COMPRESSION", _NE, "22.4.3", text, test)
@@ -148,15 +141,23 @@ def axial_cap(inp: Any, t: TraceRecorder) -> tuple[float, float, float]:
     return po, pn_max, _step(t, "phiPn_max_kN", phi_cc * pn_max, f"phi_cc_{kind} * Pn_max_kN", src)
 
 
-# CS S3 to S5 at one depth: `a` in mm, forces in N, `mn` in N.mm about mid-depth, strains, stresses (MPa), `phi`.
-_FLOATS = tuple[float, ...]
-_FIELDS = [("a", float), ("cc", float), ("eps", _FLOATS), ("fs", _FLOATS), ("force", _FLOATS), ("pn", float)]
-SectionPoint = NamedTuple("SectionPoint", [*_FIELDS, ("mn", float), ("eps_t", float), ("phi", float)])
+class SectionPoint(NamedTuple):
+    """CS S3 to S5 at one depth: `a` (mm), forces (N), `mn` (N.mm about mid-depth), strains, stresses (MPa), `phi`."""
+
+    a: float
+    cc: float
+    eps: tuple[float, ...]
+    fs: tuple[float, ...]
+    force: tuple[float, ...]
+    pn: float
+    mn: float
+    eps_t: float
+    phi: float
 
 
 # The recorded values CS S3 to S5 read, by trace name (inputs, constants and the steps of CS S2).
-_SECTION = ("b_mm", "h_mm", "d_prime_mm", "fc_MPa", "fy_MPa", "Es", "eps_cu", "eps_ty_ratio", "alpha_1", "beta1_ratio")
-_SECTION += ("c_half", "phi_tc", "eps_tc")
+_SECTION: tuple[str, ...] = ("b_mm", "h_mm", "d_prime_mm", "fc_MPa", "fy_MPa", "Es", "eps_cu", "eps_ty_ratio")
+_SECTION += ("alpha_1", "beta1_ratio", "c_half", "phi_tc", "eps_tc")
 
 
 @dataclass(frozen=True, slots=True)

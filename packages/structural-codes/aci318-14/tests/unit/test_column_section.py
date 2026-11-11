@@ -12,7 +12,6 @@ from eng_contract.cited import Cited
 from eng_contract.envelope import LiteralInput
 from eng_contract.params import ValidatedInput
 from eng_contract.verdicts import Subject, SubjectKind
-from pydantic import create_model
 from structural_codes.applicability import Outcome, Precondition
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.inputs import CheckInputs, bounded, unbounded
@@ -38,11 +37,19 @@ _ONE = Cited(value=0, unit="1", source="Geometry: test input, a count or factor 
 _LEN, _KN, _RATIO = 1e-4, 0.001, 1e-6
 
 
-# The input models are built with `create_model`: their field names carry the contract's unit suffixes (EC §4.7.2).
+def create_model(name: str, *, base: type[Any], doc: str, **fields: tuple[Any, Any]) -> type[Any]:
+    """Build an input model through `base`'s own metaclass: field names such as `fc_MPa` carry the contract's unit
+    suffixes (EC §4.7.2), which a class body would spell as mixed case."""
+    namespace = {"__doc__": doc, "__module__": __name__, "__annotations__": {k: f[0] for k, f in fields.items()}}
+    metaclass: Any = type(base)
+    model: type[Any] = metaclass(name, (base,), namespace | {k: f[1] for k, f in fields.items()})
+    return model
+
+
 _COLUMN = create_model(
     "_Column",
-    __base__=CheckInputs,
-    __doc__="Inputs common to the column checks (AF §3, MA §3).",
+    base=CheckInputs,
+    doc="Inputs common to the column checks (AF §3, MA §3).",
     Pu_kN=(float, unbounded(reason="signed axial force, compression positive", unit="kN")),
     b_mm=(float, bounded(gt=_MM, unit="mm")),
     h_mm=(float, bounded(gt=_MM, unit="mm")),
@@ -54,8 +61,8 @@ _COLUMN = create_model(
 )
 _Layout = create_model(
     "_Layout",
-    __base__=_COLUMN,
-    __doc__="Axial-flexure form: the bar layout of CS S1.",
+    base=_COLUMN,
+    doc="Axial-flexure form: the bar layout of CS S1.",
     d_prime_mm=(float, bounded(gt=_MM, unit="mm")),
     n_bars_b=(int, bounded(gt=_ONE, unit="1")),
     n_bars_h=(int, bounded(gt=_ONE, unit="1")),
@@ -63,14 +70,14 @@ _Layout = create_model(
 )
 _Axial = create_model(
     "_Axial",
-    __base__=_COLUMN,
-    __doc__="Maximum axial strength form: the total steel area as an input.",
+    base=_COLUMN,
+    doc="Maximum axial strength form: the total steel area as an input.",
     Ast_mm2=(float, bounded(gt=_MM2, unit="mm2")),
 )
 _Limits = create_model(
     "_Limits",
-    __base__=CheckInputs,
-    __doc__="Reinforcement limits form: both areas as inputs.",
+    base=CheckInputs,
+    doc="Reinforcement limits form: both areas as inputs.",
     Ag_mm2=(float, bounded(gt=_MM2, unit="mm2")),
     Ast_mm2=(float, bounded(gt=_MM2, unit="mm2")),
 )
