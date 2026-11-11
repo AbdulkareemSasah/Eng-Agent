@@ -837,7 +837,7 @@ JSON result: `{"command", "mode", "status", "steps": [{"name", "status", "findin
 Root `.gate/` files: `gate.yml` (new in this package; mode `bootstrap.{enabled,gate_branch}`, `main_branch`, `identities`,
 `spec_globs`, `plan_globs`, `test_globs`, `generated_globs`, `spike_globs`, `agents.unmanaged_ok`, `limits.{diff_lines,
 max_task_lines, test_run_seconds, mutation_run_seconds, max_file_bytes}`, `license_exceptions`, `secrets.allow`), `forbidden.yml`
-(`escape_hatch`, `host_sdk`, `io_modules`, `cited`, `rationale`), `risk-map.yml`, `ratchet.json`, `agents.yml`.
+(`escape_hatch`, `host_sdk`, `io_modules`, `cited`, `versioned`, `rationale`), `risk-map.yml`, `ratchet.json`, `agents.yml`.
 
 Spec and plan front matter (YAML between `---` lines at the start of the file): spec `id`, `issue`, `status`, `size`,
 `risk`; plan `id`, `issue`, `spec`, `status`, `size`, `risk`, `tasks`; each task `id` (`T<n>`), `title`, `files`
@@ -917,7 +917,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC19 to AC21b | integration | `test_risk_floor.py::test_union_of_maps_and_commits`, `::test_risk_sets_and_body_line`, `::test_invalid_map`, `::test_none_reason_takes_the_body_risk_line` (T27), `::test_in_scope_ratchet_change_does_not_raise_floor` (T33) |
 | AC22, AC25, AC26, AC28 | integration | `test_test_first_selection.py::test_exempt_types`, `::test_no_test_commit_and_mixed_commit`, `::test_refactor_and_test_types`, `::test_tests_first_files` |
 | AC23, AC24, AC27, AC27a | integration | `test_test_first_run.py::test_red_green`, `::test_passes_at_base_and_fails_at_head`, `::test_base_isolation_and_cleanup`, `::test_new_package_hidden_at_base` (T34) |
-| AC29 to AC37 | unit | `test_forbidden_<rule>.py` (one file per rule: flagged case, permitted neighbour), `test_forbidden_scope.py::test_spikes_tests_and_waivers` |
+| AC29 to AC37 (with AC33a) | unit | `test_forbidden_<rule>.py` (one file per rule: flagged case, permitted neighbour), `test_forbidden_scope.py::test_spikes_tests_and_waivers`, `test_forbidden_fb005.py::test_version_keyword_of_versioned_callable` (T39) |
 | AC38 to AC41 | unit and integration | `test_ratchet.py::test_counts_and_rise`, `::test_skip_xfail_reasons`, `::test_json_raise_vs_base`, `::test_suppression_issue_reference` |
 | AC42 to AC45 | unit | `test_imports.py::test_layers`, `::test_public_modules`, `::test_declared_and_sasaah_and_third_party`, `::test_cycle` |
 | AC46 | unit | `test_secrets.py::test_range_scan_no_echo`, `::test_allowlist_fingerprint` |
