@@ -1,10 +1,7 @@
 """Shadow-mode evaluation metrics, eligibility and the ``evaluate`` command (spec 0009 section 4.10; 12 section 6).
 
 Pure functions over labeled examples: per-provider case counts, agreement, abstention and latency percentiles
-(nearest rank, process/05 section 7). Calibration is gap E-G1 until the owner defines a metric (spec 0005 Q4).
-``python -m eng_harness.decisions.evaluation evaluate POINT`` reads the labels, prints the report and appends one
-record to ``evaluations.sqlite``; it writes no configuration and never releases a point (12 section 6).
-"""
+(nearest rank, process/05 section 7). Calibration is gap E-G1 until the owner defines a metric (spec 0005 Q4)."""
 
 import argparse
 import json
@@ -242,8 +239,7 @@ def _print_report(point: str, version: int, source: str, report: EvalReport, eva
 def main(argv: Sequence[str] | None = None) -> int:
     """Run ``evaluate POINT [--workspace DIR] [--point-version N] [--from-export FILE]`` (AC43, AC44); return 0.
 
-    Reads the labels of the point's current version (``--point-version`` replaces the discovered version), prints the
-    report and appends one record; no other file is written.
+    Prints the report and appends one record to ``evaluations.sqlite``; no other file is written.
 
     Raises:
         ContractError: ``INVALID_ARGUMENT`` for an unknown point or an unreadable export; ``StoreWriteError``.
@@ -259,14 +255,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     version = args.point_version if args.point_version is not None else _current_version(args.point)
     clock = SystemClock()
     ids = SystemIdSource(clock)
-    if args.from_export is None:
+    labels: tuple[LabeledExample, ...] = ()
+    if args.from_export is not None:
+        labels = labels_from_export(args.from_export, args.point, version)
+    elif (args.workspace / "decisions" / "decisions.sqlite").exists():  # a missing store is not created here
         label_store = LabelStore(args.workspace, DecisionSettings(), clock, ids)
         try:
             labels = label_store.read(args.point, version)
         finally:
             label_store.close()
-    else:
-        labels = labels_from_export(args.from_export, args.point, version)
     thresholds = EvalThresholds()
     report = evaluate_point(labels, thresholds)
     source: Literal["store", "export"] = "store" if args.from_export is None else "export"

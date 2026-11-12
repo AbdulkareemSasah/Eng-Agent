@@ -133,3 +133,8 @@ def test_unknown_point_needs_a_version(tmp_path: Path) -> None:
         main(["evaluate", "no_such_point", "--workspace", str(tmp_path)])
     assert info.value.detail.field == "point"
     assert not (tmp_path / "decisions").exists()
+
+
+def test_evaluate_without_label_store_creates_only_evaluations(tmp_path: Path) -> None:
+    assert main(["evaluate", "footing_fix", "--workspace", str(tmp_path), "--point-version", "1"]) == 0
+    assert sorted(_files(tmp_path)) == ["decisions/evaluations.sqlite"]
