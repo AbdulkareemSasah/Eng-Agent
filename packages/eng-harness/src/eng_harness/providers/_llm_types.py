@@ -1,10 +1,9 @@
 """Per-request structured output for the language-model tier (spec 0009 section 4.7, AC21)."""
 
 from hashlib import sha256
-from typing import Annotated, Any, cast
+from typing import Annotated, Any
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, create_model
-from typing_extensions import TypeForm
 from pydantic_ai.output import ToolOutput
 
 from eng_harness.decisions._rules import Rationale
@@ -13,7 +12,7 @@ from eng_harness.decisions.interfaces import ProviderRequest
 __all__ = ["build_output_type", "build_tool_output"]
 
 
-def _choice_type(values: tuple[str, ...]) -> TypeForm[Any]:
+def _choice_type(values: tuple[str, ...]) -> Any:
     allowed = frozenset(values)
 
     def check(value: object) -> str:
@@ -22,10 +21,7 @@ def _choice_type(values: tuple[str, ...]) -> TypeForm[Any]:
             raise ValueError(msg)
         return value
 
-    return cast(
-        TypeForm[Any],
-        Annotated[str, BeforeValidator(check), Field(json_schema_extra={"enum": list(values)})],
-    )
+    return Annotated[str, BeforeValidator(check), Field(json_schema_extra={"enum": list(values)})]
 
 
 def build_output_type(request: ProviderRequest) -> type[BaseModel]:
