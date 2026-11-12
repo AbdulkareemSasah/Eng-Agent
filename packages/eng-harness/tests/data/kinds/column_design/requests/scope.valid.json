@@ -1,0 +1,12 @@
+{
+  "select": {
+    "stories": [
+      "L1"
+    ],
+    "sections": null
+  },
+  "combinations": [
+    "COMB1"
+  ],
+  "special_seismic": false
+}
