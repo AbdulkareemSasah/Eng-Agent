@@ -1,19 +1,49 @@
-"""Shadow-mode evaluation metrics and eligibility (spec 0009 section 4.10; 12 section 6).
+"""Shadow-mode evaluation metrics, eligibility and the ``evaluate`` command (spec 0009 section 4.10; 12 section 6).
 
 Pure functions over labeled examples: per-provider case counts, agreement, abstention and latency percentiles
-(nearest rank, process/05 section 7). Calibration is gap E-G1 until the owner defines a metric (spec 0005 Q4).
-"""
+(nearest rank, process/05 section 7). Calibration is gap E-G1 until the owner defines a metric (spec 0005 Q4)."""
 
+import argparse
+import json
 import math
+import sys
 from collections.abc import Mapping, Sequence
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.ids import SystemClock, SystemIdSource
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from eng_harness.decisions._labels import LabeledExample
+from eng_harness.decisions import _points
+from eng_harness.decisions._evalstore import (
+    EvalStore,
+    ReleaseFinding,
+    ReleaseVerification,
+    StoredEvaluation,
+    labels_sha256,
+    provider_key,
+    verify_releases,
+)
+from eng_harness.decisions._labels import LabeledExample, LabelStore
+from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions._record import Suggestion
 
-__all__ = ["EvalReport", "EvalThresholds", "ProviderEvalMetrics", "evaluate_point"]
+__all__ = [
+    "EvalReport",
+    "EvalStore",
+    "EvalThresholds",
+    "ProviderEvalMetrics",
+    "ReleaseFinding",
+    "ReleaseVerification",
+    "StoredEvaluation",
+    "evaluate_point",
+    "labels_from_export",
+    "labels_sha256",
+    "main",
+    "provider_key",
+    "verify_releases",
+]
 
 _SKIPPED_OUTCOMES = frozenset({"skipped_local_only", "skipped_redaction"})
 _ANSWERED_OUTCOMES = frozenset({"shadow", "accepted", "below_threshold"})
@@ -157,3 +187,94 @@ def _reasons_for(metrics: ProviderEvalMetrics, thresholds: EvalThresholds) -> se
         reasons.add("agreement_below_threshold")
     reasons.add("calibration_not_evaluated")
     return reasons
+
+
+def labels_from_export(path: Path, point: str, point_version: int) -> tuple[LabeledExample, ...]:
+    """Read anonymized export lines (spec 0005 AC39) of one point version as labels (AC44).
+
+    The export has no ids, engineer, run or step: each line gets ``export_<n>`` ids (a line is one request) and fixed
+    placeholders for the others, so an override line is never paired with a decision, as in the store.
+
+    Raises:
+        ContractError: ``INVALID_ARGUMENT`` (field ``from_export``) when the file or a line cannot be read.
+    """
+    labels: list[LabeledExample] = []
+    try:
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
+            data: dict[str, Any] = json.loads(line)
+            ids = {"label_id": f"export_{number}", "request_id": f"export_{number}"}
+            placeholders = {"engineer": "export", "run_id": "export", "step_path": "export"}
+            label = LabeledExample.model_validate({**data, **ids, **placeholders})
+            if label.point == point and label.point_version == point_version:
+                labels.append(label)
+    except (OSError, ValueError, TypeError, ValidationError) as exc:  # json errors are ValueError
+        raise ContractError(
+            ErrorCode.INVALID_ARGUMENT, "the label export cannot be read", field="from_export",
+            hint=type(exc).__name__,
+        ) from exc  # fmt: skip
+    return tuple(labels)
+
+
+def _current_version(point: str) -> int:
+    found = _points.discover().get(point)
+    if found is None:
+        raise ContractError(
+            ErrorCode.INVALID_ARGUMENT, "unknown decision point", field="point", hint="pass --point-version"
+        )
+    return found.version
+
+
+def _print_report(point: str, version: int, source: str, report: EvalReport, evaluation_id: str) -> None:
+    lines = [f"point: {point} v{version} (labels from the {source})"]
+    lines += [f"{key}: {metrics.model_dump_json()}" for key, metrics in report.by.items()]
+    lines += [
+        f"eligible: {str(report.eligible).lower()}",
+        f"reasons: {', '.join(report.reasons) or 'none'}",
+        "verdict: the owner releases a point (12 section 6); this command never does",
+        f"record: {evaluation_id}",
+    ]
+    sys.stdout.write("".join(f"{line}\n" for line in lines))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run ``evaluate POINT [--workspace DIR] [--point-version N] [--from-export FILE]`` (AC43, AC44); return 0.
+
+    Prints the report and appends one record to ``evaluations.sqlite``; no other file is written.
+
+    Raises:
+        ContractError: ``INVALID_ARGUMENT`` for an unknown point or an unreadable export; ``StoreWriteError``.
+    """
+    parser = argparse.ArgumentParser(prog="eng_harness.decisions.evaluation")
+    sub = parser.add_subparsers(dest="command", required=True)
+    cmd = sub.add_parser("evaluate")
+    cmd.add_argument("point")
+    cmd.add_argument("--workspace", type=Path, default=Path.cwd())
+    cmd.add_argument("--point-version", type=int, default=None)
+    cmd.add_argument("--from-export", type=Path, default=None)
+    args = parser.parse_args(argv)
+    version = args.point_version if args.point_version is not None else _current_version(args.point)
+    clock = SystemClock()
+    ids = SystemIdSource(clock)
+    labels: tuple[LabeledExample, ...] = ()
+    if args.from_export is not None:
+        labels = labels_from_export(args.from_export, args.point, version)
+    elif (args.workspace / "decisions" / "decisions.sqlite").exists():  # a missing store is not created here
+        label_store = LabelStore(args.workspace, DecisionSettings(), clock, ids)
+        try:
+            labels = label_store.read(args.point, version)
+        finally:
+            label_store.close()
+    thresholds = EvalThresholds()
+    report = evaluate_point(labels, thresholds)
+    source: Literal["store", "export"] = "store" if args.from_export is None else "export"
+    store = EvalStore(args.workspace, clock, ids)
+    try:
+        evaluation_id = store.append(args.point, version, report, thresholds, labels_sha256(labels), source)
+    finally:
+        store.close()
+    _print_report(args.point, version, source, report, evaluation_id)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

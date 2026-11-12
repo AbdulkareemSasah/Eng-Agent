@@ -324,8 +324,8 @@ AC43; `_cascade.py` gains the constructor argument and the getter, about 20 line
   amendment B-411, engine spec Q19). The amendments
   of spec Q1 are made in the engine spec's own pull request before T10. Specs 0006 and 0007 depend on T10.
 - Command line (amendment B-412 sixth review): spec 0006 §4.2.2 step 5 builds the `Cascade` in the command line through
-  the `CliDeps` field `decision_port_factory` (plan 0006 T14b defines it with the default `None`; plan 0006 T18 binds it
-  once T7 and T10 here have merged). No task here touches `src/eng_harness/cli/__init__.py`.
+  the `CliDeps` field `decision_port_factory` (plan 0006 T14b defines it with the default `None`; plan 0006 T18a, split from
+  T18 by B-471, binds it once T7 and T10 here have merged). No task here touches `src/eng_harness/cli/__init__.py`.
 
 ## 4. Verification
 
