@@ -39,10 +39,10 @@ from workflows.rig import Rig
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
-from eng_harness.errors import JournalIntegrityError
+from eng_harness.errors import HarnessCode, JournalIntegrityError, RunRefused
 from eng_harness.journal import EventType, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, Reconciliation
+from eng_harness.ports import CalcInfo, HostLease, Reconciliation, ServerCheck, UnitsState
 
 T = EventType
 WRITE_ARGS: dict[str, JsonValue] = {"n": 1, "model": "m1"}
@@ -341,3 +341,54 @@ def test_a_write_found_applied_whose_result_cannot_be_read_stays_in_flight(tmp_p
     # an answer given at the earlier resume is read from the journal: no second answer event, no new presentation
     assert len(_events(rig, run_id, ev.InputProvided)) == (1 if cause == "engineer" else 0)
     assert len(rig.inputs.presented) == presented
+
+
+_ORDER = ("host.preflight", "host.acquire", "host.read_units", "tool.reconcile", "host.model_state", "tool.describe")
+
+
+def test_resume_order_guards_reconciliation(tmp_path: Path) -> None:
+    """A failing preflight, a refused lease or differing units stop the resume before any reconciliation (AC62)."""
+    rig, host, run_id = _cut_off_write(tmp_path)
+    workflow = chain(ORIGINAL)
+    check = ServerCheck(
+        server="csi", build="old", min_build="b", fingerprint="a", expected_fingerprint="a", ok=False, reason="old"
+    )  # fmt: skip
+    differ = UnitsState(loaded=True, ok=False, present="unit-system-b", expected="unit-system-a")
+    held = HostLease(host_key="csi", lease_id="other-run")
+
+    def stopped(leases: dict[str, HostLease], *, escalated: bool) -> None:
+        """The write is still in flight, and nothing reconciled or compared the model (steps 7 and 8 did not run)."""
+        assert not {"tool.reconcile", "host.model_state"} & set(rig.log)
+        assert _events(rig, run_id, ev.StepReconciled) == []
+        assert [e.type for e in rig.events(run_id)].count(T.RUN_ESCALATED) == int(escalated)
+        assert host.ledger == []
+        assert host.leases == leases  # a lease taken for the resume is released, another run's is not touched
+
+    host.preflight_checks = [check]  # (a) step 4
+    with pytest.raises(RunRefused) as refused:
+        resume(rig, workflow, run_id)
+    assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
+    assert "host.acquire" not in rig.log  # no lease is taken after a failed check
+    stopped({}, escalated=False)
+    host.preflight_checks = None
+    host.leases["csi"] = held  # (b) step 5
+    with pytest.raises(ContractError) as locked:
+        resume(rig, workflow, run_id)
+    assert locked.value.detail.code is ErrorCode.HOST_LOCKED
+    assert "host.read_units" not in rig.log  # units are read only for a leased host
+    stopped({"csi": held}, escalated=False)
+    del host.leases["csi"]
+    host.units["m1"] = differ  # (c) step 6
+    units = resume(rig, workflow, run_id)
+    assert (units.status, units.escalation is not None and units.escalation.reason) == (
+        RunStatus.NEEDS_ENGINEER, "units_mismatch",
+    )  # fmt: skip
+    stopped({}, escalated=True)
+    host.units["m1"] = UnitsState(loaded=True, ok=True, present="unit-system-a", expected="unit-system-a")
+    del rig.log[:]
+    assert resume(rig, workflow, run_id).status is RunStatus.COMPLETED  # all three pass: the write is reconciled
+    (closing,) = _events(rig, run_id, ev.StepReconciled)
+    assert closing.op_id == OP
+    ordered = [line for line in rig.log if line in _ORDER]
+    assert ordered[:6] == list(_ORDER)  # preflight, acquire, units, reconcile, model state, then the first block call
+    assert host.leases == {}

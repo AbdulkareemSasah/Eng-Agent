@@ -31,7 +31,7 @@ from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcPort, HostPort, ToolPort
 
 if TYPE_CHECKING:
-    from eng_harness.engine._hostsafety import Pending
+    from eng_harness.engine._hostsafety import Leases, Pending
     from eng_harness.engine._runner import EngineSettings
 
 _LOG = logging.getLogger(__name__)
@@ -94,11 +94,12 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending, basis: Callable[[], BasisView],
+        pending: Pending, leases: Leases, basis: Callable[[], BasisView],
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts."""
+        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts
+        and host leases."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending, self._load_basis = pending, basis
+        self._pending, self._leases, self._load_basis = pending, leases, basis
         self._view: BasisView | None = None
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._guard = Guard(host, store, writer, producer)
@@ -183,6 +184,7 @@ class Ctx:
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
         info = await self._tools.describe(name)
+        await self._leases.acquire(info.host_key)  # one driver per host: leased before the first step on it (4.6 #10)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
         if prior is None:  # the first live attempt; a retry already prepared above
@@ -206,9 +208,11 @@ class Ctx:
                 envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
             except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
                 if info.effect != "write":
+                    await self._leases.started(info.host_key)  # the raised read may have started an instance (4.6 #10)
                     raise
                 _LOG.warning("the write at step %s raised, so its outcome is unknown: %r", path, exc)
                 envelope = None
+            await self._leases.started(info.host_key)  # an instance the call started is journaled before the next step
             if isinstance(envelope, SuccessEnvelope):
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)

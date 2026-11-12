@@ -131,7 +131,7 @@ def test_a_completed_block_is_replayed_without_a_second_record(tmp_path: Path) -
     mark = len(rig.log)
     done = asyncio.run(rig.engine(workflow).resume(paused.run_id))
     assert done.status is RunStatus.COMPLETED
-    assert rig.log[mark:] == ["tool.unreleased_tools"]  # no tool call: the two steps of the block replayed
+    assert rig.log[mark:] == ["tool.unreleased_tools", "host.preflight"]  # no tool call: the block's steps replayed
     assert rig.types(paused.run_id).count(T.STEP_COMPLETED) == before == 3  # 0/0, 0/1 and 0
     recorded = [
         e.payload.result.ref

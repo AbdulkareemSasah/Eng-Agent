@@ -198,6 +198,21 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_compare.py::test_unnamed_row_keys"
     covers: []
     depends_on: [T7]
+  - id: T8c
+    title: Difference keys carry their list (comparison core; the diff kind is unchanged)
+    # Amendment (B-469, documents only): new task from the T8 and T8b reviews (spec 0003 4.7 D2, AC51): a key begins
+    # with its list name, so two lists of one section never give one key. The kind's rule (changes sorted and unique
+    # by section and key, a key a list of strings) does not change: kinds/calcs.py and the schema snapshot stay out.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/_compare.py"
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py::test_keys_carry_their_list"
+    covers: [AC51]
+    depends_on: [T8]
   - id: T8b
     title: Calc 2, difference report, on the comparison core of T8
     # Amendment (B-416, documents only): engine plan T12 is merged before this task (section 3); adds T5's test block file.
@@ -230,7 +245,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_calc_step.py::test_older_revision_inputs"
       - "packages/eng-harness/tests/contract/test_calc_lock.py::test_stale_ok_fields_match_spec"
     covers: [AC24, AC25, AC26, AC27, AC28, AC29, AC48, AC49]
-    depends_on: [T8]
+    depends_on: [T8c]  # amendment (B-469): the calc runs on the list-prefixed keys of T8c
   - id: T9
     title: Calc 3, read-back check
     files:
@@ -400,8 +415,10 @@ and property tests, verification record, lock entry and `REGISTRY` line. T7 adds
 canonical order, spec §4.6 table) and builds `REGISTRY` with `removed=removed_ids(read_lock())`, so a removed id is
 refused at import time as well as by the contract test (spec AC2; amendment B-388, B-141 review). T8 adds
 `_compare.py` (D3 and D4, exact `Fraction` comparison, plus the leaf walker of D5 and the keyed-row comparison of D2
-that the calc calls) and extends `_state.py` with the unnamed-row keys of D2. T8 holds no calc, golden file, lock entry
-or `REGISTRY` line; its unit tests call `_compare.py` and `_state.py` directly. T8b adds the calc on that core
+that the calc calls). The D2 keys, unnamed-row keys included, live in `_compare.py`, not in `_state.py`, which is in
+the hash closure of `harness.model_fingerprint`. T8 holds no calc, golden file, lock entry or `REGISTRY` line; its unit
+tests call `_compare.py` directly. T8c makes each key begin with its list name (spec D2, AC51; amendment B-469, from
+the T8 and T8b reviews: two lists of one section gave one key). T8b adds the calc on that core
 (amendment B-458: the B-147 writer measured 532 counted lines for the former T8, above its 380). T8b also adds the
 older-revision workflow test (spec AC48, a test block that reads, writes and reads
 again through fake tool ports; its test block goes in `tests/workflows/calc_test_blocks.py`, next to T5's, amendment
