@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Language-model structured output and prompt: per-request literal ``choice`` with ``Rationale``, ``build_tool_output`` for PydanticAI, ``PROMPT_VERSION`` and golden prompt rendering with the data-block injection guard (plan 0009 T5, B-224; spec 0009 AC21, AC22).
 - Calc `harness.footing_subjects` v1 (draft) and the footing calc package: `eng_harness.calcs.footing` (`FOOTING_CALCS`, `FOOTING_KINDS`) and `.subjects` (support joints under one rectangular column, axes mapped through the rotation within `compare.angle`, every other joint excluded with its reason), `REGISTRY` now holds it, `calcs.lock.json` entry, verification record `docs/verification/calcs/harness.footing_subjects.md`, golden cases under `tests/data/golden/footing/` (plan 0010 T3, B-394; spec 0010 AC6, AC12).
 - Decision evaluation core: `eng_harness.decisions.evaluation` (`EvalThresholds`, `EvalReport`, `ProviderEvalMetrics`, `evaluate_point` with per-provider metrics, eligibility reasons and the calibration gap) and golden thresholds and fixture report (plan 0009 T8, B-227; spec 0009 AC37 to AC40).
 - Column workflow requests: `eng_harness.workflows.column_design` (`ColumnScopeRequest`, `ColumnLayoutRequest`, `ColumnProposalRequest`, `request_refusal` for spiral and special seismic) (plan 0013 T1b, B-448; spec 0013 AC3 section 4.3).
