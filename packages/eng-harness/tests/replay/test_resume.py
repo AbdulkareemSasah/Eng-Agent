@@ -14,7 +14,7 @@ from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from fakes.ports import failure
 from workflows.chain import ChainOutput, chain
 from workflows.ctx_flows import answer, flow, need_approval
-from workflows.rig import Rig, hold_lock, make_rig, request, steps
+from workflows.rig import Rig, hold_lock, make_rig, request, steps, watch_closing
 
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
@@ -271,3 +271,38 @@ def test_pause_and_resume(tmp_path: Path) -> None:
     reader = JournalReader(rig.run_dir(run_id))
     assert reader.run().status == "COMPLETED"
     reader.close()
+
+
+def test_close_started_after_resume(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run paused after it started an instance closes nothing; a new process closes that instance from the journal."""
+    rig = make_rig(tmp_path)
+    closing = watch_closing(rig, monkeypatch)
+
+    async def body(ctx: Any) -> list[str]:
+        refs = [(await ctx.tool("write_b", {"n": 0, "model": "m1"})).ref.ref]
+        await need_approval(rig.approvals, "apr_1")
+        refs.append((await ctx.tool("read_c", {"n": 1})).ref.ref)
+        return refs
+
+    workflow = flow(body)
+    paused = asyncio.run(rig.engine(workflow).start(request()))
+    run_id = paused.run_id
+    assert paused.status is RunStatus.PAUSED
+    assert (closing, rig.host.closed, "host.close_started" in rig.log) == ([], [], False)  # nothing at the pause
+    rig_instance = rig.host.instances["csi"][0]  # listed once per open model; the journal holds it once
+    assert [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.HostStarted)] == [
+        ev.HostStarted(host_key="csi", **rig_instance.model_dump(mode="json"))
+    ]
+    rig.host.instances["csi"].clear()  # the host of the new process does not list it: the journal is the record
+    _append(rig, run_id, _started("csi", CSI_ONE))  # a second instance, started before a crash
+    rig.approvals.script("apr_1", answer("apr_1"))
+    mark = len(rig.log)
+    done = asyncio.run(rig.engine(workflow).resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    assert rig.host.closed == [rig_instance, CSI_ONE]  # what the journal holds, in its order
+    assert [t[-1] for t in closing] == [T.RUN_COMPLETED]  # only after `run_completed`
+    assert rig.log[mark:].count("host.close_started") == 1
+    assert rig.host.leases == {}
+    again = asyncio.run(rig.engine(workflow).resume(run_id))  # a terminal run closes them again
+    assert again == done
+    assert rig.host.closed == [rig_instance, CSI_ONE] * 2

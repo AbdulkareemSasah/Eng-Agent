@@ -16,6 +16,7 @@ from multiprocessing.process import BaseProcess
 from pathlib import Path
 from typing import Any
 
+import pytest
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import FailureEnvelope, Provenance
@@ -250,6 +251,19 @@ def make_rig(
     loaded = {BASIS_REF: LoadedBasis(result_id=BASIS_REF, basis=DesignBasis(template=None, fields={}))}
     loaded.update(bases or {})
     return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort(), run_class, bases=loaded)
+
+
+def watch_closing(rig: Rig, monkeypatch: pytest.MonkeyPatch) -> list[list[EventType]]:
+    """Record the journal's event types at each `close_started` of the rig's host (the rig has one run)."""
+    seen: list[list[EventType]] = []
+    close = rig.host.close_started
+
+    async def closing(host_key: str, instances: Sequence[HostInstance]) -> None:
+        seen.append(rig.types(rig.run_ids()[0]))
+        await close(host_key, instances)
+
+    monkeypatch.setattr(rig.host, "close_started", closing)
+    return seen
 
 
 def request(
