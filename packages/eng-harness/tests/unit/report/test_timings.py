@@ -14,11 +14,14 @@ from eng_harness.report._model import fold_report
 
 
 def test_wait_and_run_times(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
-    run = build_report_run(run_dir, store, ids)
-    timings = fold_report(JournalReader(run_dir), store).timings
+    run = build_report_run(run_dir, store, ids, duplicate_resume=True)
+    model = fold_report(JournalReader(run_dir), store)
+    timings = model.timings
     assert timings.waiting_ms == run.wait_ms
     assert timings.machine_ms == run.machine_ms
     assert timings.resumes == run.resumes == 1
+    assert len(model.resumes) == 2
+    assert {item.resume_no for item in model.resumes} == {1}
     assert [(s.path, s.status, s.duration_ms) for s in timings.steps] == [
         ("0", "completed", 2_000), ("1", "completed", 5_000), ("2", "failed", 1_500),
     ]  # fmt: skip

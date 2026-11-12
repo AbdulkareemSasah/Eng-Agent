@@ -80,7 +80,14 @@ class ReportRun:
     """Result ids the journal references, in order of first appearance."""
 
 
-def build_report_run(run_dir: Path, store: ResultStore, ids: IdSource, *, open_approval: bool = False) -> ReportRun:
+def build_report_run(
+    run_dir: Path,
+    store: ResultStore,
+    ids: IdSource,
+    *,
+    open_approval: bool = False,
+    duplicate_resume: bool = False,
+) -> ReportRun:
     """Write the scripted run into `run_dir`; with `open_approval` one more approval stays unanswered at the end."""
     producer = Provenance(
         tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0
@@ -120,6 +127,8 @@ def build_report_run(run_dir: Path, store: ResultStore, ids: IdSource, *, open_a
     at(100, kinds.STEP_STARTED, STARTED, "2")
     failure = {"error": {"harness_code": "NEEDS_ENGINEER", "message": "m"}, "retryable": False, "duration_ms": 1_500}
     at(101.5, kinds.STEP_FAILED, failure, "2")
+    if duplicate_resume:
+        at(101.55, kinds.RUN_RESUMED, {"resume_no": 1, "code_hash_changed": False, "servers": []})
     at(101.6, kinds.STEP_RECONCILED, RECONCILED)
     at(101.7, kinds.RUN_ESCALATED, ESCALATION)
     at(102, kinds.INPUT_REQUESTED, DECISION_REQUEST)
