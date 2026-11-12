@@ -4,7 +4,7 @@ issue: "B-090"
 spec: packages/eng-harness/docs/specs/0014-idea-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
+risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356); r2 from the kinds (amendment B-453)
 tasks:
   - id: T1
     title: The IDEA server section on the framework additions of plan 0002 T20 (routes, audit_log flag)
