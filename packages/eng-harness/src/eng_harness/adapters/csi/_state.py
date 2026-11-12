@@ -111,19 +111,28 @@ class CsiStateReader:
                 expected={"units": info.get("units")},
                 received=after.get("units"),
             )
-        status = model_status(info, model_path)
-        loads = load_set(  # the tables carry no token: their values are in the present units
-            rows["patterns"], rows["combos"], rows["pattern_defs"], rows["combo_defs"],
-            rows["frame_loads"], rows["area_loads"], status.units,
-        )  # fmt: skip
-        payloads: dict[str, BaseModel] = {
-            "model.stories/1": stories(rows["stories"], READ_UNITS),
-            "model.grid_system/1": grids(rows["grids"], READ_UNITS),
-            "model.frame_placements/1": frames(rows["frames"], READ_UNITS),
-            "model.area_placements/1": areas(rows["areas"], READ_UNITS, area_section_kinds(rows["area_sections"])),
-            "model.load_set/1": loads,
-            "model.joint_restraints/1": restraints(rows["restraints"]),
-        }
+        try:  # a row the T11 mappers cannot read is an unusable reply, like a reply without its rows
+            status = model_status(info, model_path)
+            loads = load_set(  # the tables carry no token: their values are in the present units
+                rows["patterns"], rows["combos"], rows["pattern_defs"], rows["combo_defs"],
+                rows["frame_loads"], rows["area_loads"], status.units,
+            )  # fmt: skip
+            payloads: dict[str, BaseModel] = {
+                "model.stories/1": stories(rows["stories"], READ_UNITS),
+                "model.grid_system/1": grids(rows["grids"], READ_UNITS),
+                "model.frame_placements/1": frames(rows["frames"], READ_UNITS),
+                "model.area_placements/1": areas(rows["areas"], READ_UNITS, area_section_kinds(rows["area_sections"])),
+                "model.load_set/1": loads,
+                "model.joint_restraints/1": restraints(rows["restraints"]),
+            }
+        except (KeyError, TypeError, ValueError) as error:  # pydantic's ValidationError is a ValueError
+            raise ContractError(
+                ErrorCode.HOST_ERROR,
+                "a reply of the model-state read has rows the neutral kinds cannot map",
+                retryable=False,
+                host_code="UNEXPECTED_REPLY",
+                field="rows",
+            ) from error
         host = {kind: {name: rows[name] for name in names} for kind, names in _SOURCES.items()}
         return StateRead(payloads, status, fingerprint(host, status.object_counts))
 

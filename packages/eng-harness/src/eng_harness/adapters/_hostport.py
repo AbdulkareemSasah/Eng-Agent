@@ -98,7 +98,7 @@ class AdapterHostPort:
         self._reads[model_key] = read
         return HostModelState(
             loaded=True, model_id=resolved.model_id, revision=revision, fingerprint=read.fingerprint,
-            file_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+            file_sha256=_file_sha256(path),
         )  # fmt: skip
 
     def last_read(self, model_key: str) -> StateRead | None:
@@ -192,6 +192,11 @@ class AdapterHostPort:
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(body, encoding="utf-8")
         os.replace(temporary, path)
+
+
+def _file_sha256(path: Path) -> str:
+    with path.open("rb") as handle:  # in chunks: a model file is not loaded whole into memory
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _copied(source: Path, folder: Path) -> Path:

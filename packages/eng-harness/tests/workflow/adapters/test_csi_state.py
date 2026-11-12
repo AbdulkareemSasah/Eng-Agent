@@ -456,6 +456,30 @@ def test_unusable_reply_is_refused(reply: dict[str, Any]) -> None:
     anyio.run(body)
 
 
+@pytest.mark.parametrize(
+    "replies",
+    [
+        {"csi_list_stories": {"items": [{"name": "S1"}], "truncated": False}},  # a row without its elevation
+        {"csi_db_table_read": {"rows": [{"Unknown": 1}], "truncated": False}},  # a table row without its keys
+    ],
+)
+def test_unmappable_rows_are_refused(replies: dict[str, dict[str, Any]]) -> None:
+    """Rows the neutral mappers cannot read are `UNEXPECTED_REPLY`, so every read failure is a `ContractError`."""
+    from eng_harness.adapters.csi._state import CsiStateReader
+
+    _calls, call = _recorder({"csi_model_info": _INFO, **replies})
+
+    async def body() -> None:
+        with pytest.raises(ContractError) as refused:
+            await CsiStateReader(product="ETABS", call=call).read(1, None)
+        assert refused.value.detail.code is ErrorCode.HOST_ERROR
+        assert refused.value.detail.host_code == "UNEXPECTED_REPLY"
+        assert refused.value.detail.retryable is False
+        assert refused.value.detail.field == "rows"
+
+    anyio.run(body)
+
+
 def test_fingerprint_layout() -> None:
     """The fingerprint is the SHA-256 of the canonical JSON of the sections and the counts, rows ordered."""
     from eng_harness.adapters.csi._state import fingerprint
