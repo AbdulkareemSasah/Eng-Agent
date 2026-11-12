@@ -33,3 +33,5 @@ Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 
 Plan 0003 T7 (spec 0003 L-1): the model fingerprint on real reads.
 16. `harness.model_fingerprint` over the read set of a real ETABS model: the same fingerprint over repeated reads, and after save and reopen; a different fingerprint after each of the S-04 hand edits E1 to E10 (only CI's synthetic read sets have run).
+Plan 0010 T3 (footing subjects; spec 0010 section 12 L2). Needs the real ETABS model; nothing here runs in CI:
+17. `harness.footing_subjects` on a copy of a real model: which of a rectangular column section's `b_mm` and `h_mm` lies along local axis 2 at rotation zero (the calc maps `cx = b`, `cy = h` for rotations near 0 and 180 degrees), the `rotation_deg` values the adapter reports for rotated columns, and which joints report reactions.

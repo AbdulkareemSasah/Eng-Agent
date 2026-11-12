@@ -1,0 +1,14 @@
+"""The footing calcs of spec 0010 section 4.4: explicit registration, no discovery (spec 0003 4.2).
+
+`FOOTING_CALCS` are registered in `eng_harness.calcs.REGISTRY`; `FOOTING_KINDS` are the result kinds their registry
+needs (spec 0010 4.2). Each later footing calc is added here by its plan task.
+"""
+
+from eng_harness.calc import CalcDef
+from eng_harness.calcs.footing.subjects import footing_subjects
+from eng_harness.kinds.footing import FOOTING_KINDS
+
+FOOTING_CALCS: tuple[CalcDef, ...] = (footing_subjects,)
+"""The shipped footing calcs, in registration order."""
+
+__all__ = ["FOOTING_CALCS", "FOOTING_KINDS"]
