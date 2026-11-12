@@ -8,6 +8,8 @@ engine made, and the fake host's ledger shows which calls reached the host. The 
 
 import asyncio
 import re
+import sqlite3
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -25,7 +27,7 @@ from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, RunRefused
 from eng_harness.journal import EventType, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import RunClass
+from eng_harness.ports import RunClass, ServerCheck
 
 T = EventType
 RUN_ID = re.compile(r"^run_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
@@ -268,3 +270,52 @@ def test_resume_of_an_unknown_run(tmp_path: Path, bad: str) -> None:
         asyncio.run(rig.engine(chain(steps("read_a"))).resume(bad))
     assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert rig.log == []
+
+
+def _meta_run_id(run_dir: Path) -> str:
+    with sqlite3.connect(run_dir / "journal.sqlite") as db:
+        return str(db.execute("SELECT value FROM meta WHERE key = 'run_id'").fetchone()[0])
+
+
+def _tree(root: Path) -> list[str]:
+    return sorted(str(p.relative_to(root)) for p in root.rglob("*"))
+
+
+def test_caller_chosen_run_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    rig = make_rig(tmp_path)
+    twin = make_rig(tmp_path / "twin")  # the same seed: the first id its source draws is the first one the rig draws
+    drawn = f"run_{twin.ids.new_ulid()}"
+    chosen = f"run_{twin.ids.new_ulid()}"
+    assert chosen != drawn
+    engine = rig.engine(chain(steps("read_a")))
+
+    # the server checks of invariant 8 write under the run folder before the engine creates it
+    async def preflight(min_builds: Mapping[str, str]) -> list[ServerCheck]:
+        (rig.run_dir(chosen) / "servers").mkdir(parents=True)
+        return []
+
+    monkeypatch.setattr(rig.host, "preflight", preflight)
+    outcome = asyncio.run(engine.start(request().model_copy(update={"run_id": chosen})))
+    assert (outcome.status, outcome.run_id) == (RunStatus.COMPLETED, chosen)
+    assert rig.run_ids() == [chosen]
+    assert (rig.run_dir(chosen) / "servers").is_dir()  # what the server checks wrote stays
+    assert rig.header(chosen).run_id == chosen
+    assert _meta_run_id(rig.run_dir(chosen)) == chosen
+    assert [c.tool for c in rig.host.ledger] == ["read_a"]
+    assert [c.op_id for c in rig.host.ledger] == [op_id(chosen, "0", 1)]
+    # a run folder that exists, and a malformed id, are refused before any port call and nothing is created
+    log, before = list(rig.log), _tree(rig.workspace.root)
+    for bad in (chosen, "../x", "run_x", "", "run_" + "0" * 26 + "/..", "run_" + "8" * 26, "run_" + "0" * 26 + "\n"):
+        with pytest.raises(ContractError) as refused:
+            asyncio.run(engine.start(request().model_copy(update={"run_id": bad})))
+        assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
+        assert refused.value.detail.received == bad
+        assert rig.log == log
+        assert _tree(rig.workspace.root) == before
+    assert rig.run_ids() == [chosen]
+    # no run id: the engine draws one from its id source
+    plain = asyncio.run(rig.engine(chain(steps("read_a"))).start(request()))
+    assert plain.run_id == drawn
+    assert RUN_ID.fullmatch(plain.run_id)
+    assert request().run_id is None
+    assert rig.run_ids() == sorted([chosen, drawn])
