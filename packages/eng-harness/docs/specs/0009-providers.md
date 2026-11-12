@@ -220,6 +220,20 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
   after a provider's `model_version` changed, then `run_resumed.decision_runtime` holds the new summary; and no journal
   byte holds an endpoint, a `key_ref` or the sentinel key (amendment B-098: spec 0005 §4.12, engine AC69). Test:
   `tests/workflow/providers/test_shadow_workflow.py::test_run_header_records_runtime_summary`.
+- AC49. **[added: B-475]** Given `assemble_decision_runtime(providers_config, decision_settings, workspace,
+  point_policies)` in a build without the provider factory and release verification (gap PR-G1, the phase-1 assembly),
+  then: (1) with no `[providers.*]` table, the runtime holds no provider and no release, and its summary an empty
+  provider list; (2) a configured provider is not constructed, no client is created and no key is read, the cascade
+  receives `None` for its tier, its summary entry holds `name`, `model`, `version` (its `model_version`), `is_local`
+  (its `local`), `tier` and `status` `not_implemented`, and a build warning names it and PR-G1; (3) every
+  `shadow_released` entry is dropped, so its point stays in shadow, each with a build warning, a plain string that names
+  the point and PR-G1, and the summary holds no released point; (4) the result is the same for any `point_policies`,
+  the empty mapping included, since no release is kept and so no policy is checked; (5) no summary entry or warning
+  holds an endpoint, a `key_ref` or a header; (6) with the real engine and cascade wired as spec 0006 §4.2.2 wires them,
+  `run_started.decision_runtime` equals the summary. Tests: `tests/unit/providers/test_runtime.py::test_no_provider_table_gives_phase1_runtime`,
+  `::test_configured_provider_not_built_is_reported`, `::test_no_release_kept_without_verification`,
+  `::test_phase1_summary_has_no_secrets`,
+  `tests/workflow/providers/test_phase1_runtime.py::test_run_header_records_phase1_summary`.
 
 ### 3.7 Shadow mode with recorded providers
 
@@ -313,7 +327,9 @@ calls `assemble_decision_runtime` and builds the cascade with it (spec 0006 §4.
 signature (amendment B-471, spec 0006 Q16 (a)) is `assemble_decision_runtime(providers_config: ProvidersConfig,
 decision_settings: DecisionSettings, workspace: Workspace, point_policies: Mapping[str, DecisionPolicy]) ->
 DecisionRuntime`: `point_policies` are the `policies` of `verify_releases` (AC42), and the result holds the providers,
-the verified releases and the summary (AC29).
+the verified releases and the summary (AC29). Until the provider factory and release verification are wired (gap
+PR-G1), the same function is the phase-1 assembly of AC49: it builds no provider, keeps no release and reads no point
+policy (amendment B-475).
 
 ### 4.2 Configuration (`harness.toml`, sections owned here)
 
@@ -624,10 +640,10 @@ deliberately with the evaluation suite as the gate" is enforced for a model chan
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1 to AC11, AC13, AC15 to AC26, AC28 to AC30, AC47 | Unit (with `MockTransport`, recorded fakes, `FunctionModel`/`TestModel` of the pinned PydanticAI, a temporary workspace) | `tests/unit/providers/` |
+| AC1 to AC11, AC13, AC15 to AC26, AC28 to AC30, AC47, AC49 (assembly) | Unit (with `MockTransport`, recorded fakes, `FunctionModel`/`TestModel` of the pinned PydanticAI, a temporary workspace) | `tests/unit/providers/` |
 | AC12 (text in values and in nested keys), AC14 (any text and failure kind; also over the full PydanticAI path) | Unit and property (Hypothesis, `derandomize=True`) | `tests/unit/providers/`, `tests/property/` |
 | AC27, AC36, AC46 | Contract | `tests/contract/` |
-| AC31 to AC34, AC48 | Fake-host workflow (real engine, cascade and adapters; recorded transports) | `tests/workflow/providers/` |
+| AC31 to AC34, AC48, AC49 (run header) | Fake-host workflow (real engine, cascade and adapters; recorded transports) | `tests/workflow/providers/` |
 | AC35 | Replay (process/05 §1) | `tests/replay/` |
 | AC37, AC38, AC39 | Golden (sources 12 §3, §6; hand-computed fixture) and unit | `tests/data/golden/`, `tests/unit/decisions/` |
 | AC45 | Unit (source rules) | `tests/rules/` |
@@ -667,3 +683,4 @@ New modules of `eng-harness` (phase 2). `decisions.interfaces` gains `ProviderEr
 | Q11 | Package-local ADR numbers 0001 to 0003 may collide with other eng-harness ADRs written in parallel | Lead | Renumber at merge if needed; the specs link by file name |
 | Q12 | The pull request mixes ADR files with a spec and a plan, which the gate's `spec and plan` reason (all files match `spec_globs` or `plan_globs`) may reject (GC010) | Lead | Merge the ADRs with the first implementation task (T1, which needs them) or allow `docs/adr/*.md` in the reason |
 | Q13 | The prompt carries the point name, not the human-readable title, because `ProviderRequest` has no title field | Owner | Accept for v1; if the first evaluations show the model needs the title, amend spec 0005 §4.7 with `title: Label` (the cascade has it from `DecisionPoint`) and bump `PROMPT_VERSION` |
+| PR-G1 | **[added: B-475]** Gap: `assemble_decision_runtime` without the provider factory (plan T7) and release verification (`verify_releases`, plan T9), so the first live run (phase 1, rules and the engineer) does not wait for the provider adapters | Lead | The phase-1 assembly of AC49 (plan task T10a); plan task T10b wires the factory and `verify_releases` and closes the gap, replacing the AC49 tests of a provider not built and a release dropped (a spec change, not a test changed to pass) |
