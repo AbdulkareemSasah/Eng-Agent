@@ -86,6 +86,14 @@ def _kinds(rig: Rig, run_id: str, *kinds: EventType) -> list[Any]:
     return [e.payload for e in rig.events(run_id) if e.type in kinds]
 
 
+def _bound_before_step(rig: Rig, run_id: str) -> bool:
+    """True when the first `model_bound` of the run precedes the first `step_started` addressed to m1 (AC64)."""
+    events = rig.events(run_id)
+    bound_at = next(e.seq for e in events if e.type is T.MODEL_BOUND)
+    began = (e.seq for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.model_key == "m1")
+    return bound_at < next(began)
+
+
 def _housekeeping(rig: Rig, run_id: str, number: int) -> list[str]:
     """The paths of the `@resume<number>` steps, in order of their start."""
     paths = [e.path or "" for e in rig.events(run_id) if e.type is T.STEP_STARTED]
@@ -320,12 +328,13 @@ def test_first_use_binding(tmp_path: Path) -> None:
     assert first == ev.ModelBound(
         model_key="m1", host_key="csi", instance_id="csi-1", reason="first_use", file_names=["m1.edb"]
     )
+    assert _bound_before_step(rig, run_id)  # the binding lands before the `step_started` of the step addressed to m1
     named = [c[:2] for c in host.calls if c[1] in ("m1", "write_b")]
-    assert named == [("locate", "m1"), ("call", "write_b")]  # located before the write reached the host
+    assert named == [("locate", "m1"), ("read_units", "m1"), ("call", "write_b")]  # located and verified, then written
     assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
     assert [c for c in host.calls if c[0] in ("read_units", "model_state")] == [
-        ("read_units", "m1", "csi-1"), ("model_state", "m1", "csi-1"),
-    ]  # fmt: skip  # every later read names the instance of the first use
+        ("read_units", "m1", "csi-1"), ("read_units", "m1", "csi-1"), ("model_state", "m1", "csi-1"),
+    ]  # fmt: skip  # the first use, then the resume: every read names the instance of the first use
     assert len(_kinds(rig, run_id, T.MODEL_BOUND)) == 1  # the binding is not repeated at the resume
 
 
@@ -347,8 +356,8 @@ def _reopened(root: Path, after_save: str) -> tuple[Rig, ScriptedHost, BlockDef[
     host.add_model("m1", INSTANCE)
     host.models["m1"] = host.models["m1"].model_copy(update={"revision": 1, "fingerprint": "fp1"})  # the first write
     workflow = chain(TWO_WRITES)
-    steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), start("1", "write_b", M1, write=True), done("1")]
-    steps += [bound("m1", INSTANCE), saved(rig, "m1")]
+    steps: list[Forged] = [start("0", "read_a", {"n": 0}), done("0"), bound("m1", INSTANCE)]
+    steps += [start("1", "write_b", M1, write=True), done("1"), saved(rig, "m1")]
     if after_save != "none":
         steps += [start("2", "write_b", SECOND, write=True), *([done("2")] if after_save == "completed" else [])]
     run_id = forge(rig, workflow, *steps)
@@ -359,6 +368,12 @@ def _reopened(root: Path, after_save: str) -> tuple[Rig, ScriptedHost, BlockDef[
 
 @pytest.mark.parametrize("after_save", ["none", "completed", "in_flight"])
 def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
+    live, lhost = scripted_rig(tmp_path / "live")
+    lhost.add_model("m1", INSTANCE)  # first the run binds the model at its first use, before the step that addresses it
+    first = asyncio.run(live.engine(chain(TWO_WRITES)).start(request(values={"count": 3})))
+    assert first.status is RunStatus.COMPLETED
+    assert _bound_before_step(live, first.run_id)
+    assert [p.reason for p in _kinds(live, first.run_id, T.MODEL_BOUND)] == ["first_use"]
     rig, host, workflow, run_id = _reopened(tmp_path, after_save)
     outcome = resume(rig, workflow, run_id)
     rebound = [p for p in _kinds(rig, run_id, T.MODEL_BOUND) if p.reason == "reopened"]
