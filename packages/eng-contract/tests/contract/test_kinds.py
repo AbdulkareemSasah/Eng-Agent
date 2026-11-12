@@ -222,7 +222,7 @@ def test_basis_path_unit_suffixes() -> None:
     for path, unit in (("compare.stress_MPa", "MPa"), ("bounds.w_kN_m", "kN/m"), ("limits.drift_ratio", "1")):
         assert path in _basis_at(path, unit).fields
     assert "compare._MPa" in _basis_at("compare._MPa", "MPa").fields
-    assert "compare.x_MPa2_mm" in _basis_at("compare.x_MPa2_mm", "mm").fields  # a lowercase tail is no suffix
+    assert "compare.x_mm2_mm" in _basis_at("compare.x_mm2_mm", "mm").fields  # the longer suffix is not read as the end
     with pytest.raises(ValidationError, match=r"does not match the unit suffix \(MPa\)"):
         _basis_at("compare.stress_MPa", "kPa")
     with pytest.raises(ValidationError, match=r"does not match the unit suffix \(MPa\)"):
@@ -237,7 +237,8 @@ def test_basis_path_unit_suffixes() -> None:
         "compare.stress_MPa.max",  # suffix not at the end of the last segment
         "compare.stress_MPa_x",
         "compare.stress_MPax",
-        "compare.stress_kN_mm",  # one suffix only, and _kN_m is not followed by a lowercase tail
+        "compare.stress_kN_mm",  # one suffix only
+        "compare.x_MPa_mm",
         "stress_MPa",  # no dot
         "compare.stress.MPa",
         "compare.",
