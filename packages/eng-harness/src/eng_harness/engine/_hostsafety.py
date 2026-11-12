@@ -6,7 +6,8 @@ before the run folder exists. `Pending` holds, per host, the writes whose outcom
 host, while steps on other hosts go on (#6). It also binds each model to the instance that holds it before the first
 step addressed to it (spec 4.8) and reads the units of the models of a host at that first use and after a reconnect or
 a timeout (#9). Units: none. Errors: `RunRefused`; `Stopped` (see `_inflight`) when the engineer must decide a write,
-or abandoned the run; `ContractError`: `PRECONDITION_FAILED` (`model_open`, `units_verified`) or from a port call.
+or abandoned the run, or the units differ (`units_mismatch`); `ContractError`: `PRECONDITION_FAILED` (`model_open`) or
+from a port call.
 """
 
 import asyncio
@@ -68,6 +69,7 @@ class Pending:
             if isinstance(p := e.payload, ev.StepStarted) and p.kind == "read" and p.name[:5] == "units"
         }
         self._epochs: dict[str, int] = {}  # the session epoch of each host when this process first saw it (4.6 #9)
+        self._timed: set[str] = set()  # the hosts on which a timeout was observed, until their units are read again
         self._turn = asyncio.Lock()
 
     async def settle(self, host_key: str) -> None:
@@ -100,8 +102,8 @@ class Pending:
         with action `open` the model is not open before it, so both come after it (`after`, `~post.units`).
 
         Raises:
-            ContractError: `PRECONDITION_FAILED` `model_open` when no instance holds the model before the step;
-                `units_verified` when its units differ (the run is escalated, `units_mismatch`).
+            ContractError: `PRECONDITION_FAILED` `model_open` when no instance holds the model before the step.
+            Stopped: its units differ (the run is escalated, `units_mismatch`).
         """
         if key is None or after != (info.action == "open"):
             return
@@ -125,17 +127,22 @@ class Pending:
             for phase in ("pre", "post"):
                 ctx._look(inserted_path(path, phase, "units", path_key(key)), "read", "units", {"model_key": key})
 
-    async def reconnected(self, ctx: _Ctx, path: str, attempt: int, host_key: str, *, timeout: bool = False) -> None:
+    def timed_out(self, host_key: str) -> None:
+        """Note a timeout, `TIMEOUT_UNKNOWN_OUTCOME` or `HOST_WEDGED` observed on `host_key` (4.6 #9 c)."""
+        self._timed.add(host_key)
+
+    async def reconnected(self, ctx: _Ctx, path: str, attempt: int, host_key: str) -> None:
         """Read the units of the models bound on `host_key` again when its session epoch changed in this process, or
-        when a write on it timed out (`timeout`), as `<path>~host.units.<key>` (4.6 #9 c); before any reconciliation.
+        when a timeout was observed on it since (`timed_out`), as `<path>~host.units.<key>` (4.6 #9 c).
 
         Raises:
-            ContractError: `units_verified` when the units differ (the run is escalated, `units_mismatch`).
+            Stopped: the units differ (the run is escalated, `units_mismatch`).
         """
         async with self._turn:
             epoch = self._rt.host.session_epoch(host_key)
             changed, self._epochs[host_key] = self._epochs.setdefault(host_key, epoch) != epoch, epoch
-            if changed or timeout:
+            if changed or host_key in self._timed:
+                self._timed.discard(host_key)
                 for key, (bound_host, instance_id) in sorted(self._bound.items()):
                     if bound_host == host_key:
                         await self._check(
@@ -146,11 +153,8 @@ class Pending:
         """Read the units of `key` in `instance_id` as the inserted step `path`; differing units end the run (#9)."""
         rt, args = self._rt, _Obj(model_key=key)
         units = await rt.host.read_units(key, instance_id)
-        if not units.ok:
-            message = f"the units of {key} are {units.present}, not {units.expected}"
-            escalated = ev.RunEscalated(reason="units_mismatch", detail=message, evidence=[], request_id=None)
-            rt.writer.append(EventType.RUN_ESCALATED, escalated)  # the step is not recorded: a resume reads them again
-            raise ContractError(ErrorCode.PRECONDITION_FAILED, message, precondition=Precondition.units_verified)
+        if not units.ok:  # the step is not recorded, so a resume reads the units again; a block cannot catch the stop
+            rt.stop(f"the units of {key} are {units.present}, not {units.expected}", None, "units_mismatch")
         began = ctx._begin(path, attempt, "read", "units", args, effect="read", model_key=key)
         summary = _Obj(loaded=units.loaded, instance_id=instance_id)
         stored = rt.store.put("harness.journal_blob/1", {"value": summary}, rt.producer())

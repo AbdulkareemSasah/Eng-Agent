@@ -39,6 +39,7 @@ _RETRIED = (RetryRule.always, RetryRule.depends)  # `after_wedge_clears` and `re
 _DRAFT = (CalcStatus.DRAFT, CalcStatus.VERIFIED)
 _REFUSALS = (errors.HarnessCode.CALC_NOT_APPROVED, errors.HarnessCode.CALC_WITHDRAWN)
 _UNKNOWN = (ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED)  # a write's outcome is unknown (spec 4.6 #6)
+_TIMEOUTS = (ErrorCode.TIMEOUT_NO_EFFECT, *_UNKNOWN)  # the timeouts after which the units are read again (spec 4.6 #9)
 _Obj = dict[str, JsonValue]
 _Pair = tuple[str, str]
 
@@ -207,8 +208,10 @@ class Ctx:
                     self._guard.mark(key)
                 await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
                 return _result(name, done)
+            if envelope is None or envelope.error.code in _TIMEOUTS:
+                self._pending.timed_out(info.host_key)  # read or write: the units are read before the next step
             if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
-                await self._pending.reconnected(self, path, attempt, info.host_key, timeout=True)  # before 4.5.3 runs
+                await self._pending.reconnected(self, path, attempt, info.host_key)  # before 4.5.3 runs
                 found = await self._pending.resolve(info.host_key, path, attempt)
                 if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
                     self._guard.mark(key)
