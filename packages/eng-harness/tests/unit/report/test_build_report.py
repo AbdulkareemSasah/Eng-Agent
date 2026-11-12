@@ -46,6 +46,7 @@ _FORBIDDEN = frozenset(
 )
 _SHA = "a" * 64
 _MARKS = ReleaseMarks(records={})
+_STEP = {"kind": "tool", "name": "t", "args": {}, "args_sha256": _SHA, "effect": "read"}
 
 
 def _tamper(run_dir: Path, sql: str, *args: Any) -> None:
@@ -115,7 +116,7 @@ def test_tampered_refused_live_banner(
     }
     writer = JournalWriter(run_dir, store, clock, ids)
     writer.append(EventType.RUN_STARTED, {**header, "input_ref": base, "basis_ref": base})
-    writer.append(EventType.STEP_STARTED, {"kind": "tool", "name": "t", "args": {}, "args_sha256": _SHA, "effect": "read"}, path="0", attempt=1)  # fmt: skip
+    writer.append(EventType.STEP_STARTED, _STEP, path="0", attempt=1)
     writer.close()
     _tamper(run_dir, "UPDATE events SET chain_sha256 = ? WHERE seq = 2", "b" * 64)
     with pytest.raises(JournalIntegrityError):
@@ -124,7 +125,7 @@ def test_tampered_refused_live_banner(
     live_dir.mkdir()
     writer = JournalWriter(live_dir, store, clock, ids)
     writer.append(EventType.RUN_STARTED, {**header, "input_ref": base, "basis_ref": base})
-    writer.append(EventType.STEP_STARTED, {"kind": "tool", "name": "t", "args": {}, "args_sha256": _SHA, "effect": "read"}, path="0", attempt=1)  # fmt: skip
+    writer.append(EventType.STEP_STARTED, _STEP, path="0", attempt=1)
     writer.close()
     lock = RunLock(live_dir)
     lock.acquire()
