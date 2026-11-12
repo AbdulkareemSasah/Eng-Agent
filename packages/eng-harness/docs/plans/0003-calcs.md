@@ -171,11 +171,11 @@ tasks:
     max_changed_lines: 285
     max_sessions: 2
     tests_first:
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent"
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_any_change_changes_fingerprint"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[fingerprint-point-order]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[fingerprint-moved-column]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[fingerprint-canonical-bytes]"
       - "packages/eng-harness/tests/unit/calcs/test_fingerprint.py::test_incomplete_read"
       - "packages/eng-harness/tests/unit/calcs/test_fingerprint.py::test_mixed_models_refused"
     covers: [AC19, AC20, AC21, AC22, AC23]
@@ -202,9 +202,9 @@ tasks:
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[diff-section-changed]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[diff-boundary]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[diff-angle-full-turn]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/property/test_diff.py::test_boundary_exact"
       - "packages/eng-harness/tests/property/test_diff.py::test_identity_and_symmetry"
       - "packages/eng-harness/tests/unit/calcs/test_diff.py::test_basis_tolerances_required"
@@ -229,10 +229,9 @@ tasks:
     max_changed_lines: 260
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[readback-pass]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[readback-mismatch]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[readback-unexpected]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[readback-unit-scale]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/unit/calcs/test_readback.py::test_not_read"
       - "packages/eng-harness/tests/unit/calcs/test_readback.py::test_circular_inputs_refused"
     covers: [AC30, AC31, AC32, AC33, AC34]
@@ -253,10 +252,9 @@ tasks:
     max_changed_lines: 280
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-basic]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-not-designed]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-previous]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[summary-member-worst]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/unit/calcs/test_summary.py::test_empty"
     covers: [AC35, AC36, AC37, AC38, AC50]
     depends_on: [T9]
@@ -276,9 +274,9 @@ tasks:
     max_changed_lines: 150
     max_sessions: 1
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-up]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-exact]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[round-just-above]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/unit/calcs/test_rounding.py::test_edge_cases"
       - "packages/eng-harness/tests/property/test_rounding.py::test_rounding_properties"
     covers: [AC39, AC40, AC41]
@@ -298,10 +296,10 @@ tasks:
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[placement-counts]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[placement-frames]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[placement-areas]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[placement-renames]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
+      - "packages/eng-harness/tests/unit/calcs/test_placement.py::test_counts_frames_areas_renames"  # B-452: the four golden scenarios as unit cases
     covers: [AC42, AC43, AC44, AC45]
     depends_on: [T11]
 ---

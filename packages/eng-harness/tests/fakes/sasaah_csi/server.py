@@ -133,7 +133,15 @@ def _list(kind: str, args: dict[str, Any], units: str) -> dict[str, Any]:
 def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     model = STATE.model
     if name == "csi_model_info":
-        return {"units": model["units"], "locked": model["locked"], "model_path": model["model_path"]}
+        counts = {kind: len(model[kind]) for kind in COLLECTIONS}
+        return {
+            "units": model["units"],
+            "locked": model["locked"],
+            "model_path": model["model_path"],
+            "object_counts": counts,
+            "counts": counts,
+            "program_version": "22.0.0",
+        }
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
         return _list(name[len("csi_list_") :], args, units)
     if name == "csi_db_table_read":
