@@ -344,3 +344,40 @@ def test_server_check(tmp_path: Path) -> None:
 @workflow(name="needs_nothing", version=1, description="no basis field, no server build")
 async def _needs_nothing(ctx: Any, inp: ChainInput) -> ChainOutput:
     return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
+
+
+def test_refusal_messages_name_what_failed(tmp_path: Path) -> None:
+    """The refusals name the missing basis fields and each failed server with its reason (AC41, AC44)."""
+    ref = "res_" + "3" * 26
+    empty = LoadedBasis(result_id=ref, basis=DesignBasis(template=None, fields={}))
+    rig = make_rig(tmp_path, bases={ref: empty})
+    with pytest.raises(RunRefused) as basis:
+        asyncio.run(rig.engine(_needs_basis).start(request(workflow="needs_basis", basis_ref=ref)))
+    assert basis.value.message == (
+        "the design basis lacks or has not confirmed code.edition, loads.risk_category, site.seismic_class"
+    )
+    good, old, wrong = (
+        ServerCheck(
+            server=name, build="b", min_build="b", fingerprint="f", expected_fingerprint="f", ok=ok, reason=reason
+        )
+        for name, ok, reason in (
+            ("csi", True, None),
+            ("etabs", False, "build below the minimum"),
+            ("safe", False, None),
+        )
+    )
+    rig = make_rig(tmp_path / "servers")
+    rig.host.preflight_checks = [good, old, wrong]
+    with pytest.raises(RunRefused) as servers:
+        asyncio.run(rig.engine(_checked).start(request(workflow="checked")))
+    assert servers.value.evidence == ("etabs", "safe")  # the failed checks only, in the order of the port
+    assert servers.value.message == "server check failed: etabs (build below the minimum); safe (not ok)"
+
+
+def test_no_basis_read_when_nothing_is_required(tmp_path: Path) -> None:
+    """A workflow that requires no basis field does not load the basis, so an unknown reference does not stop it."""
+    rig = make_rig(tmp_path)
+    done = asyncio.run(rig.engine(_needs_nothing).start(request(workflow="needs_nothing", basis_ref="res_" + "1" * 26)))
+    assert done.status is RunStatus.COMPLETED
+    assert "basis.load" not in rig.log
+    assert rig.header(done.run_id).servers == []
