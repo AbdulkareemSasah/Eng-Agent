@@ -6,12 +6,14 @@ import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from eng_contract.errors import ContractError, ErrorCode, Precondition
+from eng_contract.errors import ContractError, ErrorCode, Precondition, WarningCode
 from eng_contract.ids import Clock, IdSource
+from eng_contract.store import ModelStateStore
 
 from eng_harness.adapters._identity import IdentityStore
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
-from eng_harness.ports import HostInstance, SavedModel
+from eng_harness.adapters.csi._state import CsiStateReader, StateRead
+from eng_harness.ports import HostInstance, HostModelState, SavedModel, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
 from eng_harness.servers._procinfo import ProcessInspector
@@ -22,7 +24,7 @@ class AdapterHostPort:
     def __init__(
         self, *, identity: IdentityStore, sessions: ServerManager, guard: ProcessGuard, inspector: ProcessInspector,
         locks: HostLocks, clock: Clock, ids: IdSource, run_dir: Path, product: str, program: str, exe_name: str,
-        files: Mapping[str, Path], server: str = "csi", host_key: str = "csi",
+        files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
     ) -> None:  # fmt: skip
         self._identity, self._clock, self._ids = identity, clock, ids
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
@@ -31,9 +33,14 @@ class AdapterHostPort:
         self._bound: dict[str, str] = {}
         self._instances: dict[str, OpenedInstance] = {}
         self._units: dict[str, str] = {}
+        self._states = states  # without it an outside edit of the model in memory (4.6.4) cannot raise the revision
+        self._reads: dict[str, StateRead] = {}
+        self._written: set[str] = set()
+        self._warnings: list[tuple[str, WarningCode]] = []
         self._session = CsiSession(
             sessions, guard, inspector, locks, ids, server=server, product=product, program=program, exe_name=exe_name
         )
+        self._reader = CsiStateReader(product=product, call=self._session._call)  # B-451: no public read on CsiSession
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         source = self._file(model_key)
@@ -65,6 +72,56 @@ class AdapterHostPort:
         self._units[model_key] = await self._session.units(opened)
         self._persist()
         return self._host(opened)
+
+    async def model_state(self, model_key: str, instance_id: str) -> HostModelState:
+        """The state of the model in `instance_id` (spec 4.6.4); `loaded` false when it is absent from that instance.
+
+        A fingerprint that changed with no `wrote` mark since the last read, or a file saved outside, is an outside
+        edit: the revision rises and `take_warnings` gives `MODEL_CHANGED_OUTSIDE`.
+        """
+        held = await self.locate(model_key)
+        if held is None or held.instance_id != instance_id:
+            return HostModelState(loaded=False)
+        path, opened = self._held(model_key)
+        read = await self._reader.read(opened.pid, path)
+        resolved = self._identity.resolve(path)
+        revision, outside = resolved.revision, bool(resolved.warnings)
+        previous = self._reads.get(model_key)
+        marked = model_key in self._written
+        self._written.discard(model_key)
+        if previous is not None and previous.fingerprint != read.fingerprint and not (marked or outside):
+            outside = True
+            if self._states is not None:  # the unsaved state is a new revision with no file hash
+                revision = self._states.increment(resolved.model_id, revision, read.fingerprint, None).revision
+        if outside:
+            self._warnings.append((model_key, WarningCode.MODEL_CHANGED_OUTSIDE))
+        self._reads[model_key] = read
+        return HostModelState(
+            loaded=True, model_id=resolved.model_id, revision=revision, fingerprint=read.fingerprint,
+            file_sha256=_file_sha256(path),
+        )  # fmt: skip
+
+    def last_read(self, model_key: str) -> StateRead | None:
+        """The payloads, status and fingerprint of the last `model_state` of `model_key`, or `None`."""
+        return self._reads.get(model_key)
+
+    def wrote(self, model_key: str) -> None:
+        """Mark an adapter write: the next fingerprint change of `model_key` is the adapter's, not an outside edit."""
+        self._written.add(model_key)
+
+    def take_warnings(self) -> list[tuple[str, WarningCode]]:
+        """The `MODEL_CHANGED_OUTSIDE` warnings (model key, code) noted by `model_state` since the last call."""
+        taken, self._warnings = self._warnings, []
+        return taken
+
+    async def read_units(self, model_key: str, instance_id: str) -> UnitsState:
+        """The present units against those recorded at open (spec 4.5.4); never raises for a model that is absent."""
+        expected = self._units.get(model_key, "")
+        held = await self.locate(model_key)
+        if held is None or held.instance_id != instance_id:
+            return UnitsState(loaded=False, ok=True, present=None, expected=expected)
+        present = await self._session.units(self._held(model_key)[1])
+        return UnitsState(loaded=True, ok=present == expected, present=present, expected=expected)
 
     async def locate(self, model_key: str) -> HostInstance | None:
         opened = self._bound_instance(model_key)
@@ -113,6 +170,8 @@ class AdapterHostPort:
 
     def _keep(self, model_key: str, path: Path, model_id: str, opened: OpenedInstance) -> None:
         self._files[model_key], self._models[model_key] = path, model_id
+        self._reads.pop(model_key, None)  # a reopened file starts a new baseline for outside-edit detection
+        self._written.discard(model_key)
         self._bound[model_key] = opened.instance_id
         self._instances[opened.instance_id] = opened
 
@@ -133,6 +192,11 @@ class AdapterHostPort:
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(body, encoding="utf-8")
         os.replace(temporary, path)
+
+
+def _file_sha256(path: Path) -> str:
+    with path.open("rb") as handle:  # in chunks: a model file is not loaded whole into memory
+        return hashlib.file_digest(handle, "sha256").hexdigest()
 
 
 def _copied(source: Path, folder: Path) -> Path:
