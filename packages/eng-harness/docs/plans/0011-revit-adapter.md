@@ -4,7 +4,7 @@ issue: "B-080"
 spec: packages/eng-harness/docs/specs/0011-revit-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
+risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356); r2 from the kinds (amendment B-453)
 tasks:
   - id: T1
     title: Framework extensions (attended class, host_dialog confirm, optional pid, deny-list names) and the Revit server section
@@ -237,13 +237,9 @@ tasks:
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-match]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-offset]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-ambiguous]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-unmatched]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-link-conflict]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-upper-end]"
-      - "packages/eng-harness/tests/golden/test_calcs_golden.py::test_case[frame-element-map-tolerance-boundary]"
+      # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
+      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
+      # the task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/property/test_frame_element_map.py::test_permutation_invariant"
       - "packages/eng-harness/tests/unit/calcs/test_frame_element_map.py::test_basis_fields_required"
     covers: [AC27, AC28, AC29]
