@@ -2,17 +2,13 @@
 
 A `token` tool passes the units token whose units make its conversion simplest (spec 4.5.4): `kN_mm_C` for the wall
 thickness, `kN_m_C` for the loads (spec 4.6.3). The framework fixes one token per binding, so the token of the tool
-being called is put on the binding here.
+being called, from its descriptor, is put on the binding here.
 """
 
-from collections.abc import Mapping
-from contextvars import ContextVar
 from typing import Any
 
-from eng_contract.envelope import Envelope
-from pydantic import JsonValue
-
 from eng_harness.adapters._allowlist import Allowlist
+from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._toolport import AdapterToolPort, Binding, ModelBinder
 from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.adapters.csi._edits import EDIT_BUILDERS, EDIT_MODELS
@@ -24,7 +20,6 @@ TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_set_frame_load_distributed": "kN_m_C",
     "csi_set_area_load_uniform": "kN_m_C",
 }
-_CALLING: ContextVar[str] = ContextVar("csi_calling_tool", default="")
 
 
 def edit_allowlist() -> Allowlist:
@@ -39,9 +34,9 @@ class _TokenBinder:
     def __init__(self, inner: ModelBinder) -> None:
         self._inner = inner
 
-    async def binding(self, host_key: str, model: str | None) -> Binding:
-        bound = await self._inner.binding(host_key, model)
-        token = TOKENS.get(_CALLING.get())
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
+        bound = await self._inner.binding(host_key, model, descriptor)
+        token = TOKENS.get(descriptor.name)
         return bound if token is None else bound.model_copy(update={"units_system": token})
 
     def revision(self, model_id: str) -> int | None:
@@ -56,11 +51,3 @@ class CsiToolPort(AdapterToolPort):
             allowlist=edit_allowlist(), arg_models=EDIT_MODELS, builders=EDIT_BUILDERS,
             binder=_TokenBinder(binder), **wiring,
         )  # fmt: skip
-
-    async def call(self, tool: str, args: Mapping[str, JsonValue], *, op_id: str, model: str | None) -> Envelope:
-        """Call `tool` with its units token on the binding."""
-        reset = _CALLING.set(tool)
-        try:
-            return await super().call(tool, args, op_id=op_id, model=model)
-        finally:
-            _CALLING.reset(reset)
