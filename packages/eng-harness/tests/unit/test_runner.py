@@ -11,6 +11,7 @@ import re
 import sqlite3
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from eng_contract import CONTRACT_VERSION
@@ -18,10 +19,11 @@ from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from fakes.ports import failure
 from pydantic import JsonValue, ValidationError
-from workflows.chain import ChainOutput, bad_output, chain
+from workflows.chain import ChainInput, ChainOutput, bad_output, chain
 from workflows.rig import BASIS_REF, make_rig, request, steps
 
 from eng_harness import __version__
+from eng_harness.block import workflow
 from eng_harness.engine import EngineSettings, PermissionMode, RunRequest, RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, RunRefused
@@ -272,6 +274,11 @@ def test_resume_of_an_unknown_run(tmp_path: Path, bad: str) -> None:
     assert rig.log == []
 
 
+@workflow(name="checked", version=1, description="needs a server build", min_server_builds={"csi": "build-1"})
+async def _checked(ctx: Any, inp: ChainInput) -> ChainOutput:
+    return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
+
+
 def _meta_run_id(run_dir: Path) -> str:
     with sqlite3.connect(run_dir / "journal.sqlite") as db:
         return str(db.execute("SELECT value FROM meta WHERE key = 'run_id'").fetchone()[0])
@@ -287,35 +294,47 @@ def test_caller_chosen_run_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     drawn = f"run_{twin.ids.new_ulid()}"
     chosen = f"run_{twin.ids.new_ulid()}"
     assert chosen != drawn
-    engine = rig.engine(chain(steps("read_a")))
+    engine = rig.engine(_checked)
 
     # the server checks of invariant 8 write under the run folder before the engine creates it
     async def preflight(min_builds: Mapping[str, str]) -> list[ServerCheck]:
         (rig.run_dir(chosen) / "servers").mkdir(parents=True)
-        return []
+        return [
+            ServerCheck(
+                server="csi",
+                build="build-1",
+                min_build="build-1",
+                fingerprint="f",
+                expected_fingerprint="f",
+                ok=True,
+                reason=None,
+            )
+        ]
 
     monkeypatch.setattr(rig.host, "preflight", preflight)
-    outcome = asyncio.run(engine.start(request().model_copy(update={"run_id": chosen})))
+    outcome = asyncio.run(engine.start(request("checked").model_copy(update={"run_id": chosen})))
     assert (outcome.status, outcome.run_id) == (RunStatus.COMPLETED, chosen)
     assert rig.run_ids() == [chosen]
     assert (rig.run_dir(chosen) / "servers").is_dir()  # what the server checks wrote stays
     assert rig.header(chosen).run_id == chosen
     assert _meta_run_id(rig.run_dir(chosen)) == chosen
+    assert "host.preflight" in rig.log
     assert [c.tool for c in rig.host.ledger] == ["read_a"]
     assert [c.op_id for c in rig.host.ledger] == [op_id(chosen, "0", 1)]
     # a run folder that exists, and a malformed id, are refused before any port call and nothing is created
     log, before = list(rig.log), _tree(rig.workspace.root)
     for bad in (chosen, "../x", "run_x", "", "run_" + "0" * 26 + "/..", "run_" + "8" * 26, "run_" + "0" * 26 + "\n"):
         with pytest.raises(ContractError) as refused:
-            asyncio.run(engine.start(request().model_copy(update={"run_id": bad})))
+            asyncio.run(engine.start(request("checked").model_copy(update={"run_id": bad})))
         assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
         assert refused.value.detail.received == bad
         assert rig.log == log
         assert _tree(rig.workspace.root) == before
     assert rig.run_ids() == [chosen]
     # no run id: the engine draws one from its id source
-    plain = asyncio.run(rig.engine(chain(steps("read_a"))).start(request()))
+    fresh = make_rig(tmp_path / "fresh")
+    plain = asyncio.run(fresh.engine(chain(steps("read_a"))).start(request()))
     assert plain.run_id == drawn
     assert RUN_ID.fullmatch(plain.run_id)
     assert request().run_id is None
-    assert rig.run_ids() == sorted([chosen, drawn])
+    assert fresh.run_ids() == [drawn]
