@@ -202,10 +202,11 @@ def compare_rows(
     A key once on each side is compared member by member; its nested keyed lists are compared under its key.
     """
     members = next(fields for k, p, fields in ROW_KEYS if k == kind and p == path)
+    *_, name = path
     groups: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {}
     for side, rows in enumerate((before, after)):
         for row in rows:
-            groups.setdefault((*prefix, path[-1], *row_key(members, row)), ([], []))[side].append(row)
+            groups.setdefault((*prefix, name, *row_key(members, row)), ([], []))[side].append(row)
     diff = SectionDiff(changes=[], within=[], outcomes=[])
     for key in sorted(groups):
         left, right = groups[key]
