@@ -181,15 +181,33 @@ tasks:
     covers: [AC19, AC20, AC21, AC22, AC23]
     depends_on: [T5, T6]
   - id: T8
-    title: Calc 2, difference report, with the tolerance-comparison helper
+    title: Difference report, part 1, the tolerance-comparison helper and the comparison core
+    # Amendment (B-458, documents only): split (D-12); the B-147 branch measured 532 counted lines against 380
+    # (model_diff.py 436). T8 keeps _compare.py (D3, D4) plus the leaf walker and keyed-row comparison of D2 and D5,
+    # moved out of model_diff.py (about 225 lines), and _state.py (38); budget 380 -> 290. The calc is T8b.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/_compare.py"
+      - "packages/eng-harness/src/eng_harness/calcs/_state.py"
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py"
+    max_changed_lines: 290
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py::test_tolerance_boundary_exact"
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py::test_keyed_rows_change_kinds"
+      - "packages/eng-harness/tests/unit/calcs/test_compare.py::test_unnamed_row_keys"
+    covers: []
+    depends_on: [T7]
+  - id: T8b
+    title: Calc 2, difference report, on the comparison core of T8
     # Amendment (B-416, documents only): engine plan T12 is merged before this task (section 3); adds T5's test block file.
+    # Amendment (B-458, documents only): split from T8 (D-12): input model, basis read, side metadata, the calc and its
+    # registration (about 286 counted lines on the B-147 branch once the core moves to T8); budget 380 -> 315.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.model_diff (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.model_diff.md"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
-      - "packages/eng-harness/src/eng_harness/calcs/_compare.py"
-      - "packages/eng-harness/src/eng_harness/calcs/_state.py"
       - "packages/eng-harness/src/eng_harness/calcs/model_diff.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/unit/calcs/test_diff.py"
@@ -199,7 +217,7 @@ tasks:
       - "packages/eng-harness/tests/contract/test_calc_lock.py"
       - "packages/eng-harness/tests/data/calcs/stale_ok.json"
       - "packages/eng-harness/tests/data/golden/calcs/diff-*.json"
-    max_changed_lines: 380
+    max_changed_lines: 315
     max_sessions: 3
     tests_first:
       # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
@@ -212,7 +230,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_calc_step.py::test_older_revision_inputs"
       - "packages/eng-harness/tests/contract/test_calc_lock.py::test_stale_ok_fields_match_spec"
     covers: [AC24, AC25, AC26, AC27, AC28, AC29, AC48, AC49]
-    depends_on: [T7]
+    depends_on: [T8]
   - id: T9
     title: Calc 3, read-back check
     files:
@@ -235,7 +253,7 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_readback.py::test_not_read"
       - "packages/eng-harness/tests/unit/calcs/test_readback.py::test_circular_inputs_refused"
     covers: [AC30, AC31, AC32, AC33, AC34]
-    depends_on: [T8]
+    depends_on: [T8b]  # amendment (B-458): T8 split, the calc is T8b
   - id: T10
     title: Calc 4, design results summary
     files:
@@ -312,7 +330,8 @@ The framework comes first, in the order its own imports need: the decorator and 
 lock file (T2), approvals (T3), the kinds (T4) and the CalcPort (T5). The rules test and golden harness (T6) are in
 place before any calc exists, so every calc lands under them. Then the six calcs follow, in the order the edit cycle
 depends on them. The fingerprint (T7) comes first because the difference report reuses its canonical-state helper.
-The difference report (T8) is the riskiest part (A5) and is built before the read-back check (T9), which embeds it.
+The difference report (T8, its comparison core, and T8b, the calc; split B-458) is the riskiest part (A5) and is built
+before the read-back check (T9), which embeds it.
 The summary (T10), rounding (T11) and placement comparison (T12) follow. T7 to T12 all edit `calcs/__init__.py`,
 `calcs.lock.json` and `CHANGELOG.md`, so they run one after another (`depends_on`). T4 and T6 may run beside T2 and T3.
 They share only `CHANGELOG.md` and `pyproject.toml` (`public_modules` lines), which are merged in pull-request order.
@@ -376,11 +395,15 @@ checked locally so it runs before the gate is merged. The golden loader parametr
 `tests/data/golden/calcs/*.json`. The golden file lint checks `source`, `method_ref`, `synthetic` and the schema. The
 verification record template goes in `docs/verification/calcs/README.md`. Almost everything here is test code.
 
-**T7 to T12 The calcs** (spec §4.6 to §4.11). One calc per task, each with its golden files, unit and property tests,
-verification record, lock entry and `REGISTRY` line. T7 adds `_state.py` (section keys and canonical order, spec §4.6
-table) and builds `REGISTRY` with `removed=removed_ids(read_lock())`, so a removed id is refused at import time as
-well as by the contract test (spec AC2; amendment B-388, B-141 review). T8 adds `_compare.py` (D3 and D4, exact `Fraction` comparison) and extends `_state.py` with the unnamed-row
-keys of D2. T8 also adds the older-revision workflow test (spec AC48, a test block that reads, writes and reads
+**T7 to T12 The calcs** (spec §4.6 to §4.11). One calc per task (T8 excepted, below), each with its golden files, unit
+and property tests, verification record, lock entry and `REGISTRY` line. T7 adds `_state.py` (section keys and
+canonical order, spec §4.6 table) and builds `REGISTRY` with `removed=removed_ids(read_lock())`, so a removed id is
+refused at import time as well as by the contract test (spec AC2; amendment B-388, B-141 review). T8 adds
+`_compare.py` (D3 and D4, exact `Fraction` comparison, plus the leaf walker of D5 and the keyed-row comparison of D2
+that the calc calls) and extends `_state.py` with the unnamed-row keys of D2. T8 holds no calc, golden file, lock entry
+or `REGISTRY` line; its unit tests call `_compare.py` and `_state.py` directly. T8b adds the calc on that core
+(amendment B-458: the B-147 writer measured 532 counted lines for the former T8, above its 380). T8b also adds the
+older-revision workflow test (spec AC48, a test block that reads, writes and reads
 again through fake tool ports; its test block goes in `tests/workflows/calc_test_blocks.py`, next to T5's, amendment
 B-416) and the `stale_ok` contract test (spec AC49), which compares each registered calc's
 input schema with `tests/data/calcs/stale_ok.json`, the spec §4.13 table; T9 to T12 add their calc's row to that
@@ -395,7 +418,7 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
 - Other plans: engine plan T2 (errors) is merged before T1; engine T3 (`_kinds.py`) before T4; engine T6 (ports and
   fakes) and engine T10 (`ctx.calc`, and so engine T9) before T5. T7 to T12 inherit this through `depends_on`.
   The engine-spec amendment of spec Q11 is merged (engine spec section 4.6 invariant 3, Q17, Q18). Engine plan T12
-  (invariant 3 with `CalcInfo.ref_rules`) is merged before T8, whose workflow test (spec AC48) needs the staleness
+  (invariant 3 with `CalcInfo.ref_rules`) is merged before T8b, whose workflow test (spec AC48) needs the staleness
   check. Amendment (B-416).
   The gate's T39 (B-439, FB005 form A4, the `version=` keyword of `calc(...)`) is merged before T7. Amendment (B-437).
   `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
