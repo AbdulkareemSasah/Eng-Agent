@@ -21,8 +21,11 @@ import aci318_14
 from aci318_14 import PACK
 
 _IDS = [
+    "aci318_14.10_6_1_1.longitudinal_reinforcement_limits",
     "aci318_14.13_2_7_1.flexure_at_column_face",
     "aci318_14.13_3_1_1.bearing_pressure_service",
+    "aci318_14.22_4_1_1.axial_flexure_uniaxial",
+    "aci318_14.22_4_2_1.max_axial_strength",
     "aci318_14.22_5_5_1.one_way_shear",
     "aci318_14.22_6_5_2.punching_shear",
     "aci318_14.25_4_2_3.development_length_bottom_bars",
@@ -34,7 +37,7 @@ _MODULES = ["src/aci318_14/**/*.py"]
 
 
 def test_registry_and_specs() -> None:
-    """Discovery finds the pack with exactly the six checks, each naming an existing clause spec (PK-AC3).
+    """Discovery finds the pack with exactly the nine checks (the column checks added by plan 0004 T5, Q11), each naming an existing clause spec (PK-AC3).
 
     The clause specs sit outside the member; mutmut's copy of it (``MUTANT_UNDER_TEST`` set) lacks them, so only there,
     after the registry assertions, a missing folder skips; in every other run it fails (as B-369 and B-423).
