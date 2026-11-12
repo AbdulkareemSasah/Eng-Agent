@@ -137,6 +137,10 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
         T.RUN_STARTED,
         T.STEP_STARTED,
         T.STEP_COMPLETED,
+        T.MODEL_BOUND,  # the first step addressed to m1: its binding, then its units, then the step itself
+        T.STEP_STARTED,
+        T.STEP_COMPLETED,
+        T.CHECK_ENFORCED,
         T.STEP_STARTED,
         T.STEP_COMPLETED,
         T.STEP_STARTED,
@@ -154,8 +158,14 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["write_b"], {}, {})
     assert rig.store.payload(head.input_ref) == {"value": given}  # the input is stored, not copied into the journal
     assert head.input_sha256 == payload_sha256(given)
-    read, read_done, write, write_done, end_check, _end_check_done, enforced, done = events[1:]
+    read, read_done, bind, units, _units_done, units_enforced = events[1:7]
+    write, write_done, end_check, _end_check_done, enforced, done = events[7:]
     assert (read.path, read.attempt, write.path, write.attempt) == ("0", 1, "1", 1)
+    assert bind.payload == ev.ModelBound(
+        model_key="m1", host_key="csi", instance_id="rig-1", reason="first_use", file_names=["m1.edb"]
+    )  # journaled before the first step addressed to m1, and its units are read before that step (spec 4.8, 4.6 #9)
+    assert (units.path, units_enforced.path) == ("1~pre.units.m1", "1~pre.units.m1")
+    assert units_enforced.payload == ev.CheckEnforced(invariant=9, model_key="m1", outcome="pass")
     started_read, started_write = read.payload, write.payload
     assert isinstance(started_read, ev.StepStarted)
     assert isinstance(started_write, ev.StepStarted)
