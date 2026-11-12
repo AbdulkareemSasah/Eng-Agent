@@ -31,7 +31,7 @@ from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcPort, HostPort, ToolPort
 
 if TYPE_CHECKING:
-    from eng_harness.engine._hostsafety import Pending
+    from eng_harness.engine._hostsafety import Leases, Pending
     from eng_harness.engine._runner import EngineSettings
 
 _LOG = logging.getLogger(__name__)
@@ -94,11 +94,12 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending,
+        pending: Pending, leases: Leases,
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts."""
+        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts
+        and host leases."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending = pending
+        self._pending, self._leases = pending, leases
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._guard = Guard(host, store, writer, producer)
         self._guard.install()
@@ -175,6 +176,7 @@ class Ctx:
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
         info = await self._tools.describe(name)
+        await self._leases.acquire(info.host_key)  # one driver per host: leased before the first step on it (4.6 #10)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
         if prior is None:  # the first live attempt; a retry already prepared above
@@ -201,6 +203,7 @@ class Ctx:
                     raise
                 _LOG.warning("the write at step %s raised, so its outcome is unknown: %r", path, exc)
                 envelope = None
+            await self._leases.started(info.host_key)  # an instance the call started is journaled before the next step
             if isinstance(envelope, SuccessEnvelope):
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)
