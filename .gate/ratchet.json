@@ -1,1 +1,1 @@
-{"version": 1, "counts": {"tools/eng-dev-gate": {"noqa": 19, "skip": 0}, "packages/eng-contract": {"noqa": 3, "type_ignore": 1}, "packages/eng-harness": {"noqa": 12, "skip": 4}, "packages/structural-codes/aci318-14": {"noqa": 11, "skip": 2}, "packages/structural-codes/core": {"noqa": 3}}}
+{"version": 1, "counts": {"tools/eng-dev-gate": {"noqa": 19, "skip": 0}, "packages/eng-contract": {"noqa": 3, "type_ignore": 1}, "packages/eng-harness": {"noqa": 12, "skip": 4}, "packages/structural-codes/aci318-14": {"noqa": 12, "skip": 2}, "packages/structural-codes/core": {"noqa": 3}}}

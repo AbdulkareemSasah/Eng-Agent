@@ -1,0 +1,27 @@
+{
+  "columns": [
+    {
+      "frame_id": "C1",
+      "required": {
+        "b": {
+          "source": "input",
+          "value": 400.0
+        },
+        "h": {
+          "source": "input",
+          "value": 600.0,
+          "unit": "mm"
+        }
+      }
+    },
+    {
+      "frame_id": "C2",
+      "required": {
+        "D": {
+          "source": "basis",
+          "path": "columns.required_d_mm"
+        }
+      }
+    }
+  ]
+}
