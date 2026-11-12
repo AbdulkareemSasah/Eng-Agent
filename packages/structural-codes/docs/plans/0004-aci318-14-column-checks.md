@@ -81,6 +81,9 @@ tasks:
       - "packages/structural-codes/aci318-14/tests/unit/test_pack_columns.py"
       - "packages/structural-codes/aci318-14/tests/contract/test_column_payloads.py"
       - "packages/structural-codes/aci318-14/tests/replay/test_column_determinism.py"
+      # amendment B-461: these two existing tests pin the number of registered checks (six to nine)
+      - "packages/structural-codes/aci318-14/tests/unit/test_verify_cli.py"
+      - "packages/structural-codes/aci318-14/tests/replay/test_pack_determinism.py"
     max_changed_lines: 80
     max_sessions: 2
     tests_first:
@@ -249,7 +252,7 @@ B-083.
 | Q8 | The maximum ratio is checked at a section without lap splices | B-083 evaluates the section away from laps; the owner decides whether a lap-region check is needed |
 | Q9 | Reduced effective area for the minimum ratio (10.3.1.2) | Do not add until a project needs it; the full `Ag` is safe for the minimum |
 | Q10 | Columns of special moment frames (Chapter 18 limits, `fy` rows of Table 20.2.2.4(a)) | B-083 refuses them until seismic checks exist; needs a design-basis field for the seismic system (B-063) |
-| Q11 | T5 changes the expected id set of plan 0002's `test_pack.py` (six to nine ids) | Accept as a scope change approved by this plan; alternatively amend plan 0002 PK-AC3 to "holds at least the six ids" in the lead's next documents change |
+| Q11 | T5 changes the expected id set of plan 0002's `test_pack.py` (six to nine ids) | Accept as a scope change approved by this plan; the edits of `tests/unit/test_verify_cli.py` (line counts and pending count) and `tests/replay/test_pack_determinism.py` (payload lines) are the same scope change (amendment B-461); alternatively amend plan 0002 PK-AC3 to "holds at least the six ids" in the lead's next documents change |
 | Q12 | The `SHORT_COLUMN` limit uses the sway value (22) for braced columns too (AF C-4) | Accept (narrower applicability, no unsafe verdict); a braced-column limit can be added once C3 confirms 6.2.5(b) and its sign convention |
 
 ### 6.2 Gaps
