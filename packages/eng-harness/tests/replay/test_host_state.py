@@ -438,6 +438,7 @@ def test_the_cut_of_a_restore_leaves_the_new_attempt_to_later_resumes(tmp_path: 
     assert isinstance(found.outcome, ev.StepResult)
     index.lookup("0", "tool", "read_a", payload_sha256({"n": 0}))
     index.lookup("2", "tool", "read_c", payload_sha256({"n": 2}))
+    index.lookup("~end.check_model.m1", "read", "check_model", payload_sha256({"model": "m1"}))
     index.finish()  # every recorded path was visited: nothing hidden, nothing left over
 
 

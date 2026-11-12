@@ -4,26 +4,41 @@ issue: "B-083"
 spec: packages/eng-harness/docs/specs/0013-column-workflow.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
+risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356); r2 from the kinds (amendment B-453)
 tasks:
   - id: T1
-    title: Column workflow kinds and request models
+    title: Column workflow kinds
+    # Amendment (B-447, D-12): split from the request models (now T1b). The eight kinds written as ordinary classes
+    # measured 322 counted lines, the kinds and requests together 427, over the 400-line cap.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.column_design, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/__init__.py"
       - "packages/eng-harness/src/eng_harness/kinds/column_design.py"
-      - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
-      - "packages/eng-harness/src/eng_harness/workflows/column_design/_requests.py"
       - "packages/eng-harness/tests/contract/test_column_design_kinds.py"
-      - "packages/eng-harness/tests/data/kinds/column_design/**"
-    max_changed_lines: 260
+      - "packages/eng-harness/tests/data/kinds/column_design/*.json"
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/contract/test_column_design_kinds.py::test_request_models"
       - "packages/eng-harness/tests/contract/test_column_design_kinds.py::test_kind_fixtures"
     covers: [AC3]
     depends_on: []
+  - id: T1b
+    title: Column workflow request models
+    # Amendment (B-447, D-12): the request models of spec 4.3, split from T1.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows.column_design
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
+      - "packages/eng-harness/src/eng_harness/workflows/column_design/_requests.py"
+      - "packages/eng-harness/tests/contract/test_column_requests.py"
+      - "packages/eng-harness/tests/data/kinds/column_design/requests/**"
+    max_changed_lines: 120
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_column_requests.py::test_request_models"
+    covers: [AC3]
+    depends_on: [T1]
   - id: T2
     title: Calc harness.column_select with golden and property tests
     files:
@@ -208,7 +223,7 @@ tasks:
       - "packages/eng-harness/tests/unit/rules/test_column_design_rules.py::test_revit_rules"
       - "packages/eng-harness/tests/unit/rules/test_column_design_rules.py::test_lock"
     covers: [AC14]
-    depends_on: [T1]
+    depends_on: [T1, T1b]  # T1b: the decision points answer with the request models (amendment B-447)
   - id: T10
     title: Engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets)
     files:
@@ -372,9 +387,12 @@ selection, bar count, length), not code capacities.
 
 ## 2. Tasks
 
-**T1 Kinds and requests** (spec §4.2, §4.3). The eight `harness.*` kinds with strict models and registration beside
-the edit-cycle kinds; `ColumnScopeRequest`, `ColumnLayoutRequest` and `ColumnProposalRequest`, with the refused
-variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reasoned refusal with the gap id.
+**T1 Kinds** (spec §4.2). The eight `harness.*` kinds with strict models, written as ordinary classes, and registration
+beside the edit-cycle kinds.
+
+**T1b Requests** (spec §4.3). `ColumnScopeRequest`, `ColumnLayoutRequest` and `ColumnProposalRequest`, with the refused
+variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reasoned refusal with the gap id. Amendment
+B-447 (D-12): split from T1, whose explicit kinds alone measured 322 counted lines.
 
 **T2 `harness.column_select`** (spec §4.4.1). Name and story-section resolution, the exact verticality test against
 `compare.length`, shape and material per column, issues, and the shared golden test module for the column calcs.

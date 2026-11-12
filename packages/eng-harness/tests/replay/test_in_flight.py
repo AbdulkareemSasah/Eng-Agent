@@ -85,15 +85,28 @@ def test_write_in_flight(tmp_path: Path, found: str) -> None:
     if found == "not_applied":  # runs again as the next attempt, with a new op_id
         assert (closing.outcome, closing.result) == ("not_applied", None)
         assert trace(rig, run_id, before) == [
-            *reconciled, ("step_started", "1", 2), ("step_completed", "1", 2),
-            ("step_started", "2", 1), ("step_completed", "2", 1), ("run_completed", None, None),
+            *reconciled,
+            ("step_started", "1", 2),
+            ("step_completed", "1", 2),
+            ("step_started", "2", 1),
+            ("step_completed", "2", 1),
+            ("step_started", "~end.check_model.m1", 1),
+            ("step_completed", "~end.check_model.m1", 1),
+            ("check_enforced", "~end.check_model.m1", None),
+            ("run_completed", None, None),
         ]  # fmt: skip
         assert [(c.tool, c.op_id) for c in host.ledger][:1] == [("write_b", op_id(run_id, "1", 2))]
         assert op_id(run_id, "1", 2) != OP
         return
     assert closing.outcome == "applied"  # returns the reconciled result: no call
     assert trace(rig, run_id, before) == [
-        *reconciled, ("step_started", "2", 1), ("step_completed", "2", 1), ("run_completed", None, None),
+        *reconciled,
+        ("step_started", "2", 1),
+        ("step_completed", "2", 1),
+        ("step_started", "~end.check_model.m1", 1),
+        ("step_completed", "~end.check_model.m1", 1),
+        ("check_enforced", "~end.check_model.m1", None),
+        ("run_completed", None, None),
     ]  # fmt: skip
     assert [c.tool for c in host.ledger] == ["read_c"]
     assert closing.result is not None
@@ -198,8 +211,14 @@ def test_read_in_flight(tmp_path: Path, attempt: int) -> None:
     outcome = resume(rig, chain(ORIGINAL), run_id)
     assert outcome.status is RunStatus.COMPLETED
     assert trace(rig, run_id, before) == [
-        ("run_resumed", None, None), ("step_rerun", "2", attempt), ("step_started", "2", attempt),
-        ("step_completed", "2", attempt), ("run_completed", None, None),
+        ("run_resumed", None, None),
+        ("step_rerun", "2", attempt),
+        ("step_started", "2", attempt),
+        ("step_completed", "2", attempt),
+        ("step_started", "~end.check_model.m1", 1),
+        ("step_completed", "~end.check_model.m1", 1),
+        ("check_enforced", "~end.check_model.m1", None),
+        ("run_completed", None, None),
     ]  # fmt: skip
     (rerun,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
     assert rerun.reason == "read_in_flight"

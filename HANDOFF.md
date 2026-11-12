@@ -36,15 +36,15 @@ Notes for the cloud session:
 
 ## 1. Where the build stands
 
-- Resume commit: `602968c docs(eng-dev-gate): FB005 form A4, an integer version keyword of a listed callable; plan T39 (B-438) (#267)` on `build/v1`.
-- Plan tasks merged: 149 of 290 (51.4 %), plus 84 documents amendments.
+- Resume commit: `d31d53a docs(eng-harness): servers plan T11 split into reply mapping (T11) and model-state reader (T11b) (B-450) (#286)` on `build/v1` (cloud session, 2026-11-12).
+- Plan tasks merged: 158 of 292 (54.1 %; B-447 and B-450 each added a task), plus 91 documents amendments and lead fixes.
 
 | Package | Merged | Total |
 |---|---|---|
 | eng-contract | 19 | 19 |
-| eng-dev-gate | 39 | 41 |
-| structural-codes | 29 | 36 |
-| eng-harness | 62 | 194 |
+| eng-dev-gate | 40 | 41 |
+| structural-codes | 30 | 36 |
+| eng-harness | 69 | 196 |
 
 Phases: 0 done; 1 (engine, edit cycle) and 2 (codes, SAFE, providers, footing workflow) in progress; 3 and 4 (Revit,
 SAP2000, columns, IDEA) started only in structural-codes (column checks skeleton). Nothing that needs a host program is
@@ -79,40 +79,27 @@ Framework or the earlier Sasaah Agent design system, no MCP server built for a h
 the Sasaah servers, ADR-0024), Sasaah is read-only (changes only through a branch and pull request there, never merged
 by an agent).
 
-## 3. In flight at the pause (finish these first)
+## 3. In flight (cloud session, 2026-11-12)
+
+Merged this session (17): B-437, B-440, B-439, B-444, B-330, B-445, B-393, B-139, B-129, B-446, B-447, B-137, B-220,
+B-449, B-111, B-186, B-450.
 
 | Work item | Task | State | What is left |
 |---|---|---|---|
-| B-438 | DOC.GATEA4 Gate spec 4.8 FB005 form A4 | merged (#267, 602968c) | done |
-| B-437 | DOC.CALCRULES Calcs spec 0003 4.3 and plan 0003 T7: allowed imports, recursive rules | PR #260 | convergence round done (3de8b96, reviewed: APPROVE); record the review in the body, local CI, merge |
-| B-440 | DOC.PROVT1 Providers plan 0009 T1: the license exceptions of cffi and regex | PR #270 | written and reviewed (APPROVE, recorded in the body); local CI, merge |
-| B-146 | C.T7 Calc 1, model fingerprint, with the canonical-state helper | branch pushed | continue on the branch (lead note); waits for DOC.CALCRULES, G.T39 |
-| B-220 | P.T1 Dependencies, provider errors, configuration, network guard | PR #253 superseded | restart on the fresh branch of its entry (section 5), then close #253; waits for DOC.PROVT1 |
-| B-439 | G.T39 FB005 form A4: an integer literal as the version keyword of a listed v | not started | write it; waits for DOC.GATEA4 |
-| B-330 | Z.T1 Shared column section model, column preconditions, shared constants mo | PR #269 | lead review with sources and oracle lenses done (notes below), fix 502a2a8 pushed; record the review in the body, local CI, merge |
-| B-393 | X.T2 Code-pack route of the CalcPort and the structural-codes workspace dep | PR #268 | finish review, verifiers and local CI, then merge |
-| B-394 | X.T3 Calc harness.footing_subjects and the footing calc package | PR #256 | finish review, verifiers and local CI, then merge; waits for C.T7 |
+| B-146, B-333, B-280 | C.T7, Z.T4, G.T1 | PRs #283, #284, #285, reviewed, full gate pass | in the local CI queue (`/home/box/lead/ciq.sh`), merge on PASS |
+| B-331 | Z.T2 max axial | branch, reviewed, full gate pass | PR, local CI |
+| B-332 | Z.T3 axial flexure | branch, oracle-verified twice | writer raising the mutation score (112/157 < 80 %); then full gate, PR |
+| B-130 | S.T11 (after B-450: reply mapping) | branch being rebuilt from build/v1 | review; T11b is B-451 (reader copies in `.claude/worktrees/b130-t11b-stash/`) |
+| B-221, B-224, B-227 | P.T2, P.T5, P.T8 | branches, reviewed | full gate, PR, local CI |
+| B-112, B-187 | E.T13, I.T13 | in writing | review |
+| B-448 | G.T1b request models | not started | after G.T1 (B-280); request-model copies in `.claude/worktrees/b280-requests-stash/` |
+| B-394 | X.T3 | PR #256 | after C.T7 (B-146) |
 
-### Notes on the items in flight (second pause)
-
-- **B-437 (PR #260)**: the D-28 convergence round fixed the three verifier findings (AC3 now names the
-  `calcs/__init__.py` lock-file exception; the T7 comment cites gate spec 4.5 step 6, AC10b; B-438 is merged, so its
-  FB005 form A4 references resolve). Lead review: APPROVE. Merge it, then C.T7 (B-146) can continue once gate T39
-  (B-439) merges.
-- **B-440 (PR #270)**: plan-only amendment; the section 3 sentence that called the license exceptions a precondition
-  outside every task was aligned with T1's new file list. Owner note in the body: two package ADRs share number 0001.
-- **B-330 (PR #269)**: lead review of `_column.py` against the axial-flexure and maximum-axial clause specs: every
-  constant matches its cited clause (Es 20.2.2.2; Table 21.2.2 phi rows; Table 22.4.2.1; 6.2.5(a) and 6.2.5.1(b);
-  Table 22.2.2.4.3); SP-1, CS S6, CS S7 and the CP boundaries recomputed by hand agree with the tests to the last digit.
-  Two oracle findings fixed by test-only commit 502a2a8: the `SHORT_COLUMN` test had only `b < h`, so a mutant using
-  `b_mm` alone passed (mirrored `h < b` case added); the `d_j < a` boundary of the displaced concrete had no test (added
-  at `a == d_1 == 250`). LOW for Z.T2: the column inputs need `n_bars_h >= 2` (CS S1 divides by `n_bars_h - 1`).
-  Record this review in the body (the writer was the earlier session), then local CI and merge.
-- **B-393 (PR #268)**: written and reviewed with no blocking finding in the earlier session; its body has no Review
-  section yet. Record a review (read the diff again: `_calc/_code_packs.py`, `_calc/_port.py`), local CI, merge.
-- **Ready to write now** (every dependency merged): B-111 (E.T12), B-129 (S.T10), B-137 (S.T18), B-139 (S.T20), B-186
-  (I.T12), B-280 (G.T1) and B-439 (G.T39, gate FB005 form A4, unblocked by B-438). Cursor writers were started on the
-  workstation and stopped before writing anything; nothing of them is on GitHub.
+Notes:
+- Writers: Composer 2.5 (the DeepSeek model the owner chose is not in the plan, D-31). Runs often end with
+  "Connection stalled"; read the branch and restart in a fresh chat.
+- Load-sensitive tests (P-54) still fail now and then (`test_sink.py` 10 ms bound, `test_routes.py` socket timeout): rerun.
+- `git fetch` can stall on loose objects: `git repack -d`. A `gh pr create` that times out may still have created the PR.
 
 ## 4. Order of the remaining work
 

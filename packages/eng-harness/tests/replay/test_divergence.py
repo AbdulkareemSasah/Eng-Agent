@@ -9,7 +9,7 @@ rules the ctx calls of plan task T10 will exercise (a parallel size, an approval
 import asyncio
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from eng_contract.canonical import payload_sha256
@@ -17,6 +17,7 @@ from eng_contract.errors import ErrorCode, ErrorDetail
 from fakes.ports import failure
 from workflows import chain_edited
 from workflows.chain import ORIGINAL, ChainOutput, chain, chain_retyped
+from workflows.ctx_flows import flow
 from workflows.rig import Rig, make_rig, request
 
 from eng_harness.block import WorkflowDef
@@ -26,6 +27,7 @@ from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, JournalIntegrityError, NeedsReconciliation, ReplayDivergence
 from eng_harness.journal import Event, EventType
 from eng_harness.journal import _events as ev
+from eng_harness.ports import HostInstance, ToolInfo
 
 T = EventType
 REF = "res_" + "1" * 26
@@ -271,6 +273,104 @@ def test_finish_names_the_unvisited_paths() -> None:
     assert raised.value.code is HarnessCode.REPLAY_DIVERGENCE
     assert all(f" {path}" in raised.value.message for path in ("1", "2", "10"))
     ReplayIndex([]).finish()  # an empty index has nothing to miss
+
+
+def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
+    """Inserted check and save steps replay with the journal; a `~host` step is not required (AC47).
+
+    A resume that no longer performs the recorded check diverges, because the inserted step is part of the sequence.
+    An unrecorded inserted path going live is the open question Q35, not asserted here.
+    """
+    rig = make_rig(tmp_path)
+    specs: tuple[tuple[str, Literal["read", "write"], Literal["plain", "analysis"]], ...] = (
+        ("write_m", "write", "plain"),
+        ("read_m", "read", "plain"),
+        ("analyze", "read", "analysis"),
+    )
+    for name, effect, action in specs:
+        rig.host._tools[name] = ToolInfo(name=name, effect=effect, action=action, host_key="csi", model_param="model")
+    instance = HostInstance(instance_id="i-1", pid=7, process_started_at=rig.clock.now(), program="csi")
+    rig.host.add_model("m1", instance)
+    rig.host.script("read_c", failure(ErrorCode.HOST_BUSY))
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("write_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("analyze", {"model": "m1"})
+        await ctx.tool("read_c", {"n": 0})
+        return []
+
+    workflow = flow(body)
+    first = asyncio.run(rig.engine(workflow).start(request()))
+    assert first.status is RunStatus.NEEDS_ENGINEER
+    inserted = [
+        e
+        for e in rig.events(first.run_id)
+        if isinstance(e.payload, ev.StepStarted) and e.payload.name in ("check_model", "save")
+    ]
+    assert [e.path for e in inserted] == ["1~pre.check_model.m1", "2~pre.save.m1"]
+    payloads = [e.payload for e in inserted if isinstance(e.payload, ev.StepStarted)]
+    assert [(e.kind, e.effect, e.op_id) for e in payloads] == [("read", "read", None)] * 2
+    mark = len(rig.log)
+    outcome = asyncio.run(rig.engine(workflow).resume(first.run_id))
+    assert outcome.status is RunStatus.COMPLETED
+    assert "host.check_model" not in rig.log[mark:]
+    assert "host.save" not in rig.log[mark:]
+
+    fresh = make_rig(tmp_path / "removed")
+    pair: tuple[tuple[str, Literal["read", "write"], Literal["plain"]], ...] = (
+        ("write_m", "write", "plain"),
+        ("read_m", "read", "plain"),
+    )
+    for name, effect, action in pair:
+        fresh.host._tools[name] = ToolInfo(name=name, effect=effect, action=action, host_key="csi", model_param="model")
+    fresh.host.script("read_c", failure(ErrorCode.HOST_BUSY))
+
+    async def writing(ctx: Any) -> list[str]:
+        await ctx.tool("write_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_c", {"n": 0})
+        return []
+
+    written = flow(writing)
+    stopped = asyncio.run(fresh.engine(written).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert "1~pre.check_model.m1" in [e.path for e in fresh.events(stopped.run_id)]
+
+    async def empty(ctx: Any) -> list[str]:
+        return []
+
+    again = asyncio.run(fresh.engine(flow(empty, name="chain")).resume(stopped.run_id))
+    assert again.escalation is not None
+    assert again.escalation.reason == "replay_divergence"
+    assert "check_model" in again.escalation.detail
+
+    host_only = make_rig(tmp_path / "host")
+
+    async def read(ctx: Any) -> list[str]:
+        await ctx.tool("read_a", {"n": 0})
+        return []
+
+    reader = flow(read)
+    args = {"n": 0}
+    step = {"kind": "tool", "name": "read_a", "args": args, "args_sha256": payload_sha256(args), "effect": "read"}
+    done = {"result": {"ref": REF, "summary": {}, "warnings": [], "complete": True}, "duration_ms": 1}
+    audit = {
+        "kind": "read",
+        "name": "units",
+        "args": {"model": "m1"},
+        "args_sha256": payload_sha256({"model": "m1"}),
+        "effect": "read",
+    }
+    run_id = host_only.forge(
+        reader,
+        (T.STEP_STARTED, "0", step),
+        (T.STEP_COMPLETED, "0", done),
+        (T.STEP_STARTED, "0~host.units.m1", audit),
+        (T.STEP_COMPLETED, "0~host.units.m1", done),
+    )
+    skipped = asyncio.run(host_only.engine(reader).resume(run_id))
+    assert skipped.status is RunStatus.COMPLETED  # the ~host step is not part of the replayed sequence
 
 
 def test_step_event_without_a_start_is_a_damaged_journal() -> None:

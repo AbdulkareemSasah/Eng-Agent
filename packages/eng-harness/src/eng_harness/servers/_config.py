@@ -94,8 +94,8 @@ class ServerConfig(_Model):
     build: BuildPin
     host_key: str
     mcp_mode: str = "legacy"  # spec section 11 Q3
-    audit_log: bool = True
-    route: str | None = None
+    audit_log: bool = Field(default=True, strict=True)  # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError
+    route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), not this loader
     roles: Mapping[str, RoleConfig] = Field(min_length=1)
 
     @field_validator("command")
