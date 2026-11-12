@@ -4,7 +4,7 @@ issue: "B-003"
 spec: packages/eng-contract/docs/specs/0001-eng-contract-0.1.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r2, r3]           # binding for every pull request of this plan; never below the path risk floor; r3 from T15 (a development dependency in pyproject.toml and uv.lock, amendment B-345)
+risk: [r1, r2, r3]       # binding for every pull request of this plan; never below the path risk floor; r3 from T15 (a development dependency in pyproject.toml and uv.lock, amendment B-345); r1 from T19 (the calcs lock, path floor of packages/eng-harness/.gate/risk-map.yml, amendment B-468)
 tasks:
   - id: T1
     title: Package skeleton and gate configuration
@@ -498,6 +498,8 @@ mutation score over the whole package); AC53 by the gate's import check once `en
 **T19 Unit suffixes in basis paths** (spec §4.10.2, AC48a; amendment B-463, owner decision OQ-Q44). `BasisPath` keeps
 lowercase segments and lets the last segment end with one §4.7.2 suffix, built from the quantity kinds of `units`;
 regenerates the `basis.design_basis/1` schema snapshot (spec §10). Eng-harness plan 0007 T2 and T8 need it merged.
+T19 also regenerates the harness calc lock of `harness.footing_subjects` (one `content_sha256` line in
+`calcs.lock.json`), because the contract schema is part of that calc's content hash; the calc stays version 1.
 
 ## 3. Dependencies
 
