@@ -1,0 +1,19 @@
+{
+  "revision": "rev-1",
+  "fingerprint": "fp1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "file_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "changed": [
+    {
+      "frame_id": "C1",
+      "from_section": "C40",
+      "to_section": "C50"
+    },
+    {
+      "frame_id": "C1",
+      "from_section": "C40",
+      "to_section": "C60"
+    }
+  ],
+  "selection": "res_00000000000000000000000001#/field",
+  "review": "res_00000000000000000000000001#/field"
+}

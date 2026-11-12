@@ -1,0 +1,36 @@
+{
+  "calc": {
+    "id": "harness.column_select",
+    "version": 1,
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "draft"
+  },
+  "draft": true,
+  "trace": {
+    "calc_id": "harness.column_select",
+    "calc_version": "1",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "constants": [],
+    "steps": [],
+    "outputs": []
+  },
+  "status": "PASS",
+  "columns": [
+    {
+      "frame_id": "C1",
+      "section": "C40",
+      "shape": "rectangular",
+      "material": "C30",
+      "story": "L1",
+      "length_mm": 3200.0
+    }
+  ],
+  "excluded": [
+    {
+      "frame_id": "B1",
+      "reason": "NOT_VERTICAL"
+    }
+  ],
+  "issues": []
+}
