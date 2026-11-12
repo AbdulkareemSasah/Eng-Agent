@@ -254,8 +254,9 @@ def test_report_snapshot(run_dir: Path, store: ResultStore, ids: SeededIdSource)
         assert [item.resume_no for item in run.model.resumes] == [1]
         assert len(run.model.decisions) == 1
         html = build_report(run.reader, store, ReleaseMarks(records={}), clock, __version__)
-        for title in ("Status", "Changes", "Results summary", "Sources", "Decisions", "Timings", "Run events"):
-            assert f"<h2>{title}</h2>" in html
+        headings = ("Status", "Changes", "Results summary", "Sources", "Decisions", "Timings", "Run events")
+        places = [html.index(f"<h2>{title}</h2>") for title in headings]
+        assert places == sorted(places)
         assert html == SNAPSHOT.read_text(encoding="utf-8")
     finally:
         run.close()

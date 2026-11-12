@@ -7,6 +7,7 @@ from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import ResultStore
 
 from eng_harness import __version__
+from eng_harness._text import format_timestamp
 from eng_harness.journal import EventType, JournalReader, JournalWriter
 from eng_harness.report import ReleaseMarks, build_report
 
@@ -86,7 +87,7 @@ def test_draft_signed_and_sources(
         signed_at = next(event for event in reader.events() if event.type is EventType.SIGNED_OFF).at
     finally:
         reader.close()
-    shown = f"{signed_at[:10]} {signed_at[11:23]} UTC"
+    shown = format_timestamp(signed_at)
     assert '<div class="draft">' not in signed_clean
     assert "DRAFT —" not in signed_clean
     assert "Signed by engineer:ada" in signed_clean

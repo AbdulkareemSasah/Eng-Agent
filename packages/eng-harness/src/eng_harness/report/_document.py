@@ -56,7 +56,7 @@ def _banner(model: ReportModel, signed: Event | None, marked: dict[str, ResultMa
     payload = signed.payload
     if not isinstance(payload, ev.SignedOff):
         raise ReportError("signed_off event has an invalid payload")
-    signed_line = f"Signed by {payload.by} at {signed.at[:10]} {signed.at[11:23]} UTC"
+    signed_line = f"Signed by {payload.by} at {format_timestamp(signed.at)}"
     mark_rows = [el(Tag.P, Text(line)) for line in lines]
     return el(Tag.DIV, el(Tag.P, Text(signed_line), class_=SafeToken("banner")), *mark_rows)
 
