@@ -26,7 +26,7 @@ if sys.platform == "win32":
     from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunRequest, RunStatus
     from eng_harness.errors import HarnessCode, RunLocked
     from eng_harness.journal import is_locked
-    from eng_harness.ports import RunClass, ToolInfo
+    from eng_harness.ports import HostInstance, RunClass, ToolInfo
 
     HOLDER = (
         "import sys\nfrom pathlib import Path\nfrom eng_harness._runlock import RunLock\n"
@@ -72,6 +72,7 @@ if sys.platform == "win32":
             """Serve the tool `write_b`; `runs_dir` holds the one run being watched."""
             tool = ToolInfo(name="write_b", effect="write", action="plain", host_key="csi", model_param="model")
             super().__init__([tool], ids, clock)
+            self.add_model("m1", HostInstance(instance_id="i-1", pid=1, process_started_at=clock.now(), program="csi"))
             self.sightings: list[tuple[bool, str]] = []
             self._runs_dir = runs_dir
 
