@@ -235,7 +235,7 @@ def test_keyed_rows_change_kinds() -> None:
 
 def test_ambiguous_identical_and_sides_shown() -> None:
     # The same duplicated key on both sides with byte-identical rows (in any order) is unchanged, not ambiguous (D2).
-    rows = [_frame("F1"), _frame("F1", "S2")]
+    rows: list[Any] = [_frame("F1"), _frame("F1", "S2")]
     same = compare_rows(FRAMES, ("frames",), rows, list(reversed(rows)), TOL)
     assert same == SectionDiff(changes=[], within=[], outcomes=["unchanged"])
     # A duplicate on one side and nothing on the other: both lists shown, the empty one as [].
