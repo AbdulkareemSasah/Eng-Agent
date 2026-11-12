@@ -138,7 +138,7 @@ decision D-5), a real process over stdio; "fake-host workflow test" runs the rea
   `tests/property/test_idea_loads_props.py::test_structure_preserved`.
 - AC10. Given the write, when `idea_native_set_loads` is sent with `out_path` in the run folder, then the model is rebound
   to the new file (new revision, new hash, the old file kept), the read-back (`idea_native_get_loads` on the new file)
-  equals the requested forces within the basis field `checks.readback_relative_tolerance`, a mismatch is
+  equals the requested forces within the basis field `checks.readback_relative_tolerance_ratio`, a mismatch is
   `READBACK_MISMATCH` (error), a reply with a non-empty `dropped_zero` is the warning `LOAD_EFFECT_ZERO_DROPPED` naming the
   effects, and a plan whose every effect is zero is `HOST_ERROR` (`idea_error`) with no new file. Tests:
   `tests/workflow/adapters/test_idea_loads.py::test_set_loads_writes_new_file`, `::test_readback_mismatch_detected`,
@@ -482,7 +482,7 @@ the service is "stopped". Faults, selected by the test: `service_stopped` (stub 
 | `beam_segment_id`, `position_host` | int, float | host (opaque) | exact match | no | engineer-approved map from the workflow |
 | `connection` | str | | non-empty | no | workflow |
 | `design_code` | str | | 1 to 100 | basis field `connection.design_code` | design basis (13 §2), no default |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
 | `call_timeout_s`, `client_grace_s` | int | s | >= 1 | no | `harness.toml`, required |
 | Outputs | envelopes of the kinds of §4.5 | canonical | | | adapter |
 
