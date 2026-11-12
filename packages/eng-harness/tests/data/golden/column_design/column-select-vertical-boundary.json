@@ -1,0 +1,118 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (L2) and spec 0003 section 4.11 P2; synthetic tolerance, no project value",
+  "method_ref": "§4.4.1 L2",
+  "synthetic": true,
+  "derivation": "compare.length = 5 mm, t^2 = 25. C_at: plan offset (3,4) gives d_plan^2 = 9+16 = 25 <= t^2, vertical; 3D length sqrt(25+4000^2) = 4000.000078... as float 4000.000078125. C_side: offset (5,0) gives d_plan^2 = 25 exactly.",
+  "inputs": {
+    "input": {
+      "scope": {"frames": ["C_at", "C_side"], "combinations": ["1"]},
+      "frames": {
+        "frames": [
+          {
+            "id": "C_at",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 3, "y_mm": 4, "z_mm": 4000},
+            "story": "L1",
+            "rotation_deg": 0
+          },
+          {
+            "id": "C_side",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 5, "y_mm": 0, "z_mm": 3000},
+            "story": "L1",
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "C40",
+            "material": "C30",
+            "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+          }
+        ],
+        "area_sections": []
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length": {
+            "value": 5,
+            "unit": "mm",
+            "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "scope": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "basis.engineer_input/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000003",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000004",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "PASS",
+    "columns": [
+      {
+        "frame_id": "C_at",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 4000.000078125
+      },
+      {
+        "frame_id": "C_side",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 3000.0
+      }
+    ],
+    "excluded": [],
+    "issues": []
+  }
+}

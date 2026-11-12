@@ -1,0 +1,137 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (L1 to L3); synthetic model, no project value",
+  "method_ref": "§4.4.1 L1",
+  "synthetic": true,
+  "derivation": "compare.length = 5 mm. Scope frames [C1, C2, B1]. C1 vertical (0,0,0)-(0,0,3200), section C40 rectangular 400x600, story L1; length_mm = sqrt(0+0+3200^2) = 3200. C2 vertical (1000,0,0)-(1000,0,3000), section R450x300, story L1; length_mm = 3000. B1 plan span 8000 mm>5 so NOT_VERTICAL. Columns sorted by frame_id.",
+  "inputs": {
+    "input": {
+      "scope": {
+        "frames": ["C1", "C2", "B1"],
+        "combinations": ["D+LL"]
+      },
+      "frames": {
+        "frames": [
+          {
+            "id": "C1",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": 3200},
+            "story": "L1",
+            "rotation_deg": 0
+          },
+          {
+            "id": "C2",
+            "kind": "other",
+            "section": "R450x300",
+            "i": {"x_mm": 1000, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 1000, "y_mm": 0, "z_mm": 3000},
+            "story": "L1",
+            "rotation_deg": 0
+          },
+          {
+            "id": "B1",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 3000},
+            "j": {"x_mm": 8000, "y_mm": 0, "z_mm": 3000},
+            "story": "L1",
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "C40",
+            "material": "C30",
+            "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+          },
+          {
+            "name": "R450x300",
+            "material": "C30",
+            "shape": {"type": "rectangular", "b_mm": 450, "h_mm": 300}
+          }
+        ],
+        "area_sections": []
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length": {
+            "value": 5,
+            "unit": "mm",
+            "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "scope": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "basis.engineer_input/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000003",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000004",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "PASS",
+    "columns": [
+      {
+        "frame_id": "C1",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 3200.0
+      },
+      {
+        "frame_id": "C2",
+        "section": "R450x300",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 3000.0
+      }
+    ],
+    "excluded": [
+      {"frame_id": "B1", "reason": "NOT_VERTICAL"}
+    ],
+    "issues": []
+  }
+}

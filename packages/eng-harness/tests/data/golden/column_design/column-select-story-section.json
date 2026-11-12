@@ -1,0 +1,127 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (L1); synthetic model, no project value",
+  "method_ref": "§4.4.1 L1",
+  "synthetic": true,
+  "derivation": "compare.length = 5 mm. Select stories [L2] and sections [R450x300] (both filters AND). F_L2_A on L2 with R450x300 passes. F_L2_B on L2 with C40 fails section filter. F_L1 fails story filter. Plan offset zero on F_L2_A: length_mm = 3500.",
+  "inputs": {
+    "input": {
+      "scope": {
+        "select": {"stories": ["L2"], "sections": ["R450x300"]},
+        "combinations": ["1"]
+      },
+      "frames": {
+        "frames": [
+          {
+            "id": "F_L2_A",
+            "kind": "other",
+            "section": "R450x300",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": 3500},
+            "story": "L2",
+            "rotation_deg": 0
+          },
+          {
+            "id": "F_L2_B",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 2000, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 2000, "y_mm": 0, "z_mm": 3500},
+            "story": "L2",
+            "rotation_deg": 0
+          },
+          {
+            "id": "F_L1",
+            "kind": "other",
+            "section": "R450x300",
+            "i": {"x_mm": 4000, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 4000, "y_mm": 0, "z_mm": 3000},
+            "story": "L1",
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "C40",
+            "material": "C30",
+            "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+          },
+          {
+            "name": "R450x300",
+            "material": "C30",
+            "shape": {"type": "rectangular", "b_mm": 450, "h_mm": 300}
+          }
+        ],
+        "area_sections": []
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length": {
+            "value": 5,
+            "unit": "mm",
+            "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "scope": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "basis.engineer_input/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000003",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 1,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000004",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "PASS",
+    "columns": [
+      {
+        "frame_id": "F_L2_A",
+        "section": "R450x300",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L2",
+        "length_mm": 3500.0
+      }
+    ],
+    "excluded": [],
+    "issues": []
+  }
+}
