@@ -53,8 +53,8 @@ class Binding(BaseModel):
 class ModelBinder(Protocol):
     """The `HostPort` side that knows the bound instance of a model key."""
 
-    async def binding(self, host_key: str, model: str | None) -> Binding:
-        """The binding of `model`, or of the host's only bound instance when `None`."""
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
+        """The binding of `model`, or of the host's only bound instance when `None`, for the tool `descriptor`."""
 
     def revision(self, model_id: str) -> int | None:
         """The current revision of a model id, `None` when not tracked (staleness of references)."""
@@ -172,7 +172,7 @@ class AdapterToolPort:
         started, began = self._clock.now(), self._clock.now_ms()
         cls = self._models[descriptor.args_model]
         validated = validate_call(cls, args, source=self._store, current_revision=self._binder.revision)
-        binding = await self._binder.binding(server.host_key, model)
+        binding = await self._binder.binding(server.host_key, model, descriptor)
         build = self._builders.get(descriptor.name, _default_builder)
         sent = host_arguments(
             descriptor,

@@ -362,7 +362,7 @@ owner asks in a live project ([ADR-0026](../../../../design/docs/adr/0026-projec
 | `pressure_kPa` (read) | float | kPa | finite | n/a | model |
 | `u3_kN_m3` (read) | float | kN/m3 | finite | n/a | model (Q3) |
 | `call_timeout_s`, `client_grace_s`, `timeout_s` of the SAFE server | int | s | ≥ 1 | no | `harness.toml`, required, no default (0002 §4.2) |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
 | Outputs | envelopes of the kinds in §4.3 to §4.6 | canonical | - | - | adapter |
 
 ## 6. Errors
