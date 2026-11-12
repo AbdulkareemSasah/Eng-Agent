@@ -26,7 +26,7 @@ _REFS_REQUEST = ProviderRequest(
         ProviderOption(value="0", label="First member"),
         ProviderOption(value="1", label="Second member"),
     ),
-    state={"labels_field": ("North", "South")},
+    state={"labels_field": ["North", "South"]},
 )
 
 
@@ -46,7 +46,7 @@ def test_output_type_is_strict() -> None:
     assert refs_choice["enum"] == ["0", "1"]
 
     good = model.model_validate({"choice": "b", "rationale": "Bearing governs."})
-    assert good.choice == "b"
+    assert good.model_dump()["choice"] == "b"
 
     with pytest.raises(ValidationError):
         model.model_validate({"choice": "d", "rationale": "Outside the options."})

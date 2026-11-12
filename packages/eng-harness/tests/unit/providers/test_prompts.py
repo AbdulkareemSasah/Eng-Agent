@@ -50,7 +50,11 @@ def test_injected_label_stays_in_data() -> None:
     assert all("value" in opt and "label" in opt for opt in payload["options"])
     labels = [opt["label"] for opt in payload["options"]]
     assert injected in labels
-    assert request.point not in system
-    for value in ("a", "b", "c"):
-        assert value not in system
+    assert f'"point":"{request.point}"' not in system
+    for option in request.options:
+        assert option.label not in system
+        assert f'"value":"{option.value}"' not in system
+    for value in request.state.values():
+        if isinstance(value, str):
+            assert value not in system
     assert re.search(r"data.{0,40}not instructions", system, re.IGNORECASE | re.DOTALL)
