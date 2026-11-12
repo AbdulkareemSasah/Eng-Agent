@@ -3,10 +3,15 @@
 from eng_contract.kinds import NEUTRAL_KINDS
 
 from eng_harness.calc import CalcRegistry, read_lock, removed_ids
+from eng_harness.calcs.column_design.column_select import ColumnSelectBody, column_select
 from eng_harness.calcs.model_fingerprint import StateMatch, model_fingerprint, same_state
 from eng_harness.kinds.calcs import CALC_KINDS
 
-REGISTRY = CalcRegistry(NEUTRAL_KINDS.extend(CALC_KINDS), [model_fingerprint], removed=removed_ids(read_lock()))
+REGISTRY = CalcRegistry(
+    NEUTRAL_KINDS.extend(CALC_KINDS).extend({"harness.column_selection/1": ColumnSelectBody}),
+    [model_fingerprint, column_select],
+    removed=removed_ids(read_lock()),
+)
 """The registry of the shipped calcs, checked against the neutral and calc kinds."""
 
 __all__ = ["REGISTRY", "StateMatch", "same_state"]

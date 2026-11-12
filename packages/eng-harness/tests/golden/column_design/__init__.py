@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 GOLDEN_DIR = Path(__file__).resolve().parents[2] / "data" / "golden" / "column_design"
 METHOD_REF = r"^§4\.4\.1\s+L[123]$"

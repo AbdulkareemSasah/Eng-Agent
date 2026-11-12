@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc `harness.column_select` v1 (draft): column scope resolution, verticality against `compare.length` and section shape and material, in `calcs/column_design/column_select.py` with golden and property tests (plan 0013 T2, B-281; spec 0013 AC4, AC5 section 4.4.1).
 - Column-workflow kinds: `eng_harness.kinds.column_design` (the eight `harness.column_*` and `harness.revit_column_*` payloads) registered from `eng_harness.kinds` (plan 0013 T1, B-280; spec 0013 AC3 section 4.2).
 - Calc 1, model fingerprint: `harness.model_fingerprint` v1 (draft) in `calcs/model_fingerprint.py` (`FingerprintInput`, `FingerprintBody`, `StateMatch`, `same_state`), the canonical-state helper `calcs/_state.py` (F2 section keys and order) and its lock entry; `REGISTRY` now checks calcs against the neutral and calc kinds (plan 0003 T7, B-146; spec 0003 AC19 to AC23).
 - Report sections 2 to 5: `report/_sections.py` (`render_sections`, `value_cell`, `register_renderer`; changes, results summary, sources and decisions; a value cell links to `src-N`; a generic renderer stops at 200 rows and depth 4) (plan 0006 T12, B-186; spec 0006 AC51, AC52, AC55).

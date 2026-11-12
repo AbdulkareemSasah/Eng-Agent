@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0013 section 4.4.1 (L2) and spec 0003 section 4.11 P2; synthetic tolerance, no project value",
   "method_ref": "§4.4.1 L2",
   "synthetic": true,
-  "derivation": "compare.length = 5 mm, t^2 = 25. C_at: plan offset (3,4) gives d_plan^2 = 9+16 = 25 <= t^2, vertical; 3D length sqrt(25+4000^2) = 4000.000078... as float 4000.000078125. C_side: offset (5,0) gives d_plan^2 = 25 exactly.",
+  "derivation": "compare.length = 5 mm, t^2 = 25. C_at: plan offset (3,4) gives d_plan^2 = 9+16 = 25 <= t^2; length_mm = sqrt(25+4000^2) = sqrt(16000025) = 4000.003124998779 (display float). C_side: offset (5,0) gives d_plan^2 = 25; length_mm = sqrt(25+3000^2) = sqrt(9000025) = 3000.004166663773.",
   "inputs": {
     "input": {
       "scope": {"frames": ["C_at", "C_side"], "combinations": ["1"]},
@@ -101,7 +101,7 @@
         "shape": "rectangular",
         "material": "C30",
         "story": "L1",
-        "length_mm": 4000.000078125
+        "length_mm": 4000.003124998779
       },
       {
         "frame_id": "C_side",
@@ -109,7 +109,7 @@
         "shape": "rectangular",
         "material": "C30",
         "story": "L1",
-        "length_mm": 3000.0
+        "length_mm": 3000.004166663773
       }
     ],
     "excluded": [],

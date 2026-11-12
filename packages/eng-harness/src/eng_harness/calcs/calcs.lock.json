@@ -1,6 +1,11 @@
 {
   "calcs": [
     {
+      "content_sha256": "3e7c546856deb16a577f8eebf04b34d7c664c375d26b848c6c43ca4c11ac394a",
+      "id": "harness.column_select",
+      "version": 1
+    },
+    {
       "content_sha256": "4bfcbde9c475b88cd55b41f39999fdd3a682873e733c10a336e4bb2a9f4ad4a1",
       "id": "harness.model_fingerprint",
       "version": 1

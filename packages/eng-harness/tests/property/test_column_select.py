@@ -2,13 +2,13 @@
 
 import copy
 from fractions import Fraction
-from typing import Any
+from typing import Any, cast
 
 from eng_contract.canonical import payload_sha256
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from eng_harness.calc import InputMeta, TraceBuilder
+from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
 
 CALC_ID = "harness.column_select"
@@ -82,7 +82,7 @@ def _frame(name: str, z: float, plan: tuple[float, float]) -> dict[str, Any]:
 def inputs(draw: st.DrawFn) -> dict[str, Any]:
     names = draw(st.lists(_name, min_size=1, max_size=6, unique=True))
     frames = []
-    for i, name in enumerate(names):
+    for name in names:
         z = float(draw(st.integers(1000, 5000)))
         plan_x = float(draw(st.integers(0, 4)))
         frames.append(_frame(name, z, (plan_x, 0.0)))
@@ -106,8 +106,9 @@ def inputs(draw: st.DrawFn) -> dict[str, Any]:
 
 def _run(fields: dict[str, Any]) -> tuple[dict[str, Any], str]:
     definition = REGISTRY[CALC_ID]
-    inp = definition.input_type.model_validate(fields)
-    meta = InputMeta.model_validate(_META)
+    input_type = cast(type[CalcInput], definition.input_type)
+    inp = input_type.model_validate(fields)
+    meta = InputMeta.model_validate({"refs": _META})
     body = definition(inp, meta, TraceBuilder())
     dumped = body.model_dump(mode="json")
     return dumped, payload_sha256(dumped)

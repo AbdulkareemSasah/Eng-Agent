@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0013 section 4.4.1 (L2) and spec 0003 section 4.11 P2; synthetic tolerance, no project value",
   "method_ref": "§4.4.1 L2",
   "synthetic": true,
-  "derivation": "compare.length = 5 mm. C_ok plan offset 4 mm, d_plan^2 = 16 <= 25. C_over plan offset 5.001 mm in x: d_plan^2 = 25.010001 > 25 -> NOT_VERTICAL. C_ok length_mm = 2800.",
+  "derivation": "compare.length = 5 mm. C_ok plan offset 4 mm, d_plan^2 = 16 <= 25; length_mm = sqrt(16+2800^2) = sqrt(7840016) = 2800.0028571413995. C_over plan offset 5.001 mm in x: d_plan^2 = 25.010001 > 25 -> NOT_VERTICAL.",
   "inputs": {
     "input": {
       "scope": {"frames": ["C_ok", "C_over"], "combinations": ["1"]},
@@ -101,7 +101,7 @@
         "shape": "rectangular",
         "material": "C30",
         "story": "L1",
-        "length_mm": 2800.0
+        "length_mm": 2800.0028571413995
       }
     ],
     "excluded": [
