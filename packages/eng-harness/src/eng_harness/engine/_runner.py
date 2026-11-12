@@ -198,8 +198,10 @@ class Engine:
 
         Raises:
             ContractError: `INVALID_ARGUMENT` for a run id that names no run, or a workflow that is not registered;
-                `HOST_LOCKED` when another driver holds a host (the write in flight stays in flight).
-            RunLocked, RunRefused (`RUN_CLASS_MISMATCH`, `SERVER_CHECK_FAILED`): the journal is left as it was.
+                `HOST_LOCKED` when another driver holds a host.
+            RunLocked, RunRefused (`RUN_CLASS_MISMATCH`): the journal is left as it was.
+            RunRefused (`SERVER_CHECK_FAILED`): like `HOST_LOCKED`, it comes after `run_resumed` (step 3), so a write in
+                flight stays in flight and `run_resumed` is the only event added.
             JournalIntegrityError.
         """
         run_dir = self._runs / run_id
