@@ -222,10 +222,14 @@ def test_keyed_rows_change_kinds() -> None:
     ]
     assert diff.within == [
         WithinRow(
-            section=FRAMES, key=["frames", "F4"], **_row("/i/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump()
+            section=FRAMES,
+            key=["frames", "F4"],
+            **_row("/i/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump(),
         ),
         WithinRow(
-            section=FRAMES, key=["frames", "F4"], **_row("/j/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump()
+            section=FRAMES,
+            key=["frames", "F4"],
+            **_row("/j/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump(),
         ),
     ]
     # Counts by hand: added F5, removed F3, changed F2, ambiguous F6, unchanged F1 and F4, two within rows.
@@ -241,7 +245,12 @@ def test_ambiguous_identical_and_sides_shown() -> None:
     assert same == SectionDiff(
         changes=[
             Change(
-                section=FRAMES, key=["frames", "F1"], change="ambiguous", before=rows, after=list(reversed(rows)), properties=[]
+                section=FRAMES,
+                key=["frames", "F1"],
+                change="ambiguous",
+                before=rows,
+                after=list(reversed(rows)),
+                properties=[],
             )
         ],
         within=[],
