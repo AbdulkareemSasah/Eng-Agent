@@ -186,9 +186,11 @@ other packages.
 
 Cross-plan dependencies, which `depends_on` cannot express: T1 needs engine T1 (skeleton) and the merged
 `eng-contract` 0.1.0 (plan B-003); T8 needs engine T6 (ports) and contract T12 and T14 (kinds, result store); T9 needs
-the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4 and T5
-need eng-contract plan 0001 T19 (work item B-464; spec Q1, decided as owner question OQ-Q44), since template keys follow
-the contract path-segment rule and suffixed names such as `fc_MPa` pass the basis path rule only from it.
+the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4, T5
+and T8 are merged with the earlier spec Q1 answer, the contract FieldPath name rule, which is wider than the rule decided
+as owner question OQ-Q44: storing a suffixed field such as `fc_MPa` needs eng-contract plan 0001 T19 (work item B-464),
+a key that passes the harness rule but not contract §4.10.2 is refused only at freeze (T8), and aligning the harness
+rule is a follow-up.
 
 ## 2. Tasks
 

@@ -241,9 +241,9 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
   with an unconfirmed field, then validation fails or the unmet field paths are listed. Test:
   `test_kinds.py::test_basis_sources`.
 - AC48a. Given the basis paths `compare.stress_MPa`, `bounds.w_kN_m` and `limits.drift_ratio` with the canonical unit
-  of their suffix, when a design basis is validated, then it is accepted; given `compare.stress_MPa` with unit `kPa`,
-  or a capital letter outside a §4.7.2 suffix at the end of the last segment (`Compare.stress_MPa`,
-  `compare.stress_MPa.max`, `compare.stress_Mpa`), then validation fails (amendment B-463). Test:
+  of their suffix, or `compare._MPa` (empty part before the suffix) with unit `MPa`, when a design basis is validated,
+  then it is accepted; given `compare.stress_MPa` with unit `kPa`, or a capital letter outside a §4.7.2 suffix at the
+  end of the last segment (`Compare.stress_MPa`, `compare.stress_MPa.max`, `compare.stress_Mpa`), then validation fails (amendment B-463). Test:
   `test_kinds.py::test_basis_path_unit_suffixes`.
 
 ### 3.8 MCP mapping and schemas
@@ -893,7 +893,7 @@ them).
 | `forces.joint_reactions/1` | `rows`: list of `{joint, case: CaseRef, FX_kN, FY_kN, FZ_kN, MX_kNm, MY_kNm, MZ_kNm}` in global axes; `axes: "global"` |
 | `forces.member_end/1` | `sign_convention: "host_local/1"` (gap G-3); `rows`: list of `{member, case: CaseRef, end: "i" or "j" or null, station_mm (≥ 0), P_kN, V2_kN, V3_kN, T_kNm, M2_kNm, M3_kNm}` |
 | `forces.story_drifts/1` | `rows`: list of `{story, case: CaseRef, direction: "X" or "Y", drift_ratio (≥ 0), point: str or null, x_mm, y_mm, z_mm: float or null}` |
-| `basis.design_basis/1` | `template`: `{name, version, sha256}` or null; `fields`: `dict[str, BasisField]` keyed by dotted path: lowercase segments (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`), except that the last segment may end with one field suffix of §4.7.2 written exactly as that table writes it, the single source of the suffixes (for example `limits.drift_ratio`, `compare.stress_MPa`; amendment B-463, owner decision OQ-Q44). `BasisField`: `value` (`JsonValue`), `unit` (`str` in `UNITS` or null; must match the suffix of the last path segment when it has one), `source` (13 §3: `template:<name>@<version>`, `engineer:<name>@<Timestamp>` or `model:<RefString>`), `confirmed` (`bool`), `citation` (`str` or null; required when `source` is `template:*`, 13 §2) |
+| `basis.design_basis/1` | `template`: `{name, version, sha256}` or null; `fields`: `dict[str, BasisField]` keyed by dotted path: lowercase segments (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`), except that the last segment may end with one field suffix of §4.7.2 written exactly as that table writes it, the single source of the suffixes; the part before the suffix may be empty, as `[a-z0-9_]+` already allows `compare._mm` (for example `limits.drift_ratio`, `compare.stress_MPa`; amendment B-463, owner decision OQ-Q44). `BasisField`: `value` (`JsonValue`), `unit` (`str` in `UNITS` or null; must match the suffix of the last path segment when it has one), `source` (13 §3: `template:<name>@<version>`, `engineer:<name>@<Timestamp>` or `model:<RefString>`), `confirmed` (`bool`), `citation` (`str` or null; required when `source` is `template:*`, 13 §2) |
 | `basis.engineer_input/1` | `step`: `str` (the step path that asked); `fields`: `dict[str, {value, unit, entered_by: str, entered_at: Timestamp}]` |
 | `verdicts.set/1` | `verdicts`: list of `Verdict`; `traces`: list of `Trace`; every non-null `trace_ref` is a `LocalTraceRef` `#/traces/<n>` with `n` less than the number of traces (§4.6.3; a full `res_…` reference is rejected, so the set is self-contained); `counts`: per `VerdictStatus` (must match); `draft: bool` (outputs of draft checks are watermarked, 10 §4) |
 | `issues.model_check/1` | `summary`: `CheckModelSummary`; `issues`: list of `ModelIssue`; counts must match |
