@@ -105,7 +105,11 @@ class RunHeader(_P):
 
 
 class StepStarted(_P):
-    """`step_started`: exactly one of `args` and `args_ref` (a `harness.journal_blob/1` result)."""
+    """`step_started`: exactly one of `args` and `args_ref` (a `harness.journal_blob/1` result).
+
+    `action` is the tool's `ToolInfo.action` (spec 4.4.2). It is optional, so a journal written before it existed
+    still reads.
+    """
 
     kind: str
     name: str
@@ -113,6 +117,7 @@ class StepStarted(_P):
     args_ref: ResultId | None = None
     args_sha256: _Sha
     effect: Literal["none", "read", "write"]
+    action: Literal["plain", "open", "save", "analysis", "design", "delete", "unlock"] | None = None
     op_id: str | None = None
     host_key: str | None = None
     model_key: str | None = None

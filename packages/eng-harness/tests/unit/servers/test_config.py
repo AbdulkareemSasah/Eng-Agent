@@ -1,4 +1,4 @@
-"""`harness.toml` server and tool sections (plan 0002 T1; spec 0002 AC1 to AC3, section 4.2)."""
+"""`harness.toml` server and tool sections (plan 0002 T1, T20; spec 0002 AC1 to AC3, AC40, section 4.2)."""
 
 from pathlib import Path
 
@@ -214,3 +214,16 @@ def test_cli_tools_release_marks(tmp_path: Path) -> None:
     ):
         with pytest.raises(ConfigError, match="release"):
             load_servers_config(_write(tmp_path, _cli(extra)))
+
+
+def test_audit_log_flag(tmp_path: Path) -> None:
+    """AC40: absent `audit_log` is true; a value that is not a boolean is a ConfigError (section 4.2 rule 5)."""
+    assert load_servers_config(_write(tmp_path, _minimal())).servers["csi"].audit_log is True
+    off = _minimal(extra="audit_log = false")
+    assert load_servers_config(_write(tmp_path, off)).servers["csi"].audit_log is False
+    on = _minimal(extra="audit_log = true")
+    assert load_servers_config(_write(tmp_path, on)).servers["csi"].audit_log is True
+    # Strings and numbers are not booleans, including the ones a lax parser would coerce.
+    for value in ('"false"', '"true"', '"yes"', "0", "1", "1.0"):
+        with pytest.raises(ConfigError, match="audit_log"):
+            load_servers_config(_write(tmp_path, _minimal(extra=f"audit_log = {value}")))

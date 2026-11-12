@@ -1,6 +1,7 @@
 """The calc lock file against the registry (plan 0003 T2; spec 0003 AC2, 4.5)."""
 
 import importlib.util
+import os
 import sys
 import warnings
 from pathlib import Path
@@ -31,6 +32,10 @@ def fixtures() -> ModuleType:
 
 
 def test_lock_matches_registry() -> None:
+    if "MUTANT_UNDER_TEST" in os.environ:
+        pytest.skip(
+            "mutants change the hashed source, so the lock cannot match the registry (B-437); expires 2026-12-31"
+        )
     lock = _hash.read_lock()
     assert lock["schema"] == 1
     assert _hash.lock_problems(REGISTRY, lock) == []
