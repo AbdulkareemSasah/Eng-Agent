@@ -349,7 +349,7 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_checks.py"
-      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # CsiToolPort.call records each write (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # CsiToolPort records each write (B-465)
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # the profile carries the read-back columns (B-465)
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"  # read-back table keys and columns, OQ-G10 (B-465)
@@ -668,10 +668,10 @@ means T12 and T12b.
 and columns are product facts in `products/_etabs.py`, flagged OQ-G10, not constants in `_checks.py`. Quantities are
 compared "within the design basis field `checks.readback_relative_tolerance` (required by every workflow that writes
 quantities; never a constant here, §11 G-2)" (spec §4.5.8); how that value reaches `check_model(model_key)`, which
-takes no basis, is an owner question (B-465). The write hook is `CsiToolPort.call` (`csi/_tools.py`), the one place
-that sees a write with its canonical model: it calls the written-items book's `prepare` before the send and `commit`
-after the reply, then `AdapterHostPort.wrote(model_key)`, so the write is not reported as `MODEL_CHANGED_OUTSIDE`
-(B-451 L4). T12b also drains `take_warnings()` (B-451 L4); which result reports the drained warnings is a lead
+takes no basis, is an owner question (B-465). The write hook is in `CsiToolPort` (`csi/_tools.py`): it wraps its edit
+builders (`EDIT_BUILDERS`), whose builder sees the canonical model and the binding before the send, to call the
+written-items book's `prepare`; `CsiToolPort.call` runs `commit` after a successful reply and then
+`AdapterHostPort.wrote(model_key)`, so the write is not reported as `MODEL_CHANGED_OUTSIDE` (B-451 L4). T12b also drains `take_warnings()` (B-451 L4); which result reports the drained warnings is a lead
 question (B-465), since design 04 §3.4 and spec §4.6.4 say only that the read adds `MODEL_CHANGED_OUTSIDE`.
 
 **T13 Analysis and design** (§4.6.1 steps 11 to 13). Long-role routing, analysis status, design run and results, the
