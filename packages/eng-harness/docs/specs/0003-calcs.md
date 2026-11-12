@@ -126,9 +126,10 @@ proposed project value.
 - AC18. Given a calc that reaches a path marked "not implemented" in §4, then `NotImplementedGap` (code
   `NOT_IMPLEMENTED`, engine §6) names the gap id, and nothing is stored. Test: `test_port.py::test_not_implemented_gap`.
 - AC48. Given the real engine, the real CalcPort and fake tool ports, a model read at revision n, then written (n+1)
-  and read again, when a block calls `ctx.calc("harness.model_diff", before=<refs at n>, after=<refs at n+1>, ...)`,
-  then the calc succeeds, because engine invariant 3 resolves `before` with the `RefRule` of
-  `CalcInfo.ref_rules` (`stale_ok` true). When `after` holds a reference at n while the model is at n+1, then the
+  and read again, when a block calls `ctx.calc("harness.model_diff", before_frames=<ref at n>,
+  after_frames=<ref at n+1>, ...)` (flat fields, §4.7), then the calc succeeds, because engine invariant 3 resolves
+  `before_frames` with the `RefRule` of `CalcInfo.ref_rules` (`stale_ok` true). When `after_frames` holds a reference
+  at n while the model is at n+1, then the
   engine raises `REF_STALE` before the port call and no step result is stored (§4.13). Test:
   `tests/workflow/test_calc_step.py::test_older_revision_inputs`.
 - AC49. Given every registered calc, then the input fields whose JSON Schema carries `x-eng.stale_ok: true` are
@@ -172,6 +173,11 @@ proposed project value.
   Test: `test_diff.py::test_not_compared_and_ambiguous`.
 - AC29. Given `rotation_deg` values that differ by a full turn, then the property is reported as changed (no
   normalization, §4.7 D6). Test: `test_calcs_golden.py::test_case[diff-angle-full-turn]`.
+- AC51. Given a `model.load_set/1` section holding a load pattern and a combination of one name, and a frame load and
+  an area load with equal (`frame` or `area`, `pattern`, `direction`), and a `model.sections/1` section holding a
+  frame section and an area section of one name, each object changed, then each change has its own key, beginning
+  with its list name (§4.7 D2), and the changes are sorted and unique by section and key as `harness.model_diff/1`
+  requires. Test: `tests/unit/calcs/test_compare.py::test_keys_carry_their_list` (amendment B-469).
 
 ### 3.6 Read-back check (§4.8)
 
@@ -453,7 +459,9 @@ change the hash (F2 keeps order); (e) properties: permutation invariance, change
 of a write (A1, §4.8).
 
 **Input** `DiffInput`: `before` and `after` (each a `FingerprintInput`-shaped group of references) and `basis`.
-`before` is `stale_ok`; `after` and `basis` are not (§4.13).
+`before` is `stale_ok`; `after` and `basis` are not (§4.13). The CalcPort resolves top-level references only, so the
+groups are flat fields: `before_<field>` and `after_<field>` for each read-set field of §4.6 (`before_frames`,
+`after_frames`, ...); `before` and `after` in this spec name these two sets of fields (amendment B-469).
 
 **Output kind** `harness.model_diff/1`: `before`, `after` (`model_id`, `model_revision`, `covered`), `tolerances`
 (per quantity kind: `value`, `unit`, `ref`), `changes` (sorted by section and key: `section`, `key` (list of strings),
@@ -468,17 +476,26 @@ changed, ambiguous, unchanged, within tolerance), `identical`, `complete`.
   Otherwise the section goes to `not_compared` and `complete: false`.
 - D2. Objects are matched by key: the §4.6 keys for named lists. Unnamed rows use these keys: `frame_loads` by
   (`frame`, `pattern`, `direction`), `area_loads` by (`area`, `pattern`, `direction`), combination `items` by
-  (`case.case`, `case.case_type`, `case.step`), stories by `name`. A key that occurs more than once on a side is
-  `ambiguous` (both object lists shown). It is counted as a change unless both sides are byte-identical. Keys are
-  compared exactly: no case folding or trimming (Q5).
+  (`case.case`, `case.case_type`, `case.step`), stories by `name`. A null key member (an item's `case.step`) is left
+  out. The reported `key` is the key of the parent row (for a nested list), then the name of the list the row comes
+  from (the last segment of its §4.6 list path), then the row's key members: `["frame_loads", frame, pattern,
+  direction]`, `["combinations", name, "items", case, case_type]`, `["systems", name, "lines", id]`. So rows of two
+  lists of one section never share a key (a load pattern and a combination of one name, a frame section and an area
+  section of one name). Changes are sorted by section, then by key compared member by member in code-point order, a
+  key before every longer key it begins: the section's own members (key `[]`, D5) come first, and a nested row
+  follows its parent. A key that occurs more than once on a side is `ambiguous` (both object lists shown) and is
+  counted as a change even when both sides are byte-identical: it is never unchanged (AC28, D7). Keys are compared
+  exactly: no case folding or trimming (Q5). Amendment B-469.
 - D3. A numeric property's quantity kind comes from its field name (`kind_for_field`, contract §4.7.2). It is equal
   when `|Fraction(after) − Fraction(before)| <= Fraction(tolerance)`, exactly, and changed otherwise. Equal but not
   identical values go to `within_tolerance`.
 - D4. Strings, booleans, enums and `null` compare exactly. A numeric field without a known suffix (none exists in the
-  0.1 model kinds) compares exactly. A type change (number to `null`, one `shape.type` to another) is a change of the
-  enclosing pointer.
+  0.1 model kinds), or whose known quantity kind has no tolerance among those given to the comparison, compares
+  exactly. A type change (number to `null`, one `shape.type` to another) is a change of the enclosing pointer. The
+  `type` rule applies to nested objects only, not to the compared object itself.
 - D5. Nested objects are compared member by member (pointer per leaf). Ordered lists (points, joints) are compared
-  index by index. A length change reports the whole list as one changed property.
+  index by index. A length change reports the whole list as one changed property. A member absent on one side is read
+  as `null`. The section's own members outside its keyed lists are compared as one object, reported under key `[]`.
 - D6. No normalization: angles are not wrapped, orientation is not canonicalized, and units are not converted (stored
   data is canonical). When in doubt the calc reports a change. A false change is shown to the engineer, and a hidden
   change would be overwritten (A5).
@@ -789,7 +806,7 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC4 to AC9, AC11 to AC16, AC18, AC22, AC23, AC26, AC28, AC32, AC33, AC38, AC40 | Unit | `tests/unit/calcs/` |
+| AC1, AC4 to AC9, AC11 to AC16, AC18, AC22, AC23, AC26, AC28, AC32, AC33, AC38, AC40, AC51 | Unit | `tests/unit/calcs/` |
 | AC2, AC10, AC47, AC49 | Contract | `tests/contract/test_calc_lock.py`, `tests/contract/test_calc_kinds.py` |
 | AC3 | Unit (source rules) | `tests/rules/test_calc_modules.py` |
 | AC17, AC48 | Fake-host workflow (real engine and CalcPort, fake tool ports, real store) | `tests/workflow/test_calc_step.py` |
