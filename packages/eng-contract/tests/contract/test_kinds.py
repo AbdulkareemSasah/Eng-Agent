@@ -14,6 +14,7 @@ from eng_contract.kinds.basis import DesignBasis as Basis
 from eng_contract.kinds.issues import ModelCheck
 from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.params import ContractDefinitionError
+from eng_contract.units import QUANTITY_KINDS
 
 _DATA = Path(__file__).resolve().parent.parent / "data" / "kinds"
 _MODEL_KINDS = (
@@ -205,6 +206,44 @@ def test_basis_sources() -> None:
     payload["fields"]["materials.cover_mm"]["unit"] = None
     with pytest.raises(ValidationError, match="does not match the unit suffix"):
         Basis.model_validate(payload)
+
+
+def _basis_at(path: str, unit: str | None) -> Basis:
+    payload = _valid("basis.design_basis/1")
+    payload["fields"] = {path: {**payload["fields"]["site.name"], "unit": unit}}
+    return Basis.model_validate(payload)
+
+
+def test_basis_path_unit_suffixes() -> None:
+    # every suffix of spec 4.7.2 is accepted at the end of the last segment with the canonical unit of its kind
+    for kind in QUANTITY_KINDS.values():
+        for path in (f"compare.value{kind.suffix}", f"compare.{kind.suffix}", f"a.b.c.d{kind.suffix}"):
+            assert path in _basis_at(path, kind.canonical_unit).fields
+    for path, unit in (("compare.stress_MPa", "MPa"), ("bounds.w_kN_m", "kN/m"), ("limits.drift_ratio", "1")):
+        assert path in _basis_at(path, unit).fields
+    assert "compare._MPa" in _basis_at("compare._MPa", "MPa").fields
+    assert "compare.x_MPa2_mm" in _basis_at("compare.x_MPa2_mm", "mm").fields  # a lowercase tail is no suffix
+    with pytest.raises(ValidationError, match=r"does not match the unit suffix \(MPa\)"):
+        _basis_at("compare.stress_MPa", "kPa")
+    with pytest.raises(ValidationError, match=r"does not match the unit suffix \(MPa\)"):
+        _basis_at("compare._MPa", None)
+    for bad in (
+        "Compare.stress_MPa",  # capital in the first segment
+        "compare_MPa.stress",  # a suffix only in the last segment
+        "compare.Stress_MPa",  # capital before the suffix
+        "compare.stress_Mpa",  # not written as the table writes it
+        "compare.stress_mPa",
+        "compare.stress_MPA",
+        "compare.stress_MPa.max",  # suffix not at the end of the last segment
+        "compare.stress_MPa_x",
+        "compare.stress_MPax",
+        "compare.stress_kN_mm",  # one suffix only, and _kN_m is not followed by a lowercase tail
+        "stress_MPa",  # no dot
+        "compare.stress.MPa",
+        "compare.",
+    ):
+        with pytest.raises(ValidationError, match="String should match pattern"):
+            _basis_at(bad, "MPa")
 
 
 def test_basis_missing_lists_absent_and_unconfirmed() -> None:
