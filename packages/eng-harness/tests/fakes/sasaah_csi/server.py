@@ -27,7 +27,8 @@ TOOLS: dict[str, dict[str, Any]] = {t["name"]: t["input_schema"] for t in SCHEMA
 CONTROL = os.environ.get("SASAAH_CSI_FAKE_CONTROL")
 DEFAULT_UNITS = "kN_m_C"
 DEFAULT_LIMIT = 2000  # S-12 section 2: `limit` is at most 2000 on every list tool
-PID = 4242  # a fixed fake process id
+PID = 4242  # the first launched instance; each later csi_launch gets the next pid (a restore needs a distinct one)
+_NEXT_PID = PID
 KINDS: dict[str, str] = {t["name"]: t["server_kind"] for t in SCHEMAS["tools"]}  # S-12 inventory `server_kind`
 WRITE_KINDS = {"Write", "Destructive"}  # S-12 report section 7: these raise model_locked while the model is locked
 LOCK_EXEMPT = {"csi_unlock_model", "csi_save_model", "csi_run_analysis", "csi_design_run"}  # S-12 report section 7
@@ -52,7 +53,7 @@ class State:
 
     def __init__(self) -> None:
         self.model: dict[str, Any] = {c: [] for c in COLLECTIONS}
-        self.model.update(units=DEFAULT_UNITS, locked=False, file_path=None, tables={})
+        self.model.update(units=DEFAULT_UNITS, locked=False, model_path=None, tables={})
         self.target: dict[str, Any] | None = None
         self.session_valid = True
         if CONTROL:
@@ -80,12 +81,29 @@ def _timeout() -> SasaahError:
     return SasaahError("timeout", "The call timed out.")
 
 
-def _session(name: str, args: dict[str, Any]) -> dict[str, Any]:
+def _launch_pid(*, fresh: bool) -> int:
+    """The next pid, starting at 4242.
+
+    A launch whose current target is some other pid (an attach) keeps answering 4242. A launch with no target, and a
+    launch of the instance this server last started, takes the next pid so a restore can see a distinct instance.
+    """
+    global _NEXT_PID
+    if not fresh and STATE.target is not None and STATE.target.get("pid") != _NEXT_PID - 1:
+        return PID
+    pid = _NEXT_PID
+    _NEXT_PID += 1
+    return pid
+
+
+def _session(name: str, args: dict[str, Any], *, fresh: bool = False) -> dict[str, Any]:
     if name == "csi_status":
         return {"read_only": False, "script_enabled": False, "instances": [], "current_target": STATE.target}
-    if name in ("csi_attach", "csi_launch"):
-        launched = name == "csi_launch"
-        STATE.target = {"product": args.get("product", "ETABS"), "pid": args.get("pid", PID), "launched": launched}
+    if name == "csi_launch":
+        STATE.target = {"product": args.get("product", "ETABS"), "pid": _launch_pid(fresh=fresh), "launched": True}
+        STATE.session_valid = True
+        return dict(STATE.target)
+    if name == "csi_attach":
+        STATE.target = {"product": args.get("product", "ETABS"), "pid": args.get("pid", PID), "launched": False}
         STATE.session_valid = True
         return dict(STATE.target)
     if name == "csi_detach":
@@ -115,7 +133,7 @@ def _list(kind: str, args: dict[str, Any], units: str) -> dict[str, Any]:
 def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     model = STATE.model
     if name == "csi_model_info":
-        return {"units": model["units"], "locked": model["locked"], "file_path": model["file_path"]}
+        return {"units": model["units"], "locked": model["locked"], "model_path": model["model_path"]}
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
         return _list(name[len("csi_list_") :], args, units)
     if name == "csi_db_table_read":
@@ -132,8 +150,14 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
         model["locked"] = True
     elif name == "csi_unlock_model":
         model["locked"] = False
-    elif name in ("csi_save_model", "csi_open_model"):
-        model["file_path"] = args.get("path", model["file_path"])
+    elif name == "csi_open_model":
+        model["model_path"] = args.get("path", model["model_path"])
+    elif name == "csi_save_model":
+        model["model_path"] = args.get("path", model["model_path"])
+        saved = model["model_path"]
+        if isinstance(saved, str) and Path(saved).is_file():  # a real save changes the bytes (spec 0002 section 4.5.7)
+            with Path(saved).open("ab") as handle:
+                handle.write(b"\n")
     return {"ok": True}
 
 
@@ -144,12 +168,14 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         os._exit(1)  # B-123: a crashing server must die without cleanup
     if STATE.pop_fault(name, {"com_worker_recycled"}):
         raise SasaahError("com_worker_recycled", "The call never started: the worker was recycled.")
-    if STATE.target is not None and not STATE.session_valid:
-        STATE.target["launched"] = False  # a re-attached session is treated as a user instance
+    target = STATE.target
+    fresh = target is not None and not STATE.session_valid
+    if target is not None and fresh:
+        target["launched"] = False  # a re-attached session is treated as a user instance
         STATE.session_valid = True
     props = TOOLS[name].get("properties", {})
     if name in ("csi_status", "csi_attach", "csi_launch", "csi_detach"):
-        return _session(name, args)
+        return _session(name, args, fresh=fresh)
     if STATE.target is None:
         raise SasaahError("no_target", "No CSI instance is attached.")
     if "confirm" in props and not args.get("confirm"):
@@ -167,7 +193,7 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
     leave = bool(requested) and STATE.pop_fault(name, {"units_left_changed"}) is not None
     if requested:
         STATE.model["units"] = requested
-    result = _session(name, args) if name == "csi_exit" else _apply(name, args, STATE.model["units"])
+    result = _session(name, args, fresh=fresh) if name == "csi_exit" else _apply(name, args, STATE.model["units"])
     if requested and not leave:
         STATE.model["units"] = previous
     if STATE.pop_fault(name, {"timeout_after_apply"}):
@@ -186,12 +212,34 @@ async def on_list_tools(
     return types.ListToolsResult(tools=[types.Tool(name=n, input_schema=s) for n, s in TOOLS.items()])
 
 
+def _note(name: str, args: dict[str, Any]) -> None:
+    """Record the call, and a launch's pid, without dropping faults already in the control file."""
+    if not CONTROL:
+        return
+    path = Path(CONTROL)
+    data = json.loads(path.read_text()) if path.is_file() else {}
+    if not isinstance(data, dict):
+        return
+    pid = STATE.target["pid"] if STATE.target is not None else None
+    entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path")}
+    if name == "csi_launch" and isinstance(pid, int):
+        entry["visible"] = bool(args.get("visible", False))
+        launched = data.get("launched")
+        data["launched"] = [*launched, pid] if isinstance(launched, list) else [pid]
+    calls = data.get("calls")
+    data["calls"] = [*calls, entry] if isinstance(calls, list) else [entry]
+    path.write_text(json.dumps(data))
+
+
 async def on_call_tool(ctx: ServerRequestContext[Any], params: types.CallToolRequestParams) -> types.CallToolResult:
     """Run one tool and answer in the Sasaah reply shape."""
+    args = dict(params.arguments or {})
     try:
-        return _reply(await _call(params.name, dict(params.arguments or {})), error=False)
+        return _reply(await _call(params.name, args), error=False)
     except SasaahError as error:
         return _reply({"code": error.code, "message": str(error), "data": error.data}, error=True)
+    finally:
+        _note(params.name, args)  # os._exit on crash_during_call skips this, so that fault is not recorded as a call
 
 
 async def main() -> None:

@@ -303,6 +303,12 @@ tasks:
       - "packages/eng-harness/tests/property/test_check_after_write.py"
       - "packages/eng-harness/tests/replay/test_divergence.py"
       - "packages/eng-harness/tests/workflows/**"
+      # Amendment (B-445): the journals these tests pin gain the root block's `~end.check_model` steps (spec 4.6 #1,
+      # AC37); T12 changes only those journal assertions there.
+      - "packages/eng-harness/tests/unit/test_runner.py"
+      - "packages/eng-harness/tests/replay/test_resume.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -674,6 +680,10 @@ and the test that inserted steps are replayed. Amendment B-434: T12 makes two ed
 awaits a new `Ctx.finish()` that runs the `~end.check_model` steps for the models still dirty (spec §4.6 #1, AC37);
 T13 still owns the rest of `_runner.py`. In `journal/_events.py`, `StepStarted` gains an optional `action` field,
 absent in older journals (spec §4.4.2). Budget stays 380 lines (estimate about 310).
+Amendment B-445: a run whose root block leaves a model dirty now journals `~end.check_model` before `run_completed`,
+so four earlier test files whose journals end after a write (`tests/unit/test_runner.py`, `tests/replay/test_resume.py`,
+`test_in_flight.py`, `test_host_state.py`) are in T12's files for those journal assertions only; nothing else in them
+changes.
 
 **T13 Invariants 5, 6, 8, 9, 10** (spec §4.6). Basis completeness before the run folder exists, per-host
 reconciliation pending, server checks at start and resume, unit reads (first contact, every resume, after epoch
