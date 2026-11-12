@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Report document: `build_report`, `write_report`, status marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial, unreleased tools), integrity line, timings and run-events sections, distinct `resume_no` counting (plan 0006 T13, B-187; spec 0006 AC50, AC51, AC53, AC56, AC57, AC59).
 - Report sections 2 to 5: `report/_sections.py` (`render_sections`, `value_cell`, `register_renderer`; changes, results summary, sources and decisions; a value cell links to `src-N`; a generic renderer stops at 200 rows and depth 4) (plan 0006 T12, B-186; spec 0006 AC51, AC52, AC55).
 - Check after write, references, staleness and save before analysis: `engine/_invariants.py` (a write leaves its model dirty; a read of it, any calc and the block's return run `check_model` first, a failed check is `ModelIntegrityError`; an engineering parameter must be a reference; a calc's references are resolved against the model's revision; analysis or design is preceded by a save; parallel siblings that conflict on a model stop before the port call), `Ctx` takes the host port and `finish` runs the root `~end` checks, and `step_started` records the tool's action (plan 0001 T12, B-111; spec 0001 AC5, AC37, AC38, AC39, AC43, AC47).
 - Fix: `test_declared_and_locked` skips its lock assertions only in the mutation step's copy of the member (`MUTANT_UNDER_TEST` set, workspace `uv.lock` missing); MU002 stopped every eng-harness source change since B-220 (B-449).

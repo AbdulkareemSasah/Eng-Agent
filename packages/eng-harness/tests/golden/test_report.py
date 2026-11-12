@@ -17,7 +17,7 @@ from eng_contract.store import ResultStore
 from eng_harness.journal import EventType, JournalReader, JournalWriter
 from eng_harness.report._model import ReportModel, fold_report
 
-SNAPSHOT = Path(__file__).resolve().parents[1] / "data" / "snapshots" / "report" / "sections.html"
+SNAPSHOT = Path(__file__).resolve().parents[1] / "data" / "snapshots" / "report" / "report.html"
 _CALC = Path(__file__).resolve().parents[1] / "data" / "kinds" / "calcs"
 SHA = "a" * 64
 MODEL = "mdl_" + "0" * 26
@@ -241,17 +241,21 @@ def load_sections_run(run_dir: Path, store: ResultStore, ids: SeededIdSource) ->
 
 
 def test_report_snapshot(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
-    """AC51: sections 2 to 5 of the fixture run match the snapshot."""
-    from eng_harness.report._sections import render_sections
+    """AC51: the fixture run report matches the snapshot."""
+    from eng_contract.ids import FixedClock
+
+    from eng_harness import __version__
+    from eng_harness.report import ReleaseMarks, build_report
 
     run = load_sections_run(run_dir, store, ids)
+    clock = FixedClock(START_MS, 1_000)
     try:
         assert [saved.saved.role for saved in run.reader.models()] == ["revision", "revision", "promoted"]
         assert [item.resume_no for item in run.model.resumes] == [1]
         assert len(run.model.decisions) == 1
-        html = render_sections(run.model, run.reader, store)
-        places = [html.index(f"<h2>{title}</h2>") for title in ("Changes", "Results summary", "Sources", "Decisions")]
-        assert places == sorted(places)
+        html = build_report(run.reader, store, ReleaseMarks(records={}), clock, __version__)
+        for title in ("Status", "Changes", "Results summary", "Sources", "Decisions", "Timings", "Run events"):
+            assert f"<h2>{title}</h2>" in html
         assert html == SNAPSHOT.read_text(encoding="utf-8")
     finally:
         run.close()

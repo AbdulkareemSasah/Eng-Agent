@@ -56,9 +56,7 @@ def _minimal_run(
     writer.close()
 
 
-def _html(
-    run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: FixedClock, **kwargs: bool
-) -> str:
+def _html(run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: FixedClock, **kwargs: bool) -> str:
     _minimal_run(run_dir, store, ids, clock, **kwargs)
     reader = JournalReader(run_dir)
     try:
@@ -68,7 +66,11 @@ def _html(
 
 
 def test_draft_signed_and_sources(
-    run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: FixedClock
+    tmp_path: Path,
+    store: ResultStore,
+    ids: SeededIdSource,
+    clock: FixedClock,
+    run_dir: Path,
 ) -> None:
     """AC53: DRAFT until signed; signed banner; DRAFT SOURCES after signing; INCOMPLETE when not terminal."""
     unsigned = _html(run_dir, store, ids, clock, terminal=False, draft_output=False, signed=False)
@@ -76,12 +78,22 @@ def test_draft_signed_and_sources(
     assert "<title>DRAFT " in unsigned
     assert "INCOMPLETE:" in unsigned
 
-    signed_clean = _html(run_dir, store, ids, clock, terminal=True, draft_output=False, signed=True)
+    signed_dir = tmp_path / "runs" / f"{run_dir.name}_signed"
+    signed_dir.mkdir(parents=True)
+    signed_clean = _html(signed_dir, store, ids, clock, terminal=True, draft_output=False, signed=True)
+    reader = JournalReader(signed_dir)
+    try:
+        signed_at = next(event for event in reader.events() if event.type is EventType.SIGNED_OFF).at
+    finally:
+        reader.close()
+    shown = f"{signed_at[:10]} {signed_at[11:23]} UTC"
     assert '<div class="draft">' not in signed_clean
     assert "DRAFT —" not in signed_clean
     assert "Signed by engineer:ada" in signed_clean
-    assert "2026-01-01 00:00:00.002 UTC" in signed_clean
+    assert shown in signed_clean
 
-    signed_draft_sources = _html(run_dir, store, ids, clock, terminal=True, draft_output=True, signed=True)
+    draft_dir = tmp_path / "runs" / f"{run_dir.name}_draft_sources"
+    draft_dir.mkdir(parents=True)
+    signed_draft_sources = _html(draft_dir, store, ids, clock, terminal=True, draft_output=True, signed=True)
     assert "DRAFT SOURCES" in signed_draft_sources
     assert '<div class="draft">' not in signed_draft_sources

@@ -6,6 +6,7 @@ import os
 import sqlite3
 import stat
 from pathlib import Path
+from typing import Any
 
 import pytest
 from eng_contract.envelope import Provenance
@@ -47,15 +48,24 @@ _SHA = "a" * 64
 _MARKS = ReleaseMarks(records={})
 
 
+def _tamper(run_dir: Path, sql: str, *args: Any) -> None:
+    uri = f"file:{run_dir / 'journal.sqlite'}?mode=rw"
+    conn = sqlite3.connect(uri, uri=True, isolation_level=None)
+    for trigger in ("events_no_update", "events_no_delete"):
+        conn.execute(f"DROP TRIGGER IF EXISTS {trigger}")
+    conn.execute(sql, args)
+    conn.commit()
+    conn.close()
+
+
 def _top_level_imports(module_path: Path) -> set[str]:
     tree = ast.parse(module_path.read_text(encoding="utf-8"))
     found: set[str] = set()
     for node in tree.body:
         if isinstance(node, ast.Import):
             found.update(alias.name.split(".", 1)[0] for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module is not None:
-                found.add(node.module.split(".", 1)[0])
+        elif isinstance(node, ast.ImportFrom) and node.module is not None:
+            found.add(node.module.split(".", 1)[0])
     return found
 
 
@@ -63,7 +73,10 @@ def test_inputs_only_and_deterministic(
     run_dir: Path, store: ResultStore, ids: SeededIdSource, clock: FixedClock
 ) -> None:
     """AC50: `_document` imports no file or process module; the same inputs give the same bytes."""
-    document = Path(importlib.util.find_spec("eng_harness.report._document").origin)  # type: ignore[union-attr]
+    spec = importlib.util.find_spec("eng_harness.report._document")
+    assert spec is not None
+    assert spec.origin is not None
+    document = Path(spec.origin)
     assert _top_level_imports(document).isdisjoint(_FORBIDDEN)
     build_report_run(run_dir, store, ids)
     (run_dir / "notes.txt").write_text("irrelevant", encoding="utf-8")
@@ -104,15 +117,19 @@ def test_tampered_refused_live_banner(
     writer.append(EventType.RUN_STARTED, {**header, "input_ref": base, "basis_ref": base})
     writer.append(EventType.STEP_STARTED, {"kind": "tool", "name": "t", "args": {}, "args_sha256": _SHA, "effect": "read"}, path="0", attempt=1)  # fmt: skip
     writer.close()
-    with sqlite3.connect(run_dir / "journal.sqlite") as conn:
-        conn.execute("UPDATE events SET chain_sha256 = ? WHERE seq = 2", ("b" * 64,))
-        conn.commit()
+    _tamper(run_dir, "UPDATE events SET chain_sha256 = ? WHERE seq = 2", "b" * 64)
     with pytest.raises(JournalIntegrityError):
         build_report(JournalReader(run_dir), store, _MARKS, clock, __version__)
-    lock = RunLock(run_dir)
+    live_dir = run_dir.parent / f"{run_dir.name}_live"
+    live_dir.mkdir()
+    writer = JournalWriter(live_dir, store, clock, ids)
+    writer.append(EventType.RUN_STARTED, {**header, "input_ref": base, "basis_ref": base})
+    writer.append(EventType.STEP_STARTED, {"kind": "tool", "name": "t", "args": {}, "args_sha256": _SHA, "effect": "read"}, path="0", attempt=1)  # fmt: skip
+    writer.close()
+    lock = RunLock(live_dir)
     lock.acquire()
     try:
-        reader = JournalReader(run_dir)
+        reader = JournalReader(live_dir)
         try:
             html = build_report(reader, store, _MARKS, clock, __version__)
         finally:
