@@ -22,7 +22,7 @@ from eng_contract.trace import Trace, TraceConstant, TraceInput, TraceStep
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness._calc import CalcRegistryError
-from eng_harness._calc._hash import content_hash
+from eng_harness._calc._hash import content_hash, read_lock, removed_ids
 from eng_harness.errors import NotImplementedGap
 
 __all__ = [
@@ -37,6 +37,8 @@ __all__ = [
     "TraceBuilder",
     "TraceError",
     "calc",
+    "read_lock",
+    "removed_ids",
 ]
 
 _ID = re.compile(r"^harness\.[a-z][a-z0-9_]*$")

@@ -198,7 +198,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-109 | E.T10 | ctx implementation of tool, read, calc, block, parallel, attempts, escalate | sonnet, high | opus, medium | [#231](https://github.com/AbdulkareemSasah/Eng-Agent/pull/231) | done (0b1063b) |
 | B-110 | E.T11 | Input requests (the x-eng-input marker, choice schemas, answer checks) and the escalation request | sonnet, xhigh | opus, medium | [#236](https://github.com/AbdulkareemSasah/Eng-Agent/pull/236) | done (e00ea75) |
 | B-111 | E.T12 | Invariants 1, 2, 3 and 7 (check after write, references, staleness, save before analysis) | sonnet, high | opus, medium | [#279](https://github.com/AbdulkareemSasah/Eng-Agent/pull/279) | done (db30265) |
-| B-112 | E.T13 | Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases) | sonnet, high | opus, medium | — | in writing |
+| B-112 | E.T13 | Invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases) | sonnet, high | opus, medium | — | BLOCKED on scope: plan split B-454 (#291) |
 | B-113 | E.T14 | ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4) | sonnet, medium | opus, medium | — | not started or in writing |
 | B-114 | E.T15 | Approvals (binding, single use, re-check before the write, items, pause and re-presentation) | sonnet, high | opus, medium | — | not started or in writing |
 | B-115 | E.T16 | Permission modes, always-ask list, working copies and file-copy promotion | sonnet, high | opus, medium | — | not started or in writing |
@@ -230,8 +230,8 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-143 | C.T4 | Calc kinds and their registration | sonnet, medium | opus, medium | [#184](https://github.com/AbdulkareemSasah/Eng-Agent/pull/184) | done (99cc7fe) |
 | B-144 | C.T5 | HarnessCalcPort (describe, run, preflight, run class, limits, storage) and the calc step workflow test | sonnet, medium | opus, medium | [#238](https://github.com/AbdulkareemSasah/Eng-Agent/pull/238) | done (31a4350) |
 | B-145 | C.T6 | Calc-module rules test, golden data loader and golden file lint, verification record template | sonnet, low | opus, medium | [#148](https://github.com/AbdulkareemSasah/Eng-Agent/pull/148) | done (205dfd5) |
-| B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | opus, medium | opus, medium | [#283](https://github.com/AbdulkareemSasah/Eng-Agent/pull/283) | open (reviewed, full gate pass) |
-| B-147 | C.T8 | Calc 2, difference report, with the tolerance-comparison helper | opus, medium | opus, medium | — | not started or in writing |
+| B-146 | C.T7 | Calc 1, model fingerprint, with the canonical-state helper | opus, medium | opus, medium | [#283](https://github.com/AbdulkareemSasah/Eng-Agent/pull/283) | done (d9df6d4) |
+| B-147 | C.T8 | Calc 2, difference report, with the tolerance-comparison helper | opus, medium | opus, medium | — | in writing |
 | B-148 | C.T9 | Calc 3, read-back check | opus, medium | opus, medium | — | not started or in writing |
 | B-149 | C.T10 | Calc 4, design results summary | opus, medium | opus, medium | — | not started or in writing |
 | B-150 | C.T11 | Calc 5, section size rounding | opus, medium | opus, medium | — | not started or in writing |
@@ -268,7 +268,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-184 | I.T10 | Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate | sonnet, medium | opus, medium | — | not started or in writing |
 | B-185 | I.T11 | Report model: fold the journal and the store; timings, waiting and machine time | sonnet, medium | opus, low | [#220](https://github.com/AbdulkareemSasah/Eng-Agent/pull/220) | done (b249f7c) |
 | B-186 | I.T12 | Report sections: changes, results, sources, decisions; renderer registry; value cells with sources | sonnet, medium | opus, low | [#277](https://github.com/AbdulkareemSasah/Eng-Agent/pull/277) | done (42982bf) |
-| B-187 | I.T13 | Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write | sonnet, medium | opus, low | — | in writing |
+| B-187 | I.T13 | Report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write | sonnet, medium | opus, low | — | branch, reviewed (round 1 done) |
 | B-188 | I.T14 | Commands run and resume: wiring, generated options, answers file, outcome mapping | sonnet, high | opus, medium | — | not started or in writing |
 | B-189 | I.T15 | Basis confirmation screen, setup log and its place in run | sonnet, medium | opus, low | — | not started or in writing |
 | B-190 | I.T16 | Commands status, stop, report and doctor | sonnet, medium | opus, low | — | not started or in writing |
@@ -348,7 +348,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-276 | Q.T7 | Check min_flexural_reinforcement (8.6.1.1) | opus, medium | opus, medium | [#226](https://github.com/AbdulkareemSasah/Eng-Agent/pull/226) | done (d92d2ce) |
 | B-277 | Q.T8 | Check development_length_bottom_bars (25.4.2.3) | opus, medium | opus, medium | [#227](https://github.com/AbdulkareemSasah/Eng-Agent/pull/227) | done (3e7c2b9) |
 | B-278 | Q.T9 | Pack assembly, registration, pack-level tests, README usage | sonnet, low | opus, medium | [#250](https://github.com/AbdulkareemSasah/Eng-Agent/pull/250) | done (a9eed8e) |
-| B-280 | G.T1 | Column workflow kinds and request models | sonnet, medium | opus, medium | [#285](https://github.com/AbdulkareemSasah/Eng-Agent/pull/285) | open (reviewed, full gate pass) |
+| B-280 | G.T1 | Column workflow kinds and request models | sonnet, medium | opus, medium | [#290](https://github.com/AbdulkareemSasah/Eng-Agent/pull/290) | open (rebuilt from #285, closed; local CI) |
 | B-281 | G.T2 | Calc harness.column_select with golden and property tests | opus, medium | opus, medium | — | not started or in writing |
 | B-282 | G.T3 | Calc harness.column_demands (sign, axes, length, layout, not-checked reasons) | opus, medium | opus, medium | — | not started or in writing |
 | B-283 | G.T4 | Calc harness.column_review (members, governing references, changes) | opus, medium | opus, medium | — | not started or in writing |
@@ -376,9 +376,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-326 | Y.T2 | Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check | opus, medium | opus, medium | — | not started or in writing |
 | B-327 | Y.T3 | Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage | opus, medium | opus, medium | — | not started or in writing |
 | B-330 | Z.T1 | Shared column section model, column preconditions, shared constants moved to _common.py | opus, medium | opus, medium | [#269](https://github.com/AbdulkareemSasah/Eng-Agent/pull/269) | done (4d30d43) |
-| B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | — | branch, reviewed (round 1 done), full gate pass |
+| B-331 | Z.T2 | Check max_axial_strength (22.4.2.1) | opus, medium | opus, medium | [#288](https://github.com/AbdulkareemSasah/Eng-Agent/pull/288) | done (ef57ff1) |
 | B-332 | Z.T3 | Check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity | opus, medium | opus, medium | — | branch, review round 3 (mutation score) |
-| B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | [#284](https://github.com/AbdulkareemSasah/Eng-Agent/pull/284) | open (reviewed, full gate pass) |
+| B-333 | Z.T4 | Check longitudinal_reinforcement_limits (10.6.1.1) | opus, medium | opus, medium | [#284](https://github.com/AbdulkareemSasah/Eng-Agent/pull/284) | done (50a5a53) |
 | B-334 | Z.T5 | Register the column checks, pack-level tests, changelog and local-testing rows | sonnet, medium | opus, medium | — | not started or in writing |
 | B-336 | docs | docs(eng-dev-gate): risk of none-reason pull requests, zero-mutant runs, and plan tasks T27 to T29 (B-336) | sonnet, low | opus, low | [#100](https://github.com/AbdulkareemSasah/Eng-Agent/pull/100) | done |
 | B-337 | T27 | risk-floor: a none-reason pull request records its risk from the body Risk line | sonnet, medium | opus, medium | [#107](https://github.com/AbdulkareemSasah/Eng-Agent/pull/107) | done |
@@ -435,7 +435,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-391 | docs | eng-contract follow-ups as spec text and plan tasks T17 (B-095) and T18 (B-084) | lead | opus, low | [#200](https://github.com/AbdulkareemSasah/Eng-Agent/pull/200) | done (a9cc248) |
 | B-392 | X.T1 | Footing kinds and their registration | sonnet, medium | opus, medium | [#203](https://github.com/AbdulkareemSasah/Eng-Agent/pull/203) | done (3a11744) |
 | B-393 | X.T2 | Code-pack route of the CalcPort and the structural-codes workspace dependencies | sonnet, high | opus, medium | [#268](https://github.com/AbdulkareemSasah/Eng-Agent/pull/268) | done (3d879dd) |
-| B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | [#256](https://github.com/AbdulkareemSasah/Eng-Agent/pull/256) | open |
+| B-394 | X.T3 | Calc harness.footing_subjects and the footing calc package | sonnet, high | opus, medium + verifiers | [#256](https://github.com/AbdulkareemSasah/Eng-Agent/pull/256) | open (merged with build/v1, reviewed; full gate) |
 | B-395 | X.T4 | Calcs harness.footing_plan_size and harness.footing_resize | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-396 | X.T5 | Calc harness.footing_layout | sonnet, high | opus, medium + verifiers | — | not started or in writing |
 | B-397 | X.T6 | Calcs harness.footing_status and harness.footing_schedule (with clearance) | sonnet, high | opus, medium + verifiers | — | not started or in writing |
@@ -487,6 +487,11 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-449 | P.T1 fix | chore(eng-harness): the provider dependency test skips its lock assertions only in the mutation step's copy (MU002 on every eng-harness source change since #274; D-15 lead fix, skip expires 2026-12-31) | lead | sonnet (subagent) | [#282](https://github.com/AbdulkareemSasah/Eng-Agent/pull/282) | done (0971104) |
 | B-450 | docs (DOC.ST11SPLIT) | Servers plan T11 split into reply mapping (T11) and model-state reader (T11b) (D-12) | lead | sonnet (subagent) | [#286](https://github.com/AbdulkareemSasah/Eng-Agent/pull/286) | done (d31d53a) |
 | B-451 | S.T11b | CSI model-state reader, fingerprint and units read | composer-2.5 | lead | — | not started (after S.T11 and C.T7) |
+| B-452 | docs (DOC.GOLDENTF) | Golden-loader cases leave the tests_first lists of calcs T7 to T12 and Revit T12 (TF008) | lead | sonnet (subagent) | [#287](https://github.com/AbdulkareemSasah/Eng-Agent/pull/287) | done (f7bc4e6) |
+| B-453 | docs (DOC.RISKR2) | Revit, column workflow and IDEA plans carry risk r2 for their kinds (RF001) | lead | sonnet (subagent) | [#289](https://github.com/AbdulkareemSasah/Eng-Agent/pull/289) | done (44aa8e0) |
+| B-454 | docs (DOC.ET13SPLIT) | Engine plan T13 split into T13, T13b and T13c (D-12) | lead (planning subagent draft) | sonnet (subagent) | [#291](https://github.com/AbdulkareemSasah/Eng-Agent/pull/291) | open |
+| B-455 | E.T13b | Invariant 9 and the first-use binding (units reads, the model_open refusal, resume step 6) | subagent | lead | — | not started (after E.T13) |
+| B-456 | E.T13c | Invariant 10 and the resume order (host leases, host_started, close_started, resume steps 4 and 5) | subagent | lead | — | not started (after E.T13b) |
 
 ## 4. Decisions by the lead
 
