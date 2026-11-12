@@ -282,8 +282,9 @@ def fold_report(reader: JournalReader, store: ResultStore) -> ReportModel:
     )
     machine = sum(s.duration_ms or 0 for s in steps if s.status == "completed")
     waiting = sum(r.wait_ms or 0 for r in requests)
+    resume_count = len({entry.resume_no for entry in resumes})
     return ReportModel(
-        run, Timings(steps, waiting, machine, len(resumes)), resumes, hosts, requests, decisions, escalations,
+        run, Timings(steps, waiting, machine, resume_count), resumes, hosts, requests, decisions, escalations,
         reconciliations, results, tuple(r.request_id for r in requests if r.answered_at is None), len(events),
         chain_of(events),
     )  # fmt: skip

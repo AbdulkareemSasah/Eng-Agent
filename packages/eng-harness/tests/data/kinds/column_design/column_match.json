@@ -1,0 +1,23 @@
+{
+  "calc": {
+    "id": "harness.column_section_match",
+    "version": 1,
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "draft"
+  },
+  "draft": true,
+  "trace": {
+    "calc_id": "harness.column_section_match",
+    "calc_version": "1",
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "constants": [],
+    "steps": [],
+    "outputs": []
+  },
+  "status": "matched",
+  "section": "C40x60",
+  "names": [
+    "C40x60"
+  ]
+}
