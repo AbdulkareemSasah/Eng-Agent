@@ -27,12 +27,13 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
-from eng_harness.engine import _hostsafety, _hoststate, _inflight
+from eng_harness.ctx import BasisView
+from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, HostPort, InputPort, RunClass, ToolPort
+from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, DecisionPort, HostPort, InputPort, RunClass, ToolPort
 
 _RUN_ID = re.compile(r"^run_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _TERMINAL = (EventType.RUN_COMPLETED, EventType.RUN_FAILED)
@@ -93,7 +94,10 @@ class RunOutcome:
 
 @dataclass(frozen=True)
 class EnginePorts:
-    """The ports an engine works through (spec 4.8); the decision, progress and run-control ports follow."""
+    """The ports an engine works through (spec 4.8); the progress and run-control ports follow.
+
+    `decision` is `None` when no cascade is wired: a `decide` or `decide_many` call is then an internal error.
+    """
 
     tool: ToolPort
     host: HostPort
@@ -101,6 +105,7 @@ class EnginePorts:
     basis: BasisPort
     approvals: ApprovalPort
     inputs: InputPort
+    decision: DecisionPort | None = None
 
 
 @contextmanager
@@ -185,7 +190,7 @@ class Engine:
                 writer.append(EventType.RUN_STARTED, header)
                 rt, leases = self._hosts(run_id, writer, 0)
                 try:
-                    return await self._closed(rt, await self._drive(workflow, inp, rt, leases, []))
+                    return await self._closed(rt, await self._drive(workflow, inp, rt, leases, [], request.basis_ref))
                 finally:
                     await leases.release()
 
@@ -233,7 +238,9 @@ class Engine:
                     except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
                         status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
                         return await self._closed(rt, RunOutcome(run_id, status, escalation=stop.escalated))
-                    return await self._closed(rt, await self._drive(workflow, inp, rt, leases, rt.events()))  # step 9
+                    return await self._closed(
+                        rt, await self._drive(workflow, inp, rt, leases, rt.events(), head.basis_ref)
+                    )  # step 9
                 finally:
                     await leases.release()
 
@@ -295,13 +302,21 @@ class Engine:
 
     async def _drive(
         self, workflow: WorkflowDef[Any, Any], inp: BaseModel, rt: _inflight.Resume, leases: _hostsafety.Leases,
-        events: list[Event],
+        events: list[Event], basis_ref: str,
     ) -> RunOutcome:  # fmt: skip
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports, run_id, writer = self._ports, rt.run_id, rt.writer
+
+        def view() -> BasisView:  # loaded when the first decision needs it
+            loaded = ports.basis.load(basis_ref)
+            return BasisView(loaded.result_id, loaded.basis, workflow.required_basis)
+
+        decider = _decide.Decider(
+            ports.decision, ports.inputs, view, rt.events, writer, self._clock, self._ids, run_id, events
+        )
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
-            writer, events, _hostsafety.Pending(rt), leases,
+            writer, events, _hostsafety.Pending(rt), leases, decider,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
@@ -312,8 +327,9 @@ class Engine:
                 wanted = workflow.output_model.__name__
                 raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
             ctx.index.finish()
-        except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
-            writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
+        except errors.Pause as pause:  # the request ids are the evidence
+            reason = "awaiting_input" if isinstance(pause, _decide.AwaitingInput) else "awaiting_approval"
+            writer.append(EventType.RUN_PAUSED, {"reason": reason, "request_ids": list(pause.evidence)})
             return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
         except _inflight.Stopped as stop:  # a write of unknown outcome: escalated for the engineer, or abandoned
             status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED

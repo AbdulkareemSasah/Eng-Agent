@@ -4,8 +4,9 @@ Purpose: each port is a `typing.Protocol` implemented by adapters (0002), calcs 
 (0006); fakes in `tests/fakes/` stand in for tests. Host results are contract `Envelope`s; data types are frozen
 Pydantic models. Units: none (counters, hashes, `Timestamp`s). Errors: `ContractError` for contract conditions,
 `CalcRefused` from a CalcPort, `pydantic.ValidationError` for invalid data. Methods that wait on a host or a person
-are `async`; methods that read held state are synchronous. Not here: `DecisionPort` (plan T14) and `ToolPort.preview`
-(needs `Preview` of `eng_harness.ctx`, plan T7).
+are `async`; methods that read held state are synchronous. `DecisionPort` (plan T14) is built over the types of
+`eng_harness.decisions.interfaces`, which this module re-exports; its `runtime_summary` is T14b's. Not here:
+`ToolPort.preview` (needs `Preview` of `eng_harness.ctx`, plan T7).
 """
 
 from collections.abc import Mapping, Sequence
@@ -21,14 +22,15 @@ from eng_contract.refs import Ref, RefRule, RefString
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, model_validator
 
 from eng_harness.calc import CalcStatus
+from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, EngineerChoice, PendingAnswer
 from eng_harness.journal import Event
 
 # fmt: off
 __all__ = [
-    "ApprovalAnswer", "ApprovalPort", "ApprovalRequest", "BasisPort", "CalcInfo", "CalcPort", "HostInstance",
-    "HostLease", "HostModelState", "HostPort", "InputAnswer", "InputPort", "InputRequest", "LoadedBasis",
-    "ModelBinding", "ProgressSink", "Reconciliation", "RunClass", "RunControlPort", "SavedModel", "ServerCheck",
-    "ToolInfo", "ToolPort", "UnitsState",
+    "ApprovalAnswer", "ApprovalPort", "ApprovalRequest", "BasisPort", "CalcInfo", "CalcPort", "DecisionAnswer",
+    "DecisionCall", "DecisionPort", "EngineerChoice", "HostInstance", "HostLease", "HostModelState", "HostPort",
+    "InputAnswer", "InputPort", "InputRequest", "LoadedBasis", "ModelBinding", "PendingAnswer", "ProgressSink",
+    "Reconciliation", "RunClass", "RunControlPort", "SavedModel", "ServerCheck", "ToolInfo", "ToolPort", "UnitsState",
 ]
 # fmt: on
 
@@ -347,6 +349,16 @@ class InputPort(Protocol):
 
     async def answer(self, request_id: str, *, wait: bool) -> InputAnswer | None:
         """The answer, or `None` when there is none (the engine pauses)."""
+
+
+class DecisionPort(Protocol):
+    """The decision cascade (spec 0005): rules, then providers, then the engineer."""
+
+    async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
+        """Decide one call, or return the request for the engineer; a call with an `engineer_choice` is the answer."""
+
+    async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
+        """Decide the calls of one step; the result has one entry for each call, in order."""
 
 
 class ProgressSink(Protocol):
