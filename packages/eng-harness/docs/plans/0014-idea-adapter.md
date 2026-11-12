@@ -294,7 +294,7 @@ gap tests for that tool (a spec change, not a test changed to pass). Its own pla
 - Plans: plan 0002 T1, T5 to T10, T14 and T20 (config, transport, allowlist and build check, lock and guard, adapter
   framework, error mapping, model identity, reconciliation, and the framework additions of spec 0002 §11 A3: routes,
   `audit_log`, the unit header) before T1 and T3 of this plan; plan 0001 (engine ports,
-  `NotImplementedGap`) and plan 0004 (design-basis fields `connection.design_code` and `checks.readback_relative_tolerance`
+  `NotImplementedGap`) and plan 0004 (design-basis fields `connection.design_code` and `checks.readback_relative_tolerance_ratio`
   must exist in the workflow's template, which the workflow spec adds) before T7 runs a workflow. Specs: `eng-contract`
   0.1.0 merged and its `verdicts.set/1`, `forces.member_end/1` and `issues.model_check/1` kinds built (contract tasks
   T10 to T12). The column workflow spec (B-083) is the first consumer of the load plan and the verdict set.
