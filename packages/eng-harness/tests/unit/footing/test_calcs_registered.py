@@ -1,6 +1,7 @@
 """Registration of the footing calcs (plan 0010 T3; spec 0010 AC12): metadata, lock entry, record and constants."""
 
 import importlib
+import re
 import tomllib
 from pathlib import Path
 from types import ModuleType
@@ -33,13 +34,20 @@ def test_metadata_and_constants(calc_id: str) -> None:
     assert "spec 0010" in definition.method_source
     assert section in definition.method_source
     assert definition.fn.__module__ == module.__name__
-    # a verification record, with the calc's hash
+    # a verification record naming the calc; its hash matches the lock (registry ↔ lock is test_calc_lock.py)
     record = (ROOT / "docs" / "verification" / "calcs" / f"{calc_id}.md").read_text(encoding="utf-8")
-    assert REGISTRY.content_hash(calc_id) in record
+    assert f"Calc id: `{calc_id}`" in record
+    assert "- Version: 1" in record
+    content = re.search(r"Content hash: `([0-9a-f]{64})`", record)
+    assert content is not None
+    record_hash = content.group(1)
     assert "Status: draft" in record
-    # a lock entry
     entries = [e for e in _hash.read_lock()["calcs"] if e["id"] == calc_id]
-    assert entries == [{"id": calc_id, "version": 1, "content_sha256": REGISTRY.content_hash(calc_id)}]
+    assert len(entries) == 1
+    entry = entries[0]
+    assert (entry["id"], entry["version"]) == (calc_id, 1)
+    assert re.fullmatch(r"[0-9a-f]{64}", entry["content_sha256"])
+    assert record_hash == entry["content_sha256"]
     # only cited constants: every upper-case module name is a Cited with a source, and no approval is recorded
     constants = {n: v for n, v in vars(module).items() if n.isupper() and not n.startswith("_")}
     cited = {n: v for n, v in constants.items() if isinstance(v, Cited)}
