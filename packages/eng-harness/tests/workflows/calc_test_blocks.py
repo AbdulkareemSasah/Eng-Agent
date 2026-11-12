@@ -7,8 +7,6 @@ fake. Plan 0003 T8 adds its older-revision block here.
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
 
-Body = Callable[[Any], Awaitable[Sequence[str]]]
-
 from eng_contract.refs import Ref
 from fakes.ports import FakeApprovalPort, FakeBasisPort, FakeInputPort
 
@@ -18,6 +16,8 @@ from eng_harness.ports import CalcPort
 from workflows.chain import ChainInput, ChainOutput
 from workflows.ctx_flows import flow
 from workflows.rig import Rig, Spy
+
+Body = Callable[[Any], Awaitable[Sequence[str]]]
 
 
 def engine(rig: Rig, port: CalcPort, *workflows: BlockDef[Any, Any]) -> Engine:

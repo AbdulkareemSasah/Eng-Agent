@@ -179,8 +179,10 @@ def test_older_revision_inputs(tmp_path: Path) -> None:
     info = port.describe("harness.model_diff")
     assert info.ref_rules["before_frames"].stale_ok is True
     assert info.ref_rules["after_frames"].stale_ok is False
+
     def revision(model: str) -> int | None:
         return 2 if model == model_id else None
+
     resolve_ref(
         Ref.model_validate({"$ref": before_id}),
         info.ref_rules["before_frames"],
