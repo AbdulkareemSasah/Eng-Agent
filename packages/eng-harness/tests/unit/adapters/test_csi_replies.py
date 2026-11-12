@@ -6,19 +6,24 @@ import pytest
 from eng_contract.kinds import NEUTRAL_KINDS
 from eng_contract.kinds.model import (
     AreaKind,
+    AreaPlacements,
     CombinationType,
     FrameKind,
+    FramePlacements,
+    GridSystem,
+    JointRestraints,
     LoadDirection,
+    LoadSet,
     PatternType,
+    Stories,
 )
 
 from eng_harness.adapters.csi._replies import (
-    CSI_KINDS,
     CsiModelStatus,
     area_section_kinds,
     areas,
-    grids,
     frames,
+    grids,
     load_set,
     model_status,
     restraints,
@@ -74,9 +79,7 @@ def test_six_kinds_and_status_validate() -> None:
     combo_table = [{"Name": "1.4D", "Type": "Linear Add"}]
     frame_load_rows = [{"Frame": "B1", "LoadPattern": "DEAD", "Value": 12.5}]
     area_load_rows = [{"UniqueName": "SlabA", "LoadPattern": "DEAD", "Value": 6.25}]
-    restraint_rows = [
-        {"UniqueName": "J1", "Ux": True, "Uy": False, "Uz": True, "Rx": False, "Ry": True, "Rz": False}
-    ]
+    restraint_rows = [{"UniqueName": "J1", "Ux": True, "Uy": False, "Uz": True, "Rx": False, "Ry": True, "Rz": False}]
     info = {
         "units": UNITS,
         "locked": False,
@@ -84,68 +87,79 @@ def test_six_kinds_and_status_validate() -> None:
         "program_version": "22.1.0",
     }
 
-    mapped = {
-        "model.stories/1": stories(story_rows, UNITS),
-        "model.grid_system/1": grids(grid_rows, UNITS),
-        "model.frame_placements/1": frames(frame_rows, UNITS),
-        "model.area_placements/1": areas(area_rows, UNITS, area_section_kinds(area_section_rows)),
-        "model.load_set/1": load_set(
-            pattern_rows,
-            combo_rows,
-            pattern_table,
-            combo_table,
-            frame_load_rows,
-            area_load_rows,
-            UNITS,
-        ),
-        "model.joint_restraints/1": restraints(restraint_rows),
-        "harness.csi_model_status/1": model_status(info, Path("/runs/demo/tower.EDB")),
-    }
+    stories_payload = stories(story_rows, UNITS)
+    grid_payload = grids(grid_rows, UNITS)
+    frame_payload = frames(frame_rows, UNITS)
+    area_payload = areas(area_rows, UNITS, area_section_kinds(area_section_rows))
+    load_payload = load_set(
+        pattern_rows,
+        combo_rows,
+        pattern_table,
+        combo_table,
+        frame_load_rows,
+        area_load_rows,
+        UNITS,
+    )
+    joint_payload = restraints(restraint_rows)
+    status_payload = model_status(info, Path("/runs/demo/tower.EDB"))
 
-    for kind, payload in mapped.items():
-        model = NEUTRAL_KINDS.get(kind) or CSI_KINDS[kind]
-        model.model_validate(payload.model_dump() if hasattr(payload, "model_dump") else payload)
+    for kind, payload in (
+        ("model.stories/1", stories_payload),
+        ("model.grid_system/1", grid_payload),
+        ("model.frame_placements/1", frame_payload),
+        ("model.area_placements/1", area_payload),
+        ("model.load_set/1", load_payload),
+        ("model.joint_restraints/1", joint_payload),
+        ("harness.csi_model_status/1", status_payload),
+    ):
+        kind_model = NEUTRAL_KINDS[kind] if kind.startswith("model.") else CsiModelStatus
+        kind_model.model_validate(payload.model_dump())
 
-    stories_payload = mapped["model.stories/1"]
+    assert isinstance(stories_payload, Stories)
     assert stories_payload.base_elevation_mm == pytest.approx(_mm(-4.0))
     mezz = next(s for s in stories_payload.stories if s.name == "Mezz")
     assert mezz.elevation_mm == pytest.approx(_mm(4.25))
     assert mezz.height_mm == pytest.approx(_mm(2.75))
     assert mezz.similar_to == "Basement"
 
-    grid_payload = mapped["model.grid_system/1"].systems[0]
-    assert grid_payload.origin_x_mm == pytest.approx(_mm(2.5))
-    assert grid_payload.origin_y_mm == pytest.approx(_mm(7.25))
-    assert grid_payload.rotation_deg == 15.0
-    x_line = next(line for line in grid_payload.lines if line.axis.value == "x")
-    y_line = next(line for line in grid_payload.lines if line.axis.value == "y")
+    assert isinstance(grid_payload, GridSystem)
+    grid_system = grid_payload.systems[0]
+    assert grid_system.origin_x_mm == pytest.approx(_mm(2.5))
+    assert grid_system.origin_y_mm == pytest.approx(_mm(7.25))
+    assert grid_system.rotation_deg == 15.0
+    x_line = next(line for line in grid_system.lines if line.axis.value == "x")
+    y_line = next(line for line in grid_system.lines if line.axis.value == "y")
     assert x_line.coordinate_mm == pytest.approx(_mm(3.25))
     assert y_line.coordinate_mm == pytest.approx(_mm(-1.5))
     assert y_line.visible is False
 
-    frame_payload = mapped["model.frame_placements/1"].frames[0]
-    assert frame_payload.kind is FrameKind.OTHER
-    assert frame_payload.i.x_mm == pytest.approx(_mm(1.2))
-    assert frame_payload.j.z_mm == pytest.approx(_mm(4.1))
-    assert frame_payload.story == "Mezz"
+    assert isinstance(frame_payload, FramePlacements)
+    frame = frame_payload.frames[0]
+    assert frame.kind is FrameKind.OTHER
+    assert frame.i.x_mm == pytest.approx(_mm(1.2))
+    assert frame.j.z_mm == pytest.approx(_mm(4.1))
+    assert frame.story == "Mezz"
 
-    area_payload = mapped["model.area_placements/1"].areas[0]
-    assert area_payload.kind is AreaKind.SLAB
-    assert len(area_payload.points) == 3
-    assert area_payload.points[2].y_mm == pytest.approx(_mm(4.75))
+    assert isinstance(area_payload, AreaPlacements)
+    area = area_payload.areas[0]
+    assert area.kind is AreaKind.SLAB
+    assert len(area.points) == 3
+    assert area.points[2].y_mm == pytest.approx(_mm(4.75))
 
-    load_payload = mapped["model.load_set/1"]
+    assert isinstance(load_payload, LoadSet)
     assert load_payload.patterns[0].type is PatternType.DEAD
     assert load_payload.combinations[0].type is CombinationType.LINEAR_ADD
     assert load_payload.frame_loads[0].direction is LoadDirection.GRAVITY
     assert load_payload.frame_loads[0].w_kN_m == pytest.approx(12.5)
     assert load_payload.area_loads[0].q_kPa == pytest.approx(6.25)
 
-    joint_payload = mapped["model.joint_restraints/1"].joints[0]
-    assert joint_payload.joint == "J1"
-    assert joint_payload.ux is True and joint_payload.uy is False and joint_payload.ry is True
+    assert isinstance(joint_payload, JointRestraints)
+    joint = joint_payload.joints[0]
+    assert joint.joint == "J1"
+    assert joint.ux is True
+    assert joint.uy is False
+    assert joint.ry is True
 
-    status_payload = mapped["harness.csi_model_status/1"]
     assert isinstance(status_payload, CsiModelStatus)
     assert status_payload.units == UNITS
     assert status_payload.file_name == "tower.EDB"
