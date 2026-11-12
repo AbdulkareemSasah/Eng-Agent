@@ -6,13 +6,14 @@ import logging
 import time
 from collections.abc import Callable, Coroutine
 from pathlib import Path
+from typing import cast
 
 import httpx2
 import pytest
 from fakes.credential_stores import FakeCredentialStore
 from pydantic import JsonValue, SecretStr
 
-from eng_harness.decisions.interfaces import ProviderError, ProviderErrorCode
+from eng_harness.decisions.interfaces import OutgoingPlace, ProviderError, ProviderErrorCode
 from eng_harness.providers._config import LLMProviderConfig
 from eng_harness.providers._http import ProviderClient
 
@@ -157,7 +158,14 @@ def test_no_secret_or_body_in_logs_or_errors(caplog: pytest.LogCaptureFixture) -
         raise httpx2.ConnectError(f"{REMOTE} {KEY}", request=request)
 
     errors: list[ProviderError] = []
-    for handler in (failing(401), failing(429), failing(500), boom):
+
+    def timeout(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadTimeout(f"{REMOTE} {KEY}", request=request)
+
+    def garbage(_: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, text=f"{REMOTE} {KEY}")
+
+    for handler in (failing(401), failing(429), failing(500), boom, timeout, garbage):
         with pytest.raises(ProviderError) as excinfo:
             asyncio.run(_call(handler))
         errors.append(excinfo.value)
@@ -216,3 +224,32 @@ def test_trust_env_is_off(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     assert len(seen) == 1
     assert str(seen[0].url) == "https://api.example.test/v1/chat/completions"
     assert seen[0].headers["Authorization"] == f"Bearer {KEY}"
+
+
+def test_local_errors_hold_no_key() -> None:
+    """NO_KEY, CREDENTIAL_STORE, REDACTION_BLOCKED and a non-JSON body: no traceback frame holds the key."""
+
+    class BrokenStore(FakeCredentialStore):
+        def get(self, key_ref: str) -> SecretStr | None:
+            raise ProviderError(ProviderErrorCode.CREDENTIAL_STORE)
+
+    unnamed = _config().model_copy(update={"key_ref": None})
+    cases: list[tuple[ProviderErrorCode, LLMProviderConfig | None, FakeCredentialStore | None, tuple[str, ...]]] = [
+        (ProviderErrorCode.NO_KEY, None, _store(None), ()),
+        (ProviderErrorCode.NO_KEY, unnamed, None, ()),
+        (ProviderErrorCode.CREDENTIAL_STORE, None, BrokenStore(), ()),
+        (ProviderErrorCode.REDACTION_BLOCKED, None, None, (LOCAL_BODY,)),
+    ]
+    for code, config, store, sensitive in cases:
+        with pytest.raises(ProviderError) as excinfo:
+            asyncio.run(_call(_ok, config=config, store=store, sensitive=sensitive))
+        assert excinfo.value.code is code
+        assert_no_leak(excinfo.value, (KEY,), (REMOTE,))
+    bad_bodies: list[dict[str, JsonValue]] = [{"x": float("nan")}, cast("dict[str, JsonValue]", {"x": object()})]
+    for bad in bad_bodies:
+        client = ProviderClient(_config(), _store(), transport=httpx2.MockTransport(_ok))
+        with pytest.raises(ProviderError) as excinfo:
+            asyncio.run(client.post_json(PATH, bad))
+        assert excinfo.value.code is ProviderErrorCode.REDACTION_BLOCKED
+        assert excinfo.value.where is OutgoingPlace.STATE_VALUE
+        assert_no_leak(excinfo.value, (KEY,))

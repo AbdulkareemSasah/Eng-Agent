@@ -14,7 +14,7 @@ from typing import NoReturn
 import httpx2
 from pydantic import JsonValue, SecretStr
 
-from eng_harness.decisions.interfaces import ProviderError, ProviderErrorCode
+from eng_harness.decisions.interfaces import OutgoingPlace, ProviderError, ProviderErrorCode
 from eng_harness.providers._config import DecisionProviderConfig, LLMProviderConfig
 from eng_harness.providers._credentials import CredentialStore
 from eng_harness.providers._outgoing import find_body_place
@@ -115,6 +115,20 @@ class ProviderClient:
             _raise(ProviderErrorCode.NO_KEY)
         return secret
 
+    def _prepare(
+        self, body: Mapping[str, JsonValue], sensitive_values: Sequence[str]
+    ) -> tuple[bytes, OutgoingPlace | None]:
+        """Check the key and scan the body; the key is bound here only, so no raised error's traceback holds it.
+
+        A body that cannot be serialized to strict JSON is not scannable and counts as ``STATE_VALUE``.
+        """
+        secret = self._secret()
+        try:
+            payload = json.dumps(body, allow_nan=False).encode("utf-8")
+        except ValueError, TypeError:
+            return b"", OutgoingPlace.STATE_VALUE
+        return payload, find_body_place(payload, sensitive_values, secret)
+
     async def _exchange(self, path: str, payload: bytes) -> _Outcome:
         code: ProviderErrorCode | None = None
         data: dict[str, JsonValue] | None = None
@@ -137,12 +151,11 @@ class ProviderClient:
         ``sensitive_values`` are the ``DecisionSettings.sensitive_values`` entries the final body is scanned for.
 
         Raises:
-            ProviderError: ``NO_KEY``, ``CREDENTIAL_STORE``, ``REDACTION_BLOCKED`` (before any request), ``NETWORK``,
-                ``TIMEOUT``, ``AUTH``, ``RATE_LIMITED``, ``HTTP_STATUS`` or ``BAD_RESPONSE``; the message is the code.
+            ProviderError: ``NO_KEY``, ``CREDENTIAL_STORE``, ``REDACTION_BLOCKED`` (also for a body that is not
+                strict JSON), all before any request; ``NETWORK``, ``TIMEOUT``, ``AUTH``, ``RATE_LIMITED``,
+                ``HTTP_STATUS`` or ``BAD_RESPONSE``; the message is the code.
         """
-        secret = self._secret()
-        payload = json.dumps(body, allow_nan=False).encode("utf-8")
-        place = find_body_place(payload, sensitive_values, secret)
+        payload, place = self._prepare(body, sensitive_values)
         if place is not None:
             raise ProviderError(ProviderErrorCode.REDACTION_BLOCKED, where=place)
         code, data = await self._exchange(path, payload)

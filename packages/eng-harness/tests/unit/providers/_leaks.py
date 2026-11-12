@@ -4,14 +4,15 @@ import contextlib
 from collections.abc import Mapping, Sequence
 
 import httpx2
+from pydantic import SecretStr
 
 
 def assert_no_leak(err: BaseException, secrets: Sequence[str], bodies: Sequence[str] = ()) -> None:
     """Fail if a secret or a response-body text is reachable from ``err``.
 
     Walks the message, ``args``, attributes, ``__cause__``, ``__context__`` and every frame local of the traceback,
-    recursing into containers, exceptions and httpx2 requests and responses. The failure message names the route, never
-    the leaked text.
+    recursing into containers, ``SecretStr`` values, exceptions and httpx2 requests and responses. The failure message
+    names the route, never the leaked text.
     """
     needles = [text for text in (*secrets, *bodies) if text]
     seen: set[int] = set()
@@ -27,6 +28,8 @@ def assert_no_leak(err: BaseException, secrets: Sequence[str], bodies: Sequence[
         keep.append(obj)
         if isinstance(obj, str):
             check(obj, route)
+        elif isinstance(obj, SecretStr):
+            walk(obj.get_secret_value(), f"{route}.secret")
         elif isinstance(obj, bytes | bytearray):
             check(bytes(obj).decode("utf-8", "replace"), route)
         elif isinstance(obj, Mapping):
