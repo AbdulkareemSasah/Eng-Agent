@@ -111,6 +111,7 @@ A pull request whose recorded risk is below the floor fails `risk-floor`.
 | Defect | Reproduce as a failing regression test |
 | Refactor | Confirm tests green; change structure only; tests stay green without edits |
 | Gap report | Triage: new spec, covered, host limitation, or out of scope. During a live project: the project lane (§9) |
+| Need from a task log | Triage in a development session (§10, [02](02-work-items.md) §5) |
 | Spike | Question, time box, throwaway code in `spikes/`, report |
 | Contract change | ADR in the hub first |
 | Code clause | Clause spec ([10](10-engineering-verification.md) §3) |
@@ -129,8 +130,19 @@ During a live project, a missing capability is built through the project lane
 | Tests | A test for every number the tool produces or writes, against a cited source or a hand check |
 | Live check | On a copy of the model or a fixture, in the owner's live session; never on the working model |
 | Use | In the project only on a copy; the run report marks every result that depends on the tool |
-| Record | The session report (what was built, the tests, the live check, open risks), linked from the gap report |
+| Record | The session report, which is the task log of the lane session (§10; what was built, the tests, the live check, open risks), and the gap report, unchanged |
 | CI | Tests and `risk-floor` run on lane branches; `gate-check` and `test-first` run in the release lane |
 | Release lane | Before merge to `main` or use in another project: the full lifecycle from S2, starting from the branch |
 
 Open lane branches appear in the owner digest ([12](12-operations.md) §7); one older than 30 days is re-triaged.
+
+## 10. Live work and the task log
+
+Every task the owner asks of the agent has exactly one task log in the root folder `tasklog/` of the workspace
+repository ([ADR-0034](../docs/adr/0034-task-log-by-default.md); D1 defines a task, D5 how logs travel).
+
+| Session | Rule |
+|---|---|
+| Live (the owner asks for project work; a project-lane session included) | The agent completes what is possible only through harness workflows, records everything in the task log, and changes no other repository file. A missing capability is a `not_found` record and the agent goes on (ADR-0034 D2) |
+| Development (started on a work item, under the full process) | Develops the core; a live session never does. It may read the full logs, triages their needs ([02](02-work-items.md) §5) and files gap issues citing need ids only (A24, ADR-0034 D11) |
+| Any other | Never opens `tasklog/` |

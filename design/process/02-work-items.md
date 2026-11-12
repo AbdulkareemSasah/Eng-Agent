@@ -27,6 +27,7 @@ are each one pull request in size.
 | `status/` | `triage`, `needs-info`, `ready`, `spec-review`, `plan-review`, `in-progress`, `in-review`, `acceptance`, `blocked`, `done` |
 | `phase/` | `0` to `4` |
 | `area/` | per repository, for example `tools`, `adapter`, `plugin`, `engine`, `ui`, `decisions` |
+| `source/` | `tasklog` (filed at triage from a task-log need, §5) |
 
 ## 4. Definition of Ready and Definition of Done
 
@@ -56,9 +57,14 @@ A gap report is filed whenever someone, a workflow or an agent, needs a capabili
 tool, parameter, check, calc function, kind or host operation. During a live project, the project lane
 ([01](01-lifecycle.md) §9) builds the tool first and files the gap report as its record.
 
-- Outside the project lane, the person or agent that hits the gap stops the improvisation, files the report with the
-  exact need, the workflow or task that needs it, and evidence (host API reference, example). An agent then reports
-  `BLOCKED` and ends its work on the item; it does not switch to another item in the same session (A18).
+- In live work ([01](01-lifecycle.md) §10), a missing capability is a `not_found` record in the task log and the
+  agent goes on with what is possible. The gap issue is filed at triage by a development session, labelled
+  `source/tasklog`, citing need ids only, never log content (A24).
+- Outside live work and the project lane, the person or agent that hits the gap stops the improvisation, files the
+  report with the exact need, the workflow or task that needs it, and evidence (host API reference, example). An
+  agent then reports `BLOCKED` and ends its work on the item; it does not switch to another item in the same session
+  (A18).
 - Triage outcome: `new spec` (it becomes a feature), `covered` (existing tools do it; the report explains how),
-  `host limitation` (documented, alternative proposed), or `out of scope`.
+  `host limitation` (documented, alternative proposed), or `out of scope`; for a need from a task log also
+  `duplicate` (of another need) or `defect` (a bug, filed as one).
 - A gap is never closed by adding an escape hatch.

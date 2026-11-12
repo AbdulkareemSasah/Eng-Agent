@@ -18,7 +18,8 @@ In every phase, a capability that is missing during a live project goes through 
 
 For v1, all phases are built code-complete before live testing; the spikes that need host programs, acceptance A1 to
 A7 and the A4 time gate run at the owner's local test stage and must pass before any release
-([ADR-0028](../adr/0028-build-v1-in-this-repository.md)).
+([ADR-0028](../adr/0028-build-v1-in-this-repository.md)). The first live run comes first; the task-log code is a
+parallel lane, never on that run's critical path ([ADR-0034](../adr/0034-task-log-by-default.md) D14).
 
 Each phase gets a time box from the owner when it starts (two weeks proposed for phase 0). A phase that has not met
 its exit criteria within its time box cuts scope; its exit criteria are never lowered to close it.
