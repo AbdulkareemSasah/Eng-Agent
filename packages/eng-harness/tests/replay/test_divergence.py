@@ -349,6 +349,7 @@ def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
     assert again.escalation is not None
     assert again.escalation.reason == "replay_divergence"
     assert "check_model" in again.escalation.detail
+    assert "0~pre.units.m1" in again.escalation.detail  # the units read of the first use is part of the sequence too
 
     host_only = make_rig(tmp_path / "host")
 

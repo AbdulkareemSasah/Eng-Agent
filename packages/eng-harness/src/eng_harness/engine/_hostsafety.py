@@ -63,7 +63,9 @@ class Pending:
         events = rt.events()
         self._bound = {key: (b.host_key, b.instance_id) for key, b in Fold(events).bound.items()}
         self._read = {
-            p.model_key for e in events if isinstance(p := e.payload, ev.StepStarted) and p.name[:5] == "units"
+            p.model_key
+            for e in events
+            if isinstance(p := e.payload, ev.StepStarted) and p.kind == "read" and p.name[:5] == "units"
         }
         self._epochs: dict[str, int] = {}  # the session epoch of each host when this process first saw it (4.6 #9)
         self._turn = asyncio.Lock()
@@ -101,8 +103,7 @@ class Pending:
             ContractError: `PRECONDITION_FAILED` `model_open` when no instance holds the model before the step;
                 `units_verified` when its units differ (the run is escalated, `units_mismatch`).
         """
-        deferred = info.action == "open" and key not in self._bound
-        if key is None or after != deferred:
+        if key is None or after != (info.action == "open"):
             return
         async with self._turn:
             if key not in self._bound:
@@ -114,14 +115,15 @@ class Pending:
                 _hoststate.bind(self._rt.writer, self._rt.host, key, info.host_key, found.instance_id, "first_use")
                 self._bound[key] = (info.host_key, found.instance_id)
             first = inserted_path(path, "post" if after else "pre", "units", path_key(key))
-            if not self._recorded(ctx, first, key) and key not in self._read:
+            ctx._look(first, "read", "units", {"model_key": key})  # a recorded step is visited, so replay finds it
+            if key not in self._read:
                 await self._check(ctx, first, key, self._bound[key][1], 1)
 
     def replay(self, ctx: _Ctx, path: str, key: str | None) -> None:
         """Visit the units steps recorded for the step at `path`, so that replay finds them (AC47); no port call."""
         if key is not None:
             for phase in ("pre", "post"):
-                self._recorded(ctx, inserted_path(path, phase, "units", path_key(key)), key)
+                ctx._look(inserted_path(path, phase, "units", path_key(key)), "read", "units", {"model_key": key})
 
     async def reconnected(self, ctx: _Ctx, path: str, attempt: int, host_key: str, *, timeout: bool = False) -> None:
         """Read the units of the models bound on `host_key` again when its session epoch changed in this process, or
@@ -134,17 +136,11 @@ class Pending:
             epoch = self._rt.host.session_epoch(host_key)
             changed, self._epochs[host_key] = self._epochs.setdefault(host_key, epoch) != epoch, epoch
             if changed or timeout:
-                for key, (_, instance_id) in sorted(self._bound.items()):
-                    if self._bound[key][0] == host_key:
+                for key, (bound_host, instance_id) in sorted(self._bound.items()):
+                    if bound_host == host_key:
                         await self._check(
                             ctx, inserted_path(path, "host", "units", path_key(key)), key, instance_id, attempt
                         )
-
-    @staticmethod
-    def _recorded(ctx: _Ctx, path: str, key: str) -> bool:
-        """True when the journal holds the finished units step `path` (looking it up marks it as visited)."""
-        found = ctx._look(path, "read", "units", {"model_key": key})
-        return found is not None and found.outcome is not None
 
     async def _check(self, ctx: _Ctx, path: str, key: str, instance_id: str, attempt: int) -> None:
         """Read the units of `key` in `instance_id` as the inserted step `path`; differing units end the run (#9)."""
