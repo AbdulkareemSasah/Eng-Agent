@@ -8,7 +8,7 @@ block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
 
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
@@ -27,6 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
+from eng_harness.ctx import BasisView
 from eng_harness.engine import _hostsafety, _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
@@ -89,6 +90,16 @@ class RunOutcome:
     output: BaseModel | None = None
     pending: tuple[str, ...] = ()
     escalation: ev.RunEscalated | None = None
+
+
+def _lazy_basis(port: BasisPort, basis_ref: str, declared: tuple[str, ...]) -> Callable[[], BasisView]:
+    """The loader of `ctx.basis`: the stored basis is read when block code first asks for it, never earlier."""
+
+    def load() -> BasisView:
+        loaded = port.load(basis_ref)
+        return BasisView(loaded.result_id, loaded.basis, declared)
+
+    return load
 
 
 @dataclass(frozen=True)
@@ -182,7 +193,7 @@ class Engine:
             }  # fmt: skip
             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
                 writer.append(EventType.RUN_STARTED, header)
-                return await self._drive(workflow, inp, run_id, writer, [])
+                return await self._drive(workflow, inp, run_id, writer, [], request.basis_ref)
 
     async def resume(self, run_id: str) -> RunOutcome:
         """Resume the run (steps 1 to 3 and 6 to 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
@@ -224,7 +235,7 @@ class Engine:
                 except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
                     status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
                     return RunOutcome(run_id, status, escalation=stop.escalated)
-                return await self._drive(workflow, inp, run_id, writer, rt.events())  # step 9
+                return await self._drive(workflow, inp, run_id, writer, rt.events(), head.basis_ref)  # step 9
 
     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
@@ -271,7 +282,8 @@ class Engine:
         return outcome
 
     async def _drive(
-        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, events: list[Event]
+        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, events: list[Event],
+        basis_ref: str,
     ) -> RunOutcome:  # fmt: skip
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports = self._ports
@@ -282,7 +294,7 @@ class Engine:
         )  # fmt: skip
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
-            writer, events, _hostsafety.Pending(rt),
+            writer, events, _hostsafety.Pending(rt), _lazy_basis(ports.basis, basis_ref, workflow.required_basis),
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:

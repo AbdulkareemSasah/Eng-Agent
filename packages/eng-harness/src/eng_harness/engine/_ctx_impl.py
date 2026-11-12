@@ -21,7 +21,7 @@ from pydantic import BaseModel, JsonValue
 from eng_harness import errors
 from eng_harness.block import BlockDef
 from eng_harness.calc import CalcStatus
-from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, ReadResult, ToolResult
+from eng_harness.ctx import ArgValue, Attempt, BasisCount, BasisView, CalcResult, ReadResult, ToolResult
 from eng_harness.engine import _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._invariants import Guard, SiblingBoard
@@ -94,17 +94,25 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending,
+        pending: Pending, basis: Callable[[], BasisView],
     ) -> None:  # fmt: skip
         """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending = pending
+        self._pending, self._load_basis = pending, basis
+        self._view: BasisView | None = None
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._guard = Guard(host, store, writer, producer)
         self._guard.install()
         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
         done = [(e.path, e.payload.calc) for e in events if isinstance(e.payload, ev.StepCompleted) and e.payload.calc]
         self._calcs, self.draft = dict(done), False  # the calc of each completed calc step, for its replay
+
+    @property
+    def basis(self) -> BasisView:
+        """The frozen design basis of the run, read from its port on first use (spec 0001 4.9)."""
+        if self._view is None:
+            self._view = self._load_basis()
+        return self._view
 
     def _begin(self, path: str, attempt: int, kind: str, name: str, args: _Obj, **fields: object) -> int:
         started = {"kind": kind, "name": name, "args": args, "args_sha256": payload_sha256(args), "effect": "none"}
