@@ -1,0 +1,674 @@
+diff --git a/packages/eng-harness/src/eng_harness/engine/_ctx_impl.py b/packages/eng-harness/src/eng_harness/engine/_ctx_impl.py
+index f96c76a..477b9b3 100644
+--- a/packages/eng-harness/src/eng_harness/engine/_ctx_impl.py
++++ b/packages/eng-harness/src/eng_harness/engine/_ctx_impl.py
+@@ -6,12 +6,14 @@ returns its recorded result, or raises its recorded failure again, with no port
+ """
+ 
+ from collections.abc import Awaitable, Callable, Mapping, Sequence
++from contextlib import closing
+ from enum import StrEnum
++from pathlib import Path
+ from typing import TYPE_CHECKING, NoReturn, cast
+ 
+ from eng_contract.canonical import payload_sha256
+ from eng_contract.envelope import FailureEnvelope, Provenance, SuccessEnvelope
+-from eng_contract.errors import RETRY_RULES, ContractError, ContractWarning, ErrorDetail, RetryRule
++from eng_contract.errors import RETRY_RULES, ContractError, ContractWarning, ErrorDetail, ErrorCode, RetryRule
+ from eng_contract.ids import Clock
+ from eng_contract.refs import Ref, RefRule, resolve_ref
+ from eng_contract.store import ResultStore
+@@ -23,11 +25,12 @@ from eng_harness.calc import CalcStatus
+ from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, ReadResult, ToolResult
+ from eng_harness.engine import _steps
+ from eng_harness.engine._codec import decode, decode_summary
++from eng_harness.engine._hostsafety import Safety, _UNKNOWN
+ from eng_harness.engine._invariants import Guard, SiblingBoard
+ from eng_harness.engine._replay import Recorded, ReplayIndex
+-from eng_harness.journal import Event, EventType, JournalWriter
++from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
+ from eng_harness.journal import _events as ev
+-from eng_harness.ports import CalcPort, HostPort, ToolPort
++from eng_harness.ports import CalcPort, HostPort, InputPort, ToolPort
+ 
+ if TYPE_CHECKING:
+     from eng_harness.engine._runner import EngineSettings
+@@ -87,12 +90,25 @@ class Ctx:
+     """The ctx one run hands to its blocks; `draft` turns true when a draft or verified calc ran (AC13)."""
+ 
+     def __init__(
+-        self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
+-        clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
++        self,
++        tools: ToolPort,
++        calc: CalcPort,
++        host: HostPort,
++        inputs: InputPort,
++        store: ResultStore,
++        settings: EngineSettings,
++        clock: Clock,
++        producer: Callable[[], Provenance],
++        run_id: str,
++        writer: JournalWriter,
++        events: Sequence[Event],
++        safety: Safety,
++        run_dir: Path,
+     ) -> None:  # fmt: skip
+         """Serve one run: its ports, store, settings, clock, run id, journal writer and the events to replay."""
+         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
+-        self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
++        self._producer, self._run_id, self._writer, self._run_dir = producer, run_id, writer, run_dir
++        self._safety, self.index = safety, ReplayIndex(events)
+         self._guard = Guard(host, store, writer, producer)
+         self._guard.install()
+         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
+@@ -155,6 +171,7 @@ class Ctx:
+         recorded = self._look(path, "tool", name, args)
+         prior = self._started.get(path)
+         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
++            await self._safety.replay_units(self, path, prior.model_key)
+             await self._guard.touch(prior.model_key, prior.effect == "write")
+             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
+             if recorded is not None and (done := self._replayed(recorded)) is not None:
+@@ -170,6 +187,9 @@ class Ctx:
+             self._guard.literals(raw, info.engineering_params)
+             await self._guard.touch(key, info.effect == "write")
+             await self._guard.prepare(self, path, key, info.effect, info.action)
++            await self._safety.bind_and_units(self, path, key, info)
++        elif prior.host_key:
++            await self._safety.before_host_step(self, path, prior.host_key, prior.model_key)
+         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
+         while True:
+             op = _steps.op_id(self._run_id, path, attempt)
+@@ -181,11 +201,23 @@ class Ctx:
+             envelope = await self._tools.call(name, args, op_id=op, model=key)
+             if isinstance(envelope, SuccessEnvelope):
+                 self._done(path, attempt, began, done := _stored(envelope))
++                await self._safety.journal_started(info.host_key)
+                 self._guard.note(envelope.provenance.host)
+                 if info.effect == "write":
+                     self._guard.mark(key)
+                 return _result(name, done)
+             error = envelope.error
++            if info.effect == "write" and error.code in _UNKNOWN:
++                self._safety.mark_wedge(info.host_key)
++                await self._safety.reconcile_host(self)
++                self._sync_index()
++                if (again := self._look(path, "tool", name, args)) and (done := self._replayed(again)) is not None:
++                    if info.effect == "write":
++                        self._guard.mark(key)
++                    await self._safety.journal_started(info.host_key)
++                    return _result(name, done)
++                attempt += 1
++                continue
+             self._fail(path, attempt, began, error, error.retryable)
+             if attempt >= last or not error.retryable or RETRY_RULES[error.code] not in _RETRIED:
+                 raise errors.ToolFailed(error)
+@@ -194,6 +226,10 @@ class Ctx:
+     def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
+         return self.index.lookup(path, kind, name, payload_sha256(args), child)
+ 
++    def _sync_index(self) -> None:
++        with closing(JournalReader(self._run_dir)) as reader:
++            self.index = ReplayIndex(reader.events())
++
+     async def read(self, ref: Ref | ToolResult | CalcResult, pointer: str = "") -> ReadResult:
+         """Read the value at `pointer` (added to the one in `ref`) of a stored result as one step.
+ 
+diff --git a/packages/eng-harness/src/eng_harness/engine/_hoststate.py b/packages/eng-harness/src/eng_harness/engine/_hoststate.py
+index 5cc287c..77bfa2c 100644
+--- a/packages/eng-harness/src/eng_harness/engine/_hoststate.py
++++ b/packages/eng-harness/src/eng_harness/engine/_hoststate.py
+@@ -7,19 +7,13 @@ answer is `accept` (a new baseline), `restore` (the last save returns, the steps
+ Units: none. Errors: `Stopped` (see `_inflight`), `ContractError` from a failing port call.
+ """
+ 
+-from collections.abc import Mapping, Sequence
+-
+ from eng_contract.canonical import payload_sha256
+-from eng_contract.envelope import Envelope
+-from pydantic import JsonValue
+ 
+ from eng_harness.engine._inflight import Fold, Resume
+ from eng_harness.engine._inputs import Question
+-from eng_harness.journal import Event, EventType, JournalWriter
++from eng_harness.journal import EventType, JournalWriter
+ from eng_harness.journal import _events as ev
+-from eng_harness.ports import HostModelState, HostPort, Reconciliation, SavedModel, ToolInfo, ToolPort, UnitsState
+-
+-_Obj = Mapping[str, JsonValue]
++from eng_harness.ports import HostModelState, HostPort, SavedModel, UnitsState
+ 
+ 
+ def bind(writer: JournalWriter, host: HostPort, key: str, host_key: str, instance_id: str, reason: str) -> None:
+@@ -29,49 +23,6 @@ def bind(writer: JournalWriter, host: HostPort, key: str, host_key: str, instanc
+     writer.append(EventType.MODEL_BOUND, body)
+ 
+ 
+-class BindingTools:
+-    """A `ToolPort` that binds a model before the first call addressed to it, to the instance `locate` finds (4.8).
+-
+-    The binding is journaled between the step's `step_started` and its host call (T13 moves it before `step_started`).
+-    A model no instance holds yet is not bound: an `open` tool has not run, and it is bound at the first call after it.
+-    """
+-
+-    def __init__(self, tools: ToolPort, host: HostPort, writer: JournalWriter, events: Sequence[Event]) -> None:
+-        """Wrap `tools`; the models the journal binds already are not bound again."""
+-        self._tools, self._host, self._writer = tools, host, writer
+-        self._bound = {e.payload.model_key for e in events if isinstance(e.payload, ev.ModelBound)}
+-        self._info: dict[str, ToolInfo] = {}
+-
+-    async def describe(self, tool: str) -> ToolInfo:
+-        """The tool's info, kept for the binding of the call that follows."""
+-        self._info[tool] = await self._tools.describe(tool)
+-        return self._info[tool]
+-
+-    def unreleased_tools(self) -> Mapping[str, str]:
+-        """As the wrapped port."""
+-        return self._tools.unreleased_tools()
+-
+-    async def call(self, tool: str, args: _Obj, *, op_id: str, model: str | None) -> Envelope:
+-        """Bind `model` first when no instance is bound to it; then call the wrapped port."""
+-        if model is not None and model not in self._bound and (found := await self._host.locate(model)) is not None:
+-            info = self._info.get(tool) or await self.describe(tool)
+-            bind(self._writer, self._host, model, info.host_key, found.instance_id, "first_use")
+-            self._bound.add(model)
+-        return await self._tools.call(tool, args, op_id=op_id, model=model)
+-
+-    def supports_reconcile(self, tool: str) -> bool:
+-        """As the wrapped port."""
+-        return self._tools.supports_reconcile(tool)
+-
+-    async def reconcile(self, tool: str, args: _Obj, op_id: str) -> Reconciliation:
+-        """As the wrapped port."""
+-        return await self._tools.reconcile(tool, args, op_id)
+-
+-    async def read_back(self, tool: str, args: _Obj) -> Envelope | None:
+-        """As the wrapped port."""
+-        return await self._tools.read_back(tool, args)
+-
+-
+ async def _units(rt: Resume, kind: str, key: str, instance_id: str, *, must_load: bool = False) -> UnitsState:
+     """Read the units of `key` in `instance_id` as `@resume<n>.<kind>.<key>`; differing units stop the run (4.6 #9)."""
+     units = await rt.host.read_units(key, instance_id)
+@@ -89,7 +40,10 @@ async def locate_models(rt: Resume) -> set[str]:
+     could report `not_applied` for an edit that is only gone from memory).
+     """
+     f, lost = Fold(rt.events()), set[str]()
+-    for key in (k for k in f.written() if k in f.bound):
++    touched = sorted(
++        {p.model_key for e in rt.events() if isinstance(p := e.payload, ev.StepStarted) if p.model_key}
++    )
++    for key in (k for k in touched if k in f.bound):
+         if (await _units(rt, "units", key, f.bound[key].instance_id)).loaded:
+             continue
+         if (found := await rt.host.locate(key)) is None:
+diff --git a/packages/eng-harness/src/eng_harness/engine/_runner.py b/packages/eng-harness/src/eng_harness/engine/_runner.py
+index 01fde7a..e560b38 100644
+--- a/packages/eng-harness/src/eng_harness/engine/_runner.py
++++ b/packages/eng-harness/src/eng_harness/engine/_runner.py
+@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
+ from eng_harness import __version__, errors
+ from eng_harness._runlock import RunLock
+ from eng_harness.block import Registry, WorkflowDef
+-from eng_harness.engine import _hoststate, _inflight
++from eng_harness.engine import _hoststate, _hostsafety, _inflight
+ from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
+ from eng_harness.engine._steps import root_scope
+ from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
+@@ -163,6 +163,8 @@ class Engine:
+             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"workflow {request.workflow!r} is not registered")
+         inp = _parse(workflow.input_model, request.input, "the run input")
+         self._check_class(request.run_class.value)
++        _hostsafety.check_basis(self._ports.basis, request.basis_ref, workflow.required_basis)
++        checks = await _hostsafety.preflight(self._ports.host, workflow.min_server_builds)
+         run_id = f"run_{self._ids.new_ulid()}"
+         run_dir = self._runs / run_id
+         run_dir.mkdir(parents=True)
+@@ -173,7 +175,8 @@ class Engine:
+                 "run_id": run_id, "workflow": workflow.name, "block": block, "mode": request.mode.value,
+                 "input_ref": stored.result_id, "input_sha256": payload_sha256(request.input),
+                 "basis_ref": request.basis_ref, "run_class": request.run_class.value, "engine_version": __version__,
+-                "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256, "servers": [],
++                "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256,
++                "servers": [c.model_dump(mode="json") for c in checks],
+                 "always_ask": list(workflow.always_ask), "unreleased_tools": dict(self._ports.tool.unreleased_tools()),
+             }  # fmt: skip
+             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
+@@ -214,13 +217,23 @@ class Engine:
+                     run_dir, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
+                     writer, resumed.resume_no, ports.host,
+                 )  # fmt: skip
+-                try:  # steps 4 and 5: T13; step 6 only for the models the run wrote; 7 and 8: spec 4.5.3, 4.5.4
+-                    await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
+-                    await _hoststate.check(rt)
+-                except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
+-                    status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
+-                    return RunOutcome(run_id, status, escalation=stop.escalated)
+-                return await self._drive(workflow, inp, run_id, writer, rt.events())  # step 9
++                safety = _hostsafety.Safety(
++                    ports.host, ports.tool, ports.inputs, writer, self._store, self._clock, self._ids, events,
++                    run_dir, run_id, self._producer,
++                )
++                try:  # steps 4–6: server checks, leases and units; 7–8: spec 4.5.3, 4.5.4
++                    try:
++                        await safety.resume_begin(workflow.min_server_builds)
++                        await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
++                        await _hoststate.check(rt)
++                    except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
++                        status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
++                        return RunOutcome(run_id, status, escalation=stop.escalated)
++                    return await self._drive(
++                        workflow, inp, run_id, writer, rt.events(), safety=safety, release_lease=False
++                    )
++                finally:
++                    await safety.release_all()
+ 
+     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
+         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
+@@ -257,6 +270,11 @@ class Engine:
+             value = self._store.payload(last.output_ref)["value"]
+             output = _parse(workflow.output_model, value, "the recorded output")
+             outcome = RunOutcome(run_id, RunStatus.COMPLETED, output)
++        await self._close_hosts(events)
++        return outcome
++
++    async def _close_hosts(self, events: list[Event]) -> None:
++        """`close_started` for every journaled host instance (invariant 10)."""
+         instances: dict[str, list[HostInstance]] = {}
+         for event in events:
+             if isinstance(started := event.payload, ev.HostStarted):
+@@ -264,44 +282,60 @@ class Engine:
+                 instances.setdefault(started.host_key, []).append(found)
+         for host_key, opened in instances.items():
+             await self._ports.host.close_started(host_key, opened)
+-        return outcome
+ 
+     async def _drive(
+-        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, events: list[Event]
++        self,
++        workflow: WorkflowDef[Any, Any],
++        inp: BaseModel,
++        run_id: str,
++        writer: JournalWriter,
++        events: list[Event],
++        *,
++        safety: _hostsafety.Safety | None = None,
++        release_lease: bool = True,
+     ) -> RunOutcome:  # fmt: skip
+         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
+         ports = self._ports
+-        tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
++        safety = safety or _hostsafety.Safety(
++            ports.host, ports.tool, ports.inputs, writer, self._store, self._clock, self._ids, events,
++            self._runs / run_id, run_id, self._producer,
++        )
+         ctx = Ctx(
+-            tools, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id, writer,
+-            events,
++            ports.tool, ports.calc, ports.host, ports.inputs, self._store, self._settings, self._clock, self._producer,
++            run_id, writer, events, safety, self._runs / run_id,
+         )  # fmt: skip
+         ctx.index = _inflight.ResumeIndex(events)
+         try:
+-            with root_scope():
+-                out = await workflow.fn(ctx, inp)
+-                await ctx.finish()  # ~end checks for models the root block left dirty (spec 4.6 #1)
+-            if not isinstance(out, workflow.output_model):
+-                wanted = workflow.output_model.__name__
+-                raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
+-            ctx.index.finish()
+-        except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
+-            writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
+-            return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
+-        except errors.Escalation as stop:
+-            reason = "attempts_exhausted" if isinstance(stop, AttemptsExhausted) else "block_escalation"
+-            return self._escalate(run_id, writer, reason, stop)
+-        except (errors.ReplayDivergence, errors.NeedsReconciliation) as stop:  # the reason is the lowercase code
+-            return self._escalate(run_id, writer, stop.code.value.lower(), stop)
+-        except errors.BlockRuleViolation as stop:
+-            return self._escalate(run_id, writer, "block_rule_violation", stop)
+-        except errors.StepError as stop:  # a failure that left the root block
+-            return self._escalate(run_id, writer, "unhandled_error", stop)
+-        value = out.model_dump(mode="json")
+-        stored = self._store.put("harness.run_output/1", {"value": value}, self._producer())
+-        done = {"output_ref": stored.result_id, "output_sha256": payload_sha256(value), "draft": ctx.draft}
+-        writer.append(EventType.RUN_COMPLETED, done)
+-        return RunOutcome(run_id, RunStatus.COMPLETED, out)
++            try:
++                with root_scope():
++                    out = await workflow.fn(ctx, inp)
++                    await ctx.finish()  # ~end checks for models the root block left dirty (spec 4.6 #1)
++                if not isinstance(out, workflow.output_model):
++                    wanted = workflow.output_model.__name__
++                    raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
++                ctx.index.finish()
++            except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
++                writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
++                return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
++            except errors.Escalation as stop:
++                reason = "attempts_exhausted" if isinstance(stop, AttemptsExhausted) else "block_escalation"
++                return self._escalate(run_id, writer, reason, stop)
++            except (errors.ReplayDivergence, errors.NeedsReconciliation) as stop:  # the reason is the lowercase code
++                return self._escalate(run_id, writer, stop.code.value.lower(), stop)
++            except errors.BlockRuleViolation as stop:
++                return self._escalate(run_id, writer, "block_rule_violation", stop)
++            except errors.StepError as stop:  # a failure that left the root block
++                return self._escalate(run_id, writer, "unhandled_error", stop)
++            value = out.model_dump(mode="json")
++            stored = self._store.put("harness.run_output/1", {"value": value}, self._producer())
++            done = {"output_ref": stored.result_id, "output_sha256": payload_sha256(value), "draft": ctx.draft}
++            writer.append(EventType.RUN_COMPLETED, done)
++            with closing(JournalReader(self._runs / run_id)) as reader:
++                await self._close_hosts(reader.events())
++            return RunOutcome(run_id, RunStatus.COMPLETED, out)
++        finally:
++            if release_lease:
++                await safety.release_all()
+ 
+     @staticmethod
+     def _escalate(
+diff --git a/packages/eng-harness/tests/replay/test_host_state.py b/packages/eng-harness/tests/replay/test_host_state.py
+index 2f1e193..2ad90cb 100644
+--- a/packages/eng-harness/tests/replay/test_host_state.py
++++ b/packages/eng-harness/tests/replay/test_host_state.py
+@@ -363,6 +363,10 @@ def test_reopened_in_new_instance(tmp_path: Path, after_save: str) -> None:
+     outcome = resume(rig, workflow, run_id)
+     rebound = [p for p in _kinds(rig, run_id, T.MODEL_BOUND) if p.reason == "reopened"]
+     assert [(p.model_key, p.instance_id) for p in rebound] == [("m1", "csi-2")]  # journaled in every case
++    events = rig.events(run_id)
++    bound_seq = next(e.seq for e in events if isinstance(e.payload, ev.ModelBound) and e.payload.reason == "reopened")
++    live = next(e.seq for e in events if e.type is T.STEP_STARTED and e.path == "2" and e.seq > bound_seq)
++    assert bound_seq < live  # binding lands before the first live block step after resume (AC64)
+     assert [c for c in host.calls if c[0] in ("read_units", "model_state")][:2] == [
+         ("read_units", "m1", "csi-1"),
+         ("read_units", "m1", "csi-2"),
+diff --git a/packages/eng-harness/tests/replay/test_in_flight.py b/packages/eng-harness/tests/replay/test_in_flight.py
+index 6883ff4..1d6aa0d 100644
+--- a/packages/eng-harness/tests/replay/test_in_flight.py
++++ b/packages/eng-harness/tests/replay/test_in_flight.py
+@@ -341,3 +341,42 @@ def test_a_write_found_applied_whose_result_cannot_be_read_stays_in_flight(tmp_p
+     # an answer given at the earlier resume is read from the journal: no second answer event, no new presentation
+     assert len(_events(rig, run_id, ev.InputProvided)) == (1 if cause == "engineer" else 0)
+     assert len(rig.inputs.presented) == presented
++
++
++def test_resume_order_guards_reconciliation(tmp_path: Path) -> None:
++    """Preflight, lease and units run before reconciliation; guards leave the write in flight (AC62)."""
++    from eng_harness.errors import HarnessCode, RunRefused
++    from eng_harness.ports import ServerCheck, UnitsState
++
++    rig, host, run_id = _cut_off_write(tmp_path)
++    bad_build = ServerCheck(
++        server="csi", build="old", min_build="b", fingerprint="f", expected_fingerprint="f", ok=False, reason="old"
++    )
++    host.preflight_checks = [bad_build]
++    with pytest.raises(RunRefused) as refused:
++        resume(rig, chain(ORIGINAL), run_id)
++    assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
++    assert [c[0] for c in host.calls if c[0] in ("reconcile", "model_state")] == []
++    host.preflight_checks = None
++    from eng_harness.ports import HostLease
++
++    host.leases["csi"] = HostLease(host_key="csi", lease_id="taken")
++    from eng_contract.errors import ContractError
++
++    with pytest.raises(ContractError) as locked:
++        resume(rig, chain(ORIGINAL), run_id)
++    assert locked.value.detail.code is ErrorCode.HOST_LOCKED
++    host.leases.clear()
++    host.units["m1"] = UnitsState(loaded=True, ok=False, present="b", expected="a")
++    stopped = resume(rig, chain(ORIGINAL), run_id)
++    assert stopped.status is RunStatus.NEEDS_ENGINEER
++    assert stopped.escalation is not None
++    assert stopped.escalation.reason == "units_mismatch"
++    assert [c[0] for c in host.calls if c[0] in ("reconcile", "model_state")] == []
++    host.units["m1"] = UnitsState(loaded=True, ok=True, present="a", expected="a")
++    host.reconciliations[OP] = Reconciliation(outcome="applied")
++    mark = len(rig.log)
++    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED
++    order = [line.rsplit(".", 1)[-1] for line in rig.log[mark:] if line.startswith("host.") or line.startswith("tool.")]
++    assert order.index("preflight") < order.index("acquire") < order.index("read_units")
++    assert order.index("read_units") < order.index("reconcile") < order.index("model_state")
+diff --git a/packages/eng-harness/tests/replay/test_resume.py b/packages/eng-harness/tests/replay/test_resume.py
+index 52a581b..1afb455 100644
+--- a/packages/eng-harness/tests/replay/test_resume.py
++++ b/packages/eng-harness/tests/replay/test_resume.py
+@@ -251,3 +251,29 @@ def test_pause_and_resume(tmp_path: Path) -> None:
+     reader = JournalReader(rig.run_dir(run_id))
+     assert reader.run().status == "COMPLETED"
+     reader.close()
++
++
++def test_close_started_after_resume(tmp_path: Path) -> None:
++    """A new engine process closes instances the journal recorded when the run completes (AC46)."""
++    from workflows.ctx_flows import answer, flow, need_approval
++
++    rig = make_rig(tmp_path)
++    rig.host.instances["csi"].append(CSI_ONE)
++
++    async def body(ctx: Any) -> list[str]:
++        await ctx.tool("read_a", {"n": 0})
++        await need_approval(rig.approvals, "apr_close")
++        return []
++
++    workflow = flow(body, name="close")
++    paused = asyncio.run(rig.engine(workflow).start(request(workflow="close")))
++    run_id = paused.run_id
++    started = [e for e in rig.events(run_id) if e.type is T.HOST_STARTED]
++    assert started
++    assert rig.log.count("host.close_started") == 0
++    rig.approvals.script("apr_close", answer("apr_close"))
++    done = asyncio.run(rig.engine(workflow).resume(run_id))
++    assert done.status is RunStatus.COMPLETED
++    assert rig.log.count("host.close_started") == 1
++    inst = HostInstance.model_validate(started[-1].payload.model_dump(exclude={"host_key"}))
++    assert rig.host.closed == [inst]
+diff --git a/packages/eng-harness/tests/workflow/test_invariants.py b/packages/eng-harness/tests/workflow/test_invariants.py
+index de0ef2d..c074f2b 100644
+--- a/packages/eng-harness/tests/workflow/test_invariants.py
++++ b/packages/eng-harness/tests/workflow/test_invariants.py
+@@ -17,7 +17,8 @@ from eng_contract.ids import new_model_id, new_result_id
+ from eng_contract.quantity import Quantity
+ from eng_contract.refs import Ref, RefRule
+ from fakes.ports import failure
+-from workflows.ctx_flows import flow, success
++from workflows.chain import ChainInput, ChainOutput
++from workflows.ctx_flows import flow, need_approval, success
+ from workflows.rig import make_rig, request
+ 
+ from eng_harness.calc import CalcStatus
+@@ -272,3 +273,103 @@ def test_save_before_analysis(tmp_path: Path) -> None:
+     assert {s.model_key for s in recorded} == {"m1"}
+     started = [e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.kind == "tool"]
+     assert [s.action for s in started] == ["analysis", "design"]
++
++
++def test_basis_incomplete_refused(tmp_path: Path) -> None:
++    """A required basis field that is missing or unconfirmed refuses the run before any port call (AC41)."""
++    from eng_contract.kinds.basis import BasisField, DesignBasis
++
++    from eng_harness.block import workflow
++    from eng_harness.errors import HarnessCode, RunRefused
++    from eng_harness.ports import LoadedBasis
++
++    ref = "res_" + "0" * 26
++    basis = LoadedBasis(result_id=ref, basis=DesignBasis(template=None, fields={}))
++
++    @workflow(name="needs_basis", version=1, description="x", required_basis=("limits.drift_ratio",))
++    async def needs_basis(ctx: Any, inp: ChainInput) -> ChainOutput:
++        await ctx.tool("read_a", {"n": 0})
++        return ChainOutput(refs=[])
++
++    workflow_def = needs_basis
++    rig = make_rig(tmp_path, bases={ref: basis})
++    with pytest.raises(RunRefused) as refused:
++        asyncio.run(rig.engine(workflow_def).start(request(workflow="needs_basis", basis_ref=ref)))
++    assert refused.value.code is HarnessCode.BASIS_INCOMPLETE
++    assert refused.value.evidence == ("limits.drift_ratio",)
++    assert rig.run_ids() == []
++    assert rig.host.ledger == []
++
++
++def test_server_check(tmp_path: Path) -> None:
++    """A failing server preflight refuses the run at start and at resume (AC44)."""
++    from eng_harness.block import workflow
++    from eng_harness.errors import HarnessCode, RunRefused
++    from eng_harness.ports import ServerCheck
++
++    @workflow(name="checked", version=1, description="x", min_server_builds={"csi": "build-1"})
++    async def checked(ctx: Any, inp: ChainInput) -> ChainOutput:
++        return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
++
++    fail = ServerCheck(
++        server="csi", build="old", min_build="build-1", fingerprint="a", expected_fingerprint="b", ok=False, reason="old"
++    )
++    rig = make_rig(tmp_path)
++    rig.host.preflight_checks = [fail]
++    with pytest.raises(RunRefused) as start:
++        asyncio.run(rig.engine(checked).start(request(workflow="checked")))
++    assert start.value.code is HarnessCode.SERVER_CHECK_FAILED
++    assert rig.run_ids() == []
++
++
++def test_units_after_reconnect(tmp_path: Path) -> None:
++    """Differing units stop the run before the next step on that host (AC45)."""
++    from eng_harness.ports import HostInstance, UnitsState
++
++    inst = HostInstance(instance_id="csi-1", pid=1, process_started_at="2026-01-01T00:00:00.000Z", program="csi")
++    rig = make_rig(tmp_path)
++    rig.host.add_model("m1", inst)
++    rig.host.units["m1"] = UnitsState(loaded=True, ok=False, present="b", expected="a")
++
++    async def body(ctx: Any) -> list[str]:
++        await ctx.tool("write_b", {"n": 0, "model": "m1"})
++        return []
++
++    workflow = flow(body, name="units")
++    with pytest.raises(ContractError) as failed:
++        asyncio.run(rig.engine(workflow).start(request(workflow="units")))
++    assert failed.value.detail.code is ErrorCode.PRECONDITION_FAILED
++    assert failed.value.detail.precondition is not None
++    assert failed.value.detail.precondition.value == "units_verified"
++    assert rig.host.ledger == []
++
++
++def test_host_lease_and_close(tmp_path: Path) -> None:
++    """The engine acquires a host lease before the first step and closes instances only at run end (AC46)."""
++    from eng_harness.ports import HostInstance
++
++    inst = HostInstance(instance_id="csi-1", pid=9, process_started_at="2026-01-01T00:00:00.000Z", program="csi")
++    rig = make_rig(tmp_path)
++    rig.host.instances["csi"].append(inst)
++
++    async def body(ctx: Any) -> list[str]:
++        await ctx.tool("read_a", {"n": 0})
++        await need_approval(rig.approvals, "apr_1")
++        return [(await ctx.tool("read_c", {"n": 1})).ref.ref]
++
++    workflow = flow(body, name="lease")
++    paused = asyncio.run(rig.engine(workflow).start(request(workflow="lease")))
++    assert paused.status is RunStatus.PAUSED
++    assert "host.acquire" in rig.log
++    assert "host.close_started" not in rig.log
++    assert any(e.type is EventType.HOST_STARTED for e in rig.events(paused.run_id))
++    from workflows.ctx_flows import answer
++
++    rig.approvals.script("apr_1", answer("apr_1"))
++    mark = len(rig.log)
++    done = asyncio.run(rig.engine(workflow).resume(paused.run_id))
++    assert done.status is RunStatus.COMPLETED
++    assert any(e.type is EventType.HOST_STARTED for e in rig.events(done.run_id))
++    assert rig.log.count("host.close_started") == 1
++    assert rig.host.closed == [inst]
++    assert "host.close_started" not in rig.log[:mark]
+diff --git a/packages/eng-harness/tests/workflows/rig.py b/packages/eng-harness/tests/workflows/rig.py
+index 8cea9cf..9a4cb8f 100644
+--- a/packages/eng-harness/tests/workflows/rig.py
++++ b/packages/eng-harness/tests/workflows/rig.py
+@@ -31,7 +31,9 @@ from eng_harness.block import BlockDef, Registry
+ from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest
+ from eng_harness.journal import Event, EventType, JournalReader, JournalWriter, is_locked
+ from eng_harness.journal import _events as ev
+-from eng_harness.ports import CalcInfo, RunClass, ToolInfo
++from eng_contract.kinds.basis import DesignBasis
++
++from eng_harness.ports import CalcInfo, LoadedBasis, RunClass, ServerCheck, ToolInfo
+ 
+ START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
+ BASIS_REF = "res_" + "0" * 26
+@@ -84,6 +86,7 @@ class Host(FakeHost):
+         self.locked: list[bool] = []
+         self._runs_dir = runs_dir
+         self._checks: dict[str, deque[ENVELOPE | Raise]] = {}
++        self.preflight_checks: list[ServerCheck] | None = None
+ 
+     def script_check(self, model_key: str, outcome: ENVELOPE | Raise) -> None:
+         """Queue `outcome` for the next `check_model` of `model_key`; with none queued the check succeeds."""
+@@ -99,6 +102,12 @@ class Host(FakeHost):
+             return outcome
+         return await super().check_model(model_key)
+ 
++    async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
++        """`preflight_checks` when set, otherwise one passing check per minimum build."""
++        if self.preflight_checks is not None:
++            return self.preflight_checks
++        return await super().preflight(min_builds)
++
+     def script(self, tool: str, *outcomes: ENVELOPE | Raise) -> None:
+         """Queue outcomes; a retryable failure of a read fails every attempt of one run (the engine retries reads).
+ 
+@@ -138,6 +147,7 @@ class Rig:
+     calc_infos: list[CalcInfo] = field(default_factory=list)
+     calc_results: dict[str, ENVELOPE | Raise] = field(default_factory=dict)
+     calc_runs: list[tuple[str, Mapping[str, JsonValue]]] = field(default_factory=list)
++    bases: Mapping[str, LoadedBasis] = field(default_factory=dict)
+ 
+     def engine(
+         self,
+@@ -152,7 +162,7 @@ class Rig:
+             tool=Spy("tool", self.host, self.log),
+             host=Spy("host", self.host, self.log),
+             calc=Spy("calc", calc, self.log),
+-            basis=Spy("basis", FakeBasisPort({}), self.log),
++            basis=Spy("basis", FakeBasisPort(self.bases), self.log),
+             approvals=Spy("approvals", self.approvals, self.log),
+             inputs=Spy("inputs", self.inputs, self.log),
+         )
+@@ -222,7 +232,11 @@ class Rig:
+ 
+ 
+ def make_rig(
+-    root: Path, unreleased: Mapping[str, str] | None = None, *, run_class: RunClass = RunClass.PRODUCTION
++    root: Path,
++    unreleased: Mapping[str, str] | None = None,
++    *,
++    run_class: RunClass = RunClass.PRODUCTION,
++    bases: Mapping[str, LoadedBasis] | None = None,
+ ) -> Rig:
+     """A rig whose workspace and result store are under `root`; `unreleased` names the host's unreleased tools."""
+     clock = FixedClock(START_MS, 1)
+@@ -230,18 +244,21 @@ def make_rig(
+     workspace = Workspace(root=root / "ws", classification=LocationClass.LOCAL)
+     store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
+     host = Host(ids, clock, workspace.root / "runs", unreleased)
+-    return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort(), run_class)
++    loaded = {BASIS_REF: LoadedBasis(result_id=BASIS_REF, basis=DesignBasis(template=None, fields={}))}
++    loaded.update(bases or {})
++    return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort(), run_class, bases=loaded)
+ 
+ 
+ def request(
+     workflow: str = "chain",
+     values: Mapping[str, JsonValue] | None = None,
+     *,
++    basis_ref: str = BASIS_REF,
+     run_class: RunClass = RunClass.PRODUCTION,
+     mode: PermissionMode = PermissionMode.WORK_ON_COPY,
+ ) -> RunRequest:
+     """A request to run `workflow` with the input `values`."""
+-    return RunRequest(workflow=workflow, input=dict(values or {}), basis_ref=BASIS_REF, mode=mode, run_class=run_class)
++    return RunRequest(workflow=workflow, input=dict(values or {}), basis_ref=basis_ref, mode=mode, run_class=run_class)
+ 
+ 
+ def _hold(run_dir: str, conn: Connection) -> None:

@@ -1,0 +1,89 @@
+diff --git a/packages/eng-harness/src/eng_harness/adapters/_hostport.py b/packages/eng-harness/src/eng_harness/adapters/_hostport.py
+index 6c3c467..5ac4ec1 100644
+--- a/packages/eng-harness/src/eng_harness/adapters/_hostport.py
++++ b/packages/eng-harness/src/eng_harness/adapters/_hostport.py
+@@ -11,7 +11,9 @@ from eng_contract.ids import Clock, IdSource
+ 
+ from eng_harness.adapters._identity import IdentityStore
+ from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
+-from eng_harness.ports import HostInstance, SavedModel
++from eng_harness.adapters.csi._state import CsiStateReader, fingerprint_host
++from eng_harness.ports import HostInstance, HostModelState, SavedModel, UnitsState
++from eng_harness.servers import CallEffect
+ from eng_harness.servers._guard import ProcessGuard, StartedInstance
+ from eng_harness.servers._hostlock import HostLocks
+ from eng_harness.servers._procinfo import ProcessInspector
+@@ -25,7 +27,7 @@ class AdapterHostPort:
+         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi",
+     ) -> None:  # fmt: skip
+         self._identity, self._clock, self._ids = identity, clock, ids
+-        self._run_dir, self._program, self._host_key = run_dir, program, host_key
++        self._run_dir, self._program, self._host_key, self._product = run_dir, program, host_key, product
+         self._files = {key: path.resolve() for key, path in files.items()}
+         self._models: dict[str, str] = {}
+         self._bound: dict[str, str] = {}
+@@ -66,6 +68,39 @@ class AdapterHostPort:
+         self._persist()
+         return self._host(opened)
+ 
++    async def model_state(self, model_key: str, instance_id: str) -> HostModelState:
++        """Return the model state in `instance_id`, or `loaded: false` when the instance does not hold the model."""
++        if self._bound.get(model_key) != instance_id:
++            return HostModelState(loaded=False)
++        opened = self._bound_instance(model_key)
++        if opened is None or not self._session.alive(opened):
++            return HostModelState(loaded=False)
++        reader = CsiStateReader(product=self._product, call=self._csi_call)
++        read = await reader.read(opened.pid, self._file(model_key))
++        fp = fingerprint_host(read.host, read.object_counts)
++        self._persist_model_state(model_key, read.kinds, fp)
++        path = self._file(model_key)
++        identity = self._identity.resolve(path)
++        digest = hashlib.sha256(path.read_bytes()).hexdigest()
++        return HostModelState(
++            loaded=True,
++            model_id=identity.model_id,
++            revision=identity.revision,
++            fingerprint=fp,
++            file_sha256=digest,
++        )
++
++    async def read_units(self, model_key: str, instance_id: str) -> UnitsState:
++        """Compare present units with those recorded when the model was opened."""
++        expected = self._units.get(model_key, "")
++        if self._bound.get(model_key) != instance_id:
++            return UnitsState(loaded=False, ok=True, present=None, expected=expected)
++        opened = self._bound_instance(model_key)
++        if opened is None or not self._session.alive(opened):
++            return UnitsState(loaded=False, ok=True, present=None, expected=expected)
++        present = await self._session.units(opened)
++        return UnitsState(loaded=True, ok=present == expected, present=present, expected=expected)
++
+     async def locate(self, model_key: str) -> HostInstance | None:
+         opened = self._bound_instance(model_key)
+         if opened is None or not self._session.alive(opened):
+@@ -122,6 +157,24 @@ class AdapterHostPort:
+             instance_id=opened.instance_id, pid=opened.pid, process_started_at=at, program=self._program
+         )
+ 
++    async def _csi_call(self, tool: str, arguments: dict[str, object], effect: CallEffect) -> dict[str, object]:
++        body = await self._session._call(tool, arguments, effect)  # same package; session op helper (B-130)
++        return body
++
++    def _persist_model_state(self, model_key: str, kinds: dict[str, object], fingerprint: str) -> None:
++        path = self._run_dir / "adapter" / "model_state.json"
++        path.parent.mkdir(parents=True, exist_ok=True)
++        cached: dict[str, object] = {}
++        if path.is_file():
++            cached = json.loads(path.read_text(encoding="utf-8"))
++        stored = cached.get("models", {})
++        models = dict(stored) if isinstance(stored, dict) else {}
++        models[model_key] = {"kinds": kinds, "fingerprint": fingerprint}
++        body = {"models": models, "kinds": kinds, "fingerprint": fingerprint, "model_key": model_key}
++        temporary = path.with_suffix(".json.tmp")
++        temporary.write_text(json.dumps(body), encoding="utf-8")
++        os.replace(temporary, path)
++
+     def _persist(self) -> None:
+         path = self._run_dir / "adapter" / "state.json"
+         path.parent.mkdir(parents=True, exist_ok=True)
