@@ -252,7 +252,8 @@ class Engine:
                     except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
                         status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
                         return await self._closed(rt, RunOutcome(run_id, status, escalation=stop.escalated))
-                    return await self._closed(rt, await self._drive(workflow, inp, rt, leases, rt.events(), head.basis_ref))  # step 9
+                    drove = await self._drive(workflow, inp, rt, leases, rt.events(), head.basis_ref)  # step 9
+                    return await self._closed(rt, drove)
                 finally:
                     await leases.release()
 
