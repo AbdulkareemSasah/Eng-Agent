@@ -4,12 +4,12 @@ import math
 from fractions import Fraction
 from typing import Any
 
-from eng_harness.calcs.model_diff import DiffInput
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from eng_harness.calc import InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.model_diff import DiffInput
 
 FP = "model.frame_placements/1"
 UNITS = {

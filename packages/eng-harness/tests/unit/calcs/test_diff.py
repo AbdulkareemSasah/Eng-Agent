@@ -6,11 +6,11 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
-from eng_harness.calcs.model_diff import BASIS_FIELDS, DiffInput
 from pydantic import ValidationError
 
 from eng_harness.calc import InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.model_diff import BASIS_FIELDS, DiffInput
 
 CALC_ID = "harness.model_diff"
 MDL = "mdl_00000000000000000000000000"
@@ -234,7 +234,8 @@ def test_sides_record_their_models() -> None:
 
 def test_side_refusals() -> None:
     """A section given without a record, a record without a host model, or one side mixing revisions is refused."""
-    frames, loads = _frames(_frame("F1")), {"patterns": [], "combinations": [], "frame_loads": [], "area_loads": []}
+    frames = _frames(_frame("F1"))
+    loads: dict[str, Any] = {"patterns": [], "combinations": [], "frame_loads": [], "area_loads": []}
     for side in ("before", "after"):
         other = "after" if side == "before" else "before"
         fields = _input(**{f"{side}_frames": frames, f"{side}_loads": loads, f"{other}_frames": frames})

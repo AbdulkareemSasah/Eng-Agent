@@ -12,6 +12,7 @@ from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import new_model_id, new_result_id
 from eng_contract.store import ResultStore
+from pydantic import JsonValue
 from workflows.calc_test_blocks import calc_step, engine, older_revision
 from workflows.chain import ChainOutput
 from workflows.rig import Rig, make_rig, request
@@ -112,14 +113,16 @@ def _older_rig(root: Path) -> tuple[Rig, HarnessCalcPort, str]:
     source = "engineer:synthetic@2026-01-01T00:00:00.000Z"
     units = {"length": "mm", "angle": "deg", "stress": "MPa", "unit_weight": "kN/m3", "line_load": "kN/m",
              "area_load": "kPa", "ratio": "1"}  # fmt: skip
-    fields = {
+    fields: dict[str, JsonValue] = {
         f"compare.{name}": {"value": 1.0, "unit": unit, "source": source, "confirmed": True, "citation": None}
         for name, unit in units.items()
     }
     plain = Provenance(tool="harness", tool_version="t", inputs={}, started_at=rig.clock.now(), duration_ms=0)
     basis = rig.store.put("basis.design_basis/1", {"template": None, "fields": fields}, plain)
     rig.host.script("read_a", _envelope(rig, first.result_id, kind, producer(1)))
-    rig.host.script("write_b", _envelope(rig, new_result_id(rig.ids), "harness.run_output/1", producer(2, "fake-host/write")))
+    rig.host.script(
+        "write_b", _envelope(rig, new_result_id(rig.ids), "harness.run_output/1", producer(2, "fake-host/write"))
+    )
     rig.host.script("read_c", _envelope(rig, second.result_id, kind, producer(2)))
     approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
     port = HarnessCalcPort(
@@ -141,7 +144,7 @@ def test_older_revision_inputs(tmp_path: Path) -> None:
 
     assert outcome.status is RunStatus.COMPLETED
     assert isinstance(outcome.output, ChainOutput)
-    report = rig.store.payload(outcome.output.refs[0])
+    report: Any = rig.store.payload(outcome.output.refs[0])
     assert (report["before"]["model_revision"], report["after"]["model_revision"]) == (1, 2)
     assert [(c["key"], c["properties"][0]["pointer"]) for c in report["changes"]] == [(["F1"], "/section")]
     assert rig.log.count("calc.run") == 1

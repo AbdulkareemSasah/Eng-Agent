@@ -94,7 +94,7 @@ def _refuse(path: str, why: str) -> ContractError:
 
 
 def read_tolerances(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> tuple[Tolerances, dict[str, Tolerance]]:
-    """Spec 4.4: each `compare.*` field present, confirmed, in its unit and >= 0, as an exact value and a display row."""
+    """Spec 4.4: each `compare.*` field present, confirmed, in its unit and >= 0; exact values and display rows."""
     exact: dict[str, Fraction] = {}
     shown: dict[str, Tolerance] = {}
     for path, kind, unit in TOLERANCE_FIELDS:
