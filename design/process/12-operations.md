@@ -20,7 +20,7 @@ Runbooks:
 | Wrong engineering result | Withdraw the check or function; advisory listing affected inputs; regression test; full R1 fix ([10](10-engineering-verification.md) §7) |
 | Leaked secret | Revoke and rotate at the provider immediately; remove from the repository; if it reached a pushed commit, purge history with the owner and notify affected services (a secret in a task log: the last row, no purge); review how it escaped the secret scan |
 | Broken release | Yank the release (and the PyPI version once public); publish a patch from `main`; record the cause |
-| A hard flag of the push check on the integration branch (a direct commit that is not log-only, PS001, PS002) or a secret in a pushed task log | Revert by a new commit, never a history rewrite; for a secret, rotate it at once and withhold the span by a log-only commit ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5, D7). Unpushed logs are not an incident |
+| A hard flag of the push check on the integration branch (a direct commit that is neither a verified squash merge nor log-only) or a secret in a pushed task log | Revert by a new commit, never a history rewrite; for a secret, rotate it at once and withhold the span by a log-only commit ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5, D7). Unpushed logs are not an incident |
 
 ## 2. Claiming work
 
