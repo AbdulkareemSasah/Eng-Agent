@@ -569,7 +569,8 @@ builders, in-flight reconciliation (T11b) and the host-state check (T11c), the i
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9b) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
-by `depends_on` (T10, T12, T13, T13b, T13c, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
+by `depends_on` (T10, T12, T13, T13b, T13c, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel;
+templates plan 0004 T10, which needs T19, also edits `_ctx_impl.py` and `_runner.py` to wire `ctx.basis` (B-474). T11b
 and T11c share `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11c and
 T13 on both; T11b follows T11 (the input requests it presents), T11c follows T11b (B-427), and T14b follows T14: the
 tasks from T10 to T18 run one after
