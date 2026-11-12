@@ -1,9 +1,14 @@
-"""CSI replies mapped to neutral and harness kinds (plan 0002 T11; spec 0002 section 4.6.4)."""
+"""CSI replies mapped to neutral and harness kinds (plan 0002 T11; spec 0002 section 4.6.4).
 
+Errors: `ContractError` `HOST_ERROR` (`host_code` `UNEXPECTED_REPLY`, spec 0002 A3) when a reply field is unusable.
+"""
+
+import math
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds.model import (
     AreaKind,
     AreaPlacements,
@@ -64,28 +69,38 @@ _AREA = {"slab": AreaKind.SLAB, "wall": AreaKind.WALL, "deck": AreaKind.DECK}
 
 
 def _length(value: float, units: str) -> float:
-    # eng-contract spec 4.7.4: `csi_unit_system(units).length` is the CSI present-length symbol for the token.
-    return convert(value, csi_unit_system(units).length, "mm")
+    return convert(value, csi_unit_system(units).length, "mm")  # spec 4.7.4 present length → mm
 
 
 def _area_load(value: float, units: str) -> float:
-    # eng-contract spec 4.7.4: `stress` is force/length² in the reply's present units; kind fields use `kPa`.
-    return convert(value, csi_unit_system(units).stress, "kPa")
+    return convert(value, csi_unit_system(units).stress, "kPa")  # spec 4.7.4 present stress → kPa
 
 
 def _line_load(value: float, units: str) -> float:
-    # eng-contract spec 4.7.4: `line_load` is force/length in the reply's present units; kind fields use `kN/m`.
-    return convert(value, csi_unit_system(units).line_load, "kN/m")
+    return convert(value, csi_unit_system(units).line_load, "kN/m")  # spec 4.7.4 present line load → kN/m
 
 
-def _point(raw: Sequence[float], units: str) -> dict[str, float]:
-    x, y, z = (float(raw[0]), float(raw[1]), float(raw[2])) if len(raw) >= 3 else (0.0, 0.0, 0.0)
+def _bad_reply(field: str, received: object) -> None:
+    raise ContractError(
+        ErrorCode.HOST_ERROR,
+        f"the host reply field {field} is not usable",
+        retryable=False,
+        host_code="UNEXPECTED_REPLY",
+        field=field,
+        received=received,
+    )
+
+
+def _point(raw: Sequence[float], units: str, *, field: str) -> dict[str, float]:
+    if len(raw) != 3:
+        _bad_reply(field, list(raw))
+    try:
+        x, y, z = (float(raw[0]), float(raw[1]), float(raw[2]))
+    except TypeError, ValueError:
+        _bad_reply(field, list(raw))
+    if not all(math.isfinite(v) for v in (x, y, z)):
+        _bad_reply(field, list(raw))
     return {"x_mm": _length(x, units), "y_mm": _length(y, units), "z_mm": _length(z, units)}
-
-
-def host_stories(items: list[dict[str, Any]]) -> dict[str, Any]:
-    rows = sorted(items, key=lambda row: float(row.get("elevation", 0.0)))
-    return {"base_elevation": rows[0].get("elevation", 0.0) if rows else 0.0, "stories": rows}
 
 
 def stories(items: list[dict[str, Any]], units: str) -> Stories:
@@ -122,16 +137,6 @@ def _grid_lines(lines: list[dict[str, Any]], axis: Axis, units: str) -> list[Gri
     ]
 
 
-def host_grid(items: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "systems": [
-            row
-            for row in items
-            if str(row.get("type", "Cartesian")).lower() == "cartesian" and {"name", "x_lines", "y_lines"} <= row.keys()
-        ]
-    }
-
-
 def grids(items: list[dict[str, Any]], units: str) -> GridSystem:
     systems: list[GridSystem1] = []
     for row in items:
@@ -151,11 +156,6 @@ def grids(items: list[dict[str, Any]], units: str) -> GridSystem:
     return GridSystem(systems=systems)
 
 
-def host_frames(items: list[dict[str, Any]]) -> dict[str, Any]:
-    rows = [{"id": str(row.get("label") or row.get("name")), **row} for row in items]
-    return {"frames": sorted(rows, key=lambda row: row["id"])}
-
-
 def frames(items: list[dict[str, Any]], units: str) -> FramePlacements:
     rows = []
     for row in items:
@@ -167,17 +167,13 @@ def frames(items: list[dict[str, Any]], units: str) -> FramePlacements:
                 "section": str(row["section"]),
                 "i_joint": None,
                 "j_joint": None,
-                "i": _point(row["point1"], units),
-                "j": _point(row["point2"], units),
+                "i": _point(row["point1"], units, field="point1"),
+                "j": _point(row["point2"], units, field="point2"),
                 "story": None if row.get("story") in (None, "") else str(row["story"]),
                 "rotation_deg": 0.0,
             }
         )
     return FramePlacements.model_validate({"frames": rows})
-
-
-def host_areas(items: list[dict[str, Any]]) -> dict[str, Any]:
-    return {"areas": sorted([{"id": str(row["name"]), **row} for row in items], key=lambda row: row["id"])}
 
 
 def areas(items: list[dict[str, Any]], units: str, sections: Mapping[str, str]) -> AreaPlacements:
@@ -189,7 +185,7 @@ def areas(items: list[dict[str, Any]], units: str, sections: Mapping[str, str]) 
                 "id": str(row["name"]),
                 "kind": kind,
                 "section": str(row["section"]),
-                "points": [_point(point, units) for point in row["points"]],
+                "points": [_point(point, units, field=f"points[{index}]") for index, point in enumerate(row["points"])],
                 "joints": None,
                 "story": None,
             }
@@ -214,20 +210,6 @@ def _combo_type(value: object) -> CombinationType:
     if isinstance(value, int):
         return _COMBO.get(value, CombinationType.LINEAR_ADD)
     return _TEXT_COMBO.get(str(value).lower().replace(" ", ""), CombinationType.LINEAR_ADD)
-
-
-def host_load_set(
-    patterns: list[dict[str, Any]],
-    combos: list[dict[str, Any]],
-    frame_rows: list[dict[str, Any]],
-    area_rows: list[dict[str, Any]],
-) -> dict[str, Any]:
-    return {
-        "patterns": sorted(patterns, key=lambda row: str(row["name"])),
-        "combinations": sorted(combos, key=lambda row: str(row["name"])),
-        "frame_loads": frame_rows,
-        "area_loads": area_rows,
-    }
 
 
 def load_set(
@@ -294,22 +276,6 @@ def load_set(
             "area_loads": area_loads,
         }
     )
-
-
-def host_restraints(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    joints = [
-        {
-            "joint": str(row.get("UniqueName", row.get("joint"))),
-            "ux": bool(row.get("Ux", row.get("ux"))),
-            "uy": bool(row.get("Uy", row.get("uy"))),
-            "uz": bool(row.get("Uz", row.get("uz"))),
-            "rx": bool(row.get("Rx", row.get("rx"))),
-            "ry": bool(row.get("Ry", row.get("ry"))),
-            "rz": bool(row.get("Rz", row.get("rz"))),
-        }
-        for row in rows
-    ]
-    return {"joints": sorted(joints, key=lambda row: row["joint"])}
 
 
 def restraints(rows: list[dict[str, Any]]) -> JointRestraints:

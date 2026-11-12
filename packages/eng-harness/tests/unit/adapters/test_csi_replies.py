@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from eng_contract.errors import ContractError
 from eng_contract.kinds import NEUTRAL_KINDS
 from eng_contract.kinds.model import (
     AreaKind,
@@ -164,3 +165,10 @@ def test_six_kinds_and_status_validate() -> None:
     assert status_payload.units == UNITS
     assert status_payload.file_name == "tower.EDB"
     assert status_payload.object_counts["frames"] == 1
+
+
+def test_two_value_point_is_refused() -> None:
+    row = {"name": "B1", "point1": [1.0, 2.0], "point2": [0.0, 0.0, 1.0], "section": "W14"}
+    with pytest.raises(ContractError) as refused:
+        frames([row], UNITS)
+    assert refused.value.detail.field == "point1"
