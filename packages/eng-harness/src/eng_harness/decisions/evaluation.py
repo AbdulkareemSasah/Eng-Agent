@@ -117,9 +117,9 @@ def _metrics_for(
         if suggestion is None or suggestion.outcome in _SKIPPED_OUTCOMES:
             continue
         cases += 1
+        latencies.append(suggestion.latency_ms)
         if suggestion.outcome in _ANSWERED_OUTCOMES:
             answered += 1
-            latencies.append(suggestion.latency_ms)
             confidence = suggestion.confidence
             if confidence is not None and confidence >= thresholds.min_confidence:
                 above += 1

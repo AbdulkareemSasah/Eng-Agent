@@ -20,7 +20,7 @@
         "agreement": 0.6666666666666666,
         "abstention_rate": 0.25,
         "latency_p50_ms": 80,
-        "latency_p95_ms": 120
+        "latency_p95_ms": 300
       }
     },
     "eligible": false,

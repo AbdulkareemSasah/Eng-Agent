@@ -139,6 +139,40 @@ def test_metrics_match_fixture() -> None:
     assert set(report.by) == {MODEL_BY, LLM_BY}
 
 
+def test_latency_counts_every_case_not_only_answered() -> None:
+    # Four model cases with latencies 10, 20, 30 (shadow, answered) and 1000 (error, not answered).
+    # Nearest rank on sorted [10, 20, 30, 1000]: p50 index ceil(50/100*4)-1 = 1 -> 20;
+    # p95 index ceil(3.8)-1 = 3 -> 1000.
+    # Answered-only would give [10, 20, 30] and p95 = 30.
+    labels = (
+        _label(
+            "req_a",
+            "enlarge",
+            suggestions=(_suggestion(MODEL_BY, "shadow", choice="enlarge", confidence=0.90, latency_ms=10),),
+        ),
+        _label(
+            "req_b",
+            "enlarge",
+            suggestions=(_suggestion(MODEL_BY, "shadow", choice="enlarge", confidence=0.90, latency_ms=20),),
+        ),
+        _label(
+            "req_c",
+            "enlarge",
+            suggestions=(_suggestion(MODEL_BY, "shadow", choice="enlarge", confidence=0.90, latency_ms=30),),
+        ),
+        _label(
+            "req_d",
+            "enlarge",
+            suggestions=(_suggestion(MODEL_BY, "error", choice=None, latency_ms=1000),),
+        ),
+    )
+    metrics = evaluate_point(labels, EvalThresholds()).by[MODEL_BY]
+    assert metrics.cases == 4
+    assert metrics.answered == 3
+    assert metrics.latency_p50_ms == 20
+    assert metrics.latency_p95_ms == 1000
+
+
 def _provider_label(
     request_id: str,
     *,
