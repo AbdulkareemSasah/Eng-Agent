@@ -1,0 +1,9 @@
+{
+  "source": "design/docs/architecture/12-decision-layer.md section 6 (Learning without drift); section 3 (Policy, min_confidence); spec 0009-providers section 4.10 (Evaluation thresholds)",
+  "defaults": {
+    "min_cases": 50,
+    "min_agreement": 0.95,
+    "min_confidence": 0.85,
+    "min_above_threshold": null
+  }
+}
