@@ -449,7 +449,8 @@ def test_units_after_reconnect(tmp_path: Path) -> None:
     differ.host.units["m1"] = _DIFFER
     first = asyncio.run(differ.engine(flow(_read_twice(differ, lambda: None))).start(request()))
     assert first.status is RunStatus.NEEDS_ENGINEER  # the run stops (spec 6): it does not raise to the block
-    assert first.escalation is not None and first.escalation.reason == "units_mismatch"
+    assert first.escalation is not None
+    assert first.escalation.reason == "units_mismatch"
     assert differ.host.ledger == []
     run_id = first.run_id
     assert _trail(differ, run_id, EventType.RUN_ESCALATED, EventType.STEP_STARTED) == [("run_escalated", None)]
@@ -482,7 +483,8 @@ def test_units_after_reconnect(tmp_path: Path) -> None:
     host = changed.host
     second = asyncio.run(changed.engine(flow(_read_twice(changed, reconnected_and_changed))).start(request()))
     assert second.status is RunStatus.NEEDS_ENGINEER
-    assert second.escalation is not None and second.escalation.reason == "units_mismatch"
+    assert second.escalation is not None
+    assert second.escalation.reason == "units_mismatch"
     assert [entry.tool for entry in changed.host.ledger] == ["read_m"]  # the second read never reached the host
     assert "1" not in [e.path for e in changed.events(second.run_id) if e.type is EventType.STEP_STARTED]
 
@@ -505,13 +507,17 @@ def test_units_mismatch_cannot_be_caught_by_the_block(tmp_path: Path) -> None:
 
     stopped = asyncio.run(rig.engine(flow(body)).start(request()))
     assert stopped.status is RunStatus.NEEDS_ENGINEER
-    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
     assert [entry.tool for entry in host.ledger] == ["read_m"]  # neither later read reached the host
     types = [e.type for e in rig.events(stopped.run_id)]
-    assert EventType.RUN_COMPLETED not in types and types.count(EventType.RUN_ESCALATED) == 1
+    assert EventType.RUN_COMPLETED not in types
+    assert types.count(EventType.RUN_ESCALATED) == 1
 
 
-@pytest.mark.parametrize("code", [ErrorCode.TIMEOUT_NO_EFFECT, ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED])
+@pytest.mark.parametrize(
+    "code", [ErrorCode.TIMEOUT_NO_EFFECT, ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED]
+)
 def test_units_are_read_after_a_read_timed_out(tmp_path: Path, code: ErrorCode) -> None:
     """A read that timed out on a host makes the units of its models be read again before the retry (AC45 c)."""
     rig = make_rig(tmp_path)
@@ -530,7 +536,8 @@ def test_units_are_read_after_a_read_timed_out(tmp_path: Path, code: ErrorCode) 
 
     stopped = asyncio.run(rig.engine(flow(body)).start(request()))
     assert stopped.status is RunStatus.NEEDS_ENGINEER
-    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
     assert [entry.tool for entry in host.ledger] == ["read_m", "read_m"]  # no retry after the changed units
 
 
@@ -559,7 +566,8 @@ def test_units_are_read_after_a_timeout_before_reconciliation(tmp_path: Path, un
         return
     stopped = asyncio.run(rig.engine(flow(body)).start(request()))
     assert stopped.status is RunStatus.NEEDS_ENGINEER
-    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
     assert "tool.reconcile" not in rig.log  # the write stays in flight for the next resume
     run_id = stopped.run_id
     assert [e.attempt for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_STARTED] == [1]
