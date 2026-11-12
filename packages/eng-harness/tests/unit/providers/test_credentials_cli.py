@@ -4,9 +4,9 @@ import io
 from pathlib import Path
 
 import pytest
+from fakes.credential_stores import FakeCredentialStore
 
 from eng_harness.providers import __main__ as providers_cli
-from tests.fakes.credential_stores import FakeCredentialStore
 
 _HARNESS = """
 [providers.decision]
