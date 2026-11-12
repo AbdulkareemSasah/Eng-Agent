@@ -43,12 +43,19 @@ _LISTS = (  # (name, tool, takes the units token): the read order of spec 4.6.4
     ("combos", "csi_list_load_combos", False),
     ("area_sections", "csi_list_area_sections", False),
 )
-_TABLES = ("restraints", "pattern_defs", "combo_defs", "frame_loads", "area_loads")  # keys of the product profile
+_TABLES = (
+    "restraints",
+    "pattern_defs",
+    "combo_defs",
+    "frame_loads",
+    "area_loads",
+    "wall_sections",
+)  # keys of the product profile
 _SOURCES = {  # the host reads behind each neutral kind: what the fingerprint covers
     "model.stories/1": ("stories",),
     "model.grid_system/1": ("grids",),
     "model.frame_placements/1": ("frames",),
-    "model.area_placements/1": ("areas", "area_sections"),
+    "model.area_placements/1": ("areas", "area_sections", "wall_sections"),
     "model.load_set/1": ("patterns", "combos", "pattern_defs", "combo_defs", "frame_loads", "area_loads"),
     "model.joint_restraints/1": ("restraints",),
 }
