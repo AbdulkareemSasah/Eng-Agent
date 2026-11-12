@@ -178,10 +178,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   (`INVALID_ARGUMENT`) and creates no run folder; given a block that returns a value that is not an instance of its
   output model, then `BlockRuleViolation`. Test: `tests/unit/test_runner.py::test_input_and_output_validation`.
 - AC70. Given `RunRequest.run_id` (amendment B-471), then `start` creates the run under that id (run folder, journal
-  `meta`, `run_started.run_id`, `RunOutcome.run_id`); given a `run_id` whose run folder exists, then `start` raises
-  `ContractError` (`INVALID_ARGUMENT`) and creates nothing (no folder, lock, stored input or event); given no `run_id`,
-  then the id is drawn from the `IdSource` as before (§4.4.1). Test:
-  `tests/unit/test_runner.py::test_caller_chosen_run_id`.
+  `meta`, `run_started.run_id`, `RunOutcome.run_id`), also when the host port's server checks (invariant 8) wrote under
+  that run folder first; given a `run_id` whose run folder exists, or one that does not match `run_` + ULID (for
+  example `../x`), then `start` raises `ContractError` (`INVALID_ARGUMENT`) before any port call and creates nothing
+  (no folder, lock, stored input or event); given no `run_id`, then the id is drawn from the `IdSource` as before
+  (§4.4.1). Test: `tests/unit/test_runner.py::test_caller_chosen_run_id`.
 - AC65. Given `RunRequest.run_class` (`trial` or `production`), then `start` refuses a CalcPort whose `run_class`
   differs (`RunRefused` `RUN_CLASS_MISMATCH`, no run folder), `run_started` records the class, and a resume with a
   CalcPort of another class is refused the same way before any other port call. Test:
@@ -801,10 +802,13 @@ The terminal progress, the approval page and the run report use only this API (1
 
 #### 4.5.1 Start and resume
 
-`start(request)`: validate the input (AC16); check that `ports.calc.run_class` equals `request.run_class` (AC65); load
-the basis and check invariant 5; run the server checks (invariant 8); create the run folder (named by
-`request.run_id` when given, refused with `ContractError` `INVALID_ARGUMENT` and nothing created when that folder
-exists, AC70), take the lock, store the input, append `run_started`; call the root block.
+`start(request)`: when `request.run_id` is given, check it first, before any port call (so before the server checks
+of invariant 8, whose host port may write under the run folder): a value that does not match `run_` + ULID, or whose
+run folder exists, is refused with `ContractError` `INVALID_ARGUMENT` and the engine creates nothing (AC70); validate
+the input (AC16); check that `ports.calc.run_class` equals `request.run_class` (AC65); load the basis and check
+invariant 5; run the server checks (invariant 8); create the run folder (named by `request.run_id` when given, and
+then accepting the folder that the server checks wrote), take the lock, store the input, append `run_started`; call the
+root block.
 
 `resume(run_id)` runs in this order, and no step of it may be moved (AC62):
 
@@ -1329,4 +1333,4 @@ The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload
 | Q34 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
 | Q35 | B-111: how a replay detects a removed inserted save step (invariant 7, AC47) | Owner | Draft decision B-434, owner queue: `step_started` carries the tool's `action`, optional, so earlier journals read unchanged (§4.4.2). This records the data only: §4.5.2 has no rule that reads `action`, and an unrecorded `p~pre.save` path goes live (rule 4), so the divergence rule is open, owner queue (writer's proposal, not adopted here: a recorded step whose `action` is `analysis` or `design` with no recorded `p~pre.save.<model_key>` is `ReplayDivergence`, raised before any live call) |
 | Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read`, effect `read` and no `op_id` (names `check_model` and `save`, the path's `<kind>` segment), so in-flight reconciliation reruns them by the §4.5.3 Read row; the §4.5.3 Write row text "including save" was not amended (D-28) and reads as tool saves only, owner to confirm (a rerun of an inserted save saves the model again); the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |
-| Q37 | Spec 0006 Q20: for `run` the command line must build the tool and host ports, which need the run folder, before `Engine.start` draws the run id | Owner | Decided (owner instruction of 2026-11-12; amendment B-471; spec 0006 Q20 answer A): `RunRequest.run_id`, optional, chosen by the caller (`run_` + ULID), used by `start`, which refuses it with `ContractError` `INVALID_ARGUMENT`, creating nothing, when that run folder exists (§4.4.1, §4.5.1, AC70); built by plan T20 (work item B-472) |
+| Q37 | Spec 0006 Q20: for `run` the command line must build the tool and host ports, which need the run folder, before `Engine.start` draws the run id | Owner | Decided (owner instruction of 2026-11-12; amendment B-471; spec 0006 Q20 answer A): `RunRequest.run_id`, optional, chosen by the caller (`run_` + ULID), used by `start`, which checks it before any port call and refuses it with `ContractError` `INVALID_ARGUMENT`, creating nothing, when it does not match `run_` + ULID or that run folder exists (§4.4.1, §4.5.1, AC70); built by plan T20 (work item B-472) |

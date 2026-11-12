@@ -564,7 +564,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/tests/unit/test_runner.py"
-    # About 15 lines in _runner.py (the field, the folder check before any creation, the id choice) and 5 of
+    # About 15 lines in _runner.py (the field, the pattern and folder check before any port call, the id choice) and 5 of
     # CHANGELOG.md (an estimate, not a measurement).
     max_changed_lines: 40
     max_sessions: 1
@@ -853,10 +853,15 @@ applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
 
 **T20 Caller-chosen run id** (spec §4.4.1, §4.5.1, §5, AC70; amendment B-471, spec 0006 Q20 answer A, work item
 B-472). `RunRequest` gains the optional `run_id` (`run_` + ULID, the pattern of spec §4.4.1); `start` names the run
-folder by it when given and draws one from the `IdSource` otherwise; when that folder exists, `start` raises
-`ContractError` `INVALID_ARGUMENT` before it creates anything (folder, lock, stored input, event).
-`test_caller_chosen_run_id` checks the three cases of AC70. It needs only the merged start of T9; plan 0006 T18b makes
-`cli/_wiring.py` draw the id at step 1 of spec 0006 §4.2.2 and pass it here.
+folder by it when given and draws one from the `IdSource` otherwise. `start` checks a given `run_id` first, before any
+port call (so before the server checks of invariant 8, whose host port writes `<run_dir>/servers` and launches the
+server in the run folder): a value that does not match `_RUN_ID`, or whose run folder exists, raises `ContractError`
+`INVALID_ARGUMENT` and the engine creates nothing (folder, lock, stored input, event). The later creation of the run
+folder accepts the folder the server checks wrote (no `FileExistsError`). `test_caller_chosen_run_id` checks the
+cases of AC70 with a host-port fake whose server check writes under the run folder: the run is created under the
+given id; an existing folder and a malformed id (`../x`) are refused with no port called and nothing created; no id
+draws one from the `IdSource`. It needs only the merged start of T9; plan 0006 T18b makes `cli/_wiring.py` draw the id
+at step 1 of spec 0006 §4.2.2 and pass it here.
 
 ## 3. Dependencies
 

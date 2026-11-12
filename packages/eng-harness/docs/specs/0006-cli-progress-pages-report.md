@@ -45,7 +45,7 @@ module entry point of spec 0007 (its AC35), not a seventh command (AC1 unchanged
 `DecisionSettings` is read from `[decisions]` (spec 0005 §4.3; §4.2.4), `assemble_decision_runtime` takes the four
 inputs of §4.2.2 step 5 and its summary carries the dropped releases (spec 0009 §4.1, AC29), the Status section of the
 report shows the run's decision runtime (§4.6.1), and the command line draws the run id at step 1 for `run` as for
-`resume` and passes it to `Engine.start` (engine AC70; §4.2.2, §4.4.8).
+`resume` and passes it to `Engine.start` (engine AC70; §4.2.2, §4.4.8; AC66).
 
 ## 1. Problem
 
@@ -170,6 +170,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   prints with the program name `eng-harness`, and the workspace root `pyproject.toml` declares no script named
   `eng-harness` (the supported root form is `uv run --package eng-harness eng-harness <command>`, §4.1). Test:
   `tests/unit/cli/test_parser.py::test_entry_point_and_root_form`.
+- AC66. Given `run` with the default `CliDeps()` (amendment B-471, Q20 answer A), then the `port_builder` default is
+  spec 0002 `build_ports`; the run id (`run_` + ULID from the ids source) is drawn at step 1 of §4.2.2 and the run-id
+  cell holds it before any port is built; the engine receives the same id in `RunRequest.run_id` (engine AC70); and
+  `run` and `resume` are available. Test: `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
 
 ### 3.2 Terminal progress
 
@@ -756,7 +760,9 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
   with the run id the command line draws and passes in `RunRequest.run_id` (Q20 answer A, amendment B-471; engine
   AC70); until that binding (plan T18b) it is filled from the first `ApprovalRequest.run_id` that the wrapped page
   `ApprovalPort` receives, and, once the progress sink reaches the real engine, from the `run_started` event
-  (`RunHeader.run_id`) that the sink receives, whichever comes first; a later value that differs is a defect and raises. The cell is the one source of the run id for every
+  (`RunHeader.run_id`) that the sink receives, whichever comes first; a later value that differs is a defect and raises.
+  After T18b those two fills stay in place, but for `run` they only confirm the id of step 1 (a differing value
+  raises), so step 1 is the one source of the run id for `run`. The cell is the one source of the run id for every
   collaborator that needs the run folder `<workspace>/runs/<run_id>`, and each states what it does while the cell is
   empty:
   - the page ports: `stop_requested` returns false and `report` returns the fixed "report not available yet"
@@ -818,8 +824,10 @@ happened). Sections:
    design basis (name, version, hash; who confirmed each value and when, from the `engineer:<name>@<time>` source of its basis field), start
    and end, status, the marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial run, unreleased tools), the integrity line:
    event count and the last `chain_sha256`, and the decision runtime of the run header (`RunView.decision_runtime`,
-   engine AC69): its providers and released points, with the dropped releases (spec 0009 AC29), shown as recorded by
-   the generic renderer below; nothing when it is empty (Q16 (c), amendment B-471).
+   engine AC69): its providers and released points, with the dropped releases (spec 0009 AC29), as plain label and
+   value rows like the other Status rows (not value cells: the header is not a stored result, so it has no sources
+   row), held to the generic renderer's caps (at most 200 rows and depth 4, with "N more"); nothing when it is empty
+   (Q16 (c), amendment B-471).
 2. **Changes**: model revisions (`model_saved`: role, revision, fingerprint, base file name); per `CHANGE_SET` approval
    the items with state and reasons, the binding, the applied steps with read-back results, and the differences
    including engineer changes; promotion and its backup.
@@ -929,7 +937,7 @@ heartbeat task runs on the engine loop.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62, AC65; AC9, AC18, AC19, AC37 (production wiring, plan T16b) | Unit | `tests/unit/cli/` |
+| AC1, AC3 to AC6, AC10 to AC14, AC61 (opener), AC62, AC65, AC66; AC9, AC18, AC19, AC37 (production wiring, plan T16b) | Unit | `tests/unit/cli/` |
 | AC15, AC17 to AC19 | Unit | `tests/unit/progress/` |
 | AC22 to AC28, AC30 to AC32, AC34 (page half, plan T7b), AC36, AC38, AC39 | Unit (real loopback server, `http.client`) | `tests/unit/pages/` |
 | AC49, AC50, AC52 to AC57, AC59 | Unit | `tests/unit/`, `tests/unit/report/` |
@@ -1008,6 +1016,6 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q17 | Amendment B-354 (spec 0007 Q7; `LOCAL-TESTING.md` open points 5 and 13). The first change set could reach a run only by `resume --answers`, and the interim route `run --no-wait` could not start a workflow that needs basis confirmation, because a `--no-wait` run does not serve the basis page and no run exists to resume | Owner | Decided **[added]**: `run --answers FILE` pre-answers the first data request only, through `accept_answers_file` (AC64); a workflow with required basis fields starts only with a waiting `run` (§4.4.7, AC47); the `run --no-wait` route is withdrawn. No answer path is widened: the file still answers data requests only, and the change set is still approved on the page |
 | Q18 | Amendment B-354 (`LOCAL-TESTING.md` open point 6). How the owner invokes the command from the workspace root. The decision rests on uv's documented command-line options (`uv run --package`, `uv sync` being exact) and a check on this workspace with uv 0.11; the uv workspace documentation page was not reachable from the authoring session | Owner | Decided: `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the owner may confirm it against docs.astral.sh. `LOCAL-TESTING.md` should use this form for every `eng-harness` command |
 | Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
-| Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py`. Decided: answer A (owner instruction of 2026-11-12; amendment B-471): engine §4.4.1, §4.5.1 and AC70 (engine plan T20, work item B-472); §4.2.2 and §4.4.8 here; plan T18 split into T18a (every default but the port builder) and T18b (the port builder and the run id at step 1, after engine plan T20) |
+| Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py`. Decided: answer A (owner instruction of 2026-11-12; amendment B-471): engine §4.4.1, §4.5.1 and AC70 (engine plan T20, work item B-472); §4.2.2 and §4.4.8 here; plan T18 split into T18a (every default but the port builder) and T18b (the port builder and the run id at step 1, after engine plan T20; AC66) |
 | Q21 | Amendment B-412 (eighth review). `ApprovalVoid` carries no request id, so the page ties a void to the most recent approved `CHANGE_SET` or `PROMOTION` request of the process (§4.4.5); with nested approvals in force that may name the wrong one | Owner | Add the approval's `request_id` to the `ApprovalVoid` detail (engine §4.9, §6) at the engine's next amendment; the page then marks that request. Until then the rule of §4.4.5 holds, and the message itself is always shown |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

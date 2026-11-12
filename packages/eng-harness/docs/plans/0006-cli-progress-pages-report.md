@@ -603,7 +603,7 @@ tasks:
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn"
-    covers: [AC10]
+    covers: [AC66]
     depends_on: [T18a]
 ---
 
@@ -765,7 +765,9 @@ second `run_resumed` with the same `resume_no` (fixture `tests/fixtures/report_r
 **T13b Decision runtime in the status section** (spec §4.6.1, Q16 (c); amendment B-471, owner instruction of
 2026-11-12; T13 is merged). `_document.py` adds to the Status section the run's decision runtime
 (`RunView.decision_runtime`, engine AC69: the providers, the released points and the dropped releases of spec 0009
-AC29), shown as recorded through the generic bounded renderer of T12, and nothing when it is empty. The fixture header
+AC29), as plain label and value rows built in `_document.py` like the other Status rows (not value cells of
+`report/_sections.py`: the header is not a stored result and has no sources row, AC52), held to the generic renderer's
+caps of spec §4.6.1 (200 rows, depth 4, "N more"), and nothing when it is empty. The fixture header
 of `tests/golden/test_report.py` gains a decision runtime and the snapshot its rows, so
 `test_report_snapshot` fails at the merge base (AC51).
 
@@ -951,8 +953,9 @@ engine AC70); the `port_builder` default is `build_ports` (plan 0002 T19), so th
 workspace, store, run_folder(), clock, ids)`. `test_port_builder_bound_and_run_id_drawn` checks that the default is
 `build_ports`, that for `run` the cell holds the id before any port is built and the engine receives the same id, and
 that `run` and `resume` are then available with `CliDeps()`; it fails at the merge base because the default is `None`.
-It covers AC10: with the cell filled at step 1, the rule of spec §4.4.8 for a run id not yet known applies to `run`
-only before step 1.
+It covers AC66. With the cell filled at step 1, the rule of spec §4.4.8 for a run id not yet known (AC10, tested by
+T14b) applies to `run` only before step 1, and the fills from `ApprovalRequest.run_id` and `run_started` only confirm
+the id (a differing value raises).
 T18b follows T18a, so the default `CliDeps()` makes `run` and `resume` available only once every collaborator and the
 decision, progress and run-control ports reach the real engine.
 
