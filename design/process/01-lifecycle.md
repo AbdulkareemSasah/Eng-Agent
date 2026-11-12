@@ -110,7 +110,7 @@ A pull request whose recorded risk is below the floor fails `risk-floor`.
 | Change of behavior | Spec change pull request, then tests to the new behavior, then code |
 | Defect | Reproduce as a failing regression test |
 | Refactor | Confirm tests green; change structure only; tests stay green without edits |
-| Gap report | Triage: new spec, covered, host limitation, or out of scope. During a live project: the project lane (§9) |
+| Gap report | Triage: new spec, covered, host limitation, or out of scope. During a live project: the project lane (§9) when the owner asks, otherwise a need in the task log (§10) |
 | Need from a task log | Triage in a development session (§10, [02](02-work-items.md) §5) |
 | Spike | Question, time box, throwaway code in `spikes/`, report |
 | Contract change | ADR in the hub first |
@@ -120,8 +120,9 @@ A pull request whose recorded risk is below the floor fails `risk-floor`.
 
 ## 9. Project lane
 
-During a live project, a missing capability is built through the project lane
-([ADR-0026](../docs/adr/0026-project-lane-for-tools.md)) instead of waiting for G1 and G2.
+During a live project, when the owner asks for it, a missing capability is built through the project lane
+([ADR-0026](../docs/adr/0026-project-lane-for-tools.md)) instead of waiting for G1 and G2; otherwise the agent logs the
+need and goes on (§10).
 
 | Item | Rule |
 |---|---|

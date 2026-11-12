@@ -18,9 +18,8 @@ Runbooks:
 | Incident | Steps |
 |---|---|
 | Wrong engineering result | Withdraw the check or function; advisory listing affected inputs; regression test; full R1 fix ([10](10-engineering-verification.md) §7) |
-| Leaked secret | Revoke and rotate at the provider immediately; remove from the repository; if it reached a pushed commit, purge history with the owner and notify affected services (a secret in a task log: the last row, no purge); review how it escaped the secret scan |
+| Leaked secret | Revoke and rotate at the provider immediately; remove from the repository by a new commit; if it reached a pushed commit, notify affected services, and purge history with the owner only in a repository other than the workspace repository, which is never rewritten ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D9; a secret in a pushed task log: §4); review how it escaped the secret scan |
 | Broken release | Yank the release (and the PyPI version once public); publish a patch from `main`; record the cause |
-| A hard flag of the push check on the integration branch (a direct commit that is neither a verified squash merge nor log-only) or a secret in a pushed task log | Revert by a new commit, never a history rewrite; for a secret, rotate it at once and withhold the span by a log-only commit ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5, D7). Unpushed logs are not an incident |
 
 ## 2. Claiming work
 
@@ -40,6 +39,11 @@ assignee. A claim without activity for three working days is released through th
 - An infrastructure failure (runner, network, service outage) becomes a `type/ci` issue and the agent reports
   `BLOCKED`.
 - Workflows are never edited to get a green result; workflow changes are protected and go through the owner.
+- A hard flag of the push check on the integration branch, a secret in a pushed task log included, is an incident
+  outside the emergency path of §1 (no owner approval, no pull request): merges stop until the lead has recorded the
+  flag and reverted the commit by a new commit, or recorded why it stands, without waiting for the owner; a secret is
+  rotated at once and its span withheld by a log-only commit ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5,
+  D7). Unpushed logs are not an incident.
 
 ## 5. Auditing the reviewers and delegated merges
 

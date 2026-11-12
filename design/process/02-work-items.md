@@ -54,8 +54,9 @@ are each one pull request in size.
 ## 5. Gap reports (principle P12)
 
 A gap report is filed whenever someone, a workflow or an agent, needs a capability that does not exist: a missing
-tool, parameter, check, calc function, kind or host operation. During a live project, the project lane
-([01](01-lifecycle.md) §9) builds the tool first and files the gap report as its record.
+tool, parameter, check, calc function, kind or host operation. During a live project, when the owner asks for the
+capability, the project lane ([01](01-lifecycle.md) §9) builds the tool first and files the gap report as its record;
+otherwise the first bullet below applies.
 
 - In live work ([01](01-lifecycle.md) §10), a missing capability is a `not_found` record in the task log and the
   agent goes on with what is possible. The gap issue is filed at triage by a development session, labelled

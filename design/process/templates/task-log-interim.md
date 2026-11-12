@@ -78,8 +78,8 @@ Integration branch: `build/v1` in bootstrap mode, `main` after it. Log identity 
 
 1. Once, from the repository root: `git worktree add --no-checkout -b eng-tasklog .eng/tasklog/worktree
    origin/<integration branch>`; then `git -C .eng/tasklog/worktree sparse-checkout set --no-cone '/tasklog/'
-   '/.gate/'` (plus `'/pyproject.toml'` if step 3's scan needs it); then `git -C .eng/tasklog/worktree checkout
-   eng-tasklog`. The branch `eng-tasklog` is local only and never pushed by name.
+   '/.gate/'`; then `git -C .eng/tasklog/worktree checkout eng-tasklog`. The branch `eng-tasklog` is local only and
+   never pushed by name.
 2. Per task: write `STORY.md` with the file tool (UTF-8, LF). In the worktree, `git add` that file only, and commit
    with the log identity, the subject `docs(tasklog): <task_id> <status>` and the `Assisted-by:` trailer.
 3. Before any push, in the worktree:
@@ -87,8 +87,8 @@ Integration branch: `build/v1` in bootstrap mode, `main` after it. Log identity 
    - `git <log identity> rebase origin/<integration branch>`;
    - for every commit `c` in `git rev-list origin/<integration branch>..HEAD`: `git rev-list --parents -n 1 c` shows
      one parent, and `git diff-tree -r --no-renames --raw c^ c` lists only status `A` or `M`, mode `100644`, and
-     paths of the form `tasklog/tasks/<yyyy>/<mm>/<task_id>/STORY.md`, each at most 900 000 bytes (the log-only
-     definition of ADR-0034 D5);
+     paths of the form `tasklog/tasks/<yyyy>/<mm>/<task_id>/STORY.md`, and each new blob (`git cat-file blob
+     c:<path>`) is at most 900 000 bytes, valid UTF-8 and free of NUL bytes (the log-only definition of ADR-0034 D5);
    - `uv run --project <repository root> --package eng-dev-gate eng-gate --root . secrets --range
      origin/<integration branch>..HEAD` reports no finding, SC002 included.
 
