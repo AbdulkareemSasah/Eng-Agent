@@ -194,7 +194,7 @@ def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, contr
             edits: list[tuple[str, dict[str, Any]]] = [
                 ("csi_add_point", {"x": 1.0, "y": 2.0, "z": 3.0}),
                 ("csi_add_load_pattern", {"name": "LIVE", "type": "Live"}),
-                ("csi_add_load_combo", {"name": "C2", "combo_type": 0, "components": []}),
+                ("csi_add_load_pattern", {"name": "WIND", "type": "Wind"}),
                 ("csi_delete_load_combo", {"name": "C1", "confirm": True}),
             ]
             for tool, arguments in edits:
@@ -229,7 +229,8 @@ def test_outside_edit_raises_the_revision(tmp_path: Path, make_config: ConfigFac
             assert port.take_warnings() == []
             stored = states.get(second.model_id or "")
             assert stored is not None
-            assert (stored.revision, stored.fingerprint, stored.file_sha256) == (second.revision, second.fingerprint, None)
+            assert (stored.revision, stored.fingerprint) == (second.revision, second.fingerprint)
+            assert stored.file_sha256 is None
             assert await port.model_state(key, held.instance_id) == second  # nothing changed: nothing raised
             assert port.take_warnings() == []
 
@@ -357,6 +358,29 @@ def test_not_loaded_never_raises(tmp_path: Path, make_config: ConfigFactory, con
     anyio.run(body)
 
 
+def test_without_a_store_the_change_is_warned(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
+    """A port built without a model-state store cannot raise the revision, but still notes the outside edit."""
+    from .test_csi_session_ops import _open
+
+    _seeded(control)
+    clock = FixedClock(_START)
+
+    async def body() -> None:
+        port, manager, *_rest = await _open(tmp_path, make_config(), control, clock, SeededIdSource(b"bare", clock))
+        async with manager:
+            key = await port.working_copy("m", tmp_path / "run" / "copies")
+            held = await port.locate(key)
+            assert held is not None
+            first = await port.model_state(key, held.instance_id)
+            await _write(manager, held.pid, "csi_add_point", x=1.0, y=2.0, z=3.0)
+            second = await port.model_state(key, held.instance_id)
+            assert second.fingerprint != first.fingerprint
+            assert second.revision == first.revision
+            assert port.take_warnings() == [(key, WarningCode.MODEL_CHANGED_OUTSIDE)]
+
+    anyio.run(body)
+
+
 def _recorder(
     replies: dict[str, dict[str, Any]],
 ) -> tuple[list[tuple[str, dict[str, Any], CallEffect]], Callable[..., Any]]:
@@ -411,11 +435,12 @@ def test_reads_are_capped_tokened_and_targeted() -> None:
     assert all(args["row_limit"] == LIMIT for tool, args, _ in calls if tool == "csi_db_table_read")
 
 
-def test_unusable_reply_is_refused() -> None:
-    """A list reply without `items` is `HOST_ERROR` with `UNEXPECTED_REPLY`, not an empty list."""
+@pytest.mark.parametrize("reply", [{"count": 0}, {"items": "none"}, {"items": ["row"]}])
+def test_unusable_reply_is_refused(reply: dict[str, Any]) -> None:
+    """A list reply without `items`, or with items that are not objects, is `UNEXPECTED_REPLY`, not an empty list."""
     from eng_harness.adapters.csi._state import CsiStateReader
 
-    _calls, call = _recorder({"csi_model_info": _INFO, "csi_list_grids": {"count": 0, "truncated": False}})
+    _calls, call = _recorder({"csi_model_info": _INFO, "csi_list_grids": reply})
 
     async def body() -> None:
         with pytest.raises(ContractError) as refused:
