@@ -16,8 +16,9 @@ workflow lanes (D-33).
   matter of every plan file under `docs/plans/` on `origin/build/v1` (20 plans in `packages/` and `tools/`, at ef5d883); the
   unmerged tasks are the entries of `ops/remaining-tasks.json` of the pause whose work item is not named in the
   first-parent log of `origin/build/v1` (117), plus the six plan tasks that registry did not list (E.T13c, C.T8b,
-  eng-contract T19, S.T12b, S.T15, F.T9); one more task, SBC overlay plan 0003 T4, was dropped by its plan's own rule when ACI column T5 merged first
-  and is never built. 301 - 117 - 6 - 1 = 177. Documents amendments and lead fixes are not plan tasks and are counted
+  eng-contract T19, S.T12b, S.T15, F.T9), plus SBC overlay plan 0003 T4, which is unmerged too: that plan drops T4 only if
+  ACI column plan 0004 T5 (Z.T5, B-334) merges before SBC T2 (Y.T2, B-326), and neither has merged, so T4 stays to build
+  unless Z.T5 merges first. 301 - 117 - 7 = 177. Documents amendments and lead fixes are not plan tasks and are counted
   separately.
 - The same count at the previous checkpoint (e99bf72) gives 173 of 298; that checkpoint reported 171 of 294 on a count
   that cannot be reproduced, so compare progress by this method only. This session merged four plan tasks (B-451 S.T11b,
