@@ -349,12 +349,15 @@ tasks:
     title: "Basis paths accept the section 4.7.2 unit suffixes in the last segment (owner decision OQ-Q44)"
     # Amendment (B-463, documents only): spec 4.10.2 path rule and AC48a; implemented as work item B-464. The basis path
     # pattern is built from the suffixes of units (spec 4.7.2), never a copied list; the schema snapshot is regenerated.
+    # Amendment (B-468): the calc lock is regenerated with the harness lock writer because harness.footing_subjects takes
+    # DesignBasis as an input and the contract schema is part of its content hash; the calc stays version 1.
     files:
       - "packages/eng-contract/src/eng_contract/kinds/basis.py"
       - "packages/eng-contract/tests/contract/test_kinds.py"
       - "packages/eng-contract/tests/data/kinds/basis.design_basis-1/**"
       - "packages/eng-contract/docs/schema/kinds/basis.design_basis-1.schema.json"
       - "packages/eng-contract/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
     max_changed_lines: 40
     max_sessions: 1
     tests_first:
