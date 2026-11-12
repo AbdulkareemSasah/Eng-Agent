@@ -44,6 +44,7 @@ tasks:
   - id: T2
     title: Calc harness.change_set_check (resolve, validate, conflicts, refused kinds)
     # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2, no discovery); the bounds paths are the unit-suffixed names of spec 4.8.
+    # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) and calcs T8b as cross-plan dependencies.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.change_set_check (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -187,6 +188,7 @@ tasks:
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap).
+    # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) as a cross-plan dependency.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -466,13 +468,13 @@ uninterrupted run.
 | Task | Needs merged |
 |---|---|
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
-| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8 (difference report payload); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment of spec Q12 (a) (owner question OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it (owner queue, no work item yet) |
+| T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8b (difference report calc, split by B-458); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, the path rule of spec Q12 (a), owner decision OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
-| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); the contract path-rule amendment (owner question OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
