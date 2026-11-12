@@ -1,7 +1,12 @@
 {
   "calcs": [
     {
-      "content_sha256": "4bfcbde9c475b88cd55b41f39999fdd3a682873e733c10a336e4bb2a9f4ad4a1",
+      "content_sha256": "98f4c5837c8c67ca84f5a079954c9fc5386fdc6444a9785df663cf7877dec4c7",
+      "id": "harness.model_diff",
+      "version": 1
+    },
+    {
+      "content_sha256": "bb38ca24c61078e39821022f00d0013078b3806ed1571edd73e26d308aedc9c4",
       "id": "harness.model_fingerprint",
       "version": 1
     }

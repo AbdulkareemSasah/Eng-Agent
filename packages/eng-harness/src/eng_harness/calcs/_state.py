@@ -11,7 +11,7 @@ from typing import Any
 
 from eng_contract.canonical import canonical_json
 
-__all__ = ["ORDER", "SECTIONS", "canonical_state", "item_count"]
+__all__ = ["ORDER", "SECTIONS", "canonical_state", "item_count", "list_at", "row_key"]
 
 SECTIONS: tuple[tuple[str, str], ...] = (
     ("stories", "model.stories/1"),
@@ -67,3 +67,39 @@ def canonical_state(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
 def item_count(payload: dict[str, Any]) -> int:
     """The number of members of the payload's top-level lists (the `items` of a fingerprint section)."""
     return sum(len(value) for value in payload.values() if isinstance(value, list))
+
+
+def list_at(payload: dict[str, Any], path: tuple[str, ...]) -> list[Any]:
+    """The list at `path` under `payload` (F2 paths); raises `KeyError` when a segment is missing."""
+    if not path:
+        raise KeyError("empty path")
+    head, *rest = path
+    node = payload[head]
+    if not rest:
+        if not isinstance(node, list):
+            raise TypeError(f"path {path!r} is not a list")
+        return node
+    if isinstance(node, list):
+        rows: list[Any] = []
+        for row in node:
+            if isinstance(row, dict):
+                rows.extend(list_at(row, tuple(rest)))
+        return rows
+    if isinstance(node, dict):
+        return list_at(node, tuple(rest))
+    raise TypeError(f"path {path!r} cannot be followed")
+
+
+def row_key(list_name: str, key: str | None, row: dict[str, Any]) -> tuple[str, ...]:
+    """D2 object key within a named list (`key`) or an unnamed list (`list_name`)."""
+    if key is not None:
+        return (row[key],)
+    if list_name == "items":
+        case = row["case"]
+        step = case["step"] if case.get("step") is not None else ""
+        return (case["case"], case["case_type"], step)
+    if list_name == "frame_loads":
+        return (row["frame"], row["pattern"], row["direction"])
+    if list_name == "area_loads":
+        return (row["area"], row["pattern"], row["direction"])
+    raise ValueError(f"unnamed list {list_name!r} has no row key rule")
