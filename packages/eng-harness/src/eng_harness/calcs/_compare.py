@@ -111,7 +111,7 @@ def walk_leaves(before: Any, after: Any, pointer: str = "") -> Iterator[tuple[st
 
 def compare_property(pointer: str, before: Any, after: Any, tolerances: Tolerances) -> tuple[PropertyRow, bool]:
     """The row of one differing leaf, and whether it is equal within tolerance (D3) rather than changed."""
-    leaf = pointer.rpartition("/")[-1].replace("~1", "/").replace("~0", "~")
+    leaf = pointer.rpartition("/")[2].replace("~1", "/").replace("~0", "~")
     quantity = kind_for_field(leaf)
     kind, unit = (quantity.name, quantity.canonical_unit) if quantity else (None, None)
     left, right = as_fraction(before), as_fraction(after)
@@ -158,7 +158,7 @@ def _merge(into: SectionDiff, part: SectionDiff) -> None:
 
 def _children(kind: str, path: tuple[str, ...]) -> tuple[str, ...]:
     """Names of the keyed lists nested directly under the rows of the list at `path`."""
-    return tuple(p[-1] for k, p, _ in ROW_KEYS if k == kind and p[:-1] == path)
+    return tuple(last for k, (*head, last), _ in ROW_KEYS if k == kind and tuple(head) == path)
 
 
 def _matched(
