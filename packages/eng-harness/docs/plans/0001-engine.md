@@ -409,6 +409,9 @@ tasks:
     # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
     # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
     # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
+    # Amendment (B-481, documents only): the B-113 writer measured 387 lines in these files against 330; a decision
+    # step journals `step_started` only with its answer, so one in flight at resume is a `decide` or `decide_many`
+    # step, which spec 4.5.3 and AC32 rerun: T14 adds both kinds to `_inflight.py`'s rerun set (3 lines). Budget 390.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.ports (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -416,10 +419,11 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # the rerun set (B-481)
       - "packages/eng-harness/tests/fakes/**"
       - "packages/eng-harness/tests/contract/test_ports_conformance.py"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py"
-    max_changed_lines: 330
+    max_changed_lines: 390
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
@@ -799,7 +803,8 @@ estimated, much of `_runner.py`'s share being the re-indented `try`/`finally` th
 `DecisionCall` with `sensitive_values` (from the journal's `model_bound.file_names`, `model_saved.origin_file_names`
 and `file_name`), the `engine.decision` request through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`,
 the `EngineerChoice` round trip (AC66), and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the
-frozen dataclass of spec §4.3.2. Budget 330 lines. Build order: T14 starts only
+frozen dataclass of spec §4.3.2. A decision step in flight at resume gets `step_rerun` (§4.5.3, AC32): T14 adds
+`decide` and `decide_many` to the rerun set of `_inflight.py`. Budget 390 lines (amendment B-481). Build order: T14 starts only
 after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
 port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
 plan.
