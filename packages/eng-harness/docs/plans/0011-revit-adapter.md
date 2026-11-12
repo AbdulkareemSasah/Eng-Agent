@@ -4,7 +4,7 @@ issue: "B-080"
 spec: packages/eng-harness/docs/specs/0011-revit-adapter.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
+risk: [r1, r2, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356); r2 from the kinds (amendment B-453)
 tasks:
   - id: T1
     title: Framework extensions (attended class, host_dialog confirm, optional pid, deny-list names) and the Revit server section
