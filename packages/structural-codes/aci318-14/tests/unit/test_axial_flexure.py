@@ -4,7 +4,7 @@ Inputs are the clause spec §8 common section unless noted. Expected values are 
 tolerances (1e-4 mm, 0.001 kN and kN.m, 1e-6 on ratios, strains and phi).
 """
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
@@ -12,7 +12,15 @@ from structural_codes import evaluate
 from structural_codes.errors import NotImplementedGap
 from structural_codes.pack import Pack, Registry
 
-from aci318_14.checks.axial_flexure import axial_flexure_uniaxial, bracket_demand_ray
+from aci318_14._column import ColumnSection, SectionPoint
+from aci318_14.checks.axial_flexure import (
+    _bisect,
+    _cap_m_knm,
+    _count_crossings,
+    axial_flexure_uniaxial,
+    bracket_demand_ray,
+    demand_ray_g,
+)
 
 CHECK_ID = "aci318_14.22_4_1_1.axial_flexure_uniaxial"
 REGISTRY = Registry.of(
@@ -45,6 +53,8 @@ COMMON: dict[str, Any] = {
     "lu_mm": 3000.0,
 }
 _LEN, _KN, _KNM, _RATIO = 1e-4, 0.001, 0.001, 1e-6
+_G4_CLAUSE = "AF §4.2 step 3"
+_K_KN, _K_KNM = 0.001, 1e-6
 _BODY = {
     "crossings_up",
     "crossings_down",
@@ -144,7 +154,166 @@ def test_bracketing_gap() -> None:
 
     with pytest.raises(NotImplementedGap) as exc:
         bracket_demand_ray(3.0, 100, g, two=2.0, one=1.0)
+    err = exc.value
+    assert err.gap_id == "G-4"
+    assert err.clause == _G4_CLAUSE
+    assert err.reason == "crossings_up = 2, crossings_down = 1 on the bracketing grid"
+
+
+class _StubSection:
+    """Minimal `ColumnSection.at` stand-in: `pn` (N) and `mn` (N.mm) are fixed with `c`."""
+
+    def __init__(self, pn: float, mn: float) -> None:
+        self._pn, self._mn = pn, mn
+
+    def at(self, c: float) -> SectionPoint:
+        return SectionPoint(0.0, 0.0, (), (), (), self._pn, self._mn, 0.005, 0.9)
+
+
+def _pt(pn_n: float, mn_nmm: float) -> SectionPoint:
+    return SectionPoint(0.0, 0.0, (), (), (), pn_n, mn_nmm, 0.005, 0.9)
+
+
+def test_bracket_demand_ray_errors() -> None:
+    """G-4 guard rails and messages on the bracketing grid (AF §4.2 step 3)."""
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(10.0, 1, lambda c: -1.0, two=2.0, one=1.0)
     assert exc.value.gap_id == "G-4"
+    assert exc.value.clause == _G4_CLAUSE
+    assert exc.value.reason == "n_grid must be at least c_half"
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, lambda c: c - 1.0, two=2.0, one=1.0)
+    assert exc.value.reason == "g(c_1) >= 0 on the bracketing grid"
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, lambda c: 1.0, two=2.0, one=1.0)
+    assert exc.value.reason == "g(c_1) >= 0 on the bracketing grid"
+
+
+def test_bracket_demand_ray_minimum_grid_and_crossings() -> None:
+    """One up-crossing brackets the root; `n_grid = c_half` is allowed; a down-crossing raises G-4."""
+    lo, hi = bracket_demand_ray(2.0, 2, lambda c: c - 1.5, two=2.0, one=1.0)
+    assert lo == pytest.approx(1.0)
+    assert hi == pytest.approx(2.0)
+
+    lo, hi = bracket_demand_ray(100.0, 100, lambda c: c - 50.0, two=2.0, one=1.0)
+    assert lo == pytest.approx(49.0)
+    assert hi == pytest.approx(50.0)
+
+    lo, hi = bracket_demand_ray(100.0, 100, lambda c: -1.0 if c < 50 else 0.0, two=2.0, one=1.0)
+    assert lo == pytest.approx(49.0)
+    assert hi == pytest.approx(50.0)
+
+    def one_up_one_down(c: float) -> float:
+        if c < 40:
+            return -1.0
+        if c < 60:
+            return 1.0
+        return -1.0
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, one_up_one_down, two=2.0, one=1.0)
+    assert exc.value.reason == "crossings_up = 1, crossings_down = 1 on the bracketing grid"
+
+    def two_up(c: float) -> float:
+        if c < 25:
+            return -1.0
+        if c < 50:
+            return 1.0
+        if c < 75:
+            return -1.0
+        return 1.0
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, two_up, two=2.0, one=1.0)
+    assert exc.value.reason == "crossings_up = 2, crossings_down = 1 on the bracketing grid"
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, lambda c: -1.0, two=2.0, one=1.0)
+    assert exc.value.reason == "crossings_up = 0, crossings_down = 0 on the bracketing grid"
+
+    def down_at_exact_zero(c: float) -> float:
+        if c < 49:
+            return -1.0
+        if c < 51:
+            return 1.0
+        if c < 52:
+            return 0.0
+        return -1.0
+
+    with pytest.raises(NotImplementedGap) as exc:
+        bracket_demand_ray(100.0, 100, down_at_exact_zero, two=2.0, one=1.0)
+    assert exc.value.reason == "crossings_up = 1, crossings_down = 1 on the bracketing grid"
+
+
+def test_count_crossings_matches_bracket_stubs() -> None:
+    """`_count_crossings` tallies the same up/down counts as the bracketing step uses on failure."""
+
+    def two_up(c: float) -> float:
+        if c < 0.5:
+            return -1.0
+        if c < 1.5:
+            return 1.0
+        if c < 2.5:
+            return -1.0
+        return 1.0
+
+    assert _count_crossings(3.0, 100, two_up, one=1.0, two=2.0) == (2, 1)
+
+    def single(c: float) -> float:
+        return c - 50.0
+
+    assert _count_crossings(100.0, 100, single, one=1.0, two=2.0) == (1, 0)
+
+    def down_at_exact_zero(c: float) -> float:
+        if c < 49:
+            return -1.0
+        if c < 51:
+            return 1.0
+        if c < 52:
+            return 0.0
+        return -1.0
+
+    assert _count_crossings(100.0, 100, down_at_exact_zero, one=1.0, two=2.0) == (1, 1)
+
+
+def test_demand_ray_g_hand_linear() -> None:
+    """AF §4.2 step 2: `g(c) = Mu*Pn(c) - Pu*Mn(c)` with forces in N and N.mm."""
+    sec = cast(ColumnSection, _StubSection(pn_n := 2_000_000.0, mn_nmm := 500_000_000.0))
+    pu_n, mu_nmm = 1_500_000.0, 300_000_000.0
+    assert demand_ray_g(sec, 1.0, pu_n, mu_nmm) == pytest.approx(mu_nmm * pn_n - pu_n * mn_nmm)
+    assert demand_ray_g(sec, 1.0, 0.0, mu_nmm) == pytest.approx(mu_nmm * pn_n)
+
+
+def test_bisect_keeps_negative_low_endpoint() -> None:
+    """Bisection stops with `g(lo) < 0` and `g(hi) >= 0` (strictly negative at `lo` on a linear root)."""
+    lo, hi = _bisect(0.0, 10.0, lambda c: c - 5.0, two=2.0)
+    assert lo < 5.0 <= hi
+    assert lo - 5.0 < 0.0
+    assert hi - 5.0 >= 0.0
+
+
+def test_cap_m_knm_on_cap_requires_compression_and_strict_excess() -> None:
+    """Step 5: axial cap applies only for `Pu > 0` and `phiPn > phiPn_max`, not at equality (AF §4.2)."""
+    pt = _pt(2_000_000.0, 500_000_000.0)  # phiPn = 1800 kN, phiMn = 450 kN.m
+    cap, phi_pn, phi_mn, on_cap = _cap_m_knm(pt, 100.0, 50.0, 1_000.0, _K_KN, _K_KNM)
+    assert on_cap is True
+    assert phi_pn == pytest.approx(1_800.0, abs=_KN)
+    assert cap == pytest.approx(500.0, abs=_KNM)
+
+    _, _, _, on_cap = _cap_m_knm(pt, 0.0, 50.0, 1_000.0, _K_KN, _K_KNM)
+    assert on_cap is False
+
+    cap, _, _, on_cap = _cap_m_knm(pt, 100.0, 50.0, 1_800.0, _K_KN, _K_KNM)
+    assert on_cap is False
+    assert cap == pytest.approx(phi_mn, abs=_KNM)
+
+
+def test_pure_axial_on_cap_false() -> None:
+    """HC-2 (`Pu = 0`): the axial-cap branch is off even though the section has finite strength."""
+    payload = run(Pu_kN=0.0, Mu_kNm=200.0)
+    assert steps(payload)["on_cap"] == pytest.approx(0.0, abs=_RATIO)
 
 
 def test_trace_complete() -> None:
