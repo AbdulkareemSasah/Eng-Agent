@@ -18,6 +18,7 @@ from eng_contract.store import ResultStore
 from mcp import types
 
 from eng_harness.adapters._args import HostTarget
+from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters._toolport import Binding
 from eng_harness.ports import ServerCheck
@@ -59,7 +60,7 @@ class Binder:
     def __init__(self, pid: int) -> None:
         self.pid = pid
 
-    async def binding(self, host_key: str, model: str | None) -> Binding:
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
         return Binding(target=HostTarget(product="ETABS", pid=self.pid), host=HOST, owned=True)
 
     def revision(self, model_id: str) -> int | None:
