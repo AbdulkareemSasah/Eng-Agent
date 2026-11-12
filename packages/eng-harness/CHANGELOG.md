@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Decision evaluation core: `eng_harness.decisions.evaluation` (`EvalThresholds`, `EvalReport`, `ProviderEvalMetrics`, `evaluate_point` with per-provider metrics, eligibility reasons and the calibration gap) and golden thresholds and fixture report (plan 0009 T8, B-227; spec 0009 AC37 to AC40).
+- Report document: `build_report`, `write_report`, status marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial, unreleased tools), integrity line, timings and run-events sections, distinct `resume_no` counting (plan 0006 T13, B-187; spec 0006 AC50, AC51, AC53, AC56, AC57, AC59).
+- CSI reply mapping: `adapters/csi/_replies.py`, ETABS `products/` table keys, and `harness.csi_model_status/1` (plan 0002 T11, B-130; spec 0002 AC27).
 - Credential store: `CredentialStore`, `KeyringCredentialStore` with the §4.4 backend allow-list, `python -m eng_harness.providers` (`set-key`, `delete-key`, `status`), and test doubles in `tests/fakes/credential_stores.py` (plan 0009 T2, B-221; spec 0009 AC6 to AC8).
 - Column-workflow kinds: `eng_harness.kinds.column_design` (the eight `harness.column_*` and `harness.revit_column_*` payloads) registered from `eng_harness.kinds` (plan 0013 T1, B-280; spec 0013 AC3 section 4.2).
 - Calc 1, model fingerprint: `harness.model_fingerprint` v1 (draft) in `calcs/model_fingerprint.py` (`FingerprintInput`, `FingerprintBody`, `StateMatch`, `same_state`), the canonical-state helper `calcs/_state.py` (F2 section keys and order) and its lock entry; `REGISTRY` now checks calcs against the neutral and calc kinds (plan 0003 T7, B-146; spec 0003 AC19 to AC23).
