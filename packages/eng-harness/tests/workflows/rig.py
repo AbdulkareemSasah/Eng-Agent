@@ -20,6 +20,7 @@ from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import FailureEnvelope, Provenance
 from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.kinds.basis import DesignBasis
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from fakes.ports import ENVELOPE, FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort, Raise
 from pydantic import JsonValue
@@ -31,7 +32,7 @@ from eng_harness.block import BlockDef, Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter, is_locked
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, RunClass, ToolInfo
+from eng_harness.ports import CalcInfo, LoadedBasis, RunClass, ServerCheck, ToolInfo
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
 BASIS_REF = "res_" + "0" * 26
@@ -84,6 +85,7 @@ class Host(FakeHost):
         self.locked: list[bool] = []
         self._runs_dir = runs_dir
         self._checks: dict[str, deque[ENVELOPE | Raise]] = {}
+        self.preflight_checks: list[ServerCheck] | None = None
 
     def script_check(self, model_key: str, outcome: ENVELOPE | Raise) -> None:
         """Queue `outcome` for the next `check_model` of `model_key`; with none queued the check succeeds."""
@@ -98,6 +100,12 @@ class Host(FakeHost):
                 raise outcome.error
             return outcome
         return await super().check_model(model_key)
+
+    async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
+        """`preflight_checks` when set, otherwise one passing check per minimum build."""
+        if self.preflight_checks is not None:
+            return self.preflight_checks
+        return await super().preflight(min_builds)
 
     def script(self, tool: str, *outcomes: ENVELOPE | Raise) -> None:
         """Queue outcomes; a retryable failure of a read fails every attempt of one run (the engine retries reads).
@@ -138,6 +146,7 @@ class Rig:
     calc_infos: list[CalcInfo] = field(default_factory=list)
     calc_results: dict[str, ENVELOPE | Raise] = field(default_factory=dict)
     calc_runs: list[tuple[str, Mapping[str, JsonValue]]] = field(default_factory=list)
+    bases: Mapping[str, LoadedBasis] = field(default_factory=dict)
 
     def engine(
         self,
@@ -152,7 +161,7 @@ class Rig:
             tool=Spy("tool", self.host, self.log),
             host=Spy("host", self.host, self.log),
             calc=Spy("calc", calc, self.log),
-            basis=Spy("basis", FakeBasisPort({}), self.log),
+            basis=Spy("basis", FakeBasisPort(self.bases), self.log),
             approvals=Spy("approvals", self.approvals, self.log),
             inputs=Spy("inputs", self.inputs, self.log),
         )
@@ -222,7 +231,11 @@ class Rig:
 
 
 def make_rig(
-    root: Path, unreleased: Mapping[str, str] | None = None, *, run_class: RunClass = RunClass.PRODUCTION
+    root: Path,
+    unreleased: Mapping[str, str] | None = None,
+    *,
+    run_class: RunClass = RunClass.PRODUCTION,
+    bases: Mapping[str, LoadedBasis] | None = None,
 ) -> Rig:
     """A rig whose workspace and result store are under `root`; `unreleased` names the host's unreleased tools."""
     clock = FixedClock(START_MS, 1)
@@ -230,18 +243,21 @@ def make_rig(
     workspace = Workspace(root=root / "ws", classification=LocationClass.LOCAL)
     store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
     host = Host(ids, clock, workspace.root / "runs", unreleased)
-    return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort(), run_class)
+    loaded = {BASIS_REF: LoadedBasis(result_id=BASIS_REF, basis=DesignBasis(template=None, fields={}))}
+    loaded.update(bases or {})
+    return Rig(workspace, store, clock, ids, host, FakeApprovalPort(), FakeInputPort(), run_class, bases=loaded)
 
 
 def request(
     workflow: str = "chain",
     values: Mapping[str, JsonValue] | None = None,
     *,
+    basis_ref: str = BASIS_REF,
     run_class: RunClass = RunClass.PRODUCTION,
     mode: PermissionMode = PermissionMode.WORK_ON_COPY,
 ) -> RunRequest:
     """A request to run `workflow` with the input `values`."""
-    return RunRequest(workflow=workflow, input=dict(values or {}), basis_ref=BASIS_REF, mode=mode, run_class=run_class)
+    return RunRequest(workflow=workflow, input=dict(values or {}), basis_ref=basis_ref, mode=mode, run_class=run_class)
 
 
 def _hold(run_dir: str, conn: Connection) -> None:

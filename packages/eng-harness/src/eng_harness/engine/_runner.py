@@ -27,7 +27,7 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
-from eng_harness.engine import _hoststate, _inflight
+from eng_harness.engine import _hostsafety, _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
@@ -154,8 +154,9 @@ class Engine:
 
         Raises:
             ContractError: `INVALID_ARGUMENT` for an unregistered workflow or an input that fails its model.
-            RunRefused: `RUN_CLASS_MISMATCH` when the calc port's class is not the request's. Neither creates a run
-                folder.
+            RunRefused: `RUN_CLASS_MISMATCH` when the calc port's class is not the request's, `BASIS_INCOMPLETE` when
+                the design basis lacks a required field, `SERVER_CHECK_FAILED` when a server check fails (spec 4.6 #5,
+                #8). None of them creates a run folder.
             RunLocked: another engine holds the new run's lock.
         """
         workflow = self._find(request.workflow)
@@ -163,6 +164,8 @@ class Engine:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"workflow {request.workflow!r} is not registered")
         inp = _parse(workflow.input_model, request.input, "the run input")
         self._check_class(request.run_class.value)
+        _hostsafety.check_basis(self._ports.basis, request.basis_ref, workflow.required_basis)
+        checks = await _hostsafety.check_servers(self._ports.host, workflow.min_server_builds)
         run_id = f"run_{self._ids.new_ulid()}"
         run_dir = self._runs / run_id
         run_dir.mkdir(parents=True)
@@ -173,7 +176,8 @@ class Engine:
                 "run_id": run_id, "workflow": workflow.name, "block": block, "mode": request.mode.value,
                 "input_ref": stored.result_id, "input_sha256": payload_sha256(request.input),
                 "basis_ref": request.basis_ref, "run_class": request.run_class.value, "engine_version": __version__,
-                "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256, "servers": [],
+                "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256,
+                "servers": [c.model_dump(mode="json") for c in checks],
                 "always_ask": list(workflow.always_ask), "unreleased_tools": dict(self._ports.tool.unreleased_tools()),
             }  # fmt: skip
             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
@@ -272,9 +276,14 @@ class Engine:
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports = self._ports
         tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
+        number = max((e.payload.resume_no for e in events if isinstance(e.payload, ev.RunResumed)), default=0)
+        rt = _inflight.Resume(
+            self._runs / run_id, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
+            writer, number, ports.host,
+        )  # fmt: skip
         ctx = Ctx(
             tools, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id, writer,
-            events,
+            events, _hostsafety.Pending(rt),
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
@@ -288,6 +297,9 @@ class Engine:
         except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
             writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
             return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
+        except _inflight.Stopped as stop:  # a write of unknown outcome: escalated for the engineer, or abandoned
+            status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
+            return RunOutcome(run_id, status, escalation=stop.escalated)
         except errors.Escalation as stop:
             reason = "attempts_exhausted" if isinstance(stop, AttemptsExhausted) else "block_escalation"
             return self._escalate(run_id, writer, reason, stop)

@@ -1,8 +1,9 @@
-"""Invariants 1, 2, 3 and 7 through the engine (plan 0001 T12; spec 0001 4.6, AC37, AC38, AC39, AC43).
+"""Invariants 1, 2, 3, 5, 7 and 8 through the engine (plan 0001 T12, T13; spec 0001 4.6, AC37-AC39, AC41, AC43, AC44).
 
 A write is checked before the next read of that model, any calc and the block's return. An engineering parameter
 rejects a literal before the port call. A stale reference is refused unless the calc's rule says `stale_ok`. An
-analysis or design tool is preceded by a save.
+analysis or design tool is preceded by a save. An incomplete design basis or a failing server check refuses the run
+before its folder exists.
 """
 
 import asyncio
@@ -14,17 +15,21 @@ import pytest
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import new_model_id, new_result_id
+from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref, RefRule
 from fakes.ports import failure
+from workflows.chain import ChainInput, ChainOutput
 from workflows.ctx_flows import flow, success
 from workflows.rig import make_rig, request
 
+from eng_harness.block import workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
+from eng_harness.errors import HarnessCode, RunRefused
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, HostInstance, ToolInfo
+from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, ServerCheck, ToolInfo
 
 _SHA = "ab" * 32
 Body = Callable[[Any], Awaitable[Sequence[str]]]
@@ -272,3 +277,107 @@ def test_save_before_analysis(tmp_path: Path) -> None:
     assert {s.model_key for s in recorded} == {"m1"}
     started = [e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.payload.kind == "tool"]
     assert [s.action for s in started] == ["analysis", "design"]
+
+
+@workflow(
+    name="needs_basis", version=1, description="needs two basis fields",
+    required_basis=("code.edition", "loads.risk_category", "site.seismic_class"),
+)  # fmt: skip
+async def _needs_basis(ctx: Any, inp: ChainInput) -> ChainOutput:
+    return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
+
+
+@workflow(name="checked", version=1, description="needs a server build", min_server_builds={"csi": "build-1"})
+async def _checked(ctx: Any, inp: ChainInput) -> ChainOutput:
+    return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
+
+
+def _field(confirmed: bool) -> BasisField:
+    source = "engineer:t@2026-01-01T00:00:00.000Z"
+    return BasisField(value="x", unit=None, source=source, confirmed=confirmed, citation=None)
+
+
+def test_basis_incomplete_refused(tmp_path: Path) -> None:
+    """A required basis field that is absent or unconfirmed refuses the run before any folder or port call (AC41)."""
+    ref = "res_" + "2" * 26
+    fields = {"code.edition": _field(True), "loads.risk_category": _field(False)}
+    basis = LoadedBasis(result_id=ref, basis=DesignBasis(template=None, fields=fields))
+    rig = make_rig(tmp_path, bases={ref: basis})
+    with pytest.raises(RunRefused) as refused:
+        asyncio.run(rig.engine(_needs_basis).start(request(workflow="needs_basis", basis_ref=ref)))
+    assert refused.value.code is HarnessCode.BASIS_INCOMPLETE
+    assert refused.value.evidence == ("loads.risk_category", "site.seismic_class")  # in the workflow's order
+    assert rig.run_ids() == []
+    assert not [line for line in rig.log if line.startswith(("tool.", "host."))]
+    fields["loads.risk_category"] = _field(True)
+    fields["site.seismic_class"] = _field(True)
+    complete = LoadedBasis(result_id=ref, basis=DesignBasis(template=None, fields=fields))
+    rig = make_rig(tmp_path / "complete", bases={ref: complete})
+    done = asyncio.run(rig.engine(_needs_basis).start(request(workflow="needs_basis", basis_ref=ref)))
+    assert done.status is RunStatus.COMPLETED
+
+
+def test_server_check(tmp_path: Path) -> None:
+    """A failing server check refuses the run at start, before the run folder and any tool call (AC44)."""
+    fail = ServerCheck(
+        server="csi", build="old", min_build="build-1", fingerprint="a", expected_fingerprint="b", ok=False,
+        reason="build below the minimum",
+    )  # fmt: skip
+    rig = make_rig(tmp_path)
+    rig.host.preflight_checks = [fail]
+    with pytest.raises(RunRefused) as refused:
+        asyncio.run(rig.engine(_checked).start(request(workflow="checked")))
+    assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
+    assert rig.run_ids() == []
+    assert "host.preflight" in rig.log
+    assert rig.host.ledger == []
+    rig.host.preflight_checks = None  # every check passes: the checks are recorded in the header
+    done = asyncio.run(rig.engine(_checked).start(request(workflow="checked")))
+    assert done.status is RunStatus.COMPLETED
+    servers = rig.header(done.run_id).servers
+    assert [(s["server"], s["min_build"], s["ok"]) for s in servers] == [("csi", "build-1", True)]
+    unchecked = make_rig(tmp_path / "unchecked")  # a workflow that names no minimum build has no server to check
+    asyncio.run(unchecked.engine(_needs_nothing).start(request(workflow="needs_nothing")))
+    assert "host.preflight" not in unchecked.log
+
+
+@workflow(name="needs_nothing", version=1, description="no basis field, no server build")
+async def _needs_nothing(ctx: Any, inp: ChainInput) -> ChainOutput:
+    return ChainOutput(refs=[(await ctx.tool("read_a", {"n": 0})).ref.ref])
+
+
+def test_refusal_messages_name_what_failed(tmp_path: Path) -> None:
+    """The refusals name the missing basis fields and each failed server with its reason (AC41, AC44)."""
+    ref = "res_" + "3" * 26
+    empty = LoadedBasis(result_id=ref, basis=DesignBasis(template=None, fields={}))
+    rig = make_rig(tmp_path, bases={ref: empty})
+    with pytest.raises(RunRefused) as basis:
+        asyncio.run(rig.engine(_needs_basis).start(request(workflow="needs_basis", basis_ref=ref)))
+    assert basis.value.message == (
+        "the design basis lacks or has not confirmed code.edition, loads.risk_category, site.seismic_class"
+    )
+    good, old, wrong = (
+        ServerCheck(
+            server=name, build="b", min_build="b", fingerprint="f", expected_fingerprint="f", ok=ok, reason=reason
+        )
+        for name, ok, reason in (
+            ("csi", True, None),
+            ("etabs", False, "build below the minimum"),
+            ("safe", False, None),
+        )
+    )
+    rig = make_rig(tmp_path / "servers")
+    rig.host.preflight_checks = [good, old, wrong]
+    with pytest.raises(RunRefused) as servers:
+        asyncio.run(rig.engine(_checked).start(request(workflow="checked")))
+    assert servers.value.evidence == ("etabs", "safe")  # the failed checks only, in the order of the port
+    assert servers.value.message == "server check failed: etabs (build below the minimum); safe (not ok)"
+
+
+def test_no_basis_read_when_nothing_is_required(tmp_path: Path) -> None:
+    """A workflow that requires no basis field does not load the basis, so an unknown reference does not stop it."""
+    rig = make_rig(tmp_path)
+    done = asyncio.run(rig.engine(_needs_nothing).start(request(workflow="needs_nothing", basis_ref="res_" + "1" * 26)))
+    assert done.status is RunStatus.COMPLETED
+    assert "basis.load" not in rig.log
+    assert rig.header(done.run_id).servers == []

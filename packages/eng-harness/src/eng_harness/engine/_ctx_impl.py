@@ -5,13 +5,14 @@ returns its recorded result, or raises its recorded failure again, with no port 
 (a failure envelope or a `REF_*` error), `CalcRefused`, `BlockRuleViolation`, `Escalation`; `ContractError` if unknown.
 """
 
+import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
 from typing import TYPE_CHECKING, NoReturn, cast
 
 from eng_contract.canonical import payload_sha256
-from eng_contract.envelope import FailureEnvelope, Provenance, SuccessEnvelope
-from eng_contract.errors import RETRY_RULES, ContractError, ContractWarning, ErrorDetail, RetryRule
+from eng_contract.envelope import Envelope, FailureEnvelope, Provenance, SuccessEnvelope
+from eng_contract.errors import RETRY_RULES, ContractError, ContractWarning, ErrorCode, ErrorDetail, RetryRule
 from eng_contract.ids import Clock
 from eng_contract.refs import Ref, RefRule, resolve_ref
 from eng_contract.store import ResultStore
@@ -30,11 +31,14 @@ from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcPort, HostPort, ToolPort
 
 if TYPE_CHECKING:
+    from eng_harness.engine._hostsafety import Pending
     from eng_harness.engine._runner import EngineSettings
 
+_LOG = logging.getLogger(__name__)
 _RETRIED = (RetryRule.always, RetryRule.depends)  # `after_wedge_clears` and `reconcile_first` go through 4.5.3
 _DRAFT = (CalcStatus.DRAFT, CalcStatus.VERIFIED)
 _REFUSALS = (errors.HarnessCode.CALC_NOT_APPROVED, errors.HarnessCode.CALC_WITHDRAWN)
+_UNKNOWN = (ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED)  # a write's outcome is unknown (spec 4.6 #6)
 _Obj = dict[str, JsonValue]
 _Pair = tuple[str, str]
 
@@ -89,9 +93,11 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
+        pending: Pending,
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer and the events to replay."""
+        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
+        self._pending = pending
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._guard = Guard(host, store, writer, producer)
         self._guard.install()
@@ -132,12 +138,15 @@ class Ctx:
         """Call the host tool `name` as one step, or return what the journal recorded for it (spec 4.3.2, 4.3.3).
 
         A read that fails with a retryable code is called again as the next attempt, at most `step_retry_limit`
-        times; a write is not retried in the run, since no port reports a write as not sent.
+        times. A write whose call raises, returns `TIMEOUT_UNKNOWN_OUTCOME` or returns `HOST_WEDGED` is reconciled at
+        once, before any further step on its host (spec 4.5.3, 4.6 #6): `applied` returns its result, `not_applied`
+        runs it again as the next attempt; no other write failure is retried in the run.
 
         Raises:
             ToolFailed: a failure envelope. `ContractError`: a tool outside the allowlist.
             BlockRuleViolation: an argument that is no `ArgValue`. ReplayDivergence, NeedsReconciliation: see
-                `ReplayIndex.lookup`. A port that raises leaves the step in flight (task T11b).
+                `ReplayIndex.lookup`. A read whose port raises leaves the step in flight (task T11b). Stopped: the
+                engineer must decide a write of unknown outcome, or abandoned the run.
         """
         raw = dict(args or {})
         return await _steps.step(lambda path: self._tool(path, name, raw))
@@ -172,19 +181,34 @@ class Ctx:
             await self._guard.prepare(self, path, key, info.effect, info.action)
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         while True:
+            await self._pending.settle(info.host_key)  # a write of unknown outcome on this host is reconciled first
             op = _steps.op_id(self._run_id, path, attempt)
             fields = {
                 "effect": info.effect, "op_id": op if info.effect == "write" else None, "host_key": info.host_key,
                 "action": info.action,
             }  # fmt: skip
             began = self._begin(path, attempt, "tool", name, args, model_key=key, **fields)
-            envelope = await self._tools.call(name, args, op_id=op, model=key)
+            try:
+                envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
+            except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
+                if info.effect != "write":
+                    raise
+                _LOG.warning("the write at step %s raised, so its outcome is unknown: %r", path, exc)
+                envelope = None
             if isinstance(envelope, SuccessEnvelope):
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
                     self._guard.mark(key)
                 return _result(name, done)
+            if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
+                found = await self._pending.resolve(info.host_key, path, attempt)
+                if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
+                    self._guard.mark(key)
+                    self._guard.note_stored(found.result.ref)
+                    return _result(name, found.result)
+                attempt += 1  # not applied: the step runs again as the next attempt, with a new op_id (ADR-0030)
+                continue
             error = envelope.error
             self._fail(path, attempt, began, error, error.retryable)
             if attempt >= last or not error.retryable or RETRY_RULES[error.code] not in _RETRIED:
