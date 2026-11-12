@@ -768,7 +768,9 @@ parameter: its values are in the present units, read and labelled as in §4.5.4:
 A list or table read with `truncated: true` raises `LIMIT_EXCEEDED` (the v1 reader cannot see the whole model,
 S-12 §2). **Fingerprint**: `sha256(canonical_json({...}))` over the six payloads in the host units tokens used for the
 reads (before conversion, so no conversion rounding enters it), with every list sorted by its name or id, plus
-`object_counts`; the file save time is not included (it changes on save without a model change). It is stable when
+`object_counts`; the file save time is not included (it changes on save without a model change). It also covers the
+rows of table `Wall Property Definitions - Specified` (§4.6.2), since `csi_list_area_sections` returns name and type
+only (S-12 §2) and a wall-thickness change would otherwise leave it unchanged (amendment B-465). It is stable when
 the same state is read twice (property test) and S-04 measures it on real models (§12). `HostModelState`:
 `model_id` and `revision` from the identity store and `ModelStateStore`, `fingerprint`, `file_sha256` of the last
 save. A fingerprint that changed with no adapter write since the last read increments the revision and adds
