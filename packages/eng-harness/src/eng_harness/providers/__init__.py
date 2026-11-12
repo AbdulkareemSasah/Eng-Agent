@@ -1,4 +1,4 @@
-"""Provider layer of the decision cascade (spec 0009). Task T1 exports the configuration only."""
+"""Provider layer of the decision cascade (spec 0009)."""
 
 from eng_harness.providers._config import (
     ConfigWarning,
@@ -7,10 +7,13 @@ from eng_harness.providers._config import (
     ProvidersConfig,
     load_providers_config,
 )
+from eng_harness.providers._credentials import CredentialStore, KeyringCredentialStore
 
 __all__ = [
     "ConfigWarning",
+    "CredentialStore",
     "DecisionProviderConfig",
+    "KeyringCredentialStore",
     "LLMProviderConfig",
     "ProvidersConfig",
     "load_providers_config",
