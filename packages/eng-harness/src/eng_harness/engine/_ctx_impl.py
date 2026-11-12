@@ -200,6 +200,7 @@ class Ctx:
                 envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
             except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
                 if info.effect != "write":
+                    await self._leases.started(info.host_key)  # the raised read may have started an instance (4.6 #10)
                     raise
                 _LOG.warning("the write at step %s raised, so its outcome is unknown: %r", path, exc)
                 envelope = None
