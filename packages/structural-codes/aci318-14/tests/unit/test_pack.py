@@ -37,7 +37,7 @@ _MODULES = ["src/aci318_14/**/*.py"]
 
 
 def test_registry_and_specs() -> None:
-    """Discovery finds the pack with exactly the nine checks (the column checks added by plan 0004 T5, Q11), each naming an existing clause spec (PK-AC3).
+    """Discovery finds the pack with exactly the nine checks, each naming an existing clause spec (PK-AC3, Q11).
 
     The clause specs sit outside the member; mutmut's copy of it (``MUTANT_UNDER_TEST`` set) lacks them, so only there,
     after the registry assertions, a missing folder skips; in every other run it fails (as B-369 and B-423).

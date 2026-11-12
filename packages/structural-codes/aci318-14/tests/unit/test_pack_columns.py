@@ -29,7 +29,7 @@ _FOOTING_COUNT = 6
 _COLUMN_MODULES = ("_column", "checks.axial_flexure", "checks.max_axial", "checks.reinforcement_limits")
 _CLAUSES = Path(__file__).parents[3] / "docs" / "clauses"
 _ROOT = Path(__file__).parents[2]
-_PREFIXES = ("ACI 318-14 ", "SI prefix", "Statics", "Geometry", "Numerical method")
+_PREFIXES = ("ACI 318-14 ", "SI prefix", "Mechanics of materials", "Statics", "Geometry", "Numerical method")
 _MODULES = ["src/aci318_14/**/*.py"]
 
 
