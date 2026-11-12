@@ -41,6 +41,12 @@ decided here and in [spec 0007](0007-model-edit-cycle.md): `run --answers FILE` 
 root is `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the A3 audit and the A7 prompt count are a
 module entry point of spec 0007 (its AC35), not a seventh command (AC1 unchanged). Listed in §11 as Q17 and Q18.
 
+**Amendment B-471.** By the owner's instruction of 2026-11-12, Q15, Q16 and Q20 are decided as their rows recommend:
+`DecisionSettings` is read from `[decisions]` (spec 0005 §4.3; §4.2.4), `assemble_decision_runtime` takes the four
+inputs of §4.2.2 step 5 and its summary carries the dropped releases (spec 0009 §4.1, AC29), the Status section of the
+report shows the run's decision runtime (§4.6.1), and the command line draws the run id at step 1 for `run` as for
+`resume` and passes it to `Engine.start` (engine AC70; §4.2.2, §4.4.8).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -416,7 +422,7 @@ cascade of spec 0005 from the assembled runtime, `decision_port_factory`, B-412)
 runs without a host, a browser or the real clock. A collaborator whose real implementation has not merged is an
 optional field that defaults to `None` until it does (so `CliDeps()` still builds); a command whose collaborators are
 not all set stays "not available in this build" (exit 2), and no stub stands in for the missing implementation;
-plan T18 binds every such default once the real implementations have merged, while a collaborator already merged when
+plan T18a and T18b bind every such default once the real implementations have merged, while a collaborator already merged when
 its field is added (the engine factory, `freeze`) gets its default in that task (plan §3, B-412).
 
 **Invocation from the workspace root (B-354).** The one supported form is
@@ -471,7 +477,8 @@ or open the page; the approval is the engineer's. The rule is generated into the
 #### 4.2.2 Flow of `run`
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
-   §4.2, AC62); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
+   §4.2, AC62); for `run`, draw the run id (`run_` + ULID from the ids source) and fill the run-id cell (§4.4.8,
+   Q20); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
    the request opens.
@@ -483,12 +490,12 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `Engine.resume`), the clock and the ids; the calc registry, the approvals file of spec 0003 (`src/eng_harness/calcs/approvals.yaml`) and the calc
    settings are those of spec 0003 §4.12 (B-412).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
-   `DecisionSettings` (spec 0005 §4.3; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
+   `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
    standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
    as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
    AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
    AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
-   `Engine.start`.
+   `Engine.start` with the run id of step 1 in `RunRequest.run_id`.
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
 `resume` is steps 1, 5 and 6 with `Engine.resume`; it removes a stale stop file first, at the start of the command, before step 1 (§4.4.8). The page server starts lazily at
@@ -531,6 +538,7 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 | `[page] ack_timeout_s` | int | 10 | AC37 |
 | `[page] display_max_chars` | int | 500 | Truncation of untrusted text (AC48) |
 | `[providers.decision]`, `[providers.llm]` | tables | absent (no providers, phase 1 behavior) | Owned by spec 0009 §4.2, not by this spec: passed to `load_providers_config`, whose refusal is a usage error naming the key (AC62); no key for a secret exists |
+| `[decisions]`, `[decisions.shadow_released.<point>]` | tables | absent (the `DecisionSettings` defaults, phase 1 behavior) | Owned by spec 0005 §4.3, not by this spec: passed through as `DecisionSettings` (Q15, amendment B-471) |
 | `[project_lane.<tool>] record` | str | none | A tool not yet released (ADR-0026 §3); `record` names its gap report or session record (Q5) |
 
 ### 4.3 Terminal progress (ADR-0027 §1, 11 §10, notes A7 and A8)
@@ -744,10 +752,11 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
   `stop_requested` and `report` (`GET /report`, §4.4.3) take no argument, but both need the run id, and for `run` the
   run id does not exist when `cli/_wiring.py` builds its collaborators: `Engine.start` creates it and returns it only
   in `RunOutcome`, and `InputRequest` and the journal `Event` do not carry it. `cli/_wiring.py` therefore keeps the
-  run id in one cell, empty for `run` and filled at once with the known run id for `resume`. For `run` it is filled
-  from the first `ApprovalRequest.run_id` that the wrapped page `ApprovalPort` receives, and, once the progress sink
-  reaches the real engine, from the `run_started` event (`RunHeader.run_id`) that the sink receives, whichever comes
-  first; a later value that differs is a defect and raises. The cell is the one source of the run id for every
+  run id in one cell, filled at once with the known run id for `resume`. For `run` it is filled at step 1 of §4.2.2
+  with the run id the command line draws and passes in `RunRequest.run_id` (Q20 answer A, amendment B-471; engine
+  AC70); until that binding (plan T18b) it is filled from the first `ApprovalRequest.run_id` that the wrapped page
+  `ApprovalPort` receives, and, once the progress sink reaches the real engine, from the `run_started` event
+  (`RunHeader.run_id`) that the sink receives, whichever comes first; a later value that differs is a defect and raises. The cell is the one source of the run id for every
   collaborator that needs the run folder `<workspace>/runs/<run_id>`, and each states what it does while the cell is
   empty:
   - the page ports: `stop_requested` returns false and `report` returns the fixed "report not available yet"
@@ -760,11 +769,11 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
   - the heartbeat (§4.3): prints its line and writes no file;
   - the tool and host ports: spec 0002 `build_ports(config, workspace, store, run_dir, clock, ids)` needs the run
     folder, the engine takes its ports at construction, and it calls `ToolPort.unreleased_tools()` for the run header
-    before `run_started` is journaled, so for `run` no fill of the cell comes early enough. The `CliDeps` port builder
-    takes the run folder as a callable that reads the cell (and raises while it is empty), so its field does not
-    depend on the answer, and binding its real default waits for Q20.
-  Letting `Engine.start` take a run id chosen by the caller (Q20, recommended) would fill the cell at once for `run`
-  too, before step 1 builds anything; that is an engine spec change and not made here.
+    before `run_started` is journaled, so for `run` only the fill at step 1 comes early enough. The `CliDeps` port
+    builder takes the run folder as a callable that reads the cell (and raises while it is empty), and its real
+    default is bound with that fill (plan T18b).
+  `Engine.start` takes the run id chosen by the caller (Q20 answer A, decided by amendment B-471; engine §4.5.1, AC70),
+  so the cell is filled for `run` as for `resume` before step 1 builds anything.
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -807,8 +816,10 @@ happened). Sections:
 
 1. **Status**: run id, workflow, block name, version and code hash, mode, engine and contract versions, template and
    design basis (name, version, hash; who confirmed each value and when, from the `engineer:<name>@<time>` source of its basis field), start
-   and end, status, the marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial run, unreleased tools), and the integrity line:
-   event count and the last `chain_sha256`.
+   and end, status, the marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial run, unreleased tools), the integrity line:
+   event count and the last `chain_sha256`, and the decision runtime of the run header (`RunView.decision_runtime`,
+   engine AC69): its providers and released points, with the dropped releases (spec 0009 AC29), shown as recorded by
+   the generic renderer below; nothing when it is empty (Q16 (c), amendment B-471).
 2. **Changes**: model revisions (`model_saved`: role, revision, fingerprint, base file name); per `CHANGE_SET` approval
    the items with state and reasons, the binding, the applied steps with read-back results, and the differences
    including engineer changes; promotion and its backup.
@@ -992,11 +1003,11 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q12 | The sign-off exceptions are verdicts other than `PASS` and `NOT_APPLICABLE`; 14 §6 says "every verdict is `PASS`" | Owner | `NOT_APPLICABLE` needs no reason; `FAIL`, `NEEDS_ENGINEER` and `ERROR` do |
 | Q13 | Extra `doctor` checks that belong to this spec: the page can bind to `127.0.0.1`, a browser can be opened, the console encoding, the locale and calendar | Owner (spec 0002) | Add them to the doctor of spec 0002 through an extension point; until then they are exercised by AC22 and AC58 |
 | Q14 | Engine §4.9 lists `ApprovalKind` `CHANGE_SET`, `PROMOTION`, `SIGN_OFF`, `INFO`, while 18 step 15 calls the engineer turn "approve" | Owner | The engineer turn is a choice request (§4.4.6), not an approval kind: it binds no model state and writes nothing. Spec 0007 states its options |
-| Q15 | Spec 0005 §4.3 and spec 0009 §4.2 say this spec reads `DecisionSettings` (`local_only`, `sensitive_values`, `export_enabled`, `shadow_released.<point>` and the limits) from `harness.toml`, but no document names its section or its keys' types and bounds, and §4.2.4 had no entry for it | Owner | Name the section `[decisions]` (keys the fields of spec 0005 §4.3, `shadow_released.<point>` as a sub-table) in an amendment of spec 0005 §4.3, which owns the type; this spec then passes it through like `[providers.*]`. Until then T14 builds `DecisionSettings` with its defaults (`local_only` false, no release), which is the phase 1 behavior |
-| Q16 | Amendment B-098 (spec 0009 Q7). (a) Spec 0009 names `assemble_decision_runtime` and its result (providers, verified releases, summary) but not its arguments; §4.2.2 step 5 reads them as the `ProvidersConfig`, the `DecisionSettings`, the workspace and the point policies of `verify_releases` **[added]**. (b) Release findings (spec 0009 §4.10: "findings go to the run report as warnings") reach standard error only, because the report reads the journal and the store only (§4.6.1) and the summary of spec 0009 AC29 does not hold them. (c) The report's Status section does not yet show `decision_runtime` | Owner | (a) Fix the signature in plan 0009 T10 to these inputs. (b) Add the dropped releases (`point`, `reason`) to the summary in an amendment of spec 0009 AC29, so they are journaled with it. (c) Show the providers and released points of `RunHeader.decision_runtime` in the Status section at the next amendment of §4.6.1 (report plan T13) |
+| Q15 | Spec 0005 §4.3 and spec 0009 §4.2 say this spec reads `DecisionSettings` (`local_only`, `sensitive_values`, `export_enabled`, `shadow_released.<point>` and the limits) from `harness.toml`, but no document names its section or its keys' types and bounds, and §4.2.4 had no entry for it | Owner | Name the section `[decisions]` (keys the fields of spec 0005 §4.3, `shadow_released.<point>` as a sub-table) in an amendment of spec 0005 §4.3, which owns the type; this spec then passes it through like `[providers.*]`. Until then T14 builds `DecisionSettings` with its defaults (`local_only` false, no release), which is the phase 1 behavior. Decided as recommended (owner instruction of 2026-11-12; amendment B-471): spec 0005 §4.3 and §4.2.4 |
+| Q16 | Amendment B-098 (spec 0009 Q7). (a) Spec 0009 names `assemble_decision_runtime` and its result (providers, verified releases, summary) but not its arguments; §4.2.2 step 5 reads them as the `ProvidersConfig`, the `DecisionSettings`, the workspace and the point policies of `verify_releases` **[added]**. (b) Release findings (spec 0009 §4.10: "findings go to the run report as warnings") reach standard error only, because the report reads the journal and the store only (§4.6.1) and the summary of spec 0009 AC29 does not hold them. (c) The report's Status section does not yet show `decision_runtime` | Owner | (a) Fix the signature in plan 0009 T10 to these inputs. (b) Add the dropped releases (`point`, `reason`) to the summary in an amendment of spec 0009 AC29, so they are journaled with it. (c) Show the providers and released points of `RunHeader.decision_runtime` in the Status section at the next amendment of §4.6.1 (report plan T13). Decided as recommended (owner instruction of 2026-11-12; amendment B-471): (a) spec 0009 §4.1 and plan 0009 T10; (b) spec 0009 AC29 (plan 0009 T7); (c) §4.6.1, built by plan T13b because T13 is merged |
 | Q17 | Amendment B-354 (spec 0007 Q7; `LOCAL-TESTING.md` open points 5 and 13). The first change set could reach a run only by `resume --answers`, and the interim route `run --no-wait` could not start a workflow that needs basis confirmation, because a `--no-wait` run does not serve the basis page and no run exists to resume | Owner | Decided **[added]**: `run --answers FILE` pre-answers the first data request only, through `accept_answers_file` (AC64); a workflow with required basis fields starts only with a waiting `run` (§4.4.7, AC47); the `run --no-wait` route is withdrawn. No answer path is widened: the file still answers data requests only, and the change set is still approved on the page |
 | Q18 | Amendment B-354 (`LOCAL-TESTING.md` open point 6). How the owner invokes the command from the workspace root. The decision rests on uv's documented command-line options (`uv run --package`, `uv sync` being exact) and a check on this workspace with uv 0.11; the uv workspace documentation page was not reachable from the authoring session | Owner | Decided: `uv run --package eng-harness eng-harness <command>` (§4.1, AC65); the owner may confirm it against docs.astral.sh. `LOCAL-TESTING.md` should use this form for every `eng-harness` command |
 | Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
-| Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py` |
+| Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py`. Decided: answer A (owner instruction of 2026-11-12; amendment B-471): engine §4.4.1, §4.5.1 and AC70 (engine plan T20, work item B-472); §4.2.2 and §4.4.8 here; plan T18 split into T18a (every default but the port builder) and T18b (the port builder and the run id at step 1, after engine plan T20) |
 | Q21 | Amendment B-412 (eighth review). `ApprovalVoid` carries no request id, so the page ties a void to the most recent approved `CHANGE_SET` or `PROMOTION` request of the process (§4.4.5); with nested approvals in force that may name the wrong one | Owner | Add the approval's `request_id` to the `ApprovalVoid` detail (engine §4.9, §6) at the engine's next amendment; the page then marks that request. Until then the rule of §4.4.5 holds, and the message itself is always shown |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

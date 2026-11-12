@@ -556,6 +556,22 @@ tasks:
       - "packages/eng-harness/tests/replay/test_crash_matrix.py::test_crash_matrix"
     covers: [AC30]
     depends_on: [T13c, T15, T16, T18]  # T13c: the B-454 split
+  - id: T20
+    title: Caller-chosen run id at start (RunRequest.run_id)
+    # Amendment (B-471, documents only): new; spec 0006 Q20 answer A (owner instruction of 2026-11-12), spec AC70;
+    # implemented as work item B-472. Plan 0006 T18b waits for it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+    # About 15 lines in _runner.py (the field, the folder check before any creation, the id choice) and 5 of
+    # CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_runner.py::test_caller_chosen_run_id"
+    covers: [AC70]
+    depends_on: [T9]
 ---
 
 # Implementation plan: eng-harness engine
@@ -834,6 +850,13 @@ committed just before the step's `step_started`; after_started: on `step_started
 returns (after_effect). The wrapper lives in `tests/replay/_worker.py` and appends each applied `op_id` to a ledger
 file in the test's temporary folder, so the resuming process and the comparison see every write the crashed process
 applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
+
+**T20 Caller-chosen run id** (spec §4.4.1, §4.5.1, §5, AC70; amendment B-471, spec 0006 Q20 answer A, work item
+B-472). `RunRequest` gains the optional `run_id` (`run_` + ULID, the pattern of spec §4.4.1); `start` names the run
+folder by it when given and draws one from the `IdSource` otherwise; when that folder exists, `start` raises
+`ContractError` `INVALID_ARGUMENT` before it creates anything (folder, lock, stored input, event).
+`test_caller_chosen_run_id` checks the three cases of AC70. It needs only the merged start of T9; plan 0006 T18b makes
+`cli/_wiring.py` draw the id at step 1 of spec 0006 §4.2.2 and pass it here.
 
 ## 3. Dependencies
 

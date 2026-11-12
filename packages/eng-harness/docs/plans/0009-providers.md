@@ -140,6 +140,7 @@ tasks:
     depends_on: [T3, T4, T5]
   - id: T7
     title: Provider factory, local_only, run summary
+    # Amendment (B-471, documents only): the summary also holds the dropped releases, point and reason (spec AC29; spec 0006 Q16 (b)).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -194,6 +195,7 @@ tasks:
     depends_on: [T8]
   - id: T10
     title: Runtime assembly, shadow-mode workflow, replay and isolation tests, local-testing notes
+    # Amendment (B-471, documents only): assemble_decision_runtime takes the four inputs of spec 4.1 (spec 0006 Q16 (a)) and passes the findings of verify_releases to the summary.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -285,6 +287,8 @@ output retries, no instrumentation, over the shared client; cancellation and cei
 **T7 Factory** (spec §4.1, §4.4, §4.8). `build_providers`: config to providers, `local_only` builds nothing remote and
 reads no key, absent or failing providers become `None` with a warning, the summary for the run header, the `check`
 subcommand (AC47; it edits the `__main__.py` of T2; its live calls are local-test only, its test uses recorded transports).
+Amendment B-471: the summary takes the kept releases and the dropped ones as `(point, reason)` pairs and records both
+(spec AC29); `test_summary_has_no_secrets` gives it one of each.
 
 **T8 Evaluation core** (spec §4.10). `EvalThresholds` with the 12 §6 and 12 §3 values (golden file citing them),
 `evaluate_point` (pure), eligibility with the explicit calibration gap, override handling. R1: the thresholds and the
@@ -298,8 +302,10 @@ the fake-host workflow tests with the real engine and cascade (one screen, batch
 the import-isolation test (not vacuous: it requires the modules), recordings, and the items of spec §9 in
 `docs/local-testing.md`. Waits for the engine's `_decide` wiring (plan 0005 T10). Amendment B-098: the summary is a
 JSON object recorded in the run header (AC48, through spec 0005 AC43 and engine AC69, which plan 0005 T10 and engine
-plan T14b build); this task tests the path end to end and fixes the arguments of `assemble_decision_runtime` (spec 0006
-Q16).
+plan T14b build); this task tests the path end to end. Amendment B-471 (spec 0006 Q16 (a) and (b), owner instruction
+of 2026-11-12): the signature is that of spec §4.1, `assemble_decision_runtime(providers_config, decision_settings,
+workspace, point_policies)`; it passes `point_policies` to `verify_releases` as its `policies` and the findings, as
+`(point, reason)` pairs, to the summary of T7.
 
 ## 3. Dependencies
 
@@ -318,8 +324,8 @@ Q16).
   needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14b for the header field of AC48; spec 0006
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
   0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
-  this plan (its tests use recorders); plan 0006 T18 binds their defaults to `load_providers_config` and
-  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18 there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
+  this plan (its tests use recorders); plan 0006 T18a (split from T18 by B-471) binds their defaults to `load_providers_config` and
+  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18a there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
 
