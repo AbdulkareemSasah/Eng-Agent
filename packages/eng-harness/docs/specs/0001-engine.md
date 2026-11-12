@@ -42,6 +42,9 @@ criterion here (the route's criteria are spec 0010 AC3, AC4 and spec 0013 AC13).
 **Amendment B-427.** The B-349 writer's questions are listed in §11 (Q26 to Q29) as draft decisions; AC34 is amended to
 match; it adds no criterion.
 
+**Amendment B-434.** The B-111 writer's questions are listed in §11 (Q35, Q36) as draft decisions; it adds no
+criterion.
+
 **Amendment B-415.** Spec 0007 (Q2, Q3, Q5) and spec 0004 (Q7) asked for changes to this spec for the model edit
 cycle; they are made here and listed in §11 (Q30 to Q34): `WorkflowDef.basis_fields`, from which `required_basis` is
 derived, and `WorkflowDef.copy_on_open` (§4.2, §4.7); `model_saved` journaled for tool saves (§4.6 "Tool saves");
@@ -564,7 +567,12 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   (before step `p`), `p~post.<kind>.<key>` (after it), `p~end.<kind>.<key>` (before the block at `p` returns; the root
   block uses `~end...`). They are decided only from the block's own steps, so they are part of the replayed sequence
   (AC47). Steps triggered by a host event (a session epoch change or an observed timeout, invariant 9) take
-  `p~host.<kind>.<key>`; they are journaled but not part of the replayed sequence (§4.5.2 rule 5).
+  `p~host.<kind>.<key>`; they are journaled but not part of the replayed sequence (§4.5.2 rule 5). The `<kind>`
+  segment of an inserted or housekeeping path is the step's name, not its journaled step kind. Inserted
+  `check_model` and `save` steps are journaled with step kind `read`, effect `read` and no `op_id` (names
+  `check_model` and `save`), so in-flight reconciliation (§4.5.3, Read row) reruns them; the §4.5.3 Write row's
+  "save" is a tool save, not these steps (Q36). The path key of a model key outside the `key` grammar is its hash form: `h`
+  followed by the first 12 hex characters of the SHA-256 of the key (draft decision B-434, owner queue).
 - Housekeeping steps of a resume (host-state reads, server checks) take paths `@resume<n>.<kind>.<key>` and are not
   replayed: each resume runs them again.
 - Grammar: `index = "0" | [1-9][0-9]*`; `path = index ("/" index)* [ "~" ("pre"|"post"|"end"|"host") "." kind ["." key] ]`,
@@ -576,7 +584,9 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   compares the step's model (`ToolInfo.model_param`) with the models its siblings in the same `ctx.parallel` have
   touched so far: a step that reads or writes a model a sibling wrote, or writes a model a sibling read, is
   `BlockRuleViolation` (a race the block must not contain). When the parallel ends, the models any child left dirty
-  get `p~post.check_model.<model_key>` steps in model-key order. Which of two conflicting siblings reaches the check
+  get `p~post.check_model.<model_key>` steps in model-key order. A parallel's children read no model the parent left
+  dirty: before the parallel starts, the engine checks those models as `p~pre.check_model.<model_key>` on the
+  parallel's path (draft decision B-434, owner queue). Which of two conflicting siblings reaches the check
   first may vary, but the outcome (a stop with `BlockRuleViolation` before the conflicting call) does not (AC5).
 - A scope allows one step in progress at a time. A second overlapping step in the same scope is `BlockRuleViolation`
   (S-10 "rules"); concurrency exists only through `ctx.parallel`.
@@ -716,7 +726,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | Event | Payload | Durability |
 |---|---|---|
 | `run_started` | Run header: `run_id`, `workflow`, `block {name, version, code_sha256}`, `input_ref`, `input_sha256`, `basis_ref`, `mode`, `run_class` (`trial`, `production`), `engine_version`, `contract_version`, `settings_sha256`, `servers` (ServerCheck list), `always_ask`, `unreleased_tools` (tool name to record, from `ToolPort.unreleased_tools()`; empty when none), `decision_runtime` (the JSON object from `DecisionPort.runtime_summary()`, recorded as given and opaque to the engine: spec 0009's `DecisionRuntime.summary`, providers and released points without endpoints or keys; empty when none) | FULL |
-| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
+| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `action` (the tool's `ToolInfo.action`; optional, so earlier journals read unchanged; it records what a replay rule needs to detect a removed inserted save step, AC47, but no §4.5.2 rule reads it yet, Q35; draft decision B-434, owner queue), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
 | `step_completed` | `result` (`ref`, `summary`, `warnings`, `complete`) or the block output ref, `duration_ms`, `calc {id, version, content_sha256, status}` (calc steps) | NORMAL |
 | `step_failed` | `error` (contract `ErrorDetail`, or `{harness_code, message}`), `retryable`, `duration_ms` | NORMAL |
 | `step_reconciled` | `op_id`, `outcome` (`applied`, `not_applied`), `result`, `decided_by` (`adapter`, `engineer:<name>`), `evidence` (refs) | FULL |
@@ -891,7 +901,8 @@ crash loses at most one step.
 
 The engine tracks, per model key: dirty flag, current revision (from the last result's `provenance.host` or
 `model_state`), last `model_saved`, and approval bindings; per host key: lease, session epoch, reconciliation pending.
-Inserted steps are journaled like other steps and emit `check_enforced`. No ctx parameter, block attribute or setting
+Inserted steps are journaled like other steps and emit `check_enforced`; inserted `check_model` and `save` steps
+take step kind `read` and effect `read` (§4.3.1, draft decision B-434). No ctx parameter, block attribute or setting
 turns an invariant off (AC37); in every case the block's call raises before any port call when the invariant fails.
 
 | # | Where and how | Raises | Tests |
@@ -1042,10 +1053,10 @@ route of [spec 0010](0010-design-isolated-footing.md) §4.3 and [spec 0013](0013
 (`_calc/_code_packs.py`, `CodePackRoute`), which `HarnessCalcPort` consults for an id that does not start with
 `harness.` (spec 0003 §4.12 item 4). The route runs only the check ids of its fixed allowlist; `describe` or `run` of
 any other id is `ContractError` `NOT_FOUND`, as an unknown calc id (spec 0003 §6). A code-pack check is described by
-the same `CalcInfo` (its `status` is the check's lifecycle state; its `version` is open, spec 0010 Q20) and is subject
-to the same run class: a `production` run refuses a check that is not `approved`, and every run refuses a `withdrawn`
-check, with `CalcRefused`. Block code imports no pack: blocks reach code-pack
-checks only through `ctx.calc`.
+the same `CalcInfo` (its `status` is the check's lifecycle state; its `version` is the check's `CheckMeta.version`,
+spec 0010 Q20, draft B-442) and is subject to the same run class: a `production` run refuses a check that is not
+`approved`, and every run refuses a `withdrawn` check, with `CalcRefused`. Block code imports no pack: blocks reach
+code-pack checks only through `ctx.calc`.
 
 **Synchronous and asynchronous methods; the shapes left open above** (amendment B-390, as built by engine T6, B-105).
 A method that waits on a host program or a person is `async`: every `ToolPort` method except `unreleased_tools` and
@@ -1303,3 +1314,5 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q32 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
 | Q33 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |
 | Q34 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
+| Q35 | B-111: how a replay detects a removed inserted save step (invariant 7, AC47) | Owner | Draft decision B-434, owner queue: `step_started` carries the tool's `action`, optional, so earlier journals read unchanged (§4.4.2). This records the data only: §4.5.2 has no rule that reads `action`, and an unrecorded `p~pre.save` path goes live (rule 4), so the divergence rule is open, owner queue (writer's proposal, not adopted here: a recorded step whose `action` is `analysis` or `design` with no recorded `p~pre.save.<model_key>` is `ReplayDivergence`, raised before any live call) |
+| Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read`, effect `read` and no `op_id` (names `check_model` and `save`, the path's `<kind>` segment), so in-flight reconciliation reruns them by the §4.5.3 Read row; the §4.5.3 Write row text "including save" was not amended (D-28) and reads as tool saves only, owner to confirm (a rerun of an inserted save saves the model again); the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |

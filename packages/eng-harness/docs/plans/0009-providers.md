@@ -8,6 +8,7 @@ risk: [r1, r3]           # binding for every pull request of this plan; r3 for p
 tasks:
   - id: T1
     # Amendment (B-411, documents only): plan 0005 T5 builds the provider error types; interfaces.py leaves T1 and test_error_shape stays as a regression test, not first.
+    # Amendment (B-440, documents only): T1 adds license_exceptions for cffi and regex in .gate/gate.yml and ADR-0005-transitive-licenses.md.
     title: Dependencies, provider errors, configuration, network guard
     files:
       - "packages/eng-harness/pyproject.toml"
@@ -20,6 +21,8 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_errors.py"
       - "packages/eng-harness/tests/contract/test_no_network.py"
       - "packages/eng-harness/tests/contract/test_provider_dependencies.py"
+      - ".gate/gate.yml"  # license_exceptions entries only (amendment B-440)
+      - "packages/eng-harness/docs/adr/0005-transitive-licenses.md"
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
@@ -250,6 +253,10 @@ at an exact version; the HTTP library is the one the pinned `pydantic-ai-slim` a
 `ProviderError`, `ProviderFailure` and `OutgoingPlace` are built by plan 0005 T5 (spec 0005 §10), which the cascade's
 AC22 needs before this plan runs; T1 no longer touches `decisions/interfaces.py`. `test_errors.py::test_error_shape`
 (AC5) stays in T1 as a regression test of those types, not a first-commit test, because it passes at T1's base.
+Amendment B-440: T1 also adds the `license_exceptions` entries for `cffi` and `regex` in `.gate/gate.yml` and
+`docs/adr/0005-transitive-licenses.md` (Proposed, owner queue) so the gate's license step accepts the provider
+runtime lock. An empty `tests/unit/providers/__init__.py` package marker need not appear in T1's file list; gate AC10c
+covers it beside in-scope neighbours and avoids mypy's duplicate module name `test_config`.
 
 **T2 Credentials** (spec §4.4). `CredentialStore`, `KeyringCredentialStore` with the allow-list and the direct use of
 one concrete backend (class names confirmed against the pinned `keyring`), `FakeCredentialStore` in `tests/fakes/`,
@@ -302,8 +309,8 @@ Q16).
   BSD-3-Clause (allowed, process/04 §7). Two transitive packages are outside the allowed list of process/04 §7 and need
   the owner's approval of the ADR that names them: `regex` (Apache-2.0 AND CNRI-Python, in ADR-0001) and `cffi`
   (MIT-0, Linux only, in ADR-0002). The gate's license step would otherwise fail T1; the entries in
-  `license_exceptions` of `.gate/gate.yml` (a protected path, so made by the owner or at the owner's request) are a
-  precondition of T1 and are not part of any task's file list. All other transitive licenses are checked by the step.
+  `license_exceptions` of `.gate/gate.yml` (a protected path) are added by T1 at the owner's request, naming the new
+  ADR 0005 (amendment B-440). All other transitive licenses are checked by the step.
 - Development: none new (Hypothesis, pytest and the coverage plugin from engine plan T1; PydanticAI's test models and
   `httpx2.MockTransport` ship with the runtime dependencies).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9

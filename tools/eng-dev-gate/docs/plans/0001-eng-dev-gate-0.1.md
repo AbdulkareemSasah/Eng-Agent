@@ -653,6 +653,23 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_mutation.py::test_run_time_limit_from_gate_config"
     covers: [AC53c]
     depends_on: [T3, T20, T37]
+  - id: T39
+    title: "FB005 form A4"
+    # Amendment (B-438, documents only): calcs, rules and code-pack checks carry an integer identity version
+    # (@calc(..., version=1), CheckMeta(version=...)), which FB005 refused as a numeric literal; spec 4.8 form A4
+    # admits it for the callables in versioned.callables of .gate/forbidden.yml (draft decision, owner queue).
+    files:
+      - "tools/eng-dev-gate/CHANGELOG.md"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/rules_b.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/forbidden/engine.py"
+      - ".gate/forbidden.yml"
+      - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py"
+    max_changed_lines: 120
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py::test_version_keyword_of_versioned_callable"
+    covers: [AC33a]
+    depends_on: [T11]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
@@ -735,6 +752,10 @@ real run in `docs/local-testing.md`. This is the first useful gate job.
 **T10 and T11** build the `forbidden` engine and its eight rules in two pull requests: T10 holds the engine, scope
 handling, `.gate/forbidden.yml` and the four simpler rules; T11 holds the I/O, numeric literal, rationale and
 collection-hook rules, whose false-positive behavior needs the most test cases.
+Amendment (B-438): T39 adds FB005 form A4 (spec §4.8): an integer literal given directly as the `version=` keyword of a
+callable in `versioned.callables` (initially `calc` and `CheckMeta`), with that list in the policy model of
+`engine.py` and in `.gate/forbidden.yml`; its first test shows `calc(version=1)` passes while `calc(limit=1)` and
+`other(version=1)` are refused.
 
 **T12** adds the `imports` check with the layer, public module, declared dependency, Sasaah, third-party and cycle rules.
 

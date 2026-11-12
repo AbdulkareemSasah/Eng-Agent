@@ -62,6 +62,12 @@ class Cited(_Model):
     callables: list[Name]
 
 
+class Versioned(_Model):
+    """FB005 form A4 policy: names of the callables whose ``version=`` keyword is an integer identity (spec 4.8)."""
+
+    callables: list[Name]
+
+
 class RationalePolicy(_Model):
     """FB006 policy: names of the types that already forbid digits."""
 
@@ -75,6 +81,7 @@ class ForbiddenConfig(_Model):
     host_sdk: HostSdk
     io_modules: list[Name]
     cited: Cited
+    versioned: Versioned
     rationale_policy: RationalePolicy = Field(alias="rationale")  # not named `rationale`: FB006 would flag it
 
 

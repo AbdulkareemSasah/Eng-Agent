@@ -22,6 +22,7 @@ from eng_harness._html import (
     document,
     el,
     field,
+    fragment,
     href,
     stylesheet,
     trusted,
@@ -88,6 +89,22 @@ def test_urls_are_built_from_validated_segments_only() -> None:
             href(SafeToken("answer"), SafeToken(dots))
     with pytest.raises(HtmlError):
         href(smuggled)
+
+
+def test_fragment_href() -> None:
+    link = fragment(SafeToken("src-3"))
+    assert isinstance(link, Href)
+    assert link.value == "#src-3"
+    assert el(Tag.A, Text("source"), href=link).render() == '<a href="#src-3">source</a>'
+    for name in ("action", "class_", "id", "name", "value"):
+        with pytest.raises(HtmlError):
+            el(Tag.A, **{name: link})
+    for bad in ("#x", "x", "", "a b", 'x"y'):
+        smuggled: Any = bad
+        with pytest.raises(HtmlError):
+            fragment(smuggled)
+    with pytest.raises(HtmlError):
+        el(Tag.A, href=Href("#src-3"))
 
 
 def test_href_is_minted_only_by_the_factory() -> None:

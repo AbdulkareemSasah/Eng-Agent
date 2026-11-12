@@ -6,6 +6,7 @@ No host program is involved. These checks need the owner's machine (plan 0001 se
 3. A resume after a forced power-off of a virtual machine (power loss is not covered by tests).
 4. File-copy promotion onto a folder the engineer uses, including a target file open in another program.
 5. Plan 0001 T11b (spec 0001 AC31, AC32) against a real host and adapter, once spec 0002's `ToolPort` adapters exist: kill the host program during a write and resume (the adapter's `reconcile` for each outcome `applied`, `not_applied`, `partial` and `unknown`, and a tool without a reconciler), the engineer's answer to the `engine.in_flight` request, the adapter's `read_back` for a write found applied (its result, and a failure while the host is busy), and a read killed in flight. Only the fakes have run these.
+6. Plan 0001 T11c (spec 0001 AC34, AC63, AC64) against a real host and adapter, once spec 0002's `HostPort` exists: close the host and reopen the model's last saved file in a new instance (`locate`, units read against the new instance, the comparison with the last save, a model reopened with writes after that save); kill the host program and resume (`model_not_loaded`, `restore` and the instance `HostPort.restore` returns, `host_started`, units read against it before the first live step); `accept` of an engineer's change to the model. Only the fakes have run these.
 
 Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 1. `csi_launch` on the owner's machine: which process is the ETABS parent, the pid the reply names, and that the instance survives the server job's closure.
@@ -30,5 +31,7 @@ Plan 0004 (templates and basis; completed by T9). Nothing here runs in CI:
 Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 15. `eng_harness.cli._opener.open_address` opens the launch address in the default browser on Windows (`os.startfile`), macOS and Linux with `BROWSER` set to a capture program (it must not run), and `write_to_terminal` reaches the controlling terminal (`CONOUT$`, `/dev/tty`); with no terminal it returns False and nothing is printed on stdout or stderr.
 
+Plan 0003 T7 (spec 0003 L-1): the model fingerprint on real reads.
+16. `harness.model_fingerprint` over the read set of a real ETABS model: the same fingerprint over repeated reads, and after save and reopen; a different fingerprint after each of the S-04 hand edits E1 to E10 (only CI's synthetic read sets have run).
 Plan 0010 T3 (footing subjects; spec 0010 section 12 L2). Needs the real ETABS model; nothing here runs in CI:
-16. `harness.footing_subjects` on a copy of a real model: which of a rectangular column section's `b_mm` and `h_mm` lies along local axis 2 at rotation zero (the calc maps `cx = b`, `cy = h` for rotations near 0 and 180 degrees), the `rotation_deg` values the adapter reports for rotated columns, and which joints report reactions.
+17. `harness.footing_subjects` on a copy of a real model: which of a rectangular column section's `b_mm` and `h_mm` lies along local axis 2 at rotation zero (the calc maps `cx = b`, `cy = h` for rotations near 0 and 180 degrees), the `rotation_deg` values the adapter reports for rotated columns, and which joints report reactions.

@@ -7,23 +7,38 @@ size: large
 risk: [r1, r3]  # r3 from the public_modules entries in pyproject.toml (amendment B-356)
 tasks:
   - id: T1
-    title: Column workflow kinds and request models
+    title: Column workflow kinds
+    # Amendment (B-447, D-12): split from the request models (now T1b). The eight kinds written as ordinary classes
+    # measured 322 counted lines, the kinds and requests together 427, over the 400-line cap.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds, eng_harness.kinds.column_design, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/kinds/__init__.py"
       - "packages/eng-harness/src/eng_harness/kinds/column_design.py"
-      - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
-      - "packages/eng-harness/src/eng_harness/workflows/column_design/_requests.py"
       - "packages/eng-harness/tests/contract/test_column_design_kinds.py"
-      - "packages/eng-harness/tests/data/kinds/column_design/**"
-    max_changed_lines: 260
+      - "packages/eng-harness/tests/data/kinds/column_design/*.json"
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/contract/test_column_design_kinds.py::test_request_models"
       - "packages/eng-harness/tests/contract/test_column_design_kinds.py::test_kind_fixtures"
     covers: [AC3]
     depends_on: []
+  - id: T1b
+    title: Column workflow request models
+    # Amendment (B-447, D-12): the request models of spec 4.3, split from T1.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows.column_design
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/workflows/column_design/__init__.py"
+      - "packages/eng-harness/src/eng_harness/workflows/column_design/_requests.py"
+      - "packages/eng-harness/tests/contract/test_column_requests.py"
+      - "packages/eng-harness/tests/data/kinds/column_design/requests/**"
+    max_changed_lines: 120
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_column_requests.py::test_request_models"
+    covers: [AC3]
+    depends_on: [T1]
   - id: T2
     title: Calc harness.column_select with golden and property tests
     files:
@@ -208,7 +223,7 @@ tasks:
       - "packages/eng-harness/tests/unit/rules/test_column_design_rules.py::test_revit_rules"
       - "packages/eng-harness/tests/unit/rules/test_column_design_rules.py::test_lock"
     covers: [AC14]
-    depends_on: [T1]
+    depends_on: [T1, T1b]  # T1b: the decision points answer with the request models (amendment B-447)
   - id: T10
     title: Engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets)
     files:
@@ -372,9 +387,12 @@ selection, bar count, length), not code capacities.
 
 ## 2. Tasks
 
-**T1 Kinds and requests** (spec §4.2, §4.3). The eight `harness.*` kinds with strict models and registration beside
-the edit-cycle kinds; `ColumnScopeRequest`, `ColumnLayoutRequest` and `ColumnProposalRequest`, with the refused
-variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reasoned refusal with the gap id.
+**T1 Kinds** (spec §4.2). The eight `harness.*` kinds with strict models, written as ordinary classes, and registration
+beside the edit-cycle kinds.
+
+**T1b Requests** (spec §4.3). `ColumnScopeRequest`, `ColumnLayoutRequest` and `ColumnProposalRequest`, with the refused
+variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reasoned refusal with the gap id. Amendment
+B-447 (D-12): split from T1, whose explicit kinds alone measured 322 counted lines.
 
 **T2 `harness.column_select`** (spec §4.4.1). Name and story-section resolution, the exact verticality test against
 `compare.length`, shape and material per column, issues, and the shared golden test module for the column calcs.
@@ -401,7 +419,7 @@ T6 starts only after the documents pull request B-405 has merged (amendment B-41
 so that an id outside the allowlist gives `ContractError` `NOT_FOUND` (spec 0010 C4), and
 `test_code_pack_route.py::test_only_listed_checks` is written to that text, never to `RegistryError`. Otherwise footing
 T2 (plan 0010) could not add its ids without changing a merged expectation (A4).
-T6 also starts only after spec Q13 (spec 0010 Q20, a check's `CalcInfo.version`) is settled by its documents pull request.
+T6 also starts only after structural-codes core plan T15 (`CheckMeta.version`, spec Q13 and spec 0010 Q20, B-442) has merged.
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the

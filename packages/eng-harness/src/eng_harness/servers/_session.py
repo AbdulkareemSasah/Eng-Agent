@@ -8,12 +8,12 @@ import hashlib
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Protocol, Self
 
 import anyio
 import anyio.abc
@@ -25,6 +25,7 @@ from eng_harness.errors import ToolFailed
 from eng_harness.ports import ServerCheck
 from eng_harness.servers._buildcheck import BuildExpectation, Observed, check_build, tool_list_fingerprint
 from eng_harness.servers._config import RoleConfig, ServerConfig, ServersConfig
+from eng_harness.servers._launch_args import launch_argv
 from eng_harness.servers._launcher import (
     JobPolicy,
     LaunchedProcess,
@@ -33,6 +34,7 @@ from eng_harness.servers._launcher import (
     PosixLauncher,
     ProcessLauncher,
 )
+from eng_harness.servers._procinfo import ProcessIdentity
 from eng_harness.servers._transport import ProcessTransport
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,28 @@ class CallEffect(StrEnum):
 
     READ = "read"
     WRITE = "write"  # write, analysis, design, save or unlock
+
+
+class HelperTracker(Protocol):
+    """Port: records helper processes a server's job lets go and ends them when the server stops (spec 4.4.2)."""
+
+    def observe_helpers(self, key: str, members: Sequence[ProcessIdentity]) -> None:
+        """Record the helpers among the children of the job `members` of role `key` (`server/role`)."""
+
+    def terminate_helpers(self, key: str) -> None:
+        """End the recorded helpers of role `key` that still match their identity."""
+
+
+def reply_body(result: types.CallToolResult) -> dict[str, Any] | None:
+    """The JSON object in the one text block of a Sasaah reply, or None when the reply has none."""
+    block = result.content[0] if result.content else None
+    if not isinstance(block, types.TextContent):
+        return None
+    try:
+        body = json.loads(block.text)
+    except ValueError:
+        return None
+    return body if isinstance(body, dict) else None
 
 
 @dataclass
@@ -94,9 +118,10 @@ class ServerManager:
         *,
         launcher: ProcessLauncher | None = None,
         check: Mapping[str, BuildExpectation] | None = None,
+        helpers: HelperTracker | None = None,
     ) -> None:
         """Prepare roles from `config`, run in `run_dir`; `check` maps a server to what its allowlist pins."""
-        self._config, self._check = config, dict(check or {})
+        self._config, self._check, self._helpers = config, dict(check or {}), helpers
         self._min_builds: dict[str, str] = {}
         self._run_dir = run_dir
         self._launcher = launcher or PosixLauncher()
@@ -106,6 +131,7 @@ class ServerManager:
             for role, role_config in server.roles.items()
         }
         self._epochs: defaultdict[str, int] = defaultdict(int)
+        self._sessions: defaultdict[tuple[str, str], int] = defaultdict(int)  # role -> launch-ownership counter
         self._bound: dict[str, tuple[int, str]] = {}  # host key -> (pid, product) of the bound instance
         self._group: anyio.abc.TaskGroup  # opened by `__aenter__`, which needs the running event loop
 
@@ -125,6 +151,19 @@ class ServerManager:
     def session_epoch(self, host_key: str) -> int:
         """Return the counter that increases whenever a session to the host is lost or re-established."""
         return self._epochs[host_key]
+
+    def role_session(self, server: str, role: str) -> int:
+        """Return the role's session counter: it grows with every loss of the role's session (spec 4.4.2).
+
+        A crash, a client backstop and a restart increase it here; a server `timeout` reply is seen by `call`, and a
+        reconnect is reported by the adapter through `invalidate_session`. A role holds launch ownership of an instance
+        only while the counter is what it was at `csi_launch`.
+        """
+        return self._sessions[server, role]
+
+    def invalidate_session(self, server: str, role: str) -> None:
+        """Increase the role's session counter (the host server dropped its cached session, or the role reconnected)."""
+        self._sessions[server, role] += 1
 
     def bind_instance(self, host_key: str, *, pid: int, product: str) -> None:
         """Record the instance a restarted or later-started role re-attaches to by process id."""
@@ -219,7 +258,13 @@ class ServerManager:
         async def send(client: Client, backstop_s: float) -> types.CallToolResult:
             return await client.call_tool(tool, dict(arguments), read_timeout_seconds=backstop_s)
 
-        return await self._request(self._roles[server, role], effect, tool, send)
+        found = self._roles[server, role]
+        result = await self._request(found, effect, tool, send)
+        if result.is_error and (body := reply_body(result)) is not None and body.get("code") == "timeout":
+            self.invalidate_session(server, role)  # the server invalidated its session (S-12 section 5)
+        if self._helpers is not None and found.live is not None:
+            self._helpers.observe_helpers(f"{server}/{role}", found.live.launched.job_members())
+        return result
 
     async def _request[T](
         self, role: _Role, effect: CallEffect, tool: str, send: Callable[[Client, float], Awaitable[T]]
@@ -264,11 +309,9 @@ class ServerManager:
             return live
 
     def _spec(self, role: _Role) -> LaunchSpec:
-        """The launch of spec section 4.3.2: the adapter's two options follow the configured arguments."""
+        """The launch of spec section 4.3.2: `launch_argv` adds the timeout and, when set, the audit log."""
         servers = self._run_dir / "servers"
-        argv = [role.config.command, *role.config.args, "--call-timeout-sec", str(role.role.call_timeout_s)]
-        if role.config.audit_log:
-            argv += ["--audit-log", str(servers / f"{role.server}-{role.name}-audit.jsonl")]
+        argv = launch_argv(role.config, role.server, role.name, role.role, self._run_dir)
         env = {**get_default_environment(), **role.config.env}
         stderr = servers / f"{role.server}-{role.name}.stderr.log"
         return LaunchSpec(argv=argv, env=env, cwd=self._run_dir, stderr_path=stderr, job=JobPolicy.SERVER)
@@ -314,8 +357,14 @@ class ServerManager:
                 task_status.started(error)  # reported to the caller of `_start`
         finally:
             if launched is not None:
-                launched.terminate_job()
-                launched.close()
+                try:
+                    if self._helpers is not None:
+                        self._helpers.observe_helpers(f"{role.server}/{role.name}", launched.job_members())
+                finally:  # a failed observation must not leave the job running or the handles open
+                    launched.terminate_job()
+                    if self._helpers is not None:
+                        self._helpers.terminate_helpers(f"{role.server}/{role.name}")
+                    launched.close()
             if live is not None:
                 live.finished.set()
 
@@ -337,6 +386,7 @@ class ServerManager:
         if role.live is not live:
             return
         role.live = None
+        self._sessions[role.server, role.name] += 1
         live.launched.terminate_job()
         live.stop.set()
         await live.finished.wait()
