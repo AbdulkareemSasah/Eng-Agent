@@ -20,7 +20,7 @@ from eng_contract.ids import new_model_id, new_result_id
 from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref, RefRule
-from fakes.ports import failure
+from fakes.ports import Raise, failure
 from workflows.chain import ChainInput, ChainOutput
 from workflows.ctx_flows import flow, success
 from workflows.rig import Host, make_rig, request
@@ -572,6 +572,34 @@ def test_units_are_read_after_a_timeout_before_reconciliation(tmp_path: Path, un
     run_id = stopped.run_id
     assert [e.attempt for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_STARTED] == [1]
     assert not [e for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_RECONCILED]
+
+
+@pytest.mark.parametrize("outcome", ["unknown", "wedged", "raised"])
+def test_units_steps_after_a_reconnect_and_a_write_timeout_have_distinct_keys(tmp_path: Path, outcome: str) -> None:
+    """The units read at the reconnect and the one after the write timed out are two steps with their own keys."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+    scripted: dict[str, Any] = {
+        "unknown": failure(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, "the reply was lost"),
+        "wedged": failure(ErrorCode.HOST_WEDGED, "the host does not answer"),
+        "raised": Raise(TimeoutError("the call timed out")),
+    }
+    host.script("write_m", scripted[outcome])
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.epochs["csi"] += 1  # the session changed before the write
+        await ctx.tool("write_m", {"model": "m1"})
+        return []
+
+    done = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert done.status is RunStatus.COMPLETED
+    started = [(e.path, e.attempt) for e in rig.events(done.run_id) if e.type is EventType.STEP_STARTED]
+    assert len(started) == len(set(started))  # one view per path and attempt (spec 0001 section 6)
+    units = [key for key in started if key[0] == "1~host.units.m1"]
+    assert len(units) == 2  # 4.6 #9 (c): after the new session, and again after the timeout, before the reconciliation
 
 
 class _Opening(Host):
