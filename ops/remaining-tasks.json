@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1",
- "count": 143,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits",
+ "count": 149,
  "tasks": [
   {
    "id": "B-437",
@@ -308,7 +308,8 @@
    "prTitle": "feat(eng-harness): cSI analysis, design and results through the long role (B-132)",
    "risk": "r1, r3",
    "pending_deps": [
-    "S.T12"
+    "S.T12",
+    "S.T12b"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -809,7 +810,7 @@
    "prTitle": "feat(eng-harness): calc 3, read-back check (B-148)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "C.T8"
+    "C.T8b"
    ],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
@@ -1690,7 +1691,7 @@
    "prTitle": "feat(eng-harness): calc harness.change_set_check (resolve, validate, conflicts, refused kinds) (B-196)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "C.T8"
+    "C.T8b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2997,6 +2998,134 @@
    "verifier_lenses": [],
    "open_pr": null,
    "branch_pushed": false
+  },
+  {
+   "id": "B-456",
+   "task": "E.T13c",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": "T13c",
+   "kind": "impl",
+   "title": "Invariant 10 and the resume order (host leases, host_started, close_started, resume steps 4 and 5)",
+   "branch": "feat/b456-harness-et13c-invariant-10-resume-order",
+   "prTitle": "feat(eng-harness): invariant 10 and the resume order (host leases, host_started, close_started, resume steps 4 and 5) (B-456)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-460",
+   "task": "C.T8b",
+   "plan": "packages/eng-harness/docs/plans/0003-calcs.md",
+   "planTask": "T8b",
+   "kind": "impl",
+   "title": "Calc 2, difference report, on the comparison core of T8",
+   "branch": "feat/b460-harness-ct8b-calc-2-difference-report",
+   "prTitle": "feat(eng-harness): calc 2, difference report, on the comparison core (B-460)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "CT.T19",
+    "C.T8c"
+   ],
+   "writer": "opus, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "source",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "written and reviewed once (BLOCKED, round 2 queued): held by playbook 5d until B-464 and B-467 are on origin/build/v1 (basis field names), and until B-469 and B-470 (C.T8c, difference keys carry their list) have merged; then rename the basis paths to the B-467 names, merge origin/build/v1 and rewrite the calc lock"
+   ]
+  },
+  {
+   "id": "B-464",
+   "task": "CT.T19",
+   "plan": "packages/eng-contract/docs/plans/0001-eng-contract-0.1.md",
+   "planTask": "T19",
+   "kind": "impl",
+   "title": "Basis paths accept the section 4.7.2 unit suffixes in the last segment (owner decision OQ-Q44 a)",
+   "branch": "feat/b464-contract-basis-path-unit-suffix",
+   "prTitle": "feat(eng-contract): basis paths accept the contract unit suffixes in the last segment (B-464)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "written (head 7966378), not pushed; waits for amendment B-468 (T19 files gain the harness calc lock, risk set r1, r2, r3); then regenerate calcs.lock.json with the lock writer, never by hand"
+   ]
+  },
+  {
+   "id": "B-466",
+   "task": "S.T12b",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T12b",
+   "kind": "impl",
+   "title": "CSI read-back helpers and check_model",
+   "branch": "feat/b466-harness-st12b-csi-read-back-helpers",
+   "prTitle": "feat(eng-harness): cSI read-back helpers and check_model (B-466)",
+   "risk": "r1, r3",
+   "pending_deps": [
+    "S.T12"
+   ],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "plan task T12b merged with amendment B-465 (#310, budget 380, depends on T12); held by playbook 5d until B-464 and B-467 are on origin/build/v1 (basis field names); owner questions on tolerance delivery and drained warnings are in BUILD-STATUS section 6"
+   ]
+  },
+  {
+   "id": "B-470",
+   "task": "C.T8c",
+   "plan": "packages/eng-harness/docs/plans/0003-calcs.md",
+   "planTask": "T8c",
+   "kind": "impl",
+   "title": "Difference keys carry their list (a pattern and a combination of one name no longer collide)",
+   "branch": "feat/b470-harness-ct8c-difference-keys-carry-their-list",
+   "prTitle": "feat(eng-harness): difference keys carry their list (B-470)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "opus, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "source",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "plan task pending amendment B-469 (calcs spec 4.7: difference keys carry their list, duplicate keys always ambiguous; new task T8c, queued); new calc version of the comparison core"
+   ]
+  },
+  {
+   "id": "B-472",
+   "task": "E.run-id",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": null,
+   "kind": "impl",
+   "title": "Engine.start takes a caller-chosen run id (spec 0006 Q20 answer A, OQ-Q45)",
+   "branch": "feat/b472-harness-engine-caller-chosen-run-id",
+   "prTitle": "feat(eng-harness): engine start takes a caller-chosen run id (B-472)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "plan task pending amendment B-471 (first-live-run blockers); blocks I.T18b (the port builder, B-433)"
+   ]
   }
  ]
 }

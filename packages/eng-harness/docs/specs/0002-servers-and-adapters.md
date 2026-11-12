@@ -669,7 +669,7 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
   for IDEA `LOADS_UNCONFIRMED_MAP` (info: the load map is unconfirmed, so no load is written) and
   `LOAD_EFFECT_ZERO_DROPPED` (warning: the server dropped all-zero load effects before the write) (spec 0014 §4.10,
   AC10). Quantities read back are compared within the design basis field
-  `checks.readback_relative_tolerance` (required by every workflow that writes quantities; never a constant here,
+  `checks.readback_relative_tolerance_ratio` (required by every workflow that writes quantities; never a constant here,
   §11 G-2). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
 - **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
   confirm=true)` on the `main` role, hashes the file, updates the identity store (ADR-0032) and returns `SavedModel`;
@@ -768,7 +768,9 @@ parameter: its values are in the present units, read and labelled as in §4.5.4:
 A list or table read with `truncated: true` raises `LIMIT_EXCEEDED` (the v1 reader cannot see the whole model,
 S-12 §2). **Fingerprint**: `sha256(canonical_json({...}))` over the six payloads in the host units tokens used for the
 reads (before conversion, so no conversion rounding enters it), with every list sorted by its name or id, plus
-`object_counts`; the file save time is not included (it changes on save without a model change). It is stable when
+`object_counts`; the file save time is not included (it changes on save without a model change). It also covers the
+rows of table `Wall Property Definitions - Specified` (§4.6.2), since `csi_list_area_sections` returns name and type
+only (S-12 §2) and a wall-thickness change would otherwise leave it unchanged (amendment B-465). It is stable when
 the same state is read twice (property test) and S-04 measures it on real models (§12). `HostModelState`:
 `model_id` and `revision` from the identity store and `ModelStateStore`, `fingerprint`, `file_sha256` of the last
 save. A fingerprint that changed with no adapter write since the last read increments the revision and adds
@@ -888,7 +890,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | `self_weight_ratio`, `scale_ratio` | float | 1 | ≥ 0 | yes, engineering quantity | change set |
 | `SnapTol_mm`, `BeamSpacing_mm`, `ColumnGrow_mm` (dxf-prep) | float | mm | ≥ 0 | yes, engineering quantity | design basis |
 | `call_timeout_s`, `client_grace_s`, `timeout_s` | int | s | ≥ 1 | no | `harness.toml`, required |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (required by writing workflows) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (required by writing workflows) |
 | Outputs | envelopes of the kinds in §4.6 and §4.7 | canonical | — | — | adapters |
 
 ## 6. Errors
@@ -972,7 +974,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G5 | `model.frame_placements/1` `kind` cannot be read from `csi_list_frames` | Owner | Read design orientation through `csi_frame_details` after a local check of its reply |
 | H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
-| G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance` with a source; no constant in code |
+| G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
 | A3 | **[added]** by B-085 for spec 0014 A1 (IDEA adapter): `routes` in the allowlist header and on entries, and the server section's `route`; `audit_log` on the server section (default true; false for IDEA, so no `--audit-log` argument); an adapter may require the `single` topology (one `main` role serving all classes); allowlist header `[[unit]]` entries with `unit_status`; the issue codes `LOADS_UNCONFIRMED_MAP` (info) and `LOAD_EFFECT_ZERO_DROPPED` (warning); the harness host codes `OFFLINE_STUB` and `UNEXPECTED_REPLY`; the harness kinds `harness.idea_status/1`, `harness.idea_project/1`, `harness.idea_loads/1`, `harness.idea_check_raw/1` (spec 0014 §4.5). AC40 to AC42 (plan T20); the IDEA uses of each are in spec 0014 and plan 0014 | Owner | Accept with spec 0014 |
