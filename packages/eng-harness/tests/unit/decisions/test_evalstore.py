@@ -58,7 +58,7 @@ def test_append_only_and_reproducible(tmp_path: Path) -> None:
     assert one.eligible is False
     assert one.min_confidence == 0.85
     assert one.source == "store"
-    assert one.created_at == "2026-01-01T00:00:00.000Z"
+    assert one.created_at.startswith("2026-01-01T00:00:00.")  # the id source shares the clock
     assert store.get(first) == one
     assert store.get("ev_missing") is None
     assert store.records("other_point") == ()
@@ -74,7 +74,7 @@ def test_append_only_and_reproducible(tmp_path: Path) -> None:
 
 def _eligible_report(*keys: str) -> EvalReport:
     metrics = ProviderEvalMetrics(cases=50, answered=50, above=50, agreeing=50, agreement=1.0)
-    return EvalReport(by={k: metrics for k in keys}, eligible=True, reasons=())
+    return EvalReport(by=dict.fromkeys(keys, metrics), eligible=True, reasons=())
 
 
 def _record(

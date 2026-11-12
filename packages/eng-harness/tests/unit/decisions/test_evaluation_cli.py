@@ -77,7 +77,7 @@ def test_evaluate_writes_record_only(tmp_path: Path, capsys: pytest.CaptureFixtu
     assert "too_few_cases" in out
     assert "calibration_not_evaluated" in out
     assert record.evaluation_id in out
-    assert "released" in out  # the verdict says that the owner releases, never the system
+    assert "owner releases" in out  # the verdict says that the owner releases, never the system
 
 
 def test_evaluate_from_export(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -101,4 +101,4 @@ def test_evaluate_from_export(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     with pytest.raises(ContractError) as info:
         main(["evaluate", "footing_fix", "--workspace", str(workspace), "--point-version", "1",
               "--from-export", str(export)])  # fmt: skip
-    assert info.value.code is ErrorCode.INVALID_ARGUMENT
+    assert info.value.detail.code is ErrorCode.INVALID_ARGUMENT
