@@ -134,7 +134,15 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert {p.name for p in rig.run_dir(run_id).iterdir()} >= {"journal.sqlite", "run.lock"}
     events = rig.events(run_id)
     assert [e.type for e in events] == [
-        T.RUN_STARTED, T.STEP_STARTED, T.STEP_COMPLETED, T.STEP_STARTED, T.STEP_COMPLETED, T.RUN_COMPLETED,
+        T.RUN_STARTED,
+        T.STEP_STARTED,
+        T.STEP_COMPLETED,
+        T.STEP_STARTED,
+        T.STEP_COMPLETED,
+        T.STEP_STARTED,
+        T.STEP_COMPLETED,
+        T.CHECK_ENFORCED,
+        T.RUN_COMPLETED,
     ]  # fmt: skip
     head = rig.header(run_id)
     assert (head.run_id, head.workflow) == (run_id, "chain")
@@ -146,7 +154,7 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["write_b"], {}, {})
     assert rig.store.payload(head.input_ref) == {"value": given}  # the input is stored, not copied into the journal
     assert head.input_sha256 == payload_sha256(given)
-    read, read_done, write, write_done, done = events[1:]
+    read, read_done, write, write_done, end_check, _end_check_done, enforced, done = events[1:]
     assert (read.path, read.attempt, write.path, write.attempt) == ("0", 1, "1", 1)
     started_read, started_write = read.payload, write.payload
     assert isinstance(started_read, ev.StepStarted)
@@ -161,6 +169,15 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert (started_read.op_id, started_read.host_key, started_read.model_key) == (None, "csi", None)
     assert started_write.effect == "write"
     assert (started_write.op_id, started_write.model_key) == (op_id(run_id, "1", 1), "m1")
+    assert isinstance(end_check.payload, ev.StepStarted)
+    assert (end_check.path, end_check.attempt) == ("~end.check_model.m1", 1)
+    assert (end_check.payload.kind, end_check.payload.name, end_check.payload.effect, end_check.payload.model_key) == (
+        "read",
+        "check_model",
+        "read",
+        "m1",
+    )
+    assert enforced.payload == ev.CheckEnforced(invariant=1, model_key="m1", outcome="pass")
     assert [(c.tool, c.op_id, c.model) for c in rig.host.ledger] == [
         ("read_a", op_id(run_id, "0", 1), None), ("write_b", op_id(run_id, "1", 1), "m1"),
     ]  # fmt: skip

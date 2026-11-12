@@ -195,7 +195,14 @@ def _rank(error: BaseException) -> int:
     return len(_RANK)
 
 
-async def parallel[T](children: Sequence[Awaitable[T]]) -> list[T]:
+async def parallel[T](
+    children: Sequence[Awaitable[T]],
+    *,
+    before: Callable[[str], Awaitable[None]] | None = None,
+    after: Callable[[str, Sequence[str]], Awaitable[None]] | None = None,
+    enter: Callable[[int], None] | None = None,
+    leave: Callable[[], Sequence[str]] | None = None,
+) -> list[T]:
     """Run `children` concurrently as one step: child `i` runs in scope `path/i`; results come in argument order.
 
     Every child runs to its end (none is cancelled). Then the error of the best class rank (`_RANK`; any other
@@ -212,15 +219,30 @@ async def parallel[T](children: Sequence[Awaitable[T]]) -> list[T]:
             if inspect.iscoroutine(child):
                 child.close()
         raise
+    if before is not None:  # a check before the children; on failure they are not started
+        try:
+            await before(path)
+        except Exception:
+            for child in children:
+                if inspect.iscoroutine(child):
+                    child.close()
+            scope.end()
+            raise
     values: dict[int, T] = {}
     failures: dict[int, BaseException] = {}
+    reported: dict[int, Sequence[str]] = {}
 
     async def run_child(index: int, child: Awaitable[T]) -> None:
         _CURRENT.set(Scope(f"{path}/{index}"))  # this task's own context
+        if enter is not None:
+            enter(index)
         try:
             values[index] = await child
         except (errors.EngineStop, Exception) as error:  # kept in `failures` and raised below, never dropped
             failures[index] = error
+        finally:
+            if leave is not None:
+                reported[index] = leave()
 
     try:
         async with asyncio.TaskGroup() as group:
@@ -228,8 +250,17 @@ async def parallel[T](children: Sequence[Awaitable[T]]) -> list[T]:
                 group.create_task(run_child(index, child))
     finally:
         scope.end()
+    caught: BaseException | None = None
+    if after is not None:  # post-checks; a child's error outranks one from here (AC8)
+        try:
+            keys = sorted({key for names in reported.values() for key in names})
+            await after(path, keys)
+        except (errors.EngineStop, Exception) as error:
+            caught = error
     if failures:
         raise failures[min(failures, key=lambda index: (_rank(failures[index]), index))]
+    if caught is not None:
+        raise caught
     return [values[index] for index in range(len(children))]
 
 

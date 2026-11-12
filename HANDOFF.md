@@ -36,15 +36,15 @@ Notes for the cloud session:
 
 ## 1. Where the build stands
 
-- Resume commit: `3d0b4fb feat(eng-harness): eng-harness doctor (B-137) (#281)` on `build/v1` (cloud session, 2026-11-12).
-- Plan tasks merged: 155 of 291 (53.3 %; B-447 split column T1 into T1 and T1b), plus 89 documents amendments and lead fixes.
+- Resume commit: `ef57ff1 feat(structural-codes): check max_axial_strength (22.4.2.1) (B-331) (#288)` on `build/v1` (cloud session, 2026-11-12).
+- Plan tasks merged: 161 of 292 (55.1 %; B-454 will add two more tasks), plus 93 documents amendments and lead fixes.
 
 | Package | Merged | Total |
 |---|---|---|
 | eng-contract | 19 | 19 |
 | eng-dev-gate | 40 | 41 |
-| structural-codes | 30 | 36 |
-| eng-harness | 66 | 195 |
+| structural-codes | 32 | 36 |
+| eng-harness | 70 | 196 |
 
 Phases: 0 done; 1 (engine, edit cycle) and 2 (codes, SAFE, providers, footing workflow) in progress; 3 and 4 (Revit,
 SAP2000, columns, IDEA) started only in structural-codes (column checks skeleton). Nothing that needs a host program is
@@ -81,25 +81,26 @@ by an agent).
 
 ## 3. In flight (cloud session, 2026-11-12)
 
-Merged this session: B-437 (#260), B-440 (#270), B-439 (#271), B-444 (#272), B-330 (#269), B-445 (#275), B-393 (#268),
-B-139 (#273), B-129 (#276), B-446 (#278), B-447 (#280), B-137 (#281).
+Merged this session (22): B-437, B-440, B-439, B-444, B-330, B-445, B-393, B-139, B-129, B-446, B-447, B-137, B-220,
+B-449, B-111, B-186, B-450, B-333, B-452, B-146, B-453, B-331.
 
 | Work item | Task | State | What is left |
 |---|---|---|---|
-| B-220 | P.T1 providers T1 | PR #274, reviewed | local CI rerun (its license exceptions landed first as B-446), merge |
-| B-111 | E.T12 invariants | PR #279, reviewed, full gate pass | local CI, merge |
-| B-186 | I.T12 report sections | PR #277, reviewed, full gate pass | local CI, merge |
-| B-146 | C.T7 calc 1 | worktree `b146` | writer fixing the mutation failure (lock hash comparison stays with the lock test); then full gate, PR |
-| B-280 | G.T1 column kinds | worktree `b280` | writer dropping the request models (B-447); request-model copies in `.claude/worktrees/b280-requests-stash/` for B-448 |
-| B-331, B-332, B-333 | Z.T2, Z.T3, Z.T4 | worktrees | B-331 and B-332: review round 1 (non-square cases, phi rows, G-4 case, ratchet counts); B-333 reviewed, full gate next |
-| B-394 | X.T3 footing subjects calc | PR #256 | after C.T7 (B-146) |
+| B-280 | G.T1 column kinds | PR #290 (rebuilt; #285 closed) | local CI (queue), merge; then B-448 (T1b) from `.claude/worktrees/b280-requests-stash/` |
+| B-454 | engine T13 split | PR #291, reviewed | local CI, merge; then B-112 (T13) continues on its worktree (uncommitted draft), B-455 (T13b), B-456 (T13c) |
+| B-332 | Z.T3 axial flexure | branch, oracle-verified | writer raising the mutation score; full gate, PR |
+| B-221, B-224, B-227, B-130, B-187, B-394 | P.T2, P.T5, P.T8, S.T11, I.T13, X.T3 | reviewed, fixes in | full gates in the gate queue (`/home/box/lead/gq.sh`), then PRs and local CI (#256 for B-394) |
+| B-147 | C.T8 | in writing | review |
+| B-451 | S.T11b | not started | after S.T11 (B-130); reader copies in `.claude/worktrees/b130-t11b-stash/` |
 
 Notes:
-- Writers run on `deepseek-v41-flash-1017-high`, falling back to `composer-2.5` (D-31). Cursor runs often end with
-  "Connection stalled"; read the branch and restart in a fresh chat with a continuation note.
-- `git fetch` can stall on loose objects: `git repack -d`.
-- Lead tooling of this session (outside the repository): PR body, local CI, merge and brief helpers;
-  `.git/hooks/pre-push` refuses a push unless `LEAD_PUSH=1`. The `Risk:` line is the bare risk set (RF002).
+- Writers: Composer 2.5 (DeepSeek refused by the plan, D-31). A task whose Cursor runs fail twice goes to a Claude
+  subagent (B-112).
+- Plan defects found and fixed this session: tests_first files outside the task (B-452, TF008), plan risk below the
+  path floor (B-453, RF001), tasks over 400 lines (B-447, B-450, B-454), a pull request cannot grant itself a gate
+  exception (B-446), tests reading outside the member under mutation (B-444, B-449).
+- Local CI queue helper: `/home/box/lead/ciq.sh <pr>...` (start, wait, merge on PASS); full-gate queue: `gq.sh`.
+  Wait on the CI log by line count, not by grepping a PR number (an old FAIL line matches).
 
 ## 4. Order of the remaining work
 

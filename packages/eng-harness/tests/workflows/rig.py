@@ -7,6 +7,7 @@ workspace, store and fake host stand for several processes that open the same ru
 
 import inspect
 import multiprocessing
+from collections import deque
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -82,6 +83,21 @@ class Host(FakeHost):
         self.unreleased: dict[str, str] = dict(unreleased or {})
         self.locked: list[bool] = []
         self._runs_dir = runs_dir
+        self._checks: dict[str, deque[ENVELOPE | Raise]] = {}
+
+    def script_check(self, model_key: str, outcome: ENVELOPE | Raise) -> None:
+        """Queue `outcome` for the next `check_model` of `model_key`; with none queued the check succeeds."""
+        self._checks.setdefault(model_key, deque()).append(outcome)
+
+    async def check_model(self, model_key: str) -> ENVELOPE:
+        """The next scripted check, or the fake host's passing check."""
+        queue = self._checks.get(model_key)
+        if queue:
+            outcome = queue.popleft()
+            if isinstance(outcome, Raise):
+                raise outcome.error
+            return outcome
+        return await super().check_model(model_key)
 
     def script(self, tool: str, *outcomes: ENVELOPE | Raise) -> None:
         """Queue outcomes; a retryable failure of a read fails every attempt of one run (the engine retries reads).

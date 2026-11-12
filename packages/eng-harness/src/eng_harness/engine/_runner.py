@@ -272,11 +272,15 @@ class Engine:
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports = self._ports
         tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
-        ctx = Ctx(tools, ports.calc, self._store, self._settings, self._clock, self._producer, run_id, writer, events)
+        ctx = Ctx(
+            tools, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id, writer,
+            events,
+        )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
             with root_scope():
                 out = await workflow.fn(ctx, inp)
+                await ctx.finish()  # ~end checks for models the root block left dirty (spec 4.6 #1)
             if not isinstance(out, workflow.output_model):
                 wanted = workflow.output_model.__name__
                 raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
