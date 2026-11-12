@@ -4,8 +4,10 @@ Test doubles; never shipped. The engine is the real one, the CalcPort the real `
 fake. Plan 0003 T8 adds its older-revision block here.
 """
 
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
+
+Body = Callable[[Any], Awaitable[Sequence[str]]]
 
 from eng_contract.refs import Ref
 from fakes.ports import FakeApprovalPort, FakeBasisPort, FakeInputPort
@@ -29,6 +31,15 @@ def engine(rig: Rig, port: CalcPort, *workflows: BlockDef[Any, Any]) -> Engine:
         inputs=Spy("inputs", FakeInputPort(), rig.log),
     )
     return Engine(rig.workspace, Registry(workflows), ports, rig.store, EngineSettings(), rig.clock, rig.ids)
+
+
+def diff_step(body: Body) -> BlockDef[ChainInput, ChainOutput]:
+    """Workflow wrapper for the older-revision difference-report test (spec 0003 AC48)."""
+
+    async def wrapper(ctx: Any) -> Sequence[str]:
+        return await body(ctx)
+
+    return flow(wrapper)
 
 
 def calc_step(calc_id: str, offset: float) -> BlockDef[ChainInput, ChainOutput]:

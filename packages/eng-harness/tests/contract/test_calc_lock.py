@@ -6,9 +6,11 @@ import sys
 import warnings
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 import pytest
 from eng_contract.kinds import NEUTRAL_KINDS
+from pydantic import BaseModel
 
 from eng_harness._calc import _hash
 from eng_harness._calc._approvals import APPROVALS_PATH, check_approvals, load_approvals
@@ -150,6 +152,18 @@ def test_main_requires_exactly_the_write_flag(fixtures: ModuleType, tmp_path: Pa
         with pytest.raises(SystemExit):
             _hash.main(argv, registry=CalcRegistry(kinds), lock_path=target)
     assert target.read_bytes() == _hash.render_lock(EMPTY)
+
+
+def test_stale_ok_fields_match_spec() -> None:
+    """AC49: `x-eng.stale_ok` on reference fields matches `tests/data/calcs/stale_ok.json` (spec 4.13)."""
+    import json
+
+    table = json.loads((_FIXTURES.parent / "stale_ok.json").read_text(encoding="utf-8"))
+    assert table["schema"] == 1
+    for calc_id, want in table["calcs"].items():
+        properties = cast(type[BaseModel], REGISTRY[calc_id].input_type).model_json_schema()["properties"]
+        got = sorted(name for name, prop in properties.items() if (prop.get("x-eng") or {}).get("stale_ok") is True)
+        assert got == sorted(want), calc_id
 
 
 def test_shipped_calcs_are_draft() -> None:

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "calcs": {
+    "harness.model_fingerprint": [],
+    "harness.model_diff": [
+      "before_stories",
+      "before_grids",
+      "before_frames",
+      "before_areas",
+      "before_sections",
+      "before_materials",
+      "before_loads",
+      "before_restraints"
+    ]
+  }
+}
