@@ -74,7 +74,9 @@ def test_divergence_variants(tmp_path: Path, variant: str) -> None:
     assert stopped.escalation is not None
     assert stopped.escalation.reason == "replay_divergence"
     assert len(rig.host.ledger) == ledger  # no live tool call
-    reads = {"host.read_units", "host.model_state"}  # the bound model m1 is read at the resume, before the block runs
+    # the resume checks the servers and leases the host (steps 4 and 5), reads the bound model m1 (steps 6 and 8), and
+    # releases the lease, all before the block runs
+    reads = {"host.preflight", "host.acquire", "host.read_units", "host.model_state", "host.release"}
     assert set(rig.log[mark:]) <= {"tool.unreleased_tools"} | reads  # and no other tool or host call either
     gained = [e for e in rig.events(run_id)[len(before) :] if not (e.path or "").startswith("@")]  # not @resume reads
     # a header change is found before the resume is recorded; a changed step after it (spec 4.5.1 step 3)
