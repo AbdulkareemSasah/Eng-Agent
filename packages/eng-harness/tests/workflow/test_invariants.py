@@ -787,3 +787,24 @@ def _stops_without_closing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
         assert (closing, rig.host.closed, rig.host.leases) == ([], [], {})
         assert "host.close_started" not in rig.log
         assert rig.log.count("host.release") == 1
+
+
+def test_host_started_when_a_read_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An instance started during a read whose port raised is journaled, so the run end can close it (4.6 #10)."""
+    rig = make_rig(tmp_path)
+    closing = watch_closing(rig, monkeypatch)
+    instance = HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+    rig.host.started.append(instance)  # the servers started it during the call that then raised
+    rig.host.script("read_a", Raise(ConnectionResetError("the connection dropped")))
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_a", {"n": 0})
+        return []
+
+    with pytest.raises(ConnectionResetError):
+        asyncio.run(rig.engine(flow(body)).start(request()))
+    run_id = rig.run_ids()[0]
+    started = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.HostStarted)]
+    assert started == [ev.HostStarted(host_key="csi", **instance.model_dump(mode="json"))]
+    assert rig.log.count("host.release") == 1  # the lease is released as the raise leaves the run
+    assert closing == []  # a run that did not end closes nothing; the journal lets a later resume do it
