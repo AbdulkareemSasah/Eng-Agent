@@ -275,8 +275,7 @@ tasks:
   - id: T11
     title: CSI reply mapping to the six model kinds and the model status
     # Amendment (B-450, D-12): split from the reader (now T11b); the B-130 writer measured 581 counted lines for the
-    # whole task (the reply mapping alone about 385). The property test is renamed test_csi_fingerprint.py, because
-    # calcs plan 0003 T7 owns tests/property/test_fingerprint.py.
+    # whole task (the reply mapping alone about 385).
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
@@ -293,19 +292,20 @@ tasks:
     depends_on: [T10]
   - id: T11b
     title: CSI model-state reader, fingerprint and units read
-    # Amendment (B-450, D-12): the reader half of the former T11.
+    # Amendment (B-450, D-12): the reader half of the former T11. tests/property/test_fingerprint.py is shared with
+    # calcs plan 0003 T7 (and later the SAFE and SAP2000 plans), so T11b adds its function after calcs T7 merges.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py"
-      - "packages/eng-harness/tests/property/test_csi_fingerprint.py"
+      - "packages/eng-harness/tests/property/test_fingerprint.py"
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"
     max_changed_lines: 250
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py::test_kinds_and_fingerprint"
-      - "packages/eng-harness/tests/property/test_csi_fingerprint.py::test_order_independent_and_edit_sensitive"
+      - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent_and_edit_sensitive"
     covers: [AC27]
     depends_on: [T11]
   - id: T12
@@ -608,8 +608,8 @@ save with hash and identity update, restore (a new hidden instance when launch o
 **T11 Model kinds** (§4.6.4). The mapping of the CSI replies to the six model kinds and the status, with the product
 tables, tested on the fake's replies. **T11b Model state** (§4.6.4). The read set, the fingerprint, `LIMIT_EXCEEDED` on
 truncation, outside-edit detection, `read_units`. Amendment B-450 (D-12): T11 split in two (581 counted lines measured);
-the property test is `tests/property/test_csi_fingerprint.py`, since calcs plan 0003 T7 owns `test_fingerprint.py`.
-A dependency on servers T11 named in another plan means T11 and T11b.
+`tests/property/test_fingerprint.py` is shared with calcs plan 0003 T7, so T11b merges after it. A dependency on
+servers T11 named in another plan means T11 and T11b.
 The units-trap workflow test, in which the engine stops, is T19's (B-413).
 
 **T12 Edits and read-back** (§4.6.1, §4.6.2, §4.5.8). Argument models and builders per edit kind, the

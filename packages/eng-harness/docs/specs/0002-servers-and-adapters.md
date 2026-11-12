@@ -185,7 +185,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   is the same for the same state read twice and differs after any edit kind; a read that is `truncated` raises
   `LIMIT_EXCEEDED`. Tests: `tests/unit/adapters/test_csi_replies.py::test_six_kinds_and_status_validate`,
   `tests/workflow/adapters/test_csi_state.py::test_kinds_and_fingerprint`,
-  `tests/property/test_csi_fingerprint.py::test_order_independent_and_edit_sensitive` (amendment B-450).
+  `tests/property/test_fingerprint.py::test_order_independent_and_edit_sensitive` (amendment B-450).
 - AC28. Given analysis or design, then the call goes to the `long` role server with its own call timeout, after the
   engine's save (engine AC43). Test: `tests/workflow/adapters/test_csi_analysis.py::test_long_role_and_save_first`.
 - AC29. Given `model_locked` from a write, then until ADR-0031 is accepted the code is `HOST_LOCKED` and no unlock is
