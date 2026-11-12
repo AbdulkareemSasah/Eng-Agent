@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Decision evaluation core: `eng_harness.decisions.evaluation` (`EvalThresholds`, `EvalReport`, `ProviderEvalMetrics`, `evaluate_point` with per-provider metrics, eligibility reasons and the calibration gap) and golden thresholds and fixture report (plan 0009 T8, B-227; spec 0009 AC37 to AC40).
+- Column workflow requests: `eng_harness.workflows.column_design` (`ColumnScopeRequest`, `ColumnLayoutRequest`, `ColumnProposalRequest`, `request_refusal` for spiral and special seismic) (plan 0013 T1b, B-448; spec 0013 AC3 section 4.3).
 - Report document: `build_report`, `write_report`, status marks (DRAFT, DRAFT SOURCES, INCOMPLETE, trial, unreleased tools), integrity line, timings and run-events sections, distinct `resume_no` counting (plan 0006 T13, B-187; spec 0006 AC50, AC51, AC53, AC56, AC57, AC59).
 - CSI reply mapping: `adapters/csi/_replies.py`, ETABS `products/` table keys, and `harness.csi_model_status/1` (plan 0002 T11, B-130; spec 0002 AC27).
 - Credential store: `CredentialStore`, `KeyringCredentialStore` with the §4.4 backend allow-list, `python -m eng_harness.providers` (`set-key`, `delete-key`, `status`), and test doubles in `tests/fakes/credential_stores.py` (plan 0009 T2, B-221; spec 0009 AC6 to AC8).
