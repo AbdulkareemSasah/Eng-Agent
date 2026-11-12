@@ -285,9 +285,9 @@ def axial_flexure_uniaxial(inp: AxialFlexureInputs, t: TraceRecorder) -> None:
     _step(t, "phiMn_kNm", phi_mn, "phi_ratio * Mn_kNm", "ACI 318-14 Table 21.2.1 (a), Table 21.2.2")
     t.step(
         "on_cap",
-        on_cap,
-        unit=None,
-        formula="phiPn_kN > phiPn_max_kN and Pu_kN > 0",
+        float(on_cap),
+        unit="1",
+        formula="1 if phiPn_kN > phiPn_max_kN and Pu_kN > 0 else 0",
         source="AF §4.2 step 5 (ray meets the axial cap)",
         uses=["phiPn_kN", "phiPn_max_kN", "Pu_kN"],
     )

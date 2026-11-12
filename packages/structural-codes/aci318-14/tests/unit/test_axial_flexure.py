@@ -181,8 +181,7 @@ def test_axial_cap_uses_phi_pn_max_in_capm() -> None:
     assert payload.verdicts[0].ratio == pytest.approx(0.969859, abs=_RATIO)
     cap = step_map(payload)["capM_kNm"]
     assert "phiPn_max_kN" in cap.uses
-    on_cap = next(s for s in payload.traces[0].steps if s.name == "on_cap")
-    assert on_cap.value is True
+    assert found["on_cap"] == pytest.approx(1.0, abs=_RATIO)
 
 
 def test_g4_from_heavy_steel_and_high_pu() -> None:
@@ -190,6 +189,9 @@ def test_g4_from_heavy_steel_and_high_pu() -> None:
     payload = run(Pu_kN=3800.0, Mu_kNm=200.0, A_bar_mm2=1500.0)
     assert [v.status for v in payload.verdicts] == [VerdictStatus.NEEDS_ENGINEER]
     assert any(m.startswith("G-4 (AF §4.2 step 3)") for m in payload.traces[0].messages)
+    found = steps(payload)
+    assert found["crossings_up"] == pytest.approx(2.0, abs=_RATIO)
+    assert found["crossings_down"] == pytest.approx(1.0, abs=_RATIO)
 
 
 def test_member_scope_not_applicable() -> None:

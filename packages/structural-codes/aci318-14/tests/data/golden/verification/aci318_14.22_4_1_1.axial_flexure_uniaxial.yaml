@@ -75,6 +75,7 @@ cases:
       status: PASS
       values:
         c_mm: {value: 582.591979, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        on_cap: {value: 1, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
         capM_kNm: {value: 51.553895, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 0.969859, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: HC-5
@@ -150,6 +151,21 @@ cases:
         c_mm: {value: 285.90126, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
         capM_kNm: {value: 471.249443, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
         ratio: {value: 0.594165, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+  - id: HC-9
+    kind: hand_check
+    source:
+      derivation: >-
+        Table 22.2.2.4.3 last row: fc >= 55 MPa gives beta1 = 0.65; common section with Pu = 1500, Mu = 300 kN.m;
+        §4 root search and CS S3–S5 at c.
+    subject: {kind: frame, id: C1}
+    inputs: {<<: *common, fc_MPa: 55}
+    expected:
+      status: PASS
+      values:
+        beta1_ratio: {value: 0.65, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        c_mm: {value: 281.76726, unit: mm, abs_tol: 1.0e-4, rel_tol: 0}
+        capM_kNm: {value: 572.416885, unit: kN.m, abs_tol: 0.001, rel_tol: 0}
+        ratio: {value: 0.524094, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: BD-1.a
     kind: boundary
     covers: [SHORT_COLUMN]
@@ -219,6 +235,18 @@ cases:
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, d_prime_mm: 250}
     expected: {status: NEEDS_ENGINEER}
+  # BD-3.f: 2d' = 120 mm; h = 500 > 120 but b = 120 is not > 120 → BAR_LAYOUT fails on b alone (lu = 700 keeps kl/r < 22).
+  - id: BD-3.f
+    kind: boundary
+    covers: [BAR_LAYOUT]
+    subject: {kind: frame, id: C1}
+    inputs:
+      <<: *common
+      b_mm: 120
+      h_mm: 500
+      d_prime_mm: 60
+      lu_mm: 700
+    expected: {status: NEEDS_ENGINEER}
   - id: BD-3.e
     kind: boundary
     covers: [STEEL_IN_SECTION]
@@ -244,7 +272,7 @@ cases:
     subject: {kind: frame, id: C1}
     source:
       derivation: >-
-        CS S5 at eps_t just below eps_tc = 0.005: Pu = 835, Mu = 344; eps_t = 0.003*(540-c)/c with dt = h-d' = 540 mm;
+        CS S5 at eps_t just below eps_tc = 0.005: Pu = 835, Mu = 344; eps_t = 0.003*(dt-c)/c with dt = h-d' = 440 mm;
         phi = 0.90 when eps_t >= 0.005, here eps_t = 0.0050 (transition side) gives phi < 0.90.
     inputs: {<<: *common, Pu_kN: 835, Mu_kNm: 344}
     expected:
@@ -270,7 +298,11 @@ cases:
     covers: [G-4]
     subject: {kind: frame, id: C1}
     inputs: {<<: *common, Pu_kN: 3800, Mu_kNm: 200, A_bar_mm2: 1500}
-    expected: {status: NEEDS_ENGINEER}
+    expected:
+      status: NEEDS_ENGINEER
+      values:
+        crossings_up: {value: 2, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
+        crossings_down: {value: 1, unit: "1", abs_tol: 1.0e-6, rel_tol: 0}
   - id: PC-1
     kind: program_comparison
     source:

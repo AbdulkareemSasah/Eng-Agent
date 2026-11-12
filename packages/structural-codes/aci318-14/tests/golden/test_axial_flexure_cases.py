@@ -1,6 +1,6 @@
 """Hand checks of the axial-flexure check through `verify_check` (plan 0004 T3; clause spec §8, AF-AC3).
 
-The case file `tests/data/golden/verification/aci318_14.22_4_1_1.axial_flexure_uniaxial.yaml` holds HC-1 to HC-8 and
+The case file `tests/data/golden/verification/aci318_14.22_4_1_1.axial_flexure_uniaxial.yaml` holds HC-1 to HC-9 and
 the boundary cases with the spec's absolute tolerances. Every hand check and boundary case passes; the report lists the
 worked example (gap G-WE) and the ETABS program comparison (needs local test) as unmet, so the check is not verified.
 """
@@ -23,6 +23,7 @@ CASE_IDS = (
     "HC-6",
     "HC-7",
     "HC-8",
+    "HC-9",
     "BD-1.a",
     "BD-1.b",
     "BD-1.c",
@@ -34,6 +35,7 @@ CASE_IDS = (
     "BD-3.b",
     "BD-3.c",
     "BD-3.d",
+    "BD-3.f",
     "BD-3.e",
     "BD-4.a",
     "BD-4.b",
@@ -42,7 +44,7 @@ CASE_IDS = (
 
 
 def test_hand_checks() -> None:
-    """HC-1 to HC-8 and BD-1 to BD-5 pass within tolerance; WE-1 and PC-1 stay unmet (AF-AC3)."""
+    """HC-1 to HC-9 and BD-1 to BD-5 pass within tolerance; WE-1 and PC-1 stay unmet (AF-AC3)."""
     pack = Pack(
         "aci318_14",
         "ACI 318-14",
