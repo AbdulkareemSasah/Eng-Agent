@@ -135,7 +135,7 @@ def test_metrics_match_fixture() -> None:
     golden = json.loads(REPORT_GOLDEN.read_text(encoding="utf-8"))
     assert golden["source"].startswith("hand-computed")
     report = evaluate_point(_metrics_fixture_labels(), EvalThresholds())
-    assert report.model_dump() == golden["report"]
+    assert report.model_dump(mode="json") == golden["report"]
     assert set(report.by) == {MODEL_BY, LLM_BY}
 
 
@@ -195,13 +195,11 @@ def test_eligibility_and_boundaries() -> None:
     assert "calibration_not_evaluated" in agree_exact.reasons
 
     no_above = evaluate_point(
-        (
+        tuple(
             _label(
                 f"req_{i}",
                 "enlarge",
-                suggestions=(
-                    _suggestion(MODEL_BY, "below_threshold", choice="enlarge", confidence=0.5, latency_ms=1),
-                ),
+                suggestions=(_suggestion(MODEL_BY, "below_threshold", choice="enlarge", confidence=0.5, latency_ms=1),),
             )
             for i in range(50)
         ),
