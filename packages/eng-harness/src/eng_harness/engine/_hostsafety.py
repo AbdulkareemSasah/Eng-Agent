@@ -63,11 +63,9 @@ class Pending:
         self._locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         events = rt.events()
         self._bound = {key: (b.host_key, b.instance_id) for key, b in Fold(events).bound.items()}
-        self._read = {
-            p.model_key
-            for e in events
-            if isinstance(p := e.payload, ev.StepStarted) and p.kind == "read" and p.name[:5] == "units"
-        }
+        started = [(e, p) for e in events if isinstance(p := e.payload, ev.StepStarted) and p.name[:5] == "units"]
+        self._read = {p.model_key for _, p in started if p.kind == "read"}
+        self._taken = {(e.path, e.attempt) for e, _ in started}  # the units steps journaled: one per path and attempt
         self._epochs: dict[str, int] = {}  # the session epoch of each host when this process first saw it (4.6 #9)
         self._timed: set[str] = set()  # the hosts on which a timeout was observed, until their units are read again
         self._turn = asyncio.Lock()
@@ -145,9 +143,11 @@ class Pending:
                 self._timed.discard(host_key)
                 for key, (bound_host, instance_id) in sorted(self._bound.items()):
                     if bound_host == host_key:
-                        await self._check(
-                            ctx, inserted_path(path, "host", "units", path_key(key)), key, instance_id, attempt
-                        )
+                        units, nth = inserted_path(path, "host", "units", path_key(key)), attempt
+                        while (units, nth) in self._taken:  # a second read at one step takes the next attempt
+                            nth += 1
+                        self._taken.add((units, nth))
+                        await self._check(ctx, units, key, instance_id, nth)
 
     async def _check(self, ctx: _Ctx, path: str, key: str, instance_id: str, attempt: int) -> None:
         """Read the units of `key` in `instance_id` as the inserted step `path`; differing units end the run (#9)."""
