@@ -128,9 +128,10 @@ def _put(table: str, keys: tuple[str, ...], row: dict[str, Any]) -> None:
 
 
 def _find(kind: str, name: object) -> dict[str, Any]:
-    for row in STATE.model[kind]:
+    rows: list[dict[str, Any]] = STATE.model[kind]
+    for row in rows:
         if row.get("name") == name:
-            return row  # type: ignore[no-any-return]
+            return row
     raise SasaahError("not_found", f"No {kind[:-1]} named {name}.")
 
 

@@ -43,7 +43,8 @@ class Recorder:
     """The session side: the manager, noting what each tool was sent."""
 
     def __init__(self, manager: ServerManager) -> None:
-        self.manager, self.sent = manager, []
+        self.manager = manager
+        self.sent: list[tuple[str, dict[str, Any]]] = []
 
     async def call(
         self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
