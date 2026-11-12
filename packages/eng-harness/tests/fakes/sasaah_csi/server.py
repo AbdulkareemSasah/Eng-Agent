@@ -120,7 +120,10 @@ def _session(name: str, args: dict[str, Any], *, fresh: bool = False) -> dict[st
 def _add(kind: str, args: dict[str, Any]) -> dict[str, Any]:
     items: list[dict[str, Any]] = STATE.model[kind]
     name = args.get("name") or f"{kind[:-1]}{len(items) + 1}"
-    items.append({**{k: v for k, v in args.items() if k not in ("units", "target", "dry_run")}, "name": name})
+    row = {**{k: v for k, v in args.items() if k not in ("units", "target", "dry_run")}, "name": name}
+    if kind == "load_combos":  # store the list-reply shape (type, items), not the tool's arguments
+        row = {"name": name, "type": args.get("combo_type", 0), "items": list(args.get("components") or [])}
+    items.append(row)
     return {"name": name}
 
 
