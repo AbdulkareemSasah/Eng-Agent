@@ -1,7 +1,6 @@
 """Credential-store doubles (spec 0009 section 4.11; lead decision D-5)."""
 
 import keyring.backend
-from keyring.compat import properties
 from keyring.errors import PasswordDeleteError
 from pydantic import SecretStr
 
@@ -16,12 +15,10 @@ def backend_path(backend: keyring.backend.KeyringBackend) -> str:
 class MemoryKeyringBackend(keyring.backend.KeyringBackend):
     """In-memory keyring backend for tests (outside the production allow-list)."""
 
+    priority = 1.0
+
     def __init__(self) -> None:
         self._passwords: dict[tuple[str, str], str] = {}
-
-    @properties.classproperty
-    def priority(cls) -> float:  # noqa: N805
-        return 1
 
     def get_password(self, service: str, username: str) -> str | None:
         return self._passwords.get((service, username))
@@ -38,12 +35,10 @@ class MemoryKeyringBackend(keyring.backend.KeyringBackend):
 class FakeChainerBackend(keyring.backend.KeyringBackend):
     """Chainer double for allow-list tests (avoids constructing the untyped keyring ``ChainerBackend``)."""
 
+    priority = 1.0
+
     def __init__(self, backends: list[keyring.backend.KeyringBackend]) -> None:
         self._backends = backends
-
-    @properties.classproperty
-    def priority(cls) -> float:  # noqa: N805
-        return 1
 
     @property
     def backends(self) -> list[keyring.backend.KeyringBackend]:
@@ -51,23 +46,6 @@ class FakeChainerBackend(keyring.backend.KeyringBackend):
 
     def get_password(self, service: str, username: str) -> str | None:
         return None
-
-    def set_password(self, service: str, username: str, password: str) -> None:
-        return None
-
-    def delete_password(self, service: str, username: str) -> None:
-        return None
-
-
-class DisallowedKeyringBackend(keyring.backend.KeyringBackend):
-    """A backend that must stay outside the production allow-list."""
-
-    @properties.classproperty
-    def priority(cls) -> float:  # noqa: N805
-        return 5
-
-    def get_password(self, service: str, username: str) -> str | None:
-        return "disallowed"
 
     def set_password(self, service: str, username: str, password: str) -> None:
         return None
