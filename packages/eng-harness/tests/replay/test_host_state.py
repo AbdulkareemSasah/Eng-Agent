@@ -338,6 +338,21 @@ def test_first_use_binding(tmp_path: Path) -> None:
     assert len(_kinds(rig, run_id, T.MODEL_BOUND)) == 1  # the binding is not repeated at the resume
 
 
+def test_units_recorded_before_the_step_started(tmp_path: Path) -> None:
+    """A process that died between the units of a first use and the step itself: the resume finds the recorded units."""
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    args = {"model_key": "m1"}
+    units = {"kind": "read", "name": "units", "args": args, "args_sha256": payload_sha256(args), "effect": "read"}
+    units |= {"model_key": "m1"}
+    path = "1~pre.units.m1"
+    run_id = forge(rig, chain(ORIGINAL), bound("m1", INSTANCE), (T.STEP_STARTED, path, 1, units), done(path))
+    assert resume(rig, chain(ORIGINAL), run_id).status is RunStatus.COMPLETED  # the recorded step is visited
+    started = [e.path for e in rig.events(run_id) if e.type is T.STEP_STARTED]
+    assert started.count(path) == 1
+    assert [c[:2] for c in host.calls if c[0] == "read_units"] == [("read_units", "m1")]  # the resume's, not a second
+
+
 SECOND: dict[str, JsonValue] = {"n": 2, "model": "m1"}
 TWO_WRITES: list[tuple[str, dict[str, JsonValue]]] = [
     ("read_a", {"n": 0}),

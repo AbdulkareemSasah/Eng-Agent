@@ -164,6 +164,7 @@ class Ctx:
         recorded = self._look(path, "tool", name, args)
         prior = self._started.get(path)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
+            self._pending.replay(self, path, prior.model_key)
             await self._guard.touch(prior.model_key, prior.effect == "write")
             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
             if recorded is not None and (done := self._replayed(recorded)) is not None:
@@ -178,9 +179,13 @@ class Ctx:
         if prior is None:  # the first live attempt; a retry already prepared above
             self._guard.literals(raw, info.engineering_params)
             await self._guard.touch(key, info.effect == "write")
+            await self._pending.bind(
+                self, path, key, info
+            )  # the model is bound and its units read before its first step
             await self._guard.prepare(self, path, key, info.effect, info.action)
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         while True:
+            await self._pending.reconnected(self, path, attempt, info.host_key)  # units after a new session (4.6 #9)
             await self._pending.settle(info.host_key)  # a write of unknown outcome on this host is reconciled first
             op = _steps.op_id(self._run_id, path, attempt)
             fields = {
@@ -200,8 +205,10 @@ class Ctx:
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
                     self._guard.mark(key)
+                await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
                 return _result(name, done)
             if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
+                await self._pending.reconnected(self, path, attempt, info.host_key, timeout=True)  # before 4.5.3 runs
                 found = await self._pending.resolve(info.host_key, path, attempt)
                 if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
                     self._guard.mark(key)
