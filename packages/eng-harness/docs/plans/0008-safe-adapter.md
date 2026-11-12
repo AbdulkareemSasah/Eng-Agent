@@ -14,8 +14,9 @@ tasks:
     # Amendment (B-413, documents only): test_build_mismatch_stops_run is written in plan 0002 T19a (B-475); the
     # test_session.py glob and the workflow conftest.py stay to adapt the session-level build-check tests of 0002 T6b to the per-product header.
     # Amendment (B-475, documents only): plan 0002 T19a now merges before T1, so build_ports in adapters/__init__.py
-    # joins the files: it builds the build check from the allowlist header that T1 makes per product. Off the
-    # first-live-run path with T2 and T3 (section 3).
+    # joins the files: it builds the build check from the allowlist header that T1 makes per product (about 10 counted
+    # lines, an estimate taken inside the unchanged 350). Plan 0002 T19b also edits build_ports: whichever of the two
+    # lands second adapts to the other in its own task. Off the first-live-run path with T2 and T3 (section 3).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -261,7 +262,7 @@ profile (behavior unchanged, the 0002 suite still passes); `[servers.<name>].pro
 the build check takes the server's product (in `_buildcheck.py` and in `ServerCheck` of `servers/_session.py`, its
 caller since plan 0002 T6b, which picks the fingerprint entry by the server's product); product by model extension.
 Touches files that plan 0002 creates or changes, so it starts only after plan 0002 T1, T6, T6b, T7, T8, T8b, T9, T10,
-T11, T12, T13 and T14 are merged on `build/v1` (amendment B-418; the gate is written as a comment on T1's `depends_on`,
+T11, T12, T13, T14 and T19a are merged on `build/v1` (amendment B-418, T19a by B-475; the gate is written as a comment on T1's `depends_on`,
 and T3 also waits for 0002 T15 or drops `csi_unlock_model`, T8 for 0002 T17). Before starting, the writer checks with
 `git ls-tree` that the 0002 files T1 lists exist, then greps the shared modules (`adapters/_hostport.py`,
 `adapters/csi/_session_ops.py`, `_state.py`, `_replies.py`, `_edits.py`, `_tools.py`, `_checks.py`, `_reconcile.py`)

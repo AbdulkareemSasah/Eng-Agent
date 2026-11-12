@@ -227,7 +227,8 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
   receives `None` for its tier, its summary entry holds `name`, `model`, `version` (its `model_version`), `is_local`
   (its `local`), `tier` and `status` `not_implemented`, and a build warning names it and PR-G1; (3) every
   `shadow_released` entry is dropped, so its point stays in shadow, each with a build warning, a plain string that names
-  the point and PR-G1, and the summary holds no released point; (4) the result is the same for any `point_policies`,
+  the point and PR-G1, and the summary holds no released point and, as AC29 records a dropped release, one entry per
+  drop with its `point` and the `reason` `PR-G1`, so the drop is journaled with the summary; (4) the result is the same for any `point_policies`,
   the empty mapping included, since no release is kept and so no policy is checked; (5) no summary entry or warning
   holds an endpoint, a `key_ref` or a header; (6) with the real engine and cascade wired as spec 0006 §4.2.2 wires them,
   `run_started.decision_runtime` equals the summary. Tests: `tests/unit/providers/test_runtime.py::test_no_provider_table_gives_phase1_runtime`,

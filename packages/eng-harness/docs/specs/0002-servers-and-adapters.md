@@ -267,7 +267,10 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC43. **[added: B-475]** Given `[cli_tools.*]` entries, then `build_ports` routes each to the command-line tool
   adapter (§4.7), and `ToolPort.describe` and `ToolPort.call` of such a tool reach it. Until plan task T19b,
   `build_ports` refuses a configuration with any `[cli_tools.*]` entry with `NotImplementedGap` (`NOT_IMPLEMENTED`, gap
-  H-G8) naming the entries, rather than drop them. Tests: `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap`
+  H-G8) naming the entries, rather than drop them; raised where the command line builds its ports (spec 0006 §4.2.2
+  step 1, outside the engine, so nothing is journaled), it ends `run` and `resume` with exit 70 `INTERNAL`, because
+  `NOT_IMPLEMENTED` is not in the error-code map of spec 0006 §4.2.3, and its message, printed on standard error, names
+  H-G8 and the entries. Tests: `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap`
   (plan task T19a; replaced in T19b), `::test_cli_tool_routed_through_build_ports` (plan task T19b).
 
 ## 4. Design

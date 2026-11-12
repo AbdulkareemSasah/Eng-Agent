@@ -141,6 +141,8 @@ tasks:
   - id: T7
     title: Provider factory, local_only, run summary
     # Amendment (B-471, documents only): the summary also holds the dropped releases, point and reason (spec AC29; spec 0006 Q16 (b)).
+    # Amendment (B-475, documents only): T10a also edits providers/__init__.py; T7 depends on T10a, so T7 lands second
+    # and adds its exports to the file as T10a left it.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -156,7 +158,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_absent_provider_is_phase1_behavior"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_check_command_makes_one_call_per_provider"
     covers: [AC28, AC29, AC30, AC47]
-    depends_on: [T2, T4, T6]
+    depends_on: [T2, T4, T6, T10a]
   - id: T8
     title: Evaluation core (thresholds, metrics, eligibility)
     files:
@@ -328,7 +330,8 @@ with the signature of spec §4.1 (amendment B-471) and `DecisionRuntime` in `_ru
 without `verify_releases`: no `[providers.*]` table gives a runtime with no provider and no release; a configured
 provider is not built and gets a summary entry with `status` `not_implemented` and a build warning naming PR-G1; every
 `shadow_released` entry is dropped with a build warning, a plain string naming the point and PR-G1 (not the
-`ReleaseFinding` of T9, which only `verify_releases` returns); `point_policies` is read by nothing, so the empty mapping
+`ReleaseFinding` of T9, which only `verify_releases` returns), and the summary records each drop as AC29 does, its
+`point` with the `reason` `PR-G1`; `point_policies` is read by nothing, so the empty mapping
 that plan 0006 T18a binds (spec 0006 Q16 (d)) gives the same runtime as any other; the run-header test runs the real
 engine and cascade. Waits for plan 0005 T10 and engine plan T14b, not for T4, T6, T7 or T9.
 
@@ -368,7 +371,7 @@ modules it requires exist at T10b's base.
   format task.
 - First live run (amendment B-475, lead decision D-32; phase 1 has no provider, spec 0005 AC17): T4, T6, T7 and T10b
   are off its path and are not weakened. They return with phase 2, before the first provider is configured (after spike
-  S-07, spec Q1): T10b depends on T7, and T7 on T4 and T6; no task of another plan depends on them. T10a stays on the
+  S-07, spec Q1): T10b depends on T7, and T7 on T4 and T6 (and on T10a, which shares `providers/__init__.py` with it); no task of another plan depends on them. T10a stays on the
   path (plan 0006 T18a binds it).
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
 

@@ -578,7 +578,8 @@ CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools 
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T12, T14, T16), `_hostport.py` (T10, T11b,
 T12b, T19a), `_identity.py` and `test_csi_session_ops.py` (T10, T19a), `adapters/__init__.py` and `test_build_ports.py`
-(T19a, T19b; B-475), `csi/_tools.py` (T12, T12b, T13, T15),
+(T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
+adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
 T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
@@ -736,7 +737,9 @@ engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation 
 pinned fingerprint and the units through the allowlist loader and the ports. Until T19b, `build_ports` builds no
 command-line tool: given a configuration with any `[cli_tools.*]` entry it raises `NotImplementedGap`
 (`NOT_IMPLEMENTED`, gap H-G8) naming the entries, rather than drop them, so `ToolPort.unreleased_tools()` never lists
-a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). A `harness.toml` for a run
+a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). The command line meets the
+refusal at step 1 of spec 0006 §4.2.2, outside the engine, and ends with exit 70 `INTERNAL` (spec AC43), the message
+naming H-G8 and the entries. A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
