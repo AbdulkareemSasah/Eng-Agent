@@ -3,7 +3,8 @@
 Purpose: match the objects of two model state sections by their D2 keys and compare matched objects member by member
 (D5), numbers within a tolerance of their quantity kind, exactly as `Fraction`s (D3), everything else exactly (D4).
 Units: a tolerance is in the canonical unit of its quantity kind (`kind_for_field`); values are not converted (D6).
-Errors: `KeyError` for a keyed list the payload lacks; `TypeError` (from `row_key`) for a key member not a string.
+Errors: `KeyError` for a keyed list the payload lacks; `TypeError` for a key member that is not a string.
+The D2 keys live here, not in `_state.py`: a change there would change the content hash of `harness.model_fingerprint`.
 """
 
 from collections.abc import Iterator, Mapping
@@ -14,19 +15,30 @@ from typing import Any, Literal, NamedTuple
 from eng_contract.canonical import canonical_json
 from eng_contract.units import kind_for_field
 
-from eng_harness.calcs._state import ROW_KEYS, row_key
+from eng_harness.calcs._state import ORDER
 from eng_harness.kinds.calcs import Change, PropertyRow, SectionCounts, WithinRow
 
 __all__ = [
+    "ROW_KEYS",
     "SectionDiff",
     "as_fraction",
     "compare_property",
     "compare_rows",
     "compare_section",
+    "row_key",
     "section_counts",
     "walk_leaves",
     "within_tolerance",
 ]
+
+ROW_KEYS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
+    ("model.stories/1", ("stories",), ("name",)),
+    *((kind, path, (key,)) for kind, path, key in ORDER if key is not None),
+    ("model.load_set/1", ("combinations", "items"), ("case.case", "case.case_type", "case.step")),
+    ("model.load_set/1", ("frame_loads",), ("frame", "pattern", "direction")),
+    ("model.load_set/1", ("area_loads",), ("area", "pattern", "direction")),
+)
+"""The D2 table: kind, path of the list (as in the F2 `ORDER`), key members (a dotted member is nested in the row)."""
 
 Tolerances = Mapping[str, Fraction]
 """Tolerance per quantity kind name (`length`, `angle`, ...), from the design basis `compare.*` fields (spec 4.4)."""
@@ -38,6 +50,21 @@ class SectionDiff(NamedTuple):
     changes: list[Change]
     within: list[WithinRow]
     outcomes: list[str]
+
+
+def row_key(members: tuple[str, ...], row: dict[str, Any]) -> tuple[str, ...]:
+    """The D2 key of `row`: its key members in order, exactly as stored; a null or absent member is left out."""
+    found: list[str] = []
+    for member in members:
+        value: Any = row
+        for part in member.split("."):
+            value = value.get(part)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise TypeError(f"key member {member!r} is not a string")
+        found.append(value)
+    return tuple(found)
 
 
 def as_fraction(value: Any) -> Fraction | None:

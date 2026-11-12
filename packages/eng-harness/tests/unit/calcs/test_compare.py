@@ -9,18 +9,19 @@ from fractions import Fraction
 from typing import Any
 
 import pytest
+
 from eng_harness.calcs._compare import (
+    ROW_KEYS,
     SectionDiff,
     as_fraction,
     compare_property,
     compare_rows,
     compare_section,
+    row_key,
     section_counts,
     walk_leaves,
     within_tolerance,
 )
-
-from eng_harness.calcs._state import ROW_KEYS, row_key
 from eng_harness.kinds.calcs import Change, PropertyRow, SectionCounts, WithinRow
 
 FRAMES = "model.frame_placements/1"

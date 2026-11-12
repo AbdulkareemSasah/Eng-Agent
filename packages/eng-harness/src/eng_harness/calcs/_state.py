@@ -4,15 +4,14 @@ Purpose: put the lists of a neutral model payload in one order, so the same stat
 same bytes. Named lists are sorted by their key as UTF-16 code-unit sequences (as RFC 8785 sorts keys); lists of
 unnamed rows by each row's canonical JSON bytes, so duplicates are kept. Stories, area `points` and `joints` keep
 their order. Units: none; values are not changed. Errors: none of its own; `canonical_json` raises
-`CanonicalJsonError` for a value outside the JSON data model. `ROW_KEYS` and `row_key` add the object keys of the
-difference report (spec 4.7 rule D2); `row_key` raises `TypeError` for a key member that is not a string.
+`CanonicalJsonError` for a value outside the JSON data model.
 """
 
 from typing import Any
 
 from eng_contract.canonical import canonical_json
 
-__all__ = ["ORDER", "ROW_KEYS", "SECTIONS", "canonical_state", "item_count", "row_key"]
+__all__ = ["ORDER", "SECTIONS", "canonical_state", "item_count"]
 
 SECTIONS: tuple[tuple[str, str], ...] = (
     ("stories", "model.stories/1"),
@@ -43,15 +42,6 @@ ORDER: tuple[tuple[str, tuple[str, ...], str | None], ...] = (
 )
 """The F2 table: kind, path of the list (a nested list under each row of the one before), key (None: row bytes)."""
 
-ROW_KEYS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
-    ("model.stories/1", ("stories",), ("name",)),
-    *((kind, path, (key,)) for kind, path, key in ORDER if key is not None),
-    ("model.load_set/1", ("combinations", "items"), ("case.case", "case.case_type", "case.step")),
-    ("model.load_set/1", ("frame_loads",), ("frame", "pattern", "direction")),
-    ("model.load_set/1", ("area_loads",), ("area", "pattern", "direction")),
-)
-"""The D2 table: kind, path of the list (as in ORDER), key members (a dotted member is nested in the row)."""
-
 
 def _sorted(rows: list[Any], key: str | None) -> list[Any]:
     if key is None:
@@ -77,18 +67,3 @@ def canonical_state(kind: str, payload: dict[str, Any]) -> dict[str, Any]:
 def item_count(payload: dict[str, Any]) -> int:
     """The number of members of the payload's top-level lists (the `items` of a fingerprint section)."""
     return sum(len(value) for value in payload.values() if isinstance(value, list))
-
-
-def row_key(members: tuple[str, ...], row: dict[str, Any]) -> tuple[str, ...]:
-    """The D2 key of `row`: its key members in order, exactly as stored; a null or absent member is left out."""
-    found: list[str] = []
-    for member in members:
-        value: Any = row
-        for part in member.split("."):
-            value = value.get(part)
-        if value is None:
-            continue
-        if not isinstance(value, str):
-            raise TypeError(f"key member {member!r} is not a string")
-        found.append(value)
-    return tuple(found)
