@@ -1,15 +1,31 @@
 """Per-request structured output for the language-model tier (spec 0009 section 4.7, AC21)."""
 
 from hashlib import sha256
-from typing import Any, Literal, cast
+from typing import Annotated, Any, cast
 
-from pydantic import BaseModel, ConfigDict, create_model
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, create_model
+from typing_extensions import TypeForm
 from pydantic_ai.output import ToolOutput
 
 from eng_harness.decisions._rules import Rationale
 from eng_harness.decisions.interfaces import ProviderRequest
 
 __all__ = ["build_output_type", "build_tool_output"]
+
+
+def _choice_type(values: tuple[str, ...]) -> TypeForm[Any]:
+    allowed = frozenset(values)
+
+    def check(value: object) -> str:
+        if not isinstance(value, str) or value not in allowed:
+            msg = "choice is not one of the request options"
+            raise ValueError(msg)
+        return value
+
+    return cast(
+        TypeForm[Any],
+        Annotated[str, BeforeValidator(check), Field(json_schema_extra={"enum": list(values)})],
+    )
 
 
 def build_output_type(request: ProviderRequest) -> type[BaseModel]:
@@ -20,13 +36,12 @@ def build_output_type(request: ProviderRequest) -> type[BaseModel]:
     return create_model(
         f"LlmStructuredOutput_{tag}",
         __config__=ConfigDict(frozen=True, extra="forbid"),
-        choice=(Literal[*values], ...),  # type: ignore[arg-type]  # B-224: dynamic option literals
+        choice=(_choice_type(values), ...),
         rationale=(Rationale, ...),
     )
 
 
-def build_tool_output(request: ProviderRequest) -> ToolOutput:
+def build_tool_output(request: ProviderRequest) -> ToolOutput[BaseModel]:
     """The strict tool output PydanticAI uses for this request (spec section 4.7; AC23)."""
 
-    output_type = cast(Any, build_output_type(request))
-    return ToolOutput(output_type, max_retries=0, strict=True)
+    return ToolOutput(build_output_type(request), max_retries=0, strict=True)
