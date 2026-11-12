@@ -1,6 +1,6 @@
 """Shared cited constants and material preconditions of the ACI 318-14 pack (plan 0002 T2). R1 module.
 
-Purpose: `CITED` (constants used by several checks, by trace name; `const` records one) and the preconditions of the
+Purpose: `CITED`, `SECTION_CITED` (shared constants by trace name; `const` records one) and the preconditions of the
 clause specs §2. Units: as each `Cited` states (`sf_max` in MPa^0.5 stored with unit 1, plan §6 Q6). Errors: `KeyError`
 for an unknown constant; `CheckDefinitionError` from the recorder for a name recorded twice.
 """
@@ -13,7 +13,7 @@ from eng_contract.cited import Cited
 from structural_codes.applicability import Outcome, Precondition
 from structural_codes.trace import TraceRecorder
 
-__all__ = ["CITED", "FC_MIN", "FY_MAX", "NORMALWEIGHT", "ConcreteClass", "const"]
+__all__ = ["CITED", "FC_MIN", "FY_MAX", "NORMALWEIGHT", "SECTION_CITED", "ConcreteClass", "const"]
 
 CITED = MappingProxyType(
     {
@@ -43,10 +43,27 @@ CITED = MappingProxyType(
     }
 )
 
+SECTION_CITED = MappingProxyType(
+    {
+        "phi_tc": Cited(
+            value=0.90, unit="1", source="ACI 318-14 Table 21.2.2 (tension-controlled), via Table 21.2.1 (a)"
+        ),
+        "eps_tc": Cited(value=0.005, unit="1", source="ACI 318-14 Table 21.2.2 (tension-controlled strain limit)"),
+        "eps_cu": Cited(value=0.003, unit="1", source="ACI 318-14 22.2.2.1"),
+        "alpha_1": Cited(value=0.85, unit="1", source="ACI 318-14 22.2.2.4.1 (stress-block concrete stress 0.85 f'c)"),
+        "beta1_hi": Cited(value=0.85, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
+        "beta1_slope": Cited(value=0.05, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
+        "beta1_step": Cited(value=7, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+        "fc_beta_lo": Cited(value=28, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+        "fc_beta_hi": Cited(value=55, unit="MPa", source="ACI 318-14 Table 22.2.2.4.3"),
+        "beta1_lo": Cited(value=0.65, unit="1", source="ACI 318-14 Table 22.2.2.4.3"),
+    }
+)
+
 
 def const(t: TraceRecorder, name: str) -> float:
-    """Record the shared constant `name` on `t` and return its value (errors: see the module docstring)."""
-    return t.const(name, CITED[name])
+    """Record the shared constant `name` (of `CITED` or `SECTION_CITED`) on `t` and return its value (errors: above)."""
+    return t.const(name, CITED[name] if name in CITED else SECTION_CITED[name])
 
 
 class ConcreteClass(StrEnum):

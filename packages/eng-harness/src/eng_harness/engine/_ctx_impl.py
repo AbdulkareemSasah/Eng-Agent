@@ -23,10 +23,11 @@ from eng_harness.calc import CalcStatus
 from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, ReadResult, ToolResult
 from eng_harness.engine import _steps
 from eng_harness.engine._codec import decode, decode_summary
+from eng_harness.engine._invariants import Guard, SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcPort, ToolPort
+from eng_harness.ports import CalcPort, HostPort, ToolPort
 
 if TYPE_CHECKING:
     from eng_harness.engine._runner import EngineSettings
@@ -86,12 +87,15 @@ class Ctx:
     """The ctx one run hands to its blocks; `draft` turns true when a draft or verified calc ran (AC13)."""
 
     def __init__(
-        self, tools: ToolPort, calc: CalcPort, store: ResultStore, settings: EngineSettings, clock: Clock,
-        producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
+        self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
+        clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
     ) -> None:  # fmt: skip
         """Serve one run: its ports, store, settings, clock, run id, journal writer and the events to replay."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
+        self._guard = Guard(host, store, writer, producer)
+        self._guard.install()
+        self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
         done = [(e.path, e.payload.calc) for e in events if isinstance(e.payload, ev.StepCompleted) and e.payload.calc]
         self._calcs, self.draft = dict(done), False  # the calc of each completed calc step, for its replay
 
@@ -119,6 +123,8 @@ class Ctx:
         if isinstance(done, ev.HarnessError):
             if calc and done.harness_code in _REFUSALS:
                 raise errors.CalcRefused(done.harness_code, done.message)
+            if done.harness_code is errors.HarnessCode.MODEL_INTEGRITY:
+                raise errors.ModelIntegrityError(done.message)
             raise errors.ReplayDivergence(f"a step recorded the harness code {done.harness_code}")
         return done
 
@@ -133,24 +139,51 @@ class Ctx:
             BlockRuleViolation: an argument that is no `ArgValue`. ReplayDivergence, NeedsReconciliation: see
                 `ReplayIndex.lookup`. A port that raises leaves the step in flight (task T11b).
         """
-        return await _steps.step(lambda path: self._tool(path, name, cast(_Obj, _json(args or {}))))
+        raw = dict(args or {})
+        return await _steps.step(lambda path: self._tool(path, name, raw))
 
-    async def _tool(self, path: str, name: str, args: _Obj) -> ToolResult:
+    async def _tool(self, path: str, name: str, raw: Mapping[str, ArgValue]) -> ToolResult:
+        try:
+            args = cast(_Obj, _json(raw))
+        except errors.BlockRuleViolation:
+            info = await self._tools.describe(name)  # a Quantity is not JSON; refuse it before the port call
+            self._guard.literals(raw, info.engineering_params)
+            args = cast(_Obj, _json(raw))
+        return await self._tool_json(path, name, raw, args)
+
+    async def _tool_json(self, path: str, name: str, raw: Mapping[str, ArgValue], args: _Obj) -> ToolResult:
         recorded = self._look(path, "tool", name, args)
-        if recorded is not None and (done := self._replayed(recorded)) is not None:
-            return _result(name, done)
+        prior = self._started.get(path)
+        if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
+            await self._guard.touch(prior.model_key, prior.effect == "write")
+            await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
+            if recorded is not None and (done := self._replayed(recorded)) is not None:
+                if prior.effect == "write":
+                    self._guard.mark(prior.model_key)
+                    self._guard.note_stored(done.ref)
+                return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
         info = await self._tools.describe(name)
-        last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
+        if prior is None:  # the first live attempt; a retry already prepared above
+            self._guard.literals(raw, info.engineering_params)
+            await self._guard.touch(key, info.effect == "write")
+            await self._guard.prepare(self, path, key, info.effect, info.action)
+        last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         while True:
             op = _steps.op_id(self._run_id, path, attempt)
-            fields = {"effect": info.effect, "op_id": op if info.effect == "write" else None, "host_key": info.host_key}
+            fields = {
+                "effect": info.effect, "op_id": op if info.effect == "write" else None, "host_key": info.host_key,
+                "action": info.action,
+            }  # fmt: skip
             began = self._begin(path, attempt, "tool", name, args, model_key=key, **fields)
             envelope = await self._tools.call(name, args, op_id=op, model=key)
             if isinstance(envelope, SuccessEnvelope):
                 self._done(path, attempt, began, done := _stored(envelope))
+                self._guard.note(envelope.provenance.host)
+                if info.effect == "write":
+                    self._guard.mark(key)
                 return _result(name, done)
             error = envelope.error
             self._fail(path, attempt, began, error, error.retryable)
@@ -198,14 +231,18 @@ class Ctx:
             CalcRefused: `CALC_NOT_APPROVED` or `CALC_WITHDRAWN`. ToolFailed: a failure envelope.
             ContractError: an unknown calc.
         """
-        return await _steps.step(lambda path: self._calc_step(path, calc_id, cast(_Obj, _json(args or {}))))
+        raw = dict(args or {})
+        return await _steps.step(lambda path: self._calc_step(path, calc_id, raw, cast(_Obj, _json(raw))))
 
-    async def _calc_step(self, path: str, calc_id: str, args: _Obj) -> CalcResult:
+    async def _calc_step(self, path: str, calc_id: str, raw: Mapping[str, ArgValue], args: _Obj) -> CalcResult:
         recorded = self._look(path, "calc", calc_id, args)
+        await self._guard.sweep(self, path, "pre")  # any calc waits for the dirty models to be checked (spec 4.6 #1)
         if recorded is not None and (done := self._replayed(recorded, calc=True)) is not None:
             return self._calc_result(calc_id, self._calcs.get(path), done)
         attempt = 1 if recorded is None else recorded.attempt + 1
         info = self._calc.describe(calc_id)
+        self._guard.literals(raw, info.engineering_params)
+        self._guard.refs(raw, info.ref_rules)
         began = self._begin(path, attempt, "calc", calc_id, args)
         try:
             envelope = self._calc.run(calc_id, args)
@@ -251,6 +288,7 @@ class Ctx:
             begun = True
         began = self._clock.now_ms() if begun else self._begin(path, 1, "block", ref.name, args, child=ref.model_dump())
         out = await child.fn(self, inp)
+        await self._guard.sweep(self, path, "end")  # the child block's return checks the models it left dirty
         if not isinstance(out, child.output_model):
             raise errors.BlockRuleViolation(f"{child.name} did not return a {child.output_model.__name__}")
         if not done:
@@ -261,7 +299,28 @@ class Ctx:
 
     async def parallel[T](self, *steps: Awaitable[T]) -> list[T]:
         """Run the steps concurrently, child `i` in scope `<path>/i`; results come in argument order (AC5, AC8)."""
-        return await _steps.parallel(steps)
+        board = SiblingBoard()
+
+        async def before(path: str) -> None:
+            await self._guard.sweep(self, path, "pre")  # children read no model the parent left dirty (spec 4.3.1)
+
+        async def after(path: str, models: Sequence[str]) -> None:
+            for model in models:
+                await self._guard.check(self, path, "post", model)
+
+        return await _steps.parallel(
+            steps, before=before, after=after, enter=lambda index: self._guard.enter(board, index),
+            leave=self._guard.dirty_models,
+        )  # fmt: skip
+
+    async def finish(self) -> None:
+        """`~end` checks after the root returns; an early end diverges before a live check (spec 4.5.2, 4.6 #1)."""
+        await self._guard.sweep(self, "", "end", live=False)
+        try:
+            self.index.finish()
+        except errors.ReplayDivergence:
+            return
+        await self._guard.sweep(self, "", "end")
 
     def attempts(self, limit: BasisCount) -> _Attempts:
         """Iterate at most `limit` times, iteration `i` in scope `<path>/i`; use `async for` and `break` on success.
