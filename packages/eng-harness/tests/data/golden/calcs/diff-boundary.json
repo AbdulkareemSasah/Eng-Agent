@@ -1,0 +1,270 @@
+{
+  "source": "eng-harness spec 0003 §4.7 (D1 to D7) and §4.4; synthetic read sets and tolerances, no project value",
+  "method_ref": "§4.7 D3",
+  "synthetic": true,
+  "derivation": "compare.length = 0.5 mm (binary 0x1p-1, exact). F1 top end x: 6000 -> 6000.5 (both exact binaries); |6000.5 - 6000| = 1/2 <= 1/2, so equal within tolerance (D3, the boundary is inclusive): a within_tolerance row, and F1 counts as unchanged. F2 top end x: 0 -> 0.5000000000000001, the next binary64 above 0.5, which is 1/2 + 2^-53 exactly (0x1.0000000000001p-1); |difference| = 1/2 + 2^-53 > 1/2, so changed, rule D3, unit mm, quantity kind length (suffix _mm), tolerance 0.5. Counts: changed 1, unchanged 1, within tolerance 1. Not identical (one change); complete.",
+  "inputs": {
+    "input": {
+      "before_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "after_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.5,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.5000000000000001,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length": {
+            "value": 0.5,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.angle": {
+            "value": 1.0,
+            "unit": "deg",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.stress": {
+            "value": 1.0,
+            "unit": "MPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.unit_weight": {
+            "value": 1.0,
+            "unit": "kN/m3",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.line_load": {
+            "value": 1.0,
+            "unit": "kN/m",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.area_load": {
+            "value": 1.0,
+            "unit": "kPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.ratio": {
+            "value": 1.0,
+            "unit": "1",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "before_frames": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "after_frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "before": {
+      "model_id": "mdl_00000000000000000000000000",
+      "model_revision": 3,
+      "covered": [
+        "model.frame_placements/1"
+      ]
+    },
+    "after": {
+      "model_id": "mdl_00000000000000000000000000",
+      "model_revision": 4,
+      "covered": [
+        "model.frame_placements/1"
+      ]
+    },
+    "tolerances": {
+      "length": {
+        "value": 0.5,
+        "unit": "mm",
+        "ref": "res_00000000000000000000000009#/fields/compare.length"
+      },
+      "angle": {
+        "value": 1.0,
+        "unit": "deg",
+        "ref": "res_00000000000000000000000009#/fields/compare.angle"
+      },
+      "stress": {
+        "value": 1.0,
+        "unit": "MPa",
+        "ref": "res_00000000000000000000000009#/fields/compare.stress"
+      },
+      "unit_weight": {
+        "value": 1.0,
+        "unit": "kN/m3",
+        "ref": "res_00000000000000000000000009#/fields/compare.unit_weight"
+      },
+      "line_load": {
+        "value": 1.0,
+        "unit": "kN/m",
+        "ref": "res_00000000000000000000000009#/fields/compare.line_load"
+      },
+      "area_load": {
+        "value": 1.0,
+        "unit": "kPa",
+        "ref": "res_00000000000000000000000009#/fields/compare.area_load"
+      },
+      "dimensionless": {
+        "value": 1.0,
+        "unit": "1",
+        "ref": "res_00000000000000000000000009#/fields/compare.ratio"
+      }
+    },
+    "changes": [
+      {
+        "section": "model.frame_placements/1",
+        "key": [
+          "F2"
+        ],
+        "change": "changed",
+        "before": null,
+        "after": null,
+        "properties": [
+          {
+            "pointer": "/j/x_mm",
+            "before": 0.0,
+            "after": 0.5000000000000001,
+            "unit": "mm",
+            "quantity_kind": "length",
+            "tolerance": 0.5,
+            "rule": "D3"
+          }
+        ]
+      }
+    ],
+    "within_tolerance": [
+      {
+        "section": "model.frame_placements/1",
+        "key": [
+          "F1"
+        ],
+        "pointer": "/j/x_mm",
+        "before": 6000.0,
+        "after": 6000.5,
+        "unit": "mm",
+        "quantity_kind": "length",
+        "tolerance": 0.5,
+        "rule": "D3"
+      }
+    ],
+    "not_compared": [],
+    "counts": {
+      "model.frame_placements/1": {
+        "added": 0,
+        "removed": 0,
+        "changed": 1,
+        "ambiguous": 0,
+        "unchanged": 1,
+        "within_tolerance": 1
+      }
+    },
+    "identical": false,
+    "complete": true
+  }
+}
