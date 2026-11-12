@@ -8,6 +8,8 @@ owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `
 - Remaining work, machine-readable: [ops/remaining-tasks.json](ops/remaining-tasks.json) (one entry per unmerged work item).
 - Local CI (the definition of done while GitHub Actions is unavailable, D-23): [ops/localci.py](ops/localci.py), described in [ops/README.md](ops/README.md).
 
+**Latest checkpoint: [docs/build/HANDOFF.md](docs/build/HANDOFF.md) (wind-down of 2026-11-12). Read it first; it supersedes sections 1, 3 and 4 below.**
+
 ## 0. Resume prompt for a cloud agent (2026-11-11, second pause)
 
 The owner moved the build to a cloud machine: local CI (mutation runs of 15 minutes and more) froze the owner's
@@ -89,7 +91,7 @@ B-449, B-111, B-186, B-450, B-333, B-452, B-146, B-453, B-331.
 | B-280 | G.T1 column kinds | PR #290 (rebuilt; #285 closed) | local CI (queue), merge; then B-448 (T1b) from `.claude/worktrees/b280-requests-stash/` |
 | B-454 | engine T13 split | PR #291, reviewed | local CI, merge; then B-112 (T13) continues on its worktree (uncommitted draft), B-455 (T13b), B-456 (T13c) |
 | B-332 | Z.T3 axial flexure | branch, oracle-verified | writer raising the mutation score; full gate, PR |
-| B-221, B-224, B-227, B-130, B-187, B-394 | P.T2, P.T5, P.T8, S.T11, I.T13, X.T3 | reviewed, fixes in | full gates in the gate queue (`/home/box/lead/gq.sh`), then PRs and local CI (#256 for B-394) |
+| B-221, B-224, B-227, B-130, B-187, B-394 | P.T2, P.T5, P.T8, S.T11, I.T13, X.T3 | reviewed, fixes in | full gates in the gate queue (`lead/gq.sh`), then PRs and local CI (#256 for B-394) |
 | B-147 | C.T8 | in writing | review |
 | B-451 | S.T11b | not started | after S.T11 (B-130); reader copies in `.claude/worktrees/b130-t11b-stash/` |
 
@@ -99,7 +101,7 @@ Notes:
 - Plan defects found and fixed this session: tests_first files outside the task (B-452, TF008), plan risk below the
   path floor (B-453, RF001), tasks over 400 lines (B-447, B-450, B-454), a pull request cannot grant itself a gate
   exception (B-446), tests reading outside the member under mutation (B-444, B-449).
-- Local CI queue helper: `/home/box/lead/ciq.sh <pr>...` (start, wait, merge on PASS); full-gate queue: `gq.sh`.
+- Local CI queue helper: `lead/ciq.sh <pr>...` (lead scripts in the build user's home folder `lead/`) (start, wait, merge on PASS); full-gate queue: `gq.sh`.
   Wait on the CI log by line count, not by grepping a PR number (an old FAIL line matches).
 
 ## 4. Order of the remaining work
