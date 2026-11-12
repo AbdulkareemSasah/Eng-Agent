@@ -41,18 +41,26 @@ tasks:
     depends_on: [T1]
   - id: T2
     title: Calc harness.column_select with golden and property tests
+    # Amendment (B-459, D-12): the branch of B-281 measured 313 counted lines against its merge base with build/v1
+    # (column_select.py 279, calcs/__init__.py registration 7, column_design/__init__.py 5, calcs.lock.json 5,
+    # verification page 14, pyproject.toml 2, CHANGELOG.md 1): one calc module with its registration, so the budget is
+    # the measurement plus about 10 percent, and calcs/__init__.py (the registration) joins the files. T2 registers
+    # through COLUMN_DESIGN_CALCS and COLUMN_DESIGN_KINDS in calcs/column_design/__init__.py, as calcs/footing/__init__.py
+    # does with FOOTING_CALCS and FOOTING_KINDS, so calcs/__init__.py is edited once here and the later calc tasks (T3,
+    # T4, T5, T7, T8) add their calcs and kinds in calcs/column_design/__init__.py only.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_select (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_select.md"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/column_select.py"
+      - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/golden/column_design/__init__.py"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-select-*.json"
       - "packages/eng-harness/tests/property/test_column_select.py"
-    max_changed_lines: 200
+    max_changed_lines: 345
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-select-names]"
