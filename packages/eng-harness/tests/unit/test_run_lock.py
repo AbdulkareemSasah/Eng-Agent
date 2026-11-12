@@ -27,7 +27,7 @@ from eng_harness.block import Registry, workflow
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest, RunStatus
 from eng_harness.errors import HarnessCode, RunLocked
 from eng_harness.journal import EventType, JournalReader, is_locked
-from eng_harness.ports import RunClass, ToolInfo
+from eng_harness.ports import HostInstance, RunClass, ToolInfo
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
 BASIS_REF = "res_" + "0" * 26
@@ -106,6 +106,7 @@ class WatchingHost(FakeHost):
     def __init__(self, ids: SeededIdSource, clock: FixedClock, runs_dir: Path) -> None:
         """Serve the tool `write_b`; `runs_dir` holds the one run being watched."""
         super().__init__([WRITE], ids, clock)
+        self.add_model("m1", HostInstance(instance_id="i-1", pid=1, process_started_at=clock.now(), program="csi"))
         self.sightings: list[Sighting] = []
         self._runs_dir = runs_dir
 
@@ -177,7 +178,14 @@ def test_lock_is_released_when_the_run_ends_abnormally(tmp_path: Path) -> None:
     (run_dir,) = runs_dir.iterdir()
     assert not is_locked(run_dir)
     reader = JournalReader(run_dir)  # the journal that the crash left verifies, and shows a run no engine holds
-    assert [e.type for e in reader.events()] == [EventType.RUN_STARTED, EventType.STEP_STARTED]
+    assert [e.type for e in reader.events()] == [
+        EventType.RUN_STARTED,
+        EventType.MODEL_BOUND,  # the first use of m1: its binding and its units come before the write that crashed
+        EventType.STEP_STARTED,
+        EventType.STEP_COMPLETED,
+        EventType.CHECK_ENFORCED,
+        EventType.STEP_STARTED,
+    ]
     assert reader.run().status == "INTERRUPTED"
     reader.close()
 

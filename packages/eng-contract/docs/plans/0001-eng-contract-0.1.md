@@ -345,6 +345,22 @@ tasks:
       - "packages/eng-contract/tests/unit/test_envelope.py::test_ref_input_uses_ref_string"
     covers: [AC9a]
     depends_on: [T16]
+  - id: T19
+    title: "Basis paths accept the section 4.7.2 unit suffixes in the last segment (owner decision OQ-Q44)"
+    # Amendment (B-463, documents only): spec 4.10.2 path rule and AC48a; implemented as work item B-464. The basis path
+    # pattern is built from the suffixes of units (spec 4.7.2), never a copied list; the schema snapshot is regenerated.
+    files:
+      - "packages/eng-contract/src/eng_contract/kinds/basis.py"
+      - "packages/eng-contract/tests/contract/test_kinds.py"
+      - "packages/eng-contract/tests/data/kinds/basis.design_basis-1/**"
+      - "packages/eng-contract/docs/schema/kinds/basis.design_basis-1.schema.json"
+      - "packages/eng-contract/CHANGELOG.md"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-contract/tests/contract/test_kinds.py::test_basis_path_unit_suffixes"
+    covers: [AC48a]
+    depends_on: [T12, T16]
 ---
 
 # Implementation plan: eng-contract 0.1
@@ -475,6 +491,10 @@ as `StoreIntegrityError`, and the end-to-end trace-reference test (AC21a).
 **T16 Schema snapshots** (spec §4.12). The exporter, the generated `docs/schema/` files, the freshness test, the
 0.1.0 changelog entry and the version bump to `0.1.0`. AC52 is proven by this task's CI run (coverage and the
 mutation score over the whole package); AC53 by the gate's import check once `eng-dev-gate` is in CI.
+
+**T19 Unit suffixes in basis paths** (spec §4.10.2, AC48a; amendment B-463, owner decision OQ-Q44). `BasisPath` keeps
+lowercase segments and lets the last segment end with one §4.7.2 suffix, built from the quantity kinds of `units`;
+regenerates the `basis.design_basis/1` schema snapshot (spec §10). Eng-harness plan 0007 T2 and T8 need it merged.
 
 ## 3. Dependencies
 

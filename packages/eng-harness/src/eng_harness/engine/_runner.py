@@ -275,15 +275,14 @@ class Engine:
     ) -> RunOutcome:  # fmt: skip
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports = self._ports
-        tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
         number = max((e.payload.resume_no for e in events if isinstance(e.payload, ev.RunResumed)), default=0)
         rt = _inflight.Resume(
             self._runs / run_id, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
             writer, number, ports.host,
         )  # fmt: skip
         ctx = Ctx(
-            tools, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id, writer,
-            events, _hostsafety.Pending(rt),
+            ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
+            writer, events, _hostsafety.Pending(rt),
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
