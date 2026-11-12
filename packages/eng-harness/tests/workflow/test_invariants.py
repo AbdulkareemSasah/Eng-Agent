@@ -718,6 +718,8 @@ def test_host_lease_and_close(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     rig = make_rig(tmp_path / "done")
     closing = watch_closing(rig, monkeypatch)
     rig.host._tools["read_s"] = ToolInfo(name="read_s", effect="read", action="plain", host_key="safe")
+    rig_instance = HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+    rig.host.started.append(rig_instance)  # the servers of the first step start an instance
     done = asyncio.run(rig.engine(chain([*ORIGINAL, ("read_s", {"n": 3})])).start(request()))
     assert done.status is RunStatus.COMPLETED
     leases = [line for line in rig.log if line == "host.acquire"]
@@ -726,7 +728,6 @@ def test_host_lease_and_close(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert rig.log.count("host.release") == 2
     assert rig.host.leases == {}  # released when the engine returned
     assert rig.log.count("host.started_instances") == 4  # after every live step, none for the inserted steps
-    rig_instance = rig.host.instances["csi"][0]
     started = [(e.path, e.payload) for e in rig.events(done.run_id) if isinstance(e.payload, ev.HostStarted)]
     assert [p for _, p in started] == [ev.HostStarted(host_key="csi", **rig_instance.model_dump(mode="json"))]
     first = _types(rig, done.run_id).index(EventType.HOST_STARTED)
@@ -776,6 +777,9 @@ def _stops_without_closing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert rig.host.leases == {}
     for name in ("paused", "escalated"):
         rig = make_rig(tmp_path / name)
+        rig.host.started.append(
+            HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+        )
         closing = watch_closing(rig, monkeypatch)
         stopped = asyncio.run(rig.engine(flow(_pauses(rig) if name == "paused" else _escalates)).start(request()))
         assert stopped.status in (RunStatus.PAUSED, RunStatus.NEEDS_ENGINEER)

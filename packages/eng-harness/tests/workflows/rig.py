@@ -76,6 +76,8 @@ class Host(FakeHost):
     """The fake host with a record of unreleased tools that a test can change between two resumes.
 
     `locked` holds, for each call that reached the host, whether any run folder under `runs_dir` was locked.
+    `started` holds the instances its servers started for the engine (none by default: the models of the rig are open in
+    an instance that was running already), which `started_instances` lists and `close_started` removes (4.6 #10).
     """
 
     def __init__(
@@ -91,6 +93,17 @@ class Host(FakeHost):
         self._runs_dir = runs_dir
         self._checks: dict[str, deque[ENVELOPE | Raise]] = {}
         self.preflight_checks: list[ServerCheck] | None = None
+        self.started: list[HostInstance] = []
+
+    async def started_instances(self, host_key: str) -> list[HostInstance]:
+        """The instances of `host_key` in `started`."""
+        return [i for i in self.started if i.program == host_key]
+
+    async def close_started(self, host_key: str, instances: Sequence[HostInstance]) -> None:
+        """Close the instances (the fake host's record) and forget them in `started`."""
+        await super().close_started(host_key, instances)
+        gone = {i.instance_id for i in instances}
+        self.started = [i for i in self.started if i.instance_id not in gone]
 
     def script_check(self, model_key: str, outcome: ENVELOPE | Raise) -> None:
         """Queue `outcome` for the next `check_model` of `model_key`; with none queued the check succeeds."""
