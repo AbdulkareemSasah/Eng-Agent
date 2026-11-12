@@ -1,0 +1,184 @@
+{
+  "source": "eng-harness spec 0003 §4.6 (F1 to F4) and RFC 8785; synthetic read set, no project value",
+  "method_ref": "§4.6 F2",
+  "synthetic": true,
+  "derivation": "Cases (b) and (d): the frames of case (a) listed in reverse order sort back by id, so the frames bytes and hash are those of case (a). The areas are listed A2 before A1 and sort by id, but each area's points and joints keep the order given (F2: vertex order carries orientation): A1 starts at its second corner, A2's joints stay J3, J1, J2. Sections are listed by kind name.\nbytes[model.area_placements/1] = {\"areas\":[{\"id\":\"A1\",\"joints\":null,\"kind\":\"slab\",\"points\":[{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":3000},{\"x_mm\":6000,\"y_mm\":6000,\"z_mm\":3000},{\"x_mm\":0,\"y_mm\":6000,\"z_mm\":3000},{\"x_mm\":0,\"y_mm\":0,\"z_mm\":3000}],\"section\":\"SL1\",\"story\":null},{\"id\":\"A2\",\"joints\":[\"J3\",\"J1\",\"J2\"],\"kind\":\"slab\",\"points\":[{\"x_mm\":6000,\"y_mm\":6000,\"z_mm\":3000},{\"x_mm\":0,\"y_mm\":6000,\"z_mm\":3000},{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":3000}],\"section\":\"SL1\",\"story\":null}]}\nbytes[model.frame_placements/1] = {\"frames\":[{\"i\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F1\",\"j\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null},{\"i\":{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F2\",\"j\":{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null}]}\nbytes[model.sections/1] = {\"area_sections\":[],\"frame_sections\":[{\"material\":\"M1\",\"name\":\"S1\",\"shape\":{\"b_mm\":300,\"h_mm\":500,\"type\":\"rectangular\"}}]}\nbytes[fingerprint] = {\"method\":\"harness.fp/1\",\"sections\":{\"model.area_placements/1\":\"c516cba71bd0d75ac3e92a8705c9e26a3de4a12fc1b75e39d47c95b9e0c41546\",\"model.frame_placements/1\":\"40ad59c821d703e2855c1ba21f4e845bcdb3f8e25e5d6c54057fd689664a660a\",\"model.sections/1\":\"9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4\"}}",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 6000,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          },
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "areas": {
+        "areas": [
+          {
+            "id": "A2",
+            "kind": "slab",
+            "section": "SL1",
+            "points": [
+              {
+                "x_mm": 6000,
+                "y_mm": 6000,
+                "z_mm": 3000
+              },
+              {
+                "x_mm": 0,
+                "y_mm": 6000,
+                "z_mm": 3000
+              },
+              {
+                "x_mm": 6000,
+                "y_mm": 0,
+                "z_mm": 3000
+              }
+            ],
+            "joints": [
+              "J3",
+              "J1",
+              "J2"
+            ]
+          },
+          {
+            "id": "A1",
+            "kind": "slab",
+            "section": "SL1",
+            "points": [
+              {
+                "x_mm": 6000,
+                "y_mm": 0,
+                "z_mm": 3000
+              },
+              {
+                "x_mm": 6000,
+                "y_mm": 6000,
+                "z_mm": 3000
+              },
+              {
+                "x_mm": 0,
+                "y_mm": 6000,
+                "z_mm": 3000
+              },
+              {
+                "x_mm": 0,
+                "y_mm": 0,
+                "z_mm": 3000
+              }
+            ]
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "S1",
+            "material": "M1",
+            "shape": {
+              "type": "rectangular",
+              "b_mm": 300,
+              "h_mm": 500
+            }
+          }
+        ],
+        "area_sections": []
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "areas": {
+          "result_id": "res_00000000000000000000000003",
+          "kind": "model.area_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        }
+      }
+    }
+  },
+  "expected": {
+    "method": "harness.fp/1",
+    "model_id": "mdl_00000000000000000000000000",
+    "model_revision": 3,
+    "sections": [
+      {
+        "kind": "model.area_placements/1",
+        "result_id": "res_00000000000000000000000003",
+        "items": 2,
+        "sha256": "c516cba71bd0d75ac3e92a8705c9e26a3de4a12fc1b75e39d47c95b9e0c41546",
+        "complete": true
+      },
+      {
+        "kind": "model.frame_placements/1",
+        "result_id": "res_00000000000000000000000001",
+        "items": 2,
+        "sha256": "40ad59c821d703e2855c1ba21f4e845bcdb3f8e25e5d6c54057fd689664a660a",
+        "complete": true
+      },
+      {
+        "kind": "model.sections/1",
+        "result_id": "res_00000000000000000000000002",
+        "items": 1,
+        "sha256": "9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4",
+        "complete": true
+      }
+    ],
+    "covered": [
+      "model.area_placements/1",
+      "model.frame_placements/1",
+      "model.sections/1"
+    ],
+    "complete": true,
+    "fingerprint": "fp1:14fea79585acaa1ac8631ccd43e031c57887c3477da17bcb5e8d665c45ad79aa"
+  }
+}

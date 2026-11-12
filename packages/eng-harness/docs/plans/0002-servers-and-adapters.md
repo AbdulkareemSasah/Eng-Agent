@@ -273,26 +273,41 @@ tasks:
     covers: [AC15, AC30]
     depends_on: [T7, T9]
   - id: T11
-    title: CSI model-state reader, model kinds, fingerprint and units read
-    # Amendment (B-413, documents only): the units trap (AC22, engine AC45) moves to T19; the synthetic CSI fake joins the files.
+    title: CSI reply mapping to the six model kinds and the model status
+    # Amendment (B-450, D-12): split from the reader (now T11b); the B-130 writer measured 581 counted lines for the
+    # whole task (the reply mapping alone about 385).
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_replies.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"
+      - "packages/eng-harness/tests/unit/adapters/test_csi_replies.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"
+    max_changed_lines: 390
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/unit/adapters/test_csi_replies.py::test_six_kinds_and_status_validate"
+    covers: [AC27]
+    depends_on: [T10]
+  - id: T11b
+    title: CSI model-state reader, fingerprint and units read
+    # Amendment (B-450, D-12): the reader half of the former T11. tests/property/test_fingerprint.py is shared with
+    # calcs plan 0003 T7 (and later the SAFE and SAP2000 plans), so T11b merges after calcs T7.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py"
       - "packages/eng-harness/tests/property/test_fingerprint.py"
-      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # csi_model_info replies (object_counts, program_version), test code (B-413)
-    max_changed_lines: 400
-    max_sessions: 3
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"
+    max_changed_lines: 250
+    max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py::test_kinds_and_fingerprint"
       - "packages/eng-harness/tests/property/test_fingerprint.py::test_order_independent_and_edit_sensitive"
     covers: [AC27]
-    depends_on: [T10]
+    depends_on: [T11]
   - id: T12
     title: CSI edit kinds, read-back helpers and check_model
     # Amendment (B-413, documents only): the synthetic CSI fake joins the files (its edit tools must apply the writes they report).
@@ -316,7 +331,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_edits.py::test_gaps_not_implemented"
       - "packages/eng-harness/tests/workflow/adapters/test_readback.py::test_mismatch_detected"
     covers: [AC24, AC25, AC26]
-    depends_on: [T11]
+    depends_on: [T11b]
   - id: T13
     title: CSI analysis, design and results through the long role
     # Amendment (B-413, documents only): the synthetic CSI fake joins the files (analysis status, design results, forces).
@@ -491,7 +506,7 @@ Bottom-up, in the order the code imports itself, with the risky parts early: con
 Objects (T2, T3), because a wrong breakaway choice either kills an engineer's ETABS or orphans instances; the
 synthetic fake (T4), which every later workflow test runs as a real process; the MCP session (T5); the build check
 and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock and guard (T7); the adapter framework (T8,
-T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), model state (T11), edits
+T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), reply mapping and model state (T11, T11b), edits
 and read-back (T12), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
 command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19) that wires the ports into
 the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
@@ -503,8 +518,8 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
-share it (T6b, T10 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11,
+share it (T6b, T10, T11, T11b, T12 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
+serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11b,
 T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
@@ -590,9 +605,12 @@ backstop rules, wedged state and epochs; `model_locked` interim mapping (`HOST_L
 save with hash and identity update, restore (a new hidden instance when launch ownership is lost), `locate`,
 `model_files`.
 
-**T11 Model state** (§4.6.4). The read set, the six model kinds and the status, the fingerprint, `LIMIT_EXCEEDED` on
-truncation, outside-edit detection, `read_units`. The units-trap workflow test, in which the engine stops, is T19's
-(B-413).
+**T11 Model kinds** (§4.6.4). The mapping of the CSI replies to the six model kinds and the status, with the product
+tables, tested on the fake's replies. **T11b Model state** (§4.6.4). The read set, the fingerprint, `LIMIT_EXCEEDED` on
+truncation, outside-edit detection, `read_units`. Amendment B-450 (D-12): T11 split in two (581 counted lines measured);
+`tests/property/test_fingerprint.py` is shared with calcs plan 0003 T7, so T11b merges after it. A dependency on
+servers T11 named in another plan means T11 and T11b.
+The units-trap workflow test, in which the engine stops, is T19's (B-413).
 
 **T12 Edits and read-back** (§4.6.1, §4.6.2, §4.5.8). Argument models and builders per edit kind, the
 `NotImplementedGap` entries H-G1 to H-G3 and the seismic exclusion, read-back helpers, `check_model` with the basis
@@ -669,7 +687,7 @@ they are used (plan 0014 T5, T7, T8).
 - Review: correctness, Python, type-design, silent-failure and test lenses on every task; the security lens on T1
   (configuration), T3 (process creation, handle inheritance), T7 (locks, terminating processes), T16 (running scripts
   with arguments) and T17 (sanitizing recordings); R1 review against the spec's reconciliation and units rules on T9,
-  T11, T12, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
+  T11, T11b, T12, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
 
 ## 5. Rollback
 
