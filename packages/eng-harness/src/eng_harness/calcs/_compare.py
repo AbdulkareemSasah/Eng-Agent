@@ -195,8 +195,9 @@ def compare_rows(
     """D2: match the rows of the keyed list at `path` of a `kind` section by key, in key order.
 
     A key on one side only is `added` or `removed` (whole object). A key that occurs more than once on a side is
-    `ambiguous` with both object lists, unless both sides are byte-identical (then unchanged). A key once on each side
-    is compared member by member; its nested keyed lists are compared under the parent key (`prefix` + key).
+    `ambiguous` with both object lists, even when both sides are byte-identical (AC28: never unchanged; D7).
+    A key once on each side is compared member by member; its nested keyed lists are compared under the parent key
+    (`prefix` + key).
     """
     members = next(fields for k, p, fields in ROW_KEYS if k == kind and p == path)
     groups: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {}
@@ -213,9 +214,6 @@ def compare_rows(
             _merge(diff, _matched(kind, path, key, left[0], right[0], tolerances))
             continue
         if len(left) > 1 or len(right) > 1:
-            if _same(sorted(left, key=canonical_json), sorted(right, key=canonical_json)):
-                diff.outcomes.append("unchanged")
-                continue
             change, old, new = "ambiguous", left, right
         elif right:
             change, old, new = "added", None, right[0]

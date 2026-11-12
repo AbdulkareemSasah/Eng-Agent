@@ -176,11 +176,11 @@ def test_unnamed_row_keys() -> None:
     assert len(ROW_KEYS) == len(keys) == 14
     load = {"frame": "F1", "pattern": "DL", "direction": "gravity", "w_kN_m": 5.0}
     assert row_key(keys[LOADS, ("frame_loads",)], load) == ("F1", "DL", "gravity")
-    item = {"case": {"case": "DL", "case_type": "pattern", "step": "Max"}, "scale_ratio": 1.2}
-    assert row_key(keys[LOADS, ("combinations", "items")], item) == ("DL", "pattern", "Max")
+    item = {"case": {"case": "DL", "case_type": "load_pattern", "step": "Max"}, "scale_ratio": 1.2}
+    assert row_key(keys[LOADS, ("combinations", "items")], item) == ("DL", "load_pattern", "Max")
     # A null member (a case without a step) is left out of the key, so it never equals any step string.
-    item_no_step = {"case": {"case": "DL", "case_type": "pattern", "step": None}, "scale_ratio": 1.2}
-    assert row_key(keys[LOADS, ("combinations", "items")], item_no_step) == ("DL", "pattern")
+    item_no_step = {"case": {"case": "DL", "case_type": "load_pattern", "step": None}, "scale_ratio": 1.2}
+    assert row_key(keys[LOADS, ("combinations", "items")], item_no_step) == ("DL", "load_pattern")
     # Keys are exact: no case folding or trimming (Q5).
     assert row_key(("id",), {"id": " f1"}) == (" f1",)
     with pytest.raises(TypeError, match="key member 'id' is not a string"):
@@ -235,10 +235,18 @@ def test_keyed_rows_change_kinds() -> None:
 
 
 def test_ambiguous_identical_and_sides_shown() -> None:
-    # The same duplicated key on both sides with byte-identical rows (in any order) is unchanged, not ambiguous (D2).
+    # A duplicated key is ambiguous even with byte-identical rows on both sides: never unchanged (AC28, D7).
     rows: list[Any] = [_frame("F1"), _frame("F1", "S2")]
     same = compare_rows(FRAMES, ("frames",), rows, list(reversed(rows)), TOL)
-    assert same == SectionDiff(changes=[], within=[], outcomes=["unchanged"])
+    assert same == SectionDiff(
+        changes=[
+            Change(
+                section=FRAMES, key=["F1"], change="ambiguous", before=rows, after=list(reversed(rows)), properties=[]
+            )
+        ],
+        within=[],
+        outcomes=["ambiguous"],
+    )
     # A duplicate on one side and nothing on the other: both lists shown, the empty one as [].
     gone = compare_rows(FRAMES, ("frames",), rows, [], TOL)
     assert gone.changes == [
@@ -290,7 +298,7 @@ def test_compare_section_whole_payload() -> None:
             {
                 "name": "C1",
                 "type": "linear_add",
-                "items": [{"case": {"case": "DL", "case_type": "pattern"}, "scale_ratio": 1.4}],
+                "items": [{"case": {"case": "DL", "case_type": "load_pattern"}, "scale_ratio": 1.4}],
             }
         ],
         "frame_loads": [{"frame": "F1", "pattern": "DL", "direction": "gravity", "w_kN_m": 5.0}],
@@ -302,7 +310,7 @@ def test_compare_section_whole_payload() -> None:
             {
                 "name": "C1",
                 "type": "linear_add",
-                "items": [{"case": {"case": "DL", "case_type": "pattern"}, "scale_ratio": 1.2}],
+                "items": [{"case": {"case": "DL", "case_type": "load_pattern"}, "scale_ratio": 1.2}],
             }
         ],
         "frame_loads": [{"frame": "F1", "pattern": "DL", "direction": "gravity", "w_kN_m": 5.25}],
@@ -311,7 +319,7 @@ def test_compare_section_whole_payload() -> None:
     diff = compare_section(LOADS, before, after, TOL)
     item_change = Change(
         section=LOADS,
-        key=["C1", "DL", "pattern"],
+        key=["C1", "DL", "load_pattern"],
         change="changed",
         before=None,
         after=None,
