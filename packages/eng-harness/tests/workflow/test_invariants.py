@@ -7,32 +7,35 @@ before its folder exists.
 """
 
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Literal
 
 import pytest
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
-from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import new_model_id, new_result_id
 from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref, RefRule
-from fakes.ports import failure
+from fakes.ports import Raise, failure
 from workflows.chain import ChainInput, ChainOutput
 from workflows.ctx_flows import flow, success
-from workflows.rig import make_rig, request
+from workflows.rig import Host, make_rig, request
 
 from eng_harness.block import workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
-from eng_harness.errors import HarnessCode, RunRefused
+from eng_harness.errors import HarnessCode, RunRefused, ToolFailed
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, ServerCheck, ToolInfo
+from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, ServerCheck, ToolInfo, UnitsState
 
 _SHA = "ab" * 32
 Body = Callable[[Any], Awaitable[Sequence[str]]]
+_DIFFER = UnitsState(loaded=True, ok=False, present="unit-system-b", expected="unit-system-a")
 
 
 def _tool(
@@ -98,7 +101,10 @@ def test_check_after_write(tmp_path: Path) -> None:
     assert "1~pre.check_model.m1" in paths
     assert paths.index("1~pre.check_model.m1") < paths.index("1")
     enforced = [e.payload for e in rig.events(done.run_id) if isinstance(e.payload, ev.CheckEnforced)]
-    assert enforced == [ev.CheckEnforced(invariant=1, model_key="m1", outcome="pass")]
+    assert enforced == [
+        ev.CheckEnforced(invariant=9, model_key="m1", outcome="pass"),
+        ev.CheckEnforced(invariant=1, model_key="m1", outcome="pass"),
+    ]  # the units of the first use, then the check
     # the read's call is after the check; nothing turns the check off (no argument was passed to disable it)
     assert rig.log.index("host.check_model") < rig.log.index("tool.call", rig.log.index("host.check_model"))
 
@@ -381,3 +387,323 @@ def test_no_basis_read_when_nothing_is_required(tmp_path: Path) -> None:
     assert done.status is RunStatus.COMPLETED
     assert "basis.load" not in rig.log
     assert rig.header(done.run_id).servers == []
+
+
+def _trail(rig: Any, run_id: str, *types: EventType) -> list[tuple[str, str | None]]:
+    """(type, path) of the events of the given types, in journal order."""
+    return [(e.type.value, e.path) for e in rig.events(run_id) if e.type in types]
+
+
+def _read_twice(rig: Any, between: Callable[[], None]) -> Body:
+    """A block that reads m1, runs `between` (the host changes), and reads m1 again."""
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        between()
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    return body
+
+
+def test_units_after_reconnect(tmp_path: Path) -> None:
+    """Units are read at the first use, at a resume, and after a reconnect or a timeout; a mismatch stops (AC45)."""
+    marks = (EventType.MODEL_BOUND, EventType.STEP_STARTED, EventType.CHECK_ENFORCED)
+    rig = make_rig(tmp_path / "first")
+    _tools(rig.host)
+    _open(rig, "m1")
+    rig.host.epochs["csi"] = 7  # the epoch is compared with the one this process saw first, whatever its value
+    rig.host.script("read_c", failure(ErrorCode.HOST_BUSY))  # the run stops at its last step
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_c", {"n": 0})
+        return []
+
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert _trail(rig, stopped.run_id, *marks)[:5] == [
+        ("model_bound", None), ("step_started", "0~pre.units.m1"), ("check_enforced", "0~pre.units.m1"),
+        ("step_started", "0"), ("step_started", "1"),
+    ]  # fmt: skip  # once, right after the binding and before the step; the second read of m1 reads no units
+    enforced = [e.payload for e in rig.events(stopped.run_id) if isinstance(e.payload, ev.CheckEnforced)]
+    assert enforced == [ev.CheckEnforced(invariant=9, model_key="m1", outcome="pass")]
+    assert rig.log.count("host.read_units") == 1
+    (units,) = [
+        e.payload.result.summary
+        for e in rig.events(stopped.run_id)
+        if e.path == "0~pre.units.m1" and isinstance(e.payload, ev.StepCompleted) and e.payload.result
+    ]
+    assert units == {"loaded": True, "instance_id": "i-1"}
+    again = asyncio.run(rig.engine(flow(body)).resume(stopped.run_id))
+    assert again.status is RunStatus.COMPLETED
+    paths = [e.path for e in rig.events(stopped.run_id) if e.type is EventType.STEP_STARTED]
+    assert paths.count("0~pre.units.m1") == 1  # replayed, not read again
+    assert "@resume1.units.m1" in paths  # a model the journal only addressed (read) has its units read at a resume
+    assert rig.log.count("host.read_units") == 2
+
+    differ = make_rig(tmp_path / "differ")
+    _tools(differ.host)
+    _open(differ, "m1")
+    differ.host.units["m1"] = _DIFFER
+    first = asyncio.run(differ.engine(flow(_read_twice(differ, lambda: None))).start(request()))
+    assert first.status is RunStatus.NEEDS_ENGINEER  # the run stops (spec 6): it does not raise to the block
+    assert first.escalation is not None
+    assert first.escalation.reason == "units_mismatch"
+    assert differ.host.ledger == []
+    run_id = first.run_id
+    assert _trail(differ, run_id, EventType.RUN_ESCALATED, EventType.STEP_STARTED) == [("run_escalated", None)]
+    escalated = [e.payload for e in differ.events(run_id) if isinstance(e.payload, ev.RunEscalated)]
+    assert [p.reason for p in escalated] == ["units_mismatch"]
+
+    reconnect = make_rig(tmp_path / "reconnect")
+    _tools(reconnect.host)
+    _open(reconnect, "m1")
+    host = reconnect.host
+
+    def reconnected() -> None:
+        host.epochs["csi"] += 1
+
+    done = asyncio.run(reconnect.engine(flow(_read_twice(reconnect, reconnected))).start(request()))
+    assert done.status is RunStatus.COMPLETED
+    assert _trail(reconnect, done.run_id, EventType.STEP_STARTED) == [
+        ("step_started", "0~pre.units.m1"), ("step_started", "0"), ("step_started", "1~host.units.m1"),
+        ("step_started", "1"),
+    ]  # fmt: skip  # the epoch changed before the second step: its units are read first, as an audit record
+    assert reconnect.log.count("host.read_units") == 2
+
+    def reconnected_and_changed() -> None:
+        host.epochs["csi"] += 1
+        host.units["m1"] = _DIFFER
+
+    changed = make_rig(tmp_path / "changed")
+    _tools(changed.host)
+    _open(changed, "m1")
+    host = changed.host
+    second = asyncio.run(changed.engine(flow(_read_twice(changed, reconnected_and_changed))).start(request()))
+    assert second.status is RunStatus.NEEDS_ENGINEER
+    assert second.escalation is not None
+    assert second.escalation.reason == "units_mismatch"
+    assert [entry.tool for entry in changed.host.ledger] == ["read_m"]  # the second read never reached the host
+    assert "1" not in [e.path for e in changed.events(second.run_id) if e.type is EventType.STEP_STARTED]
+
+
+def test_units_mismatch_cannot_be_caught_by_the_block(tmp_path: Path) -> None:
+    """A block that catches an error around the step after a reconnect cannot go on with the wrong units (AC45)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.epochs["csi"] += 1
+        host.units["m1"] = _DIFFER
+        with contextlib.suppress(Exception):  # a block that swallows every error of the step
+            await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
+    assert [entry.tool for entry in host.ledger] == ["read_m"]  # neither later read reached the host
+    types = [e.type for e in rig.events(stopped.run_id)]
+    assert EventType.RUN_COMPLETED not in types
+    assert types.count(EventType.RUN_ESCALATED) == 1
+
+
+@pytest.mark.parametrize(
+    "code", [ErrorCode.TIMEOUT_NO_EFFECT, ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED]
+)
+def test_units_are_read_after_a_read_timed_out(tmp_path: Path, code: ErrorCode) -> None:
+    """A read that timed out on a host makes the units of its models be read again before the retry (AC45 c)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.units["m1"] = _DIFFER
+        host.script("read_m", failure(code))  # the second read times out once; a code that is retried is retried
+        with contextlib.suppress(ToolFailed):  # a code that is not retried ends the step; the next reads units first
+            await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
+    assert [entry.tool for entry in host.ledger] == ["read_m", "read_m"]  # no retry after the changed units
+
+
+@pytest.mark.parametrize("units_ok", [True, False])
+def test_units_are_read_after_a_timeout_before_reconciliation(tmp_path: Path, units_ok: bool) -> None:
+    """A write that timed out is reconciled only after the units of its host's models are read again (AC45 c)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    rig.host.script("write_m", failure(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, "the reply was lost"))
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.units["m1"] = host.units["m1"] if units_ok else _DIFFER
+        await ctx.tool("write_m", {"model": "m1"})
+        return []
+
+    if units_ok:
+        done = asyncio.run(rig.engine(flow(body)).start(request()))
+        assert done.status is RunStatus.COMPLETED
+        reads = [i for i, line in enumerate(rig.log) if line == "host.read_units"]
+        assert len(reads) == 2
+        assert reads[1] < rig.log.index("tool.reconcile")  # the units are read again before the reconciliation
+        assert "1~host.units.m1" in [e.path for e in rig.events(done.run_id) if e.type is EventType.STEP_STARTED]
+        return
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "units_mismatch"
+    assert "tool.reconcile" not in rig.log  # the write stays in flight for the next resume
+    run_id = stopped.run_id
+    assert [e.attempt for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_STARTED] == [1]
+    assert not [e for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_RECONCILED]
+
+
+@pytest.mark.parametrize("outcome", ["unknown", "wedged", "raised"])
+def test_units_steps_after_a_reconnect_and_a_write_timeout_have_distinct_keys(tmp_path: Path, outcome: str) -> None:
+    """The units read at the reconnect and the one after the write timed out are two steps with their own keys."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+    scripted: dict[str, Any] = {
+        "unknown": failure(ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, "the reply was lost"),
+        "wedged": failure(ErrorCode.HOST_WEDGED, "the host does not answer"),
+        "raised": Raise(TimeoutError("the call timed out")),
+    }
+    host.script("write_m", scripted[outcome])
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.epochs["csi"] += 1  # the session changed before the write
+        await ctx.tool("write_m", {"model": "m1"})
+        return []
+
+    done = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert done.status is RunStatus.COMPLETED
+    started = [(e.path, e.attempt) for e in rig.events(done.run_id) if e.type is EventType.STEP_STARTED]
+    assert len(started) == len(set(started))  # one view per path and attempt (spec 0001 section 6)
+    units = [key for key in started if key[0] == "1~host.units.m1"]
+    assert len(units) == 2  # 4.6 #9 (c): after the new session, and again after the timeout, before the reconciliation
+
+
+class _Opening(Host):
+    """The rig's host where the tool `open_m` opens the model `m9`."""
+
+    async def call(self, tool: str, args: Mapping[str, Any], *, op_id: str, model: str | None) -> Any:
+        """As the rig's host; `open_m` then opens its model."""
+        reply = await super().call(tool, args, op_id=op_id, model=model)
+        if tool == "open_m":
+            opened = HostInstance(instance_id="i-9", pid=9, process_started_at=self._clock.now(), program="csi")
+            self.add_model("m9", opened)
+        return reply
+
+
+def test_model_not_open_refused(tmp_path: Path) -> None:
+    """A step addressed to a model no instance holds is refused before its step and its host call (spec 4.8, Q29)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m9"})
+        return []
+
+    with pytest.raises(ContractError) as refused:
+        asyncio.run(rig.engine(flow(body)).start(request()))
+    detail = refused.value.detail
+    assert (detail.code, detail.precondition) == (ErrorCode.PRECONDITION_FAILED, Precondition.model_open)
+    assert "m9" in detail.message
+    assert rig.host.ledger == []
+    (run_id,) = rig.run_ids()
+    assert _trail(rig, run_id, EventType.MODEL_BOUND, EventType.STEP_STARTED) == []
+    assert rig.log.count("host.locate") == 1
+
+    base = make_rig(tmp_path / "open")
+    host = _Opening(base.ids, base.clock, base.workspace.root / "runs")
+    _tools(host)
+    host._tools["open_m"] = ToolInfo(name="open_m", effect="write", action="open", host_key="csi", model_param="model")
+    opening = replace(base, host=host)
+
+    async def open_then_read(ctx: Any) -> list[str]:
+        await ctx.tool("open_m", {"model": "m9"})  # the model is not open before this step: it is bound after it
+        await ctx.tool("read_m", {"model": "m9"})
+        return []
+
+    host.script("read_c", failure(ErrorCode.HOST_BUSY))  # the run stops at its last step
+
+    async def open_read_stop(ctx: Any) -> list[str]:
+        await open_then_read(ctx)
+        await ctx.tool("read_c", {"n": 0})
+        return []
+
+    done = asyncio.run(opening.engine(flow(open_read_stop)).start(request()))
+    assert done.status is RunStatus.NEEDS_ENGINEER
+    assert _trail(opening, done.run_id, EventType.MODEL_BOUND, EventType.STEP_STARTED)[:5] == [
+        ("step_started", "0"), ("model_bound", None), ("step_started", "0~post.units.m9"),
+        ("step_started", "1~pre.check_model.m9"), ("step_started", "1"),
+    ]  # fmt: skip  # the open step wrote the model, so the read that follows is preceded by its check
+    (bound,) = [e.payload for e in opening.events(done.run_id) if isinstance(e.payload, ev.ModelBound)]
+    assert (bound.model_key, bound.instance_id, bound.reason) == ("m9", "i-9", "first_use")
+    again = asyncio.run(opening.engine(flow(open_read_stop)).resume(done.run_id))
+    assert again.status is RunStatus.COMPLETED  # the recorded `~post.units` step is replayed, not diverged from
+    started = [e.path for e in opening.events(done.run_id) if e.type is EventType.STEP_STARTED]
+    assert started.count("0~post.units.m9") == 1
+    assert opening.log.count("host.locate") == 1  # the binding is journaled: a resume does not locate the model again
+
+
+def test_open_tool_that_leaves_nothing_open_binds_nothing(tmp_path: Path) -> None:
+    """After an `open` tool no instance holds the model: nothing is bound, and the next step on it is refused."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    rig.host._tools["open_m"] = ToolInfo(
+        name="open_m", effect="read", action="open", host_key="csi", model_param="model"
+    )
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("open_m", {"model": "m9"})
+        await ctx.tool("read_m", {"model": "m9"})
+        return []
+
+    with pytest.raises(ContractError) as refused:
+        asyncio.run(rig.engine(flow(body)).start(request()))
+    assert refused.value.detail.precondition is Precondition.model_open
+    (run_id,) = rig.run_ids()
+    assert _trail(rig, run_id, EventType.MODEL_BOUND, EventType.STEP_STARTED) == [("step_started", "0")]
+    assert rig.log.count("host.locate") == 2  # after the open tool, and before the step that was refused
+
+
+def test_reconnect_reads_the_units_of_that_hosts_models_only(tmp_path: Path) -> None:
+    """A new session of the host `other` does not make the engine read the units of m1, which `csi` holds (4.6 #9)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    rig.host._tools["read_other"] = ToolInfo(name="read_other", effect="read", action="plain", host_key="other")
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_other", {"n": 1})
+        host.epochs["other"] += 1
+        await ctx.tool("read_other", {"n": 2})
+        return []
+
+    done = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert done.status is RunStatus.COMPLETED
+    assert rig.log.count("host.read_units") == 1  # the first use of m1 only
+    assert not [e for e in rig.events(done.run_id) if "~host." in (e.path or "")]

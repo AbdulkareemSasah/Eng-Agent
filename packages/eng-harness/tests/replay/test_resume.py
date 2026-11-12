@@ -105,20 +105,28 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
     workflow = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"}), ("read_c", {"n": 2})])
     first = asyncio.run(rig.engine(workflow).start(request()))
     run_id = first.run_id
-    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed"]
+    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and "~" not in s.path]
     mark, ledger = len(rig.log), len(rig.host.ledger)
     outcome = asyncio.run(rig.engine(workflow).resume(run_id))
     assert outcome.status is RunStatus.COMPLETED
     assert isinstance(outcome.output, ChainOutput)
     assert outcome.output.refs[:2] == recorded  # the first two steps returned what the journal holds
-    # the resume read the unreleased tools; only the third step went further, to describe and call its tool
-    assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call", "host.check_model"]
+    # the resume read the unreleased tools and, for m1 (bound, written), its units and state (4.5.1 steps 6 and 8);
+    # only the third step went further, to describe and call its tool (after the session epoch of its host)
+    assert rig.log[mark:] == [
+        "tool.unreleased_tools", "host.read_units", "host.model_state", "tool.describe", "host.session_epoch",
+        "tool.call", "host.check_model",
+    ]  # fmt: skip
     assert len(rig.host.ledger) == ledger + 1
     assert (rig.host.ledger[-1].tool, rig.host.ledger[-1].op_id) == ("read_c", op_id(run_id, "2", 4))
     events = rig.events(run_id)
-    assert [e.type for e in events[-8:]] == [
+    assert [e.type for e in events[-12:]] == [
         T.RUN_ESCALATED,
         T.RUN_RESUMED,
+        T.STEP_STARTED,  # @resume1.units.m1
+        T.STEP_COMPLETED,
+        T.STEP_STARTED,  # @resume1.model_state.m1
+        T.STEP_COMPLETED,
         T.STEP_STARTED,
         T.STEP_COMPLETED,
         T.STEP_STARTED,
@@ -126,14 +134,15 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
         T.CHECK_ENFORCED,
         T.RUN_COMPLETED,
     ]  # fmt: skip
-    resumed, started = events[-7].payload, events[-6]
+    resumed, started = events[-11].payload, events[-6]
     assert isinstance(resumed, ev.RunResumed)
     assert (resumed.resume_no, resumed.code_hash_changed, resumed.servers) == (1, False, [])
     assert resumed.restored_to_seq is None
     assert (started.path, started.attempt) == ("2", 4)  # after three failed attempts it ran again as attempt 4
-    views = [(s.path, s.attempt, s.status) for s in _steps(rig, run_id)]
+    views = [(s.path, s.attempt, s.status) for s in _steps(rig, run_id) if not s.path.startswith("@")]
     assert views == [
         ("0", 1, "completed"),
+        ("1~pre.units.m1", 1, "completed"),
         ("1", 1, "completed"),
         ("2", 1, "failed"),
         ("2", 2, "failed"),
@@ -231,22 +240,33 @@ def test_pause_and_resume(tmp_path: Path) -> None:
     done = asyncio.run(rig.engine(workflow).resume(run_id))
     assert done.status is RunStatus.COMPLETED
     # the recorded steps returned their results with no port call; the run went live at the first unrecorded step (AC27)
-    assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call", "host.check_model"]
+    assert rig.log[mark:] == [
+        "tool.unreleased_tools", "host.read_units", "host.model_state", "tool.describe", "host.session_epoch",
+        "tool.call", "host.check_model",
+    ]  # fmt: skip  # the resume checks m1 (steps 6 and 8) first
     assert [c.tool for c in rig.host.ledger[len(ledger) :]] == ["read_c"]
     assert isinstance(done.output, ChainOutput)
-    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and not s.path.startswith("~")]
+    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and s.path.isdigit()]
     assert done.output.refs == recorded
-    assert [e.type for e in rig.events(run_id)[-10:]] == [
-        T.RUN_PAUSED,
-        T.RUN_RESUMED,
-        T.RUN_PAUSED,
-        T.RUN_RESUMED,
-        T.STEP_STARTED,
-        T.STEP_COMPLETED,
-        T.STEP_STARTED,
-        T.STEP_COMPLETED,
-        T.CHECK_ENFORCED,
-        T.RUN_COMPLETED,
+    assert [(e.type, e.path) for e in rig.events(run_id)[-18:]] == [
+        (T.RUN_PAUSED, None),
+        (T.RUN_RESUMED, None),
+        (T.STEP_STARTED, "@resume1.units.m1"),  # each resume reads m1 first (4.5.1 steps 6 and 8)
+        (T.STEP_COMPLETED, "@resume1.units.m1"),
+        (T.STEP_STARTED, "@resume1.model_state.m1"),
+        (T.STEP_COMPLETED, "@resume1.model_state.m1"),
+        (T.RUN_PAUSED, None),
+        (T.RUN_RESUMED, None),
+        (T.STEP_STARTED, "@resume2.units.m1"),
+        (T.STEP_COMPLETED, "@resume2.units.m1"),
+        (T.STEP_STARTED, "@resume2.model_state.m1"),
+        (T.STEP_COMPLETED, "@resume2.model_state.m1"),
+        (T.STEP_STARTED, "2"),
+        (T.STEP_COMPLETED, "2"),
+        (T.STEP_STARTED, "~end.check_model.m1"),
+        (T.STEP_COMPLETED, "~end.check_model.m1"),
+        (T.CHECK_ENFORCED, "~end.check_model.m1"),
+        (T.RUN_COMPLETED, None),
     ]  # fmt: skip
     reader = JournalReader(rig.run_dir(run_id))
     assert reader.run().status == "COMPLETED"
