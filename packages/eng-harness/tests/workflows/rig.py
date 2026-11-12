@@ -32,10 +32,11 @@ from eng_harness.block import BlockDef, Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter, is_locked
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, LoadedBasis, RunClass, ServerCheck, ToolInfo
+from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, RunClass, ServerCheck, ToolInfo
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
 BASIS_REF = "res_" + "0" * 26
+OPEN_MODELS = ("m1", "m2")
 TOOLS = (
     ToolInfo(name="read_a", effect="read", action="plain", host_key="csi"),
     ToolInfo(name="read_c", effect="read", action="plain", host_key="csi"),
@@ -81,6 +82,9 @@ class Host(FakeHost):
     ) -> None:
         """Serve `TOOLS`; `unreleased` names the tools that are not released yet (none by default)."""
         super().__init__(TOOLS, ids, clock)
+        rig_instance = HostInstance(instance_id="rig-1", pid=1, process_started_at=clock.now(), program="csi")
+        for key in OPEN_MODELS:  # the models the tests address are open (spec 4.8: a step on a closed model is refused)
+            self.add_model(key, rig_instance)
         self.unreleased: dict[str, str] = dict(unreleased or {})
         self.locked: list[bool] = []
         self._runs_dir = runs_dir

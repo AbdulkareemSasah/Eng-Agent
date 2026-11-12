@@ -41,7 +41,11 @@ def _interrupted(tmp_path: Path) -> tuple[Rig, str, list[str]]:
     first = asyncio.run(rig.engine(chain(ORIGINAL)).start(request(values={"count": 3})))
     assert first.status is RunStatus.NEEDS_ENGINEER
     events = rig.events(first.run_id)
-    refs = [e.payload.result.ref for e in events if isinstance(e.payload, ev.StepCompleted) and e.payload.result]
+    refs = [
+        e.payload.result.ref
+        for e in events
+        if isinstance(e.payload, ev.StepCompleted) and e.payload.result and "~" not in (e.path or "")
+    ]  # the steps of the block, not the units read that the engine inserted before the first use of m1
     return rig, first.run_id, refs
 
 
@@ -70,8 +74,9 @@ def test_divergence_variants(tmp_path: Path, variant: str) -> None:
     assert stopped.escalation is not None
     assert stopped.escalation.reason == "replay_divergence"
     assert len(rig.host.ledger) == ledger  # no live tool call
-    assert set(rig.log[mark:]) <= {"tool.unreleased_tools"}  # and no other tool or host call either
-    gained = rig.events(run_id)[len(before) :]
+    reads = {"host.read_units", "host.model_state"}  # the bound model m1 is read at the resume, before the block runs
+    assert set(rig.log[mark:]) <= {"tool.unreleased_tools"} | reads  # and no other tool or host call either
+    gained = [e for e in rig.events(run_id)[len(before) :] if not (e.path or "").startswith("@")]  # not @resume reads
     # a header change is found before the resume is recorded; a changed step after it (spec 4.5.1 step 3)
     assert [e.type for e in gained] == ([T.RUN_ESCALATED] if in_header else [T.RUN_RESUMED, T.RUN_ESCALATED])
     escalated = gained[-1].payload
@@ -344,6 +349,7 @@ def test_inserted_steps_are_replayed(tmp_path: Path) -> None:
     assert again.escalation is not None
     assert again.escalation.reason == "replay_divergence"
     assert "check_model" in again.escalation.detail
+    assert "0~pre.units.m1" in again.escalation.detail  # the units read of the first use is part of the sequence too
 
     host_only = make_rig(tmp_path / "host")
 
