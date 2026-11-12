@@ -1,9 +1,8 @@
 """Append-only evaluation store and release verification (spec 0009 section 4.10, AC41, AC42).
 
-One SQLite file ``<workspace>/decisions/evaluations.sqlite`` with ``STRICT`` tables; ``evaluations`` is append-only
-(triggers forbid ``UPDATE`` and ``DELETE``). The system never releases a point: ``verify_releases`` only drops a release
-the owner wrote when what was evaluated is no longer what runs (12 section 6). Units: ``min_confidence`` is a ratio.
-Errors: ``StoreWriteError`` (``INTERNAL``) for a failed open, write or read.
+``<workspace>/decisions/evaluations.sqlite`` is ``STRICT`` and append-only (triggers forbid ``UPDATE`` and ``DELETE``).
+``verify_releases`` only drops an owner's release that no longer matches what runs (12 section 6). Units:
+``min_confidence`` is a ratio. Errors: ``StoreWriteError`` (``INTERNAL``) for a failed open, write or read.
 """
 
 import json
@@ -182,8 +181,7 @@ class EvalStore:
 
     def get(self, evaluation_id: str) -> StoredEvaluation | None:
         """Return the evaluation with this id, or ``None``."""
-        found = self._read(" WHERE evaluation_id = ?", (evaluation_id,))
-        return found[0] if found else None
+        return next(iter(self._read(" WHERE evaluation_id = ?", (evaluation_id,))), None)
 
     def records(self, point: str) -> tuple[StoredEvaluation, ...]:
         """Return the evaluations of ``point`` in append order."""
@@ -206,8 +204,7 @@ def _drop_reason(
         return "point_version_changed"
     if release.basis == "owner":
         return None
-    found = [store.get(i) for i in ids]
-    evaluations = [e for e in found if e is not None and e.point == point]
+    evaluations = [e for e in map(store.get, ids) if e is not None and e.point == point]
     if len(evaluations) != len(ids):
         return "record_missing"
     if not all(e.eligible for e in evaluations):
@@ -240,9 +237,8 @@ def verify_releases(
     findings: list[ReleaseFinding] = []
     for point, release in sorted(settings.shadow_released.items(), key=lambda item: item[0]):
         policy = policies.get(point, DecisionPolicy())
-        reason = _drop_reason(point, release, store, keys, policy, point_versions.get(point))
-        if reason is None:
-            kept[point] = release
-        else:
+        if reason := _drop_reason(point, release, store, keys, policy, point_versions.get(point)):
             findings.append(ReleaseFinding(point=point, reason=reason))
+        else:
+            kept[point] = release
     return ReleaseVerification(releases=kept, findings=tuple(findings))

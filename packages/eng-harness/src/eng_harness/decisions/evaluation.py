@@ -250,7 +250,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     parser = argparse.ArgumentParser(prog="eng_harness.decisions.evaluation")
     sub = parser.add_subparsers(dest="command", required=True)
-    cmd = sub.add_parser("evaluate", help="evaluate the labels of one point and append the record")
+    cmd = sub.add_parser("evaluate")
     cmd.add_argument("point")
     cmd.add_argument("--workspace", type=Path, default=Path.cwd())
     cmd.add_argument("--point-version", type=int, default=None)

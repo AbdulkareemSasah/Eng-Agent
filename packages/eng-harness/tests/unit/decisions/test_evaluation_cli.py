@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from eng_contract.canonical import canonical_json
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 
@@ -10,7 +11,7 @@ from eng_harness.decisions._evalstore import EvalStore, StoredEvaluation, labels
 from eng_harness.decisions._labels import LabeledExample, LabelStore
 from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions._record import Suggestion
-from eng_harness.decisions.evaluation import EvalThresholds, evaluate_point, main
+from eng_harness.decisions.evaluation import EvalThresholds, evaluate_point, labels_from_export, main
 
 START_MS = 1_767_225_600_000
 MODEL_KEY = "model:jev/jev-1@v1"
@@ -102,3 +103,33 @@ def test_evaluate_from_export(tmp_path: Path, capsys: pytest.CaptureFixture[str]
         main(["evaluate", "footing_fix", "--workspace", str(workspace), "--point-version", "1",
               "--from-export", str(export)])  # fmt: skip
     assert info.value.detail.code is ErrorCode.INVALID_ARGUMENT
+
+
+def test_export_reader_filters_point_and_version(tmp_path: Path) -> None:
+    labels = _workspace(tmp_path / "ws")
+    labels.close()
+    lines = []
+    for label in (_label(1), _label(2, version=2), _label(3, point="other")):
+        data = label.model_dump(
+            mode="json", by_alias=True, exclude={"engineer", "run_id", "step_path", "request_id", "label_id"}
+        )
+        lines.append(canonical_json(data).decode("utf-8"))
+    export = tmp_path / "export.jsonl"
+    export.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    read = labels_from_export(export, "footing_fix", 1)
+
+    assert [x.state_sha256 for x in read] == ["sha_1"]
+    assert (read[0].label_id, read[0].request_id) == ("export_0", "export_0")
+    assert read[0].engineer == "export"
+    with pytest.raises(ContractError) as info:
+        labels_from_export(tmp_path / "missing.jsonl", "footing_fix", 1)
+    assert info.value.detail.field == "from_export"
+    assert info.value.detail.message == "the label export cannot be read"
+
+
+def test_unknown_point_needs_a_version(tmp_path: Path) -> None:
+    with pytest.raises(ContractError) as info:
+        main(["evaluate", "no_such_point", "--workspace", str(tmp_path)])
+    assert info.value.detail.field == "point"
+    assert not (tmp_path / "decisions").exists()
