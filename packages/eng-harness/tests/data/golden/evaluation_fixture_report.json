@@ -1,0 +1,29 @@
+{
+  "source": "hand-computed from the fixture labels in tests/unit/decisions/test_evaluation.py (test_metrics_match_fixture)",
+  "report": {
+    "by": {
+      "model:jev/jev-1@v1": {
+        "cases": 4,
+        "answered": 4,
+        "above": 3,
+        "agreeing": 2,
+        "agreement": 0.6666666666666666,
+        "abstention_rate": 0.25,
+        "latency_p50_ms": 50,
+        "latency_p95_ms": 200
+      },
+      "llm:openrouter/mini@v1": {
+        "cases": 4,
+        "answered": 3,
+        "above": 3,
+        "agreeing": 2,
+        "agreement": 0.6666666666666666,
+        "abstention_rate": 0.25,
+        "latency_p50_ms": 80,
+        "latency_p95_ms": 120
+      }
+    },
+    "eligible": false,
+    "reasons": ["agreement_below_threshold", "calibration_not_evaluated", "too_few_cases"]
+  }
+}
