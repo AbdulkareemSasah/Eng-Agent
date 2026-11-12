@@ -258,7 +258,7 @@ Fields the model edit cycle is expected to need (proposal for spec 0007, which o
 | Path | Kind | Why |
 |---|---|---|
 | `limits.drift_ratio` | quantity (ratio) | summary of drifts against a limit (13 example, engine AC17) |
-| `limits.ratio_limit` | quantity (ratio) | design-ratio threshold for the summary (contract §4.9 `ratio_limit`) |
+| `limits.ratio_limit_ratio` | quantity (ratio) | design-ratio threshold for the summary (contract §4.9 `ratio_limit`) |
 | `modeling.merge_tolerance_mm` | quantity | joint merge after edits (13 §2 `modeling`) |
 | `modeling.snap_tolerance_mm` | quantity | grid snapping of new objects (13 §2) |
 | `modeling.section_rounding_increment_mm` | quantity | new section sizes (13 §2) |

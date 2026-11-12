@@ -199,6 +199,14 @@ def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, contr
                     {"name": "C2", "combo_type": 0, "components": [{"name": "DEAD", "factor": 1.2}]},
                 ),
                 ("csi_delete_load_combo", {"name": "C1", "confirm": True}),
+                (  # AC27: the area-section list shows name and type only, so a wall thickness is in the fingerprint
+                    "csi_define_wall_section",
+                    {"name": "W1", "material": "C30", "thickness": 200.0, "wall_type": "Specified", "units": "kN_mm_C"},
+                ),
+                (
+                    "csi_define_wall_section",
+                    {"name": "W1", "material": "C30", "thickness": 250.0, "wall_type": "Specified", "units": "kN_mm_C"},
+                ),
             ]
             for tool, arguments in edits:
                 await _write(manager, held.pid, tool, **arguments)
@@ -424,7 +432,7 @@ def test_reads_are_capped_tokened_and_targeted() -> None:
         "csi_list_load_patterns",
         "csi_list_load_combos",
         "csi_list_area_sections",
-        *["csi_db_table_read"] * 5,
+        *["csi_db_table_read"] * 6,
         "csi_model_info",
     ]
     for tool, arguments, _ in calls:

@@ -38,6 +38,9 @@ scope of the provider's second-line check (§4.10: `DecisionSettings.sensitive_v
 redaction criteria (AC33, AC34), and the owner of the provider error types (§10: plan 0005 T5, AC41). They are listed
 in §11 (Q13, Q14).
 
+**Amendment B-471.** Spec 0006 Q15 (decided by the owner's instruction of 2026-11-12): `DecisionSettings` is read from
+the `[decisions]` section of `harness.toml` (§4.3). Listed in §11 (Q15); it adds no criterion.
+
 ## 1. Problem
 
 Workflows reach points where the next step depends on a judgment: which fix to try after a failed design check, which
@@ -332,7 +335,9 @@ class FootingFixStrategy: ...  # builds an immutable DecisionPoint; no global re
 (16 §2), `sensitive_values` (strings that must never leave the machine: names the engineer or the CLI supplies; the
 engine adds the base names of model files the run touches), `extra_denied_tokens` (extends §4.10), `shadow_released`
 (`{point name: ShadowRelease(point_version, basis: "evaluation" | "owner", record: str)}`), `export_enabled` (default
-`False`).
+`False`). Its `harness.toml` section is `[decisions]` (amendment B-471, spec 0006 Q15): one key per field above, with
+the types and bounds stated here, and `shadow_released.<point>` a sub-table holding that point's `ShadowRelease`
+fields.
 
 **Effective shadow** = `policy.shadow or no ShadowRelease for (point.name, point.version)`. A tier 2 or 3 answer can
 be accepted only when effective shadow is off. Creating a `ShadowRelease` after an evaluation (12 §6: at least 50
@@ -695,3 +700,4 @@ T5 and T10; amendment B-411: plan 0009 T1 no longer adds them; AC41 here tests t
 | Q12 | Spec 0009 Q7 (amendment B-098): §4.7 carries the provider error types of spec 0009 §4.3 (`ProviderFailure` was used and undefined), and the cascade hands the decision-runtime summary to the engine for the run header (§4.12, engine Q24) | Owner | Accept (§4.7, §4.12, AC22, AC43); spec 0009 §4.3 and this section must stay identical; AC41 here tests the shapes first (`test_provider_error_shape`, plan 0005 T5, amendment B-411) and spec 0009 AC5 keeps a regression test |
 | Q13 | Plan pre-flight (amendment B-411): (a) how the lock tests and AC12 enumerate the real points and rules (discovery over `eng_harness.workflows` and `eng_harness.rules`, §4.2, §4.4); (b) one `--write-lock` for both locks; (c) `DecisionCall.sensitive_values` and the union that drives tier skips and hash-only labels (engine Q19); (d) the pending API with stored batch outcomes; (e) plan 0005 T5 builds the provider error types (AC41 `test_provider_error_shape`); (f) `LabelStore.append(label, findings)` takes the cascade's findings and does not re-run the check, so a call-supplied value also makes the label hash-only (AC36); (g) the provider's second-line check of spec 0009 §4.6 uses `DecisionSettings.sensitive_values` only, because `ProviderRequest` carries no sensitive values (§4.10). Cross-plan follow-up: plans 0007 T7 (`tests/unit/edit_cycle/test_rules.py`), 0010 (`tests/rules/test_footing_rules.py`) and 0013 (`tests/unit/rules/test_column_design_rules.py`) name rule-test files that AC12 does not find; each must use `tests/rules/test_<module>.py` with `test_<name>_typical` and `test_<name>_boundary` | Owner | Accept; the follow-up is made in those plans' own amendments (B-417 for plan 0007) |
 | Q14 | Gap (amendment B-411): `record_override(request_id, new_choice, by)` (AC38) needs the overridden decision's `point`, `point_version`, `options` and `state_sha256`, but neither the store (labels and pending rows exist only for decisions that reached the engineer) nor the journal (`decision_made.request_id` is null for an answer of another tier, engine spec §4.4.2) keys a rule, model or LLM decision by `request_id`. The redaction side is settled (an override label is always hash-only, AC38) | Owner | Give `record_override` a keyword argument with the overridden decision's identity (`point`, `point_version`, `options`, `state_sha256`, read by the caller from its `decision_made` event and the point registry), keep `NOT_FOUND` for a `request_id` the caller cannot resolve, and amend AC38 and plan 0005 T6 accordingly; until the owner decides, T6 builds `record_override` against labels and pending rows and records the rest as a gap |
+| Q15 | Spec 0006 Q15: the `harness.toml` section, keys, types and bounds of `DecisionSettings` were named by no document | Owner | Decided (owner instruction of 2026-11-12; amendment B-471): `[decisions]`, one key per field of §4.3 with the types and bounds stated there, `shadow_released.<point>` a sub-table; spec 0006 §4.2.4 passes it through like `[providers.*]` |

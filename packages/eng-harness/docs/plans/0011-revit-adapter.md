@@ -223,6 +223,7 @@ tasks:
     depends_on: [T7]
   - id: T12
     title: Calc harness.frame_element_map and its kind, with golden cases
+    # Amendment (B-467, documents only): the calc reads the basis field compare.length_mm (spec 0007 4.8 name).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -380,7 +381,7 @@ element-not-found case of `change_element_type`, with the evidence stored.
 pipe name.
 
 **T12 Mapping calc** (spec §4.11). Pure function over `model.frame_placements/1` inputs, the optional link map and the
-basis fields (`compare.length`, `mapping.offset_*`), exact arithmetic, the output kind, the verification record
+basis fields (`compare.length_mm`, `mapping.offset_*`), exact arithmetic, the output kind, the verification record
 (draft), and golden cases derived by hand and written in each file's `derivation` field.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the

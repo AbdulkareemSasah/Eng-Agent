@@ -324,19 +324,21 @@ required and the engine refuses to start without them (engine invariant 5). Read
 
 | Path | Unit | Bounds | Used by | Source of the value |
 |---|---|---|---|---|
-| `compare.length` | `mm` | ≥ 0 | §4.7, §4.8, §4.11 | Template or engineer (13 §3); no default |
-| `compare.angle` | `deg` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.stress` | `MPa` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.unit_weight` | `kN/m3` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.line_load` | `kN/m` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.area_load` | `kPa` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.ratio` | `1` | ≥ 0 | §4.7, §4.8 (dimensionless properties such as `nu_ratio`, `scale_ratio`) | same |
+| `compare.length_mm` | `mm` | ≥ 0 | §4.7, §4.8, §4.11 | Template or engineer (13 §3); no default |
+| `compare.angle_deg` | `deg` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.stress_MPa` | `MPa` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.unit_weight_kN_m3` | `kN/m3` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.line_load_kN_m` | `kN/m` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.area_load_kPa` | `kPa` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.dimensionless_ratio` | `1` | ≥ 0 | §4.7, §4.8 (dimensionless properties such as `nu_ratio`, `scale_ratio`) | same |
 | `modeling.section_increment` | `mm` | > 0 | §4.10 | 13 §2 `modeling` ("rounding increment for new section sizes") |
 | `modeling.section_rounding` | — | enum `up` | §4.10 | same |
 | `report.top_n` | — | integer ≥ 1 | §4.9 | Template or engineer |
 
 The `compare.*` section is not in 13 §2. Q2 proposes it to spec 0004. These seven are exactly the quantity kinds that
-occur in the neutral model kinds of contract §4.10.2.
+occur in the neutral model kinds of contract §4.10.2. Each `compare.*` field is the tolerance of the contract quantity
+kind (contract §4.7.2) that its last segment names before the unit suffix: `length`, `angle`, `stress`,
+`unit_weight`, `line_load`, `area_load`, and `dimensionless` for `compare.dimensionless_ratio` (amendment B-467).
 
 ### 4.5 Content hash and approvals
 
@@ -641,7 +643,7 @@ It extends the count check of ب2.
 
 **Input** `PlacementInput`: `a_frames`, `b_frames` (`model.frame_placements/1`), `a_areas`, `b_areas`
 (`model.area_placements/1`; each side needs frames, areas or both, and the same on both sides), `basis`
-(`compare.length`). `a_*` is the earlier side and is `stale_ok`; `b_*` and `basis` are not (§4.13).
+(`compare.length_mm`). `a_*` is the earlier side and is `stale_ok`; `b_*` and `basis` are not (§4.13).
 
 **Output kind** `harness.placement_comparison/1`: `counts` (per element class and type, `frame` × {`column`, `beam`,
 `brace`, `other`} and `area` × {`slab`, `wall`, `deck`, `other`}, and per story with `unassigned` for `null`: `a`,
