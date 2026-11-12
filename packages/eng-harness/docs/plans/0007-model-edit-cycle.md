@@ -439,6 +439,8 @@ avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness
 `tests/contract/test_block_lock.py::test_lock_matches_registry` then covers the `model_edit_cycle` blocks;
 `test_definition.py::test_workflow_registered` checks that `discover()` holds them (the lock part of AC1). The public
 module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 T11 and T13 add their blocks to the same tuple.
+Plan 0006 T18a binds the command line's workflow-registry default to this registry (amendment B-471), so `run` finds
+the model edit cycle without plan 0010 T9.
 The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main(["--write-lock"])`, which writes
 `discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
 and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
