@@ -113,9 +113,9 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
     assert outcome.status is RunStatus.COMPLETED
     assert isinstance(outcome.output, ChainOutput)
     assert outcome.output.refs[:2] == recorded  # the first two steps returned what the journal holds
-    # the resume read the unreleased tools, checked the servers and leased csi, the host of m1 (bound, written), and read
-    # its units and state (4.5.1 steps 3 to 6 and 8); only the third step went further, to describe and call its tool
-    # (after the session epoch of its host) and ask the host for the instances it started; the lease goes at the end
+    # the resume read the unreleased tools, checked the servers and leased csi, the host of m1 (bound, written), and
+    # read its units and state (4.5.1 steps 3 to 6 and 8); only the third step went further, to describe and call its
+    # tool (after the session epoch of its host) and ask the host for the instances it started; the lease ends last
     assert rig.log[mark:] == [
         "tool.unreleased_tools", "host.preflight", "host.acquire", "host.read_units", "host.model_state",
         "tool.describe", "host.session_epoch", "tool.call", "host.started_instances", "host.check_model",
