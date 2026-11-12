@@ -6,6 +6,7 @@ Errors: `pydantic.ValidationError` for every violated rule (a missing or malform
 that contradicts the suffix, a template field without a citation).
 """
 
+import re
 from collections.abc import Iterable
 from typing import Annotated, Self
 
@@ -15,10 +16,15 @@ from eng_contract._types import Sha256Hex
 from eng_contract.ids import Timestamp
 from eng_contract.kinds._common import Name, Payload
 from eng_contract.refs import RefString
-from eng_contract.units import UNITS, kind_for_field
+from eng_contract.units import QUANTITY_KINDS, UNITS, kind_for_field
 
-BasisPath = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$")]
-"""Dotted path of a basis field, for example `limits.drift_ratio`."""
+_SUFFIXES = "|".join(re.escape(kind.suffix) for kind in QUANTITY_KINDS.values())
+BasisPath = Annotated[
+    str,
+    StringConstraints(pattern=rf"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*\.(?:[a-z0-9_]*(?:{_SUFFIXES})|[a-z0-9_]+)$"),
+]
+"""Dotted path of a basis field, for example `limits.drift_ratio`: lowercase segments, except that the last may end with
+one unit suffix of `units.QUANTITY_KINDS` written as the table writes it, for example `compare.stress_MPa`."""
 _TIMESTAMP = TypeAdapter(Timestamp)
 _REF = TypeAdapter(RefString)
 
