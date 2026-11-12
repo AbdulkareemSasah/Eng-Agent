@@ -141,10 +141,10 @@ class FakeBinder:
 
     def __init__(self, binding: Binding) -> None:
         self.binding_of = binding
-        self.asked: list[tuple[str, str | None]] = []
+        self.asked: list[tuple[str, str | None, str]] = []
 
-    async def binding(self, host_key: str, model: str | None) -> Binding:
-        self.asked.append((host_key, model))
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
+        self.asked.append((host_key, model, descriptor.name))
         return self.binding_of
 
     def revision(self, model_id: str) -> int | None:
@@ -251,7 +251,7 @@ def test_read_call_makes_an_envelope_and_no_ledger_entry(rig: Rig) -> None:
     assert rig.caller.calls == [
         ("csi", "main", "csi_list_stories", {"target": {"product": "ETABS", "pid": 4242}}, CallEffect.READ)
     ]
-    assert rig.binder.asked == [("csi", "main")]
+    assert rig.binder.asked == [("csi", "main", "csi_list_stories")]  # the binder is given the tool's descriptor
     assert not rig.ledger.path.exists()  # only a write is ledgered
 
 

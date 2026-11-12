@@ -21,9 +21,9 @@ from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref, RefRule
 from fakes.ports import Raise, failure
-from workflows.chain import ChainInput, ChainOutput
-from workflows.ctx_flows import flow, success
-from workflows.rig import Host, make_rig, request
+from workflows.chain import ORIGINAL, ChainInput, ChainOutput, chain
+from workflows.ctx_flows import flow, need_approval, success
+from workflows.rig import Host, make_rig, request, watch_closing
 
 from eng_harness.block import workflow
 from eng_harness.calc import CalcStatus
@@ -31,7 +31,7 @@ from eng_harness.engine import RunStatus
 from eng_harness.errors import HarnessCode, RunRefused, ToolFailed
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, ServerCheck, ToolInfo, UnitsState
+from eng_harness.ports import CalcInfo, HostInstance, HostLease, LoadedBasis, ServerCheck, ToolInfo, UnitsState
 
 _SHA = "ab" * 32
 Body = Callable[[Any], Awaitable[Sequence[str]]]
@@ -707,3 +707,104 @@ def test_reconnect_reads_the_units_of_that_hosts_models_only(tmp_path: Path) -> 
     assert done.status is RunStatus.COMPLETED
     assert rig.log.count("host.read_units") == 1  # the first use of m1 only
     assert not [e for e in rig.events(done.run_id) if "~host." in (e.path or "")]
+
+
+def _types(rig: Any, run_id: str) -> list[EventType]:
+    return [e.type for e in rig.events(run_id)]
+
+
+def test_host_lease_and_close(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each host is leased before its first step and released at return; instances are journaled and closed (AC46)."""
+    rig = make_rig(tmp_path / "done")
+    closing = watch_closing(rig, monkeypatch)
+    rig.host._tools["read_s"] = ToolInfo(name="read_s", effect="read", action="plain", host_key="safe")
+    rig_instance = HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+    rig.host.started.append(rig_instance)  # the servers of the first step start an instance
+    done = asyncio.run(rig.engine(chain([*ORIGINAL, ("read_s", {"n": 3})])).start(request()))
+    assert done.status is RunStatus.COMPLETED
+    leases = [line for line in rig.log if line == "host.acquire"]
+    assert len(leases) == 2  # one lease for each host (csi, safe), however many steps it serves
+    assert rig.log.index("host.acquire") < rig.log.index("tool.call")  # before the first step on the first host
+    assert rig.log.count("host.release") == 2
+    assert rig.host.leases == {}  # released when the engine returned
+    assert rig.log.count("host.started_instances") == 4  # after every live step, none for the inserted steps
+    started = [(e.path, e.payload) for e in rig.events(done.run_id) if isinstance(e.payload, ev.HostStarted)]
+    assert [p for _, p in started] == [ev.HostStarted(host_key="csi", **rig_instance.model_dump(mode="json"))]
+    first = _types(rig, done.run_id).index(EventType.HOST_STARTED)
+    assert rig.events(done.run_id)[first - 1].path == "0"  # right after the step that started it, before the next
+    assert rig.host.closed == [rig_instance]  # exactly the journaled instances
+    assert len(closing) == 1  # one host key has instances
+    assert closing[0][-1] is EventType.RUN_COMPLETED  # after `run_completed` is appended
+
+    refused = make_rig(tmp_path / "refused")  # a refused lease raises HOST_LOCKED before any step or call on the host
+    held = HostLease(host_key="csi", lease_id="other-run")
+    refused.host.leases["csi"] = held
+    with pytest.raises(ContractError) as locked:
+        asyncio.run(refused.engine(chain(ORIGINAL)).start(request()))
+    assert locked.value.detail.code is ErrorCode.HOST_LOCKED
+    assert refused.host.ledger == []
+    assert refused.host.leases == {"csi": held}  # the other holder's lease is not touched
+    assert not [line for line in refused.log if line in ("host.close_started", "host.release")]
+    assert EventType.RUN_COMPLETED not in _types(refused, refused.run_ids()[0])
+    _stops_without_closing(tmp_path, monkeypatch)
+
+
+async def _two_reads(ctx: Any) -> list[str]:
+    refs = await ctx.parallel(ctx.tool("read_a", {"n": 0}), ctx.tool("read_c", {"n": 1}))
+    return [r.ref.ref for r in refs]
+
+
+def _pauses(rig: Any) -> Body:
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_a", {"n": 0})
+        await need_approval(rig.approvals, "apr_x")  # never answered: the run pauses
+        return []
+
+    return body
+
+
+async def _escalates(ctx: Any) -> list[str]:
+    await ctx.tool("read_a", {"n": 0})
+    await ctx.escalate("an engineer must look", [])
+    return []
+
+
+def _stops_without_closing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A pause or an escalation releases the lease but closes nothing; parallel steps share one lease (AC46)."""
+    rig = make_rig(tmp_path / "parallel")
+    asyncio.run(rig.engine(flow(_two_reads)).start(request()))  # both children want the host at once
+    assert rig.log.count("host.acquire") == 1
+    assert rig.host.leases == {}
+    for name in ("paused", "escalated"):
+        rig = make_rig(tmp_path / name)
+        rig.host.started.append(
+            HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+        )
+        closing = watch_closing(rig, monkeypatch)
+        stopped = asyncio.run(rig.engine(flow(_pauses(rig) if name == "paused" else _escalates)).start(request()))
+        assert stopped.status in (RunStatus.PAUSED, RunStatus.NEEDS_ENGINEER)
+        assert EventType.HOST_STARTED in _types(rig, stopped.run_id)  # the instance is journaled for a later resume
+        assert (closing, rig.host.closed, rig.host.leases) == ([], [], {})
+        assert "host.close_started" not in rig.log
+        assert rig.log.count("host.release") == 1
+
+
+def test_host_started_when_a_read_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An instance started during a read whose port raised is journaled, so the run end can close it (4.6 #10)."""
+    rig = make_rig(tmp_path)
+    closing = watch_closing(rig, monkeypatch)
+    instance = HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+    rig.host.started.append(instance)  # the servers started it during the call that then raised
+    rig.host.script("read_a", Raise(ConnectionResetError("the connection dropped")))
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_a", {"n": 0})
+        return []
+
+    with pytest.raises(ConnectionResetError):
+        asyncio.run(rig.engine(flow(body)).start(request()))
+    run_id = rig.run_ids()[0]
+    started = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.HostStarted)]
+    assert started == [ev.HostStarted(host_key="csi", **instance.model_dump(mode="json"))]
+    assert rig.log.count("host.release") == 1  # the lease is released as the raise leaves the run
+    assert closing == []  # a run that did not end closes nothing; the journal lets a later resume do it

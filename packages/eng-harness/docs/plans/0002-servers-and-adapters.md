@@ -666,7 +666,7 @@ means T12 and T12b.
 **T12b Read-back and check_model** (§4.5.8, the read-back column of §4.6.2; work item B-466). Read-back helpers and
 `check_model` with `READBACK_MISMATCH`, `READBACK_UNAVAILABLE` and the tolerance-free codes. The read-back table keys
 and columns are product facts in `products/_etabs.py`, flagged OQ-G10, not constants in `_checks.py`. Quantities are
-compared "within the design basis field `checks.readback_relative_tolerance` (required by every workflow that writes
+compared "within the design basis field `checks.readback_relative_tolerance_ratio` (required by every workflow that writes
 quantities; never a constant here, §11 G-2)" (spec §4.5.8); how that value reaches `check_model(model_key)`, which
 takes no basis, is an owner question (B-465). The write hook is in `CsiToolPort` (`csi/_tools.py`): it wraps its edit
 builders (`EDIT_BUILDERS`), whose builder sees the canonical model and the binding before the send, to call the

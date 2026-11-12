@@ -32,6 +32,8 @@ _NEXT_PID = PID
 KINDS: dict[str, str] = {t["name"]: t["server_kind"] for t in SCHEMAS["tools"]}  # S-12 inventory `server_kind`
 WRITE_KINDS = {"Write", "Destructive"}  # S-12 report section 7: these raise model_locked while the model is locked
 LOCK_EXEMPT = {"csi_unlock_model", "csi_save_model", "csi_run_analysis", "csi_design_run"}  # S-12 report section 7
+LENGTH_M = {"kN_mm_C": 0.001, "kN_m_C": 1.0}  # metres per length unit of a token (S-12 report, section 4)
+COMBO_NAMES = ("Linear Add", "Envelope", "Absolute Add", "SRSS")  # the schema's combo_type codes 0 to 3
 NEEDS_LAUNCHED = {"csi_open_model", "csi_new_model", "csi_new_blank_model", "csi_exit"}
 COLLECTIONS = (
     "stories", "grids", "points", "frames", "areas", "materials", "frame_sections", "area_sections",
@@ -54,6 +56,7 @@ class State:
     def __init__(self) -> None:
         self.model: dict[str, Any] = {c: [] for c in COLLECTIONS}
         self.model.update(units=DEFAULT_UNITS, locked=False, model_path=None, tables={})
+        self.resting = DEFAULT_UNITS  # the units the model shows between calls: the tables are read in these
         self.target: dict[str, Any] | None = None
         self.session_valid = True
         if CONTROL:
@@ -117,13 +120,62 @@ def _session(name: str, args: dict[str, Any], *, fresh: bool = False) -> dict[st
     return {"ok": True}
 
 
+def _put(table: str, keys: tuple[str, ...], row: dict[str, Any]) -> None:
+    """Replace the row of ``table`` with the same ``keys`` values, else append (a write is idempotent per object)."""
+    rows: list[dict[str, Any]] = STATE.model["tables"].setdefault(table, [])
+    rows[:] = [r for r in rows if any(r.get(k) != row[k] for k in keys)]
+    rows.append(row)
+
+
+def _find(kind: str, name: object) -> dict[str, Any]:
+    rows: list[dict[str, Any]] = STATE.model[kind]
+    for row in rows:
+        if row.get("name") == name:
+            return row
+    raise SasaahError("not_found", f"No {kind[:-1]} named {name}.")
+
+
+def _edit(name: str, args: dict[str, Any], units: str) -> bool:
+    """Apply an edit tool of spec 0002 section 4.6.2 to the model and its tables; False for any other tool."""
+    a = args
+    if name == "csi_assign_frame_section":
+        _find("frames", a["name"])["section"] = a["section"]
+    elif name == "csi_assign_area_section":
+        _find("areas", a["name"])["section"] = a["section"]
+        _put(
+            "Area Assignments - Section Properties", ("UniqueName",), {"UniqueName": a["name"], "Section": a["section"]}
+        )
+    elif name == "csi_define_wall_section":
+        thickness = float(a["thickness"]) * LENGTH_M[units] / LENGTH_M[STATE.resting]  # tables show the resting units
+        row = {"Name": a["name"], "Material": a["material"], "Thickness": thickness}
+        _put("Wall Property Definitions - Specified", ("Name",), row)
+    elif name in ("csi_set_frame_load_distributed", "csi_set_area_load_uniform"):
+        frame = name == "csi_set_frame_load_distributed"
+        table = "Frame Loads Assignments - Distributed" if frame else "Area Load Assignments - Uniform"
+        key = "Frame" if frame else "UniqueName"
+        row = {key: a["name"], "LoadPattern": a["load_pattern"], "Value": a["value"]}
+        _put(table, (key, "LoadPattern"), row)
+    elif name == "csi_set_point_restraint":
+        flags = dict(zip(("Ux", "Uy", "Uz", "Rx", "Ry", "Rz"), a["values"], strict=True))
+        _put("Joint Assignments - Restraints", ("UniqueName",), {"UniqueName": a["name"], **flags})
+    else:
+        return False
+    return True
+
+
 def _add(kind: str, args: dict[str, Any]) -> dict[str, Any]:
     items: list[dict[str, Any]] = STATE.model[kind]
     name = args.get("name") or f"{kind[:-1]}{len(items) + 1}"
     row = {**{k: v for k, v in args.items() if k not in ("units", "target", "dry_run")}, "name": name}
     if kind == "load_combos":  # store the list-reply shape (type, items), not the tool's arguments
         row = {"name": name, "type": args.get("combo_type", 0), "items": list(args.get("components") or [])}
+    items[:] = [r for r in items if r["name"] != name]  # a combination is replaced, not duplicated (S-12 section 2)
     items.append(row)
+    if kind == "load_patterns":
+        table = {"Name": name, "Type": args.get("type", "Dead"), "SelfWtMultpl": args.get("self_weight", 0)}
+        _put("Load Pattern Definitions", ("Name",), table)
+    elif kind == "load_combos":
+        _put("Load Combination Definitions", ("Name",), {"Name": name, "Type": COMBO_NAMES[row["type"]]})
     return {"name": name}
 
 
@@ -155,8 +207,12 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     adds.update(csi_add_load_pattern="load_patterns", csi_add_load_combo="load_combos")
     if name in adds:
         return _add(adds[name], args)
+    if _edit(name, args, units):
+        return {"ok": True}
     if name == "csi_delete_load_combo":
         model["load_combos"] = [c for c in model["load_combos"] if c["name"] != args.get("name")]
+        defs = model["tables"].get("Load Combination Definitions", [])
+        model["tables"]["Load Combination Definitions"] = [r for r in defs if r["Name"] != args.get("name")]
     elif name == "csi_run_analysis":
         model["locked"] = True
     elif name == "csi_unlock_model":
@@ -200,6 +256,7 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
     if name == "csi_run_analysis" and (slow := STATE.pop_fault(name, {"slow_analysis"})):
         await asyncio.sleep(float(slow.get("seconds", 1.0)))
     previous = STATE.model["units"]
+    STATE.resting = previous
     requested = args.get("units") if "units" in props else None
     leave = bool(requested) and STATE.pop_fault(name, {"units_left_changed"}) is not None
     if requested:
