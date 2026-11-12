@@ -1,51 +1,21 @@
 """Engineer requests of the column workflow (spec 0013 section 4.3); `request_refusal` names spiral and seismic gaps."""
 
-from typing import Annotated, ClassVar, Literal, Self
+from typing import Annotated, Literal, Self
 
-from eng_contract.kinds.basis import BasisPath
-from eng_contract.units import QUANTITY_KINDS, UNITS
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
+from pydantic import BaseModel, Field, StrictBool, model_validator
 
 from eng_harness.kinds.edit_cycle import NONEMPTY, Label
+from eng_harness.workflows.model_edit_cycle._change_set import _M, BasisValue, LengthValue, _InputValue
 
 _GAP_SPIRAL = "CK Q4"  # spec 0013 section 4.3, CK Q4
 _GAP_SEISMIC = "CK Q10"  # spec 0013 section 4.3, CK Q10
 _Names = Annotated[list[Label], Field(min_length=NONEMPTY)]
 
 
-class _M(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-
-
-class BasisValue(_M):
-    source: Literal["basis"]
-    path: BasisPath
-
-
-class _InputValue(_M):
-    source: Literal["input"]
-    value: Annotated[float, Field(strict=True)]
-    unit: Label
-    quantity: ClassVar[str]
-
-    @field_validator("unit")
-    @classmethod
-    def _dimension(cls, unit: str) -> str:
-        known = UNITS.get(unit)
-        if known is None or known.dimension != QUANTITY_KINDS[cls.quantity].dimension:
-            raise ValueError(f"unit {unit!r} is not a {cls.quantity} unit")
-        return unit
-
-
-class _LengthInput(_InputValue):
-    quantity = "length"
-
-
 class _Area(_InputValue):
     quantity = "area"
 
 
-LengthValue = Annotated[BasisValue | _LengthInput, Field(discriminator="source")]
 _AreaValue = Annotated[BasisValue | _Area, Field(discriminator="source")]
 
 
