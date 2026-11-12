@@ -1,0 +1,109 @@
+{
+  "source": "eng-harness spec 0003 §4.6 (F1 to F4) and RFC 8785; synthetic read set, no project value",
+  "method_ref": "§4.6 F2, F3, F4",
+  "synthetic": true,
+  "derivation": "Case (a): two frames and one frame section. Each section's canonical bytes are written by hand below from F2 (frames by id) and F3 (RFC 8785: keys in UTF-16 code-unit order, no whitespace, 0.0 written as 0, 3000.0 as 3000, optional fields that are absent as null). The section hash is SHA-256 of those bytes; the fingerprint is fp1: followed by SHA-256 of the F4 object's bytes. items is the number of members of the payload's lists.\nbytes[model.frame_placements/1] = {\"frames\":[{\"i\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F1\",\"j\":{\"x_mm\":0,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null},{\"i\":{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":0},\"i_joint\":null,\"id\":\"F2\",\"j\":{\"x_mm\":6000,\"y_mm\":0,\"z_mm\":3000},\"j_joint\":null,\"kind\":\"column\",\"rotation_deg\":0,\"section\":\"S1\",\"story\":null}]}\nbytes[model.sections/1] = {\"area_sections\":[],\"frame_sections\":[{\"material\":\"M1\",\"name\":\"S1\",\"shape\":{\"b_mm\":300,\"h_mm\":500,\"type\":\"rectangular\"}}]}\nbytes[fingerprint] = {\"method\":\"harness.fp/1\",\"sections\":{\"model.frame_placements/1\":\"40ad59c821d703e2855c1ba21f4e845bcdb3f8e25e5d6c54057fd689664a660a\",\"model.sections/1\":\"9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4\"}}",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 0,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000,
+              "y_mm": 0,
+              "z_mm": 0
+            },
+            "j": {
+              "x_mm": 6000,
+              "y_mm": 0,
+              "z_mm": 3000
+            },
+            "rotation_deg": 0
+          }
+        ]
+      },
+      "sections": {
+        "frame_sections": [
+          {
+            "name": "S1",
+            "material": "M1",
+            "shape": {
+              "type": "rectangular",
+              "b_mm": 300,
+              "h_mm": 500
+            }
+          }
+        ],
+        "area_sections": []
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "sections": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.sections/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        }
+      }
+    }
+  },
+  "expected": {
+    "method": "harness.fp/1",
+    "model_id": "mdl_00000000000000000000000000",
+    "model_revision": 3,
+    "sections": [
+      {
+        "kind": "model.frame_placements/1",
+        "result_id": "res_00000000000000000000000001",
+        "items": 2,
+        "sha256": "40ad59c821d703e2855c1ba21f4e845bcdb3f8e25e5d6c54057fd689664a660a",
+        "complete": true
+      },
+      {
+        "kind": "model.sections/1",
+        "result_id": "res_00000000000000000000000002",
+        "items": 1,
+        "sha256": "9936edd9284866917b629506692b70ac634a1f4861850d1a5184cb9d5cecfab4",
+        "complete": true
+      }
+    ],
+    "covered": [
+      "model.frame_placements/1",
+      "model.sections/1"
+    ],
+    "complete": true,
+    "fingerprint": "fp1:c71212eab89c8f76264f994ff5713db1dfbe2675122cd77e8bc9507c1ed54922"
+  }
+}
