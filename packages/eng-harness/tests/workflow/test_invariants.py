@@ -7,6 +7,7 @@ before its folder exists.
 """
 
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -27,7 +28,7 @@ from workflows.rig import Host, make_rig, request
 from eng_harness.block import workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
-from eng_harness.errors import HarnessCode, RunRefused
+from eng_harness.errors import HarnessCode, RunRefused, ToolFailed
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcInfo, HostInstance, LoadedBasis, ServerCheck, ToolInfo, UnitsState
@@ -446,13 +447,11 @@ def test_units_after_reconnect(tmp_path: Path) -> None:
     _tools(differ.host)
     _open(differ, "m1")
     differ.host.units["m1"] = _DIFFER
-    with pytest.raises(ContractError) as first:
-        asyncio.run(differ.engine(flow(_read_twice(differ, lambda: None))).start(request()))
-    assert (first.value.detail.code, first.value.detail.precondition) == (
-        ErrorCode.PRECONDITION_FAILED, Precondition.units_verified,
-    )  # fmt: skip
+    first = asyncio.run(differ.engine(flow(_read_twice(differ, lambda: None))).start(request()))
+    assert first.status is RunStatus.NEEDS_ENGINEER  # the run stops (spec 6): it does not raise to the block
+    assert first.escalation is not None and first.escalation.reason == "units_mismatch"
     assert differ.host.ledger == []
-    (run_id,) = differ.run_ids()
+    run_id = first.run_id
     assert _trail(differ, run_id, EventType.RUN_ESCALATED, EventType.STEP_STARTED) == [("run_escalated", None)]
     escalated = [e.payload for e in differ.events(run_id) if isinstance(e.payload, ev.RunEscalated)]
     assert [p.reason for p in escalated] == ["units_mismatch"]
@@ -481,12 +480,58 @@ def test_units_after_reconnect(tmp_path: Path) -> None:
     _tools(changed.host)
     _open(changed, "m1")
     host = changed.host
-    with pytest.raises(ContractError) as second:
-        asyncio.run(changed.engine(flow(_read_twice(changed, reconnected_and_changed))).start(request()))
-    assert second.value.detail.precondition is Precondition.units_verified
+    second = asyncio.run(changed.engine(flow(_read_twice(changed, reconnected_and_changed))).start(request()))
+    assert second.status is RunStatus.NEEDS_ENGINEER
+    assert second.escalation is not None and second.escalation.reason == "units_mismatch"
     assert [entry.tool for entry in changed.host.ledger] == ["read_m"]  # the second read never reached the host
-    (stopped_id,) = changed.run_ids()
-    assert "1" not in [e.path for e in changed.events(stopped_id) if e.type is EventType.STEP_STARTED]
+    assert "1" not in [e.path for e in changed.events(second.run_id) if e.type is EventType.STEP_STARTED]
+
+
+def test_units_mismatch_cannot_be_caught_by_the_block(tmp_path: Path) -> None:
+    """A block that catches an error around the step after a reconnect cannot go on with the wrong units (AC45)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.epochs["csi"] += 1
+        host.units["m1"] = _DIFFER
+        with contextlib.suppress(Exception):  # a block that swallows every error of the step
+            await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
+    assert [entry.tool for entry in host.ledger] == ["read_m"]  # neither later read reached the host
+    types = [e.type for e in rig.events(stopped.run_id)]
+    assert EventType.RUN_COMPLETED not in types and types.count(EventType.RUN_ESCALATED) == 1
+
+
+@pytest.mark.parametrize("code", [ErrorCode.TIMEOUT_NO_EFFECT, ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED])
+def test_units_are_read_after_a_read_timed_out(tmp_path: Path, code: ErrorCode) -> None:
+    """A read that timed out on a host makes the units of its models be read again before the retry (AC45 c)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    _open(rig, "m1")
+    host = rig.host
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("read_m", {"model": "m1"})
+        host.units["m1"] = _DIFFER
+        host.script("read_m", failure(code))  # the second read times out once; a code that is retried is retried
+        with contextlib.suppress(ToolFailed):  # a code that is not retried ends the step; the next reads units first
+            await ctx.tool("read_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
+    assert [entry.tool for entry in host.ledger] == ["read_m", "read_m"]  # no retry after the changed units
 
 
 @pytest.mark.parametrize("units_ok", [True, False])
@@ -512,11 +557,11 @@ def test_units_are_read_after_a_timeout_before_reconciliation(tmp_path: Path, un
         assert reads[1] < rig.log.index("tool.reconcile")  # the units are read again before the reconciliation
         assert "1~host.units.m1" in [e.path for e in rig.events(done.run_id) if e.type is EventType.STEP_STARTED]
         return
-    with pytest.raises(ContractError) as caught:
-        asyncio.run(rig.engine(flow(body)).start(request()))
-    assert caught.value.detail.precondition is Precondition.units_verified
+    stopped = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None and stopped.escalation.reason == "units_mismatch"
     assert "tool.reconcile" not in rig.log  # the write stays in flight for the next resume
-    (run_id,) = rig.run_ids()
+    run_id = stopped.run_id
     assert [e.attempt for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_STARTED] == [1]
     assert not [e for e in rig.events(run_id) if e.path == "1" and e.type is EventType.STEP_RECONCILED]
 
