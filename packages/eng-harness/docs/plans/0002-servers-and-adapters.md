@@ -293,7 +293,7 @@ tasks:
   - id: T11b
     title: CSI model-state reader, fingerprint and units read
     # Amendment (B-450, D-12): the reader half of the former T11. tests/property/test_fingerprint.py is shared with
-    # calcs plan 0003 T7 (and later the SAFE and SAP2000 plans), so T11b adds its function after calcs T7 merges.
+    # calcs plan 0003 T7 (and later the SAFE and SAP2000 plans), so T11b merges after calcs T7.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"
@@ -506,7 +506,7 @@ Bottom-up, in the order the code imports itself, with the risky parts early: con
 Objects (T2, T3), because a wrong breakaway choice either kills an engineer's ETABS or orphans instances; the
 synthetic fake (T4), which every later workflow test runs as a real process; the MCP session (T5); the build check
 and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock and guard (T7); the adapter framework (T8,
-T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), model state (T11), edits
+T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), reply mapping and model state (T11, T11b), edits
 and read-back (T12), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
 command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19) that wires the ports into
 the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
@@ -518,8 +518,8 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
-share it (T6b, T10 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11,
+share it (T6b, T10, T11, T11b, T12 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
+serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11b,
 T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
@@ -687,7 +687,7 @@ they are used (plan 0014 T5, T7, T8).
 - Review: correctness, Python, type-design, silent-failure and test lenses on every task; the security lens on T1
   (configuration), T3 (process creation, handle inheritance), T7 (locks, terminating processes), T16 (running scripts
   with arguments) and T17 (sanitizing recordings); R1 review against the spec's reconciliation and units rules on T9,
-  T11, T12, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
+  T11, T11b, T12, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
 
 ## 5. Rollback
 
