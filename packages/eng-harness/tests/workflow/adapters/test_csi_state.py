@@ -194,7 +194,10 @@ def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, contr
             edits: list[tuple[str, dict[str, Any]]] = [
                 ("csi_add_point", {"x": 1.0, "y": 2.0, "z": 3.0}),
                 ("csi_add_load_pattern", {"name": "LIVE", "type": "Live"}),
-                ("csi_add_load_pattern", {"name": "WIND", "type": "Wind"}),
+                (
+                    "csi_add_load_combo",
+                    {"name": "C2", "combo_type": 0, "components": [{"name": "DEAD", "factor": 1.2}]},
+                ),
                 ("csi_delete_load_combo", {"name": "C1", "confirm": True}),
             ]
             for tool, arguments in edits:
