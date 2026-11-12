@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix: `test_declared_and_locked` skips its lock assertions only in the mutation step's copy of the member (`MUTANT_UNDER_TEST` set, workspace `uv.lock` missing); MU002 stopped every eng-harness source change since B-220 (B-449).
 - Provider configuration: `eng_harness.providers` (`load_providers_config`, `ProvidersConfig`, `[providers.decision]` and `[providers.llm]` with endpoint, secret-key and timeout rules, warning `request_timeout_below_policy`), the runtime dependencies `pydantic-ai-slim[openai]` (exact pin), `keyring` and `httpx2`, and the autouse network guard of the test tree (plan 0009 T1, B-220; spec 0009 AC1 to AC4, AC36, AC46).
 - Doctor: `eng_harness.doctor` (`run`, `DoctorReport`, `Check`, `CheckProvider`; the checks of spec 4.9, the unreleased-tools warning, `extra_checks` after the built-in checks, a table or JSON on the given stream, exit 0 unless a check fails) (plan 0002 T18, B-137; spec 0002 AC37, AC39).
 - Harness-side model identity and CSI session operations: `adapters/_identity.py` (`IdentityStore`: content and path indexes under `.eng/state/model-files`, a copy derived from the older identity, an outside edit warned `MODEL_CHANGED_OUTSIDE`), `adapters/csi/_session_ops.py` (hidden launch, open and save on the main role, a new instance when launch ownership is gone) and `adapters/_hostport.py` (`working_copy`, `save`, `restore`, `locate`, `model_files`, `started_instances`, `close_started`) (plan 0002 T10, B-129; spec 0002 AC15, AC30; ADR-0032).
