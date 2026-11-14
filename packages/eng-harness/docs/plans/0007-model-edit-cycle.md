@@ -70,6 +70,9 @@ tasks:
   - id: T3
     title: Calc harness.expected_effects (projection of a resolved change set)
     # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2); after T2, which edits the same file.
+    # Amendment (B-498, documents only): spec 4.4.2 projects combination edits per item under the D2 item keys, a set on
+    # an object the state lacks as add, unique effect item ids, values from the inputs change_set and basis; covers AC36
+    # (a combination edit passes read-back, test in the task's own golden file); max_changed_lines raised from 260 to 330.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -81,12 +84,13 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/effects-*.json"
       - "packages/eng-harness/tests/property/test_expected_effects.py"
-    max_changed_lines: 260
+    max_changed_lines: 330
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back"
       - "packages/eng-harness/tests/property/test_expected_effects.py::test_order_independent"
-    covers: [AC8]
+    covers: [AC8, AC36]
     depends_on: [T2]
   - id: T4
     title: Calcs harness.host_design_verdicts and harness.analysis_summary
@@ -365,7 +369,10 @@ under amendment B-462); T3 uses the same imports without further amendment.
 
 **T3 `harness.expected_effects`** (spec §4.4.2). The projection per kind, golden cases per kind and a property test
 for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTRY` through `calcs/__init__.py`,
-after T2.
+after T2. Amendment (B-498): combination edits are projected per item under the item keys of spec 0003 §4.7 D2, a
+`set` on an object the step 3 state lacks is an `add`, values come from the inputs `change_set` and `basis`, and
+`test_combination_edit_reads_back` runs the merged read-back check (plan 0003 T9) on the projected effects (AC36); the
+read-back calc is unchanged.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
 `limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap

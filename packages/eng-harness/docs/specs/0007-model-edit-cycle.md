@@ -107,10 +107,17 @@ defines its method; values are synthetic and say so.
   item gets the `warning` issue `CONFLICTS_WITH_ENGINEER_CHANGE` with both values, the status stays `PASS`, and the
   change-set preview marks the item. Test: golden cases `check-conflict-*`.
 - AC8. Given a resolved change set, when `harness.expected_effects` runs, then it gives the effects of §4.4.2 per kind
-  (a wall thickness is one `set` effect on `model.sections/1`; a combination replace is one `set` of the whole object;
-  a delete is `remove`); a permutation of the items gives the same effects. Tests:
+  (a wall thickness of an existing section is one `set` effect on `model.sections/1`; a replace of an existing
+  combination is a `set` of its type and one effect per item under the item keys of spec 0003 §4.7 D2; a new object is
+  one `add`; a delete is `remove`); a permutation of the items gives the same effects. Tests:
   `tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases`,
   `tests/property/test_expected_effects.py::test_order_independent`.
+- AC36. Given a resolved change set that changes one scale, adds one case and drops one case of an existing
+  combination, and puts a frame load on a frame that has none in that pattern, when `harness.expected_effects` projects
+  it and `harness.readback_check` compares its effects with a before read set and an after read set that holds exactly
+  those changes, then the status is `PASS` with no `unexpected` row; with the scale change missing from the after read
+  set, `FAIL` with that effect `mismatch` (amendment B-498). Test:
+  `tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back`.
 
 ### 3.3 The cycle (§4.5)
 
@@ -349,14 +356,27 @@ load, `bounds.area_load_min_kPa` and `bounds.area_load_max_kPa` for an area load
 
 #### 4.4.2 `harness.expected_effects` v1 (spec 0003 Q6)
 
-Input: `check` (`harness.change_set_check/1`, status `PASS`), `approval_items` (the accepted item ids), `state`.
-Output: spec 0003's `harness.expected_effects/1`. Projection per kind: section assignments, loads and restraints are
-`set` effects per target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on
-`model.sections/1` (spec 0003 §4.8 edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns;
-`load_combination_set` is `set` of the whole combination (or `add` when new); `load_combination_delete` is `remove`;
-an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter. An
-effect's `key` is the reported key of spec 0003 §4.7 D2, list name included (for example `["frame_loads", frame,
-pattern, direction]`), so effects and `diff.changes` match on one key form (amendment B-483).
+Input: `check` (`harness.change_set_check/1`, status `PASS`), `approval_items` (the accepted item ids), `state` (the
+step 3 read set, the read-back's `before`), and `change_set` and `basis` as in §4.4.1, because `resolved` holds
+references, never numbers or combination terms: an effect's value is the item's value in its canonical unit (a
+literal converted by `eng_contract.units`, §4.3.1; a basis value from its field). Output: spec 0003's
+`harness.expected_effects/1`. Projection per kind: section assignments, loads and restraints are `set` effects per
+target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on `model.sections/1` (spec 0003 §4.8
+edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns; `load_combination_set` on a combination that
+`state` holds is a `set` of its `/type` and one effect per item against that combination's items in `state`: `set` of
+`/scale_ratio` for a case it holds, `add` of the item (`case`, `scale_ratio`) for a new case, `remove` for a case the
+change set leaves out; `load_combination_set` on a new combination is `add` of the whole object;
+`load_combination_delete` is `remove`; an unlock has no model effect. A `set` whose target object `state` does not
+hold (a new load row, restraint row or wall section) is `add` of the whole object instead, because the difference
+report shows that object as added, which a `set` at a property's pointer does not explain (spec 0003 §4.8 R3). Effects
+are sorted by section, key and pointer, so item order does not matter. An effect's `key` is the reported key of spec
+0003 §4.7 D2, list name included (for example `["frame_loads", frame, pattern, direction]`, and for a combination item
+`["combinations", name, "items", case, case_type]`, with `step` last when it is not null), so effects and
+`diff.changes` match on one key form (amendment B-483) and each change of a correct write is explained by the effect
+on its own key (R3). Every other kind projects onto the key D2 reports for the changed object: D2 nests keyed lists
+only under combinations and grid systems, and v1 edits no grid. An item that gives more than one effect gives each the
+`item_id` of the item, `/` and the effect's position (from 1) among that item's effects in the sorted order, because
+effect item ids are unique in `harness.expected_effects/1` (amendment B-498).
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
@@ -403,10 +423,12 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
-`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). The workflow passes
-each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for
-`harness.model_diff`, §4.8 for `harness.readback_check`) as the CalcPort `basis_fields` (spec 0003 §4.4 and AC13).
-Amendment B-483.
+`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). Each calc's basis
+paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for `harness.model_diff`, §4.8 for
+`harness.readback_check`) are the CalcPort `basis_fields` (spec 0003 §4.4 and AC13). Amendment B-483. The workflow
+does not pass them at call time: the command line's calc-port factory supplies them when it constructs the port (spec
+0003 §4.12; spec 0006 §4.2.2 step 4), mapping both calc ids to the `BASIS_FIELDS` of `calcs/model_diff.py` (amendment
+B-498).
 
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
@@ -628,7 +650,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30, AC36 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
 | AC9 to AC17, AC19 to AC24, AC26, AC31, AC34 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |

@@ -211,7 +211,8 @@ proposed project value.
   the member's status is `FAIL` and its member ratio is the larger ratio (S5), both verdicts are kept in the verdict
   lists, and the member appears once in `members` and `failing_members`. Test:
   `test_calcs_golden.py::test_case[summary-member-worst]`.
-- AC38. Given an empty verdict set, then the status is `NEEDS_ENGINEER` with the message "no design results". Test:
+- AC38. Given an empty verdict set, then the status is `NEEDS_ENGINEER` with the message "no design results" (the
+  trace step `status_reasons`, §4.9 S6; amendment B-498). Test:
   `tests/unit/calcs/test_summary.py::test_empty`.
 
 ### 3.8 Section size rounding (§4.10)
@@ -571,7 +572,10 @@ section-thickness change changes every area that uses the section (S-12 §2). Th
 effect on `model.sections/1`, never as per-area effects. The S-12 read-back gaps (frame distributed loads, pattern
 definitions, area-section thickness, restraints) give `not_read` until spec 0002 supplies typed table reads (S12-G8).
 Seismic parameters have no neutral kind and no tool (S12-G5), so there is no effect for them. A change set holding one
-is refused by spec 0007 (gap CG-1).
+is refused by spec 0007 (gap CG-1). A `remove` effect whose object is still present is `mismatch`. An effect under a
+key that occurs more than once on the after side is compared with every object under it and is `match` only when all
+match. The trace outputs are `identical` (named by the embedded difference report, R1) and `status` (amendment
+B-498).
 
 **Verification cases** (method source: this section; golden files `readback-*.json`): all effects matched (`PASS`); a
 load value read back beyond tolerance (`FAIL`, `mismatch`); a section change on a frame that no effect names
@@ -621,8 +625,12 @@ the member key, both statuses and both member ratios; `appeared` and `disappeare
   | equal statuses | | not listed (a ratio change alone is not a status change) |
   | absent | present | `appeared` (only here, whatever its status) |
   | present | absent | `disappeared` (only here, whatever its status) |
+
+  Without `previous`, every list of `changes` is empty (amendment B-498).
 - S6. Status: `FAIL` if any `FAIL`. Otherwise `NEEDS_ENGINEER` if any `NEEDS_ENGINEER` or `ERROR`, any
-  `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`.
+  `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`. The
+  payload has no message field: the messages are the value of the trace step `status_reasons`, the reasons of this
+  rule that hold, in this order, joined by `; `, or `none` (amendment B-498).
 
 **Edge cases.** Several verdicts per member (stations, cases) are all kept in `failing`, `attention` and `top`; member
 status and member ratio follow S5. Ties are broken by S2, never by input order. A `previous` without `members` (another
@@ -713,7 +721,10 @@ coincident frames (`ambiguous`).
 
 ### 4.12 CalcPort and the engine
 
-`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` implements engine §4.8 `CalcPort`:
+`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields)` implements engine §4.8
+`CalcPort`. `basis_fields` maps a calc id to the basis paths it reads (`CalcInfo.basis_fields`, §4.4); the code that
+assembles the port supplies it when the port is constructed, since the calc declaration carries no such field
+(amendment B-498):
 
 1. `describe` (AC13). `CalcInfo.ref_rules` is the only channel through which the engine learns each field's
    `RefRule`, `stale_ok` included.
@@ -862,6 +873,9 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
 | Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance_mm`, `mm`, no default) and a new calc version |
 | Q15 | Spec 0010 Q10 and C2: the CalcPort serves code-pack checks through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the run-class rule of §4.5 and §4.12; `NOT_FOUND` (§6) covers an id outside the route's allowlist | Owner | Accept (amendment B-405; draft until the owner approves) |
+| Q16 | Is an expected effect whose `unit` differs from the canonical unit of its field refused? Nothing reads `Effect.unit` today; values are compared unconverted (D6), so a wrong unit gives `mismatch` except by coincidence (amendment B-498) | Owner | Writer's recommendation: yes, `INVALID_ARGUMENT` naming the effect, in a new calc version; spec 0007 §4.4.2 already writes canonical values |
+| Q17 | Does the design summary refuse verdicts whose `source` is not `host` (Q7), or verdicts and frames of different models? §4.9 states neither (amendment B-498) | Owner | Writer's recommendation: refuse both with `INVALID_ARGUMENT` naming the field, as F5 refuses mixed models, in a new calc version |
+| Q18 | R0 admits an `after` model that is the `before` model's working copy, but `RefMeta` has no `derived_from`, so a working copy cannot be recognised and a different model id is refused (amendment B-498) | Owner | Writer's recommendation: keep the refusal (the safe side; the edit cycle reads the working copy on both sides, spec 0007 §4.5 step 9) and delete "(or its working copy)" from R0, unless a workflow needs it; then add `derived_from` to `RefMeta` first |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |
 | CG-3 | Total weight, modal periods and reactions comparison (ب2) | Owner | A later calc with its own basis tolerances, after phase 1 |

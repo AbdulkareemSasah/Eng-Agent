@@ -499,7 +499,7 @@ or open the page; the approval is the engineer's. The rule is generated into the
 4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3. The calc port is built
    with the run's store, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`, read before
    `Engine.resume`), the clock and the ids; the calc registry, the approvals file of spec 0003 (`src/eng_harness/calcs/approvals.yaml`) and the calc
-   settings are those of spec 0003 §4.12 (B-412).
+   settings are those of spec 0003 §4.12 (B-412), and so is its `basis_fields` map (spec 0007 §4.5; amendment B-498).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
    `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
    standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
