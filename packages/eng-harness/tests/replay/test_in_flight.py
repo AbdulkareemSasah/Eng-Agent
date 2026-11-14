@@ -8,6 +8,7 @@ new engine resumes it as a new process would. The fake host's reconciler answers
 rig's port-call log show what the resume asked of the ports.
 """
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,7 @@ from eng_contract.errors import ContractError, ErrorCode
 from fakes.ports import failure
 from pydantic import JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
-from workflows.ctx_flows import flow, success
+from workflows.ctx_flows import change_set, flow, request_id, success
 from workflows.hoststate import (
     INSTANCE,
     OP,
@@ -34,13 +35,13 @@ from workflows.hoststate import (
     start,
     trace,
 )
-from workflows.rig import Rig
+from workflows.rig import Rig, make_rig, request
 
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, JournalIntegrityError, RunRefused
-from eng_harness.journal import EventType, JournalReader
+from eng_harness.journal import EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcInfo, HostLease, Reconciliation, ServerCheck, UnitsState
 
@@ -392,3 +393,44 @@ def test_resume_order_guards_reconciliation(tmp_path: Path) -> None:
     ordered = [line for line in rig.log if line in _ORDER]
     assert ordered[:6] == list(_ORDER)  # preflight, acquire, units, reconcile, model state, then the first block call
     assert host.leases == {}
+
+
+def test_approval_in_flight_is_presented_again_not_reconciled(tmp_path: Path) -> None:
+    """Spec 4.5.3: an approval whose `step_started` has no end is marked for a rerun; the journal's answer stands."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.approve("Apply", shown)
+        return []
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(request())).run_id
+    rid, args = request_id(run_id, "0"), shown.model_dump(mode="json", by_alias=True)
+    resolved = ev.ApprovalResolved(
+        request_id=rid, shown_sha256=rig.approvals.presented[-1].shown_sha256, decision="approve",
+        rejected_items=[], by="engineer:ada",
+    )  # fmt: skip
+    began = {
+        "kind": "approve",
+        "name": "change_set",
+        "args": args,
+        "args_sha256": payload_sha256(args),
+        "effect": "none",
+    }
+    writer = JournalWriter(rig.run_dir(run_id), rig.store, rig.clock, rig.ids)
+    writer.append(T.APPROVAL_RESOLVED, resolved)  # the crash came after the answer, inside the step
+    writer.append(T.STEP_STARTED, began, path="0", attempt=1)
+    writer.close()
+    before = len(rig.events(run_id))
+    outcome = asyncio.run(engine.resume(run_id))
+    assert outcome.status is RunStatus.COMPLETED
+    assert [t for t in trace(rig, run_id, before) if t[1] == "0"] == [
+        ("step_rerun", "0", 1),
+        ("step_started", "0", 1),
+        ("step_completed", "0", 1),
+    ]
+    (rerun,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
+    assert rerun.reason == "read_in_flight"
+    assert len(rig.approvals.answers.get(rid, [])) == 0  # the journal's answer was used, the port was not asked
+    assert [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.ApprovalResolved)] == [resolved]  # once

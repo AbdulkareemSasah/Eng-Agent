@@ -336,6 +336,7 @@ class Engine:
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
             writer, events, _hostsafety.Pending(rt), leases, decider,
+            ports.approvals,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
