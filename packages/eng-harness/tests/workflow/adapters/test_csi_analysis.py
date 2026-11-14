@@ -14,8 +14,10 @@ from typing import Any
 
 import anyio
 import pytest
-from eng_contract.envelope import HostInfo, SuccessEnvelope
+from eng_contract.envelope import FailureEnvelope, HostInfo, SuccessEnvelope
+from eng_contract.errors import ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.kinds import NEUTRAL_KINDS
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from mcp import types
 
@@ -38,6 +40,7 @@ CHECK = ServerCheck(
 )  # fmt: skip
 MAIN_S, LONG_S = 30, 90  # the call timeouts of the two roles: the long one is its own, not the main one's
 SEED = {
+    "frames": [{"name": "F1", "section": "C30"}],
     "load_cases": [{"name": "DEAD"}, {"name": "LIVE"}],
     "results": {
         "csi_results_joint_reactions": [
@@ -125,7 +128,12 @@ def _timeouts(config: ServersConfig) -> ServersConfig:
 
 
 def _run(
-    config: ServersConfig, run_dir: Path, store: ResultStore, body: Any, launcher: SpyLauncher | None = None
+    config: ServersConfig,
+    run_dir: Path,
+    store: ResultStore,
+    body: Any,
+    launcher: SpyLauncher | None = None,
+    marks: list[str] | None = None,
 ) -> None:
     from eng_harness.adapters.csi._tools import CsiToolPort
 
@@ -143,6 +151,7 @@ def _run(
             port = CsiToolPort(
                 binder=Binder(pid), config=config, server="csi", caller=recorder, store=store,
                 ledger=WriteLedger(run_dir), clock=clock, ids=ids, check=CHECK, errors=CsiErrorMapper(ids),
+                wrote=None if marks is None else marks.append,
             )  # fmt: skip
             await body(port, recorder, pid)
 
@@ -180,3 +189,108 @@ def test_long_role_and_save_first(make_config: ConfigFactory, control: Path, sto
 
     _run(_timeouts(make_config()), run_dir, store, body, launcher)
     assert launcher.timeouts() == {"csi-main.stderr.log": str(MAIN_S), "csi-long.stderr.log": str(LONG_S)}
+
+
+def test_status_after_analysis_and_design_rows(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """The status read on `main` sees the analysis run on `long` (raw codes); design rows follow the design run."""
+    control.write_text(json.dumps({"faults": [], "seed": SEED}))
+
+    async def body(port: Any, recorder: Recorder, pid: int) -> None:
+        before = await _call(port, "csi_analysis_status")
+        assert isinstance(before, SuccessEnvelope), before
+        assert before.data == {"cases": [{"case": "DEAD", "status_code": 1}, {"case": "LIVE", "status_code": 1}]}
+        refused = await _call(port, "csi_design_results", kind="steel")
+        assert isinstance(refused, FailureEnvelope), refused  # no design run yet: the host says so
+        assert "run csi_design_run first" in refused.error.message
+        run = await _call(port, "csi_run_analysis")
+        assert isinstance(run, SuccessEnvelope), run
+        assert run.data == {"started": True}
+        after = await _call(port, "csi_analysis_status")
+        assert isinstance(after, SuccessEnvelope), after
+        assert after.data == {"cases": [{"case": "DEAD", "status_code": 4}, {"case": "LIVE", "status_code": 4}]}
+        await _call(port, "csi_design_run", kind="steel")
+        rows = await _call(port, "csi_design_results", kind="steel")
+        assert isinstance(rows, SuccessEnvelope), rows
+        assert rows.kind == "harness.csi_design_results/1"
+        assert rows.data == {
+            "rows": [{"frame": "B1", "ratio": 0.75, "ratio_type": "PMM", "location": 1.5, "combo": "1.4D"}]
+        }
+        sent = [(role, tool) for role, tool, _ in recorder.sent]
+        assert sent[-1] == ("main", "csi_design_results")
+        assert recorder.sent[-1][2]["limit"] == 2000  # the largest page the tool allows
+
+    _run(make_config(), run_dir, store, body)
+
+
+def test_unsupported_design_kinds(make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path) -> None:
+    """Aluminum and cold-formed design are `NOT_SUPPORTED_BY_VERSION`: the host says so and the adapter maps it."""
+    control.write_text(json.dumps({"faults": [], "seed": SEED}))
+
+    async def body(port: Any, recorder: Recorder, pid: int) -> None:
+        for kind in ("aluminum", "coldformed"):
+            reply = await _call(port, "csi_design_run", kind=kind)
+            assert isinstance(reply, FailureEnvelope), reply
+            assert reply.error.code is ErrorCode.NOT_SUPPORTED_BY_VERSION
+
+    _run(make_config(), run_dir, store, body)
+
+
+def test_force_results_are_neutral_kinds(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """The three force reads send the token `kN_m_C` and store neutral payloads; lengths are millimetres."""
+    control.write_text(json.dumps({"faults": [], "seed": SEED}))
+    cases = {"cases": ["DEAD"], "combos": ["1.4D"]}
+
+    async def body(port: Any, recorder: Recorder, pid: int) -> None:
+        reactions = await _call(port, "csi_results_joint_reactions", object="J1", **cases)
+        frames = await _call(port, "csi_results_frame_forces", **cases)
+        drifts = await _call(port, "csi_results_story_drifts", **cases)
+        for reply, kind in (
+            (reactions, "forces.joint_reactions/1"),
+            (frames, "forces.member_end/1"),
+            (drifts, "forces.story_drifts/1"),
+        ):
+            assert isinstance(reply, SuccessEnvelope), reply
+            assert reply.kind == kind
+            NEUTRAL_KINDS[kind].model_validate(reply.data)
+        assert [(role, tool) for role, tool, _ in recorder.sent] == [("main", t) for t in (
+            "csi_results_joint_reactions", "csi_results_frame_forces", "csi_results_story_drifts"
+        )]  # fmt: skip
+        target = {"product": "ETABS", "pid": pid}
+        assert recorder.sent[0][2] == {**cases, "object": "J1", "units": "kN_m_C", "target": target}
+        assert recorder.sent[1][2] == {**cases, "units": "kN_m_C", "target": target}
+        assert reactions.data["rows"][0]["FZ_kN"] == 120.25  # kN stays kN
+        assert frames.data["rows"][0]["station_mm"] == 1250.0  # 1.25 m
+        assert frames.data["rows"][0]["case"] == {"case": "1.4D", "case_type": "load_combination", "step": None}
+        assert drifts.data["rows"][0]["x_mm"] == 5000.0  # 5.0 m
+
+    _run(make_config(), run_dir, store, body)
+
+
+def test_only_edits_are_marked_as_writes(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """An edit tells the host port the next change is the adapter's; analysis, design and reads change no model row."""
+    control.write_text(json.dumps({"faults": [], "seed": SEED}))
+    marks: list[str] = []
+
+    async def body(port: Any, recorder: Recorder, pid: int) -> None:
+        edit = await _call(port, "csi_assign_frame_section", frame="F1", section="C40")
+        assert isinstance(edit, SuccessEnvelope), edit
+        assert marks == ["m"]
+        marks.clear()
+        for tool, arguments in (
+            ("csi_run_analysis", {}),
+            ("csi_analysis_status", {}),
+            ("csi_design_run", {"kind": "steel"}),
+            ("csi_design_results", {"kind": "steel"}),
+            ("csi_results_joint_reactions", {}),
+        ):
+            reply = await _call(port, tool, **arguments)
+            assert isinstance(reply, SuccessEnvelope), reply
+        assert marks == []
+
+    _run(make_config(), run_dir, store, body, marks=marks)
