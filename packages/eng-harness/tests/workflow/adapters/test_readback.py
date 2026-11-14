@@ -233,6 +233,8 @@ def test_envelope_and_marks(tmp_path: Path, make_config: Any, control: Path, sto
             host = envelope.provenance.host
             assert host is not None
             assert (host.program, host.version, host.model_revision) == ("ETABS", "22.0.0", 0)
+            held = await rig.host.locate(rig.key)
+            assert host.model_id == (await rig.host.model_state(rig.key, held.instance_id)).model_id
             assert store.get(envelope.result_id).payload == envelope.data  # the issues are the stored payload
 
     anyio.run(body)
@@ -589,6 +591,39 @@ def test_integrity() -> None:
     )
     missing = [(i.code, i.subject.kind.value, i.subject.id, i.message) for i in integrity(snap)]
     assert missing == [("COMBO_REFERENCE_MISSING", "load_combination", "C1", "NOPE is not defined")]
+
+
+def test_issues_of_and_envelope(store: ResultStore) -> None:
+    """Read-back issues come first, then integrity ones; the items are done; the summary counts each severity."""
+    from eng_contract.issues import ModelIssue, Severity
+
+    from eng_harness.adapters.csi import _edits as edits
+    from eng_harness.adapters.csi._checks import ReadBack, WrittenItems, check_envelope, issues_of
+
+    book = WrittenItems()
+    read_back = ReadBack(written=book, store=store, check=CHECK, tolerance_ratio=0.25)
+    book.prepare(edits.AssignFrameSectionArgs(model="m", frame="F1", section="C40"))
+    book.commit("m")
+    snap = _snap(frames=[_frame("F1", "C30")], frame_sections=[])  # F1 reads C30, and C30 is not defined
+    found = issues_of(read_back, "m", snap)
+    assert [(i.code, i.subject.id) for i in found] == [("READBACK_MISMATCH", "F1"), ("SECTION_UNDEFINED", "F1")]
+    assert book.items("m") == []
+    assert [i.code for i in issues_of(read_back, "m", snap)] == ["SECTION_UNDEFINED"]
+    subject = Subject(kind=FRAME, id="F1")
+    issues = [
+        ModelIssue(severity=Severity.ERROR, code="E_ONE", subject=subject, message="one"),
+        ModelIssue(severity=Severity.WARNING, code="W_ONE", subject=subject, message="two"),
+        ModelIssue(severity=Severity.INFO, code="I_ONE", subject=subject, message="three"),
+        ModelIssue(severity=Severity.INFO, code="I_TWO", subject=subject, message="four"),
+    ]
+    envelope = check_envelope(read_back, issues, [], HOST, "2026-01-01T00:00:00.000Z", 5)
+    assert _summary(envelope) == {"errors": 1, "warnings": 1, "infos": 2, "clean": False}
+    assert envelope.provenance.duration_ms == 5
+    assert envelope.provenance.started_at == "2026-01-01T00:00:00.000Z"
+    assert envelope.provenance.host == HOST
+    assert _issues(envelope)[1] == ("warning", "W_ONE", "frame", "F1")
+    only = check_envelope(read_back, issues[1:], [], HOST, "2026-01-01T00:00:00.000Z", 0)
+    assert _summary(only) == {"errors": 0, "warnings": 1, "infos": 2, "clean": True}
 
 
 def test_written_items_pairing() -> None:
