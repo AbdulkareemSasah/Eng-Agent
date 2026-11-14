@@ -356,16 +356,17 @@ fixtures under `tests/data/kinds/edit_cycle/`. T1b: `ChangeSetDraft`, the item m
 number with unit) and the refused kinds as parseable models. No logic beyond Pydantic validation. Amendment (B-386):
 the former T1 is split because it measured 562 lines against 320 (B-195).
 
-**T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names,
-duplicates, bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources, conflicts with
-engineer changes, and every refused kind with its gap id. A verification record from the spec 0003 template, for the
-owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through `calcs/__init__.py`
-(spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it; the bounds are the
-unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`, `bounds.area_load_min_kPa`,
-`bounds.ratio_min_ratio` and their `_max` pairs). Amendment (B-493): the task adds the edit-cycle entries of spec
-0003 §4.3 to `tests/rules/test_calc_modules.py`: `eng_harness.workflows.model_edit_cycle._change_set` by that module's
-name, never its package, and `eng_harness.kinds.edit_cycle` if not already present (plan 0013 T2 adds the same entry
-under amendment B-462); T3 uses the same imports without further amendment.
+**T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names, duplicates,
+item ids with `/` (B-498), bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources,
+conflicts with engineer changes, and every refused kind with its gap id. A verification record from the spec 0003
+template, for the owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through
+`calcs/__init__.py` (spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it;
+the bounds are the unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`,
+`bounds.area_load_min_kPa`, `bounds.ratio_min_ratio` and their `_max` pairs). Amendment (B-493): the task adds the
+edit-cycle entries of spec 0003 §4.3 to `tests/rules/test_calc_modules.py`:
+`eng_harness.workflows.model_edit_cycle._change_set` by that module's name, never its package, and
+`eng_harness.kinds.edit_cycle` if not already present (plan 0013 T2 adds the same entry under amendment B-462); T3 uses
+the same imports without further amendment.
 
 **T3 `harness.expected_effects`** (spec §4.4.2). The projection per kind, golden cases per kind and a property test
 for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTRY` through `calcs/__init__.py`,

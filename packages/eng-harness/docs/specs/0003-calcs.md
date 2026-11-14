@@ -721,10 +721,10 @@ coincident frames (`ambiguous`).
 
 ### 4.12 CalcPort and the engine
 
-`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields)` implements engine §4.8
-`CalcPort`. `basis_fields` maps a calc id to the basis paths it reads (`CalcInfo.basis_fields`, §4.4); the code that
-assembles the port supplies it when the port is constructed, since the calc declaration carries no such field
-(amendment B-498):
+`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)`
+implements engine §4.8 `CalcPort`. `basis_fields` maps a calc id to the basis paths it reads (`CalcInfo.basis_fields`,
+§4.4); the code that assembles the port supplies it when the port is constructed, since the calc declaration carries
+no such field, and a calc id it does not name (or `None`) describes no basis paths (amendment B-498):
 
 1. `describe` (AC13). `CalcInfo.ref_rules` is the only channel through which the engine learns each field's
    `RefRule`, `stale_ok` included.
