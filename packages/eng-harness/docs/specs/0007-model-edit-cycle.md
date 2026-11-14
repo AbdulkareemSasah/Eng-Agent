@@ -344,7 +344,7 @@ within the bounds of its value kind by exact comparison of canonical values (`OU
 and `bounds.thickness_max_mm` for a length, `bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line
 load, `bounds.area_load_min_kPa` and `bounds.area_load_max_kPa` for an area load, `bounds.ratio_min_ratio` and
 `bounds.ratio_max_ratio` for a ratio (§4.8). K5 refused kinds
-(§4.3.2). K6 an item whose target and property appear in `diff.changes` gets the warning
+(§4.3.2). K6 an item whose target and property appear in `diff.changes` (keys of the form of §4.4.2) gets the warning
 `CONFLICTS_WITH_ENGINEER_CHANGE`. K7 `FAIL` on any error.
 
 #### 4.4.2 `harness.expected_effects` v1 (spec 0003 Q6)
@@ -354,7 +354,9 @@ Output: spec 0003's `harness.expected_effects/1`. Projection per kind: section a
 `set` effects per target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on
 `model.sections/1` (spec 0003 §4.8 edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns;
 `load_combination_set` is `set` of the whole combination (or `add` when new); `load_combination_delete` is `remove`;
-an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter.
+an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter. An
+effect's `key` is the reported key of spec 0003 §4.7 D2, list name included (for example `["frame_loads", frame,
+pattern, direction]`), so effects and `diff.changes` match on one key form (amendment B-483).
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
@@ -386,12 +388,12 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 2 | `ctx.tool("csi_open_model", {"model": inp.model})` on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
 | — | `async for c in ctx.attempts(B.count("attempts.cycles"))`: one `ctx.block(edit_cycle_once, ...)` per cycle | Bounded loop; exhaustion escalates |
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
-| 4 | `ctx.calc("harness.model_diff", {"before": R[k-1], "after": S[k], "basis": B.ref(...)})` | `before` is `stale_ok`, `after` current (spec 0003 §4.13) |
+| 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.ref(...)})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
 | 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
 | 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
 | 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
-| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before": S[k], "after": S', "basis"})`; then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
+| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
@@ -401,6 +403,9 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
+`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). The workflow passes
+each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names it) as the CalcPort `basis_fields` (spec 0003
+§4.12). Amendment B-483.
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
 the step 3 read of cycle `k`. When the step 3 fingerprint equals that of `R[k-1]`, step 4 still runs (a cheap,
