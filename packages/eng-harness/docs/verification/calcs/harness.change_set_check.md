@@ -1,0 +1,18 @@
+# harness.change_set_check
+
+- Calc id, version and content hash: `harness.change_set_check` v1; the hash is the entry in `src/eng_harness/calcs/calcs.lock.json`
+- Status: draft (bootstrap mode, ADR-0028 section 4; owner approval awaited, spec 0007 EC-G4)
+- Method source: spec 0007 section 4.4.1, rules K1 to K7, with the change-set model of section 4.3 (refused kinds and their gaps, section 4.3.2) and the bounds of section 4.8 (`bounds.thickness_min_mm` and `_max_mm`, `bounds.line_load_min_kN_m` and `_max_kN_m`, `bounds.area_load_min_kPa` and `_max_kPa`, `bounds.ratio_min_ratio` and `_max_ratio`; no default). Values are compared exactly (`Fraction`) in the canonical unit of their kind; a literal is converted with the factors of `eng_contract.units.unit` (no offset or pi for these kinds). Keys of K3 and K6 are the reported keys of spec 0003 section 4.7 D2, list name first.
+- Golden cases (`tests/data/golden/edit_cycle/`; each derived by hand in its `derivation` field, synthetic state and bounds):
+  - `check-resolve-select.json` (K1, K2, K4): story, section and area-kind selections and explicit names, sorted. Result: pass.
+  - `check-resolve-added-earlier.json` (K2, K4): a pattern, a wall section and a combination used by later items; basis and answer references. Result: pass.
+  - `check-resolve-empty-selection.json` (K1): two empty selections. Result: pass.
+  - `check-unknown-names.json` (K2): unknown frame, frame section, joint, material, pattern, area, combination, and a pattern added only later. Result: pass.
+  - `check-duplicate-target.json` (K3): a section set twice through a selection; a combination set and deleted. Result: pass.
+  - `check-bounds-unit-scale.json` (K4, baseline د6): 200 m is 200000 mm, out of bounds; 0.2 m is 200 mm, inside. Result: pass.
+  - `check-bounds-edges.json` (K4): both bounds inclusive, values just outside, a conversion from N/m. Result: pass.
+  - `check-source-missing.json` (K4): absent and unconfirmed basis fields, a basis field of the wrong kind. Result: pass.
+  - `check-conflict-engineer.json` (K6, K7): a changed property and an added object of the step 4 report; warnings, status pass. Result: pass.
+- Boundary and contract tests: `tests/golden/edit_cycle/test_change_set_check.py` (registration, inputs and kinds, the bounds fields required, reversed bounds, records and completeness, trace, combination case types, conflicts on another property or key, restraints, patterns); `tests/unit/edit_cycle/test_change_set.py::test_refused_kinds_name_their_gap` (AC6: each refused kind and variant gives `NOT_IMPLEMENTED` with H-G1, H-G2, H-G3, OQ-G8 or CG-1)
+- Reviewer and date: awaiting review
+- Findings and open gaps: (1) the names of load cases are in no list (`harness.csi_name_lists/1` has none), so a combination term of type `load_case` is not checked by K2. (2) Known joints are the frame ends, area joints and restraint rows of the read set. (3) The answer references point into the `basis.engineer_input/1` field `change_set` (`#/fields/change_set/value/items/<i>/<field>`). (4) A basis value that is not a number is `SOURCE_MISSING`. (5) The workflow passes `BASIS_FIELDS` as the CalcPort `basis_fields`, as for the other calcs.
