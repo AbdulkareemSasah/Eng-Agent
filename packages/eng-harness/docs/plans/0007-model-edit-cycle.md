@@ -70,6 +70,9 @@ tasks:
   - id: T3
     title: Calc harness.expected_effects (projection of a resolved change set)
     # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2); after T2, which edits the same file.
+    # Amendment (B-498, documents only): spec 4.4.2 projects combination edits per item under the D2 item keys, a set on
+    # an object the state lacks as add, unique effect item ids, values from the inputs change_set and basis; covers AC36
+    # (a combination edit passes read-back, test in the task's own golden file); max_changed_lines raised from 260 to 330.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -81,12 +84,13 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/effects-*.json"
       - "packages/eng-harness/tests/property/test_expected_effects.py"
-    max_changed_lines: 260
+    max_changed_lines: 330
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back"
       - "packages/eng-harness/tests/property/test_expected_effects.py::test_order_independent"
-    covers: [AC8]
+    covers: [AC8, AC36]
     depends_on: [T2]
   - id: T4
     title: Calcs harness.host_design_verdicts and harness.analysis_summary
@@ -352,20 +356,24 @@ fixtures under `tests/data/kinds/edit_cycle/`. T1b: `ChangeSetDraft`, the item m
 number with unit) and the refused kinds as parseable models. No logic beyond Pydantic validation. Amendment (B-386):
 the former T1 is split because it measured 562 lines against 320 (B-195).
 
-**T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names,
-duplicates, bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources, conflicts with
-engineer changes, and every refused kind with its gap id. A verification record from the spec 0003 template, for the
-owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through `calcs/__init__.py`
-(spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it; the bounds are the
-unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`, `bounds.area_load_min_kPa`,
-`bounds.ratio_min_ratio` and their `_max` pairs). Amendment (B-493): the task adds the edit-cycle entries of spec
-0003 §4.3 to `tests/rules/test_calc_modules.py`: `eng_harness.workflows.model_edit_cycle._change_set` by that module's
-name, never its package, and `eng_harness.kinds.edit_cycle` if not already present (plan 0013 T2 adds the same entry
-under amendment B-462); T3 uses the same imports without further amendment.
+**T2 `harness.change_set_check`** (spec §4.4.1, rules K1 to K7). Golden cases for resolution, unknown names, duplicates,
+item ids with `/` (B-498), bounds (including the unit-scale case of baseline د6), missing or unconfirmed sources,
+conflicts with engineer changes, and every refused kind with its gap id. A verification record from the spec 0003
+template, for the owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through
+`calcs/__init__.py` (spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it;
+the bounds are the unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`,
+`bounds.area_load_min_kPa`, `bounds.ratio_min_ratio` and their `_max` pairs). Amendment (B-493): the task adds the
+edit-cycle entries of spec 0003 §4.3 to `tests/rules/test_calc_modules.py`:
+`eng_harness.workflows.model_edit_cycle._change_set` by that module's name, never its package, and
+`eng_harness.kinds.edit_cycle` if not already present (plan 0013 T2 adds the same entry under amendment B-462); T3 uses
+the same imports without further amendment.
 
 **T3 `harness.expected_effects`** (spec §4.4.2). The projection per kind, golden cases per kind and a property test
 for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTRY` through `calcs/__init__.py`,
-after T2.
+after T2. Amendment (B-498): combination edits are projected per item under the item keys of spec 0003 §4.7 D2, a
+`set` on an object the step 3 state lacks is an `add`, values come from the inputs `change_set` and `basis`, and
+`test_combination_edit_reads_back` runs the merged read-back check (plan 0003 T9) on the projected effects (AC36); the
+read-back calc is unchanged.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
 `limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
@@ -388,6 +396,9 @@ this task, which add no engine criterion: spec AC33 covers them;
 the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
 save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11c, split from T11b by B-427) to this task's
 files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
+Amendment B-499: continuing the chain (engine §4.9, EC5) means that after each tool save and each engine `p~post.save`
+under the approval, the expected state of the next step under it takes that `model_saved`'s revision, fingerprint and
+file hash (`_approvals.py`; the merged engine T15 keeps only the revision a write produced).
 Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
 package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
 `tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
@@ -480,10 +491,10 @@ uninterrupted run.
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
 | T8 | plan 0001 T10 to T17; plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
-| T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
+| T9 | plan 0001 T16b (promotion; B-499); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |

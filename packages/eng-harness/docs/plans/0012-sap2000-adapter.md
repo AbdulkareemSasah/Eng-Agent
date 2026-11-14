@@ -9,7 +9,7 @@ tasks:
   - id: T1
     title: SAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint
     # Amendment (B-413, documents only): test_sap2000_build_mismatch_stops_run runs the real engine and build_ports, so T1
-    # starts after plan 0002 T19a and plan 0008 T3 (and engine plan 0001 T13, T15, T16, T19; B-475); it fails at T1's base for want of the SAP2000 product T1 adds.
+    # starts after plan 0002 T19a and plan 0008 T3 (and engine plan 0001 T13, T15, T16, T16b, T19; B-475, B-499); it fails at T1's base for want of the SAP2000 product T1 adds.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -203,7 +203,7 @@ plan amendment lists its files and budget. If no recording is committed, SP-4 st
 
 - Runtime: none new. Development: none new.
 - Plans: plan 0002 T1, T6 to T15, T17 and T19a (T19a for the SAP2000 engine stop of T1, B-413, B-475; it brings in engine plan
-  0001 T13, T15, T16 and T19); plan 0008 T1 (profile registry, config and fingerprint per product), T2
+  0001 T13, T15, T16, T16b and T19; B-499); plan 0008 T1 (profile registry, config and fingerprint per product), T2
   (fake framework) and T3 (session operations, gap module) before T1 of this plan; plan 0008 T4 (table framework)
   before T4. Specs: `eng-contract` 0.1.0 merged; the column workflow spec (B-083) uses the kinds and gaps here.
 - Owner decisions that do not block T1 to T7: Q1 to Q6 of the spec (the recommendations are implemented).

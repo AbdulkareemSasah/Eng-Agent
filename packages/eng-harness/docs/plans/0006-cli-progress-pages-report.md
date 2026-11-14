@@ -803,13 +803,15 @@ filled at once for `resume` and, for `run`, from the first `ApprovalRequest.run_
 empty, `stop_requested` returns false and `report` returns the "report not available yet" document.
 `test_run_id_binding.py::test_page_bindings_before_and_after_run_id` checks both callables before and after the cell
 is filled, and that `resume` fills it at once (about 30 lines, hence 360 to 390). (b) The engine's `CalcPort` is
-`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` (spec 0003 §4), not merged (plan 0003
+`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)`
+(spec 0003 §4.12), not merged (plan 0003
 T5); T14 adds the `CliDeps` field `calc_port_factory` (default `None` under the defaults rule of §3), which
 `_wiring.py` calls as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth
 review): the run's `ResultStore`, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`,
 read through the merged `JournalReader` before `Engine.resume`), the clock and the ids. The `approvals` argument of
 `HarnessCalcPort` is the calcs approvals file of spec 0003 (`load_approvals`), not the page `ApprovalPort`; the calc
-registry, the approvals file and the calc settings are the default factory's business (T18a). Step 4's preflight is
+registry, the approvals file, the calc settings and the `basis_fields` map (spec 0003 §4.12, spec 0007 §4.5; B-498)
+are the default factory's business (T18a). Step 4's preflight is
 that port's `preflight`, so no separate preflight field exists. (c) The port builder field `port_builder` (default
 `None`) is called as `port_builder(config, workspace, store, run_folder, clock, ids)`, where `run_folder` is a
 callable that reads the run-id cell and raises while it is empty (spec §4.4.8); `build_ports` (spec 0002) builds
@@ -934,8 +936,9 @@ amendment B-471, owner instruction of 2026-11-12; spec §4.1, AC13, AC62). The t
 of the §3 rule but the port builder with the real implementation: the calc-port
 factory `calc_port_factory` (plan 0003 T5 `HarnessCalcPort`, whose `preflight` serves step 4; amendment B-412 seventh
 review; the eighth review spells the default out: it builds `HarnessCalcPort(registry, approvals, store, settings,
-run_class, clock, ids)` from the calc registry of spec 0003, the approvals file read by the merged `load_approvals`
-(`_calc/_approvals.py`) and the calc settings from the configuration, with the arguments T14 passes), the workflow registry of `src/eng_harness/workflows/__init__.py`
+run_class, clock, ids, basis_fields=...)` from the calc registry of spec 0003, the approvals file read by the merged
+`load_approvals` (`_calc/_approvals.py`), the calc settings from the configuration and the `basis_fields` map of spec
+0003 §4.12 and spec 0007 §4.5 (B-498), with the arguments T14 passes), the workflow registry of `src/eng_harness/workflows/__init__.py`
 (plan 0007 T9, the one task that creates that module and registers the model-edit-cycle workflow in it, spec 0007
 Q13; plan 0010 T9 and plan 0013 T11 and T13 add their blocks later, so T18a does not wait for them), `load_providers_config` and `assemble_decision_runtime` (plan
 0009 T1 and T10a, the phase-1 assembly of spec 0009 AC49; amendment B-475), the point-policy mapping `point_policies` (amendment B-412 tenth review), bound to the empty mapping, the phase-1 value of spec Q16 (d), never `None` (amendment B-475), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
@@ -1025,7 +1028,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `EngineSettings` from the `[engine]` limits of the configuration, engine §4.10 defaults otherwise (step 5, spec §4.2.4) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`engine/_runner.py`) |
 | Port builder `build_ports`: tool and host ports only (step 1), called as `port_builder(config, workspace, store, run_folder, clock, ids)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) | T14 (`port_builder`) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`) | plan 0002 T19a (amendment B-475); engine plan T20 (caller-chosen run id, work item B-472) |
-| Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` (steps 4 and 5), called as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth review) | T14 (`calc_port_factory`) | T18a (the default supplies the calc registry, the approvals file through the merged `load_approvals` and the calc settings) | plan 0003 T5; `load_approvals` merged (`_calc/_approvals.py`) |
+| Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)` (steps 4 and 5), called as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth review) | T14 (`calc_port_factory`) | T18a (the default supplies the calc registry, the approvals file through the merged `load_approvals`, the calc settings and the `basis_fields` map, B-498) | plan 0003 T5; `load_approvals` merged (`_calc/_approvals.py`) |
 | Run class: `--run-class` for `run`, the run header's `run_class` for `resume` (steps 4 and 5) | none (`cli/_wiring.py`, T14) | not applicable | merged (`cli/_parser.py`, T3; `JournalReader`, engine T4) |
 | Engine `BasisPort`, `StoreBasisPort` over the `ResultStore` (step 5) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`basis/_port.py`, plan 0004 T8) |
 | Input validation (step 2) | none (engine call) | not applicable | merged (engine plan T9, engine AC16) |
