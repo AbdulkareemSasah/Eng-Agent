@@ -1,0 +1,500 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.1 (rules K1 to K7), synthetic fixture",
+  "method_ref": "§4.4.1 K6 K7",
+  "synthetic": true,
+  "derivation": "Synthetic state (every case): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200, material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm. The step 4 report shows the engineer changed B1 /section from R300x600 to R250x500 (key frames/B1) and added the frame load B2 DEAD gravity (key frame_loads/B2/DEAD/gravity). a1 sets B1 /section: warning with both values. a2 sets the w of that load: the object was added, warning with the item's value 3.0 kN/m. a3 assigns F2, which the engineer did not touch: nothing. Warnings only, so PASS (K7).",
+  "input": {
+    "change_set": {
+      "items": [
+        {
+          "id": "a1",
+          "kind": "frame_section",
+          "frames": [
+            "B1"
+          ],
+          "section": "C400"
+        },
+        {
+          "id": "a2",
+          "kind": "frame_uniform_load",
+          "frames": [
+            "B2"
+          ],
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "w": {
+            "source": "input",
+            "value": 3.0,
+            "unit": "kN/m"
+          }
+        },
+        {
+          "id": "a3",
+          "kind": "area_section",
+          "areas": [
+            "F2"
+          ],
+          "section": "S150"
+        }
+      ]
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "B1",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J1",
+          "j_joint": "J2",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "B2",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J3",
+          "j_joint": "J4",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "story": "L2",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "C1",
+          "kind": "column",
+          "section": "C400",
+          "i_joint": "J0",
+          "j_joint": "J1",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        }
+      ]
+    },
+    "areas": {
+      "areas": [
+        {
+          "id": "F1",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": [
+            "J1",
+            "J2",
+            "J5"
+          ],
+          "story": "L1"
+        },
+        {
+          "id": "F2",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L2"
+        },
+        {
+          "id": "W1",
+          "kind": "wall",
+          "section": "W200",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L1"
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C400",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400.0,
+            "h_mm": 400.0
+          }
+        },
+        {
+          "name": "R300x600",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300.0,
+            "h_mm": 600.0
+          }
+        }
+      ],
+      "area_sections": [
+        {
+          "name": "S150",
+          "material": "C30",
+          "kind": "slab",
+          "thickness_mm": 150.0
+        },
+        {
+          "name": "W200",
+          "material": "C30",
+          "kind": "wall",
+          "thickness_mm": 200.0
+        }
+      ]
+    },
+    "restraints": {
+      "joints": [
+        {
+          "joint": "J0",
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": true,
+          "ry": true,
+          "rz": true
+        }
+      ]
+    },
+    "names": {
+      "frame_sections": [
+        "C400",
+        "R300x600"
+      ],
+      "area_sections": [
+        "S150",
+        "W200"
+      ],
+      "materials": [
+        "C30"
+      ],
+      "patterns": [
+        "DEAD",
+        "LIVE"
+      ],
+      "combinations": [
+        "COMB1"
+      ]
+    },
+    "diff": {
+      "calc": {
+        "id": "harness.model_diff",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.model_diff",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "before": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "tolerances": {},
+      "changes": [
+        {
+          "section": "model.frame_placements/1",
+          "key": [
+            "frames",
+            "B1"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/section",
+              "before": "R300x600",
+              "after": "R250x500",
+              "unit": null,
+              "quantity_kind": null,
+              "tolerance": null,
+              "rule": "D4"
+            }
+          ]
+        },
+        {
+          "section": "model.load_set/1",
+          "key": [
+            "frame_loads",
+            "B2",
+            "DEAD",
+            "gravity"
+          ],
+          "change": "added",
+          "before": null,
+          "after": {
+            "frame": "B2",
+            "pattern": "DEAD",
+            "direction": "gravity",
+            "w_kN_m": 4.0
+          },
+          "properties": []
+        }
+      ],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {
+        "model.frame_placements/1": {
+          "added": 0,
+          "removed": 0,
+          "changed": 1,
+          "ambiguous": 0,
+          "unchanged": 0,
+          "within_tolerance": 0
+        },
+        "model.load_set/1": {
+          "added": 1,
+          "removed": 0,
+          "changed": 0,
+          "ambiguous": 0,
+          "unchanged": 0,
+          "within_tolerance": 0
+        }
+      },
+      "identical": false,
+      "complete": true
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "bounds.thickness_min_mm": {
+          "value": 100.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.thickness_max_mm": {
+          "value": 1000.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_min_kN_m": {
+          "value": 0.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_max_kN_m": {
+          "value": 100.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_min_kPa": {
+          "value": 0.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_max_kPa": {
+          "value": 50.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_min_ratio": {
+          "value": 0.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_max_ratio": {
+          "value": 10.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.sdl_kPa": {
+          "value": 1.5,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.partition_kN_m": {
+          "value": 2.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": false,
+          "citation": null
+        },
+        "geometry.offset_mm": {
+          "value": 50.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "change_set": "res_00000000000000000000000001",
+    "frames": "res_00000000000000000000000002",
+    "areas": "res_00000000000000000000000003",
+    "sections": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "names": "res_00000000000000000000000006",
+    "diff": "res_00000000000000000000000007",
+    "basis": "res_00000000000000000000000008"
+  },
+  "expected": {
+    "status": "PASS",
+    "resolved": [
+      {
+        "item_id": "a1",
+        "kind": "frame_section",
+        "targets": [
+          "B1"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a2",
+        "kind": "frame_uniform_load",
+        "targets": [
+          "B2"
+        ],
+        "values": [
+          {
+            "pointer": "/w_kN_m",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/w",
+            "unit": "kN/m"
+          }
+        ]
+      },
+      {
+        "item_id": "a3",
+        "kind": "area_section",
+        "targets": [
+          "F2"
+        ],
+        "values": []
+      }
+    ],
+    "issues": [
+      {
+        "item_id": "a1",
+        "severity": "warning",
+        "code": "CONFLICTS_WITH_ENGINEER_CHANGE",
+        "detail": "the engineer changed frames/B1/section from R300x600 to R250x500; item sets C400",
+        "gap": null
+      },
+      {
+        "item_id": "a2",
+        "severity": "warning",
+        "code": "CONFLICTS_WITH_ENGINEER_CHANGE",
+        "detail": "the engineer added frame_loads/B2/DEAD/gravity; item sets 3.0 kN/m",
+        "gap": null
+      }
+    ],
+    "complete": true
+  }
+}

@@ -47,6 +47,9 @@ inputs of §4.2.2 step 5 and its summary carries the dropped releases (spec 0009
 report shows the run's decision runtime (§4.6.1), and the command line draws the run id at step 1 for `run` as for
 `resume` and passes it to `Engine.start` (engine AC70; §4.2.2, §4.4.8; AC66).
 
+**Amendment B-495.** By the owner answer of 2026-11-14, the refusal of `[cli_tools.*]` entries before servers plan
+T19b (spec 0002 AC43, gap H-G8) exits 2 (`USAGE`), not 70 (§4.2.3, §6; spec 0002 §11 Q9).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -515,7 +518,7 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 |---|---|---|
 | 0 | `OK` | Run completed; `status`, `stop`, `report` succeeded |
 | 1 | `RUN_FAILED` | The run ended `FAILED`; `doctor` reported a failed check (spec 0002 AC37) |
-| 2 | `USAGE` | Usage or configuration error; invalid input file |
+| 2 | `USAGE` | Usage or configuration error; invalid input file; a configuration this build cannot serve (`[cli_tools.*]` entries before servers plan T19b, spec 0002 AC43, gap H-G8; owner answer of 2026-11-14, B-495) |
 | 3 | `REFUSED` | `RunRefused` (`BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`), unknown workflow, calcs refused, basis rejected on the page |
 | 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`) |
 | 5 | `JOURNAL_INTEGRITY` | `JournalIntegrityError` |
@@ -905,6 +908,7 @@ heartbeat task runs on the engine loop.
 | Condition | Code | Exit |
 |---|---|---|
 | Usage, configuration, input file invalid | `INVALID_ARGUMENT` | 2 |
+| Configuration this build cannot serve (spec 0002 AC43, gap H-G8; B-495) | `NOT_IMPLEMENTED` | 2 |
 | Basis incomplete or rejected, server check failed, calcs refused, unknown workflow | `BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`, `CALC_NOT_APPROVED`, `CALC_WITHDRAWN` (engine §6, spec 0003) | 3 |
 | Another process holds the run | `RUN_LOCKED` | 4 |
 | Journal altered | `JOURNAL_INTEGRITY` | 5 |

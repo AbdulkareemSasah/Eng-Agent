@@ -7,6 +7,7 @@ import copy
 from typing import Any
 
 import pytest
+from golden.edit_cycle import load_cases, run_check
 from pydantic import ValidationError
 
 from eng_harness.workflows.model_edit_cycle._change_set import (
@@ -188,3 +189,34 @@ def test_accepted_items_have_no_gap() -> None:
 def test_unknown_kind_is_a_schema_error() -> None:
     with pytest.raises(ValidationError, match="kind"):
         ChangeSetDraft.model_validate(_draft([{"id": "x", "kind": "delete_everything"}]))
+
+
+REFUSED_ITEMS = [
+    *({"id": "r1", "kind": kind, "anything": {"x": 1}} for kind in sorted(REFUSED)),
+    {"id": "r1", "kind": "frame_point_load", "frames": ["B1"]},
+    {**_items()[5], "id": "r1", "direction": "global_x"},
+    {**_items()[6], "id": "r1", "direction": "local_3"},
+    {**_items()[7], "id": "r1", "type": "superimposed_dead"},
+    {**_items()[7], "id": "r1", "type": "roof_live"},
+    {**_items()[8], "id": "r1", "type": "range"},
+]
+REFUSED_GAPS = [*(REFUSED[kind] for kind in sorted(REFUSED)), "H-G2", "H-G2", "H-G2", "H-G3", "H-G3", "H-G3"]
+
+
+@pytest.mark.parametrize(("item", "gap"), list(zip(REFUSED_ITEMS, REFUSED_GAPS, strict=True)))
+def test_refused_kinds_name_their_gap(item: dict[str, Any], gap: str) -> None:
+    """AC6: a refused kind or variant is the error issue NOT_IMPLEMENTED with its gap id; the check fails."""
+    case = load_cases("check")["check-resolve-select"]
+    accepted = {"id": "ok", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(case, items=[item, accepted])
+    assert body["status"] == "FAIL"
+    assert body["issues"] == [
+        {
+            "item_id": "r1",
+            "severity": "error",
+            "code": "NOT_IMPLEMENTED",
+            "detail": f"{item['kind']} is refused in v1 (spec 0007 4.3.2)",
+            "gap": gap,
+        }
+    ]
+    assert [resolved["item_id"] for resolved in body["resolved"]] == ["ok"]
