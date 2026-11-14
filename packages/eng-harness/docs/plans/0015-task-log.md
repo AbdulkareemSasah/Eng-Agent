@@ -9,22 +9,25 @@ tasks:
   - id: T1
     title: Record models, schema snapshot, import rule, risk entries
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entries eng_harness.tasklog and eng_harness.tasklog.privacy; r2_modules entries for _scope.py, _hook.py, _push.py
-      - "packages/eng-harness/.gate/risk-map.yml"  # the same three modules in the r2 entry
+      - "packages/eng-harness/pyproject.toml"  # public_modules entries eng_harness.tasklog and eng_harness.tasklog.privacy; r2_modules entries for _guard.py, _scope.py, _hook.py, _push.py
+      - "packages/eng-harness/.gate/risk-map.yml"  # the same four modules in the r2 entry
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/__init__.py"
       - "packages/eng-harness/src/eng_harness/tasklog/_records.py"
       - "packages/eng-harness/tests/data/snapshots/tasklog/record-1.json"
+      - "packages/eng-harness/tests/data/snapshots/tasklog/triage-1.json"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py"
       - "packages/eng-harness/tests/rules/test_tasklog_imports.py"
-    max_changed_lines: 300
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py::test_kind_set_closed"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py::test_extra_forbidden"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py::test_owner_words_bytes_exact_arabic"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py::test_triage_model_closed"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_records.py::test_release_binds_text_hash"
       - "packages/eng-harness/tests/rules/test_tasklog_imports.py::test_blocks_do_not_import_tasklog"
-    covers: [AC1, AC2, AC32]
+    covers: [AC1, AC2, AC32, AC37]
     depends_on: []
   - id: T2
     title: Guard, policy protocol, full policy, sanitized stub
@@ -84,7 +87,7 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_config.py"
-      - "packages/eng-harness/src/eng_harness/tasklog/_pushconf.py"
+      - "packages/eng-harness/src/eng_harness/tasklog/_pushconf.py"  # standard library only: the hook embeds it (T8h)
       - "packages/eng-harness/tests/unit/cli/test_tasklog_config.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_pushconf.py"
     max_changed_lines: 180
@@ -125,6 +128,9 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_scope.py::test_log_only_definition"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_hook_refuses_non_log_only"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_hook_self_contained"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_hook_branch_from_push_file_only"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_hook_fails_closed_without_push_file"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_hook_embeds_module_sources"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_install_hook_refuses_foreign"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_hook.py::test_status_hook_in_place"
     covers: [AC34, AC35]
@@ -133,7 +139,7 @@ tasks:
     title: Command module, part 2 (search, missing, refused, instead, problem, handoff, add --batch)
     files:
       - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"
+      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # missing reads triage files through the T1 model
       - "packages/eng-harness/src/eng_harness/tasklog/_catalog.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_cli_records.py"
     max_changed_lines: 360
@@ -163,7 +169,7 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/_check.py"
-      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # check
+      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # check; the close refusal (TLC002, TLC004)
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_check.py"
     max_changed_lines: 360
     max_sessions: 2
@@ -178,23 +184,9 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_check.py::test_check_tlw001"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_check.py::test_check_tlw002"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_check.py::test_check_tlw003"
-    covers: [AC24]   # in part: TLC001 to TLC005, TLC007, TLC009, TLW001 to TLW003
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_check.py::test_close_refused_while_incomplete"
+    covers: [AC24, AC39]   # AC24 in part: TLC001 to TLC005, TLC007, TLC009, TLW001 to TLW003
     depends_on: [T6]
-  - id: T7b
-    title: Post-push withholding
-    files:
-      - "packages/eng-harness/CHANGELOG.md"
-      - "packages/eng-harness/src/eng_harness/tasklog/_withhold.py"
-      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # withhold
-      - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # the TLC001 withheld_after branch
-      - "packages/eng-harness/tests/helpers/tasklog_git.py"
-      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_withhold.py"
-    max_changed_lines: 220
-    max_sessions: 1
-    tests_first:
-      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_withhold.py::test_withhold_after_push"
-    covers: [AC27]
-    depends_on: [T7]
   - id: T8
     title: Commit helper
     files:
@@ -212,7 +204,22 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_commit.py::test_main_checkout_untouched"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_commit.py::test_check_tlc008"
     covers: [AC14, AC25, AC24]   # AC24 in part: TLC008
-    depends_on: [T7b]
+    depends_on: [T7]
+  - id: T7b
+    title: Post-push withholding
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/tasklog/_withhold.py"
+      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # withhold
+      - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # the TLC001 withheld_after branch
+      - "packages/eng-harness/tests/helpers/tasklog_git.py"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_withhold.py"
+    max_changed_lines: 220
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_withhold.py::test_withhold_after_push"
+    covers: [AC27]
+    depends_on: [T8]   # uses the commit helper of T8 (_git.py) for its one log-only commit
   - id: T8b
     title: Log-only push helper (the ADR-0034 D6 exception)
     files:
@@ -227,6 +234,8 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_disabled"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_requires_hook"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_branch_mismatch_refused"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_remote_mismatch_refused"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_exact_refspec"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_refuses_mixed_range"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_push_refuses_rename_into_tasklog"
@@ -235,7 +244,7 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_check_tlc011"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_push.py::test_check_tlw004"
     covers: [AC26, AC24]   # AC24 in part: TLC011, TLW004
-    depends_on: [T8]
+    depends_on: [T7b]
   - id: T9
     title: attach-run core
     files:
@@ -256,6 +265,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/_runneeds.py"
       - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # TLC006, TLC010
+      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # the status unattached-runs line
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_runfact_mapping.py"
     max_changed_lines: 340
     max_sessions: 2
@@ -263,7 +273,8 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_runfact_mapping.py::test_runfact_mapping"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_runfact_mapping.py::test_check_tlc006"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_runfact_mapping.py::test_check_tlc010"
-    covers: [AC22, AC24]   # AC24 in part: TLC006, TLC010
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_runfact_mapping.py::test_status_unattached_runs"
+    covers: [AC22, AC24, AC40]   # AC24 in part: TLC006, TLC010
     depends_on: [T9]
   - id: T11
     title: The --task option of run and resume, and require_task
@@ -301,6 +312,23 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage.py::test_digest_containment"
     covers: [AC17, AC29, AC30]   # AC17 in part: the hint's source, the triage files
     depends_on: [T10]   # deferred until the first triage session needs it (section 2)
+  - id: T12b
+    title: Triage commits and withholding in triage files
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/tasklog/_git.py"  # the triage subject
+      - "packages/eng-harness/src/eng_harness/tasklog/_withhold.py"  # withhold --need
+      - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # TLC008 widened to triage files
+      - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # commit --need, withhold --need
+      - "packages/eng-harness/tests/helpers/tasklog_git.py"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py"
+    max_changed_lines: 200
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_commit_need_only_triage_file"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_withhold_need_in_triage_file"
+    covers: [AC38]
+    depends_on: [T12]   # deferred with T12
   - id: T13
     title: Sanitized policy and export
     files:
@@ -316,7 +344,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_sanitized.py::test_transform_pure_shared"
     covers: [AC9]
-    depends_on: [T2, T12]   # and plan 0002 T17 merged; deferred until the owner plans publication (section 2)
+    depends_on: [T2, T12b]   # and plan 0002 T17 merged; deferred until the owner plans publication (section 2)
   - id: T14
     title: Package rule and local testing
     files:
@@ -348,15 +376,17 @@ names start with `test_tasklog_` (basenames must be unique; spec §3). Git tests
 remote built by `tests/helpers/tasklog_git.py`.
 
 Risk: `[r2, r3]`. T1 edits `packages/eng-harness/pyproject.toml` (floor `**/pyproject.toml`, r3) and adds
-`src/eng_harness/tasklog/_scope.py`, `_hook.py` and `_push.py` to the r2 entry of `packages/eng-harness/.gate/risk-map.yml`
-and to `r2_modules` (mutation), so T8h and T8b are r2 without editing either file again. The package `.gate/` files
+`src/eng_harness/tasklog/_guard.py`, `_scope.py`, `_hook.py` and `_push.py` to the r2 entry of
+`packages/eng-harness/.gate/risk-map.yml` and to `r2_modules` (mutation), so T2, T8h and T8b are r2 without editing
+either file again. The package `.gate/` files
 carry no floor of their own (the root `.gate/**` glob matches the root folder only; checked with the gate's glob
 matcher), but `**/.gate/` is a CODEOWNERS path, so T1 and T14 need the owner's review. No task writes under
 `docs/schema/` (the record snapshot is a test snapshot). No r1 path is touched.
 
 ## 2. Tasks
 
-- **T1** creates the package `eng_harness.tasklog` with the frozen record models of spec §4.3, the schema snapshot,
+- **T1** creates the package `eng_harness.tasklog` with the frozen record models of spec §4.3 and the triage model of
+  §4.3.1, the schema snapshots,
   the static test that block, rule and workflow modules never import the package (FB004 cannot name a submodule), and
   the public-module and r2 entries.
 - **T2** adds the guard (the gate's secret rule names and patterns, the launch address, tokens) with the vector file
@@ -367,35 +397,44 @@ matcher), but `**/.gate/` is a CODEOWNERS path, so T1 and T14 need the owner's r
   `RunLock` does not wait, so a concurrent writer is refused with exit 4.
 - **T3b** adds the read-only worktree checks of spec AC13 and the git test helper.
 - **T4a** adds `[tasklog]` to `HarnessConfig` (no `push` key) and the reader of the user-level push file, refused
-  inside a git working tree. The spec 0006 §4.2.4 amendment is already in that spec (B-478).
+  inside a git working tree; the reader uses the standard library only, because the hook embeds it. The spec 0006 §4.2.4 amendment is already in that spec (B-478).
 - **T4b** starts the module entry point: `status`, `open`, `said`, `note`, `close` and a `render` stub, with strict
   UTF-8 said-files and the echo of text and hash.
 - **T8h** comes before any committing command: `_scope.py` is the one implementation of the ADR D5 definition, and
-  `_hook.py` holds the shipped hook text, `install-hook` and the in-place check. The agent's pushes with the owner's
+  `_hook.py` holds the shipped hook text (embedding the sources of `_scope.py` and `_pushconf.py`, pinned by a test;
+  the guarded branch read from the push file only, both integration branch names guarded when it is unusable),
+  `install-hook` and the in-place check. The agent's pushes with the owner's
   login wait for it (ADR D6).
-- **T5** adds the remaining agent records and `add --batch`.
+- **T5** adds the remaining agent records and `add --batch`; the `missing` hint reads triage files through the T1
+  model, tested on fixture lines, before T12 writes any.
 - **T6** renders STORY.md deterministically with fenced owner words.
-- **T7** adds the completeness checks that need no git or runs.
-- **T7b** adds `withhold` and the `withheld_after` branch of TLC001.
-- **T8** adds `commit` (log identity, subject, trailer; TLC008).
-- **T8b** adds `push` (the D6 exception), TLC011 and TLW004. With it the interim procedure ends.
+- **T7** adds the completeness checks that need no git or runs, and the refusal of `close` while TLC002 or TLC004
+  fails.
+- **T8** adds `commit` (log identity, subject, trailer; TLC008) and the commit helper `_git.py`.
+- **T7b** adds `withhold` and the `withheld_after` branch of TLC001; its one log-only commit goes through T8's helper.
+- **T8b** adds `push` (the D6 exception; branch and remote from the push file only), TLC011 and TLW004. With it the
+  hand-written interim ends; until the owner installs the hook, the agent follows spec §4.7 "Before the hook is
+  installed".
 - **T9** attaches runs: `run_attached` and `run_fact` from `JournalReader`, `fold_report` and the result store.
-- **T10** derives needs from runs (the `not_found` rows of spec §4.8, the change-set check issues) and adds TLC006 and
-  TLC010.
+- **T10** derives needs from runs (the `not_found` rows of spec §4.8, the change-set check issues), adds TLC006 and
+  TLC010, and the unattached-runs line of `status`.
 - **T11** adds `--task` to `run` and `resume`, `require_task`, the attach calls at start and exit, and the reserved
   `task` option name. It edits files that plan 0006 T14, T14b, T18a and T18b create or change, so it starts only after
   all four have merged and never edits a file an open critical-path task edits.
 - **T12** adds needs, triage, `release-public`, answered and digest. **Deferred** until the first triage session needs
   it; a development session can read STORY.md meanwhile.
+- **T12b** adds `commit --need` (subject `docs(tasklog): triage <need_id>`), TLC008 for triage files and
+  `withhold --need`. **Deferred** with T12.
 - **T13** implements `sanitized` and `export` on the placeholder mapper factored out of plan 0002 T17's
   `servers/_record.py` into `src/eng_harness/_placeholders.py`. **Deferred** until the owner defines the rules and plans
   publication.
 - **T14** writes the package rule into `.gate/agents.yml` (re-rendered `AGENTS.md`) and the local-testing items:
   PowerShell said-files, the sparse worktree on its local branch, the user-level push file, `install-hook` by the owner
-  and the shipped hook's SHA-256, the interim push form (spec Q3), offline work, rotation and `withhold`.
+  and the shipped hook's SHA-256, the hook's interpreter on Windows (`#!/usr/bin/env python3` through the `sh` of Git
+  for Windows, spec §4.7), the interim push form (spec Q3), offline work, rotation and `withhold`.
 
-`src/eng_harness/tasklog/_cli.py` is edited by T4b, T8h, T5, T7, T7b, T8, T8b, T9, T12 and T13, so these tasks form
-one chain in `depends_on` and no two of them are open at once.
+`src/eng_harness/tasklog/_cli.py` is edited by T4b, T8h, T5, T7, T8, T7b, T8b, T9, T10, T12, T12b and T13, so these
+tasks form one chain in `depends_on` and no two of them are open at once.
 
 ## 3. Dependencies
 

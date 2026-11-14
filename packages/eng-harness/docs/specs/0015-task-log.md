@@ -99,8 +99,10 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
   `tests/unit/tasklog/test_tasklog_cli_open_close.py::test_open_echo`.
 - AC16. Given `search` while the workflow registry module is absent, then `catalog: unavailable` is recorded. Test:
   `tests/unit/tasklog/test_tasklog_cli_records.py::test_catalog_unavailable_is_recorded`.
-- AC17. Given `missing`, then it returns a need id and names the release of a matching answered need. Test:
-  `tests/unit/tasklog/test_tasklog_cli_records.py::test_missing_answered_hint`.
+- AC17. Given `missing`, then it returns a need id and names the release of a matching answered need, read from the
+  triage files through the `harness.tasklog_triage/1` model (§4.3.1). Test:
+  `tests/unit/tasklog/test_tasklog_cli_records.py::test_missing_answered_hint` (fixture triage lines written by the
+  test).
 - AC18. Given `refused`, then unknown workflow, `BASIS_INCOMPLETE` and "not available in this build" map to
   `no_workflow`, `value_without_source` and `harness_unavailable`. Test:
   `tests/unit/tasklog/test_tasklog_cli_records.py::test_refused_mapping`.
@@ -128,7 +130,10 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
   (`tests/unit/tasklog/test_tasklog_push.py::test_push_disabled`,
   `tests/unit/tasklog/test_tasklog_pushconf.py::test_push_file_inside_repo_refused`,
   `tests/unit/tasklog/test_tasklog_push.py::test_push_requires_hook`); a `push` key in `[tasklog]` is an unknown key
-  (`tests/unit/cli/test_tasklog_config.py::test_harness_toml_push_key_refused`); it fetches only
+  (`tests/unit/cli/test_tasklog_config.py::test_harness_toml_push_key_refused`); it is refused, pushing nothing, when
+  `[tasklog] integration_branch` differs from the push file's `integration_branch`
+  (`tests/unit/tasklog/test_tasklog_push.py::test_push_branch_mismatch_refused`) or the log worktree's `origin` URL
+  differs from the push file's remote URL (`::test_push_remote_mismatch_refused`); it fetches only
   `refs/heads/<integration_branch>` and pushes only `HEAD:refs/heads/<integration_branch>`, without `--force` or
   `--no-verify` (`tests/unit/tasklog/test_tasklog_push.py::test_push_exact_refspec`, a fake remote that records the
   commands; the following tests are in the same file); it refuses, pushing nothing,
@@ -163,13 +168,30 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
   `tests/unit/tasklog/test_tasklog_scope.py::test_log_only_definition`.
 - AC35. Given the shipped pre-push hook, then it refuses a push to `refs/heads/<integration_branch>` whose range holds a
   commit that is not log-only (the rename case included), lets a log-only range through, ignores pushes to other refs
-  and imports nothing from the working tree; `install-hook` refuses to replace a different existing hook; `status`
-  reports whether the installed hook equals the shipped text. Test:
+  and imports nothing from the working tree; it takes `<integration_branch>` only from the user-level push file, never
+  from `harness.toml`, so a different `[tasklog] integration_branch` does not move the guarded ref; when the push file
+  is absent, invalid or inside a git working tree, it guards both `refs/heads/build/v1` and `refs/heads/main`; the
+  definitions it embeds equal the sources of `_scope.py` and `_pushconf.py`; `install-hook` refuses to replace a
+  different existing hook; `status` reports whether the installed hook equals the shipped text. Test:
   `tests/unit/tasklog/test_tasklog_hook.py::test_hook_refuses_non_log_only`, `::test_hook_self_contained`,
-  `::test_install_hook_refuses_foreign`, `::test_status_hook_in_place`.
+  `::test_hook_branch_from_push_file_only`, `::test_hook_fails_closed_without_push_file`,
+  `::test_hook_embeds_module_sources`, `::test_install_hook_refuses_foreign`, `::test_status_hook_in_place`.
 - AC36. Given a workflow whose options model has a top-level field `task`, then option generation refuses it with a
   usage error naming the field (`--task` cannot collide with CLI AC14). Test:
   `tests/unit/cli/test_tasklog_task_option.py::test_generated_option_task_reserved`.
+- AC37. Given the triage model, then the `kind` set and the `outcome` set are closed, an unknown field is refused,
+  `duplicate_of` is required exactly when the outcome is `duplicate`, and a `public_released` line applies only to the
+  `public_en` whose SHA-256 it names. Test: `tests/unit/tasklog/test_tasklog_records.py::test_triage_model_closed`,
+  `::test_release_binds_text_hash`.
+- AC38. Given `commit --need`, then it stages only the named needs' triage files and writes the subject
+  `docs(tasklog): triage <need_id>`; given `withhold --need`, then the span is replaced in the triage line and
+  `withheld_after` is appended to the same triage file in one log-only commit with that subject. Test:
+  `tests/unit/tasklog/test_tasklog_triage_commit.py::test_commit_need_only_triage_file`,
+  `::test_withhold_need_in_triage_file`.
+- AC39. Given `close` while TLC002 or TLC004 fails, then it is refused with exit 3 naming the check and writes nothing.
+  Test: `tests/unit/tasklog/test_tasklog_check.py::test_close_refused_while_incomplete`.
+- AC40. Given a run folder created after `since` that no task has attached, then `status` lists it under unattached
+  runs (the TLC006 rule). Test: `tests/unit/tasklog/test_tasklog_runfact_mapping.py::test_status_unattached_runs`.
 
 ## 4. Design
 
@@ -188,7 +210,7 @@ tasklog/README.md                                  (workspace rules change, once
 tasklog/POLICY.json                                (same; changed only by an owner step)
 tasklog/tasks/<yyyy>/<mm>/<task_id>/records.jsonl  (source of truth, append-only)
 tasklog/tasks/<yyyy>/<mm>/<task_id>/STORY.md       (derived, rendered after each append; interim-1 tasks: hand-written)
-tasklog/triage/<need_id>.jsonl                     (development session only, append-only)
+tasklog/triage/<need_id>.jsonl                     (development session only, append-only; §4.3.1)
 ```
 
 - `task_id` is `task_` plus a ULID from the injected `IdSource`; `need_id` is `need_<task ULID>_<n>`. Folder names
@@ -200,7 +222,7 @@ tasklog/triage/<need_id>.jsonl                     (development session only, ap
   files), `locks/<task_id>/run.lock` (the append lock, outside the worktree so it can never be staged), `map.json`
   (sanitized placeholders, later) and the log worktree `worktree/`.
 - Files are UTF-8 without BOM, LF, one canonical JSON object per line (`canonical_json`), appended with fsync while
-  the task's `RunLock` is held. `RunLock` does not wait: a second writer gets `RunLocked` and the command exits 4
+  the task's `RunLock` is held (a triage file: the need's lock, `locks/<need_id>/run.lock`). `RunLock` does not wait: a second writer gets `RunLocked` and the command exits 4
   (`RUN_LOCKED`) having written nothing.
 - An append that would take `records.jsonl` past 900 000 bytes is refused with exit 3, `TASKLOG_FULL`; the agent
   closes the task and opens a continuation with `--continues`. `render` refuses the same way when STORY.md would pass
@@ -247,6 +269,28 @@ and categories are those of the interim template.
 in a `*_en` field is warning TLW001, listed by `check`. A value appears only inside verbatim owner words, or by
 reference to a recorded result (ADR D12).
 
+#### 4.3.1 Triage lines: `harness.tasklog_triage/1`
+
+Same conventions as §4.3 (frozen, `extra="forbid"`, closed `kind` set, snapshot
+`tests/data/snapshots/tasklog/triage-1.json`). One file per need; its lines are chained and seq-numbered exactly like
+`records.jsonl`, and TLC001 checks them the same way.
+
+**Common fields:** `schema` (`"harness.tasklog_triage/1"`), `need_id`, `seq`, `at`, `kind`, `by`
+(`dev-session:<work item>` or `harness`), `redactions`, `prev_sha256`.
+
+| kind | by | fields |
+|---|---|---|
+| `triaged` | dev-session | `outcome: new_spec\|covered\|host_limitation\|out_of_scope\|duplicate\|defect` (process/02 §5 plus `duplicate` and `defect`), `public_en`, `public_en_sha256` (of its UTF-8 bytes), `work_item?` (`B-<n>`), `issue?`, `spec?`, `plan?` (repository paths), `duplicate_of?` (a need id; required exactly when `outcome` is `duplicate`) |
+| `public_released` | dev-session | `public_en_sha256` (the exact text released), `public_en_released: owner`, `released_on` (UTC date), `reply_sha256` (of the owner's reply file) |
+| `answered` | dev-session | `release` (`DIST==VER`), `commit` (40 hex digits) |
+| `withheld_after` | harness | as in §4.3 |
+
+A later `triaged` line replaces the earlier triage; its `public_en` is unreleased until a `public_released` line names
+its `public_en_sha256`. A `public_en` leaves `tasklog/` (`digest`, any output meant to leave it) only when the latest
+`triaged` line's `public_en_sha256` has a later `public_released` line (A24). Every free-text field of a triage line is
+agent-written: a guard hit is refused as for an agent `*_en` field (§4.4), and the numbers rule applies. A secret found
+in a triage line after it was committed is withheld with `withhold --need` (§4.4).
+
 ### 4.4 Guard and privacy policy (`eng_harness.tasklog.privacy`, ADR D7)
 
 ```python
@@ -268,7 +312,7 @@ marker is `<withheld:<rule>:<12 hex digits of the span's SHA-256>>`.
 | Harness-derived text (messages, details) | the span is withheld with the marker and a `redactions` entry |
 | Owner words: hard secret shapes (tokens, keys, private keys, credential assignments) and personal paths | the span is withheld with the marker; `text_sha256` keeps the original's hash; STORY.md shows the marker; the tool tells the agent, which tells the owner. The only deviation from byte-exact (ADR D7, D10) |
 | A line found after commit, not yet pushed | the agent tells the owner; with his consent the tool rewrites the unpushed local commit (never shared) |
-| A line found after push (`check`, or the lead's local CI) | the owner rotates the credential at once; `withhold --task T --seq N --field F --rule R` replaces the span in that line by the marker and appends `withheld_after` in one log-only commit (subject `docs(tasklog): withhold <task_id>`); TLC001 checks the line against `line_sha256_before`. The history keeps the original inside the private repository (ADR D9); never a force push, never a secrets allow entry |
+| A line found after push (`check`, or the lead's local CI) | the owner rotates the credential at once; `withhold --task T --seq N --field F --rule R` replaces the span in that line by the marker and appends `withheld_after` in one log-only commit (subject `docs(tasklog): withhold <task_id>`); in a triage file, `withhold --need NEED --seq N --field F --rule R` does the same and commits with the subject `docs(tasklog): triage <need_id>` (ADR D5 has no withhold form for a need); TLC001 checks the line against `line_sha256_before`. The history keeps the original inside the private repository (ADR D9); never a force push, never a secrets allow entry |
 
 **Policies:** `full` is identity. `sanitized` raises `NotImplementedGap` `TL-G1` until the owner defines its rules;
 its planned base is the placeholder mapper of the record-mode sanitizer (spec 0002 §4.8.1), factored out into a
@@ -286,7 +330,7 @@ JSON line with `--json`, else a short text line. Exit codes are those of §6.
 
 | sub | key options | writes |
 |---|---|---|
-| `status` | none | read-only: open tasks, unattached runs, unpushed log-only commits, policy, push permission (from the user-level file), "hook in place" (the installed pre-push hook equals the shipped text) and the shipped hook's SHA-256. Run at session start |
+| `status` | none | read-only: open tasks, unattached runs (the TLC006 rule), unpushed log-only commits, policy, push permission (from the user-level file), "hook in place" (the installed pre-push hook equals the shipped text) and the shipped hook's SHA-256. Run at session start |
 | `open` | `--said-file F \| --said-stdin`, `--lang`, `--title`, `[--continues ID] [--project-label L] [--transcript-sha256 H] [--tool-session-id S]` | `task_opened` and `owner_words(request)`; echoes the stored text and `text_sha256` |
 | `said` | `--role`, `--said-file \| --said-stdin`, `--lang`, `[--gloss]` | `owner_words` |
 | `note` | `--text` | `narration` |
@@ -298,17 +342,17 @@ JSON line with `--json`, else a short text line. Exit codes are those of §6.
 | `handoff` | `--to --done --left --why` | `handoff` |
 | `add` | `--batch FILE \| -` (JSON lines of agent records without common fields) | many records under one lock |
 | `attach-run` | `--run RUN_ID` | `run_attached`, derived `run_fact` and `not_found` (§4.8); incremental and idempotent by `(run_id, last_seq)`; works after the fact on any journal |
-| `close` | `--status --summary [--next]` | `task_closed`; refused while TLC002 or TLC004 fails |
+| `close` | `--status --summary [--next]` | `task_closed`; refused with exit 3 while TLC002 or TLC004 fails (AC39) |
 | `render` | `[--task \| --all]` | STORY.md |
 | `check` | `[--task \| --all \| --session SINCE \| --staged \| --unpushed]` | read-only, §4.10 |
-| `commit` | `[--task ID ...]` | §4.7 |
+| `commit` | `[--task ID ... \| --need NEED ...]` | §4.7; `--need` commits triage files, one commit per need |
 | `install-hook` | none | §4.7; run by the owner himself, never by the agent |
 | `push` | none (no remote, ref or refspec argument) | §4.7 |
-| `withhold` | `--task --seq --field --rule --reason` | §4.4; asks for the owner's consent first (security-sensitive, AGENTS §7) |
+| `withhold` | `--task \| --need`, `--seq --field --rule --reason` | §4.4; asks for the owner's consent first (security-sensitive, AGENTS §7) |
 | `needs` | `[--state untriaged\|triaged\|answered] [--json]` | read-only, grouped by category and target or gap id |
-| `triage` | `NEED --outcome new_spec\|covered\|host_limitation\|out_of_scope\|duplicate\|defect --public-en TEXT [--work-item B-n \| --issue N] [--spec P] [--plan P] [--duplicate-of NEED]` | `tasklog/triage/<need_id>.jsonl`; development session only (`--as dev-session:<work item>`); `public_en` stored unreleased |
-| `release-public` | `NEED --reply-file F` | the owner's release of the exact `public_en` (`public_en_released: owner`, the date, the SHA-256 of his reply written by the agent's file tool); a release of text, not an engineering approval (ADR D8) |
-| `answered` | `NEED --release DIST==VER --commit SHA` | the triage file |
+| `triage` | `NEED --outcome new_spec\|covered\|host_limitation\|out_of_scope\|duplicate\|defect --public-en TEXT [--work-item B-n \| --issue N] [--spec P] [--plan P] [--duplicate-of NEED]` | a `triaged` line in `tasklog/triage/<need_id>.jsonl` (§4.3.1); development session only (`--as dev-session:<work item>`); `public_en` stored unreleased |
+| `release-public` | `NEED --reply-file F` | a `public_released` line: the owner's release of the exact latest `public_en` (`public_en_released: owner`, the date, the SHA-256 of his reply written by the agent's file tool); a release of text, not an engineering approval (ADR D8) |
+| `answered` | `NEED --release DIST==VER --commit SHA` | an `answered` line in the triage file |
 | `digest` | `[--since DATE]` | read-only Markdown: ids, categories, counts, released `public_en` only (A24) |
 | `export` | `--policy sanitized --out DIR` | sanitized copy (later, T13) |
 
@@ -344,7 +388,10 @@ With no `[tasklog]` section nothing is logged, nothing is pushed and no run is r
 scripts are exempt (owner decision). There is no `push` key: the push permission is never read from `harness.toml`,
 only from the owner's user-level push file `<user configuration folder>/eng-harness/tasklog-push.toml` (`%APPDATA%` on
 Windows, `$XDG_CONFIG_HOME` or `~/.config` elsewhere; keys `push`, `integration_branch`, the remote URL), which the
-owner writes himself and which the tool refuses when it resolves inside a git working tree (ADR D6).
+owner writes himself and which the tool refuses when it resolves inside a git working tree (ADR D6). `push` and the
+hook take the branch and the remote only from the push file: `[tasklog] integration_branch` (which the agent can edit)
+serves writing (`task_opened`, the worktree checks, TLC011) and must equal the push file's value, else `push` is
+refused; the log worktree's `origin` URL must equal the push file's remote URL, else `push` is refused (AC26).
 
 ### 4.7 Log worktree, commit, hook and push (ADR D4, D5, D6)
 
@@ -353,7 +400,8 @@ owner writes himself and which the tool refuses when it resolves inside a git wo
 - **Log-only.** `_scope.py` implements the single definition of ADR D5 over
   `git diff-tree -r -z --no-renames --raw <parent> <commit>` and the blob checks; it is pure over git output and is
   the one implementation `commit`, `push`, TLC011 and the hook text use. This spec does not restate the definition.
-- **`commit`** works in the log worktree only: `git add` of the named task folders, `check --staged` (TLC008), then a
+- **`commit`** works in the log worktree only: `git add` of the named task folders (`--task`) or the named needs'
+  triage files (`--need`), `check --staged` (TLC008), then a
   commit with the fixed log identity `eng-agent task log <tasklog@localhost>` as author and committer, the subject
   `docs(tasklog): <task_id> <status>` (`OPEN` for a task not yet closed, else its `task_closed` status),
   `docs(tasklog): triage <need_id>` or `docs(tasklog): withhold <task_id>`, no other log text, and the `Assisted-by:`
@@ -361,9 +409,17 @@ owner writes himself and which the tool refuses when it resolves inside a git wo
 - **`install-hook`** writes the shipped self-contained pre-push hook into the common hooks directory
   (`git rev-parse --git-common-dir`/`hooks`, or `core.hooksPath` when set) and refuses when another pre-push hook
   exists. The hook imports nothing from the working tree; for every pushed update of `refs/heads/<integration_branch>`
-  it refuses unless every commit of `<remote sha>..<local sha>` is log-only; other refs pass. The owner runs it
-  himself; the agent never writes or edits the hook or the push file.
-- **`push`** is refused unless the push file says `push = true` and the hook is in place. It runs
+  it refuses unless every commit of `<remote sha>..<local sha>` is log-only; other refs pass. It reads
+  `<integration_branch>` at each push from the user-level push file, never from `harness.toml`; when that file is
+  absent, invalid or inside a git working tree, it guards both `refs/heads/build/v1` and `refs/heads/main`. The
+  shipped text is a standard-library-only Python file that embeds the source of `_scope.py` and of the push-file
+  reader `_pushconf.py` (both standard-library only) between markers, so the hook and the tool share one definition;
+  a test pins the embedded parts to the module sources, and the shipped SHA-256 changes with them. Its first line is
+  `#!/usr/bin/env python3`; git runs it through `sh` (on Windows the `sh` of Git for Windows). Whether that resolves
+  an interpreter on the owner's machine is a local-testing item (T14); a hook that cannot start fails the push. The
+  owner runs `install-hook` himself; the agent never writes or edits the hook or the push file.
+- **`push`** is refused unless the push file says `push = true`, its branch and remote match (§4.6) and the hook is in
+  place. It runs
   `git fetch origin <integration_branch>` (that ref only), rebases the unpushed log-only commits onto it with the log
   identity as committer (local commits only), runs `check --unpushed` (TLC011), then
   `git push origin HEAD:refs/heads/<integration_branch>`, fast-forward, never `--force` or `--no-verify`. After a
@@ -371,6 +427,11 @@ owner writes himself and which the tool refuses when it resolves inside a git wo
   run in a cloud session (ADR D6); there a task's commits stay local and the session names the unpushed task ids.
 - **Interim.** Until plan 0015 T8b merges, the agent follows the interim template by hand (ADR D13); interim files are
   never converted, and the tool reads them only to list them.
+- **Before the hook is installed** (ADR D6). While `push` refuses because the hook is missing or not in place, the
+  agent never pushes with the owner's login: it runs the checks of the interim template's step 3 (with `check
+  --unpushed` for the log-only test, which applies the full log path pattern of ADR D5, `records.jsonl` and triage
+  files included) and, only when every check passes, prints the push command of step 4; the owner runs it himself.
+  `push` itself prints no command in that case (AC26).
 
 ### 4.8 Run-fact mapping (read-only; `JournalReader` and the result store; no new event)
 
@@ -409,8 +470,8 @@ left. The interim template uses the same seven headings.
 | TLC004 | a closed task with any `not_found` has `did_instead` or a status other than `DONE`, and lists `open_needs` |
 | TLC005 | `--session`: every task opened in the session is closed or handed off |
 | TLC006 | orphan runs: every `<workspace>/runs/run_*` created after `since` is attached to some task |
-| TLC007 | STORY.md equals its rendering |
-| TLC008 | `--staged`: only the named task folders under `tasklog/` are staged in the worktree |
+| TLC007 | STORY.md equals its rendering (interim-1 folders, which hold a hand-written STORY.md and no `records.jsonl`, are skipped) |
+| TLC008 | `--staged`: only the named task folders, or the named needs' triage files, under `tasklog/` are staged in the worktree |
 | TLC009 | the guard re-run over stored records |
 | TLC010 | an attached run whose journal now has more events than `last_seq` (re-attach needed) |
 | TLC011 | `--unpushed`: every commit of `origin/<integration_branch>..HEAD` in the worktree is log-only (ADR D5) and has the form of §4.7 (log identity as author and committer, subject) |
@@ -467,7 +528,8 @@ the optional transcript hash.
 
 ## 9. Test strategy
 
-Each criterion of §3 names its test. Git behaviour is tested against temporary repositories and a bare remote; no
+Each criterion of §3 names its test and its layer (the test folder), so the template's criterion, layer and test table
+is not repeated here. Git behaviour is tested against temporary repositories and a bare remote; no
 test uses the network or the owner's credentials. Tests that read the gate's files (AC5, AC7) skip only when
 `MUTANT_UNDER_TEST` is set and the file is missing. The hook text is tested by running it as a subprocess against a
 temporary repository. Windows-specific encoding checks are local-testing items (T14).
@@ -513,19 +575,22 @@ log-only.
 ```jsonl
 {"seq":2,"kind":"owner_words","role":"request","lang":"ar","text":"<verbatim, with the owner's own values>","text_sha256":"<h>","gloss_en":"Agent's gloss: change a slab thickness and some beam loads, then analyse"}
 {"seq":3,"kind":"did_instead","way":"harness_workflow","text_en":"Wrote the change set from the owner's words; no value added by the agent","refs":[".eng/tasklog/in/changes.json sha256:<h>"]}
-{"seq":4,"kind":"run_attached","by":"harness","run_id":"run_<ulid>","workflow":"model_edit_cycle","status":"PAUSED","exit_code":10,"event_count":"<n>","last_seq":"<n>","chain_sha256":"<h>","report":"runs/run_<ulid>/report/report.html","model_files":["<model base name>.EDB"]}
-{"seq":5,"kind":"run_fact","by":"harness","run_id":"run_<ulid>","journal_seq":"<n>","event":"step_completed","summary_en":"change-set check refused edit kind slab_section","code":"NOT_IMPLEMENTED","gap":"H-G1"}
-{"seq":6,"kind":"not_found","by":"harness","need_id":"need_<ulid>_1","category":"not_implemented","gap_id":"H-G1","target":"slab_section","need_en":"Edit kind slab_section (define and assign slab thickness)","detail":{"kind":"slab_section","step_path":"<path>"},"evidence":["run:run_<ulid>#seq=<n>","res_<id>#/issues/0"],"blocking":false}
-{"seq":7,"kind":"owner_words","role":"correction","lang":"ar","text":"<verbatim: go on with the loads only; it names the model folder as <withheld:personal-path:<12 hex>>>","text_sha256":"<h of the original bytes>","redactions":[{"field":"text","rule":"personal-path","start":"<i>","end":"<j>","span_sha256":"<h>"}]}
-{"seq":8,"kind":"did_instead","way":"partial","text_en":"Continued with the load edits only; the owner changes the slab in ETABS by hand, read as an engineer change next cycle"}
-{"seq":9,"kind":"run_fact","event":"approval_resolved","summary_en":"engineer approved promotion on the page","owner_text":"<verbatim reason>"}
-{"seq":10,"kind":"run_fact","event":"run_completed","summary_en":"cycle completed; column verdicts NEEDS_ENGINEER","gap":"EC-G2"}
-{"seq":11,"kind":"not_found","by":"harness","need_id":"need_<ulid>_2","category":"host_limitation","gap_id":"EC-G2","need_en":"Concrete design results for columns","evidence":["#10"]}
-{"seq":12,"kind":"task_closed","status":"DONE_WITH_CONCERNS","summary_en":"Load edits applied on a working copy, checked after write, approved by the engineer; slab edit and column results not available","open_needs":["need_<ulid>_1","need_<ulid>_2"]}
+{"seq":4,"kind":"run_attached","by":"harness","run_id":"run_<ulid>","workflow":"model_edit_cycle","status":"PAUSED","exit_code":10,"event_count":"<n>","last_seq":"<n>","chain_sha256":"<h>","report":"runs/run_<ulid>/report/report.html","unreleased_tools":{},"timings":{"machine_ms":"<n>","waiting_ms":"<n>","resumes":"<n>"},"model_files":["<model base name>.EDB"]}
+{"seq":5,"kind":"not_found","by":"harness","need_id":"need_<ulid>_1","category":"not_implemented","gap_id":"H-G1","target":"slab_section","need_en":"Edit kind slab_section (define and assign slab thickness)","detail":{"kind":"slab_section","step_path":"<path>"},"evidence":["run:run_<ulid>#seq=<n>","res_<id>#/issues/0"],"blocking":false}
+{"seq":6,"kind":"owner_words","role":"correction","lang":"ar","text":"<verbatim: go on with the loads only; it names the model folder as <withheld:personal-path:<12 hex>>>","text_sha256":"<h of the original bytes>","redactions":[{"field":"text","rule":"personal-path","start":"<i>","end":"<j>","span_sha256":"<h>"}]}
+{"seq":7,"kind":"did_instead","way":"partial","text_en":"Continued with the load edits only; the owner changes the slab in ETABS by hand, read as an engineer change next cycle"}
+{"seq":8,"kind":"run_fact","event":"approval_resolved","summary_en":"engineer approved promotion on the page","owner_text":"<verbatim reason>"}
+{"seq":9,"kind":"run_fact","event":"run_completed","summary_en":"cycle completed; column verdicts NEEDS_ENGINEER"}
+{"seq":10,"kind":"not_found","by":"agent:<tool>","need_id":"need_<ulid>_2","category":"host_limitation","gap_id":"EC-G2","need_en":"Concrete design results for columns","evidence":["#9","packages/eng-harness/docs/specs/0007-model-edit-cycle.md"],"blocking":false}
+{"seq":11,"kind":"task_closed","status":"DONE_WITH_CONCERNS","summary_en":"Load edits applied on a working copy, checked after write, approved by the engineer; slab edit and column results not available","open_needs":["need_<ulid>_1","need_<ulid>_2"]}
 ```
 
+Seq 5 is derived from the change-set check result (§4.8, the `step_completed` row: `not_found` only). Seq 9 carries no
+gap, because `run_completed` holds none; the agent writes seq 10 itself from the column verdicts' message (spec 0007
+§4.4.3, gap EC-G2), since no row of §4.8 derives it.
+
 Travel: the run waited for the engineer (exit 10), so the agent committed and pushed after seq 4 with the subject
-`docs(tasklog): task_<ulid> OPEN`, and again after seq 12 with `DONE_WITH_CONCERNS`. Had a file under `packages/` been
+`docs(tasklog): task_<ulid> OPEN`, and again after seq 11 with `DONE_WITH_CONCERNS`. Had a file under `packages/` been
 changed in the worktree by mistake, `commit` would refuse to stage it (TLC008), `push` would refuse the range (TLC011)
 and the owner's hook would refuse the push.
 
