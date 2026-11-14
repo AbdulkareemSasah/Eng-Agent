@@ -15,9 +15,10 @@ class ProductProfile:
     name: str
     model_extensions: tuple[str, ...]
     tables: Mapping[str, str]
+    readback: Mapping[str, tuple[str, str, str]]  # read-back tables: (table, key column, value column)
 
 
-_ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES)
+_ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES, _etabs.READBACK)
 
 
 def profile(name: str) -> ProductProfile:

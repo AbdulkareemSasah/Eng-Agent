@@ -9,6 +9,7 @@ risk: {{r0 | r1 | r2 | r3}}   # write tools are at least r1; schema changes are 
 # Tool spec: `{{prefix}}_{{verb}}_{{noun}}`
 
 Server: {{package}} · Toolset: {{toolset}}
+Source needs: {{task-log need ids only (A24), or none}}
 
 ## 1. Purpose
 {{One sentence: what it does. If it needs "and" or "or", split the tool.}}

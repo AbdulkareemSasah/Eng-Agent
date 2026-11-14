@@ -50,7 +50,7 @@ class _Stored(TypedDict):
 _STORED = TypeAdapter(_Stored)
 _Closing = ev.StepCompleted | ev.StepFailed | ev.StepReconciled
 _Reason = Literal["needs_reconciliation", "units_mismatch", "host_state_mismatch"]
-_RERUN = ("tool", "read", "calc")  # the kinds that run again when in flight; approvals and asks are presented again
+_RERUN = ("tool", "read", "calc", "decide", "decide_many")  # rerun when in flight; approvals and asks are asked again
 
 
 class Stopped(errors.Escalation):
