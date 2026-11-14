@@ -514,8 +514,7 @@ letters, which the contract's `basis.design_basis/1` path rule allows in the las
 0001 T19 (work item B-464, owner decision OQ-Q44; spec 0004 Q1, spec 0003 Q1): a basis holding those eight paths (four
 `compare.*`, four `bounds.*`) cannot be frozen before it is merged (Q12). The calcs and the adapter read the paths of
 this table; amendment B-467 renamed them to match in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014, in
-plans 0011, 0013 and 0014 and in structural-codes plan 0002; the clause document `aci318_14.13_3_1_1` (bearing
-pressure, service) still names `limits.ratio_limit` until the owner renames it (Q12).
+plans 0011, 0013 and 0014 and in structural-codes plan 0002.
 
 Spec 0004's proposed `modeling.merge_tolerance_mm`, `modeling.snap_tolerance_mm` and
 `modeling.section_rounding_increment_mm` are not used: v1 adds or moves no object and computes no section size.
