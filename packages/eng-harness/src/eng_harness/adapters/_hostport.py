@@ -6,11 +6,14 @@ import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from eng_contract.errors import ContractError, ErrorCode, Precondition, WarningCode
+from eng_contract.envelope import Envelope, HostInfo
+from eng_contract.errors import ContractError, ContractWarning, ErrorCode, Precondition, WarningCode
 from eng_contract.ids import Clock, IdSource
 from eng_contract.store import ModelStateStore
 
 from eng_harness.adapters._identity import IdentityStore
+from eng_harness.adapters.csi import products
+from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of, snapshot
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
 from eng_harness.adapters.csi._state import CsiStateReader, StateRead
 from eng_harness.ports import HostInstance, HostModelState, SavedModel, UnitsState
@@ -25,9 +28,11 @@ class AdapterHostPort:
         self, *, identity: IdentityStore, sessions: ServerManager, guard: ProcessGuard, inspector: ProcessInspector,
         locks: HostLocks, clock: Clock, ids: IdSource, run_dir: Path, product: str, program: str, exe_name: str,
         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
+        readback: ReadBack | None = None,
     ) -> None:  # fmt: skip
         self._identity, self._clock, self._ids = identity, clock, ids
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
+        self._product, self._profile, self._readback = product, products.profile(product), readback
         self._files = {key: path.resolve() for key, path in files.items()}
         self._models: dict[str, str] = {}
         self._bound: dict[str, str] = {}
@@ -100,6 +105,33 @@ class AdapterHostPort:
             loaded=True, model_id=resolved.model_id, revision=revision, fingerprint=read.fingerprint,
             file_sha256=_file_sha256(path),
         )  # fmt: skip
+
+    async def check_model(self, model_key: str) -> Envelope:
+        """The `issues.model_check/1` of `model_key` (spec 4.5.8): the items written since the last check read back.
+
+        The envelope carries the `MODEL_CHANGED_OUTSIDE` warnings of `take_warnings` (OQ-Q67). `ContractError`:
+        `PRECONDITION_FAILED` (`model_open`), `INTERNAL` without `readback`, and the state reader's errors.
+        """
+        if self._readback is None:
+            raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())
+        path, opened = self._held(model_key)
+        started, began = self._clock.now(), self._clock.now_ms()
+        read = await self._reader.read(opened.pid, path)
+        target = {"target": {"product": self._product, "pid": opened.pid}}
+        snap = await snapshot(self._reader._rows, target, read, self._profile)  # B-451: the reader's validated read
+        issues = issues_of(self._readback, model_key, snap)
+        resolved = self._identity.resolve(path)
+        host = HostInfo(
+            program=self._program, version=read.status.program_version, model_id=resolved.model_id,
+            model_revision=resolved.revision,
+        )  # fmt: skip
+        outside = [
+            ContractWarning(code=code, message=f"{key} changed outside the harness since the last read")
+            for key, code in self.take_warnings()
+        ]
+        envelope = check_envelope(self._readback, issues, outside, host, started, self._clock.now_ms() - began)
+        self._readback.written.clear(model_key)  # only now: a failed store leaves the items to the next check
+        return envelope
 
     def last_read(self, model_key: str) -> StateRead | None:
         """The payloads, status and fingerprint of the last `model_state` of `model_key`, or `None`."""

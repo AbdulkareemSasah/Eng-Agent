@@ -1,4 +1,4 @@
-"""Comparison core of the difference report (plan 0003 T8; spec 0003 4.7 rules D2 to D5) on synthetic rows.
+"""Comparison core of the difference report (plan 0003 T8 and T8c; spec 0003 4.7 rules D2 to D5) on synthetic rows.
 
 Every tolerance below is synthetic (spec 4.7 verification cases: "the synthetic tolerance"); none is a project value.
 Expected values are derived by hand in the comments from D2 to D5, never computed by the code under test.
@@ -203,17 +203,17 @@ def test_keyed_rows_change_kinds() -> None:
     assert diff.changes == [
         Change(
             section=FRAMES,
-            key=["F2"],
+            key=["frames", "F2"],
             change="changed",
             before=None,
             after=None,
             properties=[_row("/section", "S1", "S9", None, None, None, "D4")],
         ),
-        Change(section=FRAMES, key=["F3"], change="removed", before=_frame("F3"), after=None, properties=[]),
-        Change(section=FRAMES, key=["F5"], change="added", before=None, after=_frame("F5"), properties=[]),
+        Change(section=FRAMES, key=["frames", "F3"], change="removed", before=_frame("F3"), after=None, properties=[]),
+        Change(section=FRAMES, key=["frames", "F5"], change="added", before=None, after=_frame("F5"), properties=[]),
         Change(
             section=FRAMES,
-            key=["F6"],
+            key=["frames", "F6"],
             change="ambiguous",
             before=[_frame("F6"), _frame("F6", "S2")],
             after=[_frame("F6")],
@@ -222,10 +222,14 @@ def test_keyed_rows_change_kinds() -> None:
     ]
     assert diff.within == [
         WithinRow(
-            section=FRAMES, key=["F4"], **_row("/i/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump()
+            section=FRAMES,
+            key=["frames", "F4"],
+            **_row("/i/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump(),
         ),
         WithinRow(
-            section=FRAMES, key=["F4"], **_row("/j/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump()
+            section=FRAMES,
+            key=["frames", "F4"],
+            **_row("/j/x_mm", 1000.0, 1000.5, "mm", "length", 0.5, "D3").model_dump(),
         ),
     ]
     # Counts by hand: added F5, removed F3, changed F2, ambiguous F6, unchanged F1 and F4, two within rows.
@@ -241,7 +245,12 @@ def test_ambiguous_identical_and_sides_shown() -> None:
     assert same == SectionDiff(
         changes=[
             Change(
-                section=FRAMES, key=["F1"], change="ambiguous", before=rows, after=list(reversed(rows)), properties=[]
+                section=FRAMES,
+                key=["frames", "F1"],
+                change="ambiguous",
+                before=rows,
+                after=list(reversed(rows)),
+                properties=[],
             )
         ],
         within=[],
@@ -250,7 +259,7 @@ def test_ambiguous_identical_and_sides_shown() -> None:
     # A duplicate on one side and nothing on the other: both lists shown, the empty one as [].
     gone = compare_rows(FRAMES, ("frames",), rows, [], TOL)
     assert gone.changes == [
-        Change(section=FRAMES, key=["F1"], change="ambiguous", before=rows, after=[], properties=[])
+        Change(section=FRAMES, key=["frames", "F1"], change="ambiguous", before=rows, after=[], properties=[])
     ]
     # Identical values written differently (int and float, as RFC 8785 writes them) are not a change.
     assert compare_rows(FRAMES, ("frames",), [_frame("F1", x=0)], [_frame("F1", x=0.0)], TOL).changes == []
@@ -268,7 +277,7 @@ def test_nested_keyed_lists_carry_the_parent_key() -> None:
     assert diff.changes == [
         Change(
             section=GRIDS,
-            key=["G1"],
+            key=["systems", "G1"],
             change="changed",
             before=None,
             after=None,
@@ -276,7 +285,7 @@ def test_nested_keyed_lists_carry_the_parent_key() -> None:
         ),
         Change(
             section=GRIDS,
-            key=["G1", "B"],
+            key=["systems", "G1", "lines", "B"],
             change="changed",
             before=None,
             after=None,
@@ -288,7 +297,7 @@ def test_nested_keyed_lists_carry_the_parent_key() -> None:
     # An added parent carries its children inside the whole object; they get no rows of their own.
     added = compare_rows(GRIDS, ("systems",), [], [system([a])], TOL)
     assert added.outcomes == ["added"]
-    assert [c.key for c in added.changes] == [["G1"]]
+    assert [c.key for c in added.changes] == [["systems", "G1"]]
 
 
 def test_compare_section_whole_payload() -> None:
@@ -319,7 +328,7 @@ def test_compare_section_whole_payload() -> None:
     diff = compare_section(LOADS, before, after, TOL)
     item_change = Change(
         section=LOADS,
-        key=["C1", "DL", "load_pattern"],
+        key=["combinations", "C1", "items", "DL", "load_pattern"],
         change="changed",
         before=None,
         after=None,
@@ -330,7 +339,7 @@ def test_compare_section_whole_payload() -> None:
     assert diff.within == [
         WithinRow(
             section=LOADS,
-            key=["F1", "DL", "gravity"],
+            key=["frame_loads", "F1", "DL", "gravity"],
             **_row("/w_kN_m", 5.0, 5.25, "kN/m", "line_load", 0.25, "D3").model_dump(),
         )
     ]
@@ -374,5 +383,48 @@ def test_compare_section_sorts_changes_by_key() -> None:
         "area_sections": [],
     }
     diff = compare_section(SECTIONS, before, after, TOL)
-    # Sorted by key across the section's lists: ["A1"] before ["W1"].
-    assert [(c.key, c.change) for c in diff.changes] == [(["A1"], "added"), (["W1"], "removed")]
+    # Sorted by key across the section's lists (compared in list order frame, area): the list name leads the key, and
+    # "area_sections" < "frame_sections" in code points, so W1 (removed) comes before A1 (added).
+    assert [(c.key, c.change) for c in diff.changes] == [
+        (["area_sections", "W1"], "removed"),
+        (["frame_sections", "A1"], "added"),
+    ]
+
+
+def test_keys_carry_their_list() -> None:
+    # AC51 (D2, amendment B-469): rows of two lists of one section with the same name or key members, each changed.
+    def loads(kind: str, combo: str, w: float, q: float) -> dict[str, Any]:
+        return {
+            "patterns": [{"name": "X", "type": kind, "self_weight_ratio": 1.0}],
+            "combinations": [{"name": "X", "type": combo, "items": []}],
+            "frame_loads": [{"frame": "E1", "pattern": "DL", "direction": "gravity", "w_kN_m": w}],
+            "area_loads": [{"area": "E1", "pattern": "DL", "direction": "gravity", "q_kPa": q}],
+        }
+
+    def sections(material: str) -> dict[str, Any]:
+        return {
+            "frame_sections": [{"name": "S1", "material": material, "shape": {"type": "circular", "D_mm": 500.0}}],
+            "area_sections": [{"name": "S1", "material": material, "kind": "wall", "thickness_mm": 200.0}],
+        }
+
+    load_diff = compare_section(LOADS, loads("dead", "linear_add", 5.0, 2.0), loads("live", "envelope", 6.0, 3.0), TOL)
+    section_diff = compare_section(SECTIONS, sections("C30"), sections("C35"), TOL)
+    # Each key is the list name, then the row's key members; sorted in code points: area < combinations < frame <
+    # patterns. w_kN_m moves by 1 > 0.25 (changed, D3); q_kPa has no tolerance in TOL (D4).
+    assert [(c.key, [p.pointer for p in c.properties]) for c in load_diff.changes] == [
+        (["area_loads", "E1", "DL", "gravity"], ["/q_kPa"]),
+        (["combinations", "X"], ["/type"]),
+        (["frame_loads", "E1", "DL", "gravity"], ["/w_kN_m"]),
+        (["patterns", "X"], ["/type"]),
+    ]
+    assert [(c.key, [p.pointer for p in c.properties]) for c in section_diff.changes] == [
+        (["area_sections", "S1"], ["/material"]),
+        (["frame_sections", "S1"], ["/material"]),
+    ]
+    # Sorted and unique by section and key, as harness.model_diff/1 requires; four and two changed objects.
+    keys = [(c.section, tuple(c.key)) for c in load_diff.changes + section_diff.changes]
+    assert keys == sorted(set(keys))
+    assert section_counts(load_diff) == SectionCounts(
+        added=0, removed=0, changed=4, ambiguous=0, unchanged=0, within_tolerance=0
+    )
+    assert section_counts(section_diff).changed == 2

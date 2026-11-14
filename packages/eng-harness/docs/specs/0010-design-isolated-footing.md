@@ -90,7 +90,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 - AC6. `harness.footing_subjects`: given synthetic placements, sections, points and reactions, then each column whose
   lower joint has reaction rows becomes a subject with `cx_mm`, `cy_mm` mapped through its rotation (within
-  `compare.angle` of 0, 90, 180 or 270 degrees), and every other case is excluded with its reason
+  `compare.angle_deg` of 0, 90, 180 or 270 degrees), and every other case is excluded with its reason
   (`NO_COLUMN_AT_JOINT`, `SECTION_NOT_RECTANGULAR`, `COLUMN_ROTATED`, `TWO_COLUMNS_AT_JOINT`). Test:
   `tests/golden/footing/test_subjects.py::test_golden_cases`.
 - AC7. `harness.footing_plan_size`: golden cases of §4.4.2 (between and on multiples, the minimum plan governing, the
@@ -163,7 +163,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 ### 3.7 SAFE cross-check (§4.9)
 
-- AC24. `harness.reactions_to_joint_loads`: golden cases of §4.9 (negation, matching within `compare.length`, an
+- AC24. `harness.reactions_to_joint_loads`: golden cases of §4.9 (negation, matching within `compare.length_mm`, an
   unmatched or doubly matched joint, a missing pattern, only the cases of the chosen combinations). Test:
   `tests/golden/footing/test_reactions_to_loads.py::test_golden_cases`.
 - AC25. `harness.safe_equilibrium`: golden cases (within and outside the tolerance; a self-weight pattern not compared).
@@ -176,7 +176,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   `tests/workflow/footing/test_safe_stage.py::test_stage_steps`, `::test_candidate_pressure_no_verdict`,
   `::test_soil_pressure_limit_reported`.
 - AC27. Given `safe.cross_check = off` (or no `--safe-model`), then no SAFE server starts; given a basis without
-  `compare.length` or `checks.equilibrium_relative_tolerance` (required whatever `safe.cross_check` says, §4.7, Q19),
+  `compare.length_mm` or `checks.equilibrium_relative_tolerance` (required whatever `safe.cross_check` says, §4.7, Q19),
   then the basis does not freeze (spec 0004 AC23) and the run does not start. Test:
   `::test_stage_off_and_missing_fields`.
 - AC28. Given the tool names any step of this workflow can call, then they are a subset of the CSI allowlist and none is
@@ -276,11 +276,11 @@ milli", as BP §5, and π with source "mathematical constant, area of a circle",
 #### 4.4.1 `harness.footing_subjects` v1
 
 Input: `placements` (`model.frame_placements/1`), `sections` (`model.sections/1`), `reactions`
-(`forces.joint_reactions/1`), `basis` (`compare.angle`). Method: S1 a column is a frame of kind `column`; its lower
+(`forces.joint_reactions/1`), `basis` (`compare.angle_deg`). Method: S1 a column is a frame of kind `column`; its lower
 joint is the end with the smaller `z_mm`. S2 a support joint is a joint with at least one reaction row. S3 a subject is a
 support joint with exactly one column whose lower joint it is; zero columns gives `NO_COLUMN_AT_JOINT`, more gives
 `TWO_COLUMNS_AT_JOINT`. S4 the section must be `rectangular` (`SECTION_NOT_RECTANGULAR` otherwise, ACI plan §6.3). S5
-with `θ = rotation_deg` reduced to [0, 360): within `compare.angle` of 0 or 180 gives `cx = b`, `cy = h`; of 90 or 270
+with `θ = rotation_deg` reduced to [0, 360): within `compare.angle_deg` of 0 or 180 gives `cx = b`, `cy = h`; of 90 or 270
 gives `cx = h`, `cy = b`; otherwise `COLUMN_ROTATED`. Which of `b_mm` and `h_mm` lies along local axis 2 at zero
 rotation is the CSI convention to confirm (L2). S6 `x_mm`, `y_mm` from the lower joint.
 
@@ -413,7 +413,7 @@ No value is shipped (spec 0004 Q8). Paths of the ACI clause specs are kept (ACI 
 | `materials.concrete_class` | choice `normalweight`, `lightweight`, `sand_lightweight` | — | checks |
 | `materials.rebar_coating` | choice `uncoated`, `epoxy`, `zinc_epoxy_dual` | — | development |
 | `durability.cover_footing` | quantity | mm | layout, development |
-| `limits.ratio_limit` | quantity | 1 | verdicts |
+| `limits.ratio_limit_ratio` | quantity | 1 | verdicts |
 | `foundation.min_plan_dimension`, `.max_plan_dimension`, `.plan_increment` | quantity | mm | plan size, resize |
 | `foundation.plan_shape` | choice `square`, `equal_projection` | — | plan size (FG-1) |
 | `foundation.min_depth`, `.max_depth`, `.depth_increment` | quantity | mm | plan size, resize |
@@ -422,10 +422,10 @@ No value is shipped (spec 0004 Q8). Paths of the ACI clause specs are kept (ACI 
 | `reinforcement.bar_diameter` | quantity | mm | layout |
 | `reinforcement.max_spacing`, `.min_spacing`, `.spacing_increment` | quantity | mm | plan size, resize (Q15) |
 | `reinforcement.bottom_layer` | choice `x_bottom`, `y_bottom` | — | layout |
-| `compare.angle` | quantity | deg | subjects (calcs §4.4) |
+| `compare.angle_deg` | quantity | deg | subjects (calcs §4.4) |
 | `attempts.footing_rounds`, `attempts.cases` | count | — | `ctx.attempts` (engine Q1) |
 | `safe.cross_check` | choice `off`, `loads_and_analysis` | — | §4.9 |
-| `compare.length`, `checks.equilibrium_relative_tolerance` | quantity | mm, 1 | §4.9 (required in every run: spec 0004 has no conditional requirement, Q19) |
+| `compare.length_mm`, `checks.equilibrium_relative_tolerance` | quantity | mm, 1 | §4.9 (required in every run: spec 0004 has no conditional requirement, Q19) |
 
 ### 4.8 The workflow steps
 
@@ -445,9 +445,9 @@ on, and no SAFE result changes a verdict.
 
 1. Read the SAFE model state (points, load set; SAFE §4.4).
 2. `harness.reactions_to_joint_loads` v1 **[added]** (SAFE §4.2 names it): inputs the ETABS reactions, subjects, the
-   ETABS `model.load_set/1`, the SAFE points and load set, the engineer's cases, `basis` (`compare.length`). M1 the
+   ETABS `model.load_set/1`, the SAFE points and load set, the engineer's cases, `basis` (`compare.length_mm`). M1 the
    transferred cases are the `load_pattern` or `load_case` items of the chosen combinations. M2 each subject joint is
-   matched to the one SAFE point within `compare.length` in plan; none gives `NEEDS_ENGINEER` (`UNMATCHED`), two or more
+   matched to the one SAFE point within `compare.length_mm` in plan; none gives `NEEDS_ENGINEER` (`UNMATCHED`), two or more
    `INVALID_ARGUMENT`. M3 loads are the negatives of the reactions (action and reaction, as BP §4.1). M4 a case without a
    SAFE pattern of the same name is `NEEDS_ENGINEER` (`PATTERN_MISSING`): the workflow never creates a pattern (it would
    need a self-weight value). Output `harness.joint_loads/1` with null punching dimensions (SG-7), and the combinations
@@ -542,7 +542,7 @@ code-pack route (additive to engine §4.8).
 | Q16 | No measured manual time for footing design exists | Owner | Prepare a footing benchmark (two or three past projects) before the first release, for F6 and F7 |
 | Q17 | Engineer dimensions are one square plan size `L` with `h` and `s`; a rectangular footing cannot be entered, because the band rule is not checked (Q2, ACI plan Q7); an engineer plan off the increment is kept and flagged, and `enlarge_plan` then rounds up to the next multiple | Owner | Accept for v1; add `Lx`, `Ly` in a new `FootingDimensions` version together with the band-rule check |
 | Q18 | A large moment can give partial contact (`q_min < 0`) at the size found from `N` only; bearing is then `NEEDS_ENGINEER` (BP G-1), not `FAIL`, so the footing goes to the engineer with no enlargement round | Owner | Accept for v1 (explicit and tested, AC19). Later, preferred: a cited calc that sizes for `q_min ≥ 0` from the moments (BP S5 solved for the plan), so the first size already has full contact; alternative: a rule that may enlarge a bearing `NEEDS_ENGINEER` with reason `FULL_CONTACT` while `plan_at_max` is false (needs the reason in the decision state, a new point version) |
-| Q19 | `compare.length` and `checks.equilibrium_relative_tolerance` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
+| Q19 | `compare.length_mm` and `checks.equilibrium_relative_tolerance` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
 | Q20 | **[added]** A code-pack check's `CalcInfo.version` (§4.3 step 1): engine §4.8 and `eng_harness.ports.CalcInfo` require an integer of at least 1 (also `ctx` `calc_version` and the journaled step version, engine AC13), but a merged check has no integer version: `CheckMeta` has none, and the only version is the pack's string `version`, which CF AC9 makes the trace's `calc_version` | Owner, lead | Decided (draft, B-442; owner queue): each check has an integer `version` in `CheckMeta` (default 1, raised when the check's behaviour changes; CF §4.2, structural-codes core plan T15), which the route passes as `CalcInfo.version`; the pack's string version stays in the trace (CF AC9) |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |

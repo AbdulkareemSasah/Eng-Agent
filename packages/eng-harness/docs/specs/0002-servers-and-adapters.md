@@ -102,7 +102,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   reason, and the engine stops before any write (engine AC44). Tests:
   `tests/unit/servers/test_buildcheck.py::test_fingerprint_definition`, `::test_each_mismatch`,
   `tests/workflow/servers/test_session.py::test_build_mismatch_stops_run` (the engine clause; it runs the real engine,
-  plan task T19; amendment B-413).
+  plan task T19a; amendments B-413, B-475).
 - AC10. Given the S-12 inventory, when the fingerprint of the CSI allowlist is computed from it, then it equals the
   value pinned in the allowlist data (`fingerprint_source = "s12-inventory"`). Test:
   `tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`.
@@ -159,7 +159,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC22. Given a timeout on a host whose units were left changed (synthetic fault `units_left_changed`), when the next
   step on that host runs, then `read_units` reports the mismatch and the engine stops with `PRECONDITION_FAILED`
   (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`
-  (it runs the real engine, plan task T19; amendment B-413).
+  (it runs the real engine, plan task T19a; amendments B-413, B-475).
 - AC23. Given a write in flight, when reconciled, then the adapter reads the object's state and answers `applied`,
   `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result; given an analysis or design
   in flight with no proof of end of the abandoned call (v1), then the answer is `unknown` whatever the host answers,
@@ -264,6 +264,14 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   in the escape-hatch deny list (§4.5.1) is a load error; each adapter's contract test checks every `[[unit]]` tool
   against its pinned inventory. Tests: `tests/unit/adapters/test_allowlist.py::test_unit_header_entries`,
   `::test_unit_header_missing_on_unserved_tool`.
+- AC43. **[added: B-475]** Given `[cli_tools.*]` entries, then `build_ports` routes each to the command-line tool
+  adapter (§4.7), and `ToolPort.describe` and `ToolPort.call` of such a tool reach it. Until plan task T19b,
+  `build_ports` refuses a configuration with any `[cli_tools.*]` entry with `NotImplementedGap` (`NOT_IMPLEMENTED`, gap
+  H-G8) naming the entries, rather than drop them; raised where the command line builds its ports (spec 0006 §4.2.2
+  step 1, outside the engine, so nothing is journaled), it ends `run` and `resume` with exit 70 `INTERNAL`, because
+  `NOT_IMPLEMENTED` is not in the error-code map of spec 0006 §4.2.3, and its message, printed on standard error, names
+  H-G8 and the entries. Tests: `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap`
+  (plan task T19a; replaced in T19b), `::test_cli_tool_routed_through_build_ports` (plan task T19b).
 
 ## 4. Design
 
@@ -669,7 +677,7 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
   for IDEA `LOADS_UNCONFIRMED_MAP` (info: the load map is unconfirmed, so no load is written) and
   `LOAD_EFFECT_ZERO_DROPPED` (warning: the server dropped all-zero load effects before the write) (spec 0014 §4.10,
   AC10). Quantities read back are compared within the design basis field
-  `checks.readback_relative_tolerance` (required by every workflow that writes quantities; never a constant here,
+  `checks.readback_relative_tolerance_ratio` (required by every workflow that writes quantities; never a constant here,
   §11 G-2). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
 - **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
   confirm=true)` on the `main` role, hashes the file, updates the identity store (ADR-0032) and returns `SavedModel`;
@@ -890,7 +898,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | `self_weight_ratio`, `scale_ratio` | float | 1 | ≥ 0 | yes, engineering quantity | change set |
 | `SnapTol_mm`, `BeamSpacing_mm`, `ColumnGrow_mm` (dxf-prep) | float | mm | ≥ 0 | yes, engineering quantity | design basis |
 | `call_timeout_s`, `client_grace_s`, `timeout_s` | int | s | ≥ 1 | no | `harness.toml`, required |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (required by writing workflows) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (required by writing workflows) |
 | Outputs | envelopes of the kinds in §4.6 and §4.7 | canonical | — | — | adapters |
 
 ## 6. Errors
@@ -941,7 +949,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35 | Contract (inventory, recordings; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route) | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 
@@ -974,7 +982,8 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G5 | `model.frame_placements/1` `kind` cannot be read from `csi_list_frames` | Owner | Read design orientation through `csi_frame_details` after a local check of its reply |
 | H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
-| G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance` with a source; no constant in code |
+| H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then |
+| G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
 | A3 | **[added]** by B-085 for spec 0014 A1 (IDEA adapter): `routes` in the allowlist header and on entries, and the server section's `route`; `audit_log` on the server section (default true; false for IDEA, so no `--audit-log` argument); an adapter may require the `single` topology (one `main` role serving all classes); allowlist header `[[unit]]` entries with `unit_status`; the issue codes `LOADS_UNCONFIRMED_MAP` (info) and `LOAD_EFFECT_ZERO_DROPPED` (warning); the harness host codes `OFFLINE_STUB` and `UNEXPECTED_REPLY`; the harness kinds `harness.idea_status/1`, `harness.idea_project/1`, `harness.idea_loads/1`, `harness.idea_check_raw/1` (spec 0014 §4.5). AC40 to AC42 (plan T20); the IDEA uses of each are in spec 0014 and plan 0014 | Owner | Accept with spec 0014 |

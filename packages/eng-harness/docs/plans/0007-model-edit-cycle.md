@@ -439,6 +439,8 @@ avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness
 `tests/contract/test_block_lock.py::test_lock_matches_registry` then covers the `model_edit_cycle` blocks;
 `test_definition.py::test_workflow_registered` checks that `discover()` holds them (the lock part of AC1). The public
 module `eng_harness.workflows` goes into `public_modules`. Plans 0010 T9 and 0013 T11 and T13 add their blocks to the same tuple.
+Plan 0006 T18a binds the command line's workflow-registry default to this registry (amendment B-471), so `run` finds
+the model edit cycle without plan 0010 T9.
 The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main(["--write-lock"])`, which writes
 `discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
 and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
@@ -474,11 +476,11 @@ uninterrupted run.
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
-| T8 | plan 0001 T10 to T17; plan 0002 T19; plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17; plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
-| T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19 |
+| T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 
 ## 4. Verification
 

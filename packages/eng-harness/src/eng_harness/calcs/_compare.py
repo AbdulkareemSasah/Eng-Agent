@@ -53,7 +53,7 @@ class SectionDiff(NamedTuple):
 
 
 def row_key(members: tuple[str, ...], row: dict[str, Any]) -> tuple[str, ...]:
-    """The D2 key of `row`: its key members in order, exactly as stored; a null or absent member is left out."""
+    """The D2 key members of `row` in order, exactly as stored; a null or absent member is left out."""
     found: list[str] = []
     for member in members:
         value: Any = row
@@ -194,16 +194,19 @@ def compare_rows(
 ) -> SectionDiff:
     """D2: match the rows of the keyed list at `path` of a `kind` section by key, in key order.
 
+    A row's key is `prefix` (the parent row's key), the list name (the last segment of `path`), then its key members,
+    so rows of two lists of one section never share a key (amendment B-469).
+
     A key on one side only is `added` or `removed` (whole object). A key that occurs more than once on a side is
     `ambiguous` with both object lists, even when both sides are byte-identical (AC28: never unchanged; D7).
-    A key once on each side is compared member by member; its nested keyed lists are compared under the parent key
-    (`prefix` + key).
+    A key once on each side is compared member by member; its nested keyed lists are compared under its key.
     """
     members = next(fields for k, p, fields in ROW_KEYS if k == kind and p == path)
+    *_, name = path
     groups: dict[tuple[str, ...], tuple[list[Any], list[Any]]] = {}
     for side, rows in enumerate((before, after)):
         for row in rows:
-            groups.setdefault((*prefix, *row_key(members, row)), ([], []))[side].append(row)
+            groups.setdefault((*prefix, name, *row_key(members, row)), ([], []))[side].append(row)
     diff = SectionDiff(changes=[], within=[], outcomes=[])
     for key in sorted(groups):
         left, right = groups[key]

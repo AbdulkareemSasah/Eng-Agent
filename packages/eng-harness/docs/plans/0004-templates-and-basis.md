@@ -159,14 +159,20 @@ tasks:
     depends_on: [T4]
   - id: T10
     title: "Property tests and the fake-host workflow with replay"
+    # Amendment (B-474, documents only): no engine task wires `ctx.basis` (engine T7 made only `BasisView`), so T10
+    # wires it lazily in the engine Ctx and runner (36 counted lines measured by the B-164 writer).
+    # Amendment (B-482, documents only): the property tests and test_unconfirmed_basis_refuses_the_run leave tests_first
+    # (they pin merged T1 to T8 and engine invariant 5, so they pass at the base: TF004); they stay in files.
     files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/tests/property/test_template_basis_props.py"
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py"
       - "packages/eng-harness/tests/fixtures/workflows/**"
     max_changed_lines: 300
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/property/test_template_basis_props.py"
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays"
     covers: [AC28, AC30]
     depends_on: [T8]
@@ -181,8 +187,8 @@ strict loading, inheritance, repository), then `eng_harness.basis` (T5 to T8: fi
 interface, freeze and storage), then shipped content and cross-cutting tests (T9, T10). Risky parts first: the schema
 and unit rules (T1) carry the most R1 risk; the YAML dependency (T2) is added with its ADR, written in T2 with status Proposed (B-374). Reuse: the contract
 supplies `Cited`, units, `Timestamp`, `ResultStore`, the `basis.design_basis/1` kind and `DesignBasis.missing`; the
-engine supplies `BasisPort`, `ctx.basis` and the invariant that refuses an incomplete basis. Nothing is copied from
-other packages.
+engine supplies `BasisPort`, the `BasisView` type (T10 wires `ctx.basis`, B-474) and the invariant that refuses an
+incomplete basis. Nothing is copied from other packages.
 
 Cross-plan dependencies, which `depends_on` cannot express: T1 needs engine T1 (skeleton) and the merged
 `eng-contract` 0.1.0 (plan B-003); T8 needs engine T6 (ports) and contract T12 and T14 (kinds, result store); T9 needs
@@ -209,7 +215,12 @@ the page against this; no HTML here.
 `ResultStore`.
 **T9 Shipped content.** The `blank` template, package data inclusion and the golden pin. No values.
 **T10 Cross-cutting tests.** Hypothesis round trips and the fake-host workflow with journal replay (process/05 §2:
-every workflow path has a fake-host and a replay test).
+every workflow path has a fake-host and a replay test). Amendment B-474: T10 also wires `ctx.basis` in
+`engine/_ctx_impl.py` and `engine/_runner.py`, loaded on first read so `ctx` loads no basis for a run that never reads
+it (`start` still loads it once for invariant 5 when `required_basis` is not empty). Test order (amendment B-482): the
+first `test:` commit holds only `test_basis_reaches_ctx_and_replays` in `test_basis_workflow.py`; the property tests and
+`test_unconfirmed_basis_refuses_the_run` pin merged behaviour and come in a later commit of the same task (test-first
+judges each new or changed test function of the first `test:` commit's files, so a green one there is TF004).
 
 ## 3. Dependencies
 

@@ -1,19 +1,22 @@
 """Shared conformance test of the port fakes (spec 0001 AC57; plan 0001 T6).
 
 Each fake is bound to its `Protocol` by a typed assignment (checked by mypy) and then driven through the behavior the
-spec states for that port. The `DecisionPort` is not covered here: its protocol and fake arrive with plan task T14.
+spec states for that port (the `DecisionPort` from plan task T14).
 """
 
 import asyncio
+from enum import StrEnum
 from pathlib import Path
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.kinds.basis import DesignBasis
 from fakes.ports import (
     FakeApprovalPort,
     FakeBasisPort,
     FakeCalcPort,
+    FakeDecisionPort,
     FakeHost,
     FakeInputPort,
     FakeRunControl,
@@ -21,9 +24,13 @@ from fakes.ports import (
     RecordingProgressSink,
     failure,
 )
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from eng_harness.calc import CalcStatus
+from eng_harness.ctx import BasisView
+from eng_harness.decisions._points import decision_point
+from eng_harness.decisions._policy import DecisionPolicy
+from eng_harness.decisions.interfaces import DecisionAnswer, DecisionScreen, PendingAnswer
 from eng_harness.errors import CalcRefused, HarnessCode
 from eng_harness.journal import Event, EventType
 from eng_harness.journal._events import RunPaused
@@ -34,6 +41,8 @@ from eng_harness.ports import (
     BasisPort,
     CalcInfo,
     CalcPort,
+    DecisionCall,
+    DecisionPort,
     HostInstance,
     HostModelState,
     HostPort,
@@ -79,6 +88,7 @@ def test_fakes_conform() -> None:
     _check_calc_port()
     _check_basis_port()
     _check_dialog_ports()
+    _check_decision_port()
     _check_sink_and_control()
 
 
@@ -221,6 +231,45 @@ def _check_dialog_ports() -> None:
     inputs.script("inp_x", reply)
     assert asyncio.run(input_port.answer("inp_x", wait=False)) == reply
     assert inputs.waits == [False]
+
+
+class _Choice(StrEnum):
+    A = "a"
+    B = "b"
+
+
+class _State(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    ready: bool
+
+
+def _check_decision_port() -> None:
+    fake = FakeDecisionPort()
+    port: DecisionPort = fake
+    point = decision_point(name="pick_choice", version=1, title="Pick a choice", options=_Choice, state=_State)(object)
+    basis = BasisView("res_" + "0" * 26, DesignBasis(template=None, fields={}), ())
+    calls = [
+        DecisionCall(
+            request_id=f"dec_{n}", run_id="run_x", step_path="0", point=point, options=_Choice,
+            state=_State(ready=True), rules=(), policy=DecisionPolicy(), basis=basis,
+        )
+        for n in range(2)
+    ]  # fmt: skip
+    one = asyncio.run(port.decide(calls[0]))
+    assert isinstance(one, DecisionAnswer)
+    assert (one.choice, one.decided_by, one.options) == ("a", "rule:fake", ("a", "b"))
+    many = asyncio.run(port.decide_many(calls))
+    assert [type(a) for a in many] == [DecisionAnswer, DecisionAnswer]
+    assert fake.calls == [calls[0], *calls]
+    assert fake.batches == [2]
+    refs = calls[1].model_copy(update={"options": ("res_" + "1" * 26, "res_" + "2" * 26)})
+    by_index = asyncio.run(port.decide(refs))
+    assert isinstance(by_index, DecisionAnswer)
+    assert by_index.choice == "0"  # reference options are answered by index
+    asked = PendingAnswer(request_id="dec_0", screen=DecisionScreen(items=()))
+    fake.handler = lambda _call: asked
+    assert asyncio.run(port.decide(calls[0])) is asked  # the handler may leave the call to the engineer
 
 
 def _check_sink_and_control() -> None:
