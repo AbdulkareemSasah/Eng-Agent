@@ -519,6 +519,6 @@ def test_a_decision_step_in_flight_runs_again_at_a_resume(tmp_path: Path, kind: 
     port = FakeDecisionPort()
     done = asyncio.run(_engine(rig, flow(body), port).resume(run_id))
     assert done.status is RunStatus.COMPLETED
-    reruns = [e for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
-    assert [(e.path, e.payload.reason) for e in reruns] == [("0", "read_in_flight")]
+    reruns = [(e.path, e.payload.reason) for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
+    assert reruns == [("0", "read_in_flight")]
     assert len(port.calls) == 1
