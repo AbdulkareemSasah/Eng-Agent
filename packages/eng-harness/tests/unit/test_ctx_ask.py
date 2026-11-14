@@ -7,7 +7,7 @@ test scripts. The block is a plain test body wrapped as a workflow.
 import asyncio
 import hashlib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
@@ -16,7 +16,7 @@ from workflows.ctx_flows import flow
 from workflows.rig import Rig, make_rig, request
 
 from eng_harness.engine import RunStatus
-from eng_harness.engine._inputs import MARKER, build_request, data_schema
+from eng_harness.engine._inputs import MARKER, Kind, build_request, data_schema
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
 from eng_harness.ports import InputAnswer
@@ -54,12 +54,13 @@ def _body(seen: list[Any]) -> Any:
 
 def test_ask_stores_engineer_input(tmp_path: Path) -> None:
     """AC61: no answer pauses; an answer that fails the fields is refused; a valid one is stored and replayed."""
-    rig, seen = make_rig(tmp_path), []
+    rig = make_rig(tmp_path)
+    seen: list[Any] = []
     engine = rig.engine(flow(_body(seen)))
     paused = asyncio.run(engine.start(request()))
     first, second = _rid(paused.run_id, "0"), _rid(paused.run_id, "1")
     assert (paused.status, paused.pending) == (RunStatus.PAUSED, (first,))
-    requested = [e.payload for e in rig.events(paused.run_id) if e.type is T.INPUT_REQUESTED]
+    requested = [e.payload for e in rig.events(paused.run_id) if isinstance(e.payload, ev.InputRequested)]
     assert [(r.request_id, r.kind, r.title) for r in requested] == [(first, "block", "Section sizes")]
     assert rig.events(paused.run_id)[-1].payload == ev.RunPaused(reason="awaiting_input", request_ids=[first])
     _answer(rig, first, {"width": "300", "count": "many"})  # an answer that fails `fields` is refused
@@ -76,15 +77,15 @@ def test_ask_stores_engineer_input(tmp_path: Path) -> None:
     assert done.status is RunStatus.COMPLETED
     assert [r.request_id for r in rig.inputs.presented][-1] == second  # the answered first ask was not shown again
     assert seen[0].value == Section(width="300", count=4)
-    provided = [e.payload for e in rig.events(done.run_id) if e.type is T.INPUT_PROVIDED]
-    assert [(p.request_id, p.by) for p in provided] == [(first, "ada"), (second, "ada")]
-    stored = rig.store.payload(provided[0].answer_ref)
+    provided = [e.payload for e in rig.events(done.run_id) if isinstance(e.payload, ev.InputProvided)]
+    assert [(p.request_id, p.by) for p in provided] == [(first, "engineer:ada"), (second, "engineer:ada")]
+    stored = cast(dict[str, Any], rig.store.payload(provided[0].answer_ref))
     assert stored["step"] == first
     assert {k: v["value"] for k, v in stored["fields"].items()} == {"width": "300", "count": 4}
     assert {v["entered_by"] for v in stored["fields"].values()} == {"ada"}
     assert done.output is not None
     refs = [provided[0].answer_ref, f"{provided[0].answer_ref}#/fields/width/value", provided[1].answer_ref]
-    assert done.output.refs == refs
+    assert cast(Any, done.output).refs == refs
     kinds = [(e.type, e.path) for e in rig.events(done.run_id) if e.path in ("0", "1")]
     assert kinds[:2] == [(T.STEP_STARTED, "0"), (T.STEP_COMPLETED, "0")]
 
@@ -121,7 +122,7 @@ def test_input_request_markers(tmp_path: Path) -> None:
         ("engine.decision", data_schema(plain)),
     ):
         with pytest.raises(ContractError) as refused:
-            build_request(ids, "x", kind, "t", schema)  # type: ignore[arg-type]
+            build_request(ids, "x", cast(Kind, kind), "t", schema)
         assert refused.value.detail.code is ErrorCode.INTERNAL
     marked, other = (
         build_request(ids, "x", "block", "t", data_schema(plain)),

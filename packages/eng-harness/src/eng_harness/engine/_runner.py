@@ -193,6 +193,7 @@ class Engine:
                 "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256,
                 "servers": [c.model_dump(mode="json") for c in checks],
                 "always_ask": list(workflow.always_ask), "unreleased_tools": dict(self._ports.tool.unreleased_tools()),
+                "decision_runtime": self._runtime(),
             }  # fmt: skip
             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
                 writer.append(EventType.RUN_STARTED, header)
@@ -274,9 +275,19 @@ class Engine:
         changed = workflow.code_sha256 != head.block.code_sha256  # a warning, not a divergence (AC29)
         number = max((p.resume_no for p in seen), default=0) + 1  # a restore adds a second event with the same number
         now: dict[str, JsonValue] = dict(self._ports.tool.unreleased_tools())
+        last_runtime = [head.decision_runtime, *(p.decision_runtime for p in seen if p.decision_runtime is not None)][
+            -1
+        ]
+        runtime = self._runtime()
         return ev.RunResumed(
-            resume_no=number, code_hash_changed=changed, servers=[], unreleased_tools=now if now != last else None
-        )
+            resume_no=number, code_hash_changed=changed, servers=[], unreleased_tools=now if now != last else None,
+            decision_runtime=runtime if runtime != last_runtime else None,
+        )  # fmt: skip
+
+    def _runtime(self) -> dict[str, JsonValue]:
+        """The decision runtime for the run header, as the port gives it (AC69); empty with no port."""
+        port = self._ports.decision
+        return dict(port.runtime_summary()) if port is not None else {}
 
     async def _ended(self, run_id: str, head: ev.RunHeader, events: list[Event], last: object) -> RunOutcome:
         """The recorded outcome of an ended run, after `close_started` for its journaled host instances (AC35)."""
