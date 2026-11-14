@@ -46,3 +46,14 @@ class WriteLedger:
                 os.fsync(folder)
             finally:
                 os.close(folder)
+
+    def find(self, op_id: str) -> LedgerEntry | None:
+        """The last entry of `op_id`, `None` when it has none; a torn line belongs to a write that was never sent."""
+        found = None
+        for line in self.path.read_text(encoding="utf-8").splitlines() if self.path.exists() else ():
+            try:  # `append` syncs before the send, so a line that does not parse was not followed by one
+                entry = LedgerEntry.model_validate_json(line)
+            except ValueError:
+                continue
+            found = entry if entry.op_id == op_id else found
+        return found
