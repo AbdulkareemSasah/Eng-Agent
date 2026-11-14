@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits",
- "count": 149,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file.",
+ "count": 155,
  "tasks": [
   {
    "id": "B-437",
@@ -393,20 +393,20 @@
   },
   {
    "id": "B-138",
-   "task": "S.T19",
+   "task": "S.T19a",
    "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
-   "planTask": "T19",
+   "planTask": "T19a",
    "kind": "impl",
-   "title": "Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes",
+   "title": "Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes",
    "branch": "feat/b138-harness-st19-port-wiring-edit-cycle",
-   "prTitle": "feat(eng-harness): port wiring, edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
+   "prTitle": "feat(eng-harness): port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
    "risk": "r1, r3",
    "pending_deps": [
     "E.T13",
     "E.T15",
     "E.T16",
     "E.T19",
-    "S.T17",
+    "S.T14",
     "S.T18",
     "S.T20"
    ],
@@ -414,7 +414,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: T19 was split by amendment B-475 into T19a (this item: CSI only, on the first-live-run path) and T19b (command-line tools: B-490); T17 left the dependencies; the plan waits for engine T13, T15, T16 and T19; it also edits tests/fakes/sasaah_csi/** like W.T5 (B-199), so run after W.T5"
+   ]
   },
   {
    "id": "B-139",
@@ -722,13 +725,13 @@
   },
   {
    "id": "B-433",
-   "task": "I.T18",
+   "task": "I.T18a",
    "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
-   "planTask": "T18",
+   "planTask": "T18a",
    "kind": "impl",
-   "title": "Bind the CliDeps defaults to the merged real implementations",
+   "title": "Bind the CliDeps defaults to the merged real implementations, except the port builder",
    "branch": "feat/b433-harness-it18-bind-the-clideps-defaults-to",
-   "prTitle": "feat(eng-harness): bind the CliDeps defaults to the merged real implementations (B-433)",
+   "prTitle": "feat(eng-harness): bind the CliDeps defaults to the merged real implementations, except the port builder (B-433)",
    "risk": "r3",
    "pending_deps": [
     "I.T14b",
@@ -738,8 +741,8 @@
     "D.T7",
     "D.T10",
     "P.T1",
-    "P.T10",
-    "X.T9"
+    "P.T10a",
+    "W.T9"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -747,7 +750,8 @@
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "binding the port_builder default waits for the owner's answer to spec 0006 Q20; if Q20 is still open when you start, bind every other default and report DONE_WITH_CONCERNS naming the open binding (do not invent one).\nSuppression comments: `# noqa: CODE  # B-NNN: reason` (a second comment; `# type: ignore[code]  # B-NNN: reason` for mypy). Avoid new suppressions; a justified one raises its package's count in .gate/ratchet.json, which is then in your scope (gate spec 4.5 step 6, B-088 and B-089; the rise is AW05 for the owner). Test-first rejects a first-commit test that passes at the merge base (TF004): a static rule test (for example under tests/rules/) passes trivially while the code it guards does not exist, so make it import the module it protects at module level, which makes it fail at the base for the right reason. Never put dependency or configuration changes in the first test commit (TF003). A new public module goes into public_modules in the package pyproject.toml in the implementation commit.\neng-contract is complete on build/v1. If your task needs a part of another plan that is not on build/v1 when you start, stop and report BLOCKED naming it; do not stub, copy or re-implement it."
+    "binding the port_builder default waits for the owner's answer to spec 0006 Q20; if Q20 is still open when you start, bind every other default and report DONE_WITH_CONCERNS naming the open binding (do not invent one).\nSuppression comments: `# noqa: CODE  # B-NNN: reason` (a second comment; `# type: ignore[code]  # B-NNN: reason` for mypy). Avoid new suppressions; a justified one raises its package's count in .gate/ratchet.json, which is then in your scope (gate spec 4.5 step 6, B-088 and B-089; the rise is AW05 for the owner). Test-first rejects a first-commit test that passes at the merge base (TF004): a static rule test (for example under tests/rules/) passes trivially while the code it guards does not exist, so make it import the module it protects at module level, which makes it fail at the base for the right reason. Never put dependency or configuration changes in the first test commit (TF003). A new public module goes into public_modules in the package pyproject.toml in the implementation commit.\neng-contract is complete on build/v1. If your task needs a part of another plan that is not on build/v1 when you start, stop and report BLOCKED naming it; do not stub, copy or re-implement it.",
+    "B-487: T18 was split by amendment B-471 into T18a (this item, every default but the port builder; the plan lists T14b, T15, T16, T16b and cross-plan decisions T7 and T10, providers T1 and T10a, edit cycle T9; it does not wait for footing T9) and T18b (the port builder and the run id: B-488); the note above on the port builder default applies to B-488"
    ]
   },
   {
@@ -1100,7 +1104,8 @@
    "pending_deps": [
     "P.T2",
     "P.T4",
-    "P.T6"
+    "P.T6",
+    "P.T10a"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1148,26 +1153,27 @@
   },
   {
    "id": "B-229",
-   "task": "P.T10",
+   "task": "P.T10a",
    "plan": "packages/eng-harness/docs/plans/0009-providers.md",
-   "planTask": "T10",
+   "planTask": "T10a",
    "kind": "impl",
-   "title": "Runtime assembly, shadow-mode workflow, replay and isolation tests, local-testing notes",
+   "title": "Phase-1 runtime assembly (rules and engineer; providers not built, releases not kept; gap PR-G1)",
    "branch": "feat/b229-harness-pt10-runtime-assembly-shadow-mode",
-   "prTitle": "feat(eng-harness): runtime assembly, shadow-mode workflow, replay and isolation tests, local-testing notes (B-229)",
+   "prTitle": "feat(eng-harness): phase-1 runtime assembly, rules and engineer (B-229)",
    "risk": "r1, r3",
    "pending_deps": [
+    "P.T1",
     "D.T10",
-    "D.T8",
-    "D.T9",
-    "P.T7",
-    "P.T9"
+    "E.T14b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: T10 was split by amendment B-475 into T10a (this item, budget 150) and T10b (B-491); the plan front matter names T1 only (merged); the cross-plan prose of plan 0009 section 3 names decisions T10 and engine T14b, which are listed here; check that prose again before launching"
+   ]
   },
   {
    "id": "B-164",
@@ -1831,7 +1837,7 @@
     "E.T16",
     "E.T17",
     "I.T7",
-    "S.T19",
+    "S.T19a",
     "W.T2",
     "W.T3",
     "W.T5",
@@ -1919,7 +1925,7 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "E.T19",
-    "S.T19",
+    "S.T19a",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -2101,7 +2107,7 @@
     "I.T10",
     "S.T11",
     "S.T13",
-    "S.T19",
+    "S.T19a",
     "W.T6",
     "X.T8",
     "Y.T3"
@@ -2657,7 +2663,7 @@
     "R.T12",
     "R.T13",
     "R.T14",
-    "S.T19"
+    "S.T19a"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3125,6 +3131,147 @@
    "branch_pushed": false,
    "lead_notes": [
     "plan task pending amendment B-471 (first-live-run blockers); blocks I.T18b (the port builder, B-433)"
+   ]
+  },
+  {
+   "id": "B-485",
+   "task": "X.T3b",
+   "plan": "packages/eng-harness/docs/plans/0010-design-isolated-footing.md",
+   "planTask": "T3b",
+   "kind": "impl",
+   "title": "Merged harness.footing_subjects and its test data read the suffixed basis names",
+   "branch": "feat/b485-harness-xt3b-footing-subjects-read-the-suffixed",
+   "prTitle": "feat(eng-harness): the merged footing subjects calc and its test data read the suffixed basis names (B-485)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "X.T3"
+   ],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "source",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "new plan task from B-484 (budget 40, one session); edits tests/data/golden/footing/subjects-*.json, a CODEOWNERS test-oracle path, so owner review notices are expected (AW02, GC015); regenerates its calcs.lock.json entry with the lock writer, never by hand, and whichever of T3b and another calc task merges second regenerates its own entry; keeps version 1 (the calc is draft and was never approved: OQ-Q90); tests_first lines were reasoned, not run: verify red at the base first; deferred set"
+   ]
+  },
+  {
+   "id": "B-486",
+   "task": "B.T11",
+   "plan": "packages/eng-harness/docs/plans/0004-templates-and-basis.md",
+   "planTask": "T11",
+   "kind": "impl",
+   "title": "Template keys and FieldSpec paths follow the contract basis path rule",
+   "branch": "feat/b486-harness-bt11-template-keys-and-fieldspec-paths",
+   "prTitle": "feat(eng-harness): template keys and FieldSpec paths follow the contract basis path rule (B-486)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "B.T5"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "new plan task from B-484 (budget 60, one session); templates/_model.py is CODEOWNERS-protected, so owner review notices are expected; tests_first lines were reasoned, not run: verify red at the base first; deferred set"
+   ]
+  },
+  {
+   "id": "B-488",
+   "task": "I.T18b",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T18b",
+   "kind": "impl",
+   "title": "Bind the port builder default and draw the run id at step 1 for run",
+   "branch": "feat/b488-harness-it18b-bind-the-port-builder-default",
+   "prTitle": "feat(eng-harness): bind the port builder default and draw the run id at step 1 for run (B-488)",
+   "risk": "r3",
+   "pending_deps": [
+    "I.T18a",
+    "S.T19a"
+   ],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: second half of the T18 split of amendment B-471 (budget 40, one session); follows T18a (B-433); the plan also names plan 0002 T19a (B-138) for build_ports and engine T20 (B-472, merged); plan 0006 T18b draws a fresh run id per attempt (OQ-Q85); first-live-run path, not yet in priority.txt"
+   ]
+  },
+  {
+   "id": "B-489",
+   "task": "I.T13b",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T13b",
+   "kind": "impl",
+   "title": "Report status section: the run's decision runtime",
+   "branch": "feat/b489-harness-it13b-report-status-section-decision-runtime",
+   "prTitle": "feat(eng-harness): report status section shows the run's decision runtime (B-489)",
+   "risk": "r3",
+   "pending_deps": [
+    "I.T13",
+    "E.T14b"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: new plan task from B-471 (budget 50, one session, T13 is merged); the plan front matter names T13 only; E.T14b is listed because the status rows read RunView.decision_runtime (engine AC69), which the plan prose ties to the engine decision runtime record: check before launching; first-live-run path, not yet in priority.txt"
+   ]
+  },
+  {
+   "id": "B-490",
+   "task": "S.T19b",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T19b",
+   "kind": "impl",
+   "title": "Command-line tool adapter in build_ports (closes gap H-G8)",
+   "branch": "feat/b490-harness-st19b-command-line-tool-adapter-in",
+   "prTitle": "feat(eng-harness): command-line tool adapter in build_ports, closes gap H-G8 (B-490)",
+   "risk": "r1, r3",
+   "pending_deps": [
+    "S.T16",
+    "S.T19a"
+   ],
+   "writer": "sonnet, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: second half of the T19 split of amendment B-475 (budget 120, two sessions); off the first-live-run path; plan 0008 T1 also edits build_ports after T19a: whichever of the two lands second adapts to the other"
+   ]
+  },
+  {
+   "id": "B-491",
+   "task": "P.T10b",
+   "plan": "packages/eng-harness/docs/plans/0009-providers.md",
+   "planTask": "T10b",
+   "kind": "impl",
+   "title": "Runtime assembly with built providers and verified releases, shadow-mode workflow, replay and isolation tests, local-testing notes (closes PR-G1)",
+   "branch": "feat/b491-harness-pt10b-runtime-assembly-with-built-providers",
+   "prTitle": "feat(eng-harness): runtime assembly with built providers and verified releases, shadow-mode workflow (B-491)",
+   "risk": "r1, r3",
+   "pending_deps": [
+    "P.T7",
+    "P.T9",
+    "P.T10a",
+    "D.T9"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-487: second half of the T10 split of amendment B-475 (budget 200, three sessions); off the first-live-run path; the plan prose names decisions T9 (decide_many) for it; needs the real point-policy mapping, which no plan task builds (OQ-Q88)"
    ]
   }
  ]
