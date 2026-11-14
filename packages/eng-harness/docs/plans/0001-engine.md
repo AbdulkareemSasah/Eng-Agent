@@ -512,14 +512,16 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_modes.py::test_autonomous_logged"
       - "packages/eng-harness/tests/workflow/test_modes.py::test_always_ask_in_every_mode"
       - "packages/eng-harness/tests/unit/test_steps.py::test_resume_path_hashes_model_keys"  # B-499
-    covers: [AC48, AC49, AC50, AC51]  # AC51's promotion is the PROMOTION approval no mode resolves (B-499)
+    # AC51's promotion (B-499): the PROMOTION approval no mode resolves is proved here; ctx.promote's refusal of an
+    # unapproved or wrong-kind approval is proved by T16b's test_promote.py::test_promotion_rechecks_approval.
+    covers: [AC48, AC49, AC50, AC51]
     depends_on: [T15]
   - id: T16b
     title: File-copy promotion
     # Amendment (B-499, D-12): the promotion half of the former T16 (work item B-500). Measured on the B-115 branch:
     # _promote.py 73, ctx.promote in _ctx_impl.py 50, ModeApprovals.promotable in _modes.py 21, CHANGELOG 1,
     # local-testing 2: 147. It also takes `ask` into the rerun set of _inflight.py (spec 4.5.3, AC36; about 3) and the
-    # promote step in flight (spec 11 Q40; about 15, an estimate): about 165; budget 180.
+    # promote step in flight (the writer's recommendation of spec 11 Q40; about 15, an estimate): about 165; budget 180.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_promote.py"
@@ -537,6 +539,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_promote.py::test_replay_promotion_is_a_gap"
       - "packages/eng-harness/tests/unit/test_promote.py::test_promotion_rechecks_approval"
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_ask_in_flight_is_asked_again"  # B-499
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_promote_in_flight_goes_to_the_engineer"  # B-499
     covers: [AC52, AC53, AC36]  # AC36: an ask in flight at resume (B-499)
     depends_on: [T16]
   - id: T17
@@ -897,16 +900,18 @@ the run folder go into `Ctx` (a resumed run keeps the always-ask list of its sta
 or an engineer-asking request, one to three lines each. `_steps.resume_path` takes the hash form of a model key
 outside the `key` grammar, as spec §4.3.1 states for every path key, so a resume on a real model key (a file path) no
 longer raises `ValueError` (`test_resume_path_hashes_model_keys`). Its open points are spec §11 Q41 and Q43 (owner
-queue; the B-115 draft follows the recommendations recorded there).
+queue): T16 builds the writer's recommendation of each unless the owner has answered otherwise when the task starts.
 
 **T16b File-copy promotion** (spec §4.7 "Promotion", AC52, AC53; amendment B-499, work item B-500). `ctx.promote`,
 file-copy promotion over the internal `FileOps` port with its fake (including the re-check of the `PROMOTION`
 approval's binding before copying, in `_modes.py`), and the `REPLAY_WRITES` gap. The `promote` step is journaled with
 effect `write`, as the table of spec §4.3.2 states; what a promote in flight does at resume is spec §11 Q40, built in
-`_inflight.py` from its answer. `FileOps.sha256` hashes as the adapter's `file_sha256` does (spec §11 Q44). `ask`
-joins the rerun set of `_inflight.py`, since spec §4.5.3 presents an ask in flight again (AC36) and T14b left it out
-(an engineer-tier decision is a `decide` or `decide_many` step, already in the set by T14);
-`test_ask_in_flight_is_asked_again`. Its open points are spec §11 Q40, Q42 and Q44 (owner queue).
+`_inflight.py` (`test_promote_in_flight_goes_to_the_engineer`). `FileOps.sha256` hashes as the adapter's
+`file_sha256` does (spec §11 Q44). `ask` joins the rerun set of `_inflight.py`, since spec §4.5.3 presents an ask in
+flight again (AC36) and T14b left it out (an engineer-tier decision is a `decide` or `decide_many` step, already in the
+set by T14); `test_ask_in_flight_is_asked_again`. Its open points are spec §11 Q40, Q42 and Q44 (owner queue): T16b
+builds the writer's recommendation of each unless the owner has answered otherwise when the task starts, so it never
+waits on them.
 
 **T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
 call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
