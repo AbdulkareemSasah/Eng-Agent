@@ -1,8 +1,8 @@
 """The run engine: `Engine.start` and `Engine.resume` (spec 0001 4.4.4, 4.5.1, 4.5.2; plan 0001 T9, T9b).
 
 Purpose: validate a request, hold the run lock, journal the run header, run the root block and return how it ended.
-Resume runs steps 1 to 3 and 6 to 9 of spec 4.5.1 (4 and 5 follow in T13); the ctx calls are in
-`_ctx_impl.py`.
+Resume runs steps 1 to 9 of spec 4.5.1; each host is leased until the engine returns and the host instances the run
+started are closed when the run ends (invariant 10); the ctx calls are in `_ctx_impl.py`.
 Units: none; durations in ms. Errors: `ContractError`, `RunRefused`, `RunLocked`, `JournalIntegrityError`; a stop of the
 block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
@@ -27,12 +27,13 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
-from eng_harness.engine import _hostsafety, _hoststate, _inflight
+from eng_harness.ctx import BasisView
+from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, HostInstance, HostPort, InputPort, RunClass, ToolPort
+from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, DecisionPort, HostPort, InputPort, RunClass, ToolPort
 
 _RUN_ID = re.compile(r"^run_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _TERMINAL = (EventType.RUN_COMPLETED, EventType.RUN_FAILED)
@@ -69,7 +70,10 @@ class EngineSettings(BaseModel):
 
 
 class RunRequest(BaseModel):
-    """A request to start a run (spec 5): `input` is the workflow's input as JSON, `basis_ref` its design basis."""
+    """A request to start a run (spec 5): `input` is the workflow's input as JSON, `basis_ref` its design basis.
+
+    `run_id` is the id the caller chose (`run_` + ULID, AC70); `start` draws one when it is `None`.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -78,6 +82,7 @@ class RunRequest(BaseModel):
     basis_ref: RefString
     mode: PermissionMode = PermissionMode.WORK_ON_COPY
     run_class: RunClass = RunClass.PRODUCTION
+    run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,10 @@ class RunOutcome:
 
 @dataclass(frozen=True)
 class EnginePorts:
-    """The ports an engine works through (spec 4.8); the decision, progress and run-control ports follow."""
+    """The ports an engine works through (spec 4.8); the progress and run-control ports follow.
+
+    `decision` is `None` when no cascade is wired: a `decide` or `decide_many` call is then an internal error.
+    """
 
     tool: ToolPort
     host: HostPort
@@ -101,6 +109,7 @@ class EnginePorts:
     basis: BasisPort
     approvals: ApprovalPort
     inputs: InputPort
+    decision: DecisionPort | None = None
 
 
 @contextmanager
@@ -153,12 +162,17 @@ class Engine:
         """Validate `request`, create the run, journal its header and run the workflow (spec 4.5.1).
 
         Raises:
-            ContractError: `INVALID_ARGUMENT` for an unregistered workflow or an input that fails its model.
+            ContractError: `INVALID_ARGUMENT` for an unregistered workflow, an input that fails its model, or a
+                `run_id` that is not `run_` + ULID or whose run folder exists (checked first, before any port call).
             RunRefused: `RUN_CLASS_MISMATCH` when the calc port's class is not the request's, `BASIS_INCOMPLETE` when
                 the design basis lacks a required field, `SERVER_CHECK_FAILED` when a server check fails (spec 4.6 #5,
                 #8). None of them creates a run folder.
             RunLocked: another engine holds the new run's lock.
+            ContractError: `HOST_LOCKED` when another driver holds a host the run needs (spec 4.6 #10).
         """
+        chosen = request.run_id
+        if chosen is not None and (not _RUN_ID.fullmatch(chosen) or (self._runs / chosen).exists()):  # AC70
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, f"run id {chosen!r} is not usable", received=chosen)
         workflow = self._find(request.workflow)
         if workflow is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"workflow {request.workflow!r} is not registered")
@@ -166,9 +180,9 @@ class Engine:
         self._check_class(request.run_class.value)
         _hostsafety.check_basis(self._ports.basis, request.basis_ref, workflow.required_basis)
         checks = await _hostsafety.check_servers(self._ports.host, workflow.min_server_builds)
-        run_id = f"run_{self._ids.new_ulid()}"
+        run_id = chosen or f"run_{self._ids.new_ulid()}"
         run_dir = self._runs / run_id
-        run_dir.mkdir(parents=True)
+        run_dir.mkdir(parents=True, exist_ok=chosen is not None)  # the server checks may have written under it
         with _locked(run_dir):
             stored = self._store.put("harness.run_input/1", {"value": request.input}, self._producer())
             block = {"name": workflow.name, "version": str(workflow.version), "code_sha256": workflow.code_sha256}
@@ -182,17 +196,26 @@ class Engine:
             }  # fmt: skip
             with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
                 writer.append(EventType.RUN_STARTED, header)
-                return await self._drive(workflow, inp, run_id, writer, [])
+                rt, leases = self._hosts(run_id, writer, 0)
+                try:
+                    return await self._closed(rt, await self._drive(workflow, inp, rt, leases, [], request.basis_ref))
+                finally:
+                    await leases.release()
 
     async def resume(self, run_id: str) -> RunOutcome:
-        """Resume the run (steps 1 to 3 and 6 to 9 of spec 4.5.1); an ended run returns its recorded outcome (AC35).
+        """Resume the run (the nine steps of spec 4.5.1); an ended run returns its recorded outcome (AC35).
 
-        A write in flight is reconciled, a read in flight gets `step_rerun` and the host state of each written model is
-        checked before the block runs; a stop for the engineer returns `NEEDS_ENGINEER`, an abandoned run `FAILED`.
+        The servers are checked and the hosts leased before anything else is asked of them (steps 4 and 5). A write in
+        flight is reconciled, a read in flight gets `step_rerun` and the host state of each written model is checked
+        before the block runs; a stop for the engineer returns `NEEDS_ENGINEER`, an abandoned run `FAILED`.
 
         Raises:
-            ContractError: `INVALID_ARGUMENT` for a run id that names no run, or a workflow that is not registered.
-            RunLocked, RunRefused (`RUN_CLASS_MISMATCH`): the journal is left as it was. JournalIntegrityError.
+            ContractError: `INVALID_ARGUMENT` for a run id that names no run, or a workflow that is not registered;
+                `HOST_LOCKED` when another driver holds a host.
+            RunLocked, RunRefused (`RUN_CLASS_MISMATCH`): the journal is left as it was.
+            RunRefused (`SERVER_CHECK_FAILED`): like `HOST_LOCKED`, it comes after `run_resumed` (step 3), so a write in
+                flight stays in flight and `run_resumed` is the only event added.
+            JournalIntegrityError.
         """
         run_dir = self._runs / run_id
         if not _RUN_ID.fullmatch(run_id) or not run_dir.is_dir():
@@ -213,18 +236,21 @@ class Engine:
                     return self._escalate(run_id, writer, "replay_divergence", stop)
                 resumed = self._resumed(workflow, head, events)
                 writer.append(EventType.RUN_RESUMED, resumed)
-                ports = self._ports
-                rt = _inflight.Resume(
-                    run_dir, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
-                    writer, resumed.resume_no, ports.host,
-                )  # fmt: skip
-                try:  # steps 4 and 5: T13; step 6 only for the models the run wrote; 7 and 8: spec 4.5.3, 4.5.4
-                    await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
-                    await _hoststate.check(rt)
-                except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
-                    status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
-                    return RunOutcome(run_id, status, escalation=stop.escalated)
-                return await self._drive(workflow, inp, run_id, writer, rt.events())  # step 9
+                rt, leases = self._hosts(run_id, writer, resumed.resume_no)
+                try:
+                    try:  # step 6 only for the models the run wrote; 7 and 8: spec 4.5.3, 4.5.4
+                        await _hostsafety.check_servers(rt.host, workflow.min_server_builds, always=True)  # step 4
+                        await leases.resume()  # step 5
+                        await _inflight.reconcile(rt, await _hoststate.locate_models(rt))
+                        await _hoststate.check(rt)
+                    except _inflight.Stopped as stop:  # an escalation is journaled; an abandoned run has ended
+                        status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED
+                        return await self._closed(rt, RunOutcome(run_id, status, escalation=stop.escalated))
+                    return await self._closed(
+                        rt, await self._drive(workflow, inp, rt, leases, rt.events(), head.basis_ref)
+                    )  # step 9
+                finally:
+                    await leases.release()
 
     def _admit(self, head: ev.RunHeader) -> tuple[WorkflowDef[Any, Any], BaseModel]:
         """The header against the registry (version rule) and the stored input against its model (4.2, 4.5.1 step 3)."""
@@ -261,29 +287,44 @@ class Engine:
             value = self._store.payload(last.output_ref)["value"]
             output = _parse(workflow.output_model, value, "the recorded output")
             outcome = RunOutcome(run_id, RunStatus.COMPLETED, output)
-        instances: dict[str, list[HostInstance]] = {}
-        for event in events:
-            if isinstance(started := event.payload, ev.HostStarted):
-                found = HostInstance.model_validate(started.model_dump(exclude={"host_key"}))
-                instances.setdefault(started.host_key, []).append(found)
-        for host_key, opened in instances.items():
-            await self._ports.host.close_started(host_key, opened)
+        await _hostsafety.close_started(self._ports.host, events)
         return outcome
 
-    async def _drive(
-        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, run_id: str, writer: JournalWriter, events: list[Event]
-    ) -> RunOutcome:  # fmt: skip
-        """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
+    def _hosts(self, run_id: str, writer: JournalWriter, number: int) -> tuple[_inflight.Resume, _hostsafety.Leases]:
+        """The resume state of a run (its `@resume<number>` steps) and the host leases it will hold (spec 4.6 #10)."""
         ports = self._ports
-        tools = _hoststate.BindingTools(ports.tool, ports.host, writer, events)
-        number = max((e.payload.resume_no for e in events if isinstance(e.payload, ev.RunResumed)), default=0)
         rt = _inflight.Resume(
             self._runs / run_id, run_id, ports.tool, ports.inputs, self._store, self._clock, self._ids, self._producer,
             writer, number, ports.host,
         )  # fmt: skip
+        return rt, _hostsafety.Leases(rt)
+
+    @staticmethod
+    async def _closed(rt: _inflight.Resume, outcome: RunOutcome) -> RunOutcome:
+        """Pass the journaled host instances to `close_started` once the run has ended: `run_completed` or
+        `run_failed` is appended, which only `COMPLETED` and `FAILED` outcomes follow; never after a pause, an
+        escalation, a divergence or a refusal (spec 4.6 #10)."""
+        if outcome.status in (RunStatus.COMPLETED, RunStatus.FAILED):
+            await _hostsafety.close_started(rt.host, rt.events())
+        return outcome
+
+    async def _drive(
+        self, workflow: WorkflowDef[Any, Any], inp: BaseModel, rt: _inflight.Resume, leases: _hostsafety.Leases,
+        events: list[Event], basis_ref: str,
+    ) -> RunOutcome:  # fmt: skip
+        """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
+        ports, run_id, writer = self._ports, rt.run_id, rt.writer
+
+        def view() -> BasisView:  # loaded when the first decision needs it
+            loaded = ports.basis.load(basis_ref)
+            return BasisView(loaded.result_id, loaded.basis, workflow.required_basis)
+
+        decider = _decide.Decider(
+            ports.decision, ports.inputs, view, rt.events, writer, self._clock, self._ids, run_id, events
+        )
         ctx = Ctx(
-            tools, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id, writer,
-            events, _hostsafety.Pending(rt),
+            ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
+            writer, events, _hostsafety.Pending(rt), leases, decider,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
@@ -294,8 +335,9 @@ class Engine:
                 wanted = workflow.output_model.__name__
                 raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
             ctx.index.finish()
-        except errors.Pause as pause:  # the request ids are the evidence; T10 knows one reason, later tasks add more
-            writer.append(EventType.RUN_PAUSED, {"reason": "awaiting_approval", "request_ids": list(pause.evidence)})
+        except errors.Pause as pause:  # the request ids are the evidence
+            reason = "awaiting_input" if isinstance(pause, _decide.AwaitingInput) else "awaiting_approval"
+            writer.append(EventType.RUN_PAUSED, {"reason": reason, "request_ids": list(pause.evidence)})
             return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
         except _inflight.Stopped as stop:  # a write of unknown outcome: escalated for the engineer, or abandoned
             status = RunStatus.NEEDS_ENGINEER if stop.escalated else RunStatus.FAILED

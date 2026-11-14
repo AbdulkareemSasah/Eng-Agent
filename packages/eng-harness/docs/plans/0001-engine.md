@@ -409,6 +409,9 @@ tasks:
     # Amendment (B-342, documents only): the original T14 (450 lines) exceeded limits.max_task_lines (400, gate GC005);
     # lead decision D-12: split. T14 keeps the DecisionPort, `decide`, `decide_many` and the engineer-tier request
     # (B-068); T14b keeps `ctx.ask` and the decision runtime record of amendment B-098.
+    # Amendment (B-481, documents only): the B-113 writer measured 387 lines in these files against 330; a decision
+    # step journals `step_started` only with its answer, so one in flight at resume is a `decide` or `decide_many`
+    # step, which spec 4.5.3 and AC32 rerun: T14 adds both kinds to `_inflight.py`'s rerun set (3 lines). Budget 390.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine, eng_harness.ports (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -416,10 +419,11 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_decide.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # the rerun set (B-481)
       - "packages/eng-harness/tests/fakes/**"
       - "packages/eng-harness/tests/contract/test_ports_conformance.py"
       - "packages/eng-harness/tests/unit/test_ctx_decide.py"
-    max_changed_lines: 330
+    max_changed_lines: 390
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/test_ctx_decide.py::test_decisions_cannot_produce_numbers"
@@ -556,6 +560,22 @@ tasks:
       - "packages/eng-harness/tests/replay/test_crash_matrix.py::test_crash_matrix"
     covers: [AC30]
     depends_on: [T13c, T15, T16, T18]  # T13c: the B-454 split
+  - id: T20
+    title: Caller-chosen run id at start (RunRequest.run_id)
+    # Amendment (B-471, documents only): new; spec 0006 Q20 answer A (owner instruction of 2026-11-12), spec AC70;
+    # implemented as work item B-472. Plan 0006 T18b waits for it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"
+    # About 15 lines in _runner.py (the field, the pattern and folder check before any port call, the id choice) and 5 of
+    # CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_runner.py::test_caller_chosen_run_id"
+    covers: [AC70]
+    depends_on: [T9]
 ---
 
 # Implementation plan: eng-harness engine
@@ -569,7 +589,8 @@ builders, in-flight reconciliation (T11b) and the host-state check (T11c), the i
 promotion, the runtime guard, resources and the benchmark, and last the crash matrix that exercises everything
 together. Risky parts come early: the journal (T3 and T3b), path identity (T8) and replay (T9b) are the core S-10 proved, so a
 defect there shows before the invariants are built on them. The tasks that edit `engine/_ctx_impl.py` are serialized
-by `depends_on` (T10, T12, T13, T13b, T13c, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel. T11b
+by `depends_on` (T10, T12, T13, T13b, T13c, T14, T14b, T15, T16, T17, T18 in that order), so no two of them run in parallel;
+templates plan 0004 T10, which needs T19, also edits `_ctx_impl.py` and `_runner.py` to wire `ctx.basis` (B-474). T11b
 and T11c share `CHANGELOG.md` and `tests/workflows/**` with T12 and `_runner.py` with T13, so T12 depends on T11c and
 T13 on both; T11b follows T11 (the input requests it presents), T11c follows T11b (B-427), and T14b follows T14: the
 tasks from T10 to T18 run one after
@@ -782,7 +803,8 @@ estimated, much of `_runner.py`'s share being the re-indented `try`/`finally` th
 `DecisionCall` with `sensitive_values` (from the journal's `model_bound.file_names`, `model_saved.origin_file_names`
 and `file_name`), the `engine.decision` request through T11's `_inputs.py` and `InputPort`, `decision_made.request_id`,
 the `EngineerChoice` round trip (AC66), and the `choice` marker of `engine.decision` (AC67). `DecisionRequest` is the
-frozen dataclass of spec §4.3.2. Budget 330 lines. Build order: T14 starts only
+frozen dataclass of spec §4.3.2. A decision step in flight at resume gets `step_rerun` (§4.5.3, AC32): T14 adds
+`decide` and `decide_many` to the rerun set of `_inflight.py`. Budget 390 lines (amendment B-481). Build order: T14 starts only
 after decision plan T1, T4 and T5 are merged (they need this plan's T6 and T7), because `DecisionCall` and the other
 port types live in `decisions.interfaces` (spec §4.8); it is the only task of this plan that waits for the decision
 plan.
@@ -834,6 +856,18 @@ committed just before the step's `step_started`; after_started: on `step_started
 returns (after_effect). The wrapper lives in `tests/replay/_worker.py` and appends each applied `op_id` to a ledger
 file in the test's temporary folder, so the resuming process and the comparison see every write the crashed process
 applied. T19 therefore follows T18 (the sink delivery of spec §4.10, AC58).
+
+**T20 Caller-chosen run id** (spec §4.4.1, §4.5.1, §5, AC70; amendment B-471, spec 0006 Q20 answer A, work item
+B-472). `RunRequest` gains the optional `run_id` (`run_` + ULID, the pattern of spec §4.4.1); `start` names the run
+folder by it when given and draws one from the `IdSource` otherwise. `start` checks a given `run_id` first, before any
+port call (so before the server checks of invariant 8, whose host port writes `<run_dir>/servers` and launches the
+server in the run folder): a value that does not match `_RUN_ID`, or whose run folder exists, raises `ContractError`
+`INVALID_ARGUMENT` and the engine creates nothing (folder, lock, stored input, event). The later creation of the run
+folder accepts the folder the server checks wrote (no `FileExistsError`). `test_caller_chosen_run_id` checks the
+cases of AC70 with a host-port fake whose server check writes under the run folder: the run is created under the
+given id; an existing folder and a malformed id (`../x`) are refused with no port called and nothing created; no id
+draws one from the `IdSource`. It needs only the merged start of T9; plan 0006 T18b makes `cli/_wiring.py` draw the id
+at step 1 of spec 0006 §4.2.2 and pass it here.
 
 ## 3. Dependencies
 

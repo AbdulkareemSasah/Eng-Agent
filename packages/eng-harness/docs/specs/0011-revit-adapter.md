@@ -220,7 +220,7 @@ the real ports of this adapter against the synthetic fake.
   `tests/golden/test_calcs_golden.py::test_case[frame-element-map-*]`.
 - AC28. Given any permutation of the inputs, then the output is the same; given the same inputs twice, then the output
   and its content hash are the same. Test: `tests/property/test_frame_element_map.py::test_permutation_invariant`.
-- AC29. Given a basis without `compare.length` or with an unconfirmed `mapping.offset_*` field, then the calc refuses
+- AC29. Given a basis without `compare.length_mm` or with an unconfirmed `mapping.offset_*` field, then the calc refuses
   (`CalcRefused`) and no output is stored; given an input whose model revision has changed, then the engine's staleness
   check gives `REF_STALE`. Tests: `tests/unit/calcs/test_frame_element_map.py::test_basis_fields_required`,
   `tests/workflow/adapters/test_revit_map_stale.py::test_map_stale_after_edit`.
@@ -462,7 +462,7 @@ refuses unless the caller names exactly that set. The default flow is to create 
 columns only. Q4.
 
 **Read-back and `check_model`.** After a write, the written items are read back with the read-back tool of §4.4 and
-compared: a length within the design basis field `checks.readback_relative_tolerance` (0002 G-2; never a constant here),
+compared: a length within the design basis field `checks.readback_relative_tolerance_ratio` (0002 G-2; never a constant here),
 an integer, string or element id for equality, a type assignment by `typeId` per `unique_id`. Because the handlers do not
 check the commit status (§1), this read is mandatory, not optional. Integrity checks without a tolerance:
 `ELEMENT_MISSING` (an element or type of the ledger absent by `unique_id`), `TYPE_UNDEFINED` (an element whose type
@@ -516,13 +516,13 @@ write that uses it (engine approvals).
 **Inputs.** `frames`: the ETABS columns the workflow selected (`model.frame_placements/1` with a list of ids; the calc
 does not classify frames, since `kind` is `other` from the CSI reader, 0002 H-G5, and the classification script embeds
 engineering thresholds, OQ-G14); `elements`: `model.frame_placements/1` from the Revit adapter; optional `links`: a map `unique_id` to the string of the role `etabs_link`; `basis`.
-Basis fields (0003 §4.4 style): `compare.length` (mm, ≥ 0; the position and elevation tolerance, already used by
-`placement_compare`), and **[added]** `mapping.offset_x`, `mapping.offset_y`, `mapping.offset_z` (mm, signed, confirmed): the
+Basis fields (0003 §4.4 style): `compare.length_mm` (mm, ≥ 0; the position and elevation tolerance, already used by
+`placement_compare`), and **[added]** `mapping.offset_x_mm`, `mapping.offset_y_mm`, `mapping.offset_z_mm` (mm, signed, confirmed): the
 position of the ETABS global origin in Revit model coordinates; no default, no value in code, no rotation (Q6).
 
 **Method** (exact `Fraction` arithmetic as 0003 §4.11 P2). M1 translate each frame's ends by the offset and order the
 ends of every frame and element by elevation (lower, upper). M2 a frame and an element are *candidates* when the distance
-between their lower ends and the distance between their upper ends are each within `compare.length` (`d² <= t²`). M3
+between their lower ends and the distance between their upper ends are each within `compare.length_mm` (`d² <= t²`). M3
 exactly one candidate each way gives `matched`; several give `ambiguous` with all candidates; none gives
 `unmatched_frames` or `unmatched_elements`. M4 if a link names the frame id and its element is not the geometric match,
 the pair goes to `conflicts` (the link is a hint from a possibly stale sync and never decides). M5 the `basis` of a pair
@@ -573,10 +573,10 @@ titles, paths and user names.
 |---|---|---|---|---|---|
 | `b_mm`, `h_mm`, `D_mm` and any length written (role map) | float | mm | > 0 | yes, engineering quantity | code-pack result or change set |
 | `expected_instances` | list of element refs | | non-empty | no | the workflow, from `harness.revit_structure/1` |
-| `compare.length` | float | mm | ≥ 0 | basis field | design basis (13 §2), no default |
-| `mapping.offset_x`, `_y`, `_z` | float | mm | finite | basis field | design basis or engineer, confirmed |
+| `compare.length_mm` | float | mm | ≥ 0 | basis field | design basis (13 §2), no default |
+| `mapping.offset_x_mm`, `_y_mm`, `_z_mm` | float | mm | finite | basis field | design basis or engineer, confirmed |
 | `call_timeout_s`, `client_grace_s` | int | s | ≥ 1 | no | `harness.toml`, required |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
 | Outputs | envelopes of the kinds of §4.5 and §4.11 | canonical | | | adapter, calc |
 
 ## 6. Errors
@@ -654,8 +654,8 @@ engine spec 0001; plan T1 carries them.
 | Q3 | Two roles (`read` with `--read-only`, `write`) versus one | Owner | Two: the read role cannot write whatever the allowlist says, and reads keep a short timeout |
 | Q4 | Shared-type rule (AC15) | Owner | Accept; default flow creates a new type |
 | Q5 | Write the ETABS link into Revit (`Sasaah_EtabsElementId` through `set_parameter_value_by_guid`) | Owner | Not in v1: it writes into the engineer's model for a convenience; the map is kept in the harness. Revisit with the column workflow |
-| Q6 | Origin offset between ETABS and Revit: basis fields (v1) or derived from named grid lines | Owner | Basis fields now, no rotation; a grid-derived offset as a later calc. The basis template (spec 0004) needs `mapping.offset_x/_y/_z` and a source for each |
-| Q7 | `compare.length` as the single tolerance of the mapping | Owner | Reuse it; a separate `mapping.*` tolerance only if the owner wants two |
+| Q6 | Origin offset between ETABS and Revit: basis fields (v1) or derived from named grid lines | Owner | Basis fields now, no rotation; a grid-derived offset as a later calc. The basis template (spec 0004) needs `mapping.offset_x_mm/_y_mm/_z_mm` and a source for each |
+| Q7 | `compare.length_mm` as the single tolerance of the mapping | Owner | Reuse it; a separate `mapping.*` tolerance only if the owner wants two |
 | Q8 | `revit_batch_execute` and `revit_run_synapse_command` on the deny list (S-12 left them for the owner) | Owner | Deny: they forward other tools or commands |
 | Q9 | Revit version: specs 008 and 009 say 2026, 07 says "2025 and newer" | Owner | Pin 2026 in the allowlist header; widen only after a local test on another version (17) |
 | R-G1 | No save tool (S12-G11): `HostPort.save` is `NotImplementedGap`; edits stay unsaved | Owner | Q2 |

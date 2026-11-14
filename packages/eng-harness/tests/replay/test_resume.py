@@ -14,7 +14,7 @@ from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from fakes.ports import failure
 from workflows.chain import ChainOutput, chain
 from workflows.ctx_flows import answer, flow, need_approval
-from workflows.rig import Rig, hold_lock, make_rig, request, steps
+from workflows.rig import Rig, hold_lock, make_rig, request, steps, watch_closing
 
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
@@ -64,12 +64,14 @@ def test_completed_run(tmp_path: Path) -> None:
     assert completed.status is RunStatus.COMPLETED
     _append(rig, run_id, (T.SIGNED_OFF, {"outputs": [], "approval_request_id": "apr_x", "by": "engineer:x"}))
     before, mark, ledger = rig.events(run_id), len(rig.log), len(rig.host.ledger)
+    closed = len(rig.host.closed)  # the resume that completed the run closed the instances once
+    assert rig.host.closed == [CSI_ONE, CSI_TWO, OTHER]
     for _ in range(2):  # a resume of a terminal run repeats close_started
         again = asyncio.run(rig.engine(workflow).resume(run_id))
         assert again == completed  # the recorded output, equal to the live one
         assert isinstance(again.output, ChainOutput)
     assert rig.log[mark:] == ["host.close_started"] * 4  # the only calls: one per host key and resume, no tool, calc...
-    assert rig.host.closed == [CSI_ONE, CSI_TWO, OTHER] * 2  # exactly the journaled instances
+    assert rig.host.closed[closed:] == [CSI_ONE, CSI_TWO, OTHER] * 2  # exactly the journaled instances
     assert len(rig.host.ledger) == ledger
     assert rig.events(run_id) == before  # nothing is journaled: no run_resumed either
 
@@ -105,20 +107,30 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
     workflow = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"}), ("read_c", {"n": 2})])
     first = asyncio.run(rig.engine(workflow).start(request()))
     run_id = first.run_id
-    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed"]
+    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and "~" not in s.path]
     mark, ledger = len(rig.log), len(rig.host.ledger)
     outcome = asyncio.run(rig.engine(workflow).resume(run_id))
     assert outcome.status is RunStatus.COMPLETED
     assert isinstance(outcome.output, ChainOutput)
     assert outcome.output.refs[:2] == recorded  # the first two steps returned what the journal holds
-    # the resume read the unreleased tools; only the third step went further, to describe and call its tool
-    assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call", "host.check_model"]
+    # the resume read the unreleased tools, checked the servers and leased csi, the host of m1 (bound, written), and
+    # read its units and state (4.5.1 steps 3 to 6 and 8); only the third step went further, to describe and call its
+    # tool (after the session epoch of its host) and ask the host for the instances it started; the lease ends last
+    assert rig.log[mark:] == [
+        "tool.unreleased_tools", "host.preflight", "host.acquire", "host.read_units", "host.model_state",
+        "tool.describe", "host.session_epoch", "tool.call", "host.started_instances", "host.check_model",
+        "host.release",
+    ]  # fmt: skip
     assert len(rig.host.ledger) == ledger + 1
     assert (rig.host.ledger[-1].tool, rig.host.ledger[-1].op_id) == ("read_c", op_id(run_id, "2", 4))
     events = rig.events(run_id)
-    assert [e.type for e in events[-8:]] == [
+    assert [e.type for e in events[-12:]] == [
         T.RUN_ESCALATED,
         T.RUN_RESUMED,
+        T.STEP_STARTED,  # @resume1.units.m1
+        T.STEP_COMPLETED,
+        T.STEP_STARTED,  # @resume1.model_state.m1
+        T.STEP_COMPLETED,
         T.STEP_STARTED,
         T.STEP_COMPLETED,
         T.STEP_STARTED,
@@ -126,14 +138,15 @@ def test_recorded_prefix_is_replayed_without_port_calls(tmp_path: Path) -> None:
         T.CHECK_ENFORCED,
         T.RUN_COMPLETED,
     ]  # fmt: skip
-    resumed, started = events[-7].payload, events[-6]
+    resumed, started = events[-11].payload, events[-6]
     assert isinstance(resumed, ev.RunResumed)
     assert (resumed.resume_no, resumed.code_hash_changed, resumed.servers) == (1, False, [])
     assert resumed.restored_to_seq is None
     assert (started.path, started.attempt) == ("2", 4)  # after three failed attempts it ran again as attempt 4
-    views = [(s.path, s.attempt, s.status) for s in _steps(rig, run_id)]
+    views = [(s.path, s.attempt, s.status) for s in _steps(rig, run_id) if not s.path.startswith("@")]
     assert views == [
         ("0", 1, "completed"),
+        ("1~pre.units.m1", 1, "completed"),
         ("1", 1, "completed"),
         ("2", 1, "failed"),
         ("2", 2, "failed"),
@@ -162,7 +175,8 @@ def test_recorded_failures(tmp_path: Path) -> None:
         rig.engine(workflow).resume(run_id)
     )  # a non-retryable failure is raised again from the journal
     assert (second.status, second.escalation) == (first.status, first.escalation)
-    assert rig.log[mark:] == ["tool.unreleased_tools"]  # and nothing else: the failed step was not called again
+    # the servers are checked (step 4); no host has a write in flight or a written model, so none is leased
+    assert rig.log[mark:] == ["tool.unreleased_tools", "host.preflight"]  # the failed step was not called again
     assert len(rig.host.ledger) == ledger
     assert [e.type for e in rig.events(run_id)[-3:]] == [T.RUN_ESCALATED, T.RUN_RESUMED, T.RUN_ESCALATED]
 
@@ -231,23 +245,71 @@ def test_pause_and_resume(tmp_path: Path) -> None:
     done = asyncio.run(rig.engine(workflow).resume(run_id))
     assert done.status is RunStatus.COMPLETED
     # the recorded steps returned their results with no port call; the run went live at the first unrecorded step (AC27)
-    assert rig.log[mark:] == ["tool.unreleased_tools", "tool.describe", "tool.call", "host.check_model"]
+    assert rig.log[mark:] == [
+        "tool.unreleased_tools", "host.preflight", "host.acquire", "host.read_units", "host.model_state",
+        "tool.describe", "host.session_epoch", "tool.call", "host.started_instances", "host.check_model",
+        "host.release",
+    ]  # fmt: skip  # the resume checks the servers, leases csi and checks m1 (steps 4 to 6 and 8) first
     assert [c.tool for c in rig.host.ledger[len(ledger) :]] == ["read_c"]
     assert isinstance(done.output, ChainOutput)
-    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and not s.path.startswith("~")]
+    recorded = [s.result_ref for s in _steps(rig, run_id) if s.status == "completed" and s.path.isdigit()]
     assert done.output.refs == recorded
-    assert [e.type for e in rig.events(run_id)[-10:]] == [
-        T.RUN_PAUSED,
-        T.RUN_RESUMED,
-        T.RUN_PAUSED,
-        T.RUN_RESUMED,
-        T.STEP_STARTED,
-        T.STEP_COMPLETED,
-        T.STEP_STARTED,
-        T.STEP_COMPLETED,
-        T.CHECK_ENFORCED,
-        T.RUN_COMPLETED,
+    assert [(e.type, e.path) for e in rig.events(run_id)[-18:]] == [
+        (T.RUN_PAUSED, None),
+        (T.RUN_RESUMED, None),
+        (T.STEP_STARTED, "@resume1.units.m1"),  # each resume reads m1 first (4.5.1 steps 6 and 8)
+        (T.STEP_COMPLETED, "@resume1.units.m1"),
+        (T.STEP_STARTED, "@resume1.model_state.m1"),
+        (T.STEP_COMPLETED, "@resume1.model_state.m1"),
+        (T.RUN_PAUSED, None),
+        (T.RUN_RESUMED, None),
+        (T.STEP_STARTED, "@resume2.units.m1"),
+        (T.STEP_COMPLETED, "@resume2.units.m1"),
+        (T.STEP_STARTED, "@resume2.model_state.m1"),
+        (T.STEP_COMPLETED, "@resume2.model_state.m1"),
+        (T.STEP_STARTED, "2"),
+        (T.STEP_COMPLETED, "2"),
+        (T.STEP_STARTED, "~end.check_model.m1"),
+        (T.STEP_COMPLETED, "~end.check_model.m1"),
+        (T.CHECK_ENFORCED, "~end.check_model.m1"),
+        (T.RUN_COMPLETED, None),
     ]  # fmt: skip
     reader = JournalReader(rig.run_dir(run_id))
     assert reader.run().status == "COMPLETED"
     reader.close()
+
+
+def test_close_started_after_resume(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run paused after it started an instance closes nothing; a new process closes that instance from the journal."""
+    rig = make_rig(tmp_path)
+    closing = watch_closing(rig, monkeypatch)
+    rig_instance = HostInstance(instance_id="started-1", pid=2, process_started_at=rig.clock.now(), program="csi")
+    rig.host.started.append(rig_instance)  # the servers of the first step start an instance
+
+    async def body(ctx: Any) -> list[str]:
+        refs = [(await ctx.tool("write_b", {"n": 0, "model": "m1"})).ref.ref]
+        await need_approval(rig.approvals, "apr_1")
+        refs.append((await ctx.tool("read_c", {"n": 1})).ref.ref)
+        return refs
+
+    workflow = flow(body)
+    paused = asyncio.run(rig.engine(workflow).start(request()))
+    run_id = paused.run_id
+    assert paused.status is RunStatus.PAUSED
+    assert (closing, rig.host.closed, "host.close_started" in rig.log) == ([], [], False)  # nothing at the pause
+    assert [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.HostStarted)] == [
+        ev.HostStarted(host_key="csi", **rig_instance.model_dump(mode="json"))
+    ]
+    rig.host.started.clear()  # the host of the new process does not list it: the journal is the record
+    _append(rig, run_id, _started("csi", CSI_ONE))  # a second instance, started before a crash
+    rig.approvals.script("apr_1", answer("apr_1"))
+    mark = len(rig.log)
+    done = asyncio.run(rig.engine(workflow).resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    assert rig.host.closed == [rig_instance, CSI_ONE]  # what the journal holds, in its order
+    assert [t[-1] for t in closing] == [T.RUN_COMPLETED]  # only after `run_completed`
+    assert rig.log[mark:].count("host.close_started") == 1
+    assert rig.host.leases == {}
+    again = asyncio.run(rig.engine(workflow).resume(run_id))  # a terminal run closes them again
+    assert again == done
+    assert rig.host.closed == [rig_instance, CSI_ONE] * 2

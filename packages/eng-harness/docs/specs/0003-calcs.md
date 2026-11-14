@@ -126,9 +126,10 @@ proposed project value.
 - AC18. Given a calc that reaches a path marked "not implemented" in §4, then `NotImplementedGap` (code
   `NOT_IMPLEMENTED`, engine §6) names the gap id, and nothing is stored. Test: `test_port.py::test_not_implemented_gap`.
 - AC48. Given the real engine, the real CalcPort and fake tool ports, a model read at revision n, then written (n+1)
-  and read again, when a block calls `ctx.calc("harness.model_diff", before=<refs at n>, after=<refs at n+1>, ...)`,
-  then the calc succeeds, because engine invariant 3 resolves `before` with the `RefRule` of
-  `CalcInfo.ref_rules` (`stale_ok` true). When `after` holds a reference at n while the model is at n+1, then the
+  and read again, when a block calls `ctx.calc("harness.model_diff", before_frames=<ref at n>,
+  after_frames=<ref at n+1>, ...)` (flat fields, §4.7), then the calc succeeds, because engine invariant 3 resolves
+  `before_frames` with the `RefRule` of `CalcInfo.ref_rules` (`stale_ok` true). When `after_frames` holds a reference
+  at n while the model is at n+1, then the
   engine raises `REF_STALE` before the port call and no step result is stored (§4.13). Test:
   `tests/workflow/test_calc_step.py::test_older_revision_inputs`.
 - AC49. Given every registered calc, then the input fields whose JSON Schema carries `x-eng.stale_ok: true` are
@@ -172,6 +173,11 @@ proposed project value.
   Test: `test_diff.py::test_not_compared_and_ambiguous`.
 - AC29. Given `rotation_deg` values that differ by a full turn, then the property is reported as changed (no
   normalization, §4.7 D6). Test: `test_calcs_golden.py::test_case[diff-angle-full-turn]`.
+- AC51. Given a `model.load_set/1` section holding a load pattern and a combination of one name, and a frame load and
+  an area load with equal (`frame` or `area`, `pattern`, `direction`), and a `model.sections/1` section holding a
+  frame section and an area section of one name, each object changed, then each change has its own key, beginning
+  with its list name (§4.7 D2), and the changes are sorted and unique by section and key as `harness.model_diff/1`
+  requires. Test: `tests/unit/calcs/test_compare.py::test_keys_carry_their_list` (amendment B-469).
 
 ### 3.6 Read-back check (§4.8)
 
@@ -324,19 +330,21 @@ required and the engine refuses to start without them (engine invariant 5). Read
 
 | Path | Unit | Bounds | Used by | Source of the value |
 |---|---|---|---|---|
-| `compare.length` | `mm` | ≥ 0 | §4.7, §4.8, §4.11 | Template or engineer (13 §3); no default |
-| `compare.angle` | `deg` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.stress` | `MPa` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.unit_weight` | `kN/m3` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.line_load` | `kN/m` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.area_load` | `kPa` | ≥ 0 | §4.7, §4.8 | same |
-| `compare.ratio` | `1` | ≥ 0 | §4.7, §4.8 (dimensionless properties such as `nu_ratio`, `scale_ratio`) | same |
-| `modeling.section_increment` | `mm` | > 0 | §4.10 | 13 §2 `modeling` ("rounding increment for new section sizes") |
+| `compare.length_mm` | `mm` | ≥ 0 | §4.7, §4.8, §4.11 | Template or engineer (13 §3); no default |
+| `compare.angle_deg` | `deg` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.stress_MPa` | `MPa` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.unit_weight_kN_m3` | `kN/m3` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.line_load_kN_m` | `kN/m` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.area_load_kPa` | `kPa` | ≥ 0 | §4.7, §4.8 | same |
+| `compare.dimensionless_ratio` | `1` | ≥ 0 | §4.7, §4.8 (dimensionless properties such as `nu_ratio`, `scale_ratio`) | same |
+| `modeling.section_increment_mm` | `mm` | > 0 | §4.10 | 13 §2 `modeling` ("rounding increment for new section sizes") |
 | `modeling.section_rounding` | — | enum `up` | §4.10 | same |
 | `report.top_n` | — | integer ≥ 1 | §4.9 | Template or engineer |
 
 The `compare.*` section is not in 13 §2. Q2 proposes it to spec 0004. These seven are exactly the quantity kinds that
-occur in the neutral model kinds of contract §4.10.2.
+occur in the neutral model kinds of contract §4.10.2. Each `compare.*` field is the tolerance of the contract quantity
+kind (contract §4.7.2) that its last segment names before the unit suffix: `length`, `angle`, `stress`,
+`unit_weight`, `line_load`, `area_load`, and `dimensionless` for `compare.dimensionless_ratio` (amendment B-467).
 
 ### 4.5 Content hash and approvals
 
@@ -451,7 +459,9 @@ change the hash (F2 keeps order); (e) properties: permutation invariance, change
 of a write (A1, §4.8).
 
 **Input** `DiffInput`: `before` and `after` (each a `FingerprintInput`-shaped group of references) and `basis`.
-`before` is `stale_ok`; `after` and `basis` are not (§4.13).
+`before` is `stale_ok`; `after` and `basis` are not (§4.13). The CalcPort resolves top-level references only, so the
+groups are flat fields: `before_<field>` and `after_<field>` for each read-set field of §4.6 (`before_frames`,
+`after_frames`, ...); `before` and `after` in this spec name these two sets of fields (amendment B-469).
 
 **Output kind** `harness.model_diff/1`: `before`, `after` (`model_id`, `model_revision`, `covered`), `tolerances`
 (per quantity kind: `value`, `unit`, `ref`), `changes` (sorted by section and key: `section`, `key` (list of strings),
@@ -466,17 +476,26 @@ changed, ambiguous, unchanged, within tolerance), `identical`, `complete`.
   Otherwise the section goes to `not_compared` and `complete: false`.
 - D2. Objects are matched by key: the §4.6 keys for named lists. Unnamed rows use these keys: `frame_loads` by
   (`frame`, `pattern`, `direction`), `area_loads` by (`area`, `pattern`, `direction`), combination `items` by
-  (`case.case`, `case.case_type`, `case.step`), stories by `name`. A key that occurs more than once on a side is
-  `ambiguous` (both object lists shown). It is counted as a change unless both sides are byte-identical. Keys are
-  compared exactly: no case folding or trimming (Q5).
+  (`case.case`, `case.case_type`, `case.step`), stories by `name`. A null key member (an item's `case.step`) is left
+  out. The reported `key` is the key of the parent row (for a nested list), then the name of the list the row comes
+  from (the last segment of its §4.6 list path), then the row's key members: `["frame_loads", frame, pattern,
+  direction]`, `["combinations", name, "items", case, case_type]`, `["systems", name, "lines", id]`. So rows of two
+  lists of one section never share a key (a load pattern and a combination of one name, a frame section and an area
+  section of one name). Changes are sorted by section, then by key compared member by member in code-point order, a
+  key before every longer key it begins: the section's own members (key `[]`, D5) come first, and a nested row
+  follows its parent. A key that occurs more than once on a side is `ambiguous` (both object lists shown) and is
+  counted as a change even when both sides are byte-identical: it is never unchanged (AC28, D7). Keys are compared
+  exactly: no case folding or trimming (Q5). Amendment B-469.
 - D3. A numeric property's quantity kind comes from its field name (`kind_for_field`, contract §4.7.2). It is equal
   when `|Fraction(after) − Fraction(before)| <= Fraction(tolerance)`, exactly, and changed otherwise. Equal but not
   identical values go to `within_tolerance`.
 - D4. Strings, booleans, enums and `null` compare exactly. A numeric field without a known suffix (none exists in the
-  0.1 model kinds) compares exactly. A type change (number to `null`, one `shape.type` to another) is a change of the
-  enclosing pointer.
+  0.1 model kinds), or whose known quantity kind has no tolerance among those given to the comparison, compares
+  exactly. A type change (number to `null`, one `shape.type` to another) is a change of the enclosing pointer. The
+  `type` rule applies to nested objects only, not to the compared object itself.
 - D5. Nested objects are compared member by member (pointer per leaf). Ordered lists (points, joints) are compared
-  index by index. A length change reports the whole list as one changed property.
+  index by index. A length change reports the whole list as one changed property. A member absent on one side is read
+  as `null`. The section's own members outside its keyed lists are compared as one object, reported under key `[]`.
 - D6. No normalization: angles are not wrapped, orientation is not canonicalized, and units are not converted (stored
   data is canonical). When in doubt the calc reports a change. A false change is shown to the engineer, and a hidden
   change would be overwritten (A5).
@@ -523,8 +542,9 @@ embedded), `complete`.
   Otherwise the value at `pointer` is compared by D3 and D4, giving `match` or `mismatch`. For `add`: the object is
   present and every leaf matches gives `match`, else `missing` or `mismatch`. For `remove`: absent gives `match`.
 - R3. Each change in R1 (each changed property, added or removed object) must be explained by an effect with the same
-  section and key whose pointer equals or is a prefix of the property's pointer. Unexplained changes go to
-  `unexpected`. An ambiguous key or a `not_compared` section in R1 makes the result `NEEDS_ENGINEER`.
+  section and key (an effect's `key` is the reported key of §4.7 D2, list name included; amendment B-483) whose
+  pointer equals or is a prefix of the property's pointer. Unexplained changes go to `unexpected`. An ambiguous key or
+  a `not_compared` section in R1 makes the result `NEEDS_ENGINEER`.
 - R4. Status: `FAIL` if any `mismatch` or `missing` or anything is `unexpected`. Otherwise `NEEDS_ENGINEER` if any
   `not_read`, an incomplete side, or R3's ambiguity. Otherwise `PASS`.
 
@@ -604,7 +624,7 @@ one member failed and now passes, one moves from `FAIL` to `NEEDS_ENGINEER` and 
 **Purpose.** 11 §4: a new section size is the output of this calc or an engineer input, never a decision.
 
 **Input** `RoundInput`: `required` (reference to a length quantity in `mm`, > 0: a calc output or a
-`basis.engineer_input/1` field; `engineering_quantity`), `basis` (`modeling.section_increment`,
+`basis.engineer_input/1` field; `engineering_quantity`), `basis` (`modeling.section_increment_mm`,
 `modeling.section_rounding`). No comparison tolerance is read: a `compare.*` field compares model states (§4.4) and is
 no rounding allowance.
 
@@ -641,7 +661,7 @@ It extends the count check of ب2.
 
 **Input** `PlacementInput`: `a_frames`, `b_frames` (`model.frame_placements/1`), `a_areas`, `b_areas`
 (`model.area_placements/1`; each side needs frames, areas or both, and the same on both sides), `basis`
-(`compare.length`). `a_*` is the earlier side and is `stale_ok`; `b_*` and `basis` are not (§4.13).
+(`compare.length_mm`). `a_*` is the earlier side and is `stale_ok`; `b_*` and `basis` are not (§4.13).
 
 **Output kind** `harness.placement_comparison/1`: `counts` (per element class and type, `frame` × {`column`, `beam`,
 `brace`, `other`} and `area` × {`slab`, `wall`, `deck`, `other`}, and per story with `unassigned` for `null`: `a`,
@@ -787,7 +807,7 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC4 to AC9, AC11 to AC16, AC18, AC22, AC23, AC26, AC28, AC32, AC33, AC38, AC40 | Unit | `tests/unit/calcs/` |
+| AC1, AC4 to AC9, AC11 to AC16, AC18, AC22, AC23, AC26, AC28, AC32, AC33, AC38, AC40, AC51 | Unit | `tests/unit/calcs/` |
 | AC2, AC10, AC47, AC49 | Contract | `tests/contract/test_calc_lock.py`, `tests/contract/test_calc_kinds.py` |
 | AC3 | Unit (source rules) | `tests/rules/test_calc_modules.py` |
 | AC17, AC48 | Fake-host workflow (real engine and CalcPort, fake tool ports, real store) | `tests/workflow/test_calc_step.py` |
@@ -811,7 +831,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 
 | Id | Question or gap | Owner | Recommendation |
 |---|---|---|---|
-| Q1 | Conflict: contract basis paths are lowercase (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, contract §4.10.2), but unit suffixes such as `_MPa` and `_kN_m` are not, while 13 §2 shows `fc_MPa`. A `/value` reference to such a field cannot pass the suffix unit check | Owner | Amend the contract to allow `[A-Za-z0-9_]` after the first segment (minor version). Until then calcs read the field object (§4.4) |
+| Q1 | Conflict: contract basis paths were lowercase only (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, contract §4.10.2), but unit suffixes such as `_MPa` and `_kN_m` are not, while 13 §2 shows `fc_MPa`. A `/value` reference to such a field could not pass the suffix unit check | Owner | Decided (owner, OQ-Q44; amendment B-463): the last segment may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464). Until it is merged calcs read the field object (§4.4) |
 | Q2 | The `compare.*`, `report.top_n` and `modeling.section_rounding` basis fields are not in 13 §2 (a rounding allowance is Q14, not a `compare.*` field) | Owner, spec 0004 | Add a `compare` template section (one tolerance per quantity kind) and `report.top_n`. No shipped default: the owner sets the values |
 | Q3 | Fingerprint without rounding (F3) may differ between two reads if the host returns unstable floats | Owner, S-04 | Keep exact. If S-04 shows instability, decide from its data (a basis field for digits, or adapter-side normalization), never a literal |
 | Q4 | 06 §6 includes the file save time and only counts and names. This spec hashes full content (positions, ج9) and leaves out the save time (a save without changes is not a change) | Owner | Accept. Amend 06 §6 by a hub change after S-04 |
@@ -824,7 +844,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q11 | Additions to the engine spec: the production run class, `CalcRefused` with two harness codes, and `CalcInfo.basis_fields` and `CalcInfo.ref_rules` (path to `RefRule`), from which engine invariant 3 builds each argument's `RefRule` (`stale_ok` false for a path not listed) | Owner | Accept. Amend engine spec §4.8 and invariant 3 in the engine plan's next task; spec 0006 adds the `--production` option |
 | Q12 | `HostPort.model_state` (spec 0002) needs the fingerprint. In a production run it must be approved | Owner, B-061 | Spec 0002 computes it through the CalcPort, and the command-line preflight includes it |
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
-| Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance`, `mm`, no default) and a new calc version |
+| Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance_mm`, `mm`, no default) and a new calc version |
 | Q15 | Spec 0010 Q10 and C2: the CalcPort serves code-pack checks through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the run-class rule of §4.5 and §4.12; `NOT_FOUND` (§6) covers an id outside the route's allowlist | Owner | Accept (amendment B-405; draft until the owner approves) |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |

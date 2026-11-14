@@ -1,14 +1,15 @@
-"""The ctx of a running block: tool, read, calc, block, parallel, attempts and escalate (spec 0001 4.3.2, 4.3.3).
+"""The ctx of a running block: tool, read, calc, decide, block, parallel, attempts, escalate (spec 0001 4.3.2, 4.3.3).
 
 Purpose: each call is a step with a path, matched with the replay index and journaled around its work; a recorded step
 returns its recorded result, or raises its recorded failure again, with no port call. Units: none. Errors: `ToolFailed`
-(a failure envelope or a `REF_*` error), `CalcRefused`, `BlockRuleViolation`, `Escalation`; `ContractError` if unknown.
+(a failure envelope or a `REF_*` error), `CalcRefused`, `DecisionInvalid`, `BlockRuleViolation`, `Escalation`;
+`ContractError` if unknown.
 """
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
-from typing import TYPE_CHECKING, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Envelope, FailureEnvelope, Provenance, SuccessEnvelope
@@ -21,8 +22,8 @@ from pydantic import BaseModel, JsonValue
 from eng_harness import errors
 from eng_harness.block import BlockDef
 from eng_harness.calc import CalcStatus
-from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, ReadResult, ToolResult
-from eng_harness.engine import _steps
+from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, Decision, DecisionRequest, ReadResult, ToolResult
+from eng_harness.engine import _decide, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._invariants import Guard, SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
@@ -31,7 +32,7 @@ from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcPort, HostPort, ToolPort
 
 if TYPE_CHECKING:
-    from eng_harness.engine._hostsafety import Pending
+    from eng_harness.engine._hostsafety import Leases, Pending
     from eng_harness.engine._runner import EngineSettings
 
 _LOG = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ _RETRIED = (RetryRule.always, RetryRule.depends)  # `after_wedge_clears` and `re
 _DRAFT = (CalcStatus.DRAFT, CalcStatus.VERIFIED)
 _REFUSALS = (errors.HarnessCode.CALC_NOT_APPROVED, errors.HarnessCode.CALC_WITHDRAWN)
 _UNKNOWN = (ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, ErrorCode.HOST_WEDGED)  # a write's outcome is unknown (spec 4.6 #6)
+_TIMEOUTS = (ErrorCode.TIMEOUT_NO_EFFECT, *_UNKNOWN)  # the timeouts after which the units are read again (spec 4.6 #9)
 _Obj = dict[str, JsonValue]
 _Pair = tuple[str, str]
 
@@ -93,11 +95,12 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending,
+        pending: Pending, leases: Leases, decider: _decide.Decider,
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts."""
+        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts,
+        host leases and decisions."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending = pending
+        self._pending, self._leases, self._decider = pending, leases, decider
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._guard = Guard(host, store, writer, producer)
         self._guard.install()
@@ -131,6 +134,8 @@ class Ctx:
                 raise errors.CalcRefused(done.harness_code, done.message)
             if done.harness_code is errors.HarnessCode.MODEL_INTEGRITY:
                 raise errors.ModelIntegrityError(done.message)
+            if done.harness_code is errors.HarnessCode.DECISION_INVALID:
+                raise errors.DecisionInvalid(done.message)
             raise errors.ReplayDivergence(f"a step recorded the harness code {done.harness_code}")
         return done
 
@@ -164,6 +169,7 @@ class Ctx:
         recorded = self._look(path, "tool", name, args)
         prior = self._started.get(path)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
+            self._pending.replay(self, path, prior.model_key)
             await self._guard.touch(prior.model_key, prior.effect == "write")
             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
             if recorded is not None and (done := self._replayed(recorded)) is not None:
@@ -173,14 +179,19 @@ class Ctx:
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
         info = await self._tools.describe(name)
+        await self._leases.acquire(info.host_key)  # one driver per host: leased before the first step on it (4.6 #10)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
         if prior is None:  # the first live attempt; a retry already prepared above
             self._guard.literals(raw, info.engineering_params)
             await self._guard.touch(key, info.effect == "write")
+            await self._pending.bind(
+                self, path, key, info
+            )  # the model is bound and its units read before its first step
             await self._guard.prepare(self, path, key, info.effect, info.action)
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
         while True:
+            await self._pending.reconnected(self, path, attempt, info.host_key)  # units after a new session (4.6 #9)
             await self._pending.settle(info.host_key)  # a write of unknown outcome on this host is reconciled first
             op = _steps.op_id(self._run_id, path, attempt)
             fields = {
@@ -192,16 +203,22 @@ class Ctx:
                 envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
             except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
                 if info.effect != "write":
+                    await self._leases.started(info.host_key)  # the raised read may have started an instance (4.6 #10)
                     raise
                 _LOG.warning("the write at step %s raised, so its outcome is unknown: %r", path, exc)
                 envelope = None
+            await self._leases.started(info.host_key)  # an instance the call started is journaled before the next step
             if isinstance(envelope, SuccessEnvelope):
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
                     self._guard.mark(key)
+                await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
                 return _result(name, done)
+            if envelope is None or envelope.error.code in _TIMEOUTS:
+                self._pending.timed_out(info.host_key)  # read or write: the units are read before the next step
             if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
+                await self._pending.reconnected(self, path, attempt, info.host_key)  # before 4.5.3 runs
                 found = await self._pending.resolve(info.host_key, path, attempt)
                 if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
                     self._guard.mark(key)
@@ -290,6 +307,57 @@ class Ctx:
             calc_id=calc_id, calc_version=int(ref.version), status=status, ref=stored.ref, summary=stored.summary,
             draft=status in _DRAFT,
         )  # fmt: skip
+
+    async def decide(
+        self, question: str, options: object, state: BaseModel, rules: Sequence[object], policy: object
+    ) -> Decision[Any]:
+        """Decide `question` over the DecisionPort as one step: rules, providers, then the engineer (AC40, AC66).
+
+        The block gets a member or a reference, never a number; when the engineer must choose, the run pauses.
+
+        Raises:
+            BlockRuleViolation: bad options, state, rules, policy or point. DecisionInvalid: the answer is none of the
+                options. ContractError: a stale reference, or no port.
+        """
+        request = DecisionRequest(question, options, state, rules, policy)
+        return (await _steps.step(lambda path: self._decided(path, "decide", question, [request])))[0]
+
+    async def decide_many(self, requests: Sequence[DecisionRequest]) -> list[Decision[Any]]:
+        """Decide the requests as one step; the calls the engineer must choose are one input request (AC66)."""
+        return await _steps.step(lambda path: self._decided(path, "decide_many", "decide_many", list(requests)))
+
+    async def _decided(self, path: str, kind: str, name: str, requests: list[DecisionRequest]) -> list[Decision[Any]]:
+        items = [_decide.check(r) for r in requests]
+        args = _decide.arguments(items)
+        recorded = self._look(path, kind, name, args)
+        await self._guard.sweep(self, path, "pre")  # a decision waits for the dirty models to be checked (spec 4.6 #1)
+        if recorded is not None and (done := self._replayed(recorded)) is not None:
+            return _decide.decisions(items, cast(list[_Obj], done.summary["decisions"]))
+        self._guard.refs(_decide.held(items), {})  # invariant 3: the default rule for every reference
+        began = self._clock.now_ms()
+        try:
+            settled = await self._decider.settle(path, items, many=kind == "decide_many")
+            value: list[JsonValue] = [
+                {"choice": a.choice, "decided_by": a.decided_by, "confidence": a.confidence} for _, a, _ in settled
+            ]
+            out = _decide.decisions(items, cast(list[_Obj], value))
+        except errors.DecisionInvalid as invalid:
+            self._begin(path, 1, kind, name, args)
+            self._fail(
+                path,
+                1,
+                began,
+                ev.HarnessError(harness_code=errors.HarnessCode.DECISION_INVALID, message=invalid.message),
+                False,
+            )
+            raise
+        self._begin(path, 1, kind, name, args)
+        for call, answer, request_id in settled:
+            self._writer.append(EventType.DECISION_MADE, _decide.made(call, answer, request_id), path=path, attempt=1)
+        stored = self._store.put("harness.journal_blob/1", {"value": value}, self._producer())
+        result = ev.StepResult(ref=stored.result_id, summary={"decisions": value}, warnings=[], complete=True)
+        self._done(path, 1, began, result)
+        return out
 
     async def block[I: BaseModel, O: BaseModel](self, child: BlockDef[I, O], inp: I) -> O:
         """Run `child` as a scope: its steps are `<path>/0`, `<path>/1`; input and output are checked (AC15).

@@ -19,11 +19,15 @@ documents means a package directory of the `eng-platform` workspace; repository-
    ([01](01-lifecycle.md) §2, §9).
 2. **Tests first.** The first commit of every task holds failing tests; CI checks that they fail without the code.
 3. **Never invent an engineering number.** Every constant has a cited source; every value has a provenance.
-4. **Never improvise a missing capability.** Build it as a permanent tool: in a live project through the project lane
-   ([01](01-lifecycle.md) §9), otherwise through a gap report ([02](02-work-items.md) §5).
+4. **Never improvise a missing capability.** In live work, log it in the task log and continue with what is possible;
+   build it as a permanent tool through the project lane only when the owner asks ([01](01-lifecycle.md) §9, §10);
+   outside live work, file a gap report ([02](02-work-items.md) §5).
 5. **Stay inside the plan task**: its files, its size budget, its session budget.
 6. **Nobody approves their own work.** Reviews that count are run by CI or given by the owner.
-7. **CI is the definition of done.** Nothing bypasses CI; nobody bypasses branch protection.
+7. **CI is the definition of done.** Nothing bypasses CI; nobody bypasses branch protection. The only commits that
+   reach the integration branch without a pull request are log-only commits
+   ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5) and, in bootstrap mode, the lead's bookkeeping commits;
+   they are checked after the push.
 8. **uv only for Python.** No pip, poetry, conda or manual virtual environments.
 9. **Stay inside your repository.** No writes to other repositories, system settings, program folders or deployment
    targets; no instructions or memories written outside the repository.

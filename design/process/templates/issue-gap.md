@@ -12,9 +12,10 @@ labels: ["type/gap", "status/triage"]
 
 ## Evidence
 {{Host API reference, documentation, example data, what was tried with existing tools.}}
+Task-log need ids: {{need ids only, never log content (A24); or none}}
 
 ## Workaround attempted?
 No improvised workaround was written (principle P12). {{Existing tools that partly cover it, if any.}}
 
 ## Triage outcome (filled by the triager)
-new spec / covered (explain) / host limitation (alternative) / out of scope
+new spec / covered (explain) / host limitation (alternative) / out of scope / duplicate (of) / defect

@@ -258,7 +258,7 @@ Fields the model edit cycle is expected to need (proposal for spec 0007, which o
 | Path | Kind | Why |
 |---|---|---|
 | `limits.drift_ratio` | quantity (ratio) | summary of drifts against a limit (13 example, engine AC17) |
-| `limits.ratio_limit` | quantity (ratio) | design-ratio threshold for the summary (contract §4.9 `ratio_limit`) |
+| `limits.ratio_limit_ratio` | quantity (ratio) | design-ratio threshold for the summary (contract §4.9 `ratio_limit`) |
 | `modeling.merge_tolerance_mm` | quantity | joint merge after edits (13 §2 `modeling`) |
 | `modeling.snap_tolerance_mm` | quantity | grid snapping of new objects (13 §2) |
 | `modeling.section_rounding_increment_mm` | quantity | new section sizes (13 §2) |
@@ -382,14 +382,15 @@ branch 75); the freeze and merge code is also under mutation testing. A change t
 
 ## 10. Version impact
 
-New public modules in `eng-harness`: minor. No contract change in this spec; Q1 and Q4 ask for contract changes
-(minor, contract 0.2) that are not assumed.
+New public modules in `eng-harness`: minor. No contract change in this spec. Q1 is decided (OQ-Q44) and lands in
+`eng-contract` 0.1.0 through contract plan 0001 T19 (B-464); Q4 still asks for a contract change (minor, contract 0.2)
+that is not assumed.
 
 ## 11. Open questions
 
 | Question | Owner | Answer |
 |---|---|---|
-| Q1. Conflict: 13 §2 and the contract unit suffixes use mixed case (`fc_MPa`, `fy_MPa`, `_kN`), but the contract's `basis.design_basis/1` path rule `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$` allows lowercase only, so `materials.concrete.c1.fc_MPa` cannot be a basis path. | Owner (contract) | Amend the contract path rule to the `FieldPath` name rule (`[A-Za-z_][A-Za-z0-9_]*`) in contract 0.2 before this plan's T4; until then suffixed engineering fields cannot be stored |
+| Q1. Conflict: 13 §2 and the contract unit suffixes use mixed case (`fc_MPa`, `fy_MPa`, `_kN`), but the contract's `basis.design_basis/1` path rule `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$` allowed lowercase only, so `materials.concrete.c1.fc_MPa` could not be a basis path. | Owner (contract) | Decided (owner, OQ-Q44; amendment B-463): segments stay lowercase and the last one may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464). This plan's T1, T4, T5 and T8 are merged with the earlier answer, the contract FieldPath name rule (`[A-Za-z_][A-Za-z0-9_]*` per segment), which is wider than the decided rule; storing a suffixed field needs T19, a key that passes the harness rule but not contract §4.10.2 is refused only at freeze (T8), and plan T11 aligns the harness rule (amendment B-484) |
 | Q2. A YAML parser is a new runtime dependency (A10); the engine plan allows only Pydantic | Owner | Approve an ADR for `ruamel.yaml` (YAML 1.2, safe mode); fall back to JSON templates if refused |
 | Q3. 13 §4 has the engineer fill values on the setup screen; ADR-0027 keeps the page read-only | Owner | Keep the page read-only: values come from the values file, the page confirms per section (this spec); revisit with the full UI ADR |
 | Q4. `basis.design_basis/1` has no `draft` flag, so a frozen basis cannot show that its template was draft | Owner (contract) | Add `draft: bool` in contract 0.2 (as `verdicts.set/1` has); until then only the page banner and the run report show it |

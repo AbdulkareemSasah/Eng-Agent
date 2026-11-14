@@ -159,17 +159,41 @@ tasks:
     depends_on: [T4]
   - id: T10
     title: "Property tests and the fake-host workflow with replay"
+    # Amendment (B-474, documents only): no engine task wires `ctx.basis` (engine T7 made only `BasisView`), so T10
+    # wires it lazily in the engine Ctx and runner (36 counted lines measured by the B-164 writer).
+    # Amendment (B-482, documents only): the property tests and test_unconfirmed_basis_refuses_the_run leave tests_first
+    # (they pin merged T1 to T8 and engine invariant 5, so they pass at the base: TF004); they stay in files.
     files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/tests/property/test_template_basis_props.py"
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py"
       - "packages/eng-harness/tests/fixtures/workflows/**"
     max_changed_lines: 300
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/property/test_template_basis_props.py"
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays"
     covers: [AC28, AC30]
     depends_on: [T8]
+  - id: T11
+    # Amendment (B-484, documents only): the harness key and path rule merged in T1 and T5 is wider than contract
+    # section 4.10.2 (spec Q1); T11 narrows it to the contract rule.
+    title: "Template keys and FieldSpec paths follow the contract basis path rule"
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/templates/_model.py"
+      - "packages/eng-harness/src/eng_harness/basis/_fields.py"
+      - "packages/eng-harness/tests/unit/test_template_model.py"
+      - "packages/eng-harness/tests/unit/test_template_check.py"
+      - "packages/eng-harness/tests/unit/test_basis_fields.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_template_model.py::test_extra_keys_forbidden"
+      - "packages/eng-harness/tests/unit/test_basis_fields.py::test_field_spec_rules"
+    covers: [AC3, AC21]
+    depends_on: [T5]
 ---
 
 # Implementation plan: eng-harness templates and the design basis
@@ -181,14 +205,16 @@ strict loading, inheritance, repository), then `eng_harness.basis` (T5 to T8: fi
 interface, freeze and storage), then shipped content and cross-cutting tests (T9, T10). Risky parts first: the schema
 and unit rules (T1) carry the most R1 risk; the YAML dependency (T2) is added with its ADR, written in T2 with status Proposed (B-374). Reuse: the contract
 supplies `Cited`, units, `Timestamp`, `ResultStore`, the `basis.design_basis/1` kind and `DesignBasis.missing`; the
-engine supplies `BasisPort`, `ctx.basis` and the invariant that refuses an incomplete basis. Nothing is copied from
-other packages.
+engine supplies `BasisPort`, the `BasisView` type (T10 wires `ctx.basis`, B-474) and the invariant that refuses an
+incomplete basis. Nothing is copied from other packages.
 
 Cross-plan dependencies, which `depends_on` cannot express: T1 needs engine T1 (skeleton) and the merged
 `eng-contract` 0.1.0 (plan B-003); T8 needs engine T6 (ports) and contract T12 and T14 (kinds, result store); T9 needs
-the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4 and T5
-start only after the contract path-rule question (spec Q1) is decided, since template keys follow the contract path-segment
-rule and suffixed names such as `fc_MPa` do not pass the 0.1 basis path rule.
+the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4, T5
+and T8 are merged with the earlier spec Q1 answer, the contract FieldPath name rule, which is wider than the rule decided
+as owner question OQ-Q44: storing a suffixed field such as `fc_MPa` needs eng-contract plan 0001 T19 (work item B-464),
+a key that passes the harness rule but not contract §4.10.2 is refused only at freeze (T8), and T11 aligns the harness
+rule (amendment B-484; T11 needs eng-contract T19, merged).
 
 ## 2. Tasks
 
@@ -207,7 +233,21 @@ the page against this; no HTML here.
 `ResultStore`.
 **T9 Shipped content.** The `blank` template, package data inclusion and the golden pin. No values.
 **T10 Cross-cutting tests.** Hypothesis round trips and the fake-host workflow with journal replay (process/05 §2:
-every workflow path has a fake-host and a replay test).
+every workflow path has a fake-host and a replay test). Amendment B-474: T10 also wires `ctx.basis` in
+`engine/_ctx_impl.py` and `engine/_runner.py`, loaded on first read so `ctx` loads no basis for a run that never reads
+it (`start` still loads it once for invariant 5 when `required_basis` is not empty). Test order (amendment B-482): the
+first `test:` commit holds only `test_basis_reaches_ctx_and_replays` in `test_basis_workflow.py`; the property tests and
+`test_unconfirmed_basis_refuses_the_run` pin merged behaviour and come in a later commit of the same task (test-first
+judges each new or changed test function of the first `test:` commit's files, so a green one there is TF004).
+**T11 Contract path rule** (amendment B-484, spec Q1). Template group and leaf keys, `AskItem.path` and `FieldSpec.path`
+follow contract §4.10.2 (`basis.design_basis/1` paths): lowercase segments, at least two in a path, and only the last
+segment may end with one §4.7.2 unit suffix as that table writes it; the reasons stay those of the merged code
+(`unknown_key` for a template key, `value_invalid` for an ask path, `field_invalid` for a `FieldSpec` path). A path
+with a capital letter outside the last segment's suffix (`Compare.stress_MPa`, `compare.Stress_MPa`,
+`compare.stress_MPa.max`, contract AC48a), accepted by the merged rule, is then refused at load or declaration instead
+of at freeze.
+The first `test:` commit adds those refusals to `test_extra_keys_forbidden` and `test_field_spec_rules`, which fail at
+the base; tests whose synthetic keys the narrower rule refuses are renamed in a later commit.
 
 ## 3. Dependencies
 

@@ -54,6 +54,10 @@ and an approval resolved by the mode never satisfying an always-ask step (§4.7)
 they add no criterion here: their criterion is spec 0007 AC33, built by plan 0007 T6. Every rule is draft until the
 owner approves it (bootstrap mode).
 
+**Amendment B-471.** Spec 0006 (Q20, answer A; decided by the owner's instruction of 2026-11-12) asked that
+`Engine.start` take a run id chosen by the caller: `RunRequest.run_id` (§4.4.1, §4.5.1, §5). It is listed in §11
+(Q37); the new criterion is AC70, built by plan T20 (work item B-472).
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -173,6 +177,12 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC16. Given a run input that fails the workflow's input model, then `start` raises `ContractError`
   (`INVALID_ARGUMENT`) and creates no run folder; given a block that returns a value that is not an instance of its
   output model, then `BlockRuleViolation`. Test: `tests/unit/test_runner.py::test_input_and_output_validation`.
+- AC70. Given `RunRequest.run_id` (amendment B-471), then `start` creates the run under that id (run folder, journal
+  `meta`, `run_started.run_id`, `RunOutcome.run_id`), also when the host port's server checks (invariant 8) wrote under
+  that run folder first; given a `run_id` whose run folder exists, or one that does not match `run_` + ULID (for
+  example `../x`), then `start` raises `ContractError` (`INVALID_ARGUMENT`) before any port call and creates nothing
+  (no folder, lock, stored input or event); given no `run_id`, then the id is drawn from the `IdSource` as before
+  (§4.4.1). Test: `tests/unit/test_runner.py::test_caller_chosen_run_id`.
 - AC65. Given `RunRequest.run_class` (`trial` or `production`), then `start` refuses a CalcPort whose `run_class`
   differs (`RunRefused` `RUN_CLASS_MISMATCH`, no run folder), `run_started` records the class, and a resume with a
   CalcPort of another class is refused the same way before any other port call. Test:
@@ -671,7 +681,8 @@ stop (AC10).
 
 #### 4.4.1 Files and schema
 
-`<workspace>/runs/<run_id>/journal.sqlite`, with `run_id = "run_" + ULID` (from the contract `IdSource`). The run
+`<workspace>/runs/<run_id>/journal.sqlite`, with `run_id = "run_" + ULID` (from the contract `IdSource`, or
+`RunRequest.run_id` of the same pattern chosen by the caller, AC70). The run
 folder also holds `run.lock` (§4.4.4), `copies/` (working copies, spec 0002) and `backups/` (promotion backups). No
 file or folder of the run carries an answer: answers reach the engine only in memory, through `ApprovalPort` and
 `InputPort` (spec 0006 §4.4.5; Q22).
@@ -791,9 +802,13 @@ The terminal progress, the approval page and the run report use only this API (1
 
 #### 4.5.1 Start and resume
 
-`start(request)`: validate the input (AC16); check that `ports.calc.run_class` equals `request.run_class` (AC65); load
-the basis and check invariant 5; run the server checks (invariant 8); create the run folder, take the lock, store the
-input, append `run_started`; call the root block.
+`start(request)`: when `request.run_id` is given, check it first, before any port call (so before the server checks
+of invariant 8, whose host port may write under the run folder): a value that does not match `run_` + ULID, or whose
+run folder exists, is refused with `ContractError` `INVALID_ARGUMENT` and the engine creates nothing (AC70); validate
+the input (AC16); check that `ports.calc.run_class` equals `request.run_class` (AC65); load the basis and check
+invariant 5; run the server checks (invariant 8); create the run folder (named by `request.run_id` when given, and
+then accepting the folder that the server checks wrote), take the lock, store the input, append `run_started`; call the
+root block.
 
 `resume(run_id)` runs in this order, and no step of it may be moved (AC62):
 
@@ -1188,6 +1203,7 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 | `RunRequest.basis_ref` | `RefString` | — | a `basis.design_basis/1` result | yes | 0004 |
 | `RunRequest.mode` | `PermissionMode` | — | enum | no | CLI, default from settings |
 | `RunRequest.run_class` | `RunClass` | — | `trial`, `production` | no | CLI `--run-class` (0006, default `production`) |
+| `RunRequest.run_id` | `str` or `None` | — | `run_` + ULID (§4.4.1); default `None` | no | CLI, drawn at step 1 of 0006 §4.2.2 (B-471) |
 | `EngineSettings.*` | `int` | — | ≥ 1 | no | `harness.toml` (0006) |
 | `RunOutcome` | `run_id`, `status` (`COMPLETED`, `PAUSED`, `NEEDS_ENGINEER`, `FAILED`), `output` (the output model or `None`), `pending` (request ids), `escalation` (`reason`, `detail`) | — | — | — | engine |
 
@@ -1274,6 +1290,7 @@ defaults to empty.
 The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (default `False`) and
 `ToolInfo.saves_new_file` (default false) change no journal payload: a tool save is journaled with the existing
 `model_saved` payload and its existing role `revision`, so the journal schema stays version 1.
+The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload.
 
 ## 11. Open questions, gaps and additions
 
@@ -1316,3 +1333,4 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 | Q34 | **[added]** by B-415: how the engine learns that a tool save writes a new file, and that file's name and hash | Owner | `ToolInfo.saves_new_file(args)` (adapter subclass, like `overwrites_original`) and the summary key `saved_file` (`name`, `sha256`) of such a tool's result, checked against the model's file hash (§4.6, §4.8); `model_saved.file_name` always names the working file open after the step, never a snapshot, so `restore` and a reopen use the working file (§4.6); spec 0007 §4.10 states it for the CSI adapter (plan 0007 T5) |
 | Q35 | B-111: how a replay detects a removed inserted save step (invariant 7, AC47) | Owner | Draft decision B-434, owner queue: `step_started` carries the tool's `action`, optional, so earlier journals read unchanged (§4.4.2). This records the data only: §4.5.2 has no rule that reads `action`, and an unrecorded `p~pre.save` path goes live (rule 4), so the divergence rule is open, owner queue (writer's proposal, not adopted here: a recorded step whose `action` is `analysis` or `design` with no recorded `p~pre.save.<model_key>` is `ReplayDivergence`, raised before any live call) |
 | Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read`, effect `read` and no `op_id` (names `check_model` and `save`, the path's `<kind>` segment), so in-flight reconciliation reruns them by the §4.5.3 Read row; the §4.5.3 Write row text "including save" was not amended (D-28) and reads as tool saves only, owner to confirm (a rerun of an inserted save saves the model again); the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |
+| Q37 | Spec 0006 Q20: for `run` the command line must build the tool and host ports, which need the run folder, before `Engine.start` draws the run id | Owner | Decided (owner instruction of 2026-11-12; amendment B-471; spec 0006 Q20 answer A): `RunRequest.run_id`, optional, chosen by the caller (`run_` + ULID), used by `start`, which checks it before any port call and refuses it with `ContractError` `INVALID_ARGUMENT`, creating nothing, when it does not match `run_` + ULID or that run folder exists (§4.4.1, §4.5.1, AC70); built by plan T20 (work item B-472) |

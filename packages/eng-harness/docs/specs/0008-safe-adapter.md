@@ -78,7 +78,8 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   stops the run before any write (engine AC44). Tests: `tests/unit/servers/test_buildcheck.py::test_fingerprint_per_product`,
   `tests/contract/test_csi_allowlist.py::test_safe_fingerprint_from_inventory`,
   `tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run` (the stop; it runs the real engine and
-  needs `build_ports`, so it is written in plan 0002 task T19, which waits for plan task T3; amendment B-413).
+  needs `build_ports`, so it is written in plan task T3, after plan 0002 task T19a, which adds `build_ports`; amendments
+  B-413, B-475).
 - AC5. Given an ETABS server and a SAFE server in one run and a timeout injected on the ETABS server, then
   `session_epoch` of the ETABS host key increases and that of the SAFE host key does not; launch ownership, wedge state
   and the pending reconciliation of one product never mark the other. Test:
@@ -362,7 +363,7 @@ owner asks in a live project ([ADR-0026](../../../../design/docs/adr/0026-projec
 | `pressure_kPa` (read) | float | kPa | finite | n/a | model |
 | `u3_kN_m3` (read) | float | kN/m3 | finite | n/a | model (Q3) |
 | `call_timeout_s`, `client_grace_s`, `timeout_s` of the SAFE server | int | s | ≥ 1 | no | `harness.toml`, required, no default (0002 §4.2) |
-| `checks.readback_relative_tolerance` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
 | Outputs | envelopes of the kinds in §4.3 to §4.6 | canonical | - | - | adapter |
 
 ## 6. Errors

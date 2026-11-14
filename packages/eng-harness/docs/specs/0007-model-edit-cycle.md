@@ -344,7 +344,7 @@ within the bounds of its value kind by exact comparison of canonical values (`OU
 and `bounds.thickness_max_mm` for a length, `bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line
 load, `bounds.area_load_min_kPa` and `bounds.area_load_max_kPa` for an area load, `bounds.ratio_min_ratio` and
 `bounds.ratio_max_ratio` for a ratio (§4.8). K5 refused kinds
-(§4.3.2). K6 an item whose target and property appear in `diff.changes` gets the warning
+(§4.3.2). K6 an item whose target and property appear in `diff.changes` (keys of the form of §4.4.2) gets the warning
 `CONFLICTS_WITH_ENGINEER_CHANGE`. K7 `FAIL` on any error.
 
 #### 4.4.2 `harness.expected_effects` v1 (spec 0003 Q6)
@@ -354,7 +354,9 @@ Output: spec 0003's `harness.expected_effects/1`. Projection per kind: section a
 `set` effects per target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on
 `model.sections/1` (spec 0003 §4.8 edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns;
 `load_combination_set` is `set` of the whole combination (or `add` when new); `load_combination_delete` is `remove`;
-an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter.
+an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter. An
+effect's `key` is the reported key of spec 0003 §4.7 D2, list name included (for example `["frame_loads", frame,
+pattern, direction]`), so effects and `diff.changes` match on one key form (amendment B-483).
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
@@ -386,12 +388,12 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 2 | `ctx.tool("csi_open_model", {"model": inp.model})` on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
 | — | `async for c in ctx.attempts(B.count("attempts.cycles"))`: one `ctx.block(edit_cycle_once, ...)` per cycle | Bounded loop; exhaustion escalates |
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
-| 4 | `ctx.calc("harness.model_diff", {"before": R[k-1], "after": S[k], "basis": B.ref(...)})` | `before` is `stale_ok`, `after` current (spec 0003 §4.13) |
+| 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.ref(...)})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
 | 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
 | 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
 | 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
-| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before": S[k], "after": S', "basis"})`; then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
+| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
@@ -400,6 +402,11 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 15 | `ctx.decide("edit_cycle_engineer_turn", EngineerTurn, TurnState(...), rules=(), policy=require_engineer)` | Invariant 4; the choice is on the page only (spec 0006 AC46) |
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
+
+`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). The workflow passes
+each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for
+`harness.model_diff`, §4.8 for `harness.readback_check`) as the CalcPort `basis_fields` (spec 0003 §4.4 and AC13).
+Amendment B-483.
 
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
@@ -503,14 +510,12 @@ quantity's unit to be the canonical unit of its path suffix (spec 0004 AC21). A 
 `_ratio` (`limits.drift_ratio`) is unchanged; the others gain the suffix (`compare.ratio` becomes
 `compare.dimensionless_ratio`, after the contract's quantity kind, as each `compare.*` path is named after its kind).
 Counts and choices carry no unit and no suffix. The suffixes `_MPa`, `_kN_m3`, `_kN_m` and `_kPa` contain capital
-letters, which the contract's `basis.design_basis/1` path rule does not allow yet (spec 0004 Q1, spec 0003 Q1): a basis
-holding those eight paths (four `compare.*`, four `bounds.*`) cannot be frozen until the contract path rule is amended (Q12). The `compare.*` and
-`checks.readback_relative_tolerance` names also appear, without suffixes, in specs 0002 §4.5.8, 0003 §4.4, 0008, 0010,
-0011, 0013 and 0014 and in plans 0011, 0013 and 0014, and `limits.ratio_limit` (renamed `limits.ratio_limit_ratio`)
-appears in specs 0004 (its field proposal for this spec), 0010 and 0013, in structural-codes plan 0002 (its Q2 list
-of design-basis field paths) and in the structural-codes clause document `aci318_14.13_3_1_1` (bearing pressure,
-service); the calcs and the adapter read the paths of
-this table, and those documents are renamed to match (Q12).
+letters, which the contract's `basis.design_basis/1` path rule allows in the last segment only from eng-contract plan
+0001 T19 (work item B-464, owner decision OQ-Q44; spec 0004 Q1, spec 0003 Q1): a basis holding those eight paths (four
+`compare.*`, four `bounds.*`) cannot be frozen before it is merged (Q12). The calcs and the adapter read the paths of
+this table; amendment B-467 renamed them to match in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014, in
+plans 0011, 0013 and 0014 and in structural-codes plan 0002; the clause document `aci318_14.13_3_1_1` (bearing
+pressure, service) still names `limits.ratio_limit` until the owner renames it (Q12).
 
 Spec 0004's proposed `modeling.merge_tolerance_mm`, `modeling.snap_tolerance_mm` and
 `modeling.section_rounding_increment_mm` are not used: v1 adds or moves no object and computes no section size.
@@ -645,13 +650,13 @@ start at version 1 with lock entries.
 | Q3 | 18 step 7 saves "as the next revision" (a new file, baseline أ5); engine §4.6 journals `model_saved` only for its own saves, and its re-check (§4.9) would void the step 6 approval at the first write because the save changes the file hash | Owner | Engine amendment: journal `model_saved` (role `revision`) for a tool step with action `save` from its result's provenance; a save passed `under=` an approval is re-checked against the binding like a write and its result (and each engine `p~post.save` result) becomes the expected state of the next write under that approval; a save to a new file (not `overwrites_original`) gets no `approve_each_write` preview. Engine text written by amendment B-415 (engine §4.6 "Tool saves", §4.7, §4.8 `saves_new_file`, §4.9, rules EC2, EC5, EC6, Q32, Q34; draft until the owner approves) |
 | Q4 | Restoring an earlier revision inside a cycle (D-2) has no engine or adapter operation | Owner | `csi_open_revision` on this cycle's step 7 snapshot (§4.5.1, §4.10), which keeps the engineer's changes; it never overwrites a file and refuses a changed snapshot |
 | Q5 | Conflict: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval would satisfy it (engine §4.7) | Owner | Engine amendment: an approval resolved by `mode:*` never satisfies an always-ask step. Engine text written by amendment B-415 (engine §4.7, rule EC3, Q33; draft until the owner approves) |
-| Q6 | Two read-back tolerances: spec 0002 `checks.readback_relative_tolerance` and spec 0003 `compare.*` | Owner | Keep both in v1 (both required); converge on `compare.*` in the next spec 0002 revision |
+| Q6 | Two read-back tolerances: spec 0002 `checks.readback_relative_tolerance_ratio` and spec 0003 `compare.*` | Owner | Keep both in v1 (both required); converge on `compare.*` in the next spec 0002 revision |
 | Q7 | The first change set arrives only by `resume --answers` after `run` pauses at the request | Owner | Decided by amendment B-354 in spec 0006 (§4.2.1, §4.4.7, AC47, AC64, Q17): `run --answers FILE` pre-answers the first change-set request; the engineer starts `run` without `--no-wait`, confirms the basis on the page and approves the change set there. The interim `run --no-wait` route is withdrawn: a `--no-wait` run cannot confirm the basis, so it cannot start this workflow |
 | Q11 | The A3 audit and the A7 prompt count (AC25, AC26) are functions, and spec 0006 AC1 allows six commands only (`LOCAL-TESTING.md` open point 7) | Owner | Decided by amendment B-354: the read-only module entry point `python -m eng_harness.report` with `audit-sources` and `count-prompts` (AC35), as spec 0009 exposes `python -m eng_harness.providers` (its Q6); no seventh command |
 | Q8 | Which A7 requests count, and on which paths (§4.9) | Owner | As §4.9: the first change-set request and the first step 6 approval are the cycle's own and do not count; re-asks, repeated approvals and engine requests do; the bound applies to normal paths, failure and escalation paths are counted and reported |
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `edit_cycle_analysis_messages.clean` (an unknown message must not pass silently) |
-| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule is lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) Amend the contract path rule to the `FieldPath` name rule in a contract minor version, as spec 0004 Q1 recommends, before plan 0007 T2 and T8; (b), (c) and (d) a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it; all before plan 0003 T8 and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
+| Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule was lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) decided by the owner (OQ-Q44, amendment B-463): the last path segment may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464) before plan 0007 T2 and T8; (b), (c) and (d) done by amendment B-467, a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it (listed by B-467, not edited); all before plan 0003 T8b and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
 | Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |

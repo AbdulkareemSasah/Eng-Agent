@@ -44,7 +44,7 @@ reach hosts only through allowlisted tools.
 |---|---|---|
 | Specs 0001 to 0009 | Engine, adapters (ETABS reactions, SAFE loads and results), calcs, basis, decisions with shadow tiers, page, report, edit-cycle helpers | Used; this spec adds a workflow, a block, eight calcs, one decision point with rules, kinds, and the code-pack route of §4.3 |
 | `structural_codes.evaluate_batch`, `notes.render_html` (CF §4.10, §4.12), ACI and SBC packs | Pure batch evaluation to `verdicts.set/1`; calculation notes; `check_id_for` for SBC ids (SBC Q1) | Used through the CalcPort (§4.3); nothing copied (A12) |
-| `harness.section_round` (calcs §4.10) | Rounds up to the single `modeling.section_increment` | Not used: plan and depth have their own increments and bounds (§4.4.2, §4.4.4) |
+| `harness.section_round` (calcs §4.10) | Rounds up to the single `modeling.section_increment_mm` | Not used: plan and depth have their own increments and bounds (§4.4.2, §4.4.4) |
 | Sasaah footing tool (`FootingSizer`, `FootingGrouper`, SAFE phase) | Sizing, grouping, SAFE build with table writes; embedded values (load factors, subgrade ratio, spacing cap, equilibrium tolerance); ACI 318-19 | Not adopted or called (SAFE Q4, Q9). Its step order is the evidence for WS §2 |
 | `audit_value_sources`, `count_prompts` (spec 0007 §4.9, plan 0007 T10) | Journal audits | Reused for F2 and F4 |
 
@@ -90,7 +90,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 - AC6. `harness.footing_subjects`: given synthetic placements, sections, points and reactions, then each column whose
   lower joint has reaction rows becomes a subject with `cx_mm`, `cy_mm` mapped through its rotation (within
-  `compare.angle` of 0, 90, 180 or 270 degrees), and every other case is excluded with its reason
+  `compare.angle_deg` of 0, 90, 180 or 270 degrees), and every other case is excluded with its reason
   (`NO_COLUMN_AT_JOINT`, `SECTION_NOT_RECTANGULAR`, `COLUMN_ROTATED`, `TWO_COLUMNS_AT_JOINT`). Test:
   `tests/golden/footing/test_subjects.py::test_golden_cases`.
 - AC7. `harness.footing_plan_size`: golden cases of §4.4.2 (between and on multiples, the minimum plan governing, the
@@ -105,7 +105,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 - AC9. `harness.footing_resize`: each action of §4.4.4 gives the next size; a step past a bound leaves the size
   unchanged with `LIMIT_REACHED`; `engineer_set` takes the single plan size `L`, `h` and `s` as engineer-input
   references, sets `Lx = Ly = L`, and flags values outside the basis bounds (`OUTSIDE_BASIS_BOUNDS`) and a plan that is
-  not a multiple of `plan_increment` (`OFF_INCREMENT`); `enlarge_plan` from a plan that is not a multiple gives the
+  not a multiple of `plan_increment_mm` (`OFF_INCREMENT`); `enlarge_plan` from a plan that is not a multiple gives the
   smallest multiple above it (golden cases: an engineer plan between multiples, then enlarged). Test:
   `tests/golden/footing/test_resize.py::test_golden_cases`.
 - AC10. `harness.footing_status`: golden cases of §4.4.5 for the family status order, the closure and the decision
@@ -163,7 +163,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
 
 ### 3.7 SAFE cross-check (§4.9)
 
-- AC24. `harness.reactions_to_joint_loads`: golden cases of §4.9 (negation, matching within `compare.length`, an
+- AC24. `harness.reactions_to_joint_loads`: golden cases of §4.9 (negation, matching within `compare.length_mm`, an
   unmatched or doubly matched joint, a missing pattern, only the cases of the chosen combinations). Test:
   `tests/golden/footing/test_reactions_to_loads.py::test_golden_cases`.
 - AC25. `harness.safe_equilibrium`: golden cases (within and outside the tolerance; a self-weight pattern not compared).
@@ -176,7 +176,7 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   `tests/workflow/footing/test_safe_stage.py::test_stage_steps`, `::test_candidate_pressure_no_verdict`,
   `::test_soil_pressure_limit_reported`.
 - AC27. Given `safe.cross_check = off` (or no `--safe-model`), then no SAFE server starts; given a basis without
-  `compare.length` or `checks.equilibrium_relative_tolerance` (required whatever `safe.cross_check` says, §4.7, Q19),
+  `compare.length_mm` or `checks.equilibrium_relative_tolerance_ratio` (required whatever `safe.cross_check` says, §4.7, Q19),
   then the basis does not freeze (spec 0004 AC23) and the run does not start. Test:
   `::test_stage_off_and_missing_fields`.
 - AC28. Given the tool names any step of this workflow can call, then they are a subset of the CSI allowlist and none is
@@ -276,20 +276,21 @@ milli", as BP §5, and π with source "mathematical constant, area of a circle",
 #### 4.4.1 `harness.footing_subjects` v1
 
 Input: `placements` (`model.frame_placements/1`), `sections` (`model.sections/1`), `reactions`
-(`forces.joint_reactions/1`), `basis` (`compare.angle`). Method: S1 a column is a frame of kind `column`; its lower
+(`forces.joint_reactions/1`), `basis` (`compare.angle_deg`). Method: S1 a column is a frame of kind `column`; its lower
 joint is the end with the smaller `z_mm`. S2 a support joint is a joint with at least one reaction row. S3 a subject is a
 support joint with exactly one column whose lower joint it is; zero columns gives `NO_COLUMN_AT_JOINT`, more gives
 `TWO_COLUMNS_AT_JOINT`. S4 the section must be `rectangular` (`SECTION_NOT_RECTANGULAR` otherwise, ACI plan §6.3). S5
-with `θ = rotation_deg` reduced to [0, 360): within `compare.angle` of 0 or 180 gives `cx = b`, `cy = h`; of 90 or 270
+with `θ = rotation_deg` reduced to [0, 360): within `compare.angle_deg` of 0 or 180 gives `cx = b`, `cy = h`; of 90 or 270
 gives `cx = h`, `cy = b`; otherwise `COLUMN_ROTATED`. Which of `b_mm` and `h_mm` lies along local axis 2 at zero
 rotation is the CSI convention to confirm (L2). S6 `x_mm`, `y_mm` from the lower joint.
 
 #### 4.4.2 `harness.footing_plan_size` v1
 
-Input: `subjects`, `reactions`, `service_cases` (engineer input reference), `basis` (`foundation.allowable_bearing_pressure`,
-`.allowable_bearing_kind`, `.soil_unit_weight`, `.soil_depth_above_footing`, `.surcharge`, `materials.concrete_unit_weight`,
-`foundation.min_depth`, `.min_plan_dimension`, `.max_plan_dimension`, `.plan_increment`, `.plan_shape`,
-`reinforcement.max_spacing`). Output `harness.footing_dims/1` with `h = min_depth`, `s = max_spacing`.
+Input: `subjects`, `reactions`, `service_cases` (engineer input reference), `basis`
+(`foundation.allowable_bearing_pressure_kPa`, `.allowable_bearing_kind`, `.soil_unit_weight_kN_m3`,
+`.soil_depth_above_footing_mm`, `.surcharge_kPa`, `materials.concrete_unit_weight_kN_m3`, `foundation.min_depth_mm`,
+`.min_plan_dimension_mm`, `.max_plan_dimension_mm`, `.plan_increment_mm`, `.plan_shape`, `reinforcement.max_spacing_mm`).
+Output `harness.footing_dims/1` with `h = min_depth_mm`, `s = max_spacing_mm`.
 
 - P0. `allowable_bearing_kind` must be `gross`, else `NEEDS_ENGINEER` (`NET_ALLOWABLE`, BP G-2). `plan_shape` must be
   `square`, else `NotImplementedGap` FG-1.
@@ -308,7 +309,7 @@ Input: `subjects`, `reactions`, `service_cases` (engineer input reference), `bas
 
 #### 4.4.3 `harness.footing_layout` v1
 
-Input: `dims`, `subjects`, `basis` (`reinforcement.bar_diameter`, `.bottom_layer`, `durability.cover_footing`,
+Input: `dims`, `subjects`, `basis` (`reinforcement.bar_diameter_mm`, `.bottom_layer`, `durability.cover_footing_mm`,
 `foundation.reaction_point`). Output `harness.footing_design/1`. Bars spanning in X lie across the width `Ly` (and Y
 across `Lx`); `c` is the cover, `db` the diameter.
 
@@ -324,15 +325,15 @@ across `Lx`); `c` is the cover, `db` the diameter.
 #### 4.4.4 `harness.footing_resize` v1
 
 Input: `dims`, `actions` (per footing: `enlarge_plan`, `increase_depth`, `reduce_bar_spacing`, `engineer_set` with
-references to the `basis.engineer_input/1` fields `L`, `h`, `s`, or `none`), `basis` (`foundation.plan_increment`,
-`.max_plan_dimension`, `.depth_increment`, `.max_depth`, `reinforcement.spacing_increment`, `.min_spacing`). Footings
-stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
-`i` above `L` (`(n + 1)·i` when `L = n·i`; exact floor division of the fractions). R2 `increase_depth`: `h + depth_increment`. R3 `reduce_bar_spacing`:
-`s − spacing_increment`. A result past its bound leaves the size unchanged, sets the flag and status `LIMIT_REACHED`.
+references to the `basis.engineer_input/1` fields `L`, `h`, `s`, or `none`), `basis` (`foundation.plan_increment_mm`,
+`.max_plan_dimension_mm`, `.depth_increment_mm`, `.max_depth_mm`, `reinforcement.spacing_increment_mm`,
+`.min_spacing_mm`). Footings stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
+`i` above `L` (`(n + 1)·i` when `L = n·i`; exact floor division of the fractions). R2 `increase_depth`: `h + depth_increment_mm`. R3 `reduce_bar_spacing`:
+`s − spacing_increment_mm`. A result past its bound leaves the size unchanged, sets the flag and status `LIMIT_REACHED`.
 R4 `engineer_set` takes the three values `L`, `h`, `s` of `basis.engineer_input/1` with `source: engineer` and sets
 `Lx = Ly = L`; the engineer cannot enter a rectangle (Q17). A value outside the basis bounds is kept and flagged
 `OUTSIDE_BASIS_BOUNDS` (Q13); a plan that is not a multiple of `i` is kept and flagged `OFF_INCREMENT` (no check
-depends on the increment). Depths are counted from `min_depth`, plans from zero.
+depends on the increment). Depths are counted from `min_depth_mm`, plans from zero.
 
 #### 4.4.5 `harness.footing_status` v1
 
@@ -344,9 +345,9 @@ all six are `PASS`; `failing` when any is `FAIL`; else `needs_engineer`. `state`
 #### 4.4.6 `harness.footing_schedule` v1
 
 Input: `subjects`, the last `design`, the last `status`, closures (reasons), the decision references, `basis`
-(`foundation.min_clear_distance`). Clearance per pair of footings, plans centred on their joints (the column is centred,
+(`foundation.min_clear_distance_mm`). Clearance per pair of footings, plans centred on their joints (the column is centred,
 BP §2): `gx = |xi − xj| − (Lxi + Lxj)/2`, `gy` likewise; both negative is an overlap; one negative gives the other as the
-distance; both positive give `√(gx² + gy²)` (compared squared). A distance below `min_clear_distance` marks both
+distance; both positive give `√(gx² + gy²)` (compared squared). A distance below `min_clear_distance_mm` marks both
 footings `NEEDS_ENGINEER` (`CLEARANCE`, the neighbour named). Output `harness.footing_schedule/1`: per footing the design,
 status, reasons, family statuses and ratios, verdict-set references, decision references, sources of each size.
 
@@ -397,35 +398,37 @@ The `for` over footings builds argument lists only; every engineering value is a
 ### 4.7 Design basis fields
 
 No value is shipped (spec 0004 Q8). Paths of the ACI clause specs are kept (ACI plan Q2); the others are **[added]**
-(Q12). All are required unless marked; units are those of `BasisField.unit`.
+(Q12). The last segment of each quantity path ends with the contract §4.7.2 suffix of its unit (spec 0007 §4.8 naming;
+amendment B-484); the clause specs name those paths without the suffix until the owner renames them. All are required
+unless marked; units are those of `BasisField.unit`.
 
 | Path | Kind | Unit | Used by |
 |---|---|---|---|
 | `design.code_pack` | choice `aci318_14`, `sbc304_2018` | — | §4.3 |
 | `seismic.design_category` | choice `a` to `f` | — | refusal of D to F (ACI plan Q16) |
 | `seismic.special_system` | choice `yes`, `no` | — | refusal (ACI plan Q8) |
-| `foundation.allowable_bearing_pressure` | quantity | kPa | plan size, bearing (asked each run, 13 §2) |
+| `foundation.allowable_bearing_pressure_kPa` | quantity | kPa | plan size, bearing (asked each run, 13 §2) |
 | `foundation.allowable_bearing_kind` | choice `gross`, `net` | — | plan size, bearing |
-| `foundation.soil_unit_weight`, `materials.concrete_unit_weight` | quantity | kN/m3 | plan size, bearing |
-| `foundation.soil_depth_above_footing` | quantity | mm | plan size, bearing |
-| `foundation.surcharge` | quantity | kPa | plan size, bearing |
-| `materials.concrete_fc`, `materials.rebar_fy` | quantity | MPa | checks |
+| `foundation.soil_unit_weight_kN_m3`, `materials.concrete_unit_weight_kN_m3` | quantity | kN/m3 | plan size, bearing |
+| `foundation.soil_depth_above_footing_mm` | quantity | mm | plan size, bearing |
+| `foundation.surcharge_kPa` | quantity | kPa | plan size, bearing |
+| `materials.concrete_fc_MPa`, `materials.rebar_fy_MPa` | quantity | MPa | checks |
 | `materials.concrete_class` | choice `normalweight`, `lightweight`, `sand_lightweight` | — | checks |
 | `materials.rebar_coating` | choice `uncoated`, `epoxy`, `zinc_epoxy_dual` | — | development |
-| `durability.cover_footing` | quantity | mm | layout, development |
-| `limits.ratio_limit` | quantity | 1 | verdicts |
-| `foundation.min_plan_dimension`, `.max_plan_dimension`, `.plan_increment` | quantity | mm | plan size, resize |
+| `durability.cover_footing_mm` | quantity | mm | layout, development |
+| `limits.ratio_limit_ratio` | quantity | 1 | verdicts |
+| `foundation.min_plan_dimension_mm`, `.max_plan_dimension_mm`, `.plan_increment_mm` | quantity | mm | plan size, resize |
 | `foundation.plan_shape` | choice `square`, `equal_projection` | — | plan size (FG-1) |
-| `foundation.min_depth`, `.max_depth`, `.depth_increment` | quantity | mm | plan size, resize |
+| `foundation.min_depth_mm`, `.max_depth_mm`, `.depth_increment_mm` | quantity | mm | plan size, resize |
 | `foundation.reaction_point` | choice `top_of_footing`, `base_of_footing` | — | layout (Q6) |
-| `foundation.min_clear_distance` | quantity | mm | schedule |
-| `reinforcement.bar_diameter` | quantity | mm | layout |
-| `reinforcement.max_spacing`, `.min_spacing`, `.spacing_increment` | quantity | mm | plan size, resize (Q15) |
+| `foundation.min_clear_distance_mm` | quantity | mm | schedule |
+| `reinforcement.bar_diameter_mm` | quantity | mm | layout |
+| `reinforcement.max_spacing_mm`, `.min_spacing_mm`, `.spacing_increment_mm` | quantity | mm | plan size, resize (Q15) |
 | `reinforcement.bottom_layer` | choice `x_bottom`, `y_bottom` | — | layout |
-| `compare.angle` | quantity | deg | subjects (calcs §4.4) |
+| `compare.angle_deg` | quantity | deg | subjects (calcs §4.4) |
 | `attempts.footing_rounds`, `attempts.cases` | count | — | `ctx.attempts` (engine Q1) |
 | `safe.cross_check` | choice `off`, `loads_and_analysis` | — | §4.9 |
-| `compare.length`, `checks.equilibrium_relative_tolerance` | quantity | mm, 1 | §4.9 (required in every run: spec 0004 has no conditional requirement, Q19) |
+| `compare.length_mm`, `checks.equilibrium_relative_tolerance_ratio` | quantity | mm, 1 | §4.9 (required in every run: spec 0004 has no conditional requirement, Q19) |
 
 ### 4.8 The workflow steps
 
@@ -445,9 +448,9 @@ on, and no SAFE result changes a verdict.
 
 1. Read the SAFE model state (points, load set; SAFE §4.4).
 2. `harness.reactions_to_joint_loads` v1 **[added]** (SAFE §4.2 names it): inputs the ETABS reactions, subjects, the
-   ETABS `model.load_set/1`, the SAFE points and load set, the engineer's cases, `basis` (`compare.length`). M1 the
+   ETABS `model.load_set/1`, the SAFE points and load set, the engineer's cases, `basis` (`compare.length_mm`). M1 the
    transferred cases are the `load_pattern` or `load_case` items of the chosen combinations. M2 each subject joint is
-   matched to the one SAFE point within `compare.length` in plan; none gives `NEEDS_ENGINEER` (`UNMATCHED`), two or more
+   matched to the one SAFE point within `compare.length_mm` in plan; none gives `NEEDS_ENGINEER` (`UNMATCHED`), two or more
    `INVALID_ARGUMENT`. M3 loads are the negatives of the reactions (action and reaction, as BP §4.1). M4 a case without a
    SAFE pattern of the same name is `NEEDS_ENGINEER` (`PATTERN_MISSING`): the workflow never creates a pattern (it would
    need a self-weight value). Output `harness.joint_loads/1` with null punching dimensions (SG-7), and the combinations
@@ -537,12 +540,12 @@ code-pack route (additive to engine §4.8).
 | Q11 | `eng-harness` depends on three workspace packages of `structural-codes` | Owner | No ADR (no third-party code; 03 §2 allows it from phase 2); spec 0013 Q12 asks the same and plan 0013 T6 lists `docs/adr/0004-workspace-code-packs.md`: one answer for both |
 | Q12 | New basis paths (`design.*`, `seismic.*`, `foundation.*` sizing, `reinforcement.*`, `safe.*`) | Owner | Adopt with spec 0004's template schema, with the clause-spec paths (ACI plan Q2) |
 | Q13 | Engineer dimensions outside the basis bounds are kept and flagged, not refused | Owner | Accept: the engineer decides; the report shows the flag |
-| Q14 | `foundation.min_depth` is the engineer's value; the code minimum effective depth is not checked (ACI plan Q13) | Owner | Add the check to the pack later |
+| Q14 | `foundation.min_depth_mm` is the engineer's value; the code minimum effective depth is not checked (ACI plan Q13) | Owner | Add the check to the pack later |
 | Q15 | Bar spacing limits of the code are not checked; the basis spacings are the engineer's (ACI plan Q7) | Owner | As Q14 |
 | Q16 | No measured manual time for footing design exists | Owner | Prepare a footing benchmark (two or three past projects) before the first release, for F6 and F7 |
 | Q17 | Engineer dimensions are one square plan size `L` with `h` and `s`; a rectangular footing cannot be entered, because the band rule is not checked (Q2, ACI plan Q7); an engineer plan off the increment is kept and flagged, and `enlarge_plan` then rounds up to the next multiple | Owner | Accept for v1; add `Lx`, `Ly` in a new `FootingDimensions` version together with the band-rule check |
 | Q18 | A large moment can give partial contact (`q_min < 0`) at the size found from `N` only; bearing is then `NEEDS_ENGINEER` (BP G-1), not `FAIL`, so the footing goes to the engineer with no enlargement round | Owner | Accept for v1 (explicit and tested, AC19). Later, preferred: a cited calc that sizes for `q_min ≥ 0` from the moments (BP S5 solved for the plan), so the first size already has full contact; alternative: a rule that may enlarge a bearing `NEEDS_ENGINEER` with reason `FULL_CONTACT` while `plan_at_max` is false (needs the reason in the decision state, a new point version) |
-| Q19 | `compare.length` and `checks.equilibrium_relative_tolerance` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
+| Q19 | `compare.length_mm` and `checks.equilibrium_relative_tolerance_ratio` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
 | Q20 | **[added]** A code-pack check's `CalcInfo.version` (§4.3 step 1): engine §4.8 and `eng_harness.ports.CalcInfo` require an integer of at least 1 (also `ctx` `calc_version` and the journaled step version, engine AC13), but a merged check has no integer version: `CheckMeta` has none, and the only version is the pack's string `version`, which CF AC9 makes the trace's `calc_version` | Owner, lead | Decided (draft, B-442; owner queue): each check has an integer `version` in `CheckMeta` (default 1, raised when the check's behaviour changes; CF §4.2, structural-codes core plan T15), which the route passes as `CalcInfo.version`; the pack's string version stays in the trace (CF AC9) |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |
