@@ -579,6 +579,7 @@ tasks:
     # Amendment (B-412 eighth review, documents only): calc-port factory default spelled out; the port builder default waits for spec Q20; cli/_wiring.py added (under answer A, it draws the run id for run).
     # Amendment (B-412 tenth review, documents only): also binds the point_policies default (the point-policy mapping of step 5).
     # Amendment (B-471, documents only): T18 split into T18a and T18b (owner instruction of 2026-11-12, spec Q20 answer A). T18a binds every default but the port builder; the workflow registry is plan 0007 T9's workflows/__init__.py (spec 0007 Q13), so T18a does not wait for plan 0010 T9; cli/_wiring.py moves to T18b.
+    # Amendment (B-475, documents only): the decision assembler default is plan 0009 T10a's phase-1 assemble_decision_runtime (spec 0009 AC49), and the point_policies default is the empty mapping (spec Q16 (d)), not None.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -592,7 +593,7 @@ tasks:
     depends_on: [T14b, T15, T16, T16b]
   - id: T18b
     title: "Bind the port builder default and draw the run id at step 1 for run"
-    # Amendment (B-471, documents only): new, split from T18 (spec Q20 answer A, owner instruction of 2026-11-12); waits for engine plan T20 (work item B-472) and plan 0002 T19.
+    # Amendment (B-471, documents only): new, split from T18 (spec Q20 answer A, owner instruction of 2026-11-12); waits for engine plan T20 (work item B-472) and plan 0002 T19a (B-475).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -825,8 +826,8 @@ Amendment B-098: the decision layer is built from `[providers.*]` through `load_
 assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `DecisionPort` and the runtime's warnings
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
 the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
-`cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10 merge they default to `None` (the
-decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18a binds the defaults once plan 0009 T1 and T10 have merged. `_wiring.py` calls the assembler as `decision_assembler(providers_config, decision_settings, workspace, point_policies)`, the four inputs of spec §4.2.2 step 5 and spec Q16(a), so the spec's default `assemble_decision_runtime` is called as the spec reads it; `point_policies` (the mapping from each point name to its `DecisionPolicy`) is a fourth `CliDeps` field in `cli/__init__.py`, default `None` under the defaults rule of §3 (while it is `None`, `run` and `resume` stay "not available in this build"), injected in AC62's tests (an empty mapping, recorded by the assembler recorder), and bound by T18a (amendment B-412 tenth review, replacing the ninth review's three-argument call). The
+`cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10a merge they default to `None` (the
+decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18a binds the defaults once plan 0009 T1 and T10a have merged (amendment B-475). `_wiring.py` calls the assembler as `decision_assembler(providers_config, decision_settings, workspace, point_policies)`, the four inputs of spec §4.2.2 step 5 and spec Q16(a), so the spec's default `assemble_decision_runtime` is called as the spec reads it; `point_policies` (the mapping from each point name to its `DecisionPolicy`) is a fourth `CliDeps` field in `cli/__init__.py`, default `None` under the defaults rule of §3 (while it is `None`, `run` and `resume` stay "not available in this build"), injected in AC62's tests (an empty mapping, recorded by the assembler recorder), and bound by T18a (amendment B-412 tenth review, replacing the ninth review's three-argument call). The
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`. Amendment B-412 eighth review:
 `cli/_signals.py` reads the run-id cell of T14; while the cell is empty or the run folder does not exist yet (steps 1
 to 4 of spec §4.2.2, the basis screen included, or the start of `Engine.start`), the first interrupt ends the process
@@ -937,7 +938,7 @@ run_class, clock, ids)` from the calc registry of spec 0003, the approvals file 
 (`_calc/_approvals.py`) and the calc settings from the configuration, with the arguments T14 passes), the workflow registry of `src/eng_harness/workflows/__init__.py`
 (plan 0007 T9, the one task that creates that module and registers the model-edit-cycle workflow in it, spec 0007
 Q13; plan 0010 T9 and plan 0013 T11 and T13 add their blocks later, so T18a does not wait for them), `load_providers_config` and `assemble_decision_runtime` (plan
-0009 T1 and T10), the point-policy mapping `point_policies` (amendment B-412 tenth review), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
+0009 T1 and T10a, the phase-1 assembly of spec 0009 AC49; amendment B-475), the point-policy mapping `point_policies` (amendment B-412 tenth review), bound to the empty mapping, the phase-1 value of spec Q16 (d), never `None` (amendment B-475), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
 plan 0005 T10; amendment B-412 sixth review), and `eng_harness.doctor.run` (plan 0002 T18). The engine factory and `freeze` are merged (engine
 plan T9 and T9b; plan 0004 T8) and are bound by T14 and T15, not here (amendment B-412 fourth review). It waits for
 all of them; if one is still missing long after the others, the lead amends this plan to split T18a rather than bind
@@ -949,7 +950,7 @@ fifth review).
 **T18b Bind the port builder and draw the run id** (split from T18 by amendment B-471; spec §4.2.2 step 1, §4.4.8,
 Q20 answer A). `cli/_wiring.py` draws the run id for `run` at step 1 (`run_` + ULID from the ids source), fills the
 run-id cell at once, as for `resume`, and passes the id in `RunRequest.run_id` (engine plan T20, work item B-472,
-engine AC70); the `port_builder` default is `build_ports` (plan 0002 T19), so the default calls `build_ports(config,
+engine AC70); the `port_builder` default is `build_ports` (plan 0002 T19a; amendment B-475), so the default calls `build_ports(config,
 workspace, store, run_folder(), clock, ids)`. `test_port_builder_bound_and_run_id_drawn` checks that the default is
 `build_ports`, that for `run` the cell holds the id before any port is built and the engine receives the same id, and
 that `run` and `resume` are then available with `CliDeps()`; it fails at the merge base because the default is `None`.
@@ -971,7 +972,7 @@ decision, progress and run-control ports reach the real engine.
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 T9 for the workflow registry (`workflows/__init__.py`, spec 0007 Q13; plan 0010 T9 adds its workflow to it; amendment B-471); engine plan T20 (caller-chosen run id, for T18b; amendment B-471); for T14b (B-098),
   decision plan T7 (the `Cascade`) and T10 (the cascade's `runtime_summary()` and its engine wiring; amendment B-412
   sixth review: the cascade is the `decision_port_factory` default that T18a binds), engine plan T14b (`decision_runtime` in the header) and
-  provider plan 0009 T1 (`load_providers_config`) and T10 (`assemble_decision_runtime`). T14, T14b and T15 use
+  provider plan 0009 T1 (`load_providers_config`) and T10a (`assemble_decision_runtime`, phase 1; amendment B-475). T14, T14b and T15 use
   fakes and `CliDeps` until the real ones merge, so they do not wait; the pull request that finds the real
   implementation missing states it. Their real-engine halves are re-checked in T17c (staged engine, below); plan 0009
   section 3 says the same (amendment B-412 third review).
@@ -1023,7 +1024,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Workspace, `eng_contract.store.Workspace` (step 1, amendment B-412 seventh review) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `EngineSettings` from the `[engine]` limits of the configuration, engine §4.10 defaults otherwise (step 5, spec §4.2.4) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`engine/_runner.py`) |
-| Port builder `build_ports`: tool and host ports only (step 1), called as `port_builder(config, workspace, store, run_folder, clock, ids)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) | T14 (`port_builder`) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`) | plan 0002 T19; engine plan T20 (caller-chosen run id, work item B-472) |
+| Port builder `build_ports`: tool and host ports only (step 1), called as `port_builder(config, workspace, store, run_folder, clock, ids)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) | T14 (`port_builder`) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`) | plan 0002 T19a (amendment B-475); engine plan T20 (caller-chosen run id, work item B-472) |
 | Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` (steps 4 and 5), called as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth review) | T14 (`calc_port_factory`) | T18a (the default supplies the calc registry, the approvals file through the merged `load_approvals` and the calc settings) | plan 0003 T5; `load_approvals` merged (`_calc/_approvals.py`) |
 | Run class: `--run-class` for `run`, the run header's `run_class` for `resume` (steps 4 and 5) | none (`cli/_wiring.py`, T14) | not applicable | merged (`cli/_parser.py`, T3; `JournalReader`, engine T4) |
 | Engine `BasisPort`, `StoreBasisPort` over the `ResultStore` (step 5) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`basis/_port.py`, plan 0004 T8) |
@@ -1032,8 +1033,8 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Draft (`build_draft`), basis-port factory, `freeze` (step 3) | T15, if they become fields | T15 | merged (plan 0004 T7 and T8: `basis/_build.py`, `_setup.py`, `_freeze.py`) |
 | Basis screen port `PageBasisSetupPort` and the `setup` kind (step 3, §4.4.7) | none (`pages/_ports.py`) | not applicable | T15 |
 | Calc preflight (step 4) | none: `preflight` of the calc port built by `calc_port_factory` | T18a (through `calc_port_factory`) | plan 0003 T5 |
-| Decision-runtime assembler `assemble_decision_runtime` and `DecisionSettings` from the configuration (step 5) | T14b (`decision_assembler`) | T18a | plan 0009 T10; `DecisionSettings` merged (`decisions/_policy.py`) |
-| Point policies for the release check of `assemble_decision_runtime`: a mapping from each point name to its `DecisionPolicy` (step 5; spec 0009 AC42; spec Q16; amendment B-412 ninth review) | T14b (`point_policies`, default `None`), passed by `cli/_wiring.py` as the fourth argument: `decision_assembler(providers_config, decision_settings, workspace, point_policies)` (spec §4.2.2 step 5, Q16(a); amendment B-412 tenth review) | T18a | workflow code `policies/` (spec 0005 §4.3 and section 5); no task creates the mapping yet; the assembler's arguments are fixed by spec 0009 §4.1 (spec Q16 (a), amendment B-471) |
+| Decision-runtime assembler `assemble_decision_runtime` and `DecisionSettings` from the configuration (step 5) | T14b (`decision_assembler`) | T18a | plan 0009 T10a (phase 1, spec 0009 AC49; amendment B-475); `DecisionSettings` merged (`decisions/_policy.py`) |
+| Point policies for the release check of `assemble_decision_runtime`: a mapping from each point name to its `DecisionPolicy` (step 5; spec 0009 AC42; spec Q16; amendment B-412 ninth review) | T14b (`point_policies`, default `None`), passed by `cli/_wiring.py` as the fourth argument: `decision_assembler(providers_config, decision_settings, workspace, point_policies)` (spec §4.2.2 step 5, Q16(a); amendment B-412 tenth review) | T18a, to the empty mapping, the phase-1 value (spec Q16 (d), spec 0009 AC49; amendment B-475) | workflow code `policies/` (spec 0005 §4.3 and section 5); no task creates the mapping yet, and none is needed before plan 0009 T10b; the assembler's arguments are fixed by spec 0009 §4.1 (spec Q16 (a), amendment B-471) |
 | Cascade as the `DecisionPort` (step 5) | T14b (`decision_port_factory`) | T18a | plan 0005 T7 (`Cascade`) and T10 (engine wiring); reaches the real `EnginePorts` in T16b (engine plan T14) |
 | `ExpectedTimes` index, built once before the engine starts (spec §4.3; amendment B-412 eighth review) | none (`cli/_wiring.py`, T14) | not applicable | merged (`progress/_expected.py`, T4) |
 | `TerminalProgress` as the `ProgressSink` (step 5) | none (built by `cli/_wiring.py`, T14, with the `ExpectedTimes` index) | not applicable | T5; reaches the real `EnginePorts` in T16b (engine plan T18) |
@@ -1059,7 +1060,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 - Amendments to other documents (spec §11): engine §4.4.1 (`inbox/`; `stop.json` and `heartbeat.json`, Q19), engine §4.9 (`item_reasons`, the choice
   convention and the `x-eng-input` marker), spec 0002 (tool `release`, doctor checks). They are owner queue items, not part of any task here. Amended in this
   plan's B-412 pull request, to agree with the `CliDeps` defaults rule: plan 0009 section 3 (T14b does not wait for
-  plan 0009 T1 and T10; T18 binds `load_providers_config` and `assemble_decision_runtime`) and plan 0010 T9 (T18 binds
+  plan 0009 T1 and T10, now T10a by amendment B-475; T18 binds `load_providers_config` and `assemble_decision_runtime`) and plan 0010 T9 (T18 binds
   the workflow registry default); engine plan 0001 T14 and T18 and its section 3 (the `EnginePorts` fields added after T9
   take a `None` default, and T18 adds the `RunControlPort` field and the stop check between steps; amendment B-412 fifth
   review).

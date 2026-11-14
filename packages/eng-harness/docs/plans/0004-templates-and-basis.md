@@ -161,6 +161,8 @@ tasks:
     title: "Property tests and the fake-host workflow with replay"
     # Amendment (B-474, documents only): no engine task wires `ctx.basis` (engine T7 made only `BasisView`), so T10
     # wires it lazily in the engine Ctx and runner (36 counted lines measured by the B-164 writer).
+    # Amendment (B-482, documents only): the property tests and test_unconfirmed_basis_refuses_the_run leave tests_first
+    # (they pin merged T1 to T8 and engine invariant 5, so they pass at the base: TF004); they stay in files.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
@@ -171,7 +173,6 @@ tasks:
     max_changed_lines: 300
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/property/test_template_basis_props.py"
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays"
     covers: [AC28, AC30]
     depends_on: [T8]
@@ -215,7 +216,11 @@ the page against this; no HTML here.
 **T9 Shipped content.** The `blank` template, package data inclusion and the golden pin. No values.
 **T10 Cross-cutting tests.** Hypothesis round trips and the fake-host workflow with journal replay (process/05 §2:
 every workflow path has a fake-host and a replay test). Amendment B-474: T10 also wires `ctx.basis` in
-`engine/_ctx_impl.py` and `engine/_runner.py`, loaded on first read so a run that never reads it loads no basis.
+`engine/_ctx_impl.py` and `engine/_runner.py`, loaded on first read so `ctx` loads no basis for a run that never reads
+it (`start` still loads it once for invariant 5 when `required_basis` is not empty). Test order (amendment B-482): the
+first `test:` commit holds only `test_basis_reaches_ctx_and_replays` in `test_basis_workflow.py`; the property tests and
+`test_unconfirmed_basis_refuses_the_run` pin merged behaviour and come in a later commit of the same task (test-first
+judges each new or changed test function of the first `test:` commit's files, so a green one there is TF004).
 
 ## 3. Dependencies
 

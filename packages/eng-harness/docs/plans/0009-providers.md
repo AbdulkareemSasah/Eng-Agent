@@ -141,6 +141,8 @@ tasks:
   - id: T7
     title: Provider factory, local_only, run summary
     # Amendment (B-471, documents only): the summary also holds the dropped releases, point and reason (spec AC29; spec 0006 Q16 (b)).
+    # Amendment (B-475, documents only): T10a also edits providers/__init__.py; T7 depends on T10a, so T7 lands second
+    # and adds its exports to the file as T10a left it.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -156,7 +158,7 @@ tasks:
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_absent_provider_is_phase1_behavior"
       - "packages/eng-harness/tests/unit/providers/test_factory.py::test_check_command_makes_one_call_per_provider"
     covers: [AC28, AC29, AC30, AC47]
-    depends_on: [T2, T4, T6]
+    depends_on: [T2, T4, T6, T10a]
   - id: T8
     title: Evaluation core (thresholds, metrics, eligibility)
     files:
@@ -193,15 +195,41 @@ tasks:
       - "packages/eng-harness/tests/unit/decisions/test_evaluation_cli.py::test_evaluate_from_export"
     covers: [AC41, AC42, AC43, AC44]
     depends_on: [T8]
-  - id: T10
-    title: Runtime assembly, shadow-mode workflow, replay and isolation tests, local-testing notes
+  - id: T10a
+    title: Phase-1 runtime assembly (rules and engineer; providers not built, releases not kept; gap PR-G1)
+    # Amendment (B-475, documents only): T10 split into T10a and T10b (shorter first-live-run path, lead decision D-32).
+    # T10a is the phase-1 assemble_decision_runtime of spec AC49, with the fixed signature of spec 4.1 (B-471); it needs
+    # neither the factory (T7) nor verify_releases (T9). External: plan 0005 T10, engine plan 0001 T14b. Budget an estimate.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/providers/__init__.py"
+      - "packages/eng-harness/src/eng_harness/providers/_runtime.py"
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py"
+      - "packages/eng-harness/tests/workflow/providers/test_phase1_runtime.py"
+    max_changed_lines: 150
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py::test_no_provider_table_gives_phase1_runtime"
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py::test_configured_provider_not_built_is_reported"
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py::test_no_release_kept_without_verification"
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py::test_phase1_summary_has_no_secrets"
+      - "packages/eng-harness/tests/workflow/providers/test_phase1_runtime.py::test_run_header_records_phase1_summary"
+    covers: [AC49]
+    depends_on: [T1]
+  - id: T10b
+    title: Runtime assembly with built providers and verified releases, shadow-mode workflow, replay and isolation tests, local-testing notes (closes PR-G1)
     # Amendment (B-471, documents only): assemble_decision_runtime takes the four inputs of spec 4.1 (spec 0006 Q16 (a)) and passes the findings of verify_releases to the summary.
+    # Amendment (B-475, documents only): the original T10 scope over T10a's _runtime.py; off the first-live-run path, back
+    # with phase 2 (section 3). test_isolation stays (AC45) but leaves tests_first: at T10b's base _runtime.py and the
+    # provider modules exist, so it would pass there (TF004). Replaces T10a's PR-G1 tests (a spec change, spec AC49).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/src/eng_harness/providers/__init__.py"
       - "packages/eng-harness/src/eng_harness/providers/_runtime.py"
+      - "packages/eng-harness/tests/unit/providers/test_runtime.py"
       - "packages/eng-harness/tests/workflow/providers/test_shadow_workflow.py"
       - "packages/eng-harness/tests/replay/test_provider_replay.py"
       - "packages/eng-harness/tests/rules/test_provider_imports.py"
@@ -214,10 +242,9 @@ tasks:
       - "packages/eng-harness/tests/workflow/providers/test_shadow_workflow.py::test_decide_many_one_batched_screen"
       - "packages/eng-harness/tests/workflow/providers/test_shadow_workflow.py::test_provider_outage"
       - "packages/eng-harness/tests/replay/test_provider_replay.py::test_resume_does_not_requery_providers"
-      - "packages/eng-harness/tests/rules/test_provider_imports.py::test_isolation"
       - "packages/eng-harness/tests/workflow/providers/test_shadow_workflow.py::test_run_header_records_runtime_summary"
     covers: [AC31, AC32, AC33, AC34, AC35, AC45, AC48]
-    depends_on: [T7, T9]
+    depends_on: [T7, T9, T10a]
 ---
 
 # Implementation plan: eng-harness provider layer (spec 0009)
@@ -228,8 +255,9 @@ Build the safety surfaces first and the adapters on top of them, so that no adap
 configuration, the error type and the no-network fixture (T1); the credential store (T2); the shared HTTP client with
 the key placement, error mapping and outgoing guard (T3); then the two adapters (T4 Jev behind a format boundary, T5 and
 T6 the language-model tier); the factory with `local_only` (T7); and, independent of the adapters, the evaluation that
-gates the exit from shadow mode (T8, T9). T10 assembles the runtime, runs the shadow-mode workflow, replay and isolation
-tests, and writes the local-testing notes. Nothing here needs a host program, the network, a key or a real credential
+gates the exit from shadow mode (T8, T9). T10a assembles the phase-1 runtime (rules and the engineer, spec AC49) and
+T10b the full one, runs the shadow-mode workflow, replay and isolation tests, and writes the local-testing notes
+(amendment B-475: T10 split so that the first live run waits for no provider adapter). Nothing here needs a host program, the network, a key or a real credential
 store; the first commit of every task holds the failing tests, run against recorded transports and fake providers.
 
 The Jev wire format is deliberately not written: spike S-07 decides it and needs the owner's network and key (spec §4.6,
@@ -297,7 +325,17 @@ fixture report go to the owner queue.
 **T9 Evaluation store and release** (spec §4.10). `evaluations.sqlite` with append-only triggers, `verify_releases(settings, store, provider_infos, policies)`
 (including the `threshold_mismatch` check) and `ReleaseFinding`, the `evaluate` command with `--from-export`; it writes no configuration.
 
-**T10 Assembly and acceptance** (spec §4.9, §4.11). `assemble_decision_runtime` (providers, verified releases, summary),
+**T10a Phase-1 assembly** (spec §4.1, AC49, gap PR-G1; split from T10 by amendment B-475). `assemble_decision_runtime`
+with the signature of spec §4.1 (amendment B-471) and `DecisionRuntime` in `_runtime.py`, without the factory and
+without `verify_releases`: no `[providers.*]` table gives a runtime with no provider and no release; a configured
+provider is not built and gets a summary entry with `status` `not_implemented` and a build warning naming PR-G1; every
+`shadow_released` entry is dropped with a build warning, a plain string naming the point and PR-G1 (not the
+`ReleaseFinding` of T9, which only `verify_releases` returns), and the summary records each drop as AC29 does, its
+`point` with the `reason` `PR-G1`; `point_policies` is read by nothing, so the empty mapping
+that plan 0006 T18a binds (spec 0006 Q16 (d)) gives the same runtime as any other; the run-header test runs the real
+engine and cascade. Waits for plan 0005 T10 and engine plan T14b, not for T4, T6, T7 or T9.
+
+**T10b Assembly and acceptance** (spec §4.9, §4.11; the scope of T10 before amendment B-475, closing PR-G1). `assemble_decision_runtime` (providers, verified releases, summary),
 the fake-host workflow tests with the real engine and cascade (one screen, batching, outage, timeouts), the replay test,
 the import-isolation test (not vacuous: it requires the modules), recordings, and the items of spec §9 in
 `docs/local-testing.md`. Waits for the engine's `_decide` wiring (plan 0005 T10). Amendment B-098: the summary is a
@@ -305,7 +343,11 @@ JSON object recorded in the run header (AC48, through spec 0005 AC43 and engine 
 plan T14b build); this task tests the path end to end. Amendment B-471 (spec 0006 Q16 (a) and (b), owner instruction
 of 2026-11-12): the signature is that of spec §4.1, `assemble_decision_runtime(providers_config, decision_settings,
 workspace, point_policies)`; it passes `point_policies` to `verify_releases` as its `policies` and the findings, as
-`(point, reason)` pairs, to the summary of T7.
+`(point, reason)` pairs, to the summary of T7. Amendment B-475: T10b reworks T10a's `_runtime.py` to build the providers
+through T7's factory and keep the releases `verify_releases` keeps, and replaces T10a's tests of a provider not built
+and a release dropped, because the specified behavior changes when PR-G1 closes (spec AC49; a spec change, not a test
+changed to pass). `test_provider_imports.py::test_isolation` is written here as a regression test, not first: the
+modules it requires exist at T10b's base.
 
 ## 3. Dependencies
 
@@ -321,12 +363,16 @@ workspace, point_policies)`; it passes `point_policies` to `verify_releases` as 
   `httpx2.MockTransport` ship with the runtime dependencies).
 - Work items: plan 0005 (B-064) T3 (redaction), T5 (interfaces, fakes), T6 (label store), T8 (cascade tiers), T9
   (`decide_many`) and T10 (engine wiring) merged before the tasks that need them (T1 needs T5, which builds the provider error types in `interfaces.py`, amendment B-411; T8
-  needs T6; T10 needs T9 and T10 there); engine plan T1, T2 and T6, and T14b for the header field of AC48; spec 0006
+  needs T6; T10a needs T10 there, and T10b T9 there); engine plan T1, T2 and T6, and T14b for the header fields of AC48 and AC49; spec 0006
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
   0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
   this plan (its tests use recorders); plan 0006 T18a (split from T18 by B-471) binds their defaults to `load_providers_config` and
-  `assemble_decision_runtime` once this plan's T1 and T10 have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18a there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
+  `assemble_decision_runtime` once this plan's T1 and T10a have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18a there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
+- First live run (amendment B-475, lead decision D-32; phase 1 has no provider, spec 0005 AC17): T4, T6, T7 and T10b
+  are off its path and are not weakened. They return with phase 2, before the first provider is configured (after spike
+  S-07, spec Q1): T10b depends on T7, and T7 on T4 and T6 (and on T10a, which shares `providers/__init__.py` with it); no task of another plan depends on them. T10a stays on the
+  path (plan 0006 T18a binds it).
 - Amendments requested in other documents (spec Q7) are made in their own pull request (B-098), not in a task here.
 
 ## 4. Verification
@@ -336,7 +382,7 @@ workspace, point_policies)`; it passes `point_policies` to `verify_releases` as 
   pull request links its CI run; local output is not evidence (process/05 §8).
 - Windows CI job: the credential-store tests with the in-memory backend double and the evaluation store tests. The real
   Windows Credential Manager is not exercised in CI.
-- Needs local test (spec §9, listed in `docs/local-testing.md` by T10; no host program is involved): (1) spike S-07 (Jev
+- Needs local test (spec §9, listed in `docs/local-testing.md` by T10b; no host program is involved): (1) spike S-07 (Jev
   access, format, batching, latency, confidence, data terms); (2) set a key with `set-key`, run, `status`, `delete-key`,
   and search the workspace and logs for the key on the owner's machine; (3) one live structured-output call through
   OpenRouter with the chosen model, and with a local OpenAI-compatible server; (4) a run with the network disconnected;
@@ -345,12 +391,12 @@ workspace, point_policies)`; it passes `point_policies` to `verify_releases` as 
   owner queue with the calibration metric (spec Q4); no release exists, and none can be made by `evaluation` basis until
   calibration is defined.
 - Review: each pull request by a subagent that did not write it, with the correctness, Python, type-design,
-  silent-failure and test lenses; T1 to T3, T6, T7 and T10 also with the security lens (what leaves the machine, where a
+  silent-failure and test lenses; T1 to T3, T6, T7, T10a and T10b also with the security lens (what leaves the machine, where a
   key can appear); T5, T8 and T9 against the R1 rules. Second-family review and owner approvals are `awaiting owner`.
 
 ## 5. Rollback
 
-Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants. Before T10 nothing
+Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants. Before T10b nothing
 in the engine constructs a provider, and with no `[providers.*]` table the harness behaves as in phase 1 (spec AC1), so
 reverting the whole plan changes no run. Keys live in the operating system's credential store, outside the repository:
 a revert does not remove them, and `python -m eng_harness.providers delete-key` (T2) does. `evaluations.sqlite` rows are

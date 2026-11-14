@@ -70,7 +70,8 @@ the real `ToolPort` and `HostPort` against it.
   `tests/contract/test_csi_allowlist.py::test_sap2000_fingerprint_from_inventory`,
   `tests/unit/servers/test_buildcheck.py::test_fingerprint_three_products`,
   `tests/workflow/servers/test_session.py::test_sap2000_build_mismatch_stops_run` (the stop; it runs the real engine
-  through `build_ports`, so plan task T1 starts after plan 0002 task T19; amendment B-413).
+  through `build_ports`, so plan task T1 starts after plan 0002 task T19a and plan 0008 task T3; amendments B-413,
+  B-475).
 - AC4. Given three servers in one run and a timeout injected on one, then only its `session_epoch` increases; launch
   ownership, wedge state and pending reconciliation never mark another product. Test:
   `tests/workflow/adapters/test_sap2000_isolation.py::test_epochs_independent`.
