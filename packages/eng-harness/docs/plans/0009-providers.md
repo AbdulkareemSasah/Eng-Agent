@@ -200,6 +200,10 @@ tasks:
     # Amendment (B-475, documents only): T10 split into T10a and T10b (shorter first-live-run path, lead decision D-32).
     # T10a is the phase-1 assemble_decision_runtime of spec AC49, with the fixed signature of spec 4.1 (B-471); it needs
     # neither the factory (T7) nor verify_releases (T9). External: plan 0005 T10, engine plan 0001 T14b. Budget an estimate.
+    # Amendment (B-495, documents only): owner answer of 2026-11-14 (spec Q14): the dropped releases are journaled as
+    # the summary's (point, reason) entries, which run_started.decision_runtime records as given (engine AC69, merged);
+    # no new event. Re-estimated: about 100 lines (_runtime.py about 85 with DecisionRuntime, the provider entries, the
+    # warnings and the drop entries; __init__.py 3, pyproject.toml 1, CHANGELOG.md 3; an estimate); budget 150 stays.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -331,7 +335,8 @@ without `verify_releases`: no `[providers.*]` table gives a runtime with no prov
 provider is not built and gets a summary entry with `status` `not_implemented` and a build warning naming PR-G1; every
 `shadow_released` entry is dropped with a build warning, a plain string naming the point and PR-G1 (not the
 `ReleaseFinding` of T9, which only `verify_releases` returns), and the summary records each drop as AC29 does, its
-`point` with the `reason` `PR-G1`; `point_policies` is read by nothing, so the empty mapping
+`point` with the `reason` `PR-G1`, so each drop is journaled in `run_started.decision_runtime`, not only printed (owner
+answer of 2026-11-14, amendment B-495, spec Q14); `point_policies` is read by nothing, so the empty mapping
 that plan 0006 T18a binds (spec 0006 Q16 (d)) gives the same runtime as any other; the run-header test runs the real
 engine and cascade. Waits for plan 0005 T10 and engine plan T14b, not for T4, T6, T7 or T9.
 

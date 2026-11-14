@@ -268,10 +268,11 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   adapter (§4.7), and `ToolPort.describe` and `ToolPort.call` of such a tool reach it. Until plan task T19b,
   `build_ports` refuses a configuration with any `[cli_tools.*]` entry with `NotImplementedGap` (`NOT_IMPLEMENTED`, gap
   H-G8) naming the entries, rather than drop them; raised where the command line builds its ports (spec 0006 §4.2.2
-  step 1, outside the engine, so nothing is journaled), it ends `run` and `resume` with exit 70 `INTERNAL`, because
-  `NOT_IMPLEMENTED` is not in the error-code map of spec 0006 §4.2.3, and its message, printed on standard error, names
-  H-G8 and the entries. Tests: `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap`
-  (plan task T19a; replaced in T19b), `::test_cli_tool_routed_through_build_ports` (plan task T19b).
+  step 1, outside the engine, so nothing is journaled), it ends `run` and `resume` with exit 2 `USAGE` (a
+  configuration this build cannot serve: spec 0006 §4.2.3 and §6 map its `NOT_IMPLEMENTED` to 2; owner answer of
+  2026-11-14, B-495, §11 Q9), and its message, printed on standard error, names H-G8 and the entries. Tests:
+  `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap` (plan task T19a, also for the exit code; replaced
+  in T19b), `::test_cli_tool_routed_through_build_ports` (plan task T19b).
 
 ## 4. Design
 
@@ -678,7 +679,9 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
   `LOAD_EFFECT_ZERO_DROPPED` (warning: the server dropped all-zero load effects before the write) (spec 0014 §4.10,
   AC10). Quantities read back are compared within the design basis field
   `checks.readback_relative_tolerance_ratio` (required by every workflow that writes quantities; never a constant here,
-  §11 G-2). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
+  §11 G-2): its frozen value is passed by the workflow to the adapter host port when the ports are wired for the run
+  (`ReadBack.tolerance_ratio`), and while none is passed a quantity read back is `READBACK_UNAVAILABLE` (owner answer
+  of 2026-11-14, B-495, §11 Q8). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
 - **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
   confirm=true)` on the `main` role, hashes the file, updates the identity store (ADR-0032) and returns `SavedModel`;
   the engine journals `model_saved` before the analysis.
@@ -975,6 +978,8 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | Q5 | ADR-0032: harness-side identity by content and path hash | Owner | Accept; ask Sasaah for a typed `csi_set_project_info` (S12-G6) |
 | Q6 | Silent breakaway lets server helpers escape; the guard terminates recorded helpers | Owner | Accept; ask Sasaah to start hosts with `CREATE_BREAKAWAY_FROM_JOB`, then switch to `BREAKAWAY_OK` |
 | Q7 | A launched instance that cannot be exited gracefully and was visible is left running | Owner | Accept: an engineer may be using a visible instance; the run report lists it |
+| Q8 | Where `check_model(model_key)`, which takes no basis, takes the read-back tolerance from (B-465) | Owner | Decided (owner answer of 2026-11-14, B-495): from the basis field `checks.readback_relative_tolerance_ratio`, passed by the workflow (§4.5.8); the merged plan T12b code takes it as `ReadBack.tolerance_ratio` and reports `READBACK_UNAVAILABLE` for a quantity without it |
+| Q9 | Exit code of the H-G8 refusal of `[cli_tools.*]` entries (AC43) | Owner | Decided (owner answer of 2026-11-14, B-495): 2 (`USAGE`), not 70 (spec 0006 §4.2.3, §6); built by plan T19a |
 | H-G1 | `csi_define_area_section`, `csi_define_frame_section`, `csi_define_material` need CSi API `spec` keys not in the schema; slab thickness change is therefore not implemented | Owner | Confirm the keys locally and pin a method and key list (OQ-G11), or a Sasaah typed slab tool (the engine's `DefineSlabSection` exists unexposed); test `test_gaps_not_implemented` expects `NOT_IMPLEMENTED` |
 | H-G2 | Load directions other than `gravity` and frame point loads (S12-G9) | Owner | Local test of the direction codes, then a Sasaah fix |
 | H-G3 | Load pattern types `superimposed_dead`, `roof_live` and combination type `range` have no documented Sasaah value | Owner | Confirm the host names locally; until then refused |
@@ -982,7 +987,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G5 | `model.frame_placements/1` `kind` cannot be read from `csi_list_frames` | Owner | Read design orientation through `csi_frame_details` after a local check of its reply |
 | H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
-| H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then |
+| H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then; the refusal exits 2 (Q9) |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |

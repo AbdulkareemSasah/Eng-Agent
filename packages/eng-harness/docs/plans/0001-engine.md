@@ -579,6 +579,24 @@ tasks:
       - "packages/eng-harness/tests/unit/test_runner.py::test_caller_chosen_run_id"
     covers: [AC70]
     depends_on: [T9]
+  - id: T21
+    title: One automatic rerun of a write reconciled not_applied, then the engineer
+    # Amendment (B-495, documents only): new; owner answer of 2026-11-14 (spec section 11 Q39, AC71). After T20 so
+    # that the chain T15 to T19 is not disturbed; depends on T15, which also edits _inflight.py and test_in_flight.py.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"
+    # About 15 lines in _inflight.py (the previous attempt's adapter outcome read from the journal, the branch to the
+    # engineer request) and 3 of CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_honest_outcomes.py::test_not_applied_write_reruns_once"
+      - "packages/eng-harness/tests/replay/test_in_flight.py::test_second_not_applied_stops_for_the_engineer"
+    covers: [AC71]
+    depends_on: [T15]
 ---
 
 # Implementation plan: eng-harness engine
@@ -873,6 +891,19 @@ cases of AC70 with a host-port fake whose server check writes under the run fold
 given id; an existing folder and a malformed id (`../x`) are refused with no port called and nothing created; no id
 draws one from the `IdSource`. It needs only the merged start of T9; plan 0006 T18b makes `cli/_wiring.py` draw the id
 at step 1 of spec 0006 §4.2.2 and pass it here.
+
+**T21 One automatic rerun** (spec §4.5.3, AC31, AC71; amendment B-495, owner answer of 2026-11-14, spec §11 Q39).
+Today a write that the adapter reconciles `not_applied` runs again as the next attempt every time, so a write that
+keeps failing that way reruns without end (in one process, through the immediate reconciliation of `_ctx_impl.py`, or
+over resumes). `_inflight._write`, which both paths use, takes the adapter's `not_applied` only when the attempt is not
+itself the rerun of an attempt the adapter reconciled `not_applied` (read from the journal: that attempt's
+`step_reconciled`, `decided_by` `adapter`); otherwise it records no `step_reconciled` from the adapter and asks the
+engineer through the existing `engine.in_flight` request (`applied`, `not_applied`, `abandon`), so the run stops with
+`NEEDS_RECONCILIATION` and no new code. `test_not_applied_write_reruns_once` scripts two timeouts and two
+`not_applied` reconciliations of one write in one run: two calls, then the stop with no third call;
+`test_second_not_applied_stops_for_the_engineer` resumes a run whose rerun is in flight, then answers `not_applied` and
+checks that the next attempt runs. The merged T20 needs no change for spec Q38: a `SERVER_CHECK_FAILED` refusal removes
+nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses a start whose run folder exists.
 
 ## 3. Dependencies
 
