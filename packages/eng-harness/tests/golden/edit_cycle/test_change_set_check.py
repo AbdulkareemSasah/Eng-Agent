@@ -221,7 +221,7 @@ def test_combination_cases_are_checked_by_their_type() -> None:
             "scale": {"source": "input", "value": 1.0, "unit": "1"},
         },
     ]
-    items = [
+    items: list[dict[str, Any]] = [
         {"id": "c1", "kind": "load_combination_set", "name": "C2", "type": "srss", "items": terms},
         {"id": "c2", "kind": "load_combination_delete", "name": "C2"},
     ]
