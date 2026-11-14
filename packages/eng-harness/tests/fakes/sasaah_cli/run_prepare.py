@@ -1,5 +1,1 @@
-"""Stand-in for the `prepare` script."""
-
-from stand_in import main
-
-main("prepare")
+"""Marker for the `prepare` script: `pwsh.py` takes the behaviour from this file's name."""

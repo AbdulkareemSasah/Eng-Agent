@@ -1,5 +1,1 @@
-"""Stand-in for the `inspect` script."""
-
-from stand_in import main
-
-main("inspect")
+"""Marker for the `inspect` script: `pwsh.py` takes the behaviour from this file's name."""

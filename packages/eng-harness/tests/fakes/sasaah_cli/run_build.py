@@ -1,5 +1,1 @@
-"""Stand-in for the `build` script."""
-
-from stand_in import main
-
-main("build")
+"""Marker for the `build` script: `pwsh.py` takes the behaviour from this file's name."""
