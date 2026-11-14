@@ -373,16 +373,17 @@ starts only after the documents pull request that settles spec C4 (an id outside
 verification record (from the spec 0003 template).
 
 **T3b Suffixed basis names in merged code** (amendments B-467, B-484). `harness.footing_subjects` reads
-`compare.angle_deg` (spec §4.4.1) in place of `compare.angle` (`BASIS_FIELDS`, the field it reads, the source text of its
-zero constant); its golden files and tests follow. The example reference `#/fields/compare.length` of the calcs kind
-fixtures `model_diff.json` and `readback_check.json` becomes `compare.length_mm`, with the two report snapshots that
-show it; the change-set test's basis path `loads.floor_dead_kpa` (an area load, spec 0007 §4.3.1) becomes
+`compare.angle_deg` (spec §4.4.1) in place of `compare.angle` (`BASIS_FIELDS`, the field it reads, the source text of
+its zero constant); its golden files and tests follow. The example reference `#/fields/compare.length` of the calcs
+kind fixtures `model_diff.json` and `readback_check.json` becomes `compare.length_mm`, with the two report snapshots
+that show it; the change-set test's basis path `loads.floor_dead_kpa` (an area load, spec 0007 §4.3.1) becomes
 `loads.floor_dead_kPa`. No rule, value or bound changes. The rename changes the calc's content hash: the task
 regenerates its `calcs.lock.json` entry and the hash and basis-field lines of its verification record, which stays
 `draft`, and the owner re-verifies the calc (owner queue). The calc keeps version 1 (draft, never approved); if the
-owner rules that the renamed input needs a new version (calcs spec §4.2, stable ids), the lead amends this task. Test order: the first `test:` commit holds the three
-`test_subjects.py` tests and the renamed golden files, which fail at the base because the merged calc reads
-`compare.angle`; the kind fixtures, snapshots and change-set test come in a later commit (they pass at the base).
+owner rules that the renamed input needs a new version (calcs spec §4.2, stable ids), the lead amends this task. Test
+order: the first `test:` commit holds the three `test_subjects.py` tests and the renamed golden files, which fail at
+the base because the merged calc reads `compare.angle`; the kind fixtures, snapshots and change-set test come in a
+later commit (they pass at the base).
 
 **T4 Plan size and resize** (spec §4.4.2, §4.4.4). Exact integer search on fractions; `LIMIT_REACHED`; FG-1. The
 minimality and monotonicity properties run with Hypothesis.
