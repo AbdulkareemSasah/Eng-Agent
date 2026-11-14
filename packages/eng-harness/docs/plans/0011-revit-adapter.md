@@ -223,6 +223,7 @@ tasks:
     depends_on: [T7]
   - id: T12
     title: Calc harness.frame_element_map and its kind, with golden cases
+    # Amendment (B-467, documents only): the calc reads the basis field compare.length_mm (spec 0007 4.8 name).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -380,7 +381,7 @@ element-not-found case of `change_element_type`, with the evidence stored.
 pipe name.
 
 **T12 Mapping calc** (spec §4.11). Pure function over `model.frame_placements/1` inputs, the optional link map and the
-basis fields (`compare.length`, `mapping.offset_*`), exact arithmetic, the output kind, the verification record
+basis fields (`compare.length_mm`, `mapping.offset_*`), exact arithmetic, the output kind, the verification record
 (draft), and golden cases derived by hand and written in each file's `derivation` field.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the
@@ -399,7 +400,7 @@ processes, the stale-map test, and the Revit section of `docs/local-testing.md` 
 - Runtime: none new (`mcp`, `eng-contract`, `pydantic` as in plan 0002). Development: none new.
 - Work items before T1: plan 0002 T6 and T6b (allowlist, build check), T7 to T10 (lock, guard, framework, errors, identity,
   session operations) as the tasks named below need them: T3 needs plan 0002 T8b, T5 needs T9, T7 needs T11, T8 needs
-  T12, T10 needs T14, T11 needs T10, T13 needs T17, T14 needs T18, T15 needs T19. Engine plan 0001 as for plan 0002 (T1
+  T12, T10 needs T14, T11 needs T10, T13 needs T17, T14 needs T18, T15 needs T19a (amendment B-475). Engine plan 0001 as for plan 0002 (T1
   edits `ports.py` of engine T6).
 - T12 needs the calc framework of plan 0003 (T1 to T6) and the helper style of its T12 (`placement_compare`).
 - Plan 0008 (SAFE) also edits `servers/_buildcheck.py` and the allowlist header shape: whichever lands second adapts to

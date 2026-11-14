@@ -7,19 +7,13 @@ answer is `accept` (a new baseline), `restore` (the last save returns, the steps
 Units: none. Errors: `Stopped` (see `_inflight`), `ContractError` from a failing port call.
 """
 
-from collections.abc import Mapping, Sequence
-
 from eng_contract.canonical import payload_sha256
-from eng_contract.envelope import Envelope
-from pydantic import JsonValue
 
 from eng_harness.engine._inflight import Fold, Resume
 from eng_harness.engine._inputs import Question
-from eng_harness.journal import Event, EventType, JournalWriter
+from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import HostModelState, HostPort, Reconciliation, SavedModel, ToolInfo, ToolPort, UnitsState
-
-_Obj = Mapping[str, JsonValue]
+from eng_harness.ports import HostModelState, HostPort, SavedModel, UnitsState
 
 
 def bind(writer: JournalWriter, host: HostPort, key: str, host_key: str, instance_id: str, reason: str) -> None:
@@ -27,49 +21,6 @@ def bind(writer: JournalWriter, host: HostPort, key: str, host_key: str, instanc
     names = [path.name for path in host.model_files(key)]
     body = {"model_key": key, "host_key": host_key, "instance_id": instance_id, "reason": reason, "file_names": names}
     writer.append(EventType.MODEL_BOUND, body)
-
-
-class BindingTools:
-    """A `ToolPort` that binds a model before the first call addressed to it, to the instance `locate` finds (4.8).
-
-    The binding is journaled between the step's `step_started` and its host call (T13 moves it before `step_started`).
-    A model no instance holds yet is not bound: an `open` tool has not run, and it is bound at the first call after it.
-    """
-
-    def __init__(self, tools: ToolPort, host: HostPort, writer: JournalWriter, events: Sequence[Event]) -> None:
-        """Wrap `tools`; the models the journal binds already are not bound again."""
-        self._tools, self._host, self._writer = tools, host, writer
-        self._bound = {e.payload.model_key for e in events if isinstance(e.payload, ev.ModelBound)}
-        self._info: dict[str, ToolInfo] = {}
-
-    async def describe(self, tool: str) -> ToolInfo:
-        """The tool's info, kept for the binding of the call that follows."""
-        self._info[tool] = await self._tools.describe(tool)
-        return self._info[tool]
-
-    def unreleased_tools(self) -> Mapping[str, str]:
-        """As the wrapped port."""
-        return self._tools.unreleased_tools()
-
-    async def call(self, tool: str, args: _Obj, *, op_id: str, model: str | None) -> Envelope:
-        """Bind `model` first when no instance is bound to it; then call the wrapped port."""
-        if model is not None and model not in self._bound and (found := await self._host.locate(model)) is not None:
-            info = self._info.get(tool) or await self.describe(tool)
-            bind(self._writer, self._host, model, info.host_key, found.instance_id, "first_use")
-            self._bound.add(model)
-        return await self._tools.call(tool, args, op_id=op_id, model=model)
-
-    def supports_reconcile(self, tool: str) -> bool:
-        """As the wrapped port."""
-        return self._tools.supports_reconcile(tool)
-
-    async def reconcile(self, tool: str, args: _Obj, op_id: str) -> Reconciliation:
-        """As the wrapped port."""
-        return await self._tools.reconcile(tool, args, op_id)
-
-    async def read_back(self, tool: str, args: _Obj) -> Envelope | None:
-        """As the wrapped port."""
-        return await self._tools.read_back(tool, args)
 
 
 async def _units(rt: Resume, kind: str, key: str, instance_id: str, *, must_load: bool = False) -> UnitsState:
@@ -82,14 +33,14 @@ async def _units(rt: Resume, kind: str, key: str, instance_id: str, *, must_load
 
 
 async def locate_models(rt: Resume) -> set[str]:
-    """Step 6 of a resume (4.5.1): read the units of each model the run wrote in its bound instance.
+    """Step 6 of a resume (4.5.1): read the units of each model the journal addressed in its bound instance.
 
     A model that instance lacks is bound again when another instance holds it (reopened) and is lost when none does.
     Returns the models not to reconcile: the lost ones, and the reopened ones whose file lacks writes (a reconciler
     could report `not_applied` for an edit that is only gone from memory).
     """
     f, lost = Fold(rt.events()), set[str]()
-    for key in (k for k in f.written() if k in f.bound):
+    for key in sorted({s.began.model_key for s in f.steps.values() if s.began.model_key in f.bound}):
         if (await _units(rt, "units", key, f.bound[key].instance_id)).loaded:
             continue
         if (found := await rt.host.locate(key)) is None:

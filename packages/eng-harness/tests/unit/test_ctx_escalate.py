@@ -42,7 +42,7 @@ def test_escalate(tmp_path: Path) -> None:
     mark, ledger = len(rig.log), len(rig.host.ledger)
     again = asyncio.run(rig.engine(workflow).resume(stopped.run_id))
     assert (again.status, again.escalation) == (RunStatus.NEEDS_ENGINEER, stopped.escalation)
-    assert rig.log[mark:] == ["tool.unreleased_tools"]
+    assert rig.log[mark:] == ["tool.unreleased_tools", "host.preflight"]  # the servers are checked (step 4), no more
     assert len(rig.host.ledger) == ledger
     assert [e.type for e in rig.events(stopped.run_id)[-2:]] == [T.RUN_RESUMED, T.RUN_ESCALATED]
 

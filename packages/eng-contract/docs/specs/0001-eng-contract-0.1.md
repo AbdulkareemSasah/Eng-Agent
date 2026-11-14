@@ -240,6 +240,11 @@ Each criterion names its planned test (§9 lists the layer). Test paths are rela
 - AC48. Given a design basis field without `source`, with a malformed source, or a required-field check over a basis
   with an unconfirmed field, then validation fails or the unmet field paths are listed. Test:
   `test_kinds.py::test_basis_sources`.
+- AC48a. Given the basis paths `compare.stress_MPa`, `bounds.w_kN_m` and `limits.drift_ratio` with the canonical unit
+  of their suffix, or `compare._MPa` (empty part before the suffix) with unit `MPa`, when a design basis is validated,
+  then it is accepted; given `compare.stress_MPa` with unit `kPa`, or a capital letter outside a §4.7.2 suffix at the
+  end of the last segment (`Compare.stress_MPa`, `compare.stress_MPa.max`, `compare.stress_Mpa`), then validation fails (amendment B-463). Test:
+  `test_kinds.py::test_basis_path_unit_suffixes`.
 
 ### 3.8 MCP mapping and schemas
 
@@ -888,7 +893,7 @@ them).
 | `forces.joint_reactions/1` | `rows`: list of `{joint, case: CaseRef, FX_kN, FY_kN, FZ_kN, MX_kNm, MY_kNm, MZ_kNm}` in global axes; `axes: "global"` |
 | `forces.member_end/1` | `sign_convention: "host_local/1"` (gap G-3); `rows`: list of `{member, case: CaseRef, end: "i" or "j" or null, station_mm (≥ 0), P_kN, V2_kN, V3_kN, T_kNm, M2_kNm, M3_kNm}` |
 | `forces.story_drifts/1` | `rows`: list of `{story, case: CaseRef, direction: "X" or "Y", drift_ratio (≥ 0), point: str or null, x_mm, y_mm, z_mm: float or null}` |
-| `basis.design_basis/1` | `template`: `{name, version, sha256}` or null; `fields`: `dict[str, BasisField]` keyed by dotted path (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`, for example `limits.drift_ratio`). `BasisField`: `value` (`JsonValue`), `unit` (`str` in `UNITS` or null; must match the suffix of the last path segment when it has one), `source` (13 §3: `template:<name>@<version>`, `engineer:<name>@<Timestamp>` or `model:<RefString>`), `confirmed` (`bool`), `citation` (`str` or null; required when `source` is `template:*`, 13 §2) |
+| `basis.design_basis/1` | `template`: `{name, version, sha256}` or null; `fields`: `dict[str, BasisField]` keyed by dotted path: lowercase segments (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$`), except that the last segment may end with one field suffix of §4.7.2 written exactly as that table writes it, the single source of the suffixes; the part before the suffix may be empty, as `[a-z0-9_]+` already allows `compare._mm` (for example `limits.drift_ratio`, `compare.stress_MPa`; amendment B-463, owner decision OQ-Q44). `BasisField`: `value` (`JsonValue`), `unit` (`str` in `UNITS` or null; must match the suffix of the last path segment when it has one), `source` (13 §3: `template:<name>@<version>`, `engineer:<name>@<Timestamp>` or `model:<RefString>`), `confirmed` (`bool`), `citation` (`str` or null; required when `source` is `template:*`, 13 §2) |
 | `basis.engineer_input/1` | `step`: `str` (the step path that asked); `fields`: `dict[str, {value, unit, entered_by: str, entered_at: Timestamp}]` |
 | `verdicts.set/1` | `verdicts`: list of `Verdict`; `traces`: list of `Trace`; every non-null `trace_ref` is a `LocalTraceRef` `#/traces/<n>` with `n` less than the number of traces (§4.6.3; a full `res_…` reference is rejected, so the set is self-contained); `counts`: per `VerdictStatus` (must match); `draft: bool` (outputs of draft checks are watermarked, 10 §4) |
 | `issues.model_check/1` | `summary`: `CheckModelSummary`; `issues`: list of `ModelIssue`; counts must match |
@@ -1023,7 +1028,7 @@ Validation never changes a value: no clamping, rounding or unit conversion.
 |---|---|---|
 | AC1 to AC3, AC5 to AC28 (with AC15a and AC21a), AC30 to AC32, AC34, AC35, AC35a, AC37 to AC45, AC49, AC49a, AC50 | Unit | `tests/unit/` |
 | AC4, AC29, AC33, AC36 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
-| AC46 to AC48, AC51 | Contract | `tests/contract/`, fixtures `tests/data/kinds/` |
+| AC46 to AC48 (with AC48a), AC51 | Contract | `tests/contract/`, fixtures `tests/data/kinds/` |
 | AC15 | Unit, marker `windows` (runs only in the Windows CI job) | `tests/windows/` |
 | AC52 | Mutation and coverage, in the gate | CI `gate` job |
 | AC53 | Gate import rule | `eng-dev-gate` tests |
@@ -1037,6 +1042,12 @@ sys.float_info.epsilon)`).
 
 New package, version 0.1.0, contract `eng-contract/1`, units `canonical/1`. Every later change follows §4.10.1 and
 04 §11; the changelog states the impact of each.
+
+Amendment B-463 (AC48a) widens the `basis.design_basis/1` path rule of §4.10.2: every path valid before stays valid,
+and the kind's JSON Schema snapshot (`docs/schema/kinds/basis.design_basis-1.schema.json`, the `fields` pattern) changes
+(§4.12, AC51). The package is unreleased (`0.1.0.dev0`), so the kind version is not yet frozen (§4.10.1): it stays
+`basis.design_basis/1`, the change ships in 0.1.0 with a changelog line, and no ADR or contract major is needed. Once
+0.1.0 is released, the same change would be a new kind version `basis.design_basis/2` in a minor version (§4.10.1).
 
 ## 11. Open questions, gaps and additions
 

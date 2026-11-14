@@ -1,0 +1,19 @@
+{
+  "rule": "compare.stress_Mpa",
+  "payload": {
+    "template": {
+      "name": "office_rc",
+      "version": "1",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "fields": {
+      "compare.stress_Mpa": {
+        "value": 1,
+        "unit": "MPa",
+        "source": "engineer:A. Engineer@2026-01-15T10:30:00.000Z",
+        "confirmed": false,
+        "citation": null
+      }
+    }
+  }
+}

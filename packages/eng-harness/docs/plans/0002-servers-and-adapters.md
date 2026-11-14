@@ -151,7 +151,7 @@ tasks:
   - id: T6b
     title: Build check, tool-list fingerprint pinned from the inventory, and ServerCheck
     # Amendment (B-413, documents only): test_build_mismatch_stops_run (the engine stop of AC9, engine AC44) moves to
-    # T19, so T6b does not wait for engine T13; the workflow fixture's build pins and the fake's script_enabled join the files.
+    # T19a (B-475), so T6b does not wait for engine T13; the workflow fixture's build pins and the fake's script_enabled join the files.
     # Amendment (B-413, documents only): the check is a ServerManager constructor argument, run by _session.py only on a
     # restart (engine calls preflight at start and resume); the fixture uses sasaah-csi-mcp only for the CSI fake, the PAGED double keeps its adapter.
     # Amendment (B-413, documents only): test_restart_repeats_build_check covers AC11's build-check clause on a restart.
@@ -309,32 +309,62 @@ tasks:
     covers: [AC27]
     depends_on: [T11]
   - id: T12
-    title: CSI edit kinds, read-back helpers and check_model
+    title: CSI edit kinds and the tool port over them
     # Amendment (B-413, documents only): the synthetic CSI fake joins the files (its edit tools must apply the writes they report).
+    # Amendment (B-465, D-12): split from the read-back and check_model (now T12b); the B-131 writer measured about 621
+    # counted lines for the whole task, 301 for this half. The binder is given the tool's descriptor (_toolport.py), and
+    # the reader's fingerprint gains the wall-section table (_state.py, products/_etabs.py; spec 4.6.4). Estimate: 301,
+    # _toolport.py about +6, _tools.py about -12 (the context variable goes), _state.py and _etabs.py about +5: about
+    # 300; budget 340.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_edits.py"
-      - "packages/eng-harness/src/eng_harness/adapters/csi/_checks.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
-      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"  # ModelBinder.binding is given the descriptor (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_state.py"  # the wall-section table in the fingerprint (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"  # that table's key, OQ-G10 (B-465)
+      - "packages/eng-harness/tests/unit/adapters/test_toolport.py"  # the binder's new argument (B-465)
       - "packages/eng-harness/tests/workflow/adapters/test_csi_steps.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_edits.py"
-      - "packages/eng-harness/tests/workflow/adapters/test_readback.py"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_state.py"  # a wall-thickness edit moves the fingerprint (B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # applies the §4.6.2 edit tools, loads and restraints, test code (B-413)
-    max_changed_lines: 400
+    max_changed_lines: 340
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_steps.py::test_step_mapping"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_edits.py::test_edit_kinds"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_edits.py::test_gaps_not_implemented"
-      - "packages/eng-harness/tests/workflow/adapters/test_readback.py::test_mismatch_detected"
-    covers: [AC24, AC25, AC26]
+    covers: [AC25, AC26, AC27]  # AC27: the wall-section table in the fingerprint (B-465 fix round)
     depends_on: [T11b]
+  - id: T12b
+    title: CSI read-back helpers and check_model
+    # Amendment (B-465, D-12): the read-back half of the former T12 (work item B-466); the B-131 draft measured about 322
+    # counted lines (_checks.py 282, _hostport.py about 40). It also takes the read-back table keys and columns into the
+    # product module (OQ-G10), the write hook in csi/_tools.py with the wrote() calls, and the take_warnings() drain
+    # (B-451 L4). Estimate: _checks.py 282, _hostport.py about 40 plus about 4 (wrote, the drain), the _tools.py hook
+    # about 10, the columns in the product profile about 6 (the constants leave _checks.py), CHANGELOG and ratchet 3:
+    # about 345; plus 10 percent, 380 (the cap). The saved fingerprint (B-451 L3, about 13) is T19a's (B-475), so it fits.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_checks.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # CsiToolPort records each write (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # the profile carries the read-back columns (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"  # read-back table keys and columns, OQ-G10 (B-465)
+      - "packages/eng-harness/tests/workflow/adapters/test_readback.py"
+      - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # read-back tables, test code (B-413)
+    max_changed_lines: 380
+    max_sessions: 3
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_readback.py::test_mismatch_detected"
+    covers: [AC24]
+    depends_on: [T12]
   - id: T13
     title: CSI analysis, design and results through the long role
     # Amendment (B-413, documents only): the synthetic CSI fake joins the files (analysis status, design results, forces).
+    # Amendment (B-465, documents only): waits for T12b (the T12 split); the T11 mappers' bare errors (B-451 L1) are T13's.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -343,13 +373,14 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_etabs.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_analysis.py"
+      - "packages/eng-harness/tests/unit/adapters/test_csi_replies.py"  # the mappers raise UNEXPECTED_REPLY (B-451 L1, B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # analysis, design and result replies, test code (B-413)
     max_changed_lines: 300
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_analysis.py::test_long_role_and_save_first"
     covers: [AC28]
-    depends_on: [T12]
+    depends_on: [T12b]
   - id: T14
     title: Reconciliation by reading model state, preview and read_back
     # Amendment (B-413, documents only): the synthetic CSI fake joins the files (timeout_after_apply leaves each write applied).
@@ -440,35 +471,60 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools"
     covers: [AC37, AC39]
     depends_on: [T7]
-  - id: T19
-    title: Port wiring, edit-cycle step sequence and crash matrix against real fake-server processes
+  - id: T19a
+    title: Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes
     # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16 and T19;
     # it also takes the two engine stops left out of T6b and T11 (AC9's engine clause, AC22), which fail at its base
     # because build_ports does not exist there yet.
-    # Amendment (B-413, documents only): also takes the SAFE engine stop test_safe_build_mismatch_stops_run (spec 0008
-    # AC4's stop) from plan 0008 T3 and T8, failing at its base for the same reason; it waits for plan 0008 T3.
+    # Amendment (B-465, documents only): takes the saved fingerprint (B-451 L3) from the T12 split, about 13 counted
+    # lines (record_save in _identity.py, the save line in _hostport.py); budget 200 + 15.
+    # Amendment (B-475, documents only): T19 split into T19a and T19b (shorter first-live-run path, lead decision D-32).
+    # The SAFE engine stop test_safe_build_mismatch_stops_run moves to plan 0008 T3, so T19a no longer waits for plan
+    # 0008 T3; the command-line adapter wiring moves to T19b, and build_ports refuses [cli_tools.*] entries with
+    # NOT_IMPLEMENTED (gap H-G8, spec AC43) until T19b. T17 leaves depends_on (no shared file; the CSI fake chain ends at
+    # T14). Budget 215 + 15 for the refusal (about 10 lines in adapters/__init__.py, 3 of CHANGELOG.md; an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
+      - "packages/eng-harness/src/eng_harness/adapters/_identity.py"  # record_save keeps the saved state's fingerprint (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # save returns that fingerprint (B-465)
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
       - "packages/eng-harness/tests/workflow/test_build_ports.py"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b) and the SAFE stop (from plan 0008), B-413
+      - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b), B-413; the SAFE stop is plan 0008 T3's (B-475)
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"  # T10's test: the saved fingerprint (B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
-    max_changed_lines: 200
+    max_changed_lines: 230
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap"
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
-      - "packages/eng-harness/tests/workflow/servers/test_session.py::test_safe_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
-    covers: [AC9, AC22, AC36, AC41]
-    depends_on: [T17, T18, T20]
+    covers: [AC9, AC22, AC36, AC41, AC43]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
+    depends_on: [T14, T18, T20]  # external: engine plan 0001 T13, T15, T16 and T19 (section 3)
+  - id: T19b
+    title: Command-line tool adapter in build_ports (closes gap H-G8)
+    # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
+    # the first workflow that names a command-line tool (section 3). Replaces T19a's H-G8 gap test, because the specified
+    # behavior changes (spec AC43; a spec change, not a test changed to pass). Budget an estimate.
+    files:
+      - "packages/eng-harness/pyproject.toml"
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
+      - "packages/eng-harness/docs/local-testing.md"
+      - "packages/eng-harness/tests/workflow/test_build_ports.py"
+    max_changed_lines: 120
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_cli_tool_routed_through_build_ports"
+    covers: [AC43]
+    depends_on: [T16, T19a]
   - id: T20
     title: Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085)
     # Amendment (B-413, documents only): test_route_key leaves tests_first (no config-level route rule fails at the base;
@@ -507,21 +563,27 @@ Objects (T2, T3), because a wrong breakaway choice either kills an engineer's ET
 synthetic fake (T4), which every later workflow test runs as a real process; the MCP session (T5); the build check
 and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock and guard (T7); the adapter framework (T8,
 T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), reply mapping and model state (T11, T11b), edits
-and read-back (T12), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
-command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19) that wires the ports into
-the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
-build check, the units trap; B-413). T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1)
-needs and that no CSI task uses.
+(T12) and read-back (T12b), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
+command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19a) that wires the CSI ports
+into the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
+build check, the units trap; B-413), and T19b, which adds the command-line tools to that wiring (amendment B-475: T19
+split so that the first live run, the edit cycle on ETABS, waits for neither the command-line adapter nor record mode).
+T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1) needs and that no CSI task uses.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line and
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
-share it (T6b, T10, T11, T11b, T12 to T14, T19) are serialized by `depends_on` (B-413). Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T14, T16), `_hostport.py` (T10, T11b,
-T12), `csi/_tools.py` and `_allowlist.toml` (T12, T13, T15), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
-`_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20). Parallel tasks
+share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
+serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T12, T14, T16), `_hostport.py` (T10, T11b,
+T12b, T19a), `_identity.py` and `test_csi_session_ops.py` (T10, T19a), `adapters/__init__.py` and `test_build_ports.py`
+(T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
+adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15),
+`_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
+T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` and
+`test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
+`_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -569,7 +631,7 @@ allowlist's `sasaah_commit`) and the fake's `csi_status` reports `script_enabled
 `preflight` runs over the CSI fake and when a role of it restarts. Where the check runs (spec §4.3.4, B-413): the engine
 calls `ServerManager.preflight` at run start and resume; `_session.py` runs the check itself only on a restart
 (§4.3.5), never on a role's first start. The check reaches the `ServerManager` as a constructor argument beside the
-launcher (`build_ports`, wired in T19, builds it from the adapter allowlist, so `servers` needs no import of
+launcher (`build_ports`, wired in T19a, builds it from the adapter allowlist, so `servers` needs no import of
 `adapters`); a `ServerManager`
 built without one answers `preflight` with `ok` false and runs no check on a restart. The fixture `make_config` names
 the CSI allowlist's adapter `sasaah-csi-mcp`, with `--disable-script` in its args (spec §4.2 rule 3; the fake reads no
@@ -582,7 +644,7 @@ mapping of `synthetic-csi` in `_session.py` (B-413). `test_session.py::test_rest
 build-check clause, B-413) builds a `ServerManager` with a check over the CSI fake, kills the server during a call and
 shows that the restart runs the check again before the re-attach (§4.3.5); it fails
 at T6b's base because `servers/_buildcheck.py` and the `ServerManager` check argument do not exist there. The workflow
-test that stops a run through the engine's preflight is T19's (B-413).
+test that stops a run through the engine's preflight is T19a's (B-413).
 Budget 180 lines. T6b edits `_session.py`,
 so T7 follows it.
 
@@ -610,14 +672,34 @@ tables, tested on the fake's replies. **T11b Model state** (§4.6.4). The read s
 truncation, outside-edit detection, `read_units`. Amendment B-450 (D-12): T11 split in two (581 counted lines measured);
 `tests/property/test_fingerprint.py` is shared with calcs plan 0003 T7, so T11b merges after it. A dependency on
 servers T11 named in another plan means T11 and T11b.
-The units-trap workflow test, in which the engine stops, is T19's (B-413).
+The units-trap workflow test, in which the engine stops, is T19a's (B-413).
 
-**T12 Edits and read-back** (§4.6.1, §4.6.2, §4.5.8). Argument models and builders per edit kind, the
-`NotImplementedGap` entries H-G1 to H-G3 and the seismic exclusion, read-back helpers, `check_model` with the basis
-tolerance.
+**T12 Edits** (§4.6.1, §4.6.2, §4.5.4). Argument models and builders per edit kind, the `NotImplementedGap` entries
+H-G1 to H-G3 and the seismic exclusion, and the CSI tool port over them. §4.5.4 chooses the units token per call, so
+`ModelBinder.binding` (`_toolport.py`) is given the tool's descriptor, and the CSI binder in `_tools.py` (the only
+`ModelBinder` in the source) puts that tool's token of §4.6.3 from `TOKENS`, which stays in `_tools.py`, on the
+binding (`kN_mm_C` for the wall thickness, `kN_m_C` for the loads). The B-131 context variable set by
+`CsiToolPort.call` is removed. The reader's fingerprint gains the table `Wall Property Definitions -
+Specified` (§4.6.4, its key in `products/_etabs.py`), so a wall-thickness edit changes it (AC27; B-451 L2). Whether
+the combination factors (`scale_ratio`, an engineering quantity in §4.6.2 and §5) may stay literals inside the
+contract's `CombinationItem`, as B-131 wrote them, is an owner question (B-465). Amendment
+B-465 (D-12): T12 split in two (about 621 counted lines measured); a dependency on servers T12 named in another plan
+means T12 and T12b.
+
+**T12b Read-back and check_model** (§4.5.8, the read-back column of §4.6.2; work item B-466). Read-back helpers and
+`check_model` with `READBACK_MISMATCH`, `READBACK_UNAVAILABLE` and the tolerance-free codes. The read-back table keys
+and columns are product facts in `products/_etabs.py`, flagged OQ-G10, not constants in `_checks.py`. Quantities are
+compared "within the design basis field `checks.readback_relative_tolerance_ratio` (required by every workflow that writes
+quantities; never a constant here, §11 G-2)" (spec §4.5.8); how that value reaches `check_model(model_key)`, which
+takes no basis, is an owner question (B-465). The write hook is in `CsiToolPort` (`csi/_tools.py`): it wraps its edit
+builders (`EDIT_BUILDERS`), whose builder sees the canonical model and the binding before the send, to call the
+written-items book's `prepare`; `CsiToolPort.call` runs `commit` after a successful reply and then
+`AdapterHostPort.wrote(model_key)`, so the write is not reported as `MODEL_CHANGED_OUTSIDE` (B-451 L4). T12b also drains `take_warnings()` (B-451 L4); which result reports the drained warnings is a lead
+question (B-465), since design 04 §3.4 and spec §4.6.4 say only that the read adds `MODEL_CHANGED_OUTSIDE`.
 
 **T13 Analysis and design** (§4.6.1 steps 11 to 13). Long-role routing, analysis status, design run and results, the
-three force kinds, analysis messages.
+three force kinds, analysis messages. The T11 mappers in `_replies.py` raise `HOST_ERROR` (`UNEXPECTED_REPLY`) instead
+of a bare `KeyError` or a pydantic `ValidationError` (B-451 L1, tested in `test_csi_replies.py`; amendment B-465).
 
 **T14 Reconciliation** (§4.5.7). The per-tool rules with pre-images and evidence, `read_back`, `preview`;
 analysis and design reconcile `unknown` while no proof of end exists (gap H-G7).
@@ -639,21 +721,38 @@ script and its README.
 **T18 Doctor** (§4.9). The checks behind interfaces (installed programs, integrity level, location probe), table and
 JSON output, exit codes; the unreleased-tools check and the `extra_checks` extension point for spec 0006 (AC39, B-068).
 
-**T19 End to end.** `build_ports` wiring; a test block that runs the cycle's steps through the real engine and real
-fake-server processes; the crash matrix that kills the engine at each write step and resumes. Completes
+**T19a End to end on ETABS** (split from T19 by amendment B-475). `build_ports` wiring for the CSI adapter; a test
+block that runs the cycle's steps through the real engine and real
+fake-server processes; the crash matrix that kills the engine at each write step and resumes. `save` returns in
+`SavedModel.fingerprint` the fingerprint of the saved state instead of `""` (`_identity.py` `record_save`, tested in
+T10's `test_csi_session_ops.py`), so the engine's resume check does not report `model_differs` after a save (B-451 L3;
+from the T12 split, amendment B-465). Completes
 `docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20); the route-bearing
 case is tested in `test_build_ports.py` with a synthetic routed allowlist (test data, product-neutral), since the CSI
 cycle has no route (AC41). The two engine stops moved out of T6b and T11 (B-413):
 `test_session.py::test_build_mismatch_stops_run`, a mismatched build stops the run before any write (AC9's engine
 clause, engine AC44); `test_units_after_timeout.py::test_units_trap`, the synthetic fault `units_left_changed` makes the
-engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). The SAFE engine
-stop of spec 0008 AC4 (`test_session.py::test_safe_build_mismatch_stops_run`, a SAFE server whose build does not match
-the SAFE fingerprint stops the run before any write) is also T19's (B-413): plan 0008 has no later task that adds a
-source file the stop needs, so there it would pass at its merge base (test-first TF004). All three need `build_ports`,
-which this task adds to `src/eng_harness/adapters/__init__.py`, so they fail at its base. They read the pinned
-fingerprints and the units through the allowlist loader and the ports. T19 starts after plan 0008 T3 (the SAFE server
-section and per-product `[fingerprint]` header of 0008 T1, the SAFE fake mode of 0008 T2, the pinned SAFE fingerprint
-of 0008 T3).
+engine stop with `PRECONDITION_FAILED` (`units_verified`) before reconciliation (AC22, engine AC45). Both need
+`build_ports`, which this task adds to `src/eng_harness/adapters/__init__.py`, so they fail at its base. They read the
+pinned fingerprint and the units through the allowlist loader and the ports. Until T19b, `build_ports` builds no
+command-line tool: given a configuration with any `[cli_tools.*]` entry it raises `NotImplementedGap`
+(`NOT_IMPLEMENTED`, gap H-G8) naming the entries, rather than drop them, so `ToolPort.unreleased_tools()` never lists
+a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). The command line meets the
+refusal at step 1 of spec 0006 §4.2.2, outside the engine, and ends with exit 70 `INTERNAL` (spec AC43), the message
+naming H-G8 and the entries. A `harness.toml` for a run
+before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
+
+**T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
+routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`
+of such a tool reach it (`test_build_ports.py::test_cli_tool_routed_through_build_ports`); it replaces T19a's H-G8
+refusal and its gap test, because the specified behavior changes (spec AC43; a spec change, not a test changed to
+pass). The SAFE engine stop of spec 0008 AC4 (`test_session.py::test_safe_build_mismatch_stops_run`), which T19 held
+(B-413), is plan 0008 T3's, not T19b's: once T19a has merged `build_ports`, the stop fails at 0008 T3's base for want
+of the SAFE entries and the pinned SAFE fingerprint that 0008 T3 adds. Its expected error, which that tests-first test
+asserts: the run stops before any write with `RunRefused` whose code is the existing harness code
+`SERVER_CHECK_FAILED` (engine AC44, `eng_harness.errors`; no new code), with the SAFE server section as its evidence,
+and that server's `ServerCheck` has `ok` false with the reason "tool-list fingerprint differs from the allowlist's"
+(the merged `check_build`, spec §4.3.4 item 4).
 
 **T20 Framework additions for the IDEA adapter** (AC40 to AC42, spec §11 A3, B-085). `audit_log` on the server
 section (default true) and the argv builder `servers/_launch_args.py`, wired into `_session.py`, so the CSI argv stays
@@ -669,11 +768,18 @@ they are used (plan 0014 T5, T7, T8).
 - Development: the root workspace group; no new development dependency.
 - Work items: the engine plan's ([0001-engine](0001-engine.md)) T1 (package skeleton) before this plan's T1; its T6
   (ports, port data types and fakes) before T8; its run loop, invariants and replay tasks before the workflow and
-  replay tests that run the real engine: T19 waits for engine 0001 T13, T15, T16 and T19 (T13 brings in T9 to
-  T12; B-413). No earlier task of this plan runs the real engine. T19 also waits for plan
-  [0008-safe-adapter](0008-safe-adapter.md) T3 (and so its T1 and T2), because it writes the SAFE engine stop of spec
-  0008 AC4 (B-413). `eng-contract`
+  replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16 and T19 (T13 brings in T9 to
+  T12; B-413). No earlier task of this plan runs the real engine. T19a waits for no task of plan
+  [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
+  T19b waits for T16 and T19a. `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
+- First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
+  comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
+  returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line
+  tool (the DXF start, which spec 0007 §7 leaves out; no task of plans 0007 and 0010 depends on them); T17 before plan
+  0008 T8, plan 0011 T13 and plan 0012 T1, which depend on it (record mode is not available at the first live run);
+  plan 0008 T1 to T3 before plan 0008 T4, which the footing workflow (plan 0010 T10 and T11, through 0008 T5 to T7) and
+  plan 0012 T1 need.
 
 ## 4. Verification
 
@@ -687,7 +793,7 @@ they are used (plan 0014 T5, T7, T8).
 - Review: correctness, Python, type-design, silent-failure and test lenses on every task; the security lens on T1
   (configuration), T3 (process creation, handle inheritance), T7 (locks, terminating processes), T16 (running scripts
   with arguments) and T17 (sanitizing recordings); R1 review against the spec's reconciliation and units rules on T9,
-  T11, T11b, T12, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
+  T11, T11b, T12, T12b, T14. Second-family review and owner approvals are `awaiting owner` (ADR-0028 §4).
 
 ## 5. Rollback
 

@@ -77,7 +77,7 @@ values are synthetic and say so.
 
 ### 3.2 Calcs
 
-- AC4. Given the golden cases of §4.4.1 (by names; by story and section; a frame vertical within `compare.length`;
+- AC4. Given the golden cases of §4.4.1 (by names; by story and section; a frame vertical within `compare.length_mm`;
   one exactly at it; one beyond it; unknown names), when `harness.column_select` runs, then `columns`, `excluded` and
   `issues` equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-select-*]`.
 - AC5. Given any permutation of the frames, sections or scope lists, when `harness.column_select` runs, then the output
@@ -100,7 +100,7 @@ values are synthetic and say so.
   `tests/golden/column_design/test_golden.py::test_case[column-review-*]`,
   `tests/property/test_column_review.py::test_ratios_are_referenced_not_computed`.
 - AC9. Given the golden cases of §4.4.4 (one matching section; none; two; same size other material; a dimension
-  exactly at `compare.length`; circular), when `harness.column_section_match` runs, then `status` and `section` equal
+  exactly at `compare.length_mm`; circular), when `harness.column_section_match` runs, then `status` and `section` equal
   the expected ones; given a literal size instead of a `harness.section_size/1` reference, then `INVALID_ARGUMENT`.
   Tests: `tests/golden/column_design/test_golden.py::test_case[column-match-*]`,
   `tests/unit/calcs/test_column_section_match.py::test_size_must_be_rounding_result`.
@@ -114,7 +114,7 @@ values are synthetic and say so.
   ETABS `model.sections/1` field, never a number; any permutation gives the same output. Tests:
   `tests/golden/column_design/test_golden.py::test_case[revit-update-*]`,
   `tests/property/test_revit_column_update.py::test_permutation_invariant`.
-- AC12. Given the golden cases of §4.4.6 (all applied; a wrong type; a role value off by more than `compare.length`;
+- AC12. Given the golden cases of §4.4.6 (all applied; a wrong type; a role value off by more than `compare.length_mm`;
   an unplanned type change; an element missing; a role not read), when `harness.revit_column_readback` runs, then
   status and issues equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[revit-readback-*]`.
 
@@ -253,10 +253,10 @@ approves them in `approvals.yaml`); runs are `--run-class trial` until then. Non
 #### 4.4.1 `harness.column_select` v1
 
 Input: `scope` (answer reference), `frames` (`model.frame_placements/1`), `sections` (`model.sections/1`), `basis`
-(`compare.length`). Method: L1 resolve `frames` names, or every frame whose story is in `stories` (when given) and whose
+(`compare.length_mm`). Method: L1 resolve `frames` names, or every frame whose story is in `stories` (when given) and whose
 section is in `sections` (when given); unknown names are error issues (`UNKNOWN_FRAME`, `UNKNOWN_STORY`,
 `UNKNOWN_SECTION`). L2 a frame is a column when the squared plan distance between its ends is at most
-`compare.length`² (exact `Fraction`, as 0003 §4.11 P2); otherwise `excluded` with `NOT_VERTICAL`. The contract `kind`
+`compare.length_mm`² (exact `Fraction`, as 0003 §4.11 P2); otherwise `excluded` with `NOT_VERTICAL`. The contract `kind`
 is not used: the CSI reader gives `other` (H-G5, C3). L3 per column: `frame_id`, `section`, `shape` (`rectangular`,
 `circular`, `other` from `model.sections/1`), `material`, `story`, `length_mm` (distance between the ends, display
 float). Output `harness.column_selection/1`; `status` `FAIL` on an error issue or an empty selection.
@@ -307,8 +307,8 @@ R4 `changes` against `previous` per 0003 S5's table. Output `harness.column_revi
 #### 4.4.4 `harness.column_section_match` v1
 
 Input: `column` (a row reference into the selection), `sizes` (one `harness.section_size/1` reference per dimension:
-`b` and `h`, or `D`), `sections`, `basis` (`compare.length`). Method: M1 candidates are frame sections with the
-column's shape type and material whose every dimension differs from the rounded size by at most `compare.length`
+`b` and `h`, or `D`), `sections`, `basis` (`compare.length_mm`). Method: M1 candidates are frame sections with the
+column's shape type and material whose every dimension differs from the rounded size by at most `compare.length_mm`
 (exact). M2 one candidate is `matched` with its name; none is `no_section_in_model` (CW-G3, H-G1); several are
 `ambiguous` with all names. Output `harness.column_match/1`.
 
@@ -320,14 +320,14 @@ per accepted, matched frame, sorted by frame id; others are issues `NOT_IMPLEMEN
 
 Input: `map` (`harness.frame_element_map/1`), `frames`, `sections` (this run's ETABS reads), `revit`
 (`harness.revit_structure/1`, with role statuses, RV §4.8), `changed` (reference to the changed frames of the design
-record, AC22), `basis` (`compare.length`). Method:
+record, AC22), `basis` (`compare.length_mm`). Method:
 
 - U1 targets per pair from the frame's ETABS section: `rectangular` sets roles `section_b` and `section_h`,
   `circular` sets `section_D`; `other` is `not_updatable` `SHAPE_NOT_SUPPORTED`. Each target is the reference
   `<sections result>#/frame_sections/<i>/shape/<field>`.
 - U2 a role `unmapped` for the element's family gives `SECTION_ROLES_UNMAPPED`.
-- U3 the element's current type with every role within `compare.length` of its target is `no_change`.
-- U4 otherwise a type of the same family with every role within `compare.length` is `assign` to it; several are
+- U3 the element's current type with every role within `compare.length_mm` of its target is `no_change`.
+- U4 otherwise a type of the same family with every role within `compare.length_mm` is `assign` to it; several are
   `TYPE_AMBIGUOUS`; none gives one `new_type` per (family, ETABS section name), named after the ETABS section,
   duplicated from the current type of the first pair by `unique_id`; a type of that name already in the family is
   `NAME_CONFLICT` (RV AC16). The new type's role sets carry the U1 references; its instances before the assignment
@@ -348,8 +348,8 @@ references), `complete`.
 #### 4.4.6 `harness.revit_column_readback` v1
 
 Input: `plan`, `before` (`harness.revit_structure/1`, `stale_ok`, 0003 §4.13), `after` (current), `basis`
-(`compare.length`). Method: B1 each planned element exists by `unique_id` (`ELEMENT_MISSING`) and has its planned type
-(`TYPE_MISMATCH`); B2 each planned role value resolves and is within `compare.length` (`VALUE_MISMATCH`); B3 no other
+(`compare.length_mm`). Method: B1 each planned element exists by `unique_id` (`ELEMENT_MISSING`) and has its planned type
+(`TYPE_MISMATCH`); B2 each planned role value resolves and is within `compare.length_mm` (`VALUE_MISMATCH`); B3 no other
 element of the read set changed type between `before` and `after` (`UNEXPECTED_TYPE_CHANGE`); B4 an unread role is
 `not_read`. `status` `PASS` only without issues and with `after` at a later revision than `before`.
 
@@ -418,7 +418,7 @@ same frames).
 No value is shipped (spec 0004 Q8). Every field is required and confirmed on the page.
 
 Table A, `column_design`: the EC §4.8 fields the reused blocks and calcs declare (`compare.*`,
-`checks.readback_relative_tolerance`, `report.top_n`, `limits.ratio_limit`, `limits.drift_ratio`, `bounds.*`,
+`checks.readback_relative_tolerance_ratio`, `report.top_n`, `limits.ratio_limit_ratio`, `limits.drift_ratio`, `bounds.*`,
 `design.run`, `attempts.cycles`, `attempts.change_set`, `attempts.approval_void`), plus:
 
 | Path | Kind | Unit | Used by | Source |
@@ -429,8 +429,8 @@ Table A, `column_design`: the EC §4.8 fields the reused blocks and calcs declar
 | `modeling.section_increment`, `modeling.section_rounding` | quantity, choice | `mm`, `up` | `harness.section_round` | 0003 §4.4 |
 | `attempts.column_inputs` | count | — | scope, layout and proposal requests | engineer |
 
-Table B, `column_revit_update`: `compare.length`, `mapping.offset_x`, `mapping.offset_y`, `mapping.offset_z` (RV §4.11),
-`checks.readback_relative_tolerance` (RV §4.8), `attempts.approval_void`.
+Table B, `column_revit_update`: `compare.length_mm`, `mapping.offset_x`, `mapping.offset_y`, `mapping.offset_z` (RV §4.11),
+`checks.readback_relative_tolerance_ratio` (RV §4.8), `attempts.approval_void`.
 
 ### 4.8 Decision points and rules
 
@@ -459,7 +459,7 @@ Revit promotion.
 ### 4.10 Mapping and references
 
 ETABS frames and Revit elements are paired only by `harness.frame_element_map` (RV §4.11: geometry with the basis
-offset and `compare.length`, links as hints, the engineer approves the map with the change set at R6). Every Revit
+offset and `compare.length_mm`, links as hints, the engineer approves the map with the change set at R6). Every Revit
 length is a reference to this run's ETABS `model.sections/1` field (U1), so a copying error cannot happen
 (ADR-0005); the map and the plan become stale when either model changes (`REF_STALE`). `audit_verdict_sources`
 (report) checks AC21: every verdict a review references has a source, a check id and, for `code_pack`, a clause.
