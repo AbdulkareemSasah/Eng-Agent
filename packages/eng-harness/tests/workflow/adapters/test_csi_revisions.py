@@ -372,3 +372,31 @@ def test_revisions_refusals(tmp_path: Path) -> None:
         revisions.reopen("model.rev005.EDB")
     assert unknown.value.detail.code is ErrorCode.NOT_FOUND
     assert unknown.value.detail.received == "model.rev005.EDB"
+
+
+def test_copy_with_a_different_hash_is_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A copy whose bytes do not hash as the original is deleted, refused with `CONFLICT` and not recorded."""
+    from eng_harness.adapters.csi import _revisions
+
+    class Unreliable:
+        """`hashlib` whose second digest differs: the first is of the original, the second of the copy."""
+
+        calls = 0
+
+        @staticmethod
+        def sha256(data: bytes) -> Any:
+            Unreliable.calls += 1
+            return hashlib.sha256(data + (b"?" if Unreliable.calls > 1 else b""))
+
+    folder = tmp_path / "copies"
+    folder.mkdir()
+    work = folder / "model.EDB"
+    work.write_bytes(b"one")
+    revisions = _revisions.Revisions(folder, tmp_path / "revisions.json")
+    monkeypatch.setattr(_revisions, "hashlib", Unreliable)
+    with pytest.raises(ContractError) as refused:
+        revisions.snapshot(work, revisions.target(work))
+    assert refused.value.detail.code is ErrorCode.CONFLICT
+    assert refused.value.detail.received == "model.rev001.EDB"
+    assert [p.name for p in folder.iterdir()] == ["model.EDB"]
+    assert not (tmp_path / "revisions.json").exists()
