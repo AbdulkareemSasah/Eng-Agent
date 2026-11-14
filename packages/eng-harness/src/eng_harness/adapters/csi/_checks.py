@@ -261,7 +261,7 @@ async def snapshot(rows: Rows, target: dict[str, Any], state: StateRead, profile
     for name, (table, key_column, value_column) in profile.readback.items():
         try:
             found = await rows("csi_db_table_read", "rows", {**target, "table": table, "row_limit": LIST_LIMIT}, table)
-        except ContractError:  # any failure (cut, lost session, timeout): the table is left out, its items read READBACK_UNAVAILABLE
+        except ContractError:  # any failure: the table is left out, its items read READBACK_UNAVAILABLE
             continue
         if all({key_column, value_column} <= row.keys() for row in found):
             snap.tables[name] = found
