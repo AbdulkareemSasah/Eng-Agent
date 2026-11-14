@@ -108,15 +108,13 @@ def _item(effect: Effect, after: dict[str, dict[str, Any]], tolerances: Toleranc
         return item("match" if effect.op == "remove" else "missing")
     if effect.op == "remove":
         return item("mismatch", _one(found))
-    if effect.op == "add":
-        leaves = [leaf for obj in found for leaf in walk_leaves(effect.value, obj)]
-        agreed = all(_agrees(pointer, left, right, tolerances)[0] for pointer, left, right in leaves)
-        return item("match" if agreed else "mismatch", _one(found))
-    pointer = effect.pointer or ""
+    pointer = effect.pointer or ""  # an `add` is a `set` of the whole object
     reads = [read_pointer(obj, pointer) for obj in found]
-    verdicts = [_agrees(pointer, effect.value, read, tolerances) for read in reads]
-    agreed = all(ok for ok, _, _ in verdicts)
-    _, tolerance, rule = verdicts[0]
+    leaves = [leaf for read in reads for leaf in walk_leaves(effect.value, read, pointer)]
+    agreed = all(_agrees(*leaf, tolerances)[0] for leaf in leaves)
+    _, tolerance, rule = _agrees(pointer, effect.value, reads[0], tolerances)
+    if isinstance(effect.value, dict | list):  # compared leaf by leaf (D3 to D5)
+        tolerance, rule = None, "R2"
     return item("match" if agreed else "mismatch", _one(reads), tolerance, rule)
 
 

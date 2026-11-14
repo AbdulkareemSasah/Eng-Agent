@@ -287,6 +287,35 @@ def test_set_tolerance_boundary() -> None:
     }  # fmt: skip
 
 
+def test_set_of_an_object_compares_leaf_by_leaf() -> None:
+    """R2: a `set` of a whole object (spec 0007 4.4.2) is compared leaf by leaf (D3 to D5), not as canonical bytes."""
+
+    def combo(scale: float, step: dict[str, Any]) -> dict[str, Any]:
+        case = {"case": "DEAD", "case_type": "load_pattern"} | step
+        return {"name": "C1", "type": "linear_add", "items": [{"case": case, "scale_ratio": scale}]}
+
+    loads = _loads(combos=[combo(1.4000001, {})])  # unchanged, so R3 has nothing to explain
+    fields = {"before_loads": loads, "after_loads": loads}
+    fields |= {
+        "before_frames": _frames(),
+        "after_frames": _frames(),
+        "basis": _basis(**{"compare.dimensionless_ratio": 0.001}),
+    }
+    refs = _meta(**_frames_refs(), before_loads=_ref(3, LOADS), after_loads=_ref(4, LOADS, revision=4))
+    read = combo(1.4000001, {"step": None})  # the read object holds the omitted `step` as null
+    cases = [("", combo(1.4, {}), read, "match"), ("", combo(1.402, {}), read, "mismatch")]
+    cases += [("/items", combo(1.4, {})["items"], read["items"], "match")]
+    cases += [("", combo(1.4, {"step": "Max"}), read, "mismatch")]
+    for pointer, value, expected_read, result in cases:
+        effect = _effect("e1", LOADS, ["combinations", "C1"], "set", pointer=pointer, value=value)
+        out = _run(fields | {"effects": _effects(effect)}, refs)
+        assert out["items"] == [
+            {"item_id": "e1", "result": result, "expected": value, "read": expected_read, "tolerance": None,
+             "rule": "R2"}
+        ], (pointer, value)  # fmt: skip
+        assert out["status"] == ("PASS" if result == "match" else "FAIL")
+
+
 def test_duplicate_keys_need_the_engineer() -> None:
     """A key twice in the after set: each object is compared; the report's ambiguous key gives NEEDS_ENGINEER (R3)."""
     fields = {"before_loads": _loads(_load(10.0)), "after_loads": _loads(_load(12.0), _load(12.0))}
