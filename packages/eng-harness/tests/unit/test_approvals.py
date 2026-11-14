@@ -7,23 +7,38 @@ test scripts. The block is a plain test body wrapped as a workflow; a write resu
 
 import asyncio
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from eng_contract.canonical import payload_sha256
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import new_model_id
-from pydantic import ValidationError
-from workflows.ctx_flows import ChildInput, change_set, child, flow, reply, request_id, success, written
+from eng_contract.refs import Ref
+from fakes.ports import Raise
+from pydantic import JsonValue, ValidationError
+from workflows.ctx_flows import (
+    ChildInput,
+    answer,
+    change_set,
+    child,
+    flow,
+    need_approval,
+    reply,
+    request_id,
+    success,
+    written,
+)
 from workflows.rig import Rig, make_rig, request
 
 from eng_harness import errors
-from eng_harness.ctx import Approval
+from eng_harness.ctx import Approval, ApprovalKind, Preview, PreviewItem
 from eng_harness.engine import RunStatus
+from eng_harness.engine._steps import op_id
 from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalAnswer, HostModelState
+from eng_harness.ports import ApprovalAnswer, HostModelState, Reconciliation
 
 T = EventType
 
@@ -234,17 +249,21 @@ def test_recheck_before_write(tmp_path: Path) -> None:
         assert trail == [f"model m1 changed since approval {request_id(run_id, '0')} was shown"], name
         assert (refs, _calls(rig), rig.log.count("tool.call")) == ([], [], 0), name  # the port was not called
         assert [e for e in rig.events(run_id) if e.path == "1"] == [], name  # the voided write left no step behind
-    new_id = lambda r: _set(model_id=new_model_id(r.ids))(r)  # noqa: E731
-    rig, run_id, trail, refs = _guarded(tmp_path / "identity", mutate=new_id)
+
+    def other_model(rig: Rig) -> None:
+        _set(model_id=new_model_id(rig.ids))(rig)
+
+    rig, run_id, trail, refs = _guarded(tmp_path / "identity", mutate=other_model)
     assert (len(trail), _calls(rig)) == (1, [])
 
     # the second write finds the revision its predecessor produced, or the approval is void (spec 4.9)
-    for name, kwargs in {
+    later: dict[str, dict[str, Any]] = {
         "outside": {"between": _set(revision=5)},
         "gone": {"between": lambda r: r.host.models.update(m1=HostModelState(loaded=False))},
         "unknown": {"silent": True},  # a result that does not say which revision it produced
-    }.items():
-        rig, run_id, trail, refs = _guarded(tmp_path / name, **kwargs)  # type: ignore[arg-type]
+    }
+    for name, kwargs in later.items():
+        rig, run_id, trail, refs = _guarded(tmp_path / name, **kwargs)
         assert (len(refs), _calls(rig), len(trail)) == (1, ["write_b"], 1), name
         assert trail[0] == f"model m1 changed since approval {request_id(run_id, '0')} was shown", name
 
@@ -313,3 +332,220 @@ def test_per_item_rejection_and_expiry(tmp_path: Path) -> None:
     refused = [label for label, why in seen.items() if why is not None]
     assert len(refused) == 8
     assert rig.log.count("tool.call") == 2
+
+
+def test_rejected_approval_is_returned_not_raised(tmp_path: Path) -> None:
+    """A rejected approval returns `approved: false` to the block; a write under it is refused (spec 4.9)."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+    got: list[Approval] = []
+    refused: list[str] = []
+
+    async def body(ctx: Any) -> list[str]:
+        got.append(await ctx.approve("Apply", shown))
+        try:
+            await ctx.tool("write_b", {"n": 0, "model": "m1"}, under=got[0], item="i1")
+        except errors.BlockRuleViolation as stop:
+            refused.append(stop.message)
+        return []
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(request())).run_id
+    rig.approvals.script(request_id(run_id, "0"), reply(rig, decision="reject", by="engineer:ada"))
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    assert (got[0].approved, got[0].rejected_items, got[0].accepts("i1")) == (False, (), False)
+    assert [r.by for r in _resolved(rig, run_id)] == ["engineer:ada"]  # the prefix is not doubled
+    assert refused == [f"approval {request_id(run_id, '0')} is not an approved request of this run"]
+    assert rig.host.ledger == []
+
+
+def test_a_preview_the_journal_does_not_hold_and_an_unopened_model(tmp_path: Path) -> None:
+    """The request is shown with the same preview at every resume; a bound model must be open; the type is checked."""
+    rig = make_rig(tmp_path)
+    first, other = change_set(rig, "i1"), change_set(rig, "i1", "i2")
+
+    def shows(preview: Any, name: str = "chain") -> Any:
+        async def body(ctx: Any) -> list[str]:
+            await ctx.approve("Apply", preview)
+            return []
+
+        return flow(body, name=name)
+
+    run_id = asyncio.run(rig.engine(shows(first)).start(request())).run_id
+    stopped = asyncio.run(rig.engine(shows(other)).resume(run_id))  # the journal shows the request with `first`
+    assert (stopped.status, stopped.escalation.reason if stopped.escalation else None) == (
+        RunStatus.NEEDS_ENGINEER,
+        "replay_divergence",
+    )
+    assert "another preview" in (stopped.escalation.detail if stopped.escalation else "")
+    assert [e.type for e in rig.events(run_id)].count(T.APPROVAL_REQUESTED) == 1
+
+    closed = make_rig(tmp_path / "closed")
+    shown = change_set(closed, "i1")
+    closed.host.models["m1"] = HostModelState(loaded=False)  # no instance holds it
+    with pytest.raises(ContractError) as unopened:
+        asyncio.run(closed.engine(shows(shown)).start(request()))
+    assert unopened.value.detail.code is ErrorCode.PRECONDITION_FAILED
+    assert "the model m1 is not open in any host instance" in unopened.value.detail.message
+    assert closed.approvals.presented == []
+    assert not [r for r in closed.run_ids() for e in closed.events(r) if e.type is T.APPROVAL_REQUESTED]
+
+    async def untyped(ctx: Any) -> list[str]:
+        await ctx.approve("Apply", {"items": []})
+        return []
+
+    refused = asyncio.run(make_rig(tmp_path / "untyped").engine(flow(untyped)).start(request()))
+    assert (refused.status, refused.escalation.reason if refused.escalation else None) == (
+        RunStatus.NEEDS_ENGINEER,
+        "block_rule_violation",
+    )
+
+
+def test_references_of_a_preview_are_resolved(tmp_path: Path) -> None:
+    """Invariant 3: a reference in an item or in the diff must resolve before the request is made."""
+    rig = make_rig(tmp_path)
+    gone = Ref.model_validate({"$ref": "res_" + "1" * 26})
+    refs = {
+        "item": Preview(items=(PreviewItem(id="i1", label="A", refs=(gone,)),), diff_ref=None, models=()),
+        "diff": Preview(items=(), diff_ref=gone, models=()),
+    }
+    for name, shown in refs.items():
+
+        async def body(ctx: Any, shown: Preview = shown) -> list[str]:
+            await ctx.approve("Apply", shown)
+            return []
+
+        with pytest.raises(ContractError) as raised:  # the contract's code leaves the root block, as for any read
+            asyncio.run(rig.engine(flow(body)).start(request()))
+        assert raised.value.detail.code is ErrorCode.REF_NOT_FOUND, name
+        assert rig.approvals.presented == [], name
+
+
+def test_signed_off_for_an_approved_sign_off(tmp_path: Path) -> None:
+    """An approved `SIGN_OFF` also journals `signed_off` once; a rejected one, and any other kind, do not."""
+    rig = make_rig(tmp_path)
+    done_ref = rig.store.put("harness.run_output/1", {"value": 1}, written(rig, "m1", 1).provenance).result_id
+    refs = {
+        "i1": Ref.model_validate({"$ref": done_ref}),
+        "i2": Ref.model_validate({"$ref": done_ref + "#/value"}),
+        "i3": Ref.model_validate({"$ref": done_ref}),
+    }
+    items = tuple(PreviewItem(id=k, label=k, refs=(v,)) for k, v in refs.items())
+    shown = Preview(items=items, diff_ref=None, models=())
+    kinds: dict[str, tuple[ApprovalKind, Literal["approve", "reject"], bool]] = {
+        "sign": (ApprovalKind.SIGN_OFF, "approve", True),
+        "refused": (ApprovalKind.SIGN_OFF, "reject", False),
+        "info": (ApprovalKind.INFO, "approve", False),
+        "change": (ApprovalKind.CHANGE_SET, "approve", False),
+    }
+    for name, (kind, decision, signed) in kinds.items():
+
+        async def body(ctx: Any, kind: ApprovalKind = kind) -> list[str]:
+            await ctx.approve("Sign", shown, kind=kind)
+            return []
+
+        engine = rig.engine(flow(body))
+        run_id = asyncio.run(engine.start(request())).run_id
+        rig.approvals.script(
+            request_id(run_id, "0"),
+            reply(rig, decision=decision, rejected={"i2": "an exception"} if decision == "approve" else None),
+        )
+        assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED, name
+        asyncio.run(engine.resume(run_id))  # a terminal run is not signed again
+        sign_offs = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.SignedOff)]
+        if signed:
+            assert sign_offs == [
+                ev.SignedOff(outputs=[done_ref], approval_request_id=request_id(run_id, "0"), by="engineer:ada")
+            ], name
+        else:
+            assert sign_offs == [], name
+
+
+def test_replayed_writes_leave_the_revision_the_next_write_must_find(tmp_path: Path) -> None:
+    """A run paused between two writes under one approval resumes: the replayed write's revision is the one expected."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+    rig.host.script("write_b", written(rig, "m1", 1), written(rig, "m1", 2))
+    voided: list[str] = []
+
+    async def body(ctx: Any) -> list[str]:
+        approval = await ctx.approve("Apply", shown)
+        await ctx.tool("write_b", {"n": 0, "model": "m1"}, under=approval, item="i1")
+        await need_approval(rig.approvals, "apr_stub")  # a pause that checks nothing, so the approval stays valid
+        try:
+            await ctx.tool("write_b", {"n": 1, "model": "m1"}, under=approval, item="i1")
+        except errors.ApprovalVoid as void:
+            voided.append(void.message)
+        return []
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(request())).run_id
+    rig.approvals.script(request_id(run_id, "0"), reply(rig))
+    assert asyncio.run(engine.resume(run_id)).pending == ("apr_stub",)  # one write is made, then the stub pauses
+    rig.approvals.script("apr_stub", answer("apr_stub"))
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    assert (voided, _calls(rig)) == (
+        [],
+        ["write_b", "write_b"],
+    )  # the second write found revision 1, as the first left it
+
+
+def test_signed_off_is_journaled_once_across_a_crash(tmp_path: Path) -> None:
+    """A crash after `approval_resolved` of a sign-off leaves `signed_off` to the resume, and only once."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.approve("Sign", shown, kind=ApprovalKind.SIGN_OFF)
+        return []
+
+    engine = rig.engine(flow(body))
+    for name, signed_before in (("late", False), ("early", True)):
+        run_id = asyncio.run(engine.start(request())).run_id
+        rid = request_id(run_id, "0")
+        resolved = ev.ApprovalResolved(
+            request_id=rid, shown_sha256=rig.approvals.presented[-1].shown_sha256, decision="approve",
+            rejected_items=[], by="engineer:ada",
+        )  # fmt: skip
+        writer = JournalWriter(rig.run_dir(run_id), rig.store, rig.clock, rig.ids)
+        writer.append(T.APPROVAL_RESOLVED, resolved)
+        if signed_before:
+            writer.append(T.SIGNED_OFF, {"outputs": [], "approval_request_id": rid, "by": "engineer:ada"})
+        writer.close()
+        assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED, name
+        sign_offs = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.SignedOff)]
+        assert [s.approval_request_id for s in sign_offs] == [rid], name
+
+
+def test_a_reconciled_write_leaves_its_revision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A write under an approval whose call raised and was reconciled `applied` leaves the revision of its result."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+    rig.host.script("write_b", Raise(OSError("the call was lost")))
+    voided: list[str] = []
+
+    async def body(ctx: Any) -> list[str]:
+        approval = await ctx.approve("Apply", shown)
+        for n in range(2):
+            try:
+                await ctx.tool("write_b", {"n": n, "model": "m1"}, under=approval, item="i1")
+            except errors.ApprovalVoid as void:
+                voided.append(void.message)
+        return []
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(request())).run_id
+    first = op_id(run_id, "1", 1)
+    rig.host.reconciliations[first] = Reconciliation(outcome="applied", result=written(rig, "m1", 1))
+    reconcile = rig.host.reconcile
+
+    async def applied(tool: str, args: Mapping[str, JsonValue], op: str) -> Reconciliation:
+        rig.host.models["m1"] = rig.host.models["m1"].model_copy(update={"revision": 1, "fingerprint": "fp1"})
+        return await reconcile(tool, args, op)  # the lost call had been applied after all
+
+    monkeypatch.setattr(rig.host, "reconcile", applied)
+    rig.approvals.script(request_id(run_id, "0"), reply(rig))
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    assert voided == []  # the second write found revision 1, which the reconciled first write left
+    assert next(c.op_id for c in rig.host.ledger) == first
+    assert len(rig.host.ledger) == 2
