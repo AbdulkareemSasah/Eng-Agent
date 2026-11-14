@@ -213,7 +213,8 @@ def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
 
     `csi_run_analysis` answers `{started: true}` only after it finished (S-12 section 5) and leaves the model locked.
     `csi_analysis_status` answers raw per-case codes (the test values 1 and 4 mean nothing: the server does not decode
-    them). The results tools answer the seed's rows of the tool, `model["results"][tool]`, in the units of the call;
+    them). The results tools answer the seed's rows of the tool, `model["results"][tool]`, as seeded and not rescaled
+    (the reply's `units` names the call's token; a test seeds the rows in the units it calls with);
     a design result needs a design run of its kind first (the tool's description).
     """
     model = STATE.model
