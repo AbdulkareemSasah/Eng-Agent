@@ -433,4 +433,4 @@ def test_approval_in_flight_is_presented_again_not_reconciled(tmp_path: Path) ->
     (rerun,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
     assert rerun.reason == "read_in_flight"
     assert len(rig.approvals.answers.get(rid, [])) == 0  # the journal's answer was used, the port was not asked
-    assert _events(rig, run_id, ev.ApprovalResolved) == [resolved]  # no second record
+    assert [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.ApprovalResolved)] == [resolved]  # once
