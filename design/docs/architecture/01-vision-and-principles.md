@@ -35,7 +35,7 @@ These are numbered and stable. Other documents cite them as `P1` to `P12`.
 | P9 | **Every outcome is honest.** A timeout whose effect is unknown is reported as `TIMEOUT_UNKNOWN_OUTCOME`, never as success or plain failure. Partial results say they are partial. | Tool contract §8 |
 | P10 | **Decisions are fast, typed and recorded.** Rules first, then a typed decision model, then a language model, then the engineer. Every decision is logged with who made it and with what confidence. | Decision layer ([12](12-decision-layer.md)) |
 | P11 | **The engineer stays in charge.** Write permissions are a user setting. Original models are protected by default. Outputs stay `DRAFT` until the engineer signs them. | Permission modes; UI |
-| P12 | **A missing capability becomes a permanent tool, never ad-hoc code.** During a live project the tool is built or extended on a branch with tests (project lane); before reuse it passes the full process (release lane) ([ADR-0026](../adr/0026-project-lane-for-tools.md)). | Process ([02-work-items](../../process/02-work-items.md)) |
+| P12 | **A missing capability becomes a permanent tool, never ad-hoc code.** During a live project, when the owner asks, the tool is built or extended on a branch with tests (project lane); otherwise the need is logged in the task log ([ADR-0034](../adr/0034-task-log-by-default.md)); before reuse it passes the full process (release lane) ([ADR-0026](../adr/0026-project-lane-for-tools.md)). | Process ([02-work-items](../../process/02-work-items.md)) |
 
 ## 4. Quality attributes, in priority order
 

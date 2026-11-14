@@ -86,6 +86,13 @@ rounding calc or an engineer input, never a decision.
 - The terminal progress, the approval page and the run report read the same journal, so what the engineer sees is
   exactly what happened.
 
+### Task log beside the journal
+
+The task log ([ADR-0034](../adr/0034-task-log-by-default.md)) records each owner task, including requests that never
+reach a run. It is not part of the engine: the journal and its event set are unchanged, and blocks never write to it.
+The harness task-log module, in the command-line layer, derives run facts read-only from the journal (through the
+journal reader) and the result store, and keeps its local state under `<repo>/.eng/tasklog/`.
+
 ## 6. Enforced invariants
 
 The engine enforces these regardless of what block code does:
