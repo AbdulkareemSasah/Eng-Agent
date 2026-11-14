@@ -1,7 +1,8 @@
 # ADR-0034: The task log by default: every owner task has a log in `tasklog/`, pushed directly as log-only commits
 
 Status: Proposed · Date: 2026-11-12 · Deciders: owner. The decisions below were given by the owner on 2026-11-12, in
-two rounds of answers to the lead's questions; this written record awaits his acceptance (hub rule 3).
+two rounds of answers to the lead's questions; this written record awaits his acceptance (hub rule 3). On 2026-11-14
+he answered open questions 1, 2, 3 and 5, recorded under each question.
 
 ## Context
 
@@ -143,7 +144,8 @@ CI). The task logs are its input (D11). A live session never develops the core.
   bootstrap merge of `build/v1` into `main` is exempt: it carries the logs by design. Logs never appear in file
   scopes, line budgets or CI reviewer payloads.
 - Offline, commits stay local in the log worktree. No force push, no hook bypass, no history rewrite of the
-  integration branch (A6, A16). How log-only pushes reach a protected `main` is open (open question 1).
+  integration branch (A6, A16). How log-only pushes reach a protected `main` is decided by the owner at the end of
+  bootstrap, a path-restricted rule or an agent identity preferred over a general bypass (question 1).
 
 **D6. Push identity: one recorded exception to "never the owner's credentials".** By the owner's decision:
 
@@ -164,9 +166,8 @@ CI). The task logs are its input (D11). A live session never develops the core.
 - The lead's bootstrap bookkeeping pushes (D-4, D-33) are a separate, existing practice, not this exception: the
   workspace root rules state them, and the push check limits them to the allowance of D5. The lead rebases its
   unpushed bookkeeping commits before pushing, never a merge commit.
-- Cloud sessions push nothing under `tasklog/`, with any login or tool, until the owner decides otherwise (open
-  question 3). A task asked in a cloud session keeps its log as local commits, and the session names the unpushed task
-  ids in its final status.
+- Cloud sessions push nothing under `tasklog/`, with any login or tool (question 3, answered 2026-11-14). A task asked
+  in a cloud session keeps its log as local commits, and the session names the unpushed task ids in its final status.
 
 **D7. Privacy is a separate, replaceable component** of the harness, selected by a required `policy` setting with no
 default.
@@ -258,24 +259,26 @@ coding tool's transcript only its SHA-256 and session id are recorded, never the
 module entry point of the harness, keeping its six-command CLI; needs that belong to the Sasaah tools are only logged,
 nothing is filed in the Sasaah repository; logs are kept indefinitely while the repository is private.
 
-## Open questions for the owner
+## Questions for the owner
+
+Questions 1, 2, 3 and 5 were answered by the owner on 2026-11-14 (his words are in the appendix); questions 4 and 6
+are open.
 
 1. **Log-only pushes to a protected `main`.** Process/06 §5 disables direct pushes to `main` with no bypass. When
    bootstrap ends, log-only pushes need a bypass for his login (it would bypass every rule, not only for logs), a
    path-restricted push rule (if his GitHub plan offers one on a private repository), or an agent identity with a
-   narrow rule. *Recommendation:* decide at the end of bootstrap; prefer a path-restricted rule or an agent identity
-   over a general bypass.
-2. **Exposure to writers on other services.** The sparse checkouts of D11 are a precondition of the first log push.
-   The alternative, accepting the exposure of client data to writers on other services instead, needs his recorded
-   acceptance first. *Recommendation:* keep the precondition.
-3. **Log pushes from cloud sessions.** D6 is for his machine only. *Default until he decides:* cloud sessions read logs
-   and push nothing under `tasklog/` (their GitHub access is his account, OQ-Q50, and allowing it would widen D6 beyond
-   his machine). *Option:* allow cloud pushes of log-only commits, recorded as a change to D6, with the same log-only
-   definition, the same detection, and no GitHub file-write tool.
+   narrow rule. *Answered 2026-11-14:* decided at the end of bootstrap; a path-restricted rule or an agent identity is
+   preferred over a general bypass. The choice itself is made then.
+2. **Exposure to writers on other services.** The alternative to the sparse checkouts of D11 is accepting the
+   exposure of client data to writers on other services, which needs his recorded acceptance first. *Answered
+   2026-11-14:* the sparse-checkout precondition of D11 stays a precondition of the first log push (D14).
+3. **Log pushes from cloud sessions.** D6 is for his machine only; allowing cloud pushes of log-only commits would be
+   a change to D6 (their GitHub access is his account, OQ-Q50). *Answered 2026-11-14:* cloud sessions read logs and
+   push nothing under `tasklog/`; the push exception of D6 is for the owner's machine only.
 4. **The lead's bookkeeping allowance.** *Recommendation:* accept the closed allowance of D5 until bootstrap ends; then
    only squash merges and log-only commits reach the integration branch.
-5. **Personal paths in his words.** *Recommendation:* accept that the guard withholds them; the alternative is a
-   reviewed secrets allow entry per affected line.
+5. **Personal paths in his words.** The alternative to withholding them is a reviewed secrets allow entry per affected
+   line. *Answered 2026-11-14:* the guard withholds them (D7).
 6. **OQ-Q50** stays open; D6 does not answer it.
 
 ## Consequences
@@ -308,7 +311,7 @@ nothing is filed in the Sasaah repository; logs are kept indefinitely while the 
 - **Logs only in the local workspace**: the owner wants them in the repository, and a cloud session could not read
   them.
 - **A separate agent identity for log pushes**: none exists; the owner chose his login with recorded limits. It returns
-  when an agent identity exists (open question 1).
+  when an agent identity exists (question 1).
 - **A seventh CLI command**: reopens the harness CLI's six-command criterion; a module entry point is used instead.
 - **New journal event types**: the event set is closed, the engine is the single writer, and blocks do no I/O.
 - **Refusing writes on any secret pattern in owner words**: loses owner words mid-session.
@@ -344,6 +347,12 @@ final status names no task id.
 The originals are copied from the lead's record of the session, never translated back from the Context above.
 
 > انا متناقض
+
+On 2026-11-14 the lead put the open questions above to him, each with its recommendation. He answered in one line that the
+recommendations are applied. It answers questions 1, 2, 3 and 5 as recommended; questions 4 and 6 were not part of
+that batch and stay open:
+
+> نفّذ التوصيات
 
 The originals of answers 1 to 16 are inserted here from the lead's session record before the owner accepts this
 record; until then this appendix is incomplete.
