@@ -337,7 +337,7 @@ required and the engine refuses to start without them (engine invariant 5). Read
 | `compare.line_load_kN_m` | `kN/m` | ≥ 0 | §4.7, §4.8 | same |
 | `compare.area_load_kPa` | `kPa` | ≥ 0 | §4.7, §4.8 | same |
 | `compare.dimensionless_ratio` | `1` | ≥ 0 | §4.7, §4.8 (dimensionless properties such as `nu_ratio`, `scale_ratio`) | same |
-| `modeling.section_increment` | `mm` | > 0 | §4.10 | 13 §2 `modeling` ("rounding increment for new section sizes") |
+| `modeling.section_increment_mm` | `mm` | > 0 | §4.10 | 13 §2 `modeling` ("rounding increment for new section sizes") |
 | `modeling.section_rounding` | — | enum `up` | §4.10 | same |
 | `report.top_n` | — | integer ≥ 1 | §4.9 | Template or engineer |
 
@@ -624,7 +624,7 @@ one member failed and now passes, one moves from `FAIL` to `NEEDS_ENGINEER` and 
 **Purpose.** 11 §4: a new section size is the output of this calc or an engineer input, never a decision.
 
 **Input** `RoundInput`: `required` (reference to a length quantity in `mm`, > 0: a calc output or a
-`basis.engineer_input/1` field; `engineering_quantity`), `basis` (`modeling.section_increment`,
+`basis.engineer_input/1` field; `engineering_quantity`), `basis` (`modeling.section_increment_mm`,
 `modeling.section_rounding`). No comparison tolerance is read: a `compare.*` field compares model states (§4.4) and is
 no rounding allowance.
 
@@ -844,7 +844,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q11 | Additions to the engine spec: the production run class, `CalcRefused` with two harness codes, and `CalcInfo.basis_fields` and `CalcInfo.ref_rules` (path to `RefRule`), from which engine invariant 3 builds each argument's `RefRule` (`stale_ok` false for a path not listed) | Owner | Accept. Amend engine spec §4.8 and invariant 3 in the engine plan's next task; spec 0006 adds the `--production` option |
 | Q12 | `HostPort.model_state` (spec 0002) needs the fingerprint. In a production run it must be approved | Owner, B-061 | Spec 0002 computes it through the CalcPort, and the command-line preflight includes it |
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
-| Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance`, `mm`, no default) and a new calc version |
+| Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance_mm`, `mm`, no default) and a new calc version |
 | Q15 | Spec 0010 Q10 and C2: the CalcPort serves code-pack checks through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the run-class rule of §4.5 and §4.12; `NOT_FOUND` (§6) covers an id outside the route's allowlist | Owner | Accept (amendment B-405; draft until the owner approves) |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |

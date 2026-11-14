@@ -176,6 +176,24 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays"
     covers: [AC28, AC30]
     depends_on: [T8]
+  - id: T11
+    # Amendment (B-484, documents only): the harness key and path rule merged in T1 and T5 is wider than contract
+    # section 4.10.2 (spec Q1); T11 narrows it to the contract rule.
+    title: "Template keys and FieldSpec paths follow the contract basis path rule"
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/templates/_model.py"
+      - "packages/eng-harness/src/eng_harness/basis/_fields.py"
+      - "packages/eng-harness/tests/unit/test_template_model.py"
+      - "packages/eng-harness/tests/unit/test_template_check.py"
+      - "packages/eng-harness/tests/unit/test_basis_fields.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_template_model.py::test_extra_keys_forbidden"
+      - "packages/eng-harness/tests/unit/test_basis_fields.py::test_field_spec_rules"
+    covers: [AC3, AC21]
+    depends_on: [T5]
 ---
 
 # Implementation plan: eng-harness templates and the design basis
@@ -195,8 +213,8 @@ Cross-plan dependencies, which `depends_on` cannot express: T1 needs engine T1 (
 the field list of spec 0007; T10 needs engine T7, T13 and T19 (basis view, invariant 5, replay suite). T1, T3, T4, T5
 and T8 are merged with the earlier spec Q1 answer, the contract FieldPath name rule, which is wider than the rule decided
 as owner question OQ-Q44: storing a suffixed field such as `fc_MPa` needs eng-contract plan 0001 T19 (work item B-464),
-a key that passes the harness rule but not contract §4.10.2 is refused only at freeze (T8), and aligning the harness
-rule is a follow-up.
+a key that passes the harness rule but not contract §4.10.2 is refused only at freeze (T8), and T11 aligns the harness
+rule (amendment B-484; T11 needs eng-contract T19, merged).
 
 ## 2. Tasks
 
@@ -221,6 +239,15 @@ it (`start` still loads it once for invariant 5 when `required_basis` is not emp
 first `test:` commit holds only `test_basis_reaches_ctx_and_replays` in `test_basis_workflow.py`; the property tests and
 `test_unconfirmed_basis_refuses_the_run` pin merged behaviour and come in a later commit of the same task (test-first
 judges each new or changed test function of the first `test:` commit's files, so a green one there is TF004).
+**T11 Contract path rule** (amendment B-484, spec Q1). Template group and leaf keys, `AskItem.path` and `FieldSpec.path`
+follow contract §4.10.2 (`basis.design_basis/1` paths): lowercase segments, at least two in a path, and only the last
+segment may end with one §4.7.2 unit suffix as that table writes it; the reasons stay those of the merged code
+(`unknown_key` for a template key, `value_invalid` for an ask path, `field_invalid` for a `FieldSpec` path). A path
+with a capital letter outside the last segment's suffix (`Compare.stress_MPa`, `compare.Stress_MPa`,
+`compare.stress_MPa.max`, contract AC48a), accepted by the merged rule, is then refused at load or declaration instead
+of at freeze.
+The first `test:` commit adds those refusals to `test_extra_keys_forbidden` and `test_field_spec_rules`, which fail at
+the base; tests whose synthetic keys the narrower rule refuses are renamed in a later commit.
 
 ## 3. Dependencies
 

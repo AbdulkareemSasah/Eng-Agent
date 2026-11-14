@@ -373,6 +373,10 @@ Things to know:
   [spec 0008](packages/eng-harness/docs/specs/0008-safe-adapter.md), [spec 0011](packages/eng-harness/docs/specs/0011-revit-adapter.md),
   [spec 0014](packages/eng-harness/docs/specs/0014-idea-adapter.md) and [spec 0009](packages/eng-harness/docs/specs/0009-providers.md).
   You need none of them for the model edit cycle on ETABS.
+- **First live run: leave out every `[cli_tools.*]` section.** At phase 1 the run refuses a settings file that holds one
+  (gap H-G8 of [spec 0002](packages/eng-harness/docs/specs/0002-servers-and-adapters.md), as amended by B-475); the
+  command-line tools are wired later (servers plan 0002 T19b).
+- **Record mode is not available at the first run** (section 4): do not turn it on for the first live run.
 
 ### 3.2 The environment check (`doctor`)
 
@@ -536,11 +540,11 @@ time gate A4. If A4 is not met, no release is made until the cause is found ([18
 
    | Group | Fields |
    |---|---|
-   | Comparison tolerances | `compare.length`, `compare.angle`, `compare.stress`, `compare.unit_weight`, `compare.line_load`, `compare.area_load`, `compare.ratio` |
-   | Read-back | `checks.readback_relative_tolerance` |
+   | Comparison tolerances | `compare.length_mm`, `compare.angle_deg`, `compare.stress_MPa`, `compare.unit_weight_kN_m3`, `compare.line_load_kN_m`, `compare.area_load_kPa`, `compare.dimensionless_ratio` |
+   | Read-back | `checks.readback_relative_tolerance_ratio` |
    | Report | `report.top_n` |
-   | Limits | `limits.ratio_limit`, `limits.drift_ratio` |
-   | Change-set bounds | `bounds.thickness_min`, `bounds.thickness_max`, `bounds.line_load_min`, `bounds.line_load_max`, `bounds.area_load_min`, `bounds.area_load_max`, `bounds.ratio_min`, `bounds.ratio_max` |
+   | Limits | `limits.ratio_limit_ratio`, `limits.drift_ratio` |
+   | Change-set bounds | `bounds.thickness_min_mm`, `bounds.thickness_max_mm`, `bounds.line_load_min_kN_m`, `bounds.line_load_max_kN_m`, `bounds.area_load_min_kPa`, `bounds.area_load_max_kPa`, `bounds.ratio_min_ratio`, `bounds.ratio_max_ratio` |
    | Design | `design.run` (`steel`, `concrete` or `steel_and_concrete`) |
    | Attempts | `attempts.cycles`, `attempts.change_set`, `attempts.approval_void` |
 

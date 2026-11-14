@@ -517,7 +517,7 @@ write that uses it (engine approvals).
 does not classify frames, since `kind` is `other` from the CSI reader, 0002 H-G5, and the classification script embeds
 engineering thresholds, OQ-G14); `elements`: `model.frame_placements/1` from the Revit adapter; optional `links`: a map `unique_id` to the string of the role `etabs_link`; `basis`.
 Basis fields (0003 §4.4 style): `compare.length_mm` (mm, ≥ 0; the position and elevation tolerance, already used by
-`placement_compare`), and **[added]** `mapping.offset_x`, `mapping.offset_y`, `mapping.offset_z` (mm, signed, confirmed): the
+`placement_compare`), and **[added]** `mapping.offset_x_mm`, `mapping.offset_y_mm`, `mapping.offset_z_mm` (mm, signed, confirmed): the
 position of the ETABS global origin in Revit model coordinates; no default, no value in code, no rotation (Q6).
 
 **Method** (exact `Fraction` arithmetic as 0003 §4.11 P2). M1 translate each frame's ends by the offset and order the
@@ -574,7 +574,7 @@ titles, paths and user names.
 | `b_mm`, `h_mm`, `D_mm` and any length written (role map) | float | mm | > 0 | yes, engineering quantity | code-pack result or change set |
 | `expected_instances` | list of element refs | | non-empty | no | the workflow, from `harness.revit_structure/1` |
 | `compare.length_mm` | float | mm | ≥ 0 | basis field | design basis (13 §2), no default |
-| `mapping.offset_x`, `_y`, `_z` | float | mm | finite | basis field | design basis or engineer, confirmed |
+| `mapping.offset_x_mm`, `_y_mm`, `_z_mm` | float | mm | finite | basis field | design basis or engineer, confirmed |
 | `call_timeout_s`, `client_grace_s` | int | s | ≥ 1 | no | `harness.toml`, required |
 | `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (0002 G-2) |
 | Outputs | envelopes of the kinds of §4.5 and §4.11 | canonical | | | adapter, calc |
@@ -654,7 +654,7 @@ engine spec 0001; plan T1 carries them.
 | Q3 | Two roles (`read` with `--read-only`, `write`) versus one | Owner | Two: the read role cannot write whatever the allowlist says, and reads keep a short timeout |
 | Q4 | Shared-type rule (AC15) | Owner | Accept; default flow creates a new type |
 | Q5 | Write the ETABS link into Revit (`Sasaah_EtabsElementId` through `set_parameter_value_by_guid`) | Owner | Not in v1: it writes into the engineer's model for a convenience; the map is kept in the harness. Revisit with the column workflow |
-| Q6 | Origin offset between ETABS and Revit: basis fields (v1) or derived from named grid lines | Owner | Basis fields now, no rotation; a grid-derived offset as a later calc. The basis template (spec 0004) needs `mapping.offset_x/_y/_z` and a source for each |
+| Q6 | Origin offset between ETABS and Revit: basis fields (v1) or derived from named grid lines | Owner | Basis fields now, no rotation; a grid-derived offset as a later calc. The basis template (spec 0004) needs `mapping.offset_x_mm/_y_mm/_z_mm` and a source for each |
 | Q7 | `compare.length_mm` as the single tolerance of the mapping | Owner | Reuse it; a separate `mapping.*` tolerance only if the owner wants two |
 | Q8 | `revit_batch_execute` and `revit_run_synapse_command` on the deny list (S-12 left them for the owner) | Owner | Deny: they forward other tools or commands |
 | Q9 | Revit version: specs 008 and 009 say 2026, 07 says "2025 and newer" | Owner | Pin 2026 in the allowlist header; widen only after a local test on another version (17) |

@@ -264,7 +264,8 @@ float). Output `harness.column_selection/1`; `status` `FAIL` on an error issue o
 #### 4.4.2 `harness.column_demands` v1
 
 Input: `selection`, `forces` (`forces.member_end/1`), `sections`, `layouts` (answer reference), `combinations` (from the
-scope answer), `basis` (`materials.concrete_fc`, `materials.rebar_fy`, `columns.effective_length_factor`). Method:
+scope answer), `basis` (`materials.concrete_fc_MPa`, `materials.rebar_fy_MPa`,
+`columns.effective_length_factor_ratio`). Method:
 
 - E1 `sign_convention` must be `host_local/1`, else `CalcRefused` (contract G-3).
 - E2 rows: every row of a selected column whose `case` is a selected combination, sorted by member, case, station.
@@ -423,14 +424,14 @@ Table A, `column_design`: the EC §4.8 fields the reused blocks and calcs declar
 
 | Path | Kind | Unit | Used by | Source |
 |---|---|---|---|---|
-| `materials.concrete_fc` | quantity | `MPa` | column demands | project basis (13 §2 materials); name as the clause specs (C1) |
-| `materials.rebar_fy` | quantity | `MPa` | column demands | same |
-| `columns.effective_length_factor` | quantity | `1` | column demands | engineer, per project (CK Q5) |
-| `modeling.section_increment`, `modeling.section_rounding` | quantity, choice | `mm`, `up` | `harness.section_round` | 0003 §4.4 |
+| `materials.concrete_fc_MPa` | quantity | `MPa` | column demands | project basis (13 §2 materials); the clause specs' name with the unit suffix (C1) |
+| `materials.rebar_fy_MPa` | quantity | `MPa` | column demands | same |
+| `columns.effective_length_factor_ratio` | quantity | `1` | column demands | engineer, per project (CK Q5) |
+| `modeling.section_increment_mm`, `modeling.section_rounding` | quantity, choice | `mm`, `up` | `harness.section_round` | 0003 §4.4 |
 | `attempts.column_inputs` | count | — | scope, layout and proposal requests | engineer |
 
-Table B, `column_revit_update`: `compare.length_mm`, `mapping.offset_x`, `mapping.offset_y`, `mapping.offset_z` (RV §4.11),
-`checks.readback_relative_tolerance_ratio` (RV §4.8), `attempts.approval_void`.
+Table B, `column_revit_update`: `compare.length_mm`, `mapping.offset_x_mm`, `mapping.offset_y_mm`,
+`mapping.offset_z_mm` (RV §4.11), `checks.readback_relative_tolerance_ratio` (RV §4.8), `attempts.approval_void`.
 
 ### 4.8 Decision points and rules
 
@@ -548,7 +549,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
-| C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Align in one lead documents change before plan T3; this spec follows the clause specs |
+| C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa`; the clause specs keep the unsuffixed names until the owner renames them |
 | C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |
 | C4 | 19 §1 names one workflow; this spec has two runs (Q1) | Owner | As Q1 |
