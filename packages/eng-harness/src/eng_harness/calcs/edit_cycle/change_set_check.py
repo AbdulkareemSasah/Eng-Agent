@@ -241,14 +241,25 @@ def _named(check: _Check, index: int, item: Any, values: list[ResolvedValue], sh
 def _conflicts(
     check: _Check, item: str, claim: Claim, changes: dict[tuple[str, tuple[str, ...]], list[Change]]
 ) -> None:
-    """K6: a change of the step 4 report on the claimed object and property is a warning with both values."""
+    """K6: a change of the step 4 report on the claimed object and property is a warning with both values.
+
+    A whole-object claim (pointer "") also covers the rows nested in that object (spec 0003 D2 keys them under it).
+    """
     section, key, pointer, shown = claim
-    for change in changes.get((section, key), []):
+    whole = pointer == ""
+    found = [
+        change
+        for (where, at), listed in changes.items()
+        if where == section and (at == key or (whole and at[: len(key)] == key))
+        for change in listed
+    ]
+    for change in found:
+        name = "/".join(change.key)
         rows = [r for r in change.properties if pointer in ("", r.pointer) or r.pointer.startswith(pointer + "/")]
         if change.change != "changed":
-            engineer = f"{change.change} {'/'.join(key)}"
+            engineer = f"{change.change} {name}"
         elif rows:
-            engineer = "changed " + "; ".join(f"{'/'.join(key)}{r.pointer} from {r.before} to {r.after}" for r in rows)
+            engineer = "changed " + "; ".join(f"{name}{r.pointer} from {r.before} to {r.after}" for r in rows)
         else:
             continue
         check.issue(item, "CONFLICTS_WITH_ENGINEER_CHANGE", f"the engineer {engineer}; item sets {shown}", warn=True)
