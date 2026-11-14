@@ -85,7 +85,7 @@
   "properties": {
     "fields": {
       "patternProperties": {
-        "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$": {
+        "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*\\.(?:[a-z0-9_]*(?:_mm|_mm2|_mm3|_mm4|_kN|_kNm|_MPa|_kN_m|_kPa|_kN_m3|_kg|_deg|_s|_C|_m_s2|_ratio)|[a-z0-9_]+)$": {
           "$ref": "#/$defs/BasisField"
         }
       },
