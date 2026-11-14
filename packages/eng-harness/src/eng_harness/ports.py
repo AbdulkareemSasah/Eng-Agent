@@ -5,7 +5,7 @@ Purpose: each port is a `typing.Protocol` implemented by adapters (0002), calcs 
 Pydantic models. Units: none (counters, hashes, `Timestamp`s). Errors: `ContractError` for contract conditions,
 `CalcRefused` from a CalcPort, `pydantic.ValidationError` for invalid data. Methods that wait on a host or a person
 are `async`; methods that read held state are synchronous. `DecisionPort` (plan T14) is built over the types of
-`eng_harness.decisions.interfaces`, which this module re-exports; its `runtime_summary` is T14b's. Not here:
+`eng_harness.decisions.interfaces`, which this module re-exports. Not here:
 `ToolPort.preview` (needs `Preview` of `eng_harness.ctx`, plan T7).
 """
 
@@ -359,6 +359,12 @@ class DecisionPort(Protocol):
 
     async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
         """Decide the calls of one step; the result has one entry for each call, in order."""
+
+    def runtime_summary(self) -> Mapping[str, JsonValue]:
+        """The providers and released points the port was built with, for the run header (AC69); `{}` for none.
+
+        Synchronous and free of I/O. The engine records the object as given and reads no field of it.
+        """
 
 
 class ProgressSink(Protocol):

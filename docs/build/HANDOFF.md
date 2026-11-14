@@ -1,4 +1,181 @@
-# Build handoff checkpoint (cloud session 2, 2026-11-12)
+# Build handoff checkpoint (cloud session of 2026-11-14, after the pause)
+
+Committed directly to `build/v1` under lead decision D-4 (build state files). Work item B-487, written by the lead
+bookkeeper of the session for the next lead agent. This section is the newest; the checkpoint of 2026-11-12 below it
+and the one below that stay for the history they record. Read this section, then the lead playbook
+([lead-playbook.md](lead-playbook.md), in full), [resume/RESUME.md](resume/RESUME.md), the lead findings
+([lead-findings.md](lead-findings.md)), the root [HANDOFF.md](../../HANDOFF.md) (process),
+[BUILD-STATUS.md](../../BUILD-STATUS.md) (sections 3 to 6) and `git log origin/build/v1 -25`. Integration branch:
+`build/v1` (never push to `main`). The paths in `docs/build/` are placeholders (section 7, item 2).
+
+The session is the "Cloud session of 2026-11-12 (second cloud session)", resumed after the owner's pause. The lead is a
+Claude session that writes no code: every change is written, reviewed, gated and integrated by Claude subagents in
+workflow lanes (D-33). Timeline: the owner needed his usage allowance and every lane was stopped at once on
+2026-11-12 at 20:38 UTC; the machine restarted during the pause (state intact); the owner said to continue on 2026-11-14
+at 05:50 UTC and every running lane was resumed with its run id and identical arguments (D-36).
+
+## 1. Where the build stands
+
+- **Plan tasks merged: 185 of 309 (59.9 %).** Counted by the method of the checkpoint below: the total is the number of
+  tasks in the `tasks:` front matter of the 20 plan files under `packages/*/docs/plans`,
+  `packages/structural-codes/*/docs/plans` and `tools/*/docs/plans` on `origin/build/v1` (309 at beccdb9, recounted from
+  the files); the merged count is the previous checkpoint's 177 plus the eight plan-task work items merged since
+  b559295 (B-228 P.T9, B-131 S.T12, B-456 E.T13c, B-464 CT.T19, B-472 E.T20, B-470 C.T8c, B-113 E.T14, B-466 S.T12b).
+  124 plan tasks are unmerged. The total grew from 301 to 309 by plan amendments (engine T20; calcs T8c; servers T19
+  into T19a and T19b; providers T10 into T10a and T10b; interface T13b and T18 into T18a and T18b; footing T3b;
+  templates T11), which is why the percentage moved little (58.8 % to 59.9 %). The lead's own count is the same.
+  Compare progress by this method only. SBC overlay plan 0003 T4 is counted as unmerged, as before.
+- Documents amendments and lead fixes are not plan tasks. Merged since the last checkpoint: B-467, B-468, B-469,
+  B-471, B-474, B-475, B-476, B-480, B-481, B-482, B-483, B-484 (twelve; with the eight plan tasks that is the 20 pull
+  requests of section 2).
+- Phases: 0 done; 1 and 2 in progress; 3 and 4 not started beyond the column kinds, requests and checks.
+- **Priority:** the first live run comes first (D-32); scenario C is applied (D-39), so servers T16, T17, T19b, SAFE
+  plan 0008 T1 to T3 and providers T4, T6, T7, T10b are off the path. `priority.txt` lists the path in order.
+- **Pace:** the usage allowance bounds it (D-35, D-36). Five lanes run; one deferred lane is stopped (section 4).
+
+## 2. Merged since the last checkpoint (20 pull requests: #309, #311 to #322, #324 to #330)
+
+| Work item | Task | Pull request |
+|---|---|---|
+| B-228 | P.T9 evaluation store, release verification, evaluate command | #309 |
+| B-468 | DOC: contract plan T19 owns the harness calc lock | #311 |
+| B-467 | DOC: basis field names carry the unit suffixes | #312 |
+| B-471 | DOC: caller-chosen run id, decisions settings, registry on the edit cycle, the T18 split | #313 |
+| B-131 | S.T12 CSI edit kinds and the tool port | #314 |
+| B-474 | DOC: templates and basis plan T10 wires Ctx.basis | #315 |
+| B-456 | E.T13c invariant 10 and the resume order | #316 |
+| B-480 | DOC: contract plan T19 also owns the footing subjects verification record | #317 |
+| B-469 | DOC: difference report key carries its list; calcs T8c | #318 |
+| B-472 | E.T20 Engine.start takes a caller-chosen run id | #319 |
+| B-464 | CT.T19 basis paths accept the contract unit suffixes | #320 |
+| B-475 | DOC: scenario C, servers T19 and providers T10 split | #321 |
+| B-481 | DOC: engine plan T14 budget | #322 |
+| B-470 | C.T8c difference keys carry their list | #324 |
+| B-482 | DOC: templates and basis plan T10 tests-first list | #325 |
+| B-113 | E.T14 ctx.decide and ctx.decide_many | #326 |
+| B-466 | S.T12b CSI read-back helpers and check_model | #327 |
+| B-476 | DOC: ADR-0034, the task log by default (status Proposed) | #328 |
+| B-483 | DOC: effect keys are the reported difference keys | #329 |
+| B-484 | DOC: the remaining basis paths carry their unit suffix | #330 |
+
+Direct commit under D-4 after b559295: d881c1c (a correction to the previous checkpoint's count text).
+
+## 3. Decisions of this period (recorded in BUILD-STATUS sections 4 and 6)
+
+- Owner: stop on 2026-11-12 at 20:38 UTC, continue on 2026-11-14 at 05:50 UTC; the decisions of 2026-11-12 recorded in
+  the checkpoint below (full cycle, direct pushes of build state files only, OQ-Q44 answer (a), the first live run
+  first, the task log by default) stand.
+- Lead: D-36 (stop and resume of all lanes at once), D-37 (B-164: no gate exemption, rebuilt after E.T19), D-38 (B-460:
+  the B-470 precedent for the mutation step), D-39 (scenario C applied as a draft), D-40 (the basis path rename is
+  complete, the hold of playbook 5d is lifted).
+- Owner queue (all items with recommendations are in BUILD-STATUS section 6): ADR-0034 acceptance with its six
+  questions (OQ-A14); the scenario C spec changes (OQ-Q62); OQ-Q85 to OQ-Q91 are new, and OQ-Q65 to OQ-Q68, OQ-Q75 were
+  updated. The full queue of lead findings is [lead-findings.md](lead-findings.md).
+
+## 4. What is running, by lane (state at beccdb9; run ids are for `resumeFromRunId`)
+
+| Lane | Run id | State |
+|---|---|---|
+| engine-2 (critical path) | wf_2aa69ef3-6fb | B-481 and B-113 (E.T14) merged; next B-350 (E.T14b; a local branch with three commits exists), then B-114 (E.T15), B-115 (E.T16), B-116 (E.T17), B-117 (E.T18), B-118 (E.T19) |
+| servers-2 | wf_291c36a0-69b | B-465, B-131 (S.T12), B-466 (S.T12b) merged; next B-132 (S.T13; local branch with commits), B-133 (S.T14), then B-135 (S.T16) and B-136 (S.T17), which are off the path |
+| tasklog-docs | wf_db726637-cfb | B-476 (ADR-0034, Proposed) merged; B-477 (AGENTS template and root rules), B-478 (spec and plan 0015), B-479 (gate spec and plan amendment) in work; the writer note of B-477 reports NEEDS_PLAN_AMENDMENT (no `Plan-Task: none (<reason>)` of gate spec 4.5 step 3 fits its 13 files, the gap of OQ-Q59); what the lane did with it is unknown at this checkpoint |
+| amendments-zt5-gt2 | wf_86423180-ee8 | B-334 (Z.T5) at integration (`integrate.owner.b334` was held), then B-462 (docs), B-281 (G.T2), B-282 (G.T3), B-283 (G.T4) |
+| calcs-3 | wf_66240cfa-1a7 | B-483 merged; B-460 (C.T8b) in its third round (D-38), then B-148 (C.T9), B-149 (C.T10). Its arguments are not among the saved argument files (the saved calcs-2.args.json belongs to the earlier run wf_063e17d6-666 of this lane); whether a copy exists elsewhere is unknown |
+| footing-column-calcs (deferred) | wf_89fc0eda-b17 | stopped on 2026-11-12, not resumed (allowance): B-395 (footing T4) needs a plan amendment (OQ-Q61), B-396 (footing T5) written with the full gate pending, B-397 not started; both branches use basis names from before B-484 and are renamed by their writers |
+
+Lanes of the earlier run that are not in the list above: scenario-c (wf_6488545e-6ea) ended with B-475 merged; basis
+(wf_153cc0a2-b0f) ended with B-474 merged and B-164 stopped at its local CI FAIL (D-37); its run state beyond that is
+not recorded here.
+
+**Risk of losing work:** these task branches have commits that `git ls-remote --heads origin` did not show on GitHub at
+the time of writing: B-132, B-350, B-395, B-396, B-460, B-477, B-478 (the worktree also had two uncommitted files),
+and the v2 branch of B-281 (the old branch of B-281 is on GitHub and abandoned, D-22). The container is temporary:
+push each task branch with `git push -u origin <branch>` (task branches only; the owner approved this) and check
+`git branch -r`. The writer and reviewer notes lived in `<lead>/reports/`; for merged items they are in the pull request
+bodies, and the findings that need a later decision are in [lead-findings.md](lead-findings.md) and BUILD-STATUS
+section 6. Lock files at the time of writing: `integrate.owner.b334` and `prio-wait.b132`, `prio-wait.b350`,
+`prio-wait.b460` (live lanes; remove any that is older than the restart of the machine or than three hours with no
+process behind it).
+
+## 5. What waits, and for what
+
+- B-164 (B.T10, #323 open with a local CI FAIL on TF004): rebuilt on a fresh branch after E.T19 (B-118) merges, by
+  the recipe in [lead-findings.md](lead-findings.md); then #323 is closed or replaced (D-37).
+- Decisions D.T7 to D.T10 (B-171 to B-174): wait for E.T14b (B-350) and E.T17 (B-116).
+- Interface I.T7 (B-181) and what follows it: wait for E.T15 (B-114).
+- Edit cycle W.T2 (B-196): C.T8b (B-460); W.T5 (B-199): S.T13, S.T14; W.T6 (B-200): E.T15, E.T16.
+- S.T19a (B-138): E.T15, E.T16, E.T19 (and W.T5, since both edit `tests/fakes/sasaah_csi/**`).
+- P.T10a (B-229): its plan dependency is P.T1 only (merged); the cross-plan prose of plan 0009 also names decisions T10
+  and engine T14b, so check before launching.
+- I.T18a (B-433), then I.T18b (B-488), and the report status section I.T13b (B-489): see the registry.
+- Owner: ADR-0034 and the scenario C spec changes (section 3).
+
+## 6. Remaining order
+
+1. **First-live-run path (D-32, D-39)**, in the order of [priority.txt](priority.txt) (it is also the order in which
+   work items take the gate and integration locks). Unmerged on it: engine B-350, B-114 to B-118; servers B-132, B-133,
+   B-138 (S.T19a); calcs B-460, B-148, B-149; basis B-164 (after B-118); decisions B-171 to B-174; interface B-181,
+   B-183, B-184, B-188 to B-190, B-353, B-429 to B-431, B-433 (I.T18a), and then B-488 (I.T18b) and B-489 (I.T13b);
+   edit cycle B-196 to B-203; providers B-229 (P.T10a). B-488 and B-489 are new and not yet in `priority.txt`: add them
+   after B-433. The list also names merged items, which is harmless.
+2. **Task log:** B-477 to B-479 in work, then the plan 0015 tasks; lower priority than the path.
+3. **Deferred set** (after the first run, or when the logs show the need): G.T2 to T15, R.T1 to T15, A.T1 to T7, H.T1 to
+   T9, F.T4 to T9, X.T4 to T13, Y.T2, Y.T3, Z.T5, C.T11, C.T12, W.T10 to T12, I.T17, I.T17c, S.T15 (next after the first
+   run), plan 0015 T12 and T13, gate T40 to T42; off the path by scenario C: S.T16, S.T17, S.T19b (B-490), F.T1 to F.T3,
+   P.T4, P.T6, P.T7, P.T10b (B-491); new from the basis rename: X.T3b (B-485), B.T11 (B-486).
+4. Phase 3 and 4 plans: SAFE (0008), Revit (0011), SAP2000 (0012), IDEA (0014).
+
+`ops/remaining-tasks.json` is updated by this checkpoint: B-433 now names I.T18a; B-138 names S.T19a; B-229 names
+P.T10a; new entries B-485, B-486, B-488 (I.T18b), B-489 (I.T13b), B-490 (S.T19b) and B-491 (P.T10b); the dependencies
+that named a split task follow the plan front matters. Entries of merged work items stay in the file.
+
+## 7. How the next lead resumes
+
+1. **Read** this section, the playbook (sections 1, 5, 5b, 5c and 5d first), [resume/RESUME.md](resume/RESUME.md),
+   BUILD-STATUS sections 3 to 6, then `git fetch origin build/v1 && git log origin/build/v1 -25`. Check
+   `git ls-remote --heads origin` and the open pull requests (`mcp__github__list_pull_requests`).
+2. **Rebuild the machine layout** (the container is temporary). The paths in `docs/build/` are placeholders: `<lead>/`
+   is the lead scratch folder with `reports/`, `pr/`, `logs/`, `locks/`, `resume/`; `<build-v1>` is a read-only
+   reference checkout of `build/v1`; `<worktrees>/b<NNN>` is one worktree per work item; `<hub>` is the hub checkout;
+   `<lane-scripts>` is the folder of workflow scripts. Copy lead-playbook.md to `<lead>/PLAYBOOK.md`, priority.txt to
+   `<lead>/PRIORITY.txt`, lead-findings.md to `<lead>/reports/lead-findings.md`, task-log-brief-v2.md to
+   `<lead>/reports/task-log-brief-v2.md`, b484-basis-path-inventory.md to `<lead>/reports/b484-writer.md` and resume/
+   to `<lead>/resume/`; then replace the placeholders with the real paths in your copies (for example
+   `sed -i 's#<lead>#/real/lead#g'`) and run `uv sync --all-packages --locked` in each worktree once.
+3. **The lane workflow script** is [build-lane.workflow.js](build-lane.workflow.js) (the session's workflow tool; its
+   arguments and its steps are described in item 3 of section 6 of the checkpoint below). One call runs one lane.
+4. **The saved lane arguments** are in `resume/<lane>.args.json` (see [resume/RESUME.md](resume/RESUME.md); the
+   placeholders in them are replaced the same way). Resume a lane with its run id from section 4 as `resumeFromRunId`
+   and the identical arguments: finished agents replay from the cache and the agent that was cut off runs again. The
+   files are the arguments as of 2026-11-12 and 2026-11-14 05:50 UTC; a lane started later (calcs-3) has none saved.
+   A lane whose run id is lost starts fresh from the state on GitHub (an open pull request with a local CI PASS goes
+   to the merge step, a pushed branch resumes in open-pull-request mode).
+5. **The locks** (all under `<lead>/locks/`): `gate.lock`, `integrate.lock`, `prio-wait.b<NNN>`; rules as in item 4 of
+   section 6 of the checkpoint below and in playbook sections 4, 5 and 5b. After a machine restart: remove any
+   `integrate.owner.*` and `prio-wait.*` file older than the restart (`uptime -s`), start a new local CI run for a run
+   directory whose `status.txt` is not final (playbook 5d).
+6. **The priority list** is [priority.txt](priority.txt): update it when the owner accepts scenario C and as work items
+   merge.
+7. **Stop and resume procedure** (D-36): when the owner says stop, stop every lane workflow task at once, kill leftover
+   `flock` holders of `integrate.lock` (`pgrep -af "flock <lead>/locks/integrate.lock"`), remove `integrate.owner.*`
+   and `prio-wait.*` files, and save each lane's arguments and run id under `<lead>/resume/` (write them in
+   RESUME.md). When he says continue: check `ls <lead>/locks`, the open pull requests and the local CI run
+   directories, then resume every lane with its run id and identical arguments, the deferred lanes only when allowance
+   is spare.
+8. **Do not** let a writer start a task that reads the basis fields from a branch written before B-484 without
+   renaming them (playbook 5d); keep commit trailers to `Assisted-by: anthropic/claude` (5c); write no model version
+   identifiers (D-3); never edit the state files from a task branch (D-4); never push to `main`.
+9. **Lead items that are not owner questions:** `tests/unit/test_bearing.py` line 132 of the aci318-14 pack uses the
+   old basis name `foundation.allowable_bearing_pressure`: fold the rename into the next aci318-14 task that touches the
+   file (a test-only task cannot pass test-first); the B-164 rebuild recipe and the other findings are in
+   [lead-findings.md](lead-findings.md); the engine spec amendment that collects the engine findings (P-65) is not
+   written yet.
+
+---
+
+# Earlier checkpoint (cloud session 2, 2026-11-12, at b559295)
+
+(Superseded as the newest checkpoint by the section above; the text below is unchanged.)
 
 Committed directly to `build/v1` under lead decision D-4 (build state files). Written by the lead of the second cloud
 session for the next lead agent. This section is the newest; the older checkpoint (sections E1 to E8, from e99bf72) stays

@@ -9,6 +9,7 @@ risk: {{r0 | r1 | r2 | r3}}
 # Spec NNNN: {{title}}
 
 Package: {{package}} · Author: {{identity}} · Date: {{yyyy-mm-dd}}
+Source needs: {{task-log need ids only (A24), or none}}
 
 ## 1. Problem
 {{Who has the problem, what it costs today, in measurable terms.}}

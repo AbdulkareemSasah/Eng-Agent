@@ -1,6 +1,7 @@
 """The calc lock file against the registry (plan 0003 T2; spec 0003 AC2, 4.5)."""
 
 import importlib.util
+import json
 import os
 import sys
 import warnings
@@ -12,10 +13,11 @@ from eng_contract.kinds import NEUTRAL_KINDS
 
 from eng_harness._calc import _hash
 from eng_harness._calc._approvals import APPROVALS_PATH, check_approvals, load_approvals
-from eng_harness.calc import CalcRegistry, CalcRegistryError
+from eng_harness.calc import CalcInput, CalcRegistry, CalcRegistryError
 from eng_harness.calcs import REGISTRY
 
 _FIXTURES = Path(__file__).resolve().parents[1] / "data" / "calcs" / "fixture_calcs.py"
+_STALE_OK = _FIXTURES.with_name("stale_ok.json")
 EMPTY: dict[str, object] = {"schema": 1, "calcs": []}
 
 
@@ -161,3 +163,20 @@ def test_shipped_calcs_are_draft() -> None:
     assert not any(finding.kind == "unknown_calc" for finding in findings)
     for finding in findings:  # spec 0003 4.5: stale entries are reported, not failed
         warnings.warn(f"stale approval for {finding.calc_id}", stacklevel=1)
+
+
+def test_stale_ok_fields_match_spec() -> None:
+    """AC49: the input fields marked `x-eng.stale_ok` are those of the spec 4.13 table, and no `never` field is."""
+    table = json.loads(_STALE_OK.read_text(encoding="utf-8"))
+    assert table["schema"] == 1
+    assert set(table["calcs"]) <= set(REGISTRY)
+    assert "harness.model_diff" in table["calcs"]
+    for calc_id in REGISTRY:
+        input_type = REGISTRY[calc_id].input_type
+        assert isinstance(input_type, type)
+        assert issubclass(input_type, CalcInput)
+        properties = input_type.model_json_schema()["properties"]
+        marked = sorted(name for name, prop in properties.items() if prop.get("x-eng", {}).get("stale_ok"))
+        assert marked == table["calcs"].get(calc_id, []), calc_id
+        for name in marked:
+            assert not any(name == n or name.startswith(f"{n}_") for n in table["never"]), (calc_id, name)

@@ -37,7 +37,11 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
   `spikes/**`. A member's `CHANGELOG.md`, `docs/local-testing.md` and `.gate/ratchet.json` are in scope when another
   in-scope file of that member changes.
 - If the task cannot fit its budget or needs a file outside its list, STOP and report `NEEDS_PLAN_AMENDMENT` with the
-  measured numbers and the exact amendment you propose. Never stretch, never weaken lint, types, tests or the gate, never
+  measured numbers and the exact amendment you propose. Before you report missing files, make the proposal COMPLETE:
+  apply every out-of-list edit the task needs as an uncommitted trial, run the gate (`--skip mutation`) for every
+  workspace member the change can affect (a contract change affects eng-harness; a calc input change affects the calc
+  lock, the calc's verification record and the tests that pin them) until each says `check: pass`, list every file
+  the trial touched, then revert the trial. A second amendment for a file the first one missed costs an hour. Never stretch, never weaken lint, types, tests or the gate, never
   add a suppression without the `# B-NNN: reason` form the repository already uses.
 - No escape-hatch tools in any allowlist, uv only, no new dependency without an ADR, no secrets or personal paths, no
   force push, no history rewrite, no host program is driven, nothing is sent outside the services of AGENTS.md section 9.
@@ -151,7 +155,7 @@ remove the owner file.
 
 ## 5b. Priority at the two locks (owner decision of 2026-11-12: the first live run comes first)
 
-`<lead>/PRIORITY.txt` (kept as `docs/build/priority.txt`) lists the work items on the path to the first live run. Before you start a full gate
+`<lead>/PRIORITY.txt` lists the work items on the path to the first live run. Before you start a full gate
 (section 4) or take the integration lock (section 5):
 
 - Your work item IS in the list: create `<lead>/locks/prio-wait.b<NNN>` first, then take the lock as usual,
@@ -178,6 +182,34 @@ in the repository) is the owner's instruction and takes precedence. Do not rewri
   (`git -C <build-v1> fetch origin build/v1 && git -C <build-v1> log origin/build/v1 --oneline | grep -E "B-464|B-467"`
   must show both). Until then wait with `timeout 570 bash -c 'sleep 560'` and check again, for at most four hours; if
   they are still missing, return `BLOCKED` saying so. Tasks that do not touch those fields are not held.
+- **Old field names in prompts and in work written before the rename.** B-467 is merged. Where your prompt, a writer
+  note or a branch written earlier names a basis field by its old name (for example `compare.length`,
+  `checks.readback_relative_tolerance`, `limits.ratio_limit`), the binding name is the one in the documents on
+  `origin/build/v1` now (edit-cycle spec 0007 section 4.8 and the spec of your own task). A writer finishing such a
+  branch renames the field in code and tests as part of its step and says so in its summary; a reviewer treats an old
+  name left in the change as a finding of severity high.
+- **Basis field names after B-484 (merged, pull request 330; the hold is lifted).** Every quantity basis path now
+  carries its contract unit suffix in the specs and plans on `origin/build/v1` (for example
+  `materials.concrete_fc_MPa`, `foundation.surcharge_kPa`, `durability.cover_footing_mm`, `compare.angle_deg`). The
+  binding name is the one in the spec of your task on `origin/build/v1`, whatever a clause document, an older prompt or
+  an older branch says (the protected clause documents keep the old names until the owner renames them; the specs say
+  so). A writer finishing a branch written before the rename (b281, b395, b396) renames the fields in code, tests,
+  golden data and verification records as part of its step and says so; a reviewer treats an old name left in the
+  change as a finding of severity high. Inventory: `<lead>/reports/b484-writer.md`.
+- **Calc source and mutation.** mutmut turns a negative index literal such as `items[-1]` into `items[+1]`, and the
+  calc-module rules test then fails on the mutated copy (FB005) before any mutant runs. In calc modules name the
+  element without a numeric literal (see commit 69e9475 of pull request 324). Do not change the rules test for it.
+- **Engine findings queue.** Open points the engine and run-blocker lanes reported are in
+  `<lead>/reports/lead-findings.md`. Do not fix them unless your plan task's text covers them; do not report
+  them again as new.
+- **Machine restart on 2026-11-14.** Every lane was stopped by the owner on 2026-11-12 at 20:38 UTC and the machine
+  restarted before the resume. Branches, worktrees and reports are intact. A local CI run directory whose `status.txt`
+  is not final (for example `<build-v1>/.localci/runs/pr321-9d851f90af-27438012`, "running gate") is dead: do
+  not wait for it, start a new run for the pull request's head. If `ops/localci.py start` reports a busy runner or a
+  stale worktree, run `python3 ops/localci.py release` and `git -C <build-v1> worktree prune`, then start
+  again. Run `uv sync --all-packages --locked` in your worktree before the first gate run if a tool is missing. Lock
+  owner files and priority files from before the restart were removed; if you find one older than the restart
+  (`uptime -s`), remove it.
 
 ## 6. Final answer of every agent
 

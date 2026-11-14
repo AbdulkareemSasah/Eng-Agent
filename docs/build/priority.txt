@@ -1,5 +1,4 @@
 # The paths in this copy are placeholders (<lead>, <build-v1>, <worktrees>): see docs/build/lead-playbook.md.
-# One work item per line, in the order of the first-live-run path (owner decision D-32 of 2026-11-12).
 B-455
 B-456
 B-113
@@ -12,8 +11,6 @@ B-118
 B-131
 B-132
 B-133
-B-135
-B-136
 B-138
 B-147
 B-460
@@ -48,16 +45,17 @@ B-464
 B-465
 B-466
 B-228
-B-223
-B-225
-B-226
 B-229
-B-210
-B-211
-B-212
 B-467
 B-468
 B-469
 B-470
 B-471
 B-472
+B-474
+B-480
+B-475
+B-481
+B-482
+B-483
+B-484

@@ -355,13 +355,16 @@ class FakeInputPort(_Scripted[InputRequest, InputAnswer]):
 class FakeDecisionPort:
     """A DecisionPort whose `handler` answers each call (by default: the first option, decided by `rule:fake`).
 
-    `calls` holds every call that reached the port, in order, and `batches` the size of each `decide_many`.
+    `calls` holds every call that reached the port, in order, and `batches` the size of each `decide_many`;
+    `runtime` is what `runtime_summary()` returns and `summaries` counts its calls.
     """
 
     def __init__(self, handler: Callable[[DecisionCall], DecisionAnswer | PendingAnswer] | None = None) -> None:
         self.handler = handler or self._first
         self.calls: list[DecisionCall] = []
         self.batches: list[int] = []
+        self.runtime: dict[str, JsonValue] = {}
+        self.summaries = 0
 
     @staticmethod
     def _first(call: DecisionCall) -> DecisionAnswer:
@@ -381,6 +384,11 @@ class FakeDecisionPort:
         self.calls.extend(calls)
         self.batches.append(len(calls))
         return [self.handler(call) for call in calls]
+
+    def runtime_summary(self) -> dict[str, JsonValue]:
+        """Count the call and return `runtime`."""
+        self.summaries += 1
+        return dict(self.runtime)
 
 
 @dataclass
