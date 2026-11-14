@@ -390,12 +390,13 @@ class Ctx:
             value = fields.model_validate({name: item["value"] for name, item in kept["fields"].items()})
             return Answered(value=value, ref=Ref.model_validate({"$ref": done.ref}))
         answer, given = await self._decider.asked(path, title, fields)
-        entered = {"unit": None, "entered_by": answer.by, "entered_at": self._clock.now()}
+        who = answer.by.removeprefix("engineer:")
+        entered = {"unit": None, "entered_by": who, "entered_at": self._clock.now()}
         held: _Obj = {name: {"value": item, **entered} for name, item in given.model_dump(mode="json").items()}
         stored = self._store.put(
-            "basis.engineer_input/1", {"step": answer.request_id, "fields": held}, self._producer()
+            "basis.engineer_input/1", {"step": path, "fields": held}, self._producer()
         )
-        by = "engineer:" + answer.by.removeprefix("engineer:")
+        by = "engineer:" + who
         self._writer.append(
             EventType.INPUT_PROVIDED, {"request_id": answer.request_id, "answer_ref": stored.result_id, "by": by}
         )

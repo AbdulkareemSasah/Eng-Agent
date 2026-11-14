@@ -35,10 +35,10 @@ def _rid(run_id: str, path: str) -> str:
     return "ask_" + hashlib.sha256(f"{run_id}\n{path}".encode()).hexdigest()[:32]
 
 
-def _answer(rig: Rig, rid: str, values: dict[str, Any]) -> None:
+def _answer(rig: Rig, rid: str, values: dict[str, Any], by: str = "ada") -> None:
     shown = rig.inputs.presented[-1]
     rig.inputs.script(
-        rid, InputAnswer(request_id=rid, shown_sha256=shown.fields_schema_sha256, values=values, by="ada")
+        rid, InputAnswer(request_id=rid, shown_sha256=shown.fields_schema_sha256, values=values, by=by)
     )
 
 
@@ -72,7 +72,7 @@ def test_ask_stores_engineer_input(tmp_path: Path) -> None:
     second_pause = asyncio.run(engine.resume(paused.run_id))  # the first ask is replayed, the second one waits
     assert (second_pause.status, second_pause.pending) == (RunStatus.PAUSED, (second,))
     assert [r.request_id for r in rig.inputs.presented] == [first, first, first, second]
-    _answer(rig, second, {"width": "250", "count": 2})
+    _answer(rig, second, {"width": "250", "count": 2}, by="engineer:ada")  # a port that prefixes `by`
     done = asyncio.run(engine.resume(paused.run_id))
     assert done.status is RunStatus.COMPLETED
     assert [r.request_id for r in rig.inputs.presented][-1] == second  # the answered first ask was not shown again
@@ -80,9 +80,12 @@ def test_ask_stores_engineer_input(tmp_path: Path) -> None:
     provided = [e.payload for e in rig.events(done.run_id) if isinstance(e.payload, ev.InputProvided)]
     assert [(p.request_id, p.by) for p in provided] == [(first, "engineer:ada"), (second, "engineer:ada")]
     stored = cast(dict[str, Any], rig.store.payload(provided[0].answer_ref))
-    assert stored["step"] == first
+    assert stored["step"] == "0"  # the step path that asked, not the request id
     assert {k: v["value"] for k, v in stored["fields"].items()} == {"width": "300", "count": 4}
     assert {v["entered_by"] for v in stored["fields"].values()} == {"ada"}
+    again_stored = cast(dict[str, Any], rig.store.payload(provided[1].answer_ref))
+    assert again_stored["step"] == "1"
+    assert {v["entered_by"] for v in again_stored["fields"].values()} == {"ada"}  # the prefix is not doubled
     assert done.output is not None
     refs = [provided[0].answer_ref, f"{provided[0].answer_ref}#/fields/width/value", provided[1].answer_ref]
     assert cast(Any, done.output).refs == refs
