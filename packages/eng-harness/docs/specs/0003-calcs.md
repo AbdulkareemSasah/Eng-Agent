@@ -542,8 +542,9 @@ embedded), `complete`.
   Otherwise the value at `pointer` is compared by D3 and D4, giving `match` or `mismatch`. For `add`: the object is
   present and every leaf matches gives `match`, else `missing` or `mismatch`. For `remove`: absent gives `match`.
 - R3. Each change in R1 (each changed property, added or removed object) must be explained by an effect with the same
-  section and key whose pointer equals or is a prefix of the property's pointer. Unexplained changes go to
-  `unexpected`. An ambiguous key or a `not_compared` section in R1 makes the result `NEEDS_ENGINEER`.
+  section and key (an effect's `key` is the reported key of §4.7 D2, list name included; amendment B-483) whose
+  pointer equals or is a prefix of the property's pointer. Unexplained changes go to `unexpected`. An ambiguous key or
+  a `not_compared` section in R1 makes the result `NEEDS_ENGINEER`.
 - R4. Status: `FAIL` if any `mismatch` or `missing` or anything is `unexpected`. Otherwise `NEEDS_ENGINEER` if any
   `not_read`, an incomplete side, or R3's ambiguity. Otherwise `PASS`.
 

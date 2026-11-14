@@ -21,12 +21,25 @@ Status: Proposed · Applies to: every repository
 - Local or private providers are a setting, for projects that must not leave the machine. A project can be marked
   `local_only`, which disables cloud providers for its runs.
 - No telemetry is sent anywhere by any component. Diagnostics stay in the workspace.
+- Task logs are never sent to the decision provider or to CI reviewer providers. Development sessions may read them
+  through their configured model provider ([ADR-0034](../adr/0034-task-log-by-default.md) D11); nothing from a log
+  leaves `tasklog/` except ids, categories, counts and owner-released need statements (A24).
 
 ## 3. Secrets
 
 - Provider keys are stored in the operating system's credential store and read at runtime.
 - Keys never appear in project files, templates, journals, logs, error messages, or URLs.
 - Repositories contain no secrets; a secret scan runs in CI and before any repository becomes public.
+- Task logs pass a guard before writing that keeps secrets, tokens, page launch addresses and personal paths out of
+  every record, withholding a matching span of owner words with a visible marker (ADR-0034 D7).
+
+### Task-log privacy policy, credential exception and publication
+
+The task logs under `tasklog/` are the one place client data may be committed, and the owner's login is used for one
+narrow purpose: pushing log-only commits from his machine. The privacy policy (`full` now, `sanitized` later) is a
+separate, replaceable component; the workspace repository is never made public, and anything published comes from a
+fresh or filtered history after `publish-check`. The rules are ADR-0034 D6 (credential exception), D7 (guard and
+policy), D8 (the A11 exception and A24) and D9 (publication block).
 
 ## 4. Untrusted input
 
