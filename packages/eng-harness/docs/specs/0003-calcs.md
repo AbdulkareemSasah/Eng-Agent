@@ -312,9 +312,18 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.refs` (`RefString`, `JsonPointer`), `eng_contract.errors` (`ContractError`, `ErrorCode`),
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
 `enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
-(`eng_param`, for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs). `calcs/__init__.py` may import
+(`eng_param`, for ref-capable inputs), `eng_harness.kinds.footing` (footing calcs), `eng_harness.kinds.edit_cycle`
+(edit-cycle calcs) and `eng_harness.workflows.model_edit_cycle._change_set` (the change-set model of spec 0007 §4.3,
+input of the edit-cycle calcs). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
+
+The change-set model is admitted by that module's own name only (amendment B-493). It imports only `typing`,
+`pydantic`, `eng_contract.kinds.basis`, `eng_contract.units` and `eng_harness.kinds.edit_cycle`: no engine, port,
+adapter or I/O. Its package `__init__` holds the workflow definition (spec 0007 §4.1), so an import from
+`eng_harness.workflows.model_edit_cycle` itself stays refused. The module and the `eng_harness` modules it imports
+enter the calc's `modules` (§4.5), so a change to the change-set model changes the hash of each calc that imports it,
+which then needs verification again (process/10 §5); the package `__init__` does not (an implicit parent, B-388).
 
 The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
 including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).
