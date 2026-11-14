@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.refs import Ref
@@ -494,3 +495,30 @@ def test_sensitive_values_are_the_file_names_the_run_touches(tmp_path: Path) -> 
         None, rig.inputs, lambda: pytest.fail("no basis"), lambda: events, no_writer, rig.clock, rig.ids, run_id, []
     )
     assert decider._sensitive() == ("a.edb", "client.edb", "copy.edb")
+
+
+@pytest.mark.parametrize("kind", ["decide", "decide_many"])
+def test_a_decision_step_in_flight_runs_again_at_a_resume(tmp_path: Path, kind: str) -> None:
+    """A decision step is in flight only between its `step_started` and its end: spec 4.5.3 reruns it (AC32)."""
+    rig = make_rig(tmp_path)
+    asked = DecisionRequest("pick_action", Action, State(failing=True), [], DecisionPolicy())
+
+    async def body(ctx: Any) -> list[str]:
+        if kind == "decide":
+            await ctx.decide("pick_action", Action, State(failing=True), [], DecisionPolicy())
+        else:
+            await ctx.decide_many([asked])
+        return []
+
+    wanted = {"question": "pick_action", "options": ["enlarge", "rebar"], "state": {"failing": True}}
+    cut = {
+        "kind": kind, "name": "pick_action" if kind == "decide" else "decide_many",
+        "args": {"requests": [wanted]}, "args_sha256": payload_sha256({"requests": [wanted]}), "effect": "none",
+    }  # fmt: skip
+    run_id = rig.forge(flow(body), (T.STEP_STARTED, "0", cut))
+    port = FakeDecisionPort()
+    done = asyncio.run(_engine(rig, flow(body), port).resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    reruns = [e for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
+    assert [(e.path, e.payload.reason) for e in reruns] == [("0", "read_in_flight")]
+    assert len(port.calls) == 1
