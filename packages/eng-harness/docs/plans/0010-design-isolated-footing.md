@@ -68,6 +68,7 @@ tasks:
   - id: T3b
     # Amendment (B-484, documents only): code follow-up of the basis renames of B-467 and B-484 in merged code and test
     # data; regenerates the calc's lock entry and the hash line of its verification record.
+    # Amendment (B-495, documents only): owner answer of 2026-11-14: the calc stays version 1 (prose of T3b).
     title: Merged harness.footing_subjects and test data read the suffixed basis names
     files:
       - "packages/eng-harness/CHANGELOG.md"
@@ -379,8 +380,8 @@ kind fixtures `model_diff.json` and `readback_check.json` becomes `compare.lengt
 that show it; the change-set test's basis path `loads.floor_dead_kpa` (an area load, spec 0007 §4.3.1) becomes
 `loads.floor_dead_kPa`. No rule, value or bound changes. The rename changes the calc's content hash: the task
 regenerates its `calcs.lock.json` entry and the hash and basis-field lines of its verification record, which stays
-`draft`, and the owner re-verifies the calc (owner queue). The calc keeps version 1 (draft, never approved); if the
-owner rules that the renamed input needs a new version (calcs spec §4.2, stable ids), the lead amends this task. Test
+`draft`, and the owner re-verifies the calc (owner queue). The calc keeps version 1 (draft, never approved): by the
+owner answer of 2026-11-14 (amendment B-495) the renamed input needs no version 2 (calcs spec §4.2, stable ids). Test
 order: the first `test:` commit holds the three `test_subjects.py` tests and the renamed golden files, which fail at
 the base because the merged calc reads `compare.angle`; the kind fixtures, snapshots and change-set test come in a
 later commit (they pass at the base).

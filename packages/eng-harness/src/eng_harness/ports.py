@@ -22,6 +22,7 @@ from eng_contract.refs import Ref, RefRule, RefString
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, model_validator
 
 from eng_harness.calc import CalcStatus
+from eng_harness.ctx import Preview
 from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, EngineerChoice, PendingAnswer
 from eng_harness.journal import Event
 
@@ -262,6 +263,9 @@ class ToolPort(Protocol):
 
     async def read_back(self, tool: str, args: _Obj) -> Envelope | None:
         """Read the state a write would produce, or `None` when the adapter has no read-back for `tool`."""
+
+    async def preview(self, tool: str, args: _Obj) -> Preview:
+        """What a call of `tool` with `args` would change, for an approval (spec 0001 4.8); it changes nothing."""
 
 
 class HostPort(Protocol):
