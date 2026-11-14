@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Basis paths: the last segment of a `basis.design_basis/1` field path may end with one unit suffix of `units.QUANTITY_KINDS` written as the table writes it (`compare.stress_MPa`, `bounds.w_kN_m`, `limits.drift_ratio`); the pattern is built from the table, and the `basis.design_basis-1` schema snapshot is regenerated. Every path valid before stays valid, so the kind stays `/1` in the unreleased 0.1.0 (owner decision OQ-Q44, spec 4.10.2, AC48a; B-464, plan task T19).
 - Fix: `RefInput.ref` uses `refs.RefString` (a pointer may hold a newline) and the local pattern is gone; `make_success` documents `CanonicalJsonError`; the comment on `Quantity._key` cites spec 4.8 rule 4 (amended by B-069); schema snapshots regenerated (B-084, plan task T18).
 - JSON Schema snapshots in `docs/schema/` and the exporter `_schema_export` (`uv run python -m eng_contract._schema_export docs/schema`), spec 4.12, with the freshness test AC51 (B-025, plan task T16). Owner queue: the `source` of each `units.json` entry points to `docs/verification/units.md` because the unit table keeps citations in comments only (gap G-4); the version bump to `0.1.0` is outside the T16 file globs (`pyproject.toml`, `__init__.py`, `test_package.py`) and needs a plan amendment or the release task; AC52 and AC53 are proven by the gate in CI.
 
