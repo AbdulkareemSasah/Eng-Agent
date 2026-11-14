@@ -6,7 +6,8 @@ this module applies D1 (a section is compared only when both sides hold it: the 
 version and records are always `canonical/1`), D6 (nothing is normalized) and D7.
 Inputs: `before_<section>` and `after_<section>` (the two read sets, flat because the CalcPort resolves top-level
 references only; `before_*` is `stale_ok`, spec 4.13) and `basis`.
-Units: tolerances are the `compare.*` basis fields of spec 4.4, one per quantity kind, in its canonical unit.
+Units: tolerances are the `compare.*` basis fields of spec 4.4 (`compare.length_mm` ... `compare.dimensionless_ratio`),
+one per contract quantity kind that the path's unit suffix names, in its canonical unit.
 Errors: `ContractError` `INVALID_ARGUMENT` (with `field`) for a basis field that is missing, unconfirmed, in another
 unit, not a number or negative (no default), a basis or section given without a record, a record without a host
 model, or one side mixing models or revisions; a `ValidationError` when a side has no section.
@@ -38,13 +39,13 @@ from eng_harness.kinds.calcs import Change, DiffBody, SectionCounts, Side, Toler
 __all__ = ["BASIS_FIELDS", "TOLERANCE_FIELDS", "DiffInput", "model_diff", "read_tolerances"]
 
 TOLERANCE_FIELDS: tuple[tuple[str, str, str], ...] = (
-    ("compare.length", "length", "mm"),
-    ("compare.angle", "angle", "deg"),
-    ("compare.stress", "stress", "MPa"),
-    ("compare.unit_weight", "unit_weight", "kN/m3"),
-    ("compare.line_load", "line_load", "kN/m"),
-    ("compare.area_load", "area_load", "kPa"),
-    ("compare.ratio", "dimensionless", "1"),
+    ("compare.length_mm", "length", "mm"),
+    ("compare.angle_deg", "angle", "deg"),
+    ("compare.stress_MPa", "stress", "MPa"),
+    ("compare.unit_weight_kN_m3", "unit_weight", "kN/m3"),
+    ("compare.line_load_kN_m", "line_load", "kN/m"),
+    ("compare.area_load_kPa", "area_load", "kPa"),
+    ("compare.dimensionless_ratio", "dimensionless", "1"),
 )
 """The spec 4.4 table rows this calc reads: basis path, quantity kind (`kind_for_field` name) and unit."""
 BASIS_FIELDS = tuple(path for path, _, _ in TOLERANCE_FIELDS)
@@ -117,9 +118,9 @@ def read_tolerances(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> t
 
 def _side(inp: DiffInput, meta: InputMeta, side: str) -> tuple[Side, bool, dict[str, dict[str, Any]]]:
     """One side's model and revision (one of each), whether its records are complete, and its payloads by kind."""
-    identity: tuple[str, int] | None = None
     complete = True
     payloads: dict[str, dict[str, Any]] = {}
+    identities: list[tuple[str, int]] = []
     for name, kind in SECTIONS:
         field = f"{side}_{name}"
         if (payload := getattr(inp, field)) is None:
@@ -128,16 +129,14 @@ def _side(inp: DiffInput, meta: InputMeta, side: str) -> tuple[Side, bool, dict[
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "a section must be a record reference", field=field)
         if ref.model_id is None or ref.model_revision is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "the record names no host model", field=field)
-        identity = identity or (ref.model_id, ref.model_revision)
-        if (ref.model_id, ref.model_revision) != identity:
+        identities.append((ref.model_id, ref.model_revision))
+        if identities[-1] != identities[0]:
             message = "the records of one side belong to different models or revisions"
             raise ContractError(ErrorCode.INVALID_ARGUMENT, message, field=field)
         complete = complete and ref.complete
         payloads[kind] = payload.model_dump(mode="json", by_alias=True, exclude_none=False)
-    if identity is None:  # the input model requires a section on each side; kept for the type checker
-        raise ContractError(ErrorCode.INVALID_ARGUMENT, "each side needs at least one section", field=side)
-    covered = sorted(payloads)
-    return Side(model_id=identity[0], model_revision=identity[1], covered=covered), complete, payloads
+    model_id, revision = identities[0]  # `DiffInput` holds at least one section on each side
+    return Side(model_id=model_id, model_revision=revision, covered=sorted(payloads)), complete, payloads
 
 
 def _tally(counts: SectionCounts) -> str:
