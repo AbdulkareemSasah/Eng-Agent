@@ -37,9 +37,7 @@ def _rid(run_id: str, path: str) -> str:
 
 def _answer(rig: Rig, rid: str, values: dict[str, Any], by: str = "ada") -> None:
     shown = rig.inputs.presented[-1]
-    rig.inputs.script(
-        rid, InputAnswer(request_id=rid, shown_sha256=shown.fields_schema_sha256, values=values, by=by)
-    )
+    rig.inputs.script(rid, InputAnswer(request_id=rid, shown_sha256=shown.fields_schema_sha256, values=values, by=by))
 
 
 def _body(seen: list[Any]) -> Any:

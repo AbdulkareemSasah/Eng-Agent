@@ -393,9 +393,7 @@ class Ctx:
         who = answer.by.removeprefix("engineer:")
         entered = {"unit": None, "entered_by": who, "entered_at": self._clock.now()}
         held: _Obj = {name: {"value": item, **entered} for name, item in given.model_dump(mode="json").items()}
-        stored = self._store.put(
-            "basis.engineer_input/1", {"step": path, "fields": held}, self._producer()
-        )
+        stored = self._store.put("basis.engineer_input/1", {"step": path, "fields": held}, self._producer())
         by = "engineer:" + who
         self._writer.append(
             EventType.INPUT_PROVIDED, {"request_id": answer.request_id, "answer_ref": stored.result_id, "by": by}
