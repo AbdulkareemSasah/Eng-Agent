@@ -1,0 +1,332 @@
+{
+  "source": "eng-harness spec 0003 §4.8 (R0 to R4), §4.7 (D1 to D7) and §4.4; synthetic read sets, effects and tolerances, no project value",
+  "method_ref": "§4.8 R3",
+  "synthetic": true,
+  "derivation": "Revision 3: frames F1 and F2 (section S1). Revision 4: F1 section S2, F2 section S3. Tolerances 1. R1: F1 changed at /section ('S1' to 'S2', D4) and F2 changed at /section ('S1' to 'S3', D4); counts changed 2, unchanged 0. R2: e1 expects 'S2' at /section of ['frames','F1'] and reads 'S2': match (D4). R3: the F1 change is explained by e1; no effect names ['frames','F2'], so its /section change is unexpected. R4: something is unexpected: FAIL.",
+  "inputs": {
+    "input": {
+      "before_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "after_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S2",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S3",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 1.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.angle_deg": {
+            "value": 1.0,
+            "unit": "deg",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.stress_MPa": {
+            "value": 1.0,
+            "unit": "MPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.unit_weight_kN_m3": {
+            "value": 1.0,
+            "unit": "kN/m3",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.line_load_kN_m": {
+            "value": 1.0,
+            "unit": "kN/m",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.area_load_kPa": {
+            "value": 1.0,
+            "unit": "kPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.dimensionless_ratio": {
+            "value": 1.0,
+            "unit": "1",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      },
+      "effects": {
+        "change_set": "res_00000000000000000000000005",
+        "model_id": "mdl_00000000000000000000000000",
+        "effects": [
+          {
+            "item_id": "e1",
+            "section": "model.frame_placements/1",
+            "key": [
+              "frames",
+              "F1"
+            ],
+            "op": "set",
+            "pointer": "/section",
+            "value": "S2",
+            "unit": null
+          }
+        ]
+      }
+    },
+    "meta": {
+      "refs": {
+        "before_frames": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "after_frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "effects": {
+          "result_id": "res_00000000000000000000000008",
+          "kind": "harness.expected_effects/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [
+            "res_00000000000000000000000005",
+            "res_00000000000000000000000001"
+          ],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "FAIL",
+    "items": [
+      {
+        "item_id": "e1",
+        "result": "match",
+        "expected": "S2",
+        "read": "S2",
+        "tolerance": null,
+        "rule": "D4"
+      }
+    ],
+    "unexpected": [
+      {
+        "section": "model.frame_placements/1",
+        "key": [
+          "frames",
+          "F2"
+        ],
+        "pointer": "/section"
+      }
+    ],
+    "diff": {
+      "before": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 3,
+        "covered": [
+          "model.frame_placements/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 4,
+        "covered": [
+          "model.frame_placements/1"
+        ]
+      },
+      "tolerances": {
+        "length": {
+          "value": 1.0,
+          "unit": "mm",
+          "ref": "res_00000000000000000000000009#/fields/compare.length_mm"
+        },
+        "angle": {
+          "value": 1.0,
+          "unit": "deg",
+          "ref": "res_00000000000000000000000009#/fields/compare.angle_deg"
+        },
+        "stress": {
+          "value": 1.0,
+          "unit": "MPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.stress_MPa"
+        },
+        "unit_weight": {
+          "value": 1.0,
+          "unit": "kN/m3",
+          "ref": "res_00000000000000000000000009#/fields/compare.unit_weight_kN_m3"
+        },
+        "line_load": {
+          "value": 1.0,
+          "unit": "kN/m",
+          "ref": "res_00000000000000000000000009#/fields/compare.line_load_kN_m"
+        },
+        "area_load": {
+          "value": 1.0,
+          "unit": "kPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.area_load_kPa"
+        },
+        "dimensionless": {
+          "value": 1.0,
+          "unit": "1",
+          "ref": "res_00000000000000000000000009#/fields/compare.dimensionless_ratio"
+        }
+      },
+      "changes": [
+        {
+          "section": "model.frame_placements/1",
+          "key": [
+            "frames",
+            "F1"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/section",
+              "before": "S1",
+              "after": "S2",
+              "unit": null,
+              "quantity_kind": null,
+              "tolerance": null,
+              "rule": "D4"
+            }
+          ]
+        },
+        {
+          "section": "model.frame_placements/1",
+          "key": [
+            "frames",
+            "F2"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/section",
+              "before": "S1",
+              "after": "S3",
+              "unit": null,
+              "quantity_kind": null,
+              "tolerance": null,
+              "rule": "D4"
+            }
+          ]
+        }
+      ],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {
+        "model.frame_placements/1": {
+          "added": 0,
+          "removed": 0,
+          "changed": 2,
+          "ambiguous": 0,
+          "unchanged": 0,
+          "within_tolerance": 0
+        }
+      },
+      "identical": false,
+      "complete": true
+    },
+    "complete": true
+  }
+}
