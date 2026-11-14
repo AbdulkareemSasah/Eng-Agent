@@ -79,7 +79,7 @@ Process enforcement is code, and it lives in one repository so no repository can
 | `test-first` | Linux | [05](05-testing-and-verification.md) §9 |
 | `ci-review` | Linux | CI reviewers ([06](06-review-and-merge.md) §1), posting under the reviewer identity; re-runs on new commits |
 | `agents-drift` | Linux | `AGENTS.md` equals its rendering from the pinned template |
-| `security` | Linux | Secret scan; dependency vulnerability audit |
+| `security` | Linux | Secret scan; dependency vulnerability audit. On a push to the integration branch: `secrets --range`, `push-scope` and `tasklog-lint` over the pushed commits ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5) |
 | `windows` | Windows | Tests of adapters that only import on Windows (with fakes) |
 | `build` | Linux (Windows for C#) | `uv build`; `dotnet build -warnaserror` and `dotnet test` for C# parts |
 
@@ -91,7 +91,7 @@ maintainer applies a label).
 
 | Identity | Who uses it | Rights |
 |---|---|---|
-| Owner account | The owner only | Admin. Its token never exists in any agent environment |
+| Owner account | The owner only | Admin. Its token never exists in any agent environment; the one recorded exception is the log-only push on the owner's machine ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D6) |
 | Agent identity (GitHub App, or a machine user account) | Coding agents | Write to branches, open pull requests, comment, assign itself. No admin, no bypass, no settings, no secrets |
 | Reviewer identity (GitHub App) | The `ci-review` workflow | Post reviews and status checks only |
 
