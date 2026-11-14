@@ -2,12 +2,13 @@
 
 Test doubles only: a fake host with a ledger of every call and its `op_id`, scripted outcomes, model state with
 revision and fingerprint, units, a host crash, session epochs and leases; a fake CalcPort, BasisPort, ApprovalPort and
-InputPort with scripted answers; a recording ProgressSink and a RunControlPort. Nothing here reads a clock, a network
-or a host program. Revisions and fingerprints are counters, not engineering values.
+InputPort with scripted answers; a DecisionPort whose handler answers each call; a recording ProgressSink and a
+RunControlPort. Nothing here reads a clock, a network or a host program. Revisions and fingerprints are counters, not
+engineering values.
 """
 
 from collections import defaultdict, deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock, IdSource, new_model_id, new_result_id
 from pydantic import JsonValue
 
+from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
 from eng_harness.journal import Event
 from eng_harness.ports import (
     ApprovalAnswer,
@@ -350,6 +352,37 @@ class FakeInputPort(_Scripted[InputRequest, InputAnswer]):
         self.presented.append(request)
 
 
+class FakeDecisionPort:
+    """A DecisionPort whose `handler` answers each call (by default: the first option, decided by `rule:fake`).
+
+    `calls` holds every call that reached the port, in order, and `batches` the size of each `decide_many`.
+    """
+
+    def __init__(self, handler: Callable[[DecisionCall], DecisionAnswer | PendingAnswer] | None = None) -> None:
+        self.handler = handler or self._first
+        self.calls: list[DecisionCall] = []
+        self.batches: list[int] = []
+
+    @staticmethod
+    def _first(call: DecisionCall) -> DecisionAnswer:
+        values = tuple(str(m.value) for m in call.options) if isinstance(call.options, type) else call.options
+        choice = values[0] if isinstance(call.options, type) else "0"  # reference options answer by index
+        return DecisionAnswer(
+            choice=choice, decided_by="rule:fake", latency_ms=0, options=values, state_sha256="0" * 64
+        )
+
+    async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
+        """Record the call and return what the handler answers."""
+        self.calls.append(call)
+        return self.handler(call)
+
+    async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
+        """Record the calls and the batch size, and return one answer for each call."""
+        self.calls.extend(calls)
+        self.batches.append(len(calls))
+        return [self.handler(call) for call in calls]
+
+
 @dataclass
 class RecordingProgressSink:
     """A ProgressSink that records every event in arrival order."""
@@ -376,6 +409,7 @@ __all__ = [
     "FakeApprovalPort",
     "FakeBasisPort",
     "FakeCalcPort",
+    "FakeDecisionPort",
     "FakeHost",
     "FakeInputPort",
     "FakeRunControl",
