@@ -268,10 +268,12 @@ def test_force_mappers_convert_to_canonical() -> None:
         "frame": "B1", "case": "1.4D", "kind": "combo", "step": "Max", "end": "j", "station": 1250.0,
         "P": -10.0, "V2": 4.5, "V3": 0.5, "T": 100.0, "M2": 200.0, "M3": -7750.0,
     }  # fmt: skip
-    forces = _replies.member_forces({"items": [frame, {**frame, "end": "mid", "step": "", "kind": "case"}]}, mm)
+    rows = [frame, {**frame, "end": "mid", "step": "", "kind": "case"}, {**frame, "end": "i", "step": None}]
+    forces = _replies.member_forces({"items": rows}, mm)
     assert isinstance(forces, MemberEnd)
     assert forces.sign_convention == "host_local/1"
-    first, second = forces.rows
+    first, second, third = forces.rows
+    assert (third.end, third.case.step) == ("i", None)
     assert (first.member, first.end, first.station_mm) == ("B1", "j", 1250.0)
     assert (first.case.case_type.value, first.case.step) == ("load_combination", "Max")
     assert (first.P_kN, first.V2_kN, first.V3_kN) == (-10.0, 4.5, 0.5)

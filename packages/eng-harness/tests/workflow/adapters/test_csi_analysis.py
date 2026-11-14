@@ -262,6 +262,7 @@ def test_force_results_are_neutral_kinds(
         target = {"product": "ETABS", "pid": pid}
         assert recorder.sent[0][2] == {**cases, "object": "J1", "units": "kN_m_C", "target": target}
         assert recorder.sent[1][2] == {**cases, "units": "kN_m_C", "target": target}
+        assert recorder.sent[2][2] == {**cases, "units": "kN_m_C", "target": target}
         assert reactions.data["rows"][0]["FZ_kN"] == 120.25  # kN stays kN
         assert frames.data["rows"][0]["station_mm"] == 1250.0  # 1.25 m
         assert frames.data["rows"][0]["case"] == {"case": "1.4D", "case_type": "load_combination", "step": None}
@@ -294,3 +295,25 @@ def test_only_edits_are_marked_as_writes(
         assert marks == []
 
     _run(make_config(), run_dir, store, body, marks=marks)
+
+
+def test_argument_bounds() -> None:
+    """The design kind is one of the four the host names; the row cap is the host's 1 to 2000, 2000 by default."""
+    from pydantic import ValidationError
+
+    from eng_harness.adapters.csi._tools import ANALYSIS_MODELS
+
+    results = ANALYSIS_MODELS["DesignResultsArgs"]
+    assert results.model_validate({"model": "m", "kind": "concrete"}).model_dump()["limit"] == 2000
+    for limit in (1, 2000):
+        assert results.model_validate({"model": "m", "kind": "steel", "limit": limit}).model_dump()["limit"] == limit
+    for bad in ({"limit": 0}, {"limit": 2001}, {"kind": "timber"}):
+        with pytest.raises(ValidationError):
+            results.model_validate({"model": "m", "kind": "steel", **bad})
+    with pytest.raises(ValidationError):
+        ANALYSIS_MODELS["DesignRunArgs"].model_validate({"model": "m", "kind": "timber"})
+    assert ANALYSIS_MODELS["ResultsStoryDriftsArgs"].model_validate({"model": "m"}).model_dump() == {
+        "model": "m",
+        "cases": [],
+        "combos": [],
+    }
