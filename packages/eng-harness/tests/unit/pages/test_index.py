@@ -4,10 +4,13 @@ import asyncio
 from http import HTTPStatus
 from pathlib import Path
 
-from helpers.engine_standin import approval_request, in_thread, input_request, until, wired
+from helpers.engine_standin import SHA, approval_request, in_thread, input_request, until, wired
 
+from eng_harness._html import Tag, Text, el, trusted
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
+from eng_harness.pages import PageApprovalPort, Screen
+from eng_harness.pages._security import Subject
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, InputRequest
 
 
@@ -51,3 +54,50 @@ def test_multiple_open_requests(tmp_path: Path) -> None:
         if isinstance(e.payload, ev.ApprovalResolved | ev.InputProvided)
     ]
     assert journal == [middle.request_id, requests[0].request_id, requests[2].request_id, choice.request_id]
+
+
+def test_a_kind_without_a_builder_gets_a_refusal_screen(tmp_path: Path) -> None:
+    request = approval_request("apr_promo", kind="PROMOTION")
+    with wired(tmp_path, wait_timeout_s=0.3) as w:
+        future = w.open(request)
+        page = w.client.get("/request/apr_promo")
+        assert page.status == HTTPStatus.OK
+        assert "This request cannot be answered here" in page.body
+        assert "PROMOTION" in page.body
+        assert "<form" not in page.body
+        assert "<button" not in page.body  # no form and no button
+        assert w.client.get("/request/apr_none").status == HTTPStatus.NOT_FOUND
+        refused = w.client.post("/answer/apr_promo", {"shown_sha256": SHA, "by": "ada", "decision": "approve"})
+        assert refused.status >= HTTPStatus.BAD_REQUEST  # no form was offered, so no token exists: nothing answers
+        assert future.result(5) is None  # the engine pauses at the wait timeout with no answer
+
+
+def test_index_report_and_setup_hooks(tmp_path: Path) -> None:
+    def setup(setup_id: str) -> Screen | None:
+        body = [el(Tag.P, Text("setup page"))]
+        return Screen(trusted("Setup"), Subject("setup", setup_id, "c" * 64), frozenset(), lambda _token: body)
+
+    with wired(tmp_path) as w:
+        index = w.client.get("/")
+        assert 'href="/report"' in index.body
+        assert "None" in index.body  # no open request
+        assert "The report is not available yet." in w.client.get("/report").body
+        assert w.client.get("/setup/setup_one").status == HTTPStatus.NOT_FOUND
+    with wired(tmp_path / "hooks", report=lambda: "the report", setup=setup) as w:
+        assert w.client.get("/report").body == "the report"
+        assert "setup page" in w.client.get("/setup/setup_one").body
+        assert (
+            w.client.post("/setup/setup_one", {"csrf": "x"}).status == HTTPStatus.FORBIDDEN
+        )  # the token binds the draft
+
+
+def test_untrusted_title_is_escaped_and_labeled(tmp_path: Path) -> None:
+    request = approval_request(title="<b>x</b> & more")
+    with wired(tmp_path, wait_timeout_s=0.3) as w:
+        future = w.open(request)
+        body = w.client.get("/").body
+        assert future.result(5) is None  # the engine pauses at the wait timeout with no answer
+    assert "<b>x</b>" not in body
+    assert "&lt;b&gt;x&lt;/b&gt; &amp; more" in body
+    assert '<bdi dir="auto">' in body
+    assert PageApprovalPort().hub.index().status == HTTPStatus.OK

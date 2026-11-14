@@ -68,6 +68,8 @@ class PageHub:
         """The accepted answer, or `None` for no answer, a stop, the wait timeout or `wait=False` (engine loop)."""
         with self._cond:
             entry = self._open.get(request_id)
+            if entry is not None and entry.answer is not None:
+                return entry.answer  # taken before the loop saw the event
         if entry is None or not await wait_for(
             entry.event, wait=wait, stop_requested=self.stop_requested, timeout_s=self.wait_timeout_s
         ):

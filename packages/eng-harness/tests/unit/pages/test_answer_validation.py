@@ -6,7 +6,7 @@ from http import HTTPStatus
 from pathlib import Path
 
 import pytest
-from helpers.engine_standin import SHA, approval_request, until, wired
+from helpers.engine_standin import SHA, approval_request, input_request, until, wired
 
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
@@ -18,6 +18,7 @@ from eng_harness.pages._answers import (
     REJECT,
     AnswerError,
     ApprovalSubmission,
+    ChoiceSubmission,
     engineer_name,
     parse,
 )
@@ -82,6 +83,36 @@ def test_reasons_and_items(tmp_path: Path) -> None:
         e.payload for e in JournalReader(w.engine.run_dir).events() if isinstance(e.payload, ev.ApprovalResolved)
     ]
     assert [r.reason for r in resolved] == ["no"]
+
+
+def test_accepted_forms_and_the_other_hash() -> None:
+    one = parse(REQUEST, BASE | {"decision": "approve", REJECT + "i1": "on", REASON + "i1": "  thin  "})
+    assert isinstance(one, ApprovalSubmission)
+    assert (one.rejected_items, dict(one.item_reasons), one.reason) == (("i1",), {"i1": "thin"}, None)
+    note = parse(REQUEST, BASE | {"decision": "approve", REASON + "i2": EDGE, "acknowledged_unreleased": "on"})
+    assert isinstance(note, ApprovalSubmission)
+    assert (note.rejected_items, dict(note.item_reasons), note.acknowledged_unreleased) == ((), {"i2": EDGE}, True)
+    rejection = parse(REQUEST, BASE | {"decision": "reject", "reason": f" {EDGE} "})
+    assert isinstance(rejection, ApprovalSubmission)
+    assert (rejection.decision, rejection.reason, rejection.acknowledged_unreleased) == ("reject", EDGE, False)
+    plain = parse(approval_request(items=()), BASE | {"decision": "approve"})  # no items: nothing to reject
+    assert isinstance(plain, ApprovalSubmission)
+    assert plain.answer().request_id == "apr_one"
+    with pytest.raises(AnswerError) as other:
+        parse(REQUEST, {**BASE, "shown_sha256": "b" * 64, "decision": "approve"})
+    assert other.value.status == HTTPStatus.CONFLICT
+
+
+def test_choices() -> None:
+    choice = input_request()
+    got = parse(choice, {"shown_sha256": choice.fields_schema_sha256, "by": "ada", "choice:q": "a"})
+    assert isinstance(got, ChoiceSubmission)
+    assert dict(got.choices) == {"q": "a"}
+    with pytest.raises(AnswerError, match="choose an option"):
+        parse(choice, {"shown_sha256": choice.fields_schema_sha256, "by": "ada"})
+    with pytest.raises(AnswerError) as other:
+        parse(choice, {"shown_sha256": SHA, "by": "ada", "choice:q": "a"})
+    assert other.value.status == HTTPStatus.CONFLICT
 
 
 def test_name_rules_and_no_os_account(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

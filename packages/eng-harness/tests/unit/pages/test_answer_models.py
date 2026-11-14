@@ -39,3 +39,15 @@ def test_answers_carry_no_values(model: type[BaseModel]) -> None:
         model.model_validate({**body, "value": 1.5})  # an extra member is refused
     with pytest.raises(ValidationError):
         model.model_validate({**body, "by": 7})  # no coercion of a number into a text member
+
+
+def test_submissions_make_the_engine_answer_without_values() -> None:
+    approval = ApprovalSubmission.model_validate(
+        {**APPROVAL, "decision": "reject", "reason": "no", "rejected_items": ("i1",), "item_reasons": {"i1": "thin"}}
+    )
+    given = approval.answer()
+    assert (given.decision, given.reason, given.rejected_items, dict(given.item_reasons)) == (
+        "reject", "no", ("i1",), {"i1": "thin"}
+    )  # fmt: skip
+    choice = ChoiceSubmission.model_validate(CHOICE).answer()
+    assert (dict(choice.choices or {}), choice.values, choice.by) == ({"q": "a"}, None, "ada")
