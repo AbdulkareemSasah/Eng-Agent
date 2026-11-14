@@ -273,3 +273,38 @@ def test_pattern_add_conflicts_with_an_engineer_pattern() -> None:
     assert [i["detail"] for i in body["issues"]] == [
         "the engineer added patterns/P9; item sets a new pattern, self weight 1.0 1"
     ]
+
+
+@pytest.mark.parametrize(
+    ("item", "shown"),
+    [
+        ({"id": "c1", "kind": "load_combination_set", "name": "COMB1", "type": "linear_add"}, "a new definition"),
+        ({"id": "c1", "kind": "load_combination_delete", "name": "COMB1"}, "its deletion"),
+    ],
+)
+def test_combination_claim_conflicts_with_an_engineer_change_to_one_of_its_items(
+    item: dict[str, Any], shown: str
+) -> None:
+    case = _case("check-conflict-engineer")
+    row = {"pointer": "/scale_ratio", "before": 1.0, "after": 1.2, "unit": "1", "quantity_kind": "dimensionless"}
+    key = ["combinations", "COMB1", "items", "DEAD", "load_pattern"]
+    change = {"section": "model.load_set/1", "key": key, "change": "changed", "before": None, "after": None}
+    count = dict.fromkeys(("added", "removed", "ambiguous", "unchanged", "within_tolerance"), 0) | {"changed": 1}
+    diff = case.input["diff"] | {
+        "changes": [change | {"properties": [row | {"tolerance": None, "rule": "D3"}]}],
+        "counts": {"model.load_set/1": count},
+    }
+    term = {
+        "case": {"case": "DEAD", "case_type": "load_pattern"},
+        "scale": {"source": "input", "value": 1.0, "unit": "1"},
+    }
+    claim = item | ({"items": [term]} if item["kind"] == "load_combination_set" else {})
+    body = run_check(case, items=[claim], diff=diff)
+    assert [i["detail"] for i in body["issues"]] == [
+        "the engineer changed combinations/COMB1/items/DEAD/load_pattern/scale_ratio from 1.0 to 1.2; "
+        f"item sets {shown}"
+    ]
+    assert body["status"] == "PASS"
+    other = claim | {"name": "COMB"}
+    names = case.input["names"] | {"combinations": ["COMB", "COMB1"]}
+    assert run_check(case, items=[other], diff=diff, names=names)["issues"] == []
