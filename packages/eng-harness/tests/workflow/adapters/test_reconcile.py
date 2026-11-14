@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import anyio
 import pytest
@@ -127,7 +127,8 @@ class Rig:
         assert reply.error.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
 
     async def reconcile(self, tool: str, args: dict[str, Any], op_id: str = "op-1") -> Reconciliation:
-        return await self.port.reconcile(tool, {"model": "m", **args}, op_id)
+        found: Reconciliation = await self.port.reconcile(tool, {"model": "m", **args}, op_id)
+        return found
 
 
 @asynccontextmanager
@@ -236,7 +237,7 @@ def test_long_tools_unknown_without_proof_of_end(
             found = await rig.reconcile(tool, args)
             assert found.outcome == "unknown"
             assert found.missing == ()
-            evidence: dict[str, Any] = store.get(found.evidence[0].ref.split("#")[0]).payload["value"]
+            evidence = _evidence(store, found)
             assert evidence["locked"] is locked
             assert evidence["proof_of_end"] is False
             if code is None:
@@ -261,8 +262,7 @@ def _run(config: ServersConfig, control: Path, store: ResultStore, run_dir: Path
 
 
 def _evidence(store: ResultStore, found: Reconciliation) -> dict[str, Any]:
-    value: dict[str, Any] = store.get(found.evidence[0].ref).payload["value"]
-    return value
+    return cast(dict[str, Any], store.payload(found.evidence[0].ref)["value"])
 
 
 def test_ledger_find(run_dir: Path) -> None:
@@ -368,7 +368,8 @@ def test_read_back_shows_the_state(
         assert isinstance(shown, SuccessEnvelope)
         assert shown.kind == "harness.run_output/1"
         assert shown.provenance.host == HOST
-        assert shown.data["value"]["observed"]["section"] == "C30"
+        data: Any = shown.data
+        assert data["value"]["observed"]["section"] == "C30"
         wall = {"model": "m", "name": "W9", "material": "C30", "thickness_mm": rig.value("thickness_mm", 250.0)}
         gone = await rig.port.read_back(WALL, wall)
         assert isinstance(gone, SuccessEnvelope)
