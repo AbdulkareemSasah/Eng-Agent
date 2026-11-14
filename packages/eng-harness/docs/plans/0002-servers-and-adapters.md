@@ -485,6 +485,7 @@ tasks:
     # T14). Budget 215 + 15 for the refusal (about 10 lines in adapters/__init__.py, 3 of CHANGELOG.md; an estimate).
     # Amendment (B-495, documents only): owner answer of 2026-11-14 (spec section 11 Q9): the refusal exits 2 (USAGE),
     # not 70; cli/_exit.py maps its code NOT_IMPLEMENTED to 2 (spec 0006 section 6), about 1 line; budget 230 + 5.
+    # The case ("NOT_IMPLEMENTED", 2) joins the error-code table test tests/unit/cli/test_exit_codes.py (test code).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -500,6 +501,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
       - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"  # T10's test: the saved fingerprint (B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
+      - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"  # the NOT_IMPLEMENTED case (B-495)
     max_changed_lines: 235
     max_sessions: 3
     tests_first:
@@ -507,6 +509,7 @@ tasks:
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route"
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap"
+      - "packages/eng-harness/tests/unit/cli/test_exit_codes.py::test_error_codes"  # case NOT_IMPLEMENTED -> 2 (B-495)
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
     covers: [AC9, AC22, AC36, AC41, AC43]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
@@ -694,8 +697,9 @@ means T12 and T12b.
 and columns are product facts in `products/_etabs.py`, flagged OQ-G10, not constants in `_checks.py`. Quantities are
 compared "within the design basis field `checks.readback_relative_tolerance_ratio` (required by every workflow that writes
 quantities; never a constant here, §11 G-2)" (spec §4.5.8); by the owner answer of 2026-11-14 (amendment B-495,
-spec §11 Q8) that value is the basis field, passed by the workflow: `check_model(model_key)` takes no basis and reads
-it as `ReadBack.tolerance_ratio`, a quantity without it being `READBACK_UNAVAILABLE`, as merged. The write hook is in
+spec §11 Q8) that value comes from the basis field, passed by the workflow, and arrives as `ReadBack.tolerance_ratio`
+(`check_model(model_key)` takes no basis); when none is passed a quantity read back is `READBACK_UNAVAILABLE`, as
+merged. No task delivers the value yet (spec §11 H-G9). The write hook is in
 `CsiToolPort` (`csi/_tools.py`): it wraps its edit
 builders (`EDIT_BUILDERS`), whose builder sees the canonical model and the binding before the send, to call the
 written-items book's `prepare`; `CsiToolPort.call` runs `commit` after a successful reply and then
@@ -745,8 +749,8 @@ command-line tool: given a configuration with any `[cli_tools.*]` entry it raise
 a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). The command line meets the
 refusal at step 1 of spec 0006 §4.2.2, outside the engine, and ends with exit 2 `USAGE` (spec AC43, §11 Q9; owner
 answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries: `cli/_exit.py` maps the code
-`NOT_IMPLEMENTED` to 2 (spec 0006 §6), and `test_cli_tools_not_wired_gap` also checks that `exit_code_for_error` gives
-2 for the refused configuration's code (70 at the base). A `harness.toml` for a run
+`NOT_IMPLEMENTED` to 2 (spec 0006 §6), pinned by the case `("NOT_IMPLEMENTED", 2)` added to the error-code table test
+`tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
