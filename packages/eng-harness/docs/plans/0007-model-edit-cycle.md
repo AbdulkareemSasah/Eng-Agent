@@ -396,6 +396,9 @@ this task, which add no engine criterion: spec AC33 covers them;
 the new hooks), `engine/_hoststate.py` and `engine/_runner.py` (EC2's resume cases: the comparison with a resumed
 save's result and the `model_saved` appended after the host-state check; both from plan 0001 T11c, split from T11b by B-427) to this task's
 files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
+Amendment B-499: continuing the chain (engine §4.9, EC5) means that after each tool save and each engine `p~post.save`
+under the approval, the expected state of the next step under it takes that `model_saved`'s revision, fingerprint and
+file hash (`_approvals.py`; the merged engine T15 keeps only the revision a write produced).
 Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
 package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
 `tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
@@ -488,10 +491,10 @@ uninterrupted run.
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
 | T8 | plan 0001 T10 to T17; plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
-| T9 | plan 0001 T16 (promotion); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
+| T9 | plan 0001 T16b (promotion; B-499); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
