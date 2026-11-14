@@ -17,6 +17,7 @@ from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock, IdSource, new_model_id, new_result_id
 from pydantic import JsonValue
 
+from eng_harness.ctx import Preview
 from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
 from eng_harness.journal import Event
 from eng_harness.ports import (
@@ -82,6 +83,7 @@ class FakeHost:
         self.units: dict[str, UnitsState] = {}
         self.instances: dict[str, list[HostInstance]] = defaultdict(list)
         self.saved: list[SavedModel] = []
+        self.previews: dict[str, Preview] = {}
         self.closed: list[HostInstance] = []
         self._succeeded: set[str] = set()
 
@@ -160,6 +162,11 @@ class FakeHost:
     async def read_back(self, tool: str, args: Mapping[str, JsonValue]) -> ENVELOPE | None:
         """The fake host has no read-back helpers."""
         return None
+
+    async def preview(self, tool: str, args: Mapping[str, JsonValue]) -> Preview:
+        """The scripted preview of `tool`, or an empty one: the fake host changes nothing."""
+        await self.describe(tool)
+        return self.previews.get(tool, Preview(items=(), diff_ref=None, models=()))
 
     # HostPort
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:

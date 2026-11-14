@@ -45,6 +45,8 @@ tasks:
     title: Calc harness.change_set_check (resolve, validate, conflicts, refused kinds)
     # Amendment (B-417, documents only): calcs/__init__.py registers the calc in REGISTRY (spec 0003 4.2, no discovery); the bounds paths are the unit-suffixed names of spec 4.8.
     # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) and calcs T8b as cross-plan dependencies.
+    # Amendment (B-493, documents only): the calc-module rules test holds the edit-cycle entries of spec 0003 4.3: the
+    # change-set model module, and kinds.edit_cycle if not already present (plan 0013 T2 adds it under B-462); test file, not counted.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.change_set_check (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -57,6 +59,7 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/check-*.json"
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py"
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # the entries of spec 0003 4.3 for the edit-cycle calcs (amendment B-493)
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -355,7 +358,10 @@ engineer changes, and every refused kind with its gap id. A verification record 
 owner. Calc ships `draft`. Amendment (B-417): the task registers the calc in `REGISTRY` through `calcs/__init__.py`
 (spec 0003 §4.2: explicit registration, no discovery), so the calc lock test and `ctx.calc` find it; the bounds are the
 unit-suffixed paths of spec §4.8 (`bounds.thickness_min_mm`, `bounds.line_load_min_kN_m`, `bounds.area_load_min_kPa`,
-`bounds.ratio_min_ratio` and their `_max` pairs).
+`bounds.ratio_min_ratio` and their `_max` pairs). Amendment (B-493): the task adds the edit-cycle entries of spec
+0003 §4.3 to `tests/rules/test_calc_modules.py`: `eng_harness.workflows.model_edit_cycle._change_set` by that module's
+name, never its package, and `eng_harness.kinds.edit_cycle` if not already present (plan 0013 T2 adds the same entry
+under amendment B-462); T3 uses the same imports without further amendment.
 
 **T3 `harness.expected_effects`** (spec §4.4.2). The projection per kind, golden cases per kind and a property test
 for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTRY` through `calcs/__init__.py`,

@@ -228,7 +228,8 @@ key or a host program; what does is in §8 and in `docs/local-testing.md`.
   (its `local`), `tier` and `status` `not_implemented`, and a build warning names it and PR-G1; (3) every
   `shadow_released` entry is dropped, so its point stays in shadow, each with a build warning, a plain string that names
   the point and PR-G1, and the summary holds no released point and, as AC29 records a dropped release, one entry per
-  drop with its `point` and the `reason` `PR-G1`, so the drop is journaled with the summary; (4) the result is the same for any `point_policies`,
+  drop with its `point` and the `reason` `PR-G1`, so the drop is journaled with the summary, not only printed as a
+  warning (owner answer of 2026-11-14, B-495, Q14); (4) the result is the same for any `point_policies`,
   the empty mapping included, since no release is kept and so no policy is checked; (5) no summary entry or warning
   holds an endpoint, a `key_ref` or a header; (6) with the real engine and cascade wired as spec 0006 §4.2.2 wires them,
   `run_started.decision_runtime` equals the summary. Tests: `tests/unit/providers/test_runtime.py::test_no_provider_table_gives_phase1_runtime`,
@@ -684,4 +685,5 @@ New modules of `eng-harness` (phase 2). `decisions.interfaces` gains `ProviderEr
 | Q11 | Package-local ADR numbers 0001 to 0003 may collide with other eng-harness ADRs written in parallel | Lead | Renumber at merge if needed; the specs link by file name |
 | Q12 | The pull request mixes ADR files with a spec and a plan, which the gate's `spec and plan` reason (all files match `spec_globs` or `plan_globs`) may reject (GC010) | Lead | Merge the ADRs with the first implementation task (T1, which needs them) or allow `docs/adr/*.md` in the reason |
 | Q13 | The prompt carries the point name, not the human-readable title, because `ProviderRequest` has no title field | Owner | Accept for v1; if the first evaluations show the model needs the title, amend spec 0005 §4.7 with `title: Label` (the cascade has it from `DecisionPoint`) and bump `PROMPT_VERSION` |
+| Q14 | Are the releases the phase-1 assembly drops (AC49) journaled with their point and reason, or only printed as warnings? | Owner | Decided (owner answer of 2026-11-14, B-495): journaled, as AC29 records a dropped release: one summary entry per drop (`point`, `reason` `PR-G1`) in `run_started.decision_runtime` (engine AC69, merged with engine plan T14b), plus the build warning; no new journal event or contract change; built by plan T10a |
 | PR-G1 | **[added: B-475]** Gap: `assemble_decision_runtime` without the provider factory (plan T7) and release verification (`verify_releases`, plan T9), so the first live run (phase 1, rules and the engineer) does not wait for the provider adapters | Lead | The phase-1 assembly of AC49 (plan task T10a); plan task T10b wires the factory and `verify_releases` and closes the gap, replacing the AC49 tests of a provider not built and a release dropped (a spec change, not a test changed to pass) |
