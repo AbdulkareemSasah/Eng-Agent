@@ -37,10 +37,12 @@ class ChildOutput(BaseModel):
     refs: list[str]
 
 
-def flow(body: Body, *, name: str = "chain", version: int = 1) -> WorkflowDef[ChainInput, ChainOutput]:
+def flow(
+    body: Body, *, name: str = "chain", version: int = 1, always_ask: tuple[str, ...] = ()
+) -> WorkflowDef[ChainInput, ChainOutput]:
     """A workflow that runs `body` and returns what it returns as the references of its output."""
 
-    @workflow(name=name, version=version, description="Runs its body.")
+    @workflow(name=name, version=version, description="Runs its body.", always_ask=always_ask)
     async def run(ctx: Any, inp: ChainInput) -> ChainOutput:
         return ChainOutput(refs=list(await body(ctx)))
 
