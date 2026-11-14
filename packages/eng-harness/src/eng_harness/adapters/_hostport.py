@@ -109,9 +109,8 @@ class AdapterHostPort:
     async def check_model(self, model_key: str) -> Envelope:
         """The `issues.model_check/1` of `model_key` (spec 4.5.8): the items written since the last check read back.
 
-        The envelope carries the `MODEL_CHANGED_OUTSIDE` warnings of `take_warnings` (OQ-Q67). The items are cleared
-        once the result is stored. `ContractError`: `PRECONDITION_FAILED` (`model_open`), `INTERNAL` without
-        `readback`, and the state reader's errors.
+        The envelope carries the `MODEL_CHANGED_OUTSIDE` warnings of `take_warnings` (OQ-Q67). `ContractError`:
+        `PRECONDITION_FAILED` (`model_open`), `INTERNAL` without `readback`, and the state reader's errors.
         """
         if self._readback is None:
             raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())

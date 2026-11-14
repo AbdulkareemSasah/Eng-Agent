@@ -249,12 +249,9 @@ def integrity(snap: Snapshot) -> list[ModelIssue]:
 
 
 async def snapshot(rows: Rows, target: dict[str, Any], state: StateRead, profile: ProductProfile) -> Snapshot:
-    """Read the section names and the read-back tables with `rows`; a table it cannot give is left out of `tables`.
+    """Read the section names and the read-back tables with `rows`; a table whose read fails is left out of `tables`.
 
-    A section list the host cut or garbled raises `ContractError` (`LIMIT_EXCEEDED`, `HOST_ERROR`). A read-back table
-    is left out on any `ContractError`, not only a refused or garbled reply: a truncated table (`LIMIT_EXCEEDED`), a
-    lost session or a timeout leave it out too. Each such item then reads `READBACK_UNAVAILABLE` (an error), never a
-    pass, and a lost session or timeout fails the check anyway at its next host call.
+    A section list the host cut or garbled raises `ContractError` (`LIMIT_EXCEEDED`, `HOST_ERROR`); a table never does.
     """
 
     async def names(tool: str) -> set[str]:
@@ -264,7 +261,7 @@ async def snapshot(rows: Rows, target: dict[str, Any], state: StateRead, profile
     for name, (table, key_column, value_column) in profile.readback.items():
         try:
             found = await rows("csi_db_table_read", "rows", {**target, "table": table, "row_limit": LIST_LIMIT}, table)
-        except ContractError:  # any failed read leaves the table out (conservative: its items are unavailable)
+        except ContractError:  # any failure (cut, lost session, timeout): the table is left out, its items read READBACK_UNAVAILABLE
             continue
         if all({key_column, value_column} <= row.keys() for row in found):
             snap.tables[name] = found
@@ -272,10 +269,7 @@ async def snapshot(rows: Rows, target: dict[str, Any], state: StateRead, profile
 
 
 def issues_of(read_back: ReadBack, model_key: str, snap: Snapshot) -> list[ModelIssue]:
-    """The read-back issues of the items written to `model_key`, then the tolerance-free ones.
-
-    The items stay in the book: the caller clears them once the result is stored (a store failure keeps them).
-    """
+    """The read-back issues of `model_key`'s items, then the tolerance-free ones; the caller clears the items later."""
     items = read_back.written.items(model_key)
     found = [issue for item in items if (issue := compare(item, snap, read_back.tolerance_ratio)) is not None]
     return [*found, *integrity(snap)]
