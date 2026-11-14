@@ -1,5 +1,5 @@
 // The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text.
-// Lane workflow script of the cloud session of 2026-11-12 (D-33). Read it with docs/build/lead-playbook.md; it needs the workflow tool of the session.
+// Lane workflow script of the cloud session of 2026-11-12 (D-33), as run on 2026-11-14 (run ids in docs/build/HANDOFF.md). Read it with docs/build/lead-playbook.md; it needs the workflow tool of the session.
 export const meta = {
   name: 'build-lane',
   description: 'One lane of v1 build tasks in order (owner-approved full cycle): write tests first, independent review with fix rounds, adversarial verification for engineering content, full gate, push the task branch, pull request into build/v1, local CI, squash merge on PASS',
