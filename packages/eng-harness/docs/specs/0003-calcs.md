@@ -325,7 +325,12 @@ port, adapter or I/O. A new import in that module needs an amendment of this sec
 module does. Its package `__init__` holds the workflow definition (spec 0007 §4.1), so an import from
 `eng_harness.workflows.model_edit_cycle` itself stays refused. The module and the `eng_harness` modules it imports
 enter the calc's `modules` (§4.5), so a change to the change-set model changes the hash of each calc that imports it,
-which then needs verification again (process/10 §5); the package `__init__` does not (an implicit parent, B-388).
+which then needs verification again (process/10 §5). Importing the module first runs its parents
+`workflows/__init__.py` and `workflows/model_edit_cycle/__init__.py`, which from plan 0007 T9 import the shipped
+blocks and what those import (spec 0007 §4.1, §4.2) whenever `eng_harness.calcs` loads. The calc reaches none of that code
+(only its listed imports), and the two parents stay outside its `modules` (implicit parents, B-388). Therefore no
+module under `eng_harness.workflows`, nor any module it imports at load time, imports `eng_harness.calcs` at module
+level: that would be an import cycle (today only the `__main__` block of `_calc/_hash.py` imports it).
 
 The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
 including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).
