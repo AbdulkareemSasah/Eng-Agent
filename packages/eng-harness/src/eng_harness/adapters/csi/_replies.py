@@ -1,14 +1,19 @@
-"""CSI replies mapped to neutral and harness kinds (plan 0002 T11; spec 0002 section 4.6.4).
+"""CSI replies mapped to neutral and harness kinds (plan 0002 T11, T13; spec 0002 sections 4.6.1, 4.6.4).
 
-Errors: `ContractError` `HOST_ERROR` (`host_code` `UNEXPECTED_REPLY`, spec 0002 A3) when a reply field is unusable.
+Units: the result mappers take the call's units token (`kN_m_C`, spec 4.6.1) and answer kN, kN.m and mm; their reply
+field names are host facts to confirm at the first local run (OQ-G10).
+Errors: `ContractError` `HOST_ERROR` (`host_code` `UNEXPECTED_REPLY`, spec 0002 A3) when a reply field is missing or
+unusable, from every mapper: never a bare `KeyError` or a pydantic `ValidationError`.
 """
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.kinds.forces import JointReactions, MemberEnd, StoryDrifts
 from eng_contract.kinds.model import (
     AreaKind,
     AreaPlacements,
@@ -30,7 +35,7 @@ from eng_contract.kinds.model import (
     Story,
 )
 from eng_contract.units import convert, csi_unit_system
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, StrictInt
 
 _HOST_KIND = "harness.csi_model_status/1"
 
@@ -47,7 +52,51 @@ class CsiModelStatus(BaseModel):
     file_name: str = Field(min_length=1)
 
 
-CSI_KINDS = {_HOST_KIND: CsiModelStatus}
+class _Host(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+
+class CsiAnalysisRun(_Host):
+    """`harness.csi_analysis_run/1`: `started`, which the host reports only after the analysis finished (S-12 5)."""
+
+    started: StrictBool
+
+
+class CaseStatus(_Host):
+    """The raw status code of one case, not decoded (spec 0002 section 4.6.1)."""
+
+    case: str = Field(min_length=1)
+    status_code: StrictInt
+
+
+class CsiAnalysisStatus(_Host):
+    """`harness.csi_analysis_status/1`: the host's per-case status codes."""
+
+    cases: list[CaseStatus]
+
+
+class CsiDesignRun(_Host):
+    """`harness.csi_design_run/1`: the host's reply to the design run, as it is."""
+
+    reply: dict[str, JsonValue]
+
+
+class CsiRows(_Host):
+    """`harness.csi_design_results/1` (design output, never a verdict, design 06 section 9) and
+    `harness.csi_analysis_messages/1` (rows of the `Analysis Messages` table): the host's rows as read.
+    """
+
+    rows: list[dict[str, JsonValue]]
+
+
+CSI_KINDS: dict[str, type[BaseModel]] = {
+    _HOST_KIND: CsiModelStatus,
+    "harness.csi_analysis_run/1": CsiAnalysisRun,
+    "harness.csi_analysis_status/1": CsiAnalysisStatus,
+    "harness.csi_design_run/1": CsiDesignRun,
+    "harness.csi_design_results/1": CsiRows,
+    "harness.csi_analysis_messages/1": CsiRows,
+}
 
 _PATTERN = {
     "dead": PatternType.DEAD,
@@ -65,6 +114,7 @@ _COMBO = {
     2: CombinationType.ABSOLUTE_ADD,
     3: CombinationType.SRSS,
 }
+_COMBO_KIND = {"combo": "load_combination"}  # the host's `kind` of a combination item: `case` or `combo`
 _AREA = {"slab": AreaKind.SLAB, "wall": AreaKind.WALL, "deck": AreaKind.DECK}
 
 
@@ -80,15 +130,30 @@ def _line_load(value: float, units: str) -> float:
     return convert(value, csi_unit_system(units).line_load, "kN/m")  # spec 4.7.4 present line load → kN/m
 
 
-def _bad_reply(field: str, received: object) -> None:
+def _bad_reply(field: str, received: object, message: str = "") -> NoReturn:
     raise ContractError(
         ErrorCode.HOST_ERROR,
-        f"the host reply field {field} is not usable",
+        message or f"the host reply field {field} is not usable",
         retryable=False,
         host_code="UNEXPECTED_REPLY",
         field=field,
         received=received,
     )
+
+
+def _mapped[**P, R](mapper: Callable[P, R]) -> Callable[P, R]:
+    """`mapper` with a missing or unusable reply value raised as `UNEXPECTED_REPLY` (field `rows`), no bare error."""
+
+    @wraps(mapper)
+    def run(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            return mapper(*args, **kwargs)
+        except KeyError as error:
+            _bad_reply("rows", None, f"{mapper.__name__}: the host reply has no field {error.args[0]}")
+        except AttributeError, TypeError, ValueError:  # a row that is no object; pydantic's error is a ValueError
+            _bad_reply("rows", None, f"{mapper.__name__}: a value of the host reply cannot be mapped")
+
+    return run
 
 
 def _point(raw: Sequence[float], units: str, *, field: str) -> dict[str, float]:
@@ -103,6 +168,7 @@ def _point(raw: Sequence[float], units: str, *, field: str) -> dict[str, float]:
     return {"x_mm": _length(x, units), "y_mm": _length(y, units), "z_mm": _length(z, units)}
 
 
+@_mapped
 def stories(items: list[dict[str, Any]], units: str) -> Stories:
     rows = sorted(items, key=lambda row: float(row["elevation"]))
     if rows:
@@ -137,6 +203,7 @@ def _grid_lines(lines: list[dict[str, Any]], axis: Axis, units: str) -> list[Gri
     ]
 
 
+@_mapped
 def grids(items: list[dict[str, Any]], units: str) -> GridSystem:
     systems: list[GridSystem1] = []
     for row in items:
@@ -156,6 +223,7 @@ def grids(items: list[dict[str, Any]], units: str) -> GridSystem:
     return GridSystem(systems=systems)
 
 
+@_mapped
 def frames(items: list[dict[str, Any]], units: str) -> FramePlacements:
     rows = []
     for row in items:
@@ -176,6 +244,7 @@ def frames(items: list[dict[str, Any]], units: str) -> FramePlacements:
     return FramePlacements.model_validate({"frames": rows})
 
 
+@_mapped
 def areas(items: list[dict[str, Any]], units: str, sections: Mapping[str, str]) -> AreaPlacements:
     rows = []
     for row in items:
@@ -212,6 +281,7 @@ def _combo_type(value: object) -> CombinationType:
     return _TEXT_COMBO.get(str(value).lower().replace(" ", ""), CombinationType.LINEAR_ADD)
 
 
+@_mapped
 def load_set(
     patterns: list[dict[str, Any]],
     combos: list[dict[str, Any]],
@@ -238,7 +308,7 @@ def load_set(
         name = str(row["name"])
         items = [
             {
-                "case": {"case": str(part["name"]), "case_type": "load_pattern", "step": None},
+                "case": {"case": str(part["name"]), "case_type": _COMBO_KIND.get(part.get("kind"), "load_pattern")},
                 "scale_ratio": float(part["factor"]),
             }
             for part in row.get("items", [])
@@ -278,6 +348,7 @@ def load_set(
     )
 
 
+@_mapped
 def restraints(rows: list[dict[str, Any]]) -> JointRestraints:
     return JointRestraints(
         joints=[
@@ -295,6 +366,7 @@ def restraints(rows: list[dict[str, Any]]) -> JointRestraints:
     )
 
 
+@_mapped
 def model_status(info: dict[str, Any], model_path: Path | None) -> CsiModelStatus:
     counts = info.get("object_counts") or info.get("counts") or {}
     if not isinstance(counts, dict):
@@ -310,5 +382,106 @@ def model_status(info: dict[str, Any], model_path: Path | None) -> CsiModelStatu
     )
 
 
+@_mapped
 def area_section_kinds(items: list[dict[str, Any]]) -> dict[str, str]:
     return {str(row["name"]): str(row.get("type", "other")) for row in items}
+
+
+def _rows(reply: Mapping[str, Any], field: str) -> list[dict[str, Any]]:
+    rows = reply.get(field)
+    if not isinstance(rows, list) or not all(isinstance(row, dict) for row in rows):
+        _bad_reply(field, None)
+    return rows
+
+
+@_mapped
+def analysis_run(reply: Mapping[str, Any]) -> CsiAnalysisRun:
+    return CsiAnalysisRun(started=reply["started"])
+
+
+@_mapped
+def analysis_status(reply: Mapping[str, Any]) -> CsiAnalysisStatus:
+    cases = [CaseStatus(case=str(row["case"]), status_code=row["status_code"]) for row in _rows(reply, "cases")]
+    return CsiAnalysisStatus(cases=cases)
+
+
+@_mapped
+def design_run(reply: Mapping[str, Any]) -> CsiDesignRun:
+    return CsiDesignRun(reply=dict(reply))
+
+
+@_mapped
+def design_results(reply: Mapping[str, Any]) -> CsiRows:
+    return CsiRows(rows=_rows(reply, "items"))
+
+
+@_mapped
+def analysis_messages(reply: Mapping[str, Any]) -> CsiRows:
+    return CsiRows(rows=_rows(reply, "rows"))
+
+
+def _case_ref(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The case of a result row: a combination when the host's `kind` says `combo`, else a load case."""
+    step = row.get("step")
+    return {
+        "case": str(row["case"]),
+        "case_type": "load_combination" if row.get("kind") == "combo" else "load_case",
+        "step": None if step in (None, "") else str(step),
+    }
+
+
+_UNIT = {"kN": ("force", "kN"), "kNm": ("moment", "kN.m"), "mm": ("length", "mm")}  # field suffix: system member, unit
+_REACTION = {"FX_kN": "F1", "FY_kN": "F2", "FZ_kN": "F3", "MX_kNm": "M1", "MY_kNm": "M2", "MZ_kNm": "M3"}
+_MEMBER = (
+    {f"{k}_kN": k for k in ("P", "V2", "V3")} | {f"{k}_kNm": k for k in ("T", "M2", "M3")} | {"station_mm": "station"}
+)
+_DRIFT_POINT = {"x_mm": "x", "y_mm": "y", "z_mm": "z"}  # optional in the reply
+
+
+def _scaled(row: Mapping[str, Any], units: str, fields: Mapping[str, str]) -> dict[str, float]:
+    """The host `fields` ({canonical field: host key}) of `row` in the canonical unit named by each field's suffix."""
+    system = csi_unit_system(units)
+    scaled = {}
+    for name, key in fields.items():
+        member, unit = _UNIT[name.rpartition("_")[2]]
+        scaled[name] = convert(float(row[key]), getattr(system, member), unit)
+    return scaled
+
+
+@_mapped
+def joint_reactions(reply: Mapping[str, Any], units: str) -> JointReactions:
+    rows = [
+        {"joint": str(row["joint"]), "case": _case_ref(row), **_scaled(row, units, _REACTION)}
+        for row in _rows(reply, "items")
+    ]
+    return JointReactions.model_validate({"axes": "global", "rows": rows})
+
+
+@_mapped
+def member_forces(reply: Mapping[str, Any], units: str) -> MemberEnd:
+    rows = [
+        {
+            "member": str(row["frame"]),
+            "case": _case_ref(row),
+            "end": row.get("end") if row.get("end") in ("i", "j") else None,
+            **_scaled(row, units, _MEMBER),
+        }
+        for row in _rows(reply, "items")
+    ]
+    return MemberEnd.model_validate({"sign_convention": "host_local/1", "rows": rows})
+
+
+@_mapped
+def story_drifts(reply: Mapping[str, Any], units: str) -> StoryDrifts:
+    rows = [
+        {
+            "story": str(row["story"]),
+            "case": _case_ref(row),
+            "direction": row["direction"],
+            "drift_ratio": float(row["drift"]),
+            "point": str(row["label"]) if row.get("label") else None,
+            **_scaled(row, units, {k: v for k, v in _DRIFT_POINT.items() if row.get(v) is not None}),
+        }
+        for row in _rows(reply, "items")
+    ]
+    return StoryDrifts.model_validate({"rows": rows})
