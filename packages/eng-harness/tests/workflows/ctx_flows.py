@@ -6,14 +6,16 @@ for an
 answer and pauses the run when there is none.
 """
 
+import hashlib
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, Literal
 
-from eng_contract.envelope import Provenance, SuccessEnvelope
+from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from eng_contract.ids import new_result_id
 from pydantic import BaseModel, JsonValue
 
 from eng_harness.block import BlockDef, WorkflowDef, block, workflow
+from eng_harness.ctx import ModelHandle, Preview, PreviewItem
 from eng_harness.errors import Pause
 from eng_harness.ports import ApprovalAnswer, ApprovalPort
 from workflows.chain import ChainInput, ChainOutput
@@ -75,3 +77,49 @@ async def need_approval(port: ApprovalPort, request_id: str) -> ApprovalAnswer:
     if given is None:
         raise Pause("awaiting approval", evidence=[request_id])
     return given
+
+
+def written(rig: Rig, model_key: str, revision: int) -> SuccessEnvelope:
+    """A write result as an adapter returns it: stored, with the revision the write produced in `provenance.host`."""
+    state = rig.host.models[model_key]
+    assert state.model_id is not None
+    host = HostInfo(program="csi", version="1", model_id=state.model_id, model_revision=revision)
+    producer = Provenance(
+        tool="harness", tool_version="fake", host=host, inputs={}, started_at=rig.clock.now(), duration_ms=0
+    )
+    stored = rig.store.put("harness.run_output/1", {"value": {"revision": revision}}, producer)
+    return SuccessEnvelope(
+        contract="eng-contract/1", ok=True, result_id=stored.result_id, kind="harness.run_output/1",
+        summary={"revision": revision}, complete=True, provenance=producer,
+    )  # fmt: skip
+
+
+def change_set(rig: Rig, *items: str, models: Sequence[str] = ("m1",)) -> Preview:
+    """A preview with the items `items` over the open models `models`, at the revision the fake host holds."""
+    handles = []
+    for key in models:
+        state = rig.host.models[key]
+        assert state.model_id is not None
+        handles.append(ModelHandle(model_key=key, model_id=state.model_id, revision=state.revision or 0))
+    shown = tuple(PreviewItem(id=item, label=f"Change {item}", refs=()) for item in items)
+    return Preview(items=shown, diff_ref=None, models=tuple(handles))
+
+
+def reply(
+    rig: Rig, *, decision: Literal["approve", "reject"] = "approve", rejected: Mapping[str, str] | None = None,
+    notes: Mapping[str, str] | None = None, acknowledged: bool = False, sha: str | None = None,
+    rid: str | None = None, by: str = "ada",
+) -> ApprovalAnswer:  # fmt: skip
+    """The engineer's answer to the request the approval port presented last; `rejected` maps item to reason."""
+    shown = rig.approvals.presented[-1]
+    given = dict(rejected or {})
+    return ApprovalAnswer(
+        request_id=rid or shown.request_id, shown_sha256=sha or shown.shown_sha256, decision=decision,
+        rejected_items=tuple(given), item_reasons={**given, **(notes or {})}, acknowledged_unreleased=acknowledged,
+        reason="because", by=by,
+    )  # fmt: skip
+
+
+def request_id(run_id: str, path: str) -> str:
+    """The id of the approval requested at step `path` of the run (spec 0001 4.9), computed here from the rule."""
+    return "apr_" + hashlib.sha256(f"{run_id}\n{path}".encode()).hexdigest()[:32]
