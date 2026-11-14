@@ -58,6 +58,12 @@ owner approves it (bootstrap mode).
 `Engine.start` take a run id chosen by the caller: `RunRequest.run_id` (§4.4.1, §4.5.1, §5). It is listed in §11
 (Q37); the new criterion is AC70, built by plan T20 (work item B-472).
 
+**Amendment B-495.** The owner answer of 2026-11-14 settles two points of the engine lane (§11 Q38, Q39): a
+`SERVER_CHECK_FAILED` refusal of a start with a chosen run id leaves the server logs in the run folder and a retry
+with that id is refused, as plan T20 built it (§4.5.1, AC70); a write that the adapter reconciled `not_applied` runs
+again automatically once, then the run stops for the engineer (§4.5.3, AC31; the new criterion AC71, built by plan
+T21).
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -182,7 +188,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   that run folder first; given a `run_id` whose run folder exists, or one that does not match `run_` + ULID (for
   example `../x`), then `start` raises `ContractError` (`INVALID_ARGUMENT`) before any port call and creates nothing
   (no folder, lock, stored input or event); given no `run_id`, then the id is drawn from the `IdSource` as before
-  (§4.4.1). Test: `tests/unit/test_runner.py::test_caller_chosen_run_id`.
+  (§4.4.1). A `SERVER_CHECK_FAILED` refusal (AC44) of a start with a chosen `run_id` removes nothing the server checks
+  wrote under that run folder (the server logs are the evidence of the refusal), so a retry with the same `run_id` is
+  refused as a run folder that exists (owner answer of 2026-11-14, B-495). Test:
+  `tests/unit/test_runner.py::test_caller_chosen_run_id`.
 - AC65. Given `RunRequest.run_class` (`trial` or `production`), then `start` refuses a CalcPort whose `run_class`
   differs (`RunRefused` `RUN_CLASS_MISMATCH`, no run folder), `run_started` records the class, and a resume with a
   CalcPort of another class is refused the same way before any other port call. Test:
@@ -258,9 +267,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `tests/replay/test_crash_matrix.py::test_crash_matrix`.
 - AC31. Given a write in flight (a `step_started` without a result) at resume, then it is reconciled before the block
   is called: `applied` records `step_reconciled` and the step returns the reconciled result with no call;
-  `not_applied` records `step_reconciled` and runs the step as attempt + 1 with a new `op_id`; `partial`, `unknown`,
-  no reconciler or a reconciler error stops the run with `NEEDS_RECONCILIATION` and an engineer request whose answer
-  resolves it. Test: `tests/replay/test_in_flight.py::test_write_in_flight`.
+  `not_applied` records `step_reconciled` and runs the step as attempt + 1 with a new `op_id` (once, AC71);
+  `partial`, `unknown`, no reconciler or a reconciler error stops the run with `NEEDS_RECONCILIATION` and an engineer
+  request whose answer resolves it. Test: `tests/replay/test_in_flight.py::test_write_in_flight`.
 - AC32. Given a read, calc or decision step in flight at resume, then `step_rerun` is recorded and the step runs
   again. Test: `tests/replay/test_in_flight.py::test_read_in_flight`.
 - AC33. Given a write step whose call raises, returns `TIMEOUT_UNKNOWN_OUTCOME` or returns `HOST_WEDGED`, then the
@@ -298,6 +307,14 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   with no engineer request; (b) with a write completed or in flight after that save, the write is not reconciled and
   the check stops with reason `model_reopened` offering `restore` and `abandon`. Test:
   `tests/replay/test_host_state.py::test_reopened_in_new_instance`.
+- AC71. Given a write whose attempt is the automatic rerun of an attempt the adapter reconciled `not_applied`, when
+  that attempt is reconciled (at resume, or at once after its call raised, returned `TIMEOUT_UNKNOWN_OUTCOME` or
+  returned `HOST_WEDGED`) and the adapter again reports `not_applied`, then no `step_reconciled` is recorded from the
+  adapter and the write is not sent again: the run stops with `NEEDS_RECONCILIATION` (`run_escalated` reason
+  `needs_reconciliation`) and the `engine.in_flight` request of AC31, whose answer resolves it (`decided_by`
+  `engineer:<name>`); an attempt that follows the engineer's `not_applied` is not an automatic rerun (owner answer of
+  2026-11-14, B-495; §4.5.3). Tests: `tests/workflow/test_honest_outcomes.py::test_not_applied_write_reruns_once`,
+  `tests/replay/test_in_flight.py::test_second_not_applied_stops_for_the_engineer`.
 - AC36. Given a pending approval or input at resume, then it is presented again with the same request id and a stored
   answer to it is consumed once. Test: `tests/replay/test_resume.py::test_pending_requests_represented`.
 
@@ -804,7 +821,9 @@ The terminal progress, the approval page and the run report use only this API (1
 
 `start(request)`: when `request.run_id` is given, check it first, before any port call (so before the server checks
 of invariant 8, whose host port may write under the run folder): a value that does not match `run_` + ULID, or whose
-run folder exists, is refused with `ContractError` `INVALID_ARGUMENT` and the engine creates nothing (AC70); validate
+run folder exists, is refused with `ContractError` `INVALID_ARGUMENT` and the engine creates nothing (AC70; a
+`SERVER_CHECK_FAILED` refusal removes nothing the server checks wrote there, so a retry with that id is refused and the
+caller draws a new one, owner answer of 2026-11-14, B-495); validate
 the input (AC16); check that `ports.calc.run_class` equals `request.run_class` (AC65); load the basis and check
 invariant 5; run the server checks (invariant 8); create the run folder (named by `request.run_id` when given, and
 then accepting the folder that the server checks wrote), take the lock, store the input, append `run_started`; call the
@@ -872,7 +891,7 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 | Step | Rule |
 |---|---|
-| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty (invariant 1), and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
+| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty (invariant 1), and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
 | Read, calc, decision (tiers other than the engineer) | `step_rerun`, then the step runs again with the same attempt (no side effect) |
 | Approval, ask, engineer-tier decision | Presented again with the same request id (AC36) |
 | Block, parallel, attempts | Scopes, not steps: their children are handled one by one |
@@ -1266,8 +1285,8 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 | AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
-| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
-| AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 to AC64 | Replay (process/05 §1) | `tests/replay/` |
+| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51, AC71 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
+| AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 to AC64, AC71 (resume case) | Replay (process/05 §1) | `tests/replay/` |
 | AC37 (generated programs) | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC60 | Performance | `tests/perf/` |
 | AC23 (Windows lock) | Unit, marker `windows` | `tests/windows/` |
@@ -1290,7 +1309,7 @@ defaults to empty.
 The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (default `False`) and
 `ToolInfo.saves_new_file` (default false) change no journal payload: a tool save is journaled with the existing
 `model_saved` payload and its existing role `revision`, so the journal schema stays version 1.
-The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload.
+The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload, nor does the B-495 rerun limit.
 
 ## 11. Open questions, gaps and additions
 
@@ -1334,3 +1353,5 @@ The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload
 | Q35 | B-111: how a replay detects a removed inserted save step (invariant 7, AC47) | Owner | Draft decision B-434, owner queue: `step_started` carries the tool's `action`, optional, so earlier journals read unchanged (§4.4.2). This records the data only: §4.5.2 has no rule that reads `action`, and an unrecorded `p~pre.save` path goes live (rule 4), so the divergence rule is open, owner queue (writer's proposal, not adopted here: a recorded step whose `action` is `analysis` or `design` with no recorded `p~pre.save.<model_key>` is `ReplayDivergence`, raised before any live call) |
 | Q36 | B-111: the step kind of inserted check and save steps, the path key of a model key outside the `key` grammar, and a parallel started while the parent has a dirty model | Owner | Draft decision B-434, owner queue: step kind `read`, effect `read` and no `op_id` (names `check_model` and `save`, the path's `<kind>` segment), so in-flight reconciliation reruns them by the §4.5.3 Read row; the §4.5.3 Write row text "including save" was not amended (D-28) and reads as tool saves only, owner to confirm (a rerun of an inserted save saves the model again); the hash form `h` plus the first 12 hex characters of the key's SHA-256; `p~pre.check_model` on the parallel's path before it starts (§4.3.1, §4.6) |
 | Q37 | Spec 0006 Q20: for `run` the command line must build the tool and host ports, which need the run folder, before `Engine.start` draws the run id | Owner | Decided (owner instruction of 2026-11-12; amendment B-471; spec 0006 Q20 answer A): `RunRequest.run_id`, optional, chosen by the caller (`run_` + ULID), used by `start`, which checks it before any port call and refuses it with `ContractError` `INVALID_ARGUMENT`, creating nothing, when it does not match `run_` + ULID or that run folder exists (§4.4.1, §4.5.1, AC70); built by plan T20 (work item B-472) |
+| Q38 | With a caller-chosen run id, a `SERVER_CHECK_FAILED` refusal leaves the run's server logs (`runs/<run_id>/servers/`) in the run folder: keep or remove them? | Owner | Decided (owner answer of 2026-11-14, B-495): the logs stay (they are the evidence of the refusal) and a retry with the same run id is refused; the merged start of plan T20 already does this (§4.5.1, AC70) |
+| Q39 | How many times does a write that reconciliation found `not_applied` run again automatically? | Owner | Decided (owner answer of 2026-11-14, B-495): once; then the run stops for the engineer with the existing stop for a write the adapter cannot decide (`NeedsReconciliation`, `NEEDS_RECONCILIATION`, request `engine.in_flight`; no new code) (§4.5.3, AC71); built by plan T21 |
