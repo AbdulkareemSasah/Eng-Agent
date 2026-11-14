@@ -270,6 +270,10 @@ def _check_decision_port() -> None:
     asked = PendingAnswer(request_id="dec_0", screen=DecisionScreen(items=()))
     fake.handler = lambda _call: asked
     assert asyncio.run(port.decide(calls[0])) is asked  # the handler may leave the call to the engineer
+    assert port.runtime_summary() == {}  # synchronous, and empty when the port has nothing to say
+    fake.runtime = {"providers": {"local": {"tier": "advisory"}}}
+    assert port.runtime_summary() == fake.runtime
+    assert fake.summaries == 2
 
 
 def _check_sink_and_control() -> None:

@@ -22,7 +22,17 @@ from pydantic import BaseModel, JsonValue
 from eng_harness import errors
 from eng_harness.block import BlockDef
 from eng_harness.calc import CalcStatus
-from eng_harness.ctx import ArgValue, Attempt, BasisCount, CalcResult, Decision, DecisionRequest, ReadResult, ToolResult
+from eng_harness.ctx import (
+    Answered,
+    ArgValue,
+    Attempt,
+    BasisCount,
+    CalcResult,
+    Decision,
+    DecisionRequest,
+    ReadResult,
+    ToolResult,
+)  # fmt: skip
 from eng_harness.engine import _decide, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._invariants import Guard, SiblingBoard
@@ -358,6 +368,39 @@ class Ctx:
         result = ev.StepResult(ref=stored.result_id, summary={"decisions": value}, warnings=[], complete=True)
         self._done(path, 1, began, result)
         return out
+
+    async def ask[M: BaseModel](self, fields: type[M], *, title: str) -> Answered[M]:
+        """Ask the engineer for the values of `fields` as one step; the run pauses until a valid answer is given.
+
+        The answer is stored as a `basis.engineer_input/1` result (AC61) and replayed from the journal.
+
+        Raises:
+            BlockRuleViolation: `fields` is not a Pydantic model. AwaitingInput: no answer fits `fields` yet.
+        """
+        if not (isinstance(fields, type) and issubclass(fields, BaseModel)):
+            raise errors.BlockRuleViolation("the fields of ctx.ask must be a Pydantic model")
+        return await _steps.step(lambda path: self._asked(path, fields, title))
+
+    async def _asked[M: BaseModel](self, path: str, fields: type[M], title: str) -> Answered[M]:
+        args: _Obj = {"title": title, "fields": fields.model_json_schema()}
+        recorded = self._look(path, "ask", fields.__name__, args)
+        await self._guard.sweep(self, path, "pre")  # like a decision, an ask waits for the dirty models to be checked
+        if recorded is not None and (done := self._replayed(recorded)) is not None:
+            kept = cast("dict[str, Any]", self._store.payload(done.ref))
+            value = fields.model_validate({name: item["value"] for name, item in kept["fields"].items()})
+            return Answered(value=value, ref=Ref.model_validate({"$ref": done.ref}))
+        answer, given = await self._decider.asked(path, title, fields)
+        who = answer.by.removeprefix("engineer:")
+        entered = {"unit": None, "entered_by": who, "entered_at": self._clock.now()}
+        held: _Obj = {name: {"value": item, **entered} for name, item in given.model_dump(mode="json").items()}
+        stored = self._store.put("basis.engineer_input/1", {"step": path, "fields": held}, self._producer())
+        by = "engineer:" + who
+        self._writer.append(
+            EventType.INPUT_PROVIDED, {"request_id": answer.request_id, "answer_ref": stored.result_id, "by": by}
+        )
+        began = self._begin(path, 1, "ask", fields.__name__, args)
+        self._done(path, 1, began, ev.StepResult(ref=stored.result_id, summary={}, warnings=[], complete=True))
+        return Answered(value=cast(M, given), ref=Ref.model_validate({"$ref": stored.result_id}))
 
     async def block[I: BaseModel, O: BaseModel](self, child: BlockDef[I, O], inp: I) -> O:
         """Run `child` as a scope: its steps are `<path>/0`, `<path>/1`; input and output are checked (AC15).

@@ -406,7 +406,7 @@ processes, the stale-map test, and the Revit section of `docs/local-testing.md` 
 - Plan 0008 (SAFE) also edits `servers/_buildcheck.py` and the allowlist header shape: whichever lands second adapts to
   the other in its own task; this plan keeps its fingerprints in its own `adapters/revit/_allowlist.toml`, keyed by role,
   so the CSI header does not change.
-- Spec 0004 (design basis template) needs `mapping.offset_x`, `_y`, `_z` with a source each; until the owner accepts them
+- Spec 0004 (design basis template) needs `mapping.offset_x_mm`, `_y_mm`, `_z_mm` with a source each; until the owner accepts them
   (spec Q6) the calc refuses a basis without them, and T12 does not depend on the template.
 - Owner decisions that do not block T1 to T15: Q1 to Q9 of the spec (the recommendations are implemented). The Sasaah
   tools of Q2 (save and close) would unblock `work_on_copy` on Revit; they are a project-lane request, not part of this plan.

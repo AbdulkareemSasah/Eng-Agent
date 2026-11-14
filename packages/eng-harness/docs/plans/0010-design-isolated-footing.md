@@ -65,6 +65,30 @@ tasks:
       - "packages/eng-harness/tests/unit/footing/test_calcs_registered.py::test_metadata_and_constants"
     covers: [AC6, AC12]
     depends_on: [T1]
+  - id: T3b
+    # Amendment (B-484, documents only): code follow-up of the basis renames of B-467 and B-484 in merged code and test
+    # data; regenerates the calc's lock entry and the hash line of its verification record.
+    title: Merged harness.footing_subjects and test data read the suffixed basis names
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/subjects.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"
+      - "packages/eng-harness/tests/golden/footing/test_subjects.py"
+      - "packages/eng-harness/tests/data/golden/footing/subjects-*.json"
+      - "packages/eng-harness/tests/data/kinds/calcs/model_diff.json"
+      - "packages/eng-harness/tests/data/kinds/calcs/readback_check.json"
+      - "packages/eng-harness/tests/data/snapshots/report/report.html"
+      - "packages/eng-harness/tests/data/snapshots/report/sections.html"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/golden/footing/test_subjects.py::test_golden_cases"
+      - "packages/eng-harness/tests/golden/footing/test_subjects.py::test_trace_records_inputs_constants_and_counts"
+      - "packages/eng-harness/tests/golden/footing/test_subjects.py::test_missing_basis_field_is_refused"
+    covers: [AC6]
+    depends_on: [T3]
   - id: T4
     title: Calcs harness.footing_plan_size and harness.footing_resize
     files:
@@ -348,6 +372,19 @@ starts only after the documents pull request that settles spec C4 (an id outside
 **T3 Subjects** (spec §4.4.1). Creates `calcs/footing/`, the registration test shared by the calc tasks, and the first
 verification record (from the spec 0003 template).
 
+**T3b Suffixed basis names in merged code** (amendments B-467, B-484). `harness.footing_subjects` reads
+`compare.angle_deg` (spec §4.4.1) in place of `compare.angle` (`BASIS_FIELDS`, the field it reads, the source text of
+its zero constant); its golden files and tests follow. The example reference `#/fields/compare.length` of the calcs
+kind fixtures `model_diff.json` and `readback_check.json` becomes `compare.length_mm`, with the two report snapshots
+that show it; the change-set test's basis path `loads.floor_dead_kpa` (an area load, spec 0007 §4.3.1) becomes
+`loads.floor_dead_kPa`. No rule, value or bound changes. The rename changes the calc's content hash: the task
+regenerates its `calcs.lock.json` entry and the hash and basis-field lines of its verification record, which stays
+`draft`, and the owner re-verifies the calc (owner queue). The calc keeps version 1 (draft, never approved); if the
+owner rules that the renamed input needs a new version (calcs spec §4.2, stable ids), the lead amends this task. Test
+order: the first `test:` commit holds the three `test_subjects.py` tests and the renamed golden files, which fail at
+the base because the merged calc reads `compare.angle`; the kind fixtures, snapshots and change-set test come in a
+later commit (they pass at the base).
+
 **T4 Plan size and resize** (spec §4.4.2, §4.4.4). Exact integer search on fractions; `LIMIT_REACHED`; FG-1. The
 minimality and monotonicity properties run with Hypothesis.
 
@@ -402,6 +439,7 @@ determinism. The non-test lines are at most a test-support helper.
 | T1 | eng-contract T11, T12 (kinds); plan 0001 T3 (`_kinds.py`); plan 0003 T4 |
 | T2 | plan 0003 T5 (CalcPort); SC T8, T11 (evaluate, lifecycle); the documents pull requests of spec Q10 and C4 (B-405) |
 | T3 to T6, T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
+| T3b | eng-contract T19 (suffixed basis paths, B-464; merged) |
 | T7 | plan 0005 T1 to T4, T7 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
 | T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19a (amendment B-475); plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); plan 0007 T9 (shipped-workflow registry in `workflows/__init__.py` and `block.discover()`, amendment B-417); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
