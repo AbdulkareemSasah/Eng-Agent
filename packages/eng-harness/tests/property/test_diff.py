@@ -13,13 +13,13 @@ from eng_harness.calcs.model_diff import DiffInput
 
 FP = "model.frame_placements/1"
 UNITS = {
-    "compare.length": "mm",
-    "compare.angle": "deg",
-    "compare.stress": "MPa",
-    "compare.unit_weight": "kN/m3",
-    "compare.line_load": "kN/m",
-    "compare.area_load": "kPa",
-    "compare.ratio": "1",
+    "compare.length_mm": "mm",
+    "compare.angle_deg": "deg",
+    "compare.stress_MPa": "MPa",
+    "compare.unit_weight_kN_m3": "kN/m3",
+    "compare.line_load_kN_m": "kN/m",
+    "compare.area_load_kPa": "kPa",
+    "compare.dimensionless_ratio": "1",
 }
 _finite = st.floats(min_value=-1e9, max_value=1e9, allow_nan=False, allow_infinity=False).map(lambda v: v + 0.0)
 _ids = st.lists(st.sampled_from(["F1", "F2", "F3", "F4", "F5"]), max_size=5, unique=True)
@@ -51,7 +51,7 @@ def _frame(fid: str, x: float, section: str = "S1", rotation: float = 0.0) -> di
 def _diff(before: list[dict[str, Any]], after: list[dict[str, Any]], length: float = 1.0) -> dict[str, Any]:
     source = "engineer:synthetic@2026-01-01T00:00:00.000Z"
     fields = {
-        p: {"value": length if p == "compare.length" else 1.0, "unit": u, "source": source, "confirmed": True,
+        p: {"value": length if p == "compare.length_mm" else 1.0, "unit": u, "source": source, "confirmed": True,
             "citation": None}
         for p, u in UNITS.items()
     }  # fmt: skip
@@ -76,8 +76,8 @@ def test_boundary_exact(n: int, k: int, m: int) -> None:
     above = math.nextafter(x + tolerance, math.inf)
     out = _diff([_frame("F1", x), _frame("F2", x)], [_frame("F1", x + tolerance), _frame("F2", above)], tolerance)
     within = [(w["key"], w["after"], w["rule"]) for w in out["within_tolerance"]]
-    assert within == ([] if tolerance == 0 else [(["F1"], x + tolerance, "D3")])
-    assert [(c["key"], c["properties"][0]["after"]) for c in out["changes"]] == [(["F2"], above)]
+    assert within == ([] if tolerance == 0 else [(["frames", "F1"], x + tolerance, "D3")])
+    assert [(c["key"], c["properties"][0]["after"]) for c in out["changes"]] == [(["frames", "F2"], above)]
     assert out["changes"][0]["properties"][0]["tolerance"] == tolerance
     assert out["counts"][FP]["within_tolerance"] == len(within)
 
@@ -103,9 +103,10 @@ def _states(draw: st.DrawFn) -> list[dict[str, Any]]:
 @settings(derandomize=True, max_examples=150, deadline=None)
 @given(a=_states(), b=_states())
 def test_identity_and_symmetry(a: list[dict[str, Any]], b: list[dict[str, Any]]) -> None:
-    """AC27: A to A is identical; A to B and B to A swap added and removed and every before and after value."""
-    if not a or not b:
-        return
+    """AC27: A to A is identical; A to B and B to A swap added and removed and every before and after value.
+
+    An empty frame list is a valid section, so the all-added and all-removed cases are drawn too.
+    """
     same = _diff(a, a)
     assert (same["identical"], same["changes"], same["within_tolerance"]) == (True, [], [])
     forward, backward = _diff(a, b), _diff(b, a)

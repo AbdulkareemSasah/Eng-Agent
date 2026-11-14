@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0003 §4.7 (D1 to D7) and §4.4; synthetic read sets and tolerances, no project value",
   "method_ref": "§4.7 D2",
   "synthetic": true,
-  "derivation": "Two frame loads on F1 under DEAD in direction gravity on each side (10 and 2 kN/m before, 10 and 3 after). The D2 key of a frame load is (frame, pattern, direction) = (F1, DEAD, gravity), which occurs twice on each side: ambiguous, with both object lists in input order, no property rows. Pattern DEAD is identical: unchanged. The section's own members are its four lists only, so no section-level row. Counts: ambiguous 1, unchanged 1. An ambiguous key makes the report incomplete (AC28) and so not identical (D7).",
+  "derivation": "Two frame loads on F1 under DEAD in direction gravity on each side (10 and 2 kN/m before, 10 and 3 after). The D2 key of a frame load is (frame, pattern, direction) = (F1, DEAD, gravity), which occurs twice on each side; reported key [\"frame_loads\", \"F1\", \"DEAD\", \"gravity\"] (D2: the list name, then the members): ambiguous, with both object lists in input order, no property rows. Pattern DEAD is identical: unchanged. The section's own members are its four lists only, so no section-level row. Counts: ambiguous 1, unchanged 1. An ambiguous key makes the report incomplete (AC28) and so not identical (D7).",
   "inputs": {
     "input": {
       "before_loads": {
@@ -58,49 +58,49 @@
       "basis": {
         "template": null,
         "fields": {
-          "compare.length": {
+          "compare.length_mm": {
             "value": 1.0,
             "unit": "mm",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.angle": {
+          "compare.angle_deg": {
             "value": 1.0,
             "unit": "deg",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.stress": {
+          "compare.stress_MPa": {
             "value": 1.0,
             "unit": "MPa",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.unit_weight": {
+          "compare.unit_weight_kN_m3": {
             "value": 1.0,
             "unit": "kN/m3",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.line_load": {
+          "compare.line_load_kN_m": {
             "value": 1.0,
             "unit": "kN/m",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.area_load": {
+          "compare.area_load_kPa": {
             "value": 1.0,
             "unit": "kPa",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
             "confirmed": true,
             "citation": null
           },
-          "compare.ratio": {
+          "compare.dimensionless_ratio": {
             "value": 1.0,
             "unit": "1",
             "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
@@ -161,43 +161,44 @@
       "length": {
         "value": 1.0,
         "unit": "mm",
-        "ref": "res_00000000000000000000000009#/fields/compare.length"
+        "ref": "res_00000000000000000000000009#/fields/compare.length_mm"
       },
       "angle": {
         "value": 1.0,
         "unit": "deg",
-        "ref": "res_00000000000000000000000009#/fields/compare.angle"
+        "ref": "res_00000000000000000000000009#/fields/compare.angle_deg"
       },
       "stress": {
         "value": 1.0,
         "unit": "MPa",
-        "ref": "res_00000000000000000000000009#/fields/compare.stress"
+        "ref": "res_00000000000000000000000009#/fields/compare.stress_MPa"
       },
       "unit_weight": {
         "value": 1.0,
         "unit": "kN/m3",
-        "ref": "res_00000000000000000000000009#/fields/compare.unit_weight"
+        "ref": "res_00000000000000000000000009#/fields/compare.unit_weight_kN_m3"
       },
       "line_load": {
         "value": 1.0,
         "unit": "kN/m",
-        "ref": "res_00000000000000000000000009#/fields/compare.line_load"
+        "ref": "res_00000000000000000000000009#/fields/compare.line_load_kN_m"
       },
       "area_load": {
         "value": 1.0,
         "unit": "kPa",
-        "ref": "res_00000000000000000000000009#/fields/compare.area_load"
+        "ref": "res_00000000000000000000000009#/fields/compare.area_load_kPa"
       },
       "dimensionless": {
         "value": 1.0,
         "unit": "1",
-        "ref": "res_00000000000000000000000009#/fields/compare.ratio"
+        "ref": "res_00000000000000000000000009#/fields/compare.dimensionless_ratio"
       }
     },
     "changes": [
       {
         "section": "model.load_set/1",
         "key": [
+          "frame_loads",
           "F1",
           "DEAD",
           "gravity"

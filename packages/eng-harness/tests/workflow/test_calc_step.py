@@ -111,8 +111,8 @@ def _older_rig(root: Path) -> tuple[Rig, HarnessCalcPort, str]:
     first = rig.store.put(kind, {"frames": [_frame("S1")]}, producer(1))
     second = rig.store.put(kind, {"frames": [_frame("S2")]}, producer(2))
     source = "engineer:synthetic@2026-01-01T00:00:00.000Z"
-    units = {"length": "mm", "angle": "deg", "stress": "MPa", "unit_weight": "kN/m3", "line_load": "kN/m",
-             "area_load": "kPa", "ratio": "1"}  # fmt: skip
+    units = {"length_mm": "mm", "angle_deg": "deg", "stress_MPa": "MPa", "unit_weight_kN_m3": "kN/m3",
+             "line_load_kN_m": "kN/m", "area_load_kPa": "kPa", "dimensionless_ratio": "1"}  # fmt: skip
     fields: dict[str, JsonValue] = {
         f"compare.{name}": {"value": 1.0, "unit": unit, "source": source, "confirmed": True, "citation": None}
         for name, unit in units.items()
@@ -146,7 +146,7 @@ def test_older_revision_inputs(tmp_path: Path) -> None:
     assert isinstance(outcome.output, ChainOutput)
     report: Any = rig.store.payload(outcome.output.refs[0])
     assert (report["before"]["model_revision"], report["after"]["model_revision"]) == (1, 2)
-    assert [(c["key"], c["properties"][0]["pointer"]) for c in report["changes"]] == [(["F1"], "/section")]
+    assert [(c["key"], c["properties"][0]["pointer"]) for c in report["changes"]] == [(["frames", "F1"], "/section")]
     assert rig.log.count("calc.run") == 1
 
     stale, stale_port, stale_basis = _older_rig(tmp_path / "stale")

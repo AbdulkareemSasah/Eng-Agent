@@ -1,16 +1,19 @@
 """Calc 2, difference report (plan 0003 T8b; spec 0003 4.7, AC24 to AC28): basis, sides, gaps and the report."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.kinds.basis import BasisField, DesignBasis
+from eng_contract.units import kind_for_field
 from pydantic import ValidationError
 
 from eng_harness.calc import InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
-from eng_harness.calcs.model_diff import BASIS_FIELDS, DiffInput
+from eng_harness.calcs.model_diff import BASIS_FIELDS, TOLERANCE_FIELDS, DiffInput, read_tolerances
 
 CALC_ID = "harness.model_diff"
 MDL = "mdl_00000000000000000000000000"
@@ -20,22 +23,22 @@ FP = "model.frame_placements/1"
 SECTIONS = "model.sections/1"
 LOADS = "model.load_set/1"
 UNITS = {
-    "compare.length": "mm",
-    "compare.angle": "deg",
-    "compare.stress": "MPa",
-    "compare.unit_weight": "kN/m3",
-    "compare.line_load": "kN/m",
-    "compare.area_load": "kPa",
-    "compare.ratio": "1",
+    "compare.length_mm": "mm",
+    "compare.angle_deg": "deg",
+    "compare.stress_MPa": "MPa",
+    "compare.unit_weight_kN_m3": "kN/m3",
+    "compare.line_load_kN_m": "kN/m",
+    "compare.area_load_kPa": "kPa",
+    "compare.dimensionless_ratio": "1",
 }
 KINDS = {
-    "compare.length": "length",
-    "compare.angle": "angle",
-    "compare.stress": "stress",
-    "compare.unit_weight": "unit_weight",
-    "compare.line_load": "line_load",
-    "compare.area_load": "area_load",
-    "compare.ratio": "dimensionless",
+    "compare.length_mm": "length",
+    "compare.angle_deg": "angle",
+    "compare.stress_MPa": "stress",
+    "compare.unit_weight_kN_m3": "unit_weight",
+    "compare.line_load_kN_m": "line_load",
+    "compare.area_load_kPa": "area_load",
+    "compare.dimensionless_ratio": "dimensionless",
 }
 _NAMES = ("stories", "grids", "frames", "areas", "sections", "materials", "loads", "restraints")
 GOLDEN = Path(__file__).resolve().parents[2] / "data" / "golden" / "calcs"
@@ -109,6 +112,23 @@ def _basis_refusal(basis: dict[str, Any]) -> ContractError:
     return _refused(fields, _meta(before_frames=_ref(1, FP), after_frames=_ref(2, FP)))
 
 
+def _unchecked_refusal(basis: dict[str, Any]) -> ContractError:
+    fields = {path: BasisField.model_validate(field) for path, field in basis["fields"].items()}
+    with pytest.raises(ContractError) as caught:
+        read_tolerances(DesignBasis.model_construct(template=None, fields=fields), BASIS_ID, TraceBuilder())
+    assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    return caught.value
+
+
+def test_tolerance_rows_follow_the_contract_suffixes() -> None:
+    """Spec 4.4: each path's last segment names its quantity kind and canonical unit (`compare.dimensionless_ratio`)."""
+    for path, kind, unit in TOLERANCE_FIELDS:
+        quantity = kind_for_field(path.rsplit(".", 1)[-1])
+        assert quantity is not None, path
+        assert (quantity.name, quantity.canonical_unit) == (kind, unit)
+    assert (KINDS["compare.dimensionless_ratio"], UNITS["compare.dimensionless_ratio"]) == ("dimensionless", "1")
+
+
 def test_basis_tolerances_required() -> None:
     """AC26: each 4.4 `compare.*` field must be present, confirmed, in its unit and >= 0; no default is used."""
     assert tuple(UNITS) == BASIS_FIELDS
@@ -125,7 +145,9 @@ def test_basis_tolerances_required() -> None:
         assert (error.detail.field, error.detail.message) == (name, f"basis field {path} is not confirmed")
         wrong = _basis()
         wrong["fields"][path]["unit"] = "kN"
-        error = _basis_refusal(wrong)
+        with pytest.raises(ValidationError, match=re.escape(f"unit of '{path}' does not match the unit suffix")):
+            DiffInput.model_validate(_input(before_frames=_frames(), after_frames=_frames()) | {"basis": wrong})
+        error = _unchecked_refusal(wrong)  # the calc checks the unit too, for a basis built past the contract check
         assert (error.detail.field, error.detail.message) == (name, f"basis field {path} must be in {unit}, not kN")
         for bad in (-1.0, -5e-324, "1", True, None):
             negative = _basis()
@@ -147,15 +169,15 @@ def test_tolerances_and_trace() -> None:
     """The tolerances are echoed per quantity kind with their basis ref, and recorded as trace inputs (4.7 Trace)."""
     trace = TraceBuilder()
     before, after = _frames(_frame("F1"), _frame("F2", x=6000.0)), _frames(_frame("F1", section="S2"))
-    fields = {"before_frames": before, "after_frames": after, "basis": _basis(**{"compare.length": 0.25})}
+    fields = {"before_frames": before, "after_frames": after, "basis": _basis(**{"compare.length_mm": 0.25})}
     out = _run(fields, _meta(before_frames=_ref(1, FP), after_frames=_ref(2, FP, revision=4)), trace)
     assert out["tolerances"] == {
-        KINDS[p]: {"value": 0.25 if p == "compare.length" else 1.0, "unit": u, "ref": f"{BASIS_ID}#/fields/{p}"}
+        KINDS[p]: {"value": 0.25 if p == "compare.length_mm" else 1.0, "unit": u, "ref": f"{BASIS_ID}#/fields/{p}"}
         for p, u in UNITS.items()
     }
     built = trace.build(REGISTRY[CALC_ID], "ab" * 32)
     assert [(i.name, i.value, i.unit, i.ref) for i in built.inputs] == [
-        (p.replace(".", "_"), 0.25 if p == "compare.length" else 1.0, u, f"{BASIS_ID}#/fields/{p}")
+        (p.replace(".", "_"), 0.25 if p == "compare.length_mm" else 1.0, u, f"{BASIS_ID}#/fields/{p}")
         for p, u in UNITS.items()
     ]
     names = [i.name for i in built.inputs]
@@ -194,7 +216,7 @@ def test_not_compared_and_ambiguous() -> None:
     out = _run(fields, refs)
     assert out["not_compared"] == [FP, SECTIONS]
     assert [(c["section"], c["key"], c["change"]) for c in out["changes"]] == [
-        (LOADS, ["F1", "DEAD", "gravity"], "ambiguous")
+        (LOADS, ["frame_loads", "F1", "DEAD", "gravity"], "ambiguous")
     ]
     assert out["changes"][0]["before"] == out["changes"][0]["after"] == [row, row]
     assert list(out["counts"]) == [LOADS]
