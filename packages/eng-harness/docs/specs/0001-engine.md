@@ -64,6 +64,11 @@ with that id is refused, as plan T20 built it (§4.5.1, AC70); a write that the 
 again automatically once, then the run stops for the engineer (§4.5.3, AC31; the new criterion AC71, built by plan
 T21).
 
+**Amendment B-499.** The B-115 writer's findings on permission modes and promotion (engine plan T16, split into T16
+and T16b): the journal and port forms of the approval binding as merged (§4.9), the rerun of an approval or ask in
+flight (§4.5.3), a rejected item of an inserted approval (§4.7), and five open questions (§11 Q40 to Q44); it adds no
+criterion.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -893,7 +898,7 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 |---|---|
 | Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty (invariant 1), and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
 | Read, calc, decision (tiers other than the engineer) | `step_rerun`, then the step runs again with the same attempt (no side effect) |
-| Approval, ask, engineer-tier decision | Presented again with the same request id (AC36) |
+| Approval, ask, engineer-tier decision | Presented again with the same request id (AC36). An approval or ask step in flight gets `step_rerun` with reason `read_in_flight` and runs again as the same attempt, which presents it again (amendment B-499) |
 | Block, parallel, attempts | Scopes, not steps: their children are handled one by one |
 
 #### 4.5.4 Host-state check before live execution
@@ -1020,6 +1025,7 @@ again.
   taken as each mode states (EC1).
 - **`approve_each_write`.** Before each write, the inserted step `p~pre.approve` presents `ToolPort.preview(tool,
   args)` as a `CHANGE_SET` approval; a rejection raises `ApprovalRejected` (a `StepError`) and the write is not called.
+  An answer that rejects any item of an inserted approval is a rejection: the write is one step (amendment B-499).
   Exception (amendment B-415, spec 0007 Q3): a tool step with action `save` whose `ToolInfo.saves_new_file(args)` is
   true and whose `ToolInfo.overwrites_original(args)` is false gets no `p~pre.approve` preview: it changes no model
   content and writes no existing file. An in-place tool save and every other write keep their preview, and a save
@@ -1129,8 +1135,9 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 - `ctx.approve(title, preview, kind)`: `request_id = "apr_" + sha256(run_id + "\n" + path).hexdigest()[:32]`, stable
   across replay. `Preview` (`items: list[PreviewItem]` with unique `id`, `label`, `refs`; `diff_ref: Ref | None`;
   `models: list[ModelHandle]`) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
-  `binding` is `[{model_key, model_id, revision, fingerprint, file_sha256}]` of every model in `preview.models`, read from HostPort
-  when the request is made (after invariant 1 has checked them).
+  `binding` holds `model_id`, `revision`, `fingerprint` and `file_sha256` of every model in `preview.models`, read from
+  HostPort when the request is made (after invariant 1 has checked them): in `approval_requested` a map keyed by model
+  key, in `ApprovalRequest.binding` a list of `ModelBinding` with its `model_key` (amendment B-499, as merged).
 - An answer is accepted only if its `request_id` names an open approval request of this run, its `shown_sha256` equals
   the request's, and the request has no `approval_resolved` yet (used once). Otherwise it is refused and the request is
   presented again (AC54).
@@ -1355,3 +1362,8 @@ The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload
 | Q37 | Spec 0006 Q20: for `run` the command line must build the tool and host ports, which need the run folder, before `Engine.start` draws the run id | Owner | Decided (owner instruction of 2026-11-12; amendment B-471; spec 0006 Q20 answer A): `RunRequest.run_id`, optional, chosen by the caller (`run_` + ULID), used by `start`, which checks it before any port call and refuses it with `ContractError` `INVALID_ARGUMENT`, creating nothing, when it does not match `run_` + ULID or that run folder exists (§4.4.1, §4.5.1, AC70); built by plan T20 (work item B-472) |
 | Q38 | With a caller-chosen run id, a `SERVER_CHECK_FAILED` refusal leaves the run's server logs (`runs/<run_id>/servers/`) in the run folder: keep or remove them? | Owner | Decided (owner answer of 2026-11-14, B-495): the logs stay (they are the evidence of the refusal) and a retry with the same run id is refused; the merged start of plan T20 already does this (§4.5.1, AC70) |
 | Q39 | How many times does a write that reconciliation found `not_applied` run again automatically? | Owner | Decided (owner answer of 2026-11-14, B-495): once; then the run stops for the engineer with the existing stop for a write the adapter cannot decide (`NeedsReconciliation`, `NEEDS_RECONCILIATION`, request `engine.in_flight`; no new code) (§4.5.3, AC71); built by plan T21 |
+| Q40 | B-499: a `promote` step in flight at resume. §4.3.2 gives it effect `write` and the §4.5.3 Write row names it, but that row reconciles through `ToolPort.reconcile(tool, args, op_id)` and asks `ToolPort.read_back` for an `applied` step, while a file copy is no tool call; §4.7 "Promotion" is silent (the B-115 draft journals the step with effect `none`, so a resume stops with `NeedsReconciliation`) | Owner | Writer's recommendation (B-499, open): effect `write` with an `op_id`, never sent to the `ToolPort`: the Write row's branch for a write with no reconciler (the `engine.in_flight` request: `applied`, `not_applied`, `abandon`); `applied` completes the step from the working copy's `HostPort.model_state`, as a live promotion does, with no `read_back`; `not_applied` runs it again as attempt + 1, whose check of the original's hash against `origin_sha256` refuses with `CONFLICT` an original already partly replaced (its backup stays in `runs/<run_id>/backups/`); plan T16b builds the answer |
+| Q41 | B-499: which models get a working copy in `work_on_copy`. §4.7 copies "an existing model" before its first write and creates new models in the run folder, but the engine cannot tell a model the engineer opened from one a tool created in the run | Owner | Writer's recommendation (B-499, open): every model open in a host gets a working copy at its first write, as the B-115 draft does (no original is ever written; a model a tool created gets a needless copy); the alternative is to copy only a model whose files (`HostPort.model_files`) lie outside the run folder; plan T16 builds the answer |
+| Q42 | B-499: promotion of a model that has no working copy (written in place in another mode, or never written). §4.7 names `FILE_COPY` for "the edit cycle and new models" but no target for a model with no original | Owner | Writer's recommendation (B-499, open): `BlockRuleViolation`, nothing copied, as the B-115 draft does, until a workflow that promotes new models has a spec naming the target; plan T16b builds the answer |
+| Q43 | B-499: an approval shown before the working copy exists. Its binding is the original's state (§4.9), the first write under it takes the copy and goes to it (§4.7), and the re-check reads the copy, whose key and file hash differ, so approving before the first write always ends in `ApprovalVoid` | Owner | Writer's recommendation (B-499, open): when the copy is taken while the original still equals the binding, the binding moves to the copy's state and a write to the copy counts as one to the bound model, as the B-115 draft does; the alternative is to take the working copy before an approval whose preview names an open model without one is shown; plan T16 builds the answer |
+| Q44 | B-499: the file hash of a model. Promotion compares `FileOps.sha256` of the original's files with `origin_sha256`, taken from `HostModelState.file_sha256`, but neither this spec nor spec 0002 (§4.6.4: "of the last save") defines that hash for a model with several files | Owner | Writer's recommendation (B-499, open): the SHA-256 of the files' bytes in the order of `HostPort.model_files`, as the B-115 draft computes it, which for the one-file adapters (spec 0002 §4.5.9, spec 0011: "the model file only") is the file's SHA-256; spec 0002 states it at its next amendment; plan T16b builds the answer |

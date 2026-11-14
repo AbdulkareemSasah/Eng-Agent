@@ -94,9 +94,9 @@ defines its method; values are synthetic and say so.
   `tests/contract/test_edit_cycle_kinds.py::test_fixtures`.
 - AC4. Given a change set and a model state, when `harness.change_set_check` runs, then selections resolve to sorted
   explicit names, and an unknown frame, area, joint, section, material or pattern, two items on the same target and
-  property, or an empty selection is an `error` issue and the status is `FAIL`. Test:
+  property, an item id with `/`, or an empty selection is an `error` issue and the status is `FAIL`. Test:
   `tests/golden/edit_cycle/test_change_set_check.py::test_golden_cases` (cases `check-resolve-*`, `check-unknown-*`,
-  `check-duplicate-*`).
+  `check-duplicate-*`, `check-item-id-*`).
 - AC5. Given a value outside the basis bounds of its quantity kind (§4.8 `bounds.*`), including a thickness entered
   as 200 where 0.2 is in the bounds' unit scale (baseline د6), or a basis path that is absent or unconfirmed, then
   `OUT_OF_BOUNDS` or `SOURCE_MISSING` and `FAIL`. Test: same file, cases `check-bounds-*`, `check-source-*`.
@@ -107,10 +107,17 @@ defines its method; values are synthetic and say so.
   item gets the `warning` issue `CONFLICTS_WITH_ENGINEER_CHANGE` with both values, the status stays `PASS`, and the
   change-set preview marks the item. Test: golden cases `check-conflict-*`.
 - AC8. Given a resolved change set, when `harness.expected_effects` runs, then it gives the effects of §4.4.2 per kind
-  (a wall thickness is one `set` effect on `model.sections/1`; a combination replace is one `set` of the whole object;
-  a delete is `remove`); a permutation of the items gives the same effects. Tests:
+  (a wall thickness of an existing section is one `set` effect on `model.sections/1`; a replace of an existing
+  combination is a `set` of its type and one effect per item under the item keys of spec 0003 §4.7 D2; a new object is
+  one `add`; a delete is `remove`); a permutation of the items gives the same effects. Tests:
   `tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases`,
   `tests/property/test_expected_effects.py::test_order_independent`.
+- AC36. Given a resolved change set that changes one scale, adds one case and drops one case of an existing
+  combination, and puts a frame load on a frame that has none in that pattern, when `harness.expected_effects` projects
+  it and `harness.readback_check` compares its effects with a before read set and an after read set that holds exactly
+  those changes, then the status is `PASS` with no `unexpected` row; with the scale change missing from the after read
+  set, `FAIL` with that effect `mismatch` (amendment B-498). Test:
+  `tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back`.
 
 ### 3.3 The cycle (§4.5)
 
@@ -337,26 +344,43 @@ sorted by code point, `values` as `{pointer, ref, unit}` where `ref` is the refe
 answer field, never a number), `issues` (`item_id`, `severity` `error`/`warning`, `code`, `detail`), `complete`.
 
 Rules: K1 resolve `select` against `model.frame_placements/1` or `model.area_placements/1` (story equal, section equal,
-area kind from `model.sections/1`); an empty result is `EMPTY_SELECTION`. K2 every name exists (`UNKNOWN_<CLASS>`) or
-is added earlier in the set. K3 two items setting the same target and property is `DUPLICATE_TARGET`. K4 each value:
-a `basis` path present and confirmed (else `SOURCE_MISSING`), unit of the field's dimension (`UNIT_MISMATCH`), value
-within the bounds of its value kind by exact comparison of canonical values (`OUT_OF_BOUNDS`): `bounds.thickness_min_mm`
-and `bounds.thickness_max_mm` for a length, `bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line
-load, `bounds.area_load_min_kPa` and `bounds.area_load_max_kPa` for an area load, `bounds.ratio_min_ratio` and
-`bounds.ratio_max_ratio` for a ratio (§4.8). K5 refused kinds
-(§4.3.2). K6 an item whose target and property appear in `diff.changes` (keys of the form of §4.4.2) gets the warning
-`CONFLICTS_WITH_ENGINEER_CHANGE`. K7 `FAIL` on any error.
+area kind from `model.sections/1`); an empty result is `EMPTY_SELECTION`. K2 every name exists (`UNKNOWN_<CLASS>`) or is
+added earlier in the set. K3 two items setting the same target and property is `DUPLICATE_TARGET`; an item id that
+contains `/` is `INVALID_ITEM_ID` (§4.4.2 effect ids). K4 each value: a `basis` path present and confirmed (else
+`SOURCE_MISSING`), unit of the field's dimension (`UNIT_MISMATCH`), value within the bounds of its value kind by exact
+comparison of canonical values (`OUT_OF_BOUNDS`): `bounds.thickness_min_mm` and `bounds.thickness_max_mm` for a length,
+`bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line load, `bounds.area_load_min_kPa` and
+`bounds.area_load_max_kPa` for an area load, `bounds.ratio_min_ratio` and `bounds.ratio_max_ratio` for a ratio (§4.8).
+K5 refused kinds (§4.3.2). K6 an item whose target and property appear in `diff.changes` (keys of the form of §4.4.2)
+gets the warning `CONFLICTS_WITH_ENGINEER_CHANGE`. K7 `FAIL` on any error.
 
 #### 4.4.2 `harness.expected_effects` v1 (spec 0003 Q6)
 
-Input: `check` (`harness.change_set_check/1`, status `PASS`), `approval_items` (the accepted item ids), `state`.
-Output: spec 0003's `harness.expected_effects/1`. Projection per kind: section assignments, loads and restraints are
-`set` effects per target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on
-`model.sections/1` (spec 0003 §4.8 edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns;
-`load_combination_set` is `set` of the whole combination (or `add` when new); `load_combination_delete` is `remove`;
-an unlock has no model effect. Effects are sorted by section, key and pointer, so item order does not matter. An
-effect's `key` is the reported key of spec 0003 §4.7 D2, list name included (for example `["frame_loads", frame,
-pattern, direction]`), so effects and `diff.changes` match on one key form (amendment B-483).
+Input: `check` (`harness.change_set_check/1`, status `PASS`), `approval_items` (the accepted item ids), `state` (the
+step 3 read set, the read-back's `before`; not `stale_ok`: the workflow runs this calc after the step 6 approval and
+before the first write, §4.5, so `state` is current), and `change_set` and `basis` as in §4.4.1, because `resolved`
+holds references, never numbers or combination terms: an effect's value is the item's value in its canonical unit (a
+literal converted by `eng_contract.units`, §4.3.1; a basis value from its field). Output: spec 0003's
+`harness.expected_effects/1`. Projection per kind: section assignments, loads and restraints are `set` effects per
+target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on `model.sections/1` (spec 0003 §4.8
+edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns; `load_combination_set` on a combination that
+`state` holds is a `set` of its `/type` and one effect per item against that combination's items in `state`, matched by
+the D2 item key (`case.case`, `case.case_type`, `case.step`), so a pattern and a combination of one name, or two
+envelope steps, stay apart: `set` of `/scale_ratio` for an item key it holds, `add` of the item (`case`, `scale_ratio`)
+for a new one, `remove` for one the change set leaves out; `load_combination_set` on a new combination is `add` of the
+whole object; `load_combination_delete` is `remove`; an unlock has no model effect. A `set` whose target object `state`
+does not hold (a new load row, restraint row or wall section) is `add` of the whole object instead (a new wall section
+is the whole `AreaSection` row: `name`, `material`, `kind: wall`, `thickness_mm`; `shell_type` is not in the neutral
+kind), because the difference report shows that object as added, which a `set` at a property's pointer does not explain
+(spec 0003 §4.8 R3). Effects are sorted by section, key and pointer, so item order does not matter. An effect's `key` is
+the reported key of spec 0003 §4.7 D2, list name included (for example `["frame_loads", frame, pattern, direction]`, and
+for a combination item `["combinations", name, "items", case, case_type]`, with `step` last when it is not null), so
+effects and `diff.changes` match on one key form (amendment B-483) and each change of a correct write is explained by
+the effect on its own key (R3). Every other kind projects onto the key D2 reports for the changed object: D2 nests keyed
+lists only under combinations and grid systems, and v1 edits no grid. An item that gives more than one effect gives each
+the `item_id` of the item, `/` and the effect's position (from 1) among that item's effects in the sorted order, because
+effect item ids are unique in `harness.expected_effects/1`; K3 refuses an item id with `/`, so these ids cannot repeat
+another item's (amendment B-498).
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
@@ -390,10 +414,10 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
 | 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.ref(...)})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
-| 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty | Binding to the model state (engine §4.9); single use |
+| 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty. Then, before any write, `ctx.calc("harness.expected_effects", ...)` with the accepted item ids (none when skipped) | Binding to the model state (engine §4.9); single use |
 | 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
 | 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
-| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.expected_effects", ...)`, `ctx.calc("harness.readback_check", {"effects", "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
+| 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.readback_check", {"effects": <the step 6 expected effects>, "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
@@ -403,10 +427,12 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
-`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). The workflow passes
-each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for
-`harness.model_diff`, §4.8 for `harness.readback_check`) as the CalcPort `basis_fields` (spec 0003 §4.4 and AC13).
-Amendment B-483.
+`X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). Each calc's basis
+paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for `harness.model_diff`, §4.8 for
+`harness.readback_check`) are the CalcPort `basis_fields` (spec 0003 §4.4 and AC13). Amendment B-483. The workflow
+does not pass them at call time: the command line's calc-port factory supplies them when it constructs the port (spec
+0003 §4.12; spec 0006 §4.2.2 step 4), mapping both calc ids to the `BASIS_FIELDS` of `calcs/model_diff.py` (amendment
+B-498).
 
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
@@ -514,8 +540,7 @@ letters, which the contract's `basis.design_basis/1` path rule allows in the las
 0001 T19 (work item B-464, owner decision OQ-Q44; spec 0004 Q1, spec 0003 Q1): a basis holding those eight paths (four
 `compare.*`, four `bounds.*`) cannot be frozen before it is merged (Q12). The calcs and the adapter read the paths of
 this table; amendment B-467 renamed them to match in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014, in
-plans 0011, 0013 and 0014 and in structural-codes plan 0002; the clause document `aci318_14.13_3_1_1` (bearing
-pressure, service) still names `limits.ratio_limit` until the owner renames it (Q12).
+plans 0011, 0013 and 0014 and in structural-codes plan 0002.
 
 Spec 0004's proposed `modeling.merge_tolerance_mm`, `modeling.snap_tolerance_mm` and
 `modeling.section_rounding_increment_mm` are not used: v1 adds or moves no object and computes no section size.
@@ -628,7 +653,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30, AC36 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
 | AC9 to AC17, AC19 to AC24, AC26, AC31, AC34 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
