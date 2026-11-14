@@ -404,8 +404,10 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
 `X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). The workflow passes
-each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names it) as the CalcPort `basis_fields` (spec 0003
-§4.12). Amendment B-483.
+each calc's basis paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for
+`harness.model_diff`, §4.8 for `harness.readback_check`) as the CalcPort `basis_fields` (spec 0003 §4.4 and AC13).
+Amendment B-483.
+
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
 the step 3 read of cycle `k`. When the step 3 fingerprint equals that of `R[k-1]`, step 4 still runs (a cheap,
