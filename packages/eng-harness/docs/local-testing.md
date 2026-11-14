@@ -34,6 +34,8 @@ Plan 0006 T3b (spec 0006 AC61): the opener on the owner machine.
 
 Plan 0003 T7 (spec 0003 L-1): the model fingerprint on real reads.
 16. `harness.model_fingerprint` over the read set of a real ETABS model: the same fingerprint over repeated reads, and after save and reopen; a different fingerprint after each of the S-04 hand edits E1 to E10 (only CI's synthetic read sets have run).
+Plan 0003 T9 (spec 0003 L-2, acceptance A1 and A5): the read-back check on real reads.
+16b. `harness.readback_check` after real ETABS writes on a copy: the unit scale of a written thickness (a value written in the wrong units must read back `mismatch`), frame load directions (S12-G9), the table reads of S12-G8 (until they exist those sections give `not_read`), and an engineer's hand edit between the before and after reads (`unexpected`); only CI's synthetic read sets have run.
 Plan 0010 T3 (footing subjects; spec 0010 section 12 L2). Needs the real ETABS model; nothing here runs in CI:
 17. `harness.footing_subjects` on a copy of a real model: which of a rectangular column section's `b_mm` and `h_mm` lies along local axis 2 at rotation zero (the calc maps `cx = b`, `cy = h` for rotations near 0 and 180 degrees), the `rotation_deg` values the adapter reports for rotated columns, and which joints report reactions.
 Plan 0001 T13b (invariant 9 and the first-use binding; spec 0001 AC45, AC64). Needs a real host and adapter; only the fakes have run these:
