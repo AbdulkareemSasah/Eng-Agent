@@ -345,8 +345,8 @@ The framework comes first, in the order its own imports need: the decorator and 
 lock file (T2), approvals (T3), the kinds (T4) and the CalcPort (T5). The rules test and golden harness (T6) are in
 place before any calc exists, so every calc lands under them. Then the six calcs follow, in the order the edit cycle
 depends on them. The fingerprint (T7) comes first because the difference report reuses its canonical-state helper.
-The difference report (T8, its comparison core, and T8b, the calc; split B-458) is the riskiest part (A5) and is built
-before the read-back check (T9), which embeds it.
+The difference report (T8, its comparison core, T8c, its list-prefixed keys, and T8b, the calc; split B-458, B-469) is
+the riskiest part (A5) and is built before the read-back check (T9), which embeds it.
 The summary (T10), rounding (T11) and placement comparison (T12) follow. T7 to T12 all edit `calcs/__init__.py`,
 `calcs.lock.json` and `CHANGELOG.md`, so they run one after another (`depends_on`). T4 and T6 may run beside T2 and T3.
 They share only `CHANGELOG.md` and `pyproject.toml` (`public_modules` lines), which are merged in pull-request order.
