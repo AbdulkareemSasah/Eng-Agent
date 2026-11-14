@@ -263,3 +263,50 @@ def test_model_locked_on_design_prefs_set(rpc: Rpc) -> None:
     _launch(rpc)
     assert not rpc.call("csi_run_analysis", confirm=True)[0]
     assert rpc.call("csi_design_prefs_set")[1]["code"] == "model_locked"
+
+
+def test_analysis_flags_are_shared_between_servers(control: Path) -> None:
+    """The host is one program: an analysis run through one server shows in the status and lock the other reads."""
+    seed = {"load_cases": [{"name": "DEAD"}, {"name": "LIVE"}]}
+    control.write_text(json.dumps({"faults": [], "seed": seed}))
+    first, second = Rpc(control), Rpc(control)
+    try:
+        _launch(first)
+        assert not second.call("csi_attach", product="ETABS", pid=4242)[0]
+        status = second.call("csi_analysis_status")[1]
+        assert status == {"cases": [{"case": "DEAD", "status_code": 1}, {"case": "LIVE", "status_code": 1}]}
+        error, body = first.call("csi_run_analysis", confirm=True)
+        assert (error, body) == (False, {"started": True})
+        status = second.call("csi_analysis_status")[1]
+        assert [c["status_code"] for c in status["cases"]] == [4, 4]  # raw codes: the fake does not decode them
+        assert second.call("csi_model_info")[1]["locked"] is True
+    finally:
+        first.close()
+        second.close()
+
+
+def test_design_needs_its_run_and_results_are_seeded(control: Path) -> None:
+    """Design rows exist only after a design run of their kind; the results tools answer the seed."""
+    rows = [{"frame": "B1", "ratio": 0.75}, {"frame": "B2", "ratio": 0.5}]
+    seed = {"design_results": {"steel": rows}, "results": {"csi_results_story_drifts": [{"story": "S1"}]}}
+    control.write_text(json.dumps({"faults": [], "seed": seed}))
+    client = Rpc(control)
+    try:
+        _launch(client)
+        error, body = client.call("csi_design_results", kind="steel")
+        assert error
+        assert body["code"] == "csi_error"
+        assert not client.call("csi_design_run", kind="steel", confirm=True)[0]
+        assert client.call("csi_design_results", kind="steel")[1]["items"] == rows
+        assert client.call("csi_design_results", kind="steel", name="B2")[1]["items"] == rows[1:]
+        page = client.call("csi_design_results", kind="steel", limit=1)[1]
+        assert (page["items"], page["truncated"]) == (rows[:1], True)
+        assert client.call("csi_design_results", kind="concrete")[0]  # only steel was run
+        for kind in ("aluminum", "coldformed"):
+            error, body = client.call("csi_design_run", kind=kind, confirm=True)
+            assert (error, body["code"]) == (True, "unsupported_by_version")
+        drifts = client.call("csi_results_story_drifts", units="kN_m_C")[1]
+        assert (drifts["items"], drifts["units"]) == ([{"story": "S1"}], "kN_m_C")
+        assert client.call("csi_results_frame_forces", units="kN_m_C")[1]["items"] == []  # nothing seeded
+    finally:
+        client.close()
