@@ -49,6 +49,9 @@ tasks:
     # through COLUMN_DESIGN_CALCS and COLUMN_DESIGN_KINDS in calcs/column_design/__init__.py, as calcs/footing/__init__.py
     # does with FOOTING_CALCS and FOOTING_KINDS, so calcs/__init__.py is edited once here and the later calc tasks (T3,
     # T4, T5, T7, T8) add their calcs and kinds in calcs/column_design/__init__.py only.
+    # Amendment (B-462, documents only): the calc-module rules test allows kinds.column_design and kinds.edit_cycle
+    # (spec 0003 4.3), and T2 registers COLUMN_DESIGN_KINDS in HARNESS_KINDS (_kinds.py), which T1 left out; budget
+    # 345 kept (294 counted on the B-281 branch plus about 5 for the registration).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_select (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -57,6 +60,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/column_design/column_select.py"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"  # COLUMN_DESIGN_KINDS in HARNESS_KINDS (amendment B-462)
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # allowed imports of spec 0003 4.3 (amendment B-462)
       - "packages/eng-harness/tests/golden/column_design/__init__.py"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-select-*.json"
@@ -404,7 +409,9 @@ variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reaso
 B-447 (D-12): split from T1, whose explicit kinds alone measured 322 counted lines.
 
 **T2 `harness.column_select`** (spec §4.4.1). Name and story-section resolution, the exact verticality test against
-`compare.length_mm`, shape and material per column, issues, and the shared golden test module for the column calcs.
+`compare.length_mm`, shape and material per column, issues, and the shared golden test module for the column calcs. T2
+also registers `COLUMN_DESIGN_KINDS` in `HARNESS_KINDS` (`_kinds.py`), so the CalcPort can store column calc results.
+Amendment (B-462).
 
 **T3 `harness.column_demands`** (spec §4.4.2). Refusal unless `host_local/1`; rows per selected column and combination;
 `Pu_kN = −P_kN`; the axis rule for sections symmetric by geometry and layout only (`b_mm == h_mm` and `n_bars_b == n_bars_h`) and

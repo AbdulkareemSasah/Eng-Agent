@@ -460,8 +460,11 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # one line: ports.approvals into Ctx (amendment B-492)
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"  # "approve" into the rerun set, spec 4.5.3 (amendment B-492)
       - "packages/eng-harness/src/eng_harness/ports.py"  # ToolPort.preview (amendment B-388)
       - "packages/eng-harness/tests/unit/test_approvals.py"
+      - "packages/eng-harness/tests/replay/test_in_flight.py"  # pins the approval in flight at resume (amendment B-492)
       - "packages/eng-harness/tests/replay/test_resume.py"
       - "packages/eng-harness/tests/workflow/test_pause.py"
       - "packages/eng-harness/tests/workflows/**"
@@ -825,7 +828,9 @@ B-105 review). Request ids, previews as results, binding, single use, refusal an
 re-check before the first write under an approval, revision continuity, expiry, items and `item_reasons`,
 `acknowledged_unreleased` (journaled as given; the page decides when it is required, spec §4.9), `signed_off`, pause
 and the
-`except Exception` test.
+`except Exception` test. Amendment B-492: T15 makes one edit in `engine/_runner.py` (`ports.approvals` into `Ctx`, the only
+place `Ctx` is built) and one in `engine/_inflight.py` (`approve` joins the steps marked for a rerun, so an approval in
+flight at resume is presented again as spec §4.5.3 says, not reconciled); `tests/replay/test_in_flight.py` pins it.
 
 **T16 Modes and promotion** (spec §4.7). Working copies (with `origin_sha256` and `origin_file_names`), approval
 per write, mode-resolved approvals, the always-ask list, file-copy promotion over the internal `FileOps` port with its

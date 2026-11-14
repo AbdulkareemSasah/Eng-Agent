@@ -1,0 +1,18 @@
+{
+  "source": "eng-harness spec 0003 §4.13 table: the stale_ok fields of each calc (every reference inside the group)",
+  "schema": 1,
+  "calcs": {
+    "harness.model_fingerprint": [],
+    "harness.model_diff": [
+      "before_areas",
+      "before_frames",
+      "before_grids",
+      "before_loads",
+      "before_materials",
+      "before_restraints",
+      "before_sections",
+      "before_stories"
+    ]
+  },
+  "never": ["basis", "effects", "after", "b", "verdicts", "frames", "required"]
+}
