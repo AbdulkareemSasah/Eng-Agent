@@ -13,6 +13,7 @@ risk: r1
 > يكتبها المالك بالعربية أو الإنجليزية، ويحوّلها المطوّر إلى بلوك مع اختبارات.
 
 Issue: #{{n}} · Owner: {{name}} · Status: Draft | Approved
+Source needs: {{task-log need ids only (A24), or none}}
 
 ## 1. Goal / الهدف
 {{What the workflow produces, and for which kind of project.}}

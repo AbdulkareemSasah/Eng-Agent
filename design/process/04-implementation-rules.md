@@ -31,6 +31,10 @@ match the implementation's output (tests that assert whatever the code returns).
 - Each task's first commit is `test: ...` with the failing tests only; CI checks that these tests fail on the base
   branch and pass at the head ([05](05-testing-and-verification.md) §9).
 - One logical change per commit. No "WIP" commits on `main` (pull requests are squash-merged).
+- Log-only commits ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5, which defines them) are the one kind of
+  commit that reaches the integration branch without a pull request after bootstrap: pushed by the harness task-log
+  push command, fast-forward, never mixed with any other path; their subject is `docs(tasklog): ...`. In bootstrap
+  mode the lead's bookkeeping commits named in the workspace root rules also do.
 
 ## 4. Pull request size
 
@@ -78,6 +82,8 @@ match the implementation's output (tests that assert whatever the code returns).
   setters, database-table writes ([ADR-0008](../docs/adr/0008-tool-naming-toolsets-no-escape-hatches.md)).
 - Copying code between repositories. Shared needs go to `eng-contract` or a new library by ADR.
 - Committing vendor binaries, generated vendor wrappers, secrets, personal paths or real client data.
+- Adding, changing or deleting `tasklog/**` in a pull request.
+- Pushing directly to the integration branch anything but a log-only commit (bootstrap bookkeeping excepted, §3).
 - Disabling, skipping or weakening tests, lint rules, type checks or CI jobs to get a green build.
 - Editing generated files by hand.
 - Changing CI configuration, `CODEOWNERS`, `AGENTS.md`, test and tool configuration, gate files, code-pack approvals,

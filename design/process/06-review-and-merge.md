@@ -18,7 +18,8 @@ nor their rubric. A CI reviewer verdict of CRITICAL or HIGH fails its required c
 
 Beyond general code quality:
 
-- [ ] The change does what the spec says, and only that; the files match the plan task.
+- [ ] The change does what the spec says, and only that; the files match the plan task. No path under `tasklog/`
+      (the gate refuses it, GC017; [ADR-0034](../docs/adr/0034-task-log-by-default.md) D5).
 - [ ] Every acceptance criterion has a test that would fail without the change.
 - [ ] Principles P1 to P12 hold; no escape hatches; nothing from the forbidden list ([04](04-implementation-rules.md) §8).
 - [ ] Units and suffixes are correct; conversions use `eng-contract.units` only.
@@ -61,6 +62,8 @@ their risk ([01](01-lifecycle.md) §5).
 ## 5. Branch protection on `main` (every repository)
 
 - Pull request required; direct pushes disabled; **no bypass for anyone**, the owner's account included.
+  Exception: log-only commits ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D5, D6). How they reach a
+  protected `main` is decided by the owner when bootstrap ends; until then this bullet applies to every other commit.
 - Required status checks: the shared gate, `gate-check`, `risk-floor`, `test-first`, CI reviewers, security scan,
   Windows tests, build ([11](11-repository-standard.md) §5).
 - Branch must be up to date with `main` before merge.

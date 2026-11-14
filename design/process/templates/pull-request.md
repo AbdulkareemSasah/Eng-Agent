@@ -27,6 +27,7 @@ Golden diff report: {{link or "no output change"}} · Verification record: {{lin
 - [ ] Every engineering constant cited; no literal thresholds in blocks or rules
 - [ ] Generated documents regenerated; human documents updated
 - [ ] No secrets, vendor binaries, client data or personal paths
+- [ ] No task-log content and no `tasklog/` path (A24, GC017)
 - [ ] `Assisted-by:` trailer on agent-written commits
 
 ## Progress and handoff

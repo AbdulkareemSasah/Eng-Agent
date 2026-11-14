@@ -17,7 +17,9 @@ to your task.
 5. **Keep it precise and short.** State decisions, contracts and rules. Do not duplicate the same rule in two places;
    link to the single source instead (the per-repository `AGENTS.md` template is the one deliberate copy).
 6. **No private data.** No client names, project data, credentials or personal paths, so the hub can be published
-   later.
+   later. The one exception in this repository is the root folder `tasklog/` under
+   [ADR-0034](docs/adr/0034-task-log-by-default.md); the hub is therefore published only from a fresh or filtered
+   history of `design/`, never by making this repository public.
 7. **Process changes propagate.** A change in `process/` lists, in its pull request, every repository whose
    `AGENTS.md` must be regenerated.
 8. The agent operating rules in [process/08-agent-operating-rules.md](process/08-agent-operating-rules.md) apply here

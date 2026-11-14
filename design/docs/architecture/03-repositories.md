@@ -19,6 +19,7 @@ eng-platform/                      private workspace repository (incubation)
   tools/
     eng-dev-gate/                  the shared process gate (process/11 §4)
   products/                        desktop products of 15, while v1 is built here (ADR-0028)
+  tasklog/                         task logs, private, pushed directly as log-only commits (ADR-0034)
   .github/                         CI, CODEOWNERS, templates (repository level)
 ```
 
@@ -80,4 +81,6 @@ tab if it does not exist and adds its own panel ([15-desktop-addins](15-desktop-
 
 `eng-platform` and the desktop product repositories are private, in git from the first commit. A package becomes a
 public repository only after its first release passes the open-source checklist
-([process/07](../../process/07-release-and-open-source.md) §4).
+([process/07](../../process/07-release-and-open-source.md) §4). The root folder `tasklog/` holds the full task logs
+([ADR-0034](../adr/0034-task-log-by-default.md)): it is never part of a package split and never published, and because
+it is in the history of the integration branch, `eng-platform` itself is never made public.

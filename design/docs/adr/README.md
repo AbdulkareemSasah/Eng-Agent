@@ -40,3 +40,4 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0031](0031-model-locked-after-analysis.md) | `model_locked` after analysis is `PRECONDITION_FAILED` (`model_unlocked`), not `HOST_LOCKED`; an approved unlock step; precondition `server_owned_instance` (amends 04 §8.1, 11 §7 and §9) | Proposed |
 | [0032](0032-harness-side-model-identity.md) | A harness-side model identity in the workspace when the host cannot stamp one (amends 04 §3.3, 06 §6) | Proposed |
 | [0033](0033-desktop-products-in-sasaah.md) | The desktop products stay in Sasaah during v1; nothing is built under `products/` | Proposed |
+| [0034](0034-task-log-by-default.md) | Every owner task has a task log in the root folder `tasklog/`, pushed directly as log-only commits; recorded owner exceptions to A11, hub rule 6 and "never the owner's credentials" | Proposed |

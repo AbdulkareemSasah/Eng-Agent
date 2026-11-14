@@ -22,6 +22,8 @@
    workflow blocks without them.
 4. Generate the changelog section from Conventional Commits (`uvx git-cliff`), then edit it for readers: what changed,
    who is affected, what to do. Code-pack and calc releases list every `check_id` or calc whose output changed.
+   Commits with scope `tasklog` are left out. The task-log needs the release answers are marked answered
+   ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D11).
 5. Open a pull request `release: <package> vX.Y.Z` with the version bump and the changelog; normal review applies.
 6. After merge, tag the merge commit; the owner approves the release (G4).
 7. CI builds from the tag (`uv build`; C# add-ins on a Windows runner), generates the software bill of materials, and
@@ -35,6 +37,9 @@ Patch releases follow the same steps from `main`. There are no long-lived releas
 
 A package becomes a public repository only when every item passes and the owner approves:
 
+- [ ] The workspace repository (`eng-platform`) is never made public: its history holds the full task logs
+      ([ADR-0034](../docs/adr/0034-task-log-by-default.md) D9). Anything published is a new repository from a fresh or
+      filtered history, and `eng-gate publish-check` passes in the new repository's clone.
 - [ ] The package is split from `eng-platform` into its own repository with its history (only its directory), and its
       workspace dependencies are replaced by PyPI version ranges of already-public packages.
 - [ ] A secret scan of the split history is clean; otherwise the public repository starts from a fresh, sanitized
