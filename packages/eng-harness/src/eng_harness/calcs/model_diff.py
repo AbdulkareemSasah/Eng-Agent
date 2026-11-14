@@ -129,8 +129,8 @@ def _side(inp: DiffInput, meta: InputMeta, side: str) -> tuple[Side, bool, dict[
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "a section must be a record reference", field=field)
         if ref.model_id is None or ref.model_revision is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "the record names no host model", field=field)
-        identities.append((ref.model_id, ref.model_revision))
-        if identities[-1] != identities[0]:
+        identities.append(identity := (ref.model_id, ref.model_revision))
+        if identity != identities[0]:
             message = "the records of one side belong to different models or revisions"
             raise ContractError(ErrorCode.INVALID_ARGUMENT, message, field=field)
         complete = complete and ref.complete
