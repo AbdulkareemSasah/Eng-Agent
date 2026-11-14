@@ -70,7 +70,10 @@ class EngineSettings(BaseModel):
 
 
 class RunRequest(BaseModel):
-    """A request to start a run (spec 5): `input` is the workflow's input as JSON, `basis_ref` its design basis."""
+    """A request to start a run (spec 5): `input` is the workflow's input as JSON, `basis_ref` its design basis.
+
+    `run_id` is the id the caller chose (`run_` + ULID, AC70); `start` draws one when it is `None`.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -79,6 +82,7 @@ class RunRequest(BaseModel):
     basis_ref: RefString
     mode: PermissionMode = PermissionMode.WORK_ON_COPY
     run_class: RunClass = RunClass.PRODUCTION
+    run_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -158,13 +162,17 @@ class Engine:
         """Validate `request`, create the run, journal its header and run the workflow (spec 4.5.1).
 
         Raises:
-            ContractError: `INVALID_ARGUMENT` for an unregistered workflow or an input that fails its model.
+            ContractError: `INVALID_ARGUMENT` for an unregistered workflow, an input that fails its model, or a
+                `run_id` that is not `run_` + ULID or whose run folder exists (checked first, before any port call).
             RunRefused: `RUN_CLASS_MISMATCH` when the calc port's class is not the request's, `BASIS_INCOMPLETE` when
                 the design basis lacks a required field, `SERVER_CHECK_FAILED` when a server check fails (spec 4.6 #5,
                 #8). None of them creates a run folder.
             RunLocked: another engine holds the new run's lock.
             ContractError: `HOST_LOCKED` when another driver holds a host the run needs (spec 4.6 #10).
         """
+        chosen = request.run_id
+        if chosen is not None and (not _RUN_ID.fullmatch(chosen) or (self._runs / chosen).exists()):  # AC70
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, f"run id {chosen!r} is not usable", received=chosen)
         workflow = self._find(request.workflow)
         if workflow is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"workflow {request.workflow!r} is not registered")
@@ -172,9 +180,9 @@ class Engine:
         self._check_class(request.run_class.value)
         _hostsafety.check_basis(self._ports.basis, request.basis_ref, workflow.required_basis)
         checks = await _hostsafety.check_servers(self._ports.host, workflow.min_server_builds)
-        run_id = f"run_{self._ids.new_ulid()}"
+        run_id = chosen or f"run_{self._ids.new_ulid()}"
         run_dir = self._runs / run_id
-        run_dir.mkdir(parents=True)
+        run_dir.mkdir(parents=True, exist_ok=chosen is not None)  # the server checks may have written under it
         with _locked(run_dir):
             stored = self._store.put("harness.run_input/1", {"value": request.input}, self._producer())
             block = {"name": workflow.name, "version": str(workflow.version), "code_sha256": workflow.code_sha256}
