@@ -14,6 +14,7 @@ Plan 0002 (servers and adapters; spec 0002 section 12). Nothing here runs in CI:
 3. The live `tools/list` fingerprint against the allowlist's, and that the real `csi_status` reports `read_only` and `script_enabled` false (the build check requires both).
 4. The `serverInfo` the Sasaah server reports.
 5. Every table key and reply field of spec 0002 sections 4.6.2 and 4.6.4, and the reply fields of every mapped list tool.
+5b. Plan 0002 T12b (spec 0002 AC24, OQ-G10), the read-back of `check_model` against real ETABS: the `READBACK` columns in `products/_etabs.py` (`UniqueName` and `Section` of `Area Assignments - Section Properties`, `Name` and `Thickness` of `Wall Property Definitions - Specified`), that the table's thickness is in the present units (the helper converts it to mm with the model's length unit), and the AC24 read-back itself, including a thickness written in the wrong units reading back x1000, a changed section and an engineer's edit behind the harness. Only the synthetic fake has run it.
 6. A server `timeout` during a write and during an analysis, the units afterwards, each reconciliation rule, `locked` after a completed analysis, and a proof-of-end mechanism for an abandoned analysis call; after a `timeout` on a role, re-attachment with `launched: false`, `csi_exit` refused, and what `csi_status` reports.
 7. Fingerprint stability and the blind spots of the read set.
 8. `close_started` closing a hidden launched instance and leaving a visible one.

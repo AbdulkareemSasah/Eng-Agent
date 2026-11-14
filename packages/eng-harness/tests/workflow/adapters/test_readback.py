@@ -215,6 +215,31 @@ def test_mismatch_detected(tmp_path: Path, make_config: Any, control: Path, stor
     anyio.run(body)
 
 
+def test_store_failure_keeps_the_items(
+    tmp_path: Path, make_config: Any, control: Path, store: ResultStore, run_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A check whose result cannot be stored raises and keeps the written items for the next check."""
+
+    async def body() -> None:
+        async with _rig(tmp_path, make_config(), control, store, run_dir) as rig:
+            await rig.write("csi_assign_frame_section", frame="F1", section="C40")
+            real = store.put
+
+            def refuse(*args: Any, **kwargs: Any) -> Any:
+                raise ContractError(ErrorCode.CONFLICT, "store failed")
+
+            monkeypatch.setattr(store, "put", refuse)
+            with pytest.raises(ContractError):
+                await rig.host.check_model(rig.key)
+            assert len(rig.written.items(rig.key)) == 1
+            monkeypatch.setattr(store, "put", real)
+            await rig.engineer("csi_assign_frame_section", name="F1", section="C30")
+            assert _issues(await rig.host.check_model(rig.key)) == [("error", "READBACK_MISMATCH", "frame", "F1")]
+            assert rig.written.items(rig.key) == []
+
+    anyio.run(body)
+
+
 def test_envelope_and_marks(tmp_path: Path, make_config: Any, control: Path, store: ResultStore, run_dir: Path) -> None:
     """The check is a stored result with the build and the model's identity; each write is marked on the port."""
 
@@ -557,6 +582,13 @@ def test_snapshot_reads() -> None:
     with pytest.raises(ContractError):  # a section list that is cut would call every section undefined
         anyio.run(read, cut)
 
+    async def truncated(tool: str, name: str, arguments: dict[str, Any], what: str) -> list[dict[str, Any]]:
+        if tool == "csi_db_table_read":
+            raise ContractError(ErrorCode.LIMIT_EXCEEDED, "cut")
+        return [{"name": "SL"}]
+
+    assert anyio.run(read, truncated).tables == {}  # a cut table is left out (its items read as unavailable)
+
 
 def test_integrity() -> None:
     """Undefined sections, combination parts that are not defined and a locked model; a load case is not checked."""
@@ -594,7 +626,7 @@ def test_integrity() -> None:
 
 
 def test_issues_of_and_envelope(store: ResultStore) -> None:
-    """Read-back issues come first, then integrity ones; the items are done; the summary counts each severity."""
+    """Read-back issues come first, then integrity ones; the book is kept; the summary counts each severity."""
     from eng_contract.issues import ModelIssue, Severity
 
     from eng_harness.adapters.csi import _edits as edits
@@ -607,7 +639,9 @@ def test_issues_of_and_envelope(store: ResultStore) -> None:
     snap = _snap(frames=[_frame("F1", "C30")], frame_sections=[])  # F1 reads C30, and C30 is not defined
     found = issues_of(read_back, "m", snap)
     assert [(i.code, i.subject.id) for i in found] == [("READBACK_MISMATCH", "F1"), ("SECTION_UNDEFINED", "F1")]
-    assert book.items("m") == []
+    assert len(book.items("m")) == 1  # clearing is the caller's, after the result is stored
+    assert [i.code for i in issues_of(read_back, "m", snap)] == ["READBACK_MISMATCH", "SECTION_UNDEFINED"]
+    book.clear("m")
     assert [i.code for i in issues_of(read_back, "m", snap)] == ["SECTION_UNDEFINED"]
     subject = Subject(kind=FRAME, id="F1")
     issues = [
