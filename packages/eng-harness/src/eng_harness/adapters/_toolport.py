@@ -359,7 +359,7 @@ class AdapterToolPort:
         )
         entry = None if op_id is None else self._ledger.find(op_id)
         ref = None if entry is None else entry.pre_image_ref
-        pre_image = None if ref is None else resolve_ref(ref, RefRule(stale_ok=True), self._store, _untracked).value
+        pre_image = None if ref is None else resolve_ref(ref, RefRule(), self._store, _untracked).value
         return LostWrite(descriptor, model, binding, ref is not None, pre_image)
 
     async def _read(self, tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:

@@ -21,7 +21,7 @@ from typing import Any
 import anyio
 import pytest
 from eng_contract.envelope import FailureEnvelope, HostInfo, Provenance, SuccessEnvelope
-from eng_contract.errors import ErrorCode
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from mcp import types
@@ -97,9 +97,9 @@ class Rig:
     pid: int
     count: int = 0
 
-    def value(self, name: str, number: float) -> dict[str, str]:
+    def value(self, name: str, number: float, host: HostInfo | None = None) -> dict[str, str]:
         producer = Provenance(
-            tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0
+            tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0, host=host
         )
         record = self.store.put("harness.run_input/1", {"value": {name: number}}, producer)
         return {"$ref": f"{record.result_id}#/value/{name}"}
@@ -133,13 +133,15 @@ class Rig:
 @asynccontextmanager
 async def _rig(
     config: ServersConfig, control: Path, store: ResultStore, run_dir: Path, *, tolerance: float | None = TOLERANCE,
-    wired: bool = True,
+    wired: bool = True, seed: Callable[[dict[str, Any]], None] | None = None,
 ) -> AsyncIterator[Rig]:  # fmt: skip
     from eng_harness.adapters.csi._reconcile import CsiReconciler
-
     from eng_harness.adapters.csi._tools import CsiToolPort
 
-    control.write_text(json.dumps({"faults": [], "seed": _seeded()}))
+    seeded = _seeded()
+    if seed is not None:
+        seed(seeded)
+    control.write_text(json.dumps({"faults": [], "seed": seeded}))
     clock = FixedClock(1_700_000_000_000, 1)
     ids = SeededIdSource(b"reconcile", clock)
     async with ServerManager(config, run_dir) as manager:
@@ -244,3 +246,280 @@ def test_long_tools_unknown_without_proof_of_end(
             assert [t for role, t in rig.recorder.sent if role == "long"] == [tool]  # no second run was sent
 
     anyio.run(body)
+
+
+FRAME = {"frame": "F1", "section": "C40"}
+WALL = "csi_define_wall_section"
+
+
+def _run(config: ServersConfig, control: Path, store: ResultStore, run_dir: Path, body: Any, **rig: Any) -> None:
+    async def scenario() -> None:
+        async with _rig(config, control, store, run_dir, **rig) as active:
+            await body(active)
+
+    anyio.run(scenario)
+
+
+def _evidence(store: ResultStore, found: Reconciliation) -> dict[str, Any]:
+    value: dict[str, Any] = store.get(found.evidence[0].ref).payload["value"]
+    return value
+
+
+def test_ledger_find(run_dir: Path) -> None:
+    """The last entry of an op id, nothing for an unknown id or a missing file; a torn line is skipped."""
+    from eng_harness.adapters._ledger import LedgerEntry
+
+    ledger = WriteLedger(run_dir)
+    assert ledger.find("op-1") is None  # no file yet
+
+    def entry(op_id: str, tool: str) -> LedgerEntry:
+        return LedgerEntry(
+            op_id=op_id, tool=tool, args_sha256=SHA, target=HostTarget(product="ETABS", pid=7), pre_image_ref=None,
+            sent_at="2026-01-01T00:00:00.000Z",
+        )  # fmt: skip
+
+    ledger.append(entry("op-1", "first"))
+    ledger.append(entry("op-2", "other"))
+    ledger.append(entry("op-1", "second"))
+    with ledger.path.open("a", encoding="utf-8") as handle:
+        handle.write('{"op_id": "op-3", "tool"\n')  # a crash in the middle of a line
+    found = ledger.find("op-1")
+    assert found is not None
+    assert found.tool == "second"
+    assert ledger.find("op-3") is None
+    assert ledger.find("op-9") is None
+
+
+def test_support_and_missing_reconciler(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """Writes of the allowlist support reconciliation when a reconciler is wired; reads and other tools do not."""
+
+    async def body(rig: Rig) -> None:
+        assert rig.port.supports_reconcile("csi_assign_frame_section") is True
+        assert rig.port.supports_reconcile("csi_run_analysis") is True
+        assert rig.port.supports_reconcile("csi_analysis_status") is False  # a read
+        assert rig.port.supports_reconcile("csi_save_model") is False  # not served by this port
+        assert await rig.port.read_back("csi_analysis_status", {"model": "m"}) is None
+        assert await rig.port.read_back("csi_run_analysis", {"model": "m"}) is None  # nothing to read back
+
+    _run(make_config(), control, store, run_dir, body)
+
+    async def unwired(rig: Rig) -> None:
+        assert rig.port.supports_reconcile("csi_assign_frame_section") is False
+        assert await rig.port.read_back("csi_assign_frame_section", {"model": "m", **FRAME}) is None
+        with pytest.raises(ContractError) as refused:
+            await rig.reconcile("csi_assign_frame_section", FRAME)
+        assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
+        assert refused.value.detail.message == "csi_assign_frame_section has no reconciler"
+        with pytest.raises(ContractError) as outside:
+            await rig.reconcile("csi_save_model", {})
+        assert outside.value.detail.code is ErrorCode.INVALID_ARGUMENT
+
+    _run(make_config(), control, store, run_dir, unwired, wired=False)
+
+
+def test_reconcile_frees_the_wedged_host(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """After a timeout the host answers `HOST_WEDGED` until the write is reconciled."""
+
+    async def body(rig: Rig) -> None:
+        await rig.cut_off("csi_assign_frame_section", FRAME, AFTER)
+        wedged = await rig.port.call("csi_assign_frame_section", {"model": "m", **FRAME}, op_id="op-2", model="m")
+        assert isinstance(wedged, FailureEnvelope)
+        assert wedged.error.code is ErrorCode.HOST_WEDGED
+        await rig.reconcile("csi_assign_frame_section", FRAME)
+        freed = await rig.port.call("csi_assign_frame_section", {"model": "m", **FRAME}, op_id="op-2", model="m")
+        assert isinstance(freed, SuccessEnvelope), freed
+
+    _run(make_config(), control, store, run_dir, body)
+
+
+def test_evidence_is_the_state_read(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """The evidence is a stored result of the request, the state read and the pre-image; its tool names the adapter."""
+
+    async def body(rig: Rig) -> None:
+        await rig.before("csi_assign_frame_section", FRAME)
+        await rig.cut_off("csi_assign_frame_section", FRAME, AFTER)
+        found = await rig.reconcile("csi_assign_frame_section", FRAME)
+        stored = store.get(found.evidence[0].ref)
+        assert stored.kind == "harness.run_output/1"
+        assert stored.producer.tool == "sasaah-csi-mcp/csi_assign_frame_section"
+        assert stored.producer.host == HOST
+        evidence = _evidence(store, found)
+        assert evidence["requested"] == {"section": "C40"}
+        assert evidence["observed"]["section"] == "C40"
+        assert evidence["pre_image_known"] is True
+        assert evidence["pre_image"]["section"] == "C30"  # the seeded section, read before the write
+
+    _run(make_config(), control, store, run_dir, body)
+
+
+def test_read_back_shows_the_state(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """`read_back` stores the `observed` state (`None`: absent); a table that was not read gives no read-back."""
+
+    async def body(rig: Rig) -> None:
+        shown = await rig.port.read_back("csi_assign_frame_section", {"model": "m", **FRAME})
+        assert isinstance(shown, SuccessEnvelope)
+        assert shown.kind == "harness.run_output/1"
+        assert shown.provenance.host == HOST
+        assert shown.data["value"]["observed"]["section"] == "C30"
+        wall = {"model": "m", "name": "W9", "material": "C30", "thickness_mm": rig.value("thickness_mm", 250.0)}
+        gone = await rig.port.read_back(WALL, wall)
+        assert isinstance(gone, SuccessEnvelope)
+        assert gone.data == {"value": {"observed": None}}
+        area = await rig.port.read_back("csi_assign_area_section", {"model": "m", "area": "A1", "section": "SL"})
+        assert area is None  # the section table has no key column: not readable
+
+    def unreadable(seed: dict[str, Any]) -> None:
+        seed["tables"]["Area Assignments - Section Properties"] = [{"Other": 1}]
+
+    _run(make_config(), control, store, run_dir, body, seed=unreadable)
+
+
+def test_setters_need_the_pre_image_to_be_not_applied(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """Without a pre-image on record, or with a malformed one, an unchanged state is `unknown`, never `not_applied`."""
+
+    async def none_on_record(rig: Rig) -> None:
+        await rig.cut_off("csi_assign_frame_section", FRAME, BEFORE)  # the state is the old one, nothing to compare
+        found = await rig.reconcile("csi_assign_frame_section", FRAME)
+        assert found.outcome == "unknown"
+        assert _evidence(store, found)["pre_image_known"] is False
+
+    _run(make_config(), control, store, run_dir, none_on_record)
+
+    async def malformed(rig: Rig) -> None:
+        listed = rig.value("pre", 1.0)  # a number, not the state of the object
+        rig.binder.pre_image = listed["$ref"]
+        await rig.cut_off("csi_assign_frame_section", FRAME, BEFORE)
+        assert (await rig.reconcile("csi_assign_frame_section", FRAME)).outcome == "unknown"
+
+    _run(make_config(), control, store, run_dir, malformed)
+
+    async def changed_since(rig: Rig) -> None:
+        await rig.before("csi_assign_frame_section", FRAME)
+        await rig.cut_off("csi_assign_frame_section", FRAME, BEFORE)
+        await rig.engineer("csi_assign_frame_section", name="F1", section="C40")  # someone else made it as requested
+        assert (await rig.reconcile("csi_assign_frame_section", FRAME)).outcome == "applied"
+
+    _run(make_config(), control, store, run_dir, changed_since)
+
+    async def another_state(rig: Rig) -> None:
+        await rig.before("csi_assign_frame_section", FRAME)
+        await rig.cut_off("csi_assign_frame_section", FRAME, BEFORE)
+        await rig.engineer(
+            "csi_assign_frame_section", name="F1", section="C50"
+        )  # neither the request nor the old state
+        assert (await rig.reconcile("csi_assign_frame_section", FRAME)).outcome == "unknown"
+
+    _run(make_config(), control, store, run_dir, another_state)
+
+
+def test_pattern_and_combination_rules(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """A pattern present with other values is `unknown`; a combination is `partial` after half of its replacement."""
+    other = {"name": "DEAD", "type": "dead", "self_weight_ratio": 0.0}  # DEAD is seeded with self weight 1.0
+    linear = [{"case": {"case": "DEAD", "case_type": "load_pattern"}, "scale_ratio": 1.4}]
+    replace = {"name": "C1", "type": "linear_add", "items": linear}  # C1 is seeded as exactly this
+
+    async def pattern(rig: Rig) -> None:
+        args = {**other, "self_weight_ratio": rig.value("w_ratio", 0.0)}
+        await rig.cut_off("csi_add_load_pattern", args, BEFORE)
+        assert (await rig.reconcile("csi_add_load_pattern", args)).outcome == "unknown"
+
+    _run(make_config(), control, store, run_dir, pattern)
+
+    async def half(rig: Rig) -> None:
+        await rig.before("csi_add_load_combo", replace)
+        await rig.cut_off("csi_add_load_combo", replace, BEFORE)
+        await rig.engineer("csi_delete_load_combo", name="C1", confirm=True)  # the delete half ran, the add did not
+        found = await rig.reconcile("csi_add_load_combo", replace)
+        assert (found.outcome, found.missing) == ("partial", ("C1",))
+
+    _run(make_config(), control, store, run_dir, half)
+
+    async def present(rig: Rig) -> None:
+        changed = {**replace, "items": [{**linear[0], "scale_ratio": 2.0}]}
+        await rig.before("csi_add_load_combo", changed)
+        await rig.cut_off("csi_add_load_combo", changed, BEFORE)  # present with the old components
+        found = await rig.reconcile("csi_add_load_combo", changed)
+        assert (found.outcome, found.missing) == ("unknown", ())
+
+    _run(make_config(), control, store, run_dir, present)
+
+    async def unrecorded(rig: Rig) -> None:
+        args = {**replace, "name": "C9"}
+        await rig.cut_off("csi_add_load_combo", args, BEFORE)  # absent, and nothing on record about before
+        found = await rig.reconcile("csi_add_load_combo", args)
+        assert (found.outcome, found.missing) == ("unknown", ())
+
+    _run(make_config(), control, store, run_dir, unrecorded)
+
+
+def test_no_tolerance_is_unknown_for_a_quantity(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """Without the frozen read-back tolerance a quantity cannot be compared; a name still can."""
+
+    async def body(rig: Rig) -> None:
+        wall = {"name": "W1", "material": "C30", "thickness_mm": rig.value("thickness_mm", 250.0)}
+        await rig.cut_off(WALL, wall, AFTER)
+        assert (await rig.reconcile(WALL, wall)).outcome == "unknown"
+        await rig.cut_off("csi_assign_frame_section", FRAME, AFTER, "op-2")
+        assert (await rig.reconcile("csi_assign_frame_section", FRAME, "op-2")).outcome == "applied"
+
+    _run(make_config(), control, store, run_dir, body, tolerance=None)
+
+
+def test_references_are_read_for_their_values(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """The write itself raised the model's revision: references of an older revision still give their values."""
+
+    async def body(rig: Rig) -> None:
+        wall = {"name": "W1", "material": "C30", "thickness_mm": rig.value("thickness_mm", 250.0, HOST)}
+        await rig.before(WALL, wall)
+        await rig.cut_off(WALL, wall, BEFORE)
+        rig.binder.current = 5  # the model is at revision 5 now; the references were made at revision 0
+        found = await rig.reconcile(WALL, wall)
+        assert found.outcome == "not_applied"
+
+    _run(make_config(), control, store, run_dir, body)
+
+
+def test_a_read_that_times_out_is_unknown(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """A host that does not answer the first read gives `unknown`; any other failure of a read is raised."""
+
+    async def timed_out(rig: Rig) -> None:
+        await rig.cut_off("csi_assign_frame_section", FRAME, AFTER)
+        rig.arm(BEFORE, "csi_model_info")
+        found = await rig.reconcile("csi_assign_frame_section", FRAME)
+        assert found.outcome == "unknown"
+        assert _evidence(store, found) == {"read_failed": "TIMEOUT_NO_EFFECT"}
+
+    _run(make_config(), control, store, run_dir, timed_out)
+
+    async def unusable(rig: Rig) -> None:
+        await rig.cut_off("csi_assign_frame_section", FRAME, AFTER)
+        with pytest.raises(ContractError) as failed:
+            await rig.reconcile("csi_assign_frame_section", FRAME)
+        assert failed.value.detail.code is ErrorCode.HOST_ERROR
+        assert failed.value.detail.host_code == "UNEXPECTED_REPLY"
+        wedged = await rig.port.call("csi_assign_frame_section", {"model": "m", **FRAME}, op_id="op-2", model="m")
+        assert isinstance(wedged, FailureEnvelope)
+        assert wedged.error.code is ErrorCode.HOST_WEDGED  # the host is freed only by a reconciliation that returned
+
+    def stories(seed: dict[str, Any]) -> None:
+        seed["stories"] = "S1"  # a list reply with no rows
+
+    _run(make_config(), control, store, run_dir, unusable, seed=stories)
