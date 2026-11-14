@@ -61,10 +61,11 @@ tasks:
       - "packages/eng-harness/src/eng_harness/tasklog/_ids.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_store.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_ids.py"
-    max_changed_lines: 260
+    max_changed_lines: 290
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_store.py::test_concurrent_append_never_interleaves"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_store.py::test_triage_append_chain_and_lock"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_store.py::test_closed_task_rules"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_store.py::test_size_cap"
     covers: [AC10, AC11, AC12]
@@ -117,7 +118,7 @@ tasks:
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/_scope.py"
-      - "packages/eng-harness/src/eng_harness/tasklog/_hook.py"
+      - "packages/eng-harness/src/eng_harness/tasklog/_hook.py"  # assembles the hook text at call time; no stored copy
       - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # install-hook; the status hook line
       - "packages/eng-harness/tests/helpers/tasklog_git.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_scope.py"
@@ -310,6 +311,7 @@ tasks:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage.py::test_triage_containment"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage.py::test_public_en_needs_release"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage.py::test_digest_containment"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage.py::test_triage_free_text_guard_refused"
     covers: [AC17, AC29, AC30]   # AC17 in part: the hint's source, the triage files
     depends_on: [T10]   # deferred until the first triage session needs it (section 2)
   - id: T12b
@@ -318,15 +320,17 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/tasklog/_git.py"  # the triage subject
       - "packages/eng-harness/src/eng_harness/tasklog/_withhold.py"  # withhold --need
-      - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # TLC008 widened to triage files
+      - "packages/eng-harness/src/eng_harness/tasklog/_check.py"  # TLC008 widened; TLC001 and TLC009 over triage files
       - "packages/eng-harness/src/eng_harness/tasklog/_cli.py"  # commit --need, withhold --need
       - "packages/eng-harness/tests/helpers/tasklog_git.py"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py"
-    max_changed_lines: 200
+    max_changed_lines: 240
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_commit_need_only_triage_file"
       - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_withhold_need_in_triage_file"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_check_tlc001_triage_chain"
+      - "packages/eng-harness/tests/unit/tasklog/test_tasklog_triage_commit.py::test_check_tlc009_triage"
     covers: [AC38]
     depends_on: [T12]   # deferred with T12
   - id: T13
@@ -393,17 +397,20 @@ matcher), but `**/.gate/` is a CODEOWNERS path, so T1 and T14 need the owner's r
   copied from the gate's test samples and pinned by hash, the `PrivacyPolicy` protocol, `full`, and `sanitized` as gap
   `TL-G1`. A property test checks that no generated secret survives the guard.
 - **T3a** adds the store: append under the task's `RunLock` kept in `.eng/tasklog/locks/`, fsync, chain, consecutive
-  seq, the 900 000-byte cap and the closed-task rules; `_ids.py` forms task and need ids from `eng_contract.ids`.
-  `RunLock` does not wait, so a concurrent writer is refused with exit 4.
+  seq, the 900 000-byte cap and the closed-task rules; the same append for a triage file under the need's lock (the
+  T1 triage model; T12 is its first writer); `_ids.py` forms task and need ids from `eng_contract.ids`. `RunLock` does
+  not wait, so a concurrent writer is refused with exit 4.
 - **T3b** adds the read-only worktree checks of spec AC13 and the git test helper.
 - **T4a** adds `[tasklog]` to `HarnessConfig` (no `push` key) and the reader of the user-level push file, refused
-  inside a git working tree; the reader uses the standard library only, because the hook embeds it. The spec 0006 §4.2.4 amendment is already in that spec (B-478).
+  inside a git working tree; the reader uses the standard library only, because the hook embeds it. The spec 0006
+  §4.2.4 amendment is already in that spec (B-478).
 - **T4b** starts the module entry point: `status`, `open`, `said`, `note`, `close` and a `render` stub, with strict
   UTF-8 said-files and the echo of text and hash.
 - **T8h** comes before any committing command: `_scope.py` is the one implementation of the ADR D5 definition, and
-  `_hook.py` holds the shipped hook text (embedding the sources of `_scope.py` and `_pushconf.py`, pinned by a test;
-  the guarded branch read from the push file only, both integration branch names guarded when it is unusable),
-  `install-hook` and the in-place check. The agent's pushes with the owner's
+  `_hook.py` builds the shipped hook text (assembled at call time from its header and the source files of `_scope.py`
+  and `_pushconf.py`, so it holds no copy that would count twice or go stale under mutmut; pinned by a test that skips
+  only under `MUTANT_UNDER_TEST`, spec §9; the guarded branch read from the push file only, both integration branch
+  names guarded when it is unusable), `install-hook` and the in-place check. The agent's pushes with the owner's
   login wait for it (ADR D6).
 - **T5** adds the remaining agent records and `add --batch`; the `missing` hint reads triage files through the T1
   model, tested on fixture lines, before T12 writes any.
@@ -421,10 +428,11 @@ matcher), but `**/.gate/` is a CODEOWNERS path, so T1 and T14 need the owner's r
 - **T11** adds `--task` to `run` and `resume`, `require_task`, the attach calls at start and exit, and the reserved
   `task` option name. It edits files that plan 0006 T14, T14b, T18a and T18b create or change, so it starts only after
   all four have merged and never edits a file an open critical-path task edits.
-- **T12** adds needs, triage, `release-public`, answered and digest. **Deferred** until the first triage session needs
+- **T12** adds needs, triage (free text guarded as agent fields, through T3a's triage append), `release-public`,
+  answered and digest. **Deferred** until the first triage session needs
   it; a development session can read STORY.md meanwhile.
-- **T12b** adds `commit --need` (subject `docs(tasklog): triage <need_id>`), TLC008 for triage files and
-  `withhold --need`. **Deferred** with T12.
+- **T12b** adds `commit --need` (subject `docs(tasklog): triage <need_id>`), TLC008 for triage files, TLC001 and
+  TLC009 over triage files and `withhold --need`. **Deferred** with T12.
 - **T13** implements `sanitized` and `export` on the placeholder mapper factored out of plan 0002 T17's
   `servers/_record.py` into `src/eng_harness/_placeholders.py`. **Deferred** until the owner defines the rules and plans
   publication.

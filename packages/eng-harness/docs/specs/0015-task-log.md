@@ -79,8 +79,10 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
 - AC9. Given a policy, then `transform` is pure and the same function serves writing and `export`. Test:
   `tests/unit/tasklog/test_tasklog_sanitized.py::test_transform_pure_shared` (deferred with T13).
 - AC10. Given appends, then they are chained and consecutive under the lock; two concurrent appends never interleave:
-  one is written and the other is refused with exit 4 and writes nothing. Test:
-  `tests/unit/tasklog/test_tasklog_store.py::test_concurrent_append_never_interleaves`.
+  one is written and the other is refused with exit 4 and writes nothing; appends to a triage file are chained and
+  seq-numbered the same way under the need's lock (§4.2, §4.3.1). Test:
+  `tests/unit/tasklog/test_tasklog_store.py::test_concurrent_append_never_interleaves`,
+  `::test_triage_append_chain_and_lock`.
 - AC11. Given a closed task, then only harness `run_attached` and `run_fact` records of runs already attached, and
   `withheld_after`, are accepted. Test: `tests/unit/tasklog/test_tasklog_store.py::test_closed_task_rules`.
 - AC12. Given an append that would take `records.jsonl` past 900 000 bytes, then `TASKLOG_FULL`, exit 3. Test:
@@ -152,8 +154,10 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
 - AC29. Given `triage`, then it writes only `tasklog/triage/<need_id>.jsonl`, requires `--public-en` and the
   development-session identity, and refuses a `public_en` holding a project label or model base name known from the
   need's task; a `public_en` without the owner's release (`release-public`) is never printed by `digest` or any other
-  output meant to leave `tasklog/`. Test: `tests/unit/tasklog/test_tasklog_triage.py::test_triage_containment`,
-  `::test_public_en_needs_release`.
+  output meant to leave `tasklog/`; a guard hit in any free-text field of a triage line is refused with exit 3 naming
+  the field and the rule, without echoing the text, and nothing is written. Test:
+  `tests/unit/tasklog/test_tasklog_triage.py::test_triage_containment`, `::test_public_en_needs_release`,
+  `::test_triage_free_text_guard_refused`.
 - AC30. Given `digest`, then it holds only ids, categories, counts and released `public_en`. Test:
   `tests/unit/tasklog/test_tasklog_triage.py::test_digest_containment`.
 - AC31. Given every sub-command, then no sub-command or option accepts an engineering approval, rejection, sign-off or
@@ -185,9 +189,10 @@ Tests live in `tests/unit/tasklog/` (git tests build temporary repositories and 
   `::test_release_binds_text_hash`.
 - AC38. Given `commit --need`, then it stages only the named needs' triage files and writes the subject
   `docs(tasklog): triage <need_id>`; given `withhold --need`, then the span is replaced in the triage line and
-  `withheld_after` is appended to the same triage file in one log-only commit with that subject. Test:
-  `tests/unit/tasklog/test_tasklog_triage_commit.py::test_commit_need_only_triage_file`,
-  `::test_withhold_need_in_triage_file`.
+  `withheld_after` is appended to the same triage file in one log-only commit with that subject, and TLC001 passes;
+  TLC001 (schema, chain, seq, the `withheld_after` branch) and TLC009 (the guard re-run) check triage files as they
+  check `records.jsonl`. Test: `tests/unit/tasklog/test_tasklog_triage_commit.py::test_commit_need_only_triage_file`,
+  `::test_withhold_need_in_triage_file`, `::test_check_tlc001_triage_chain`, `::test_check_tlc009_triage`.
 - AC39. Given `close` while TLC002 or TLC004 fails, then it is refused with exit 3 naming the check and writes nothing.
   Test: `tests/unit/tasklog/test_tasklog_check.py::test_close_refused_while_incomplete`.
 - AC40. Given a run folder created after `since` that no task has attached, then `status` lists it under unattached
@@ -222,8 +227,8 @@ tasklog/triage/<need_id>.jsonl                     (development session only, ap
   files), `locks/<task_id>/run.lock` (the append lock, outside the worktree so it can never be staged), `map.json`
   (sanitized placeholders, later) and the log worktree `worktree/`.
 - Files are UTF-8 without BOM, LF, one canonical JSON object per line (`canonical_json`), appended with fsync while
-  the task's `RunLock` is held (a triage file: the need's lock, `locks/<need_id>/run.lock`). `RunLock` does not wait: a second writer gets `RunLocked` and the command exits 4
-  (`RUN_LOCKED`) having written nothing.
+  the task's `RunLock` is held (a triage file: the need's lock, `locks/<need_id>/run.lock`). `RunLock` does not wait:
+  a second writer gets `RunLocked` and the command exits 4 (`RUN_LOCKED`) having written nothing.
 - An append that would take `records.jsonl` past 900 000 bytes is refused with exit 3, `TASKLOG_FULL`; the agent
   closes the task and opens a continuation with `--continues`. `render` refuses the same way when STORY.md would pass
   900 000 bytes. No log file reaches the gate's 1 MiB scan limit (SC002), so the secrets scan never skips one (ADR D5).
@@ -273,7 +278,7 @@ reference to a recorded result (ADR D12).
 
 Same conventions as §4.3 (frozen, `extra="forbid"`, closed `kind` set, snapshot
 `tests/data/snapshots/tasklog/triage-1.json`). One file per need; its lines are chained and seq-numbered exactly like
-`records.jsonl`, and TLC001 checks them the same way.
+`records.jsonl`, and TLC001 and TLC009 check them the same way.
 
 **Common fields:** `schema` (`"harness.tasklog_triage/1"`), `need_id`, `seq`, `at`, `kind`, `by`
 (`dev-session:<work item>` or `harness`), `redactions`, `prev_sha256`.
@@ -413,8 +418,10 @@ refused; the log worktree's `origin` URL must equal the push file's remote URL, 
   `<integration_branch>` at each push from the user-level push file, never from `harness.toml`; when that file is
   absent, invalid or inside a git working tree, it guards both `refs/heads/build/v1` and `refs/heads/main`. The
   shipped text is a standard-library-only Python file that embeds the source of `_scope.py` and of the push-file
-  reader `_pushconf.py` (both standard-library only) between markers, so the hook and the tool share one definition;
-  a test pins the embedded parts to the module sources, and the shipped SHA-256 changes with them. Its first line is
+  reader `_pushconf.py` (both standard-library only) between markers, so the hook and the tool share one definition.
+  `_hook.py` holds no copy of either: it assembles the shipped text at call time from its fixed header and the two
+  module files read next to it, so the shipped SHA-256 changes with them; a test pins the embedded parts to the
+  module sources. Its first line is
   `#!/usr/bin/env python3`; git runs it through `sh` (on Windows the `sh` of Git for Windows). Whether that resolves
   an interpreter on the owner's machine is a local-testing item (T14); a hook that cannot start fails the push. The
   owner runs `install-hook` himself; the agent never writes or edits the hook or the push file.
@@ -464,7 +471,7 @@ left. The interim template uses the same seven headings.
 
 | Code | Rule |
 |---|---|
-| TLC001 | schema valid; chain intact (a line named by a later `withheld_after` is checked against its `line_sha256_before` and must hold the marker in the named field); seq consecutive; append-only against the worktree's HEAD |
+| TLC001 | schema valid (task records and triage lines, §4.3.1); chain intact (a line named by a later `withheld_after` is checked against its `line_sha256_before` and must hold the marker in the named field); seq consecutive; append-only against the worktree's HEAD |
 | TLC002 | `task_opened` first, then `owner_words(request)` |
 | TLC003 | `no_workflow`, `no_calc`, `no_code_pack_check` and `tool_not_on_allowlist` cite a `searched` record in evidence |
 | TLC004 | a closed task with any `not_found` has `did_instead` or a status other than `DONE`, and lists `open_needs` |
@@ -472,7 +479,7 @@ left. The interim template uses the same seven headings.
 | TLC006 | orphan runs: every `<workspace>/runs/run_*` created after `since` is attached to some task |
 | TLC007 | STORY.md equals its rendering (interim-1 folders, which hold a hand-written STORY.md and no `records.jsonl`, are skipped) |
 | TLC008 | `--staged`: only the named task folders, or the named needs' triage files, under `tasklog/` are staged in the worktree |
-| TLC009 | the guard re-run over stored records |
+| TLC009 | the guard re-run over stored records and triage lines |
 | TLC010 | an attached run whose journal now has more events than `last_seq` (re-attach needed) |
 | TLC011 | `--unpushed`: every commit of `origin/<integration_branch>..HEAD` in the worktree is log-only (ADR D5) and has the form of §4.7 (log identity as author and committer, subject) |
 
@@ -498,7 +505,7 @@ the optional transcript hash.
 | Condition | Exit code (`cli/_exit.py`) | Fields |
 |---|---|---|
 | Usage error, no open task, `require_task` refusal of `run` | 2 `USAGE` | option or key |
-| Guard refusal, `TASKLOG_FULL`, closed task, unknown policy, push not allowed, non-log-only range, encoding refusal | 3 `REFUSED` | field and rule, or commit and path; never the refused text |
+| Guard refusal, `TASKLOG_FULL`, closed task, unknown policy, push not allowed, push branch or remote differing from the push file (AC26), non-log-only range, encoding refusal, `close` while TLC002 or TLC004 fails (AC39) | 3 `REFUSED` | field and rule; commit and path; key (`integration_branch` or the remote URL); or check code; never the refused text |
 | Append lock held by another writer (`RunLocked`) | 4 `RUN_LOCKED` | task id |
 | Broken chain (TLC001) or journal failing verification | 5 `JOURNAL_INTEGRITY` | task id and seq, or run id |
 | No such task, run or need | 6 `NOT_FOUND` | id |
@@ -532,7 +539,10 @@ Each criterion of §3 names its test and its layer (the test folder), so the tem
 is not repeated here. Git behaviour is tested against temporary repositories and a bare remote; no
 test uses the network or the owner's credentials. Tests that read the gate's files (AC5, AC7) skip only when
 `MUTANT_UNDER_TEST` is set and the file is missing. The hook text is tested by running it as a subprocess against a
-temporary repository. Windows-specific encoding checks are local-testing items (T14).
+temporary repository. `_scope.py` and `_hook.py` are r2 (mutation runs on them) and mutmut rewrites the sources in its
+copy: no test pins the hook's SHA-256 or a stored copy, and a test that compares the hook text with the module sources
+skips only when `MUTANT_UNDER_TEST` is set, with an issue reference and an expiry (the B-437 form). Windows-specific
+encoding checks are local-testing items (T14).
 
 ## 10. Version impact
 
