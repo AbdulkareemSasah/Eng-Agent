@@ -26,7 +26,7 @@ from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.calcs._compare import as_fraction
 from eng_harness.kinds.calcs import Change, ModelDiff
 from eng_harness.kinds.edit_cycle import CsiNameLists, Issue, ResolvedItem, ResolvedValue
-from eng_harness.workflows.model_edit_cycle import ChangeSetDraft, refused_gap
+from eng_harness.workflows.model_edit_cycle._change_set import ChangeSetDraft, refused_gap
 
 __all__ = ["ANSWER_FIELD", "BASIS_FIELDS", "BOUNDS", "CheckBody", "CheckInput", "change_set_check"]
 
