@@ -145,7 +145,7 @@ CI). The task logs are its input (D11). A live session never develops the core.
   scopes, line budgets or CI reviewer payloads.
 - Offline, commits stay local in the log worktree. No force push, no hook bypass, no history rewrite of the
   integration branch (A6, A16). How log-only pushes reach a protected `main` is decided by the owner at the end of
-  bootstrap, a path-restricted rule or an agent identity preferred over a general bypass (question 1).
+  bootstrap, with a path-restricted rule or an agent identity preferred over a general bypass (question 1).
 
 **D6. Push identity: one recorded exception to "never the owner's credentials".** By the owner's decision:
 
@@ -348,9 +348,9 @@ The originals are copied from the lead's record of the session, never translated
 
 > انا متناقض
 
-On 2026-11-14 the lead put the open questions above to him, each with its recommendation. He answered in one line that the
-recommendations are applied. It answers questions 1, 2, 3 and 5 as recommended; questions 4 and 6 were not part of
-that batch and stay open:
+On 2026-11-14 the lead put questions 1, 2, 3 and 5 above to him, each with its recommendation. He answered in one line
+that the recommendations are applied. It answers those four as recommended; questions 4 and 6 were not part of that
+batch and stay open:
 
 > نفّذ التوصيات
 
