@@ -399,8 +399,7 @@ The `for` over footings builds argument lists only; every engineering value is a
 
 No value is shipped (spec 0004 Q8). Paths of the ACI clause specs are kept (ACI plan Q2); the others are **[added]**
 (Q12). The last segment of each quantity path ends with the contract §4.7.2 suffix of its unit (spec 0007 §4.8 naming;
-amendment B-484). All are required
-unless marked; units are those of `BasisField.unit`.
+amendment B-484). All are required unless marked; units are those of `BasisField.unit`.
 
 | Path | Kind | Unit | Used by |
 |---|---|---|---|
