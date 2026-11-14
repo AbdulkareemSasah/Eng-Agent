@@ -246,7 +246,7 @@ B-083.
 | Q2 | `forces.member_end/1` uses `host_local/1` signs (EC G-3); the checks take compression-positive `Pu_kN` and moment magnitudes | B-083 converts and records the conversion in its trace; confirm the CSI convention in the local test of §4 |
 | Q3 | Biaxial bending (AF G-1): which method, from which source (code clause, commentary or textbook with edition and page)? | The owner names it; until then every column with two non-zero moments returns `NEEDS_ENGINEER`, which in practice is most columns, so this is the first column follow-up |
 | Q4 | Transverse reinforcement (ties per 25.7.2, spirals per 25.7.3, including the spiral ratio) is assumed, not checked, yet it selects `φ` and `Pn_max` | Add transverse-reinforcement checks with the column workflow's next version; B-083 builds tied columns only until then |
-| Q5 | Effective length factor `k` has no source in the design basis | Add a per-project design-basis field (for example `columns.effective_length_factor`, B-063) set by the engineer; no default |
+| Q5 | Effective length factor `k` has no source in the design basis | Add a per-project design-basis field (for example `columns.effective_length_factor_ratio`, B-063) set by the engineer; no default |
 | Q6 | Displaced concrete removed for bars inside the stress block (AF C-3) | Keep (consistent with Eq. 22.4.2.2 and slightly conservative); C3 confirms |
 | Q7 | `n_grid = 1000` is cited as "Numerical method", not a code value | Accept the citation form for numerical parameters; CK-AC3 admits it |
 | Q8 | The maximum ratio is checked at a section without lap splices | B-083 evaluates the section away from laps; the owner decides whether a lap-region check is needed |
