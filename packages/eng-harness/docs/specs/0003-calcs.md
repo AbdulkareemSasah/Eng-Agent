@@ -312,7 +312,8 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.refs` (`RefString`, `JsonPointer`), `eng_contract.errors` (`ContractError`, `ErrorCode`),
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
 `enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
-(`eng_param`, for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs). `calcs/__init__.py` may import
+(`eng_param`, for ref-capable inputs), `eng_harness.kinds.footing` (footing calcs), `eng_harness.kinds.column_design`
+(column calcs) and `eng_harness.kinds.edit_cycle` (column calcs, amendment B-462). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
 

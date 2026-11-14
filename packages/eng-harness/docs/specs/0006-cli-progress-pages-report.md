@@ -457,7 +457,11 @@ Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract
 Shared options of `run` and `resume`: `--no-wait` (never wait for an answer: exit 10 at the first open request),
 `--wait-timeout SECONDS` (default: wait until answered or stopped), `--no-browser` (do not open the page; show the launch address on the
 controlling terminal only, §4.4.4), `--progress {auto,tty,plain,json,off}` (default `auto`: `tty` on a terminal, else `plain`),
-`--json` (the final result as one JSON object on standard output; progress goes to standard error), `--no-report`.
+`--json` (the final result as one JSON object on standard output; progress goes to standard error), `--no-report`,
+`--task ID` (amendment B-478: links the run to an open task log, default `ENG_TASK_ID`, then the open task of
+`.eng/tasklog/current.json`; with `[tasklog] require_task = true` a `run` without an open task is refused with exit 2
+before any run folder; ignored without a `[tasklog]` section; a top-level options-model field named `task` is refused
+at option generation; [spec 0015](0015-task-log.md) §4.5.3, AC28, AC36). AC1's six commands are unchanged.
 
 **There is no approve command, no option that answers a request, and no file that approves.** Approval, rejection,
 per-item rejection and sign-off exist only on the page (ADR-0027 §2). An agent that runs a workflow can start, resume,
@@ -544,6 +548,7 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 | `[providers.decision]`, `[providers.llm]` | tables | absent (no providers, phase 1 behavior) | Owned by spec 0009 §4.2, not by this spec: passed to `load_providers_config`, whose refusal is a usage error naming the key (AC62); no key for a secret exists |
 | `[decisions]`, `[decisions.shadow_released.<point>]` | tables | absent (the `DecisionSettings` defaults, phase 1 behavior) | Owned by spec 0005 §4.3, not by this spec: passed through as `DecisionSettings` (Q15, amendment B-471) |
 | `[project_lane.<tool>] record` | str | none | A tool not yet released (ADR-0026 §3); `record` names its gap report or session record (Q5) |
+| `[tasklog]` (`worktree`, `integration_branch`, `policy`, `agent`, `require_task`, `since`) | table | absent (nothing logged, pushed or refused; tests and CI) | Amendment B-478: owned by [spec 0015](0015-task-log.md) §4.6, which validates it; `integration_branch`, `policy` and `require_task` are required when the table exists; there is no `push` key (the push permission lives only in a user-level file outside the repository, ADR-0034 D6) |
 
 ### 4.3 Terminal progress (ADR-0027 §1, 11 §10, notes A7 and A8)
 

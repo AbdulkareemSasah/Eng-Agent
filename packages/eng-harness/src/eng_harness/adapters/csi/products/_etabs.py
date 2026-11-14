@@ -8,6 +8,7 @@ TABLES = {
     "area_loads": "Area Load Assignments - Uniform",
     "wall_sections": "Wall Property Definitions - Specified",  # no thickness in the area-section list, OQ-G10
 }
+ANALYSIS_MESSAGES = "Analysis Messages"  # read by csi_db_table_read; not in the fingerprint; its columns are OQ-G10
 MODEL_EXTENSIONS = (".EDB",)
 READBACK = {  # read-back tables of spec 4.6.2: (table, key column, value column); host facts to confirm locally, OQ-G10
     "area_section": ("Area Assignments - Section Properties", "UniqueName", "Section"),
