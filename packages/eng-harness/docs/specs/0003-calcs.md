@@ -319,9 +319,10 @@ calcs, amendment B-493). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
 
-The change-set model is admitted by that module's own name only (amendment B-493). It imports only `typing`,
-`pydantic`, `eng_contract.kinds.basis`, `eng_contract.units` and `eng_harness.kinds.edit_cycle`: no engine, port,
-adapter or I/O. Its package `__init__` holds the workflow definition (spec 0007 §4.1), so an import from
+The change-set model is admitted by that module's own name only (amendment B-493). Its imports are limited to
+`typing`, `pydantic`, `eng_contract.kinds.basis`, `eng_contract.units` and `eng_harness.kinds.edit_cycle`: no engine,
+port, adapter or I/O. A new import in that module needs an amendment of this section first, as an import in a calc
+module does. Its package `__init__` holds the workflow definition (spec 0007 §4.1), so an import from
 `eng_harness.workflows.model_edit_cycle` itself stays refused. The module and the `eng_harness` modules it imports
 enter the calc's `modules` (§4.5), so a change to the change-set model changes the hash of each calc that imports it,
 which then needs verification again (process/10 §5); the package `__init__` does not (an implicit parent, B-388).
