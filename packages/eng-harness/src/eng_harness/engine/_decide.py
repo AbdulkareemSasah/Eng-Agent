@@ -24,7 +24,7 @@ from pydantic import BaseModel, JsonValue, ValidationError
 from eng_harness import errors
 from eng_harness.ctx import BasisView, Decision, DecisionRequest
 from eng_harness.decisions._points import DecisionPoint, PointRegistry, discover
-from eng_harness.engine._inputs import Evidence, Question, build_request, check_answer, choice_schema
+from eng_harness.engine._inputs import Evidence, Question, build_request, check_answer, choice_schema, data_schema
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import (
@@ -32,6 +32,7 @@ from eng_harness.ports import (
     DecisionCall,
     DecisionPort,
     EngineerChoice,
+    InputAnswer,
     InputPort,
     InputRequest,
     PendingAnswer,
@@ -247,10 +248,34 @@ class Decider:
         title = items[0].title if len(items) == 1 else f"{len(items)} decisions"
         rid = pending[0].batch_id or pending[0].request_id
         request = build_request(self._ids, rid, "engine.decision", title, choice_schema(questions, shown), refs)
-        if rid not in self._requested:
+        await self._show(request)
+        return request
+
+    async def _show(self, request: InputRequest) -> None:
+        """Journal `input_requested` once for `request` and present it."""
+        if (rid := request.request_id) not in self._requested:
             sha = request.fields_schema_sha256
-            body = {"request_id": rid, "kind": request.kind, "title": title, "fields_schema_sha256": sha}
+            body = {"request_id": rid, "kind": request.kind, "title": request.title, "fields_schema_sha256": sha}
             self._writer.append(EventType.INPUT_REQUESTED, body)
             self._requested.add(rid)
         await self._inputs.present(request)
-        return request
+
+    async def asked(self, path: str, title: str, fields: type[BaseModel]) -> tuple[InputAnswer, BaseModel]:
+        """Present the `ctx.ask` request of the step at `path` and return the answer that fits `fields` (AC61).
+
+        An answer that does not fit the request or `fields` is refused and the request stays open.
+
+        Raises:
+            AwaitingInput: there is no answer, or the one given was refused.
+        """
+        rid = "ask_" + hashlib.sha256(f"{self._run_id}\n{path}".encode()).hexdigest()[:32]
+        request = build_request(self._ids, rid, "block", title, data_schema(fields.model_json_schema()))
+        await self._show(request)
+        answer = await self._inputs.answer(rid, wait=False)
+        try:
+            if answer is not None:
+                check_answer(request, answer)
+                return answer, fields.model_validate(dict(answer.values or {}))
+        except (ContractError, ValidationError) as refused:
+            _LOG.warning("the answer to %s is refused and the request stays open: %s", rid, refused)
+        raise AwaitingInput(f"ask request {rid} awaits the engineer", evidence=[rid])
