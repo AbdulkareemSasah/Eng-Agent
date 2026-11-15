@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_contract.errors import ContractError, ErrorCode, Precondition
 from pydantic import JsonValue
 from workflows.chain import chain
 from workflows.ctx_flows import change_set, flow, reply, request_id
@@ -107,8 +108,10 @@ def test_working_copy_is_replayed_and_new_models_get_none(tmp_path: Path, monkey
     assert [(e.model, e.args["model"]) for e in rig.host.ledger] == [("m1.copy", "m1.copy")] * 2
 
     other = mode_rig(tmp_path / "other")
-    with pytest.raises(Exception, match="not open"):  # a write to a model no instance holds: refused, no copy taken
+    with pytest.raises(ContractError) as refused:  # a write to a model no instance holds: refused, no copy taken
         asyncio.run(other.engine(chain([("write_b", {"n": 1, "model": "new"})])).start(request(mode=COPY)))
+    assert refused.value.detail.code is ErrorCode.PRECONDITION_FAILED
+    assert refused.value.detail.precondition is Precondition.model_open
     assert "host.working_copy" not in other.log
 
 
@@ -247,3 +250,62 @@ def test_a_save_to_a_new_file_is_not_asked(tmp_path: Path, mode: PermissionMode)
     assert [e.tool for e in rig.host.ledger] == ["save_s"]  # the save ran; the delete after it waits
     assert [p.title for p in rig.approvals.presented] == ["Apply delete_d"]
     assert paused.pending == (request_id(paused.run_id, "1~pre.approve"),)
+
+
+class _Cut(BaseException):
+    """A process death between the start of a write and its end (an `Exception` would be the write's own failure)."""
+
+
+def _attempts(rig: Rig, run_id: str) -> list[Any]:
+    return [e for e in rig.events(run_id) if isinstance(e.payload, ev.StepStarted) and e.path == "0"]
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_an_inserted_approval_covers_the_rerun_of_a_write_in_flight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: bool
+) -> None:
+    """AC49, spec 4.9: a write that ran under `p~pre.approve`, cut off and reconciled not applied, runs again as the
+    next attempt under the same approval, re-checked before the write; a model that changed voids it."""
+    rig = mode_rig(tmp_path)
+    rig.host.previews["write_b"] = change_set(rig, "i1")
+    voided: list[str] = []
+
+    async def body(ctx: Any) -> list[str]:
+        try:
+            return [(await ctx.tool("write_b", {"n": 1, "model": "m1"})).ref.ref]
+        except errors.ApprovalVoid as void:
+            voided.append(void.message)
+            return []
+
+    engine = rig.engine(flow(body))
+    paused = asyncio.run(engine.start(request(mode=PermissionMode.APPROVE_EACH_WRITE)))
+    run_id, rid = paused.run_id, request_id(paused.run_id, "0~pre.approve")
+    rig.approvals.script(rid, reply(rig))
+    call = rig.host.call
+
+    async def cut(tool: str, args: Any, *, op_id: str, model: str | None) -> Any:
+        raise _Cut
+
+    monkeypatch.setattr(rig.host, "call", cut)
+    with pytest.raises(_Cut):
+        asyncio.run(engine.resume(run_id))
+    monkeypatch.setattr(rig.host, "call", call)
+    assert [e.payload.under for e in _attempts(rig, run_id)] == [rid]
+    if changed:
+        rig.host.models["m1"] = rig.host.models["m1"].model_copy(update={"revision": 7})
+    done = asyncio.run(engine.resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    assert [(e.attempt, e.payload.under) for e in _attempts(rig, run_id)] == [(1, rid)] + ([] if changed else [(2, rid)])
+    assert (len(voided), len(rig.host.ledger)) == ((1, 0) if changed else (0, 1))  # a void ends before the call
+
+
+def test_a_working_copy_with_no_model_file_is_refused_by_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A copy the port opened but cannot name a file for is a `ContractError` that names it, not an `IndexError`."""
+    rig = mode_rig(tmp_path)
+    monkeypatch.setattr(rig.host, "model_files", lambda key: () if key == "m1.copy" else (Path(f"{key}.edb"),))
+    with pytest.raises(ContractError) as refused:
+        asyncio.run(rig.engine(chain([("write_b", {"n": 1, "model": "m1"})])).start(request(mode=COPY)))
+    assert refused.value.detail.code is ErrorCode.PRECONDITION_FAILED
+    assert refused.value.detail.precondition is Precondition.model_open
+    assert "m1.copy" in refused.value.detail.message
+    assert [e.tool for e in rig.host.ledger] == []
