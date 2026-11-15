@@ -472,7 +472,7 @@ def test_ask_in_flight_is_asked_again(tmp_path: Path) -> None:
         ("step_started", "0", 1),
         ("step_completed", "0", 1),
     ]
-    (rerun,) = _events(rig, run_id, ev.StepRerun)
+    (rerun,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepRerun)]
     assert rerun.reason == "read_in_flight"
     assert [p.request_id for p in _events(rig, run_id, ev.InputProvided)] == [ask]  # answered once, not reconciled
 
