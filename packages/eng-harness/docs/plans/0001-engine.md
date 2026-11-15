@@ -643,6 +643,26 @@ tasks:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_second_not_applied_stops_for_the_engineer"
     covers: [AC71]
     depends_on: [T16b]
+  - id: T22
+    title: A check_model result whose summary is not clean stops the run (invariant 1)
+    # Amendment (B-503, documents only): new; the merged Guard.check raises only for a failure envelope or a
+    # ContractError and clears the dirty flag for any success envelope, so a READBACK_MISMATCH does not stop a run
+    # (spec 4.6 row 1, AC37). After T15 (merged), the last task that edited the test fakes; it shares only CHANGELOG.md
+    # with T16 to T21, so it does not wait for them. Plan 0007 T6 also edits _invariants.py and waits for T22 (that
+    # plan's section 3).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/fakes/ports.py"  # the fake's passing check answers a clean CheckModelSummary
+    # About 14 lines in _invariants.py (the summary validated as CheckModelSummary, the failed check journaled as for a
+    # failure envelope) and 1 of CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_unclean_check_stops_run"
+    covers: [AC37]
+    depends_on: [T15]
 ---
 
 # Implementation plan: eng-harness engine
@@ -666,7 +686,7 @@ to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 an
 files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
 B-414: its worker crashes through T18's progress sink). T16 and T16b (the B-499 split) also share `_modes.py`,
 `tests/workflows/**` and `tests/replay/test_in_flight.py`, and T16b shares `_inflight.py` with T15 and T21, so T21
-follows T16b.
+follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -991,6 +1011,19 @@ engineer through the existing `engine.in_flight` request (`applied`, `not_applie
 checks that the next attempt runs. The merged T20 needs no change for spec Q38: a `SERVER_CHECK_FAILED` refusal removes
 nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses a start whose run folder exists.
 
+**T22 An unclean check stops the run** (spec §4.6 row 1, AC37; amendment B-503). `Guard.check` takes a success
+envelope as clean only when its summary validates as `eng_contract.issues.CheckModelSummary` with `clean` true (the
+summary of `issues.model_check/1`, spec 0002 §4.5.8). Any other success envelope is handled as a failure envelope is
+today: the step fails with harness code `MODEL_INTEGRITY` (the message names the summary's error count), `check_enforced`
+is `fail`, the dirty flag stays set, and the block's call raises `ModelIntegrityError` whose `evidence` holds the
+envelope's `result_id` (the stored check, so a block can show it). A summary of another shape counts
+as not clean. `test_unclean_check_stops_run` scripts, through the rig's `script_check`, a success envelope whose summary
+has one error and `clean` false after a write. It checks that the next read raises `ModelIntegrityError` with that
+evidence, that no port call follows, and that the journal holds the failed `p~pre.check_model` step and
+`check_enforced` `fail`. The fake host
+port's passing check (`tests/fakes/ports.py`) answers a clean summary (zero counts, `clean` true), so the merged tests
+keep their expectations. What the edit cycle does with this error at its step 9 is spec 0007 §11 Q14.
+
 ## 3. Dependencies
 
 - Runtime: `eng-contract` (workspace member) and `pydantic` (named by
@@ -1027,7 +1060,7 @@ nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses
   host is killed during a write (T11b), and the host-crash, reopen and restore items (T11c). Only the fakes run them
   here; every other step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16 and T16b additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16, T16b and T22 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16, T16b and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 

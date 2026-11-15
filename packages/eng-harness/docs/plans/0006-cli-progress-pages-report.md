@@ -580,6 +580,7 @@ tasks:
     # Amendment (B-412 tenth review, documents only): also binds the point_policies default (the point-policy mapping of step 5).
     # Amendment (B-471, documents only): T18 split into T18a and T18b (owner instruction of 2026-11-12, spec Q20 answer A). T18a binds every default but the port builder; the workflow registry is plan 0007 T9's workflows/__init__.py (spec 0007 Q13), so T18a does not wait for plan 0010 T9; cli/_wiring.py moves to T18b.
     # Amendment (B-475, documents only): the decision assembler default is plan 0009 T10a's phase-1 assemble_decision_runtime (spec 0009 AC49), and the point_policies default is the empty mapping (spec Q16 (d)), not None.
+    # Amendment (B-503, documents only): the tests-first test also checks the basis_fields map of the default calc port (spec 4.2.2 step 4); the port builder passes no basis (spec 0002 H-G9 closed); files and budget unchanged.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -946,9 +947,12 @@ plan 0005 T10; amendment B-412 sixth review), and `eng_harness.doctor.run` (plan
 plan T9 and T9b; plan 0004 T8) and are bound by T14 and T15, not here (amendment B-412 fourth review). It waits for
 all of them; if one is still missing long after the others, the lead amends this plan to split T18a rather than bind
 a stub. `test_defaults_are_the_real_implementations` checks that each of these fields of `CliDeps()` is the real
-callable, that `doctor` is then available, and that `run` and `resume` stay "not available in this build" while the
+callable, that `doctor` is then available, that the calc port the default `calc_port_factory` builds carries the
+`basis_fields` map (`harness.model_diff` and `harness.readback_check` mapped to the `BASIS_FIELDS` of
+`calcs/model_diff.py`, spec 0007 §4.5; amendment B-503), and that `run` and `resume` stay "not available in this build" while the
 port builder is `None`; it fails at the merge base because the defaults are `None`. T18a follows T16b (amendment B-412
-fifth review).
+fifth review). The port builder needs no basis argument: the read-back tolerance reaches the CSI host port from the
+run header (spec 0002 §4.5.8, closed gap H-G9; amendment B-503), so T18a and T18b pass nothing for it.
 
 **T18b Bind the port builder and draw the run id** (split from T18 by amendment B-471; spec §4.2.2 step 1, §4.4.8,
 Q20 answer A). `cli/_wiring.py` draws the run id for `run` at step 1 (`run_` + ULID from the ids source), fills the
