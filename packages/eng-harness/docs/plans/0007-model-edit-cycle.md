@@ -127,6 +127,9 @@ tasks:
     # Amendment (B-415, documents only): the CSI ToolInfo implements saves_new_file (true for as_new_revision and
     # csi_open_revision) and both results carry summary saved_file (name, sha256), spec §4.10; the base default
     # (false) comes with T6, whichever of the two merges first.
+    # Amendment (B-505, documents only): max_changed_lines 330 to 375, measured on the finished task (B-199) with the
+    # gate's counting rule: 371 lines (_read_state_tool.py 89, _revisions.py 118, _tools.py 160, one line each in
+    # CHANGELOG, local-testing, pyproject and _allowlist.toml), margin 4; no file outside this list is needed.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -137,7 +140,7 @@ tasks:
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_read_state_tool.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py"
-    max_changed_lines: 330
+    max_changed_lines: 375
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_read_state_tool.py::test_read_set"
@@ -416,7 +419,9 @@ T21 moves the model there and adds the rules-test entry, so T4 waits for it (sec
 
 **T5 Adapter additions** (spec §4.10, Q1). `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages`
 and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no escape hatch: each composes allowlisted
-tools only, checked by plan 0002's allowlist contract test); fake extensions.
+tools only, checked by plan 0002's allowlist contract test); fake extensions. Amendment B-505: the adapter-local tool
+descriptors (the tools that are not server tools) live in `adapters/csi/_tools.py`, not in `_allowlist.toml`, because every
+allowlist name must be a server tool (the build check, the doctor and the pinned-fingerprint contract test require it).
 
 **T6 Engine amendments** (spec AC33). `WorkflowDef.copy_on_open` and `basis_fields` (deriving `required_basis`);
 `model_saved` for tool steps with action `save`; a save passed `under=` an approval is re-checked and continues the
