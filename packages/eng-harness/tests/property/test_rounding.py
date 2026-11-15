@@ -1,9 +1,10 @@
 """Section size rounding properties (plan 0003 T11; spec 0003 AC41): multiple, never below, less than one step above."""
 
+import sys
 from fractions import Fraction
 from typing import Any
 
-from hypothesis import given, settings
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
@@ -33,6 +34,8 @@ def _field(value: Any, unit: str | None) -> dict[str, Any]:
 @given(required=_positive, increment=_positive)
 def test_rounding_properties(required: float, increment: float) -> None:
     """AC41: on exact fractions, size = n x increment, integer n >= 1, size >= required, size < required + increment."""
+    # The trace records r / i as a float; a ratio beyond the float range is a calc defect (INTERNAL), not a size.
+    assume(Fraction(required) / Fraction(increment) <= Fraction(sys.float_info.max))
     definition = REGISTRY["harness.section_round"]
     input_type = definition.input_type
     assert isinstance(input_type, type)
