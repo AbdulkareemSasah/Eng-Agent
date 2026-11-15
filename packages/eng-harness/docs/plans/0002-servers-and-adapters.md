@@ -417,6 +417,8 @@ tasks:
     depends_on: [T14]
   - id: T16
     title: Command-line tool adapter (dxf-prep, etabs-model build)
+    # Amendment (B-504, documents only): tests/unit/test_runner.py joins the files for one test-helper fix: _meta_run_id
+    # closes its journal connection (the `with` form only commits), found by T16's local CI run (B-135); test code, not counted.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -425,6 +427,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
       - "packages/eng-harness/tests/fakes/sasaah_cli/**"
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"  # _meta_run_id closes its connection (B-504)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
