@@ -514,11 +514,23 @@ modules (`rule_modules`: `src/eng_harness/rules/**`) may import only: `eng_harne
 `StepError` family of `eng_harness.errors`, other block modules (child blocks) and rule modules, `eng_contract.quantity`,
 `eng_contract.refs` (`Ref`, `RefString` only), `eng_contract.errors` (`ErrorCode` only, for routing),
 `eng_contract.verdicts` (`VerdictStatus` only), `eng_contract.kinds` and its submodules (payload types),
+`eng_contract.units` (`QUANTITY_KINDS`, `UNITS` only; amendment B-509), `eng_harness.kinds.edit_cycle` (payload
+types; amendment B-509),
 `eng_harness.decisions.types` (spec 0005 §4.1; it imports no engine, journal, port, network or database module), `pydantic`,
 `enum`, `typing`, `collections.abc`, and `__future__`. Everything else, in particular `eng_harness.engine`,
 `eng_harness.journal`, `eng_harness.ports`, adapters, the store, `asyncio` and any I/O module, is refused. This is
 types and the ctx API only, never I/O. Enforced by the block-module rules test (AC19) and by the gate's FB004 and FB005
 ([eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §4.8).
+
+**Kinds and units admitted by name (amendment B-509).** The merged workflow modules `model_edit_cycle._change_set` and
+`column_design._requests` import them. `eng_harness.kinds.edit_cycle` is admitted by that module's own name, never
+the package `eng_harness.kinds`. Its imports are limited to `collections.abc`, `typing`, `pydantic`,
+`eng_contract.refs` (`RefString`) and `eng_harness.kinds.calcs` (`CalcPayload`), whose chain reaches
+`eng_harness.calc` (`CalcStatus`), which `eng_harness.ctx` already imports: no engine, journal, port, adapter or I/O
+module. A new import in that module needs an amendment of this section first. `eng_contract.units` imports only the
+standard library, `pydantic`, `eng_contract._unit_table` and `eng_contract.errors`. Loading
+`eng_harness.kinds.edit_cycle` also runs `eng_harness/kinds/__init__.py`; as for `FieldSpec` below, that is a run-time
+load, not an import statement of block code.
 
 **Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix).** `eng_harness.block` exports
 `FieldSpec` (§4.2) by importing it from `eng_harness.basis._fields`, never from the package `eng_harness.basis`. That
