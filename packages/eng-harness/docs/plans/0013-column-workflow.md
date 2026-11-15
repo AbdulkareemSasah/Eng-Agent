@@ -264,7 +264,7 @@ tasks:
     depends_on: [T1]
   - id: T11
     title: Workflow column_design part 1 - definition, basis fields, scope, review cycle (steps 1 to 10 and 15)
-    # Amendment (B-417, documents only): registers column_design by adding its blocks to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2); T12's blocks reach it through the same column_design export.
+    # Amendment (B-417, documents only): registers column_design by adding its blocks to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9b, spec 0007 4.2); T12's blocks reach it through the same column_design export.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -313,7 +313,7 @@ tasks:
     depends_on: [T5, T11]
   - id: T13
     title: Workflow column_revit_update (steps R1 to R9)
-    # Amendment (B-417, documents only): adds column_revit_update to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2).
+    # Amendment (B-417, documents only): adds column_revit_update to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9b, spec 0007 4.2).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -459,7 +459,7 @@ layout requests, the cycle with selection, analysis and design through the edit 
 forces read, host verdicts, demands, the code checks through T6, the review, the engineer turn, and the finish. The
 CSI fake gains a column scenario (test data): frames, sections, combinations, frame forces and steel design ratios. Amendment
 (B-417): the task registers `column_design` by adding its blocks to the shipped-workflow tuple of
-`workflows/__init__.py`, which `block.discover()` reads (plan 0007 T9); `blocks.lock.json` is regenerated from it.
+`workflows/__init__.py`, which `block.discover()` reads (plan 0007 T9b); `blocks.lock.json` is regenerated from it.
 
 **T12 Proposal and apply** (WS steps 11 to 14). The proposal request, rounding per dimension, matching, `decide_many`,
 the generated change set, `apply_change_set`, and the design record after promotion.
@@ -467,7 +467,7 @@ the generated change set, `apply_change_set`, and the design record after promot
 **T13 Revit run** (WS steps R1 to R9). Mode refusal, the ETABS fingerprint gate, the Revit working copy and reads,
 the map and its decision, the update plan, the approval, the ordered writes with references, the read-back and its
 decision, sign-off; the Revit fake gains a column scenario with families, types and role parameters. Amendment (B-417):
-the task adds `column_revit_update` to the same tuple of `workflows/__init__.py` (plan 0007 T9).
+the task adds `column_revit_update` to the same tuple of `workflows/__init__.py` (plan 0007 T9b).
 
 **T14 Report and audits** (spec §4.10). Renderers for both runs (verdict sources, size chain, map, plan, read-back,
 unsaved-document notice, draft marks), `audit_verdict_sources`, and the column section of `docs/local-testing.md`
@@ -487,9 +487,9 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
   and mode usability), and plan 0004 T5 (the column checks registered); the documents pull request B-405 (spec 0013
   AC13 and §4.5 answer `NOT_FOUND`, spec 0010 C4), scheduled before this T6 and before footing T2 (amendment B-418).
 - Before T9: plan 0005 T4 and T9 (rules, `decide_many`).
-- Before T10: engine plan 0001 (`block.py`, `_runner.py`) and plan 0007 T8, T9 and T2 (the blocks and the check it
+- Before T10: engine plan 0001 (`block.py`, `_runner.py`) and plan 0007 T8, T9b and T2 (the blocks and the check it
   amends).
-- Before T11: plan 0007 T9 (the cycle blocks) and T4 (`harness.host_design_verdicts`); plan 0002 T4 (the CSI fake);
+- Before T11: plan 0007 T9b (the cycle blocks) and T4b (`harness.host_design_verdicts`; amendment B-511); plan 0002 T4 (the CSI fake);
   plan 0004 T5 (`FieldSpec`).
 - Before T13: plan 0011 T7 to T11 and T15 (reader, edits, attended writes, reconciliation, session, wiring) and T2 (the
   Revit fake).

@@ -297,7 +297,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_tasklog_run_link.py::test_no_section_exempt"
       - "packages/eng-harness/tests/unit/cli/test_tasklog_task_option.py::test_generated_option_task_reserved"
     covers: [AC28, AC36]
-    depends_on: [T10]   # and plan 0006 T14, T14b, T18a and T18b merged (section 3)
+    depends_on: [T10]   # and plan 0006 T14, T14c, T14b, T18a and T18b merged (section 3)
   - id: T12
     title: Needs, triage, release-public, answered, digest
     files:
@@ -426,8 +426,8 @@ matcher), but `**/.gate/` is a CODEOWNERS path, so T1 and T14 need the owner's r
 - **T10** derives needs from runs (the `not_found` rows of spec §4.8, the change-set check issues), adds TLC006 and
   TLC010, and the unattached-runs line of `status`.
 - **T11** adds `--task` to `run` and `resume`, `require_task`, the attach calls at start and exit, and the reserved
-  `task` option name. It edits files that plan 0006 T14, T14b, T18a and T18b create or change, so it starts only after
-  all four have merged and never edits a file an open critical-path task edits.
+  `task` option name. It edits files that plan 0006 T14, T14c, T14b, T18a and T18b create or change, so it starts only
+  after all five have merged and never edits a file an open critical-path task edits.
 - **T12** adds needs, triage (free text guarded as agent fields, through T3a's triage append), `release-public`,
   answered and digest. **Deferred** until the first triage session needs
   it; a development session can read STORY.md meanwhile.
@@ -452,7 +452,7 @@ No runtime or development dependency is added. Git is called as a subprocess. Cr
 |---|---|---|
 | T9 | plan 0001 T4 (journal reader), plan 0006 T11 to T13 (report model) | merged |
 | T10 | plan 0007 kinds `harness.change_set_check/1` | merged |
-| T11 | plan 0006 T14 (B-188), T14b (B-353), T18a and T18b (B-433) | `cli/_run.py`, `cli/_options.py` and `tests/helpers/cli_deps.py` come with them; spec 0006 §4.2.1 carries the `--task` amendment (B-478) |
+| T11 | plan 0006 T14 (B-188), T14c (split from T14 by B-510), T14b (B-353), T18a and T18b (B-433) | `cli/_run.py`, `cli/_options.py` and `tests/helpers/cli_deps.py` come with them; spec 0006 §4.2.1 carries the `--task` amendment (B-478) |
 | T13 | plan 0002 T17 (B-136) | the record-mode sanitizer it factors out |
 | T14 | plan 0006 T17b | the CLI agent rule in the same `.gate/agents.yml` |
 | — | eng-dev-gate plan 0001 (GC017, `push-scope`, `tasklog-lint`, `publish-check`) | they apply the same log-only definition after the push; none blocks this plan |

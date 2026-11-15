@@ -76,13 +76,19 @@ tasks:
     # Amendment (B-503, documents only): a wall_section on a section the state holds also projects a set of /material
     # (spec 4.4.2, AC37, about 6 lines); the item order of an added combination is spec Q15 (open, nothing to build);
     # max_changed_lines 330 to 340 (an estimate).
+    # Amendment (B-513, documents only): the effects record carries the calc port's wrapper members (calc, draft, trace),
+    # so kinds/calcs.py gains three optional members on ExpectedEffects (3 lines); that module is in the hash closure of
+    # every calc, so calcs.lock.json moves seven entries and the footing record's hash literal follows. max_changed_lines
+    # stays 340 (311 measured with the trial).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/expected_effects.py"
+      - "packages/eng-harness/src/eng_harness/kinds/calcs.py"  # ExpectedEffects gains the optional calc, draft and trace members (amendment B-513)
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # its content-hash literal follows the lock (amendment B-513)
       - "packages/eng-harness/docs/verification/calcs/harness.expected_effects.md"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/effects-*.json"
@@ -93,35 +99,55 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_wall_section_material_reads_back"  # AC37 (B-503)
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_bodies_are_valid_payloads"  # amendment B-513
       - "packages/eng-harness/tests/property/test_expected_effects.py::test_order_independent"
     covers: [AC8, AC36, AC37]
     depends_on: [T2]
   - id: T4
-    title: Calcs harness.host_design_verdicts and harness.analysis_summary
+    title: Calc harness.analysis_summary
     # Amendment (B-417, documents only): calcs/__init__.py registers both calcs in REGISTRY (spec 0003 4.2); depends on T3 so that T2, T3 and T4 edit the shared registry files in turn; reads limits.ratio_limit_ratio (spec 4.8).
     # Amendment (B-503, documents only): the inputs harness.csi_design_results/1 and harness.csi_analysis_messages/1 are
     # typed with CsiRows of eng_harness.kinds.csi (spec 0003 4.3), which plan 0002 T21 moves there (section 3); files and budget unchanged.
+    # Amendment (B-511, documents only): pre-flight audit. A calc cannot output verdicts.set/1 (spec 0003 AC1, AC47,
+    # contract 4.10.1), so harness.host_design_verdicts moves to T4b, held until spec Q19 is answered; this task builds
+    # harness.analysis_summary alone. max_changed_lines 340 to 200 (an estimate for one calc and its record).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.analysis_summary and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
-      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/host_design_verdicts.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/analysis_summary.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
-      - "packages/eng-harness/docs/verification/calcs/harness.host_design_verdicts.md"
       - "packages/eng-harness/docs/verification/calcs/harness.analysis_summary.md"
-      - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py"
       - "packages/eng-harness/tests/golden/edit_cycle/test_analysis_summary.py"
-      - "packages/eng-harness/tests/data/golden/edit_cycle/verdicts-*.json"
       - "packages/eng-harness/tests/data/golden/edit_cycle/analysis-*.json"
-    max_changed_lines: 340
+    max_changed_lines: 200
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases"
     covers: [AC30]
     depends_on: [T3]
+  - id: T4b
+    title: Calc harness.host_design_verdicts (held until spec Q19 is answered)
+    # Amendment (B-511, documents only): split from T4. Its output kind is spec Q19 (open): the registry refuses
+    # verdicts.set/1 as a calc output. Not started before the answer; the documents amendment that records the answer
+    # adds the files of the chosen option (spec Q19) and sets the budget. 240 is an estimate for option (a).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs.edit_cycle.host_design_verdicts (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/host_design_verdicts.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.host_design_verdicts.md"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/verdicts-*.json"
+    max_changed_lines: 240
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases"
+    covers: [AC30]
+    depends_on: [T4]
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
     # Amendment (B-415, documents only): the CSI ToolInfo implements saves_new_file (true for as_new_revision and
@@ -162,9 +188,15 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"  # calls into the copy-on-open and tool-save hooks (amendment B-415)
       - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"  # resumed tool save: compared with its result's provenance.host, saved_file mismatch, engine §4.6 "At a resume" (amendment B-415)
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
+      - "packages/eng-harness/src/eng_harness/ctx.py"  # BasisView.record_ref(), engine §4.3.2 (amendment B-511)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
-    # Amendment (B-415 review fix, documents only): block.py imports FieldSpec from eng_harness.basis._fields (engine
-    # §4.1.2), and the gate also runs tests/rules/test_decision_imports.py::test_types_module_is_block_safe unchanged.
+    # Amendment (B-415 review fix, documents only): block.py exposes FieldSpec through a TYPE_CHECKING import and a
+    # module-level __getattr__, and imports check_declaration inside workflow(); a module-level import of
+    # eng_harness.basis._fields is an import cycle (engine §4.1.2, amendment B-511). The gate also runs
+    # tests/rules/test_decision_imports.py::test_types_module_is_block_safe unchanged.
+    # Amendment (B-511, documents only): pre-flight audit. The calcs take `basis` as a reference to the whole basis
+    # record (spec 0003 §4.4), which BasisView cannot give; BasisView.record_ref() (about 5 lines in ctx.py) and its
+    # test join this task, because T8 is its first user. max_changed_lines unchanged.
     # Amendment (B-415 review fix, documents only): _hoststate.py and _runner.py added for EC2's resume cases (both
     # extended from plan 0001 T11c, split from T11b by B-427); max_changed_lines raised from 200 to 300 for the two added modules (tests do not count).
     max_changed_lines: 300
@@ -176,6 +208,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_required_basis_from_fields"
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_save_under_approval_keeps_chain"
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_revision_save_no_write_preview"
+      - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py::test_basis_view_record_ref"  # amendment B-511
     covers: [AC33]
     depends_on: []
   - id: T7
@@ -200,10 +233,12 @@ tasks:
       - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_typical"
       - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_boundary"
     covers: [AC18]
-    depends_on: [T1b]
+    # Amendment (B-511, documents only): after T15, without which FB005 refuses the version=1 of every point and rule
+    # (T8 and T9a, T9b follow through T7).
+    depends_on: [T1b, T15]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
-    # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap).
+    # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap); T9b since the split (B-511).
     # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) as a cross-plan dependency.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
@@ -231,9 +266,31 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait"
     covers: [AC1, AC2, AC10, AC11, AC13, AC17, AC24]
     depends_on: [T2, T3, T5, T6, T7]
-  - id: T9
-    title: Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off), the cycle loop and registration
+  - id: T9a
+    title: Workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn)
+    # Amendment (B-511, documents only): pre-flight audit. The former T9 was planned at the 400-line cap (B-417: 395 to
+    # 400) with no margin; split by its own structure, as B-499 split engine T16. T9a: run_and_summarize and the
+    # engineer turn, tested through the test workflows of conftest.py; 200 is an estimate, to measure at write time.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
+      - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py"
+    max_changed_lines: 200
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py::test_engineer_turn_branches"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_design_timeout_reconciles"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_save_before_analysis_and_design"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_stale_build_stops_before_any_write"
+    covers: [AC16, AC19]
+    depends_on: [T4, T4b, T8]
+  - id: T9b
+    title: Workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration
     # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
+    # Amendment (B-511, documents only): split from the former T9 (see T9a); 230 is an estimate, to measure at write time.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -246,13 +303,11 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
       - "packages/eng-harness/tests/unit/test_block.py"  # isolates test_main_writes_the_lock from the shipped blocks (amendment B-417)
-    max_changed_lines: 400
+    max_changed_lines: 230
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_registered"
@@ -263,22 +318,20 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_while_stopped"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_keeps_hand_edit"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_refuses_changed_snapshot"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py::test_engineer_turn_branches"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_design_timeout_reconciles"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_save_before_analysis_and_design"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_stale_build_stops_before_any_write"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_promote_and_conflict"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode"
-    covers: [AC1, AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23, AC34]
-    depends_on: [T4, T8, T13]  # T13: the reopened hook that restore_previous needs (amendment B-503)
+    covers: [AC1, AC9, AC12, AC14, AC15, AC20, AC21, AC22, AC23, AC34]
+    depends_on: [T9a, T13]  # T13: the reopened hook that restore_previous needs (amendment B-503)
   - id: T10
     title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
+    # Amendment (B-511, documents only): pre-flight audit. The timings section is _timings() in report/_document.py,
+    # so that file joins; audit_value_sources takes the engineering parameter names as an input (spec 4.9, AC25).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_edit_cycle.py"
+      - "packages/eng-harness/src/eng_harness/report/_document.py"  # the timings section (amendment B-511)
       - "packages/eng-harness/src/eng_harness/report/_sections.py"
       - "packages/eng-harness/src/eng_harness/report/_write.py"
       - "packages/eng-harness/tests/unit/report/test_edit_cycle_renderers.py"
@@ -297,11 +350,16 @@ tasks:
     depends_on: [T1b]
   - id: T11
     title: Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list
+    # Amendment (B-511, documents only): pre-flight audit. The workflow prompt tests and the property test pin merged
+    # T9a, T9b and T10 and pass at the base (TF004): they leave tests_first and stay in files (as B-482). The entry
+    # point takes the engineering parameter names from engineering_params() in adapters/csi/_tools.py (spec AC35),
+    # about 8 lines; budget unchanged (an estimate). Pull request title type feat.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/src/eng_harness/report/__main__.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # engineering_params(), spec AC35 (amendment B-511)
       - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py"
       - "packages/eng-harness/tests/property/test_edit_cycle_sources.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py"
@@ -309,18 +367,17 @@ tasks:
     max_changed_lines: 150
     max_sessions: 2
     tests_first:
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_scenarios_within_one_prompt"
-      - "packages/eng-harness/tests/workflow/edit_cycle/test_prompts.py::test_unclassified_messages_use_the_prompt"
-      - "packages/eng-harness/tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced"
       - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder"
       - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_entry_is_read_only_and_exit_codes"
     covers: [AC25, AC26, AC35]
-    depends_on: [T9, T10]
+    depends_on: [T9b, T10]
   - id: T12
     title: Replay test and crash matrix of the workflow (A6)
     # Amendment (B-417, documents only): folder renamed from tests/replay/edit_cycle/ so that its package name differs from tests/unit/edit_cycle/ (mypy duplicate module); no tests/replay/__init__.py.
+    # Amendment (B-511, documents only): pre-flight audit. Both tests pin merged T9b and pass at the base, so this is a
+    # test-only pull request (title type test, test files only, no failing-first run; gate spec 4.7), as engine plan
+    # T19 (B-509); CHANGELOG.md leaves files.
     files:
-      - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/replay/edit_cycle_replay/__init__.py"
       - "packages/eng-harness/tests/replay/edit_cycle_replay/test_replay.py"
       - "packages/eng-harness/tests/replay/edit_cycle_replay/test_crash_matrix.py"
@@ -331,14 +388,14 @@ tasks:
       - "packages/eng-harness/tests/replay/edit_cycle_replay/test_crash_matrix.py::test_every_step"
       - "packages/eng-harness/tests/replay/edit_cycle_replay/test_replay.py::test_recorded_journal_replays"
     covers: [AC27, AC28]
-    depends_on: [T9]
+    depends_on: [T9b]
   - id: T13
     title: The host port follows the working file that csi_open_revision opens (reopened hook)
     # Amendment (B-503, documents only): new. After csi_open_revision the AdapterHostPort keeps the old path, so
     # model_files, locate and model_state, the engine's model_saved for the restore (EC2) and the next host-state check
     # cannot find the restored file. AdapterHostPort.reopened(model_key, path) (about 14 lines) and a reopened callback
-    # of CsiToolPort called after a successful open (about 6), 1 of CHANGELOG.md: budget 40 (an estimate). Before T9,
-    # whose restore_previous needs it, and before plan 0002 T19a, which wires the callback and also edits _hostport.py.
+    # of CsiToolPort called after a successful open (about 6), 1 of CHANGELOG.md: budget 40 (an estimate). Before T9
+    # (T9b since B-511), whose restore_previous needs it, and before plan 0002 T19a, which wires the callback and also edits _hostport.py.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
@@ -350,6 +407,39 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port"
     covers: [AC38]
     depends_on: [T5]
+  - id: T14
+    title: Calc harness.change_set_check refuses an item id with a slash (INVALID_ITEM_ID)
+    # Amendment (B-513, documents only): new. Spec 4.4.1 K3 and AC4 require the issue INVALID_ITEM_ID and name the golden
+    # cases check-item-id-*; the merged calc (T2, B-196) raises none and holds no such case. After T3, which also edits
+    # calcs.lock.json. About 6 lines of the calc, 2 of the lock, 1 of CHANGELOG.md and 3 of the record: budget 40 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/check-item-id-*.json"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_item_id_with_a_slash_is_refused"
+    covers: [AC4]
+    depends_on: [T3]
+  - id: T15
+    title: FB005 admits the integer version of block, workflow, decision_point and rule (gate configuration)
+    # Amendment (B-511, documents only): new. .gate/forbidden.yml line 16 lists only calc and CheckMeta under
+    # versioned.callables, so FB005 refuses the version=1 that @block, @workflow, @decision_point and @rule require in
+    # workflows/** and rules/**. A protected path (r3 floor): the pull request shows the awaiting-owner notice, and a
+    # pull request is judged by the policy of its base commit, so T7 waits for this task.
+    files:
+      - ".gate/forbidden.yml"
+      - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py"
+    max_changed_lines: 10
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py::test_version_keyword_of_versioned_callable"
+    covers: [AC2]
+    depends_on: []
 ---
 
 # Implementation plan: eng-harness model edit cycle (spec 0007)
@@ -360,12 +450,12 @@ The spec is [0007](../specs/0007-model-edit-cycle.md); the owner-facing descript
 [workflow spec](../workflows/model-edit-cycle.md). `max_changed_lines` counts non-test, non-generated lines, as in
 plans 0001 to 0006; golden data, journals and fixtures are test data.
 
-Build the data first and the R1 parts early: the kinds and the change-set model (T1a, T1b), then the four calcs (T2 to T4),
+Build the data first and the R1 parts early: the kinds and the change-set model (T1a, T1b), then the four calcs (T2 to T4b),
 which carry the engineering checks and go to the owner for review as soon as they merge. The adapter additions (T5)
 and the engine amendments (T6) are small, separate and reviewable on their own; T6 waits until the engine spec is
 amended in its own documents pull request (spec Q2, Q3, Q5 and spec 0004 Q7), as B-068 does for earlier amendments.
-The decision points and rules (T7) are R1 and reviewed separately from the block. The block is split in two (T8 steps
-1 to 10, T9 steps 11 to 17 and the loop), each tested end to end against the synthetic CSI fake server process. The
+The decision points and rules (T7) are R1 and reviewed separately from the block. The block is split in three (T8 steps
+1 to 10, T9a steps 11 to 15, T9b steps 16 and 17, the loop and registration; amendment B-511), each tested end to end against the synthetic CSI fake server process. The
 report, audit, prompt counter and timings (T10) are pure functions over the journal. T11 and T12 add the acceptance
 support and the replay suite, mostly tests.
 
@@ -407,6 +497,27 @@ spec §4.4.2), so a redefinition with another material is not `unexpected`;
 holding the new material and thickness (`PASS`, no `unexpected` row) and with the old material still read (`FAIL`, the
 material effect `mismatch`) (AC37). The order of the items of an added combination is spec Q15, open: until it is
 answered the projection keeps the change set's item order and no test pins another.
+Amendment (B-513): the calc port stores `body | {calc, draft, trace}` and the store validates that record against the
+kind (spec 0003 §4.2, §4.12 item 2), but `ExpectedEffects` in `kinds/calcs.py` is a plain model with `extra="forbid"`,
+so the effects record could not be stored and the read-back's `effects` input could not read it back. Form: the three
+members are added to `ExpectedEffects` as optional (`calc: CalcMeta | None = None`, `draft: StrictBool | None = None`,
+`trace: Trace | None = None`), and the kind does not take the `CalcPayload` base that `ModelDiff`, `ReadbackCheck`,
+`ChangeSetCheck` and the other calc kinds take, because that base requires the members and the merged bodies of this
+kind hold none: the kind fixture `tests/data/kinds/calcs/expected_effects.json`, `tests/unit/calcs/test_readback.py` and
+the four `readback-*.json` goldens (plan 0003 T4 and T9), which this task may not change. A trial with the base failed
+the kind fixture test, nine read-back unit tests and the four read-back goldens. Spec 0003 §4.8 lists the domain fields
+of the kind as it does for every calc kind, and spec 0003 §4.2 has the framework add `calc`, `draft` and `trace`, so
+no spec text contradicts the form and none changes. `kinds/calcs.py` is in the content-hash closure of every calc: the
+change moves seven entries of `calcs.lock.json` at the B-197 head (six merged calcs and this one; regenerate with
+`uv run python -m eng_harness._calc._hash --write-lock`), and the record `harness.footing_subjects.md` pins its hash
+literal (`tests/unit/footing/test_calcs_registered.py::test_metadata_and_constants`), so its literal follows; the
+hashes of the six merged calcs change, so the owner's re-verification of those drafts is as for any hash change (spec
+0003 §4.5). Trial on the head of B-197 in a scratch worktree (removed): the edit above, the regenerated lock and
+`test_golden_bodies_are_valid_payloads` (each `effects-*` golden body validates through the kind bare and with the
+wrapper; a test of the first commit, red at the base because its module imports the calc, and red at the
+implementation head until `kinds/calcs.py` changes) gave `uv run eng-gate check --package eng-harness --skip mutation`
+`check: pass`; files touched: `kinds/calcs.py`, `calcs.lock.json`, `harness.footing_subjects.md` and the golden test
+file; 311 counted lines of 340.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
 `limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
@@ -416,6 +527,16 @@ EC-G3). Golden cases with synthetic replies whose field names follow the S-12 in
 inputs `harness.csi_design_results/1` and `harness.csi_analysis_messages/1` are typed with `CsiRows` imported from
 `eng_harness.kinds.csi`, the module spec 0003 §4.3 admits, never from `eng_harness.adapters.csi._replies`; plan 0002
 T21 moves the model there and adds the rules-test entry, so T4 waits for it (section 3).
+Amendment (B-511): the registry refuses an output kind outside the `harness.` family (spec 0003 AC1; contract §4.10.1
+refuses a calc kind in a neutral family), so `harness.host_design_verdicts` cannot output `verdicts.set/1` as spec
+§4.4.3 said; the output kind is spec Q19 (open). Interim reading until Q19 is answered: T4 builds
+`harness.analysis_summary` alone (its golden test and record), and `harness.host_design_verdicts` is T4b.
+
+**T4b Host design verdicts** (amendment B-511; spec §4.4.3, AC30). The calc as spec §4.4.3 states it, with the input
+list B-511 adds there. Not started before the owner answers spec Q19; the documents amendment that records the answer
+adds the files of the chosen option (for the recommended option (a): the wrapper kind in `kinds/edit_cycle.py` with its
+fixture test and data, and the design summary's acceptance of that kind in `calcs/design_summary.py`, its record and
+the calc lock) and sets the budget. T9a waits for it (step 14).
 
 **T5 Adapter additions** (spec §4.10, Q1). `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages`
 and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no escape hatch: each composes allowlisted
@@ -437,9 +558,15 @@ files; the CSI override and the `saved_file` summary are T5's (spec §4.10).
 Amendment B-499: continuing the chain (engine §4.9, EC5) means that after each tool save and each engine `p~post.save`
 under the approval, the expected state of the next step under it takes that `model_saved`'s revision, fingerprint and
 file hash (`_approvals.py`; the merged engine T15 keeps only the revision a write produced).
-Review fix B-415: `block.py` takes `FieldSpec` from `eng_harness.basis._fields`, never from the `eng_harness.basis`
-package (engine §4.1.2), so spec 0005 AC42 holds; T6 runs
+Review fix B-415: `block.py` exposes `FieldSpec` through a `TYPE_CHECKING` import and a module-level `__getattr__`,
+and imports `check_declaration` inside `workflow()`; a module-level import of `eng_harness.basis._fields` is an import
+cycle (amendment B-511: loading it runs `basis/__init__.py`, whose `_port` reaches `ports`, `decisions` and
+`decisions/_points.py`, which imports `eng_harness.block`). Never from the `eng_harness.basis` package (engine
+§4.1.2), so spec 0005 AC42 holds; T6 runs
 `tests/rules/test_decision_imports.py::test_types_module_is_block_safe` unchanged among its checks.
+Amendment B-511: `BasisView.record_ref()` (engine §4.3.2), the reference `res_<id>` to the whole basis record that
+every calc's `basis` input takes (spec 0003 §4.4); `ref(path)` gives a field's value, which the calc input refuses.
+`test_basis_view_record_ref` (spec AC33) checks the reference and that it needs no declared path.
 
 **T7 Points and rules** (spec §4.6). Three decision points with their state models, two rules
 (`edit_cycle_readback_result.pass`, `edit_cycle_analysis_messages.clean`; the point names `edit_cycle_readback_result`,
@@ -479,7 +606,7 @@ blank template's `ask_each_run` list (paths only, no value, spec 0004 §4.8). Am
 the template with an empty `ask_each_run`; this task fills it with the unit-suffixed paths of spec §4.8, and the new pin
 is a golden change: the pull request carries the golden diff report and the change goes to the owner queue
 (process/05 §5). The same paths are the `FieldSpec`s of `basis_fields` (spec 0004 AC21). Registration of the workflow
-is T9's (this task is at its 400-line cap): `block.discover()` stays empty here and `blocks.lock.json` is unchanged, so
+is T9b's (this task is at its 400-line cap): `block.discover()` stays empty here and `blocks.lock.json` is unchanged, so
 `test_workflow_definition` checks the definition and not the lock. Tests drive the child blocks through test
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
 Amendment (B-503): plan 0001 T22 stops on a `check_model` that is not clean, which the check inserted before the S'
@@ -489,11 +616,12 @@ routing code: the inserted check's `ModelIntegrityError` escalates like any othe
 wanted value and also changes an item the change set does not touch, so `harness.readback_check` reports it
 `unexpected`). Prose, files, tests and budget are otherwise unchanged.
 
-**T9 Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7). `run_and_summarize` (analysis, design, results, D-3,
-summaries; D-2 and D-3 are never open together, spec §4.6), the engineer turn, the cycle loop, promotion and sign-off in
-`_finish.py`, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
+**T9a and T9b Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7; split by amendment B-511). T9a:
+`run_and_summarize` (analysis, design, results, D-3, summaries; D-2 and D-3 are never open together, spec §4.6) and the
+engineer turn, tested through test workflows in `conftest.py`. T9b: the cycle loop, promotion and sign-off in
+`_finish.py`, the registration, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
 stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched with T15.
-Amendment (B-417): this task registers the shipped workflow (spec §4.2): `workflows/__init__.py` exports the blocks of
+Amendment (B-417): T9b registers the shipped workflow (spec §4.2): `workflows/__init__.py` exports the blocks of
 `model_edit_cycle` (the workflow and its child blocks, `run_and_summarize` and those of `_finish.py` included) as one
 tuple, and `block.discover()` builds its `Registry` from it, importing `eng_harness.workflows` inside the function to
 avoid an import cycle. `blocks.lock.json` is written with `python -m eng_harness.block --write-lock`, and
@@ -510,18 +638,29 @@ are is checked by `test_block_lock.py` and `test_workflow_registered`).
 **T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
 AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
 `report/cycle-timings.json` (base names only).
+Amendment (B-511): the timings section is extended in `_document.py` by calling `edit_cycle_timings(reader)`, only when
+the journal holds edit-cycle steps, so the existing report snapshots stay unchanged. Renderers are registered from
+`_sections.py` by a lazy import of `_edit_cycle`, not from `report/__init__.py` or `_model.py`, which T10 does not
+list. `audit_value_sources` takes `engineering_params` (tool name to parameter names, spec §4.9, AC25); its tests pass
+it explicitly (a forged literal at a listed parameter is reported, a literal at an unlisted one is not).
 
-**T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8 and T9 (the
+**T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
 Amendment B-354 (spec AC35, Q11): `python -m eng_harness.report` with `audit-sources RUN_DIR` and
 `count-prompts RUN_DIR`, a read-only wrapper over the T10 functions so that the owner can run A3 and A7 on the
 journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-testing.md` names the command form
 `uv run --package eng-harness python -m eng_harness.report ...` (spec 0006 §4.1).
+Amendment (B-511): `audit-sources` passes `engineering_params()` of `adapters/csi/_tools.py`: per tool of
+`tool_allowlist()`, the fields of its argument model (`EDIT_MODELS | ANALYSIS_MODELS`) marked `engineering_quantity`,
+the rule `AdapterToolPort.describe` uses for `ToolInfo.engineering_params` (spec AC35); T13 and plan 0002 T15 also
+edit `_tools.py` (whichever lands later adapts). Test order: the first `test:` commit holds only the two
+`test_acceptance_entry.py` tests; `tests/workflow/edit_cycle/test_prompts.py` and
+`tests/property/test_edit_cycle_sources.py` come in a later commit of the same task (they pass at the base, TF004).
 
 **T12 Replay and crash matrix** (spec AC27, AC28). A two-cycle run killed at every step in a worker process (plan 0001
 T19's harness) and resumed with the same scripted answers; the replay test over a journal recorded by the
-uninterrupted run.
+uninterrupted run. Amendment (B-511): a test-only pull request, title type `test(eng-harness)`, as engine plan T19.
 
 **T13 Reopened hook** (amendment B-503; spec §4.10, AC38). `AdapterHostPort.reopened(model_key, path)` binds
 `model_key` to `path` on the instance it is already bound to (`model_files`, `locate` and `model_state` then use the new
@@ -535,6 +674,23 @@ until it is answered, `reopened` keeps the binding's model id and records the fi
 `MODEL_CHANGED_OUTSIDE`); a refused open (a changed snapshot, `CONFLICT`) leaves the previous file bound. Plan 0002
 T19a passes `host.reopened` in `build_ports`.
 
+**T14 Item id with a slash** (amendment B-513; spec §4.4.1 K3, AC4). `harness.change_set_check` raises the error issue
+`INVALID_ITEM_ID` for an item id that contains `/` (a refused kind included), and the golden cases `check-item-id-*` and
+`test_item_id_with_a_slash_is_refused` pin it. The merged calc (T2, B-196) gives none: a trial run of an item `a/b` gave
+only the issues of its other rules, and T2's golden files hold no such case. The task changes no other rule of the check.
+Open, not built (spec §11 Q18): two terms of one `load_combination_set` item with the same item key (`case.case`,
+`case.case_type`, `case.step`) are not refused either; K3 speaks of two items, so the spec does not require it and no
+test pins either behaviour.
+
+**T15 FB005 and the block version** (amendment B-511; spec AC2, gate spec §4.8 A4). `.gate/forbidden.yml` line 16
+becomes `callables: [calc, CheckMeta, block, workflow, decision_point, rule]`; nothing else of FB005 changes. The first
+`test:` commit extends `test_version_keyword_of_versioned_callable` with `@block(..., version=1)`,
+`@workflow(..., version=1)`, `@decision_point(..., version=1)` and `@rule(..., version=1)` in a block and a rule module
+(not FB005), while a float, a positional or an expression `version` of them stays FB005; it fails at the base because
+the test reads the committed policy. Gate spec §4.8 A4 already says "initially" for its list and AC33a holds for any
+listed callable, so no gate document changes. `.gate/**` is protected (r3 floor): the pull request shows the
+awaiting-owner notice and the owner approves the policy change; T7, and through it T8, T9a and T9b, start after it.
+
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new (Hypothesis and pytest from plan 0001 T1).
@@ -545,16 +701,19 @@ T19a passes `host.reopened` in `build_ports`.
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
 | T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8b (difference report calc, split by B-458); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, the path rule of spec Q12 (a), owner decision OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
-| T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
+| T4, T4b | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8); T4b also the owner's answer to spec Q19 (amendment B-511) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation); plan 0002 T21 waits for T5, not T5 for T21: T5's `test_csi_read_state_tool.py` builds `HARNESS_KINDS.extend(CSI_KINDS)`, which `extend` refuses once T21 registers `CSI_KINDS`, so T21 adapts that line (amendment B-503) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
-| T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
+| T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4); T15 of this plan (FB005, amendment B-511) |
 | T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
-| T9 | plan 0001 T16b (promotion; B-499); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
+| T9a | plan 0002 T13 (analysis and design tools); plan 0006 T10 (engineer-turn labels) |
+| T9b | plan 0001 T16b (promotion; B-499); plan 0002 T15 (for the final unlock test) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 | T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
+| T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
+| T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
 
 ## 4. Verification
 
@@ -575,8 +734,8 @@ T19a passes `host.reopened` in `build_ports`.
 
 ## 5. Rollback
 
-Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 and T9 depend
-on T2 to T7). Until T9 merges, nothing registers the workflow (amendment B-417: `block.discover()` reads `workflows/__init__.py`,
-which T9 creates). Calcs, points, rules and blocks are versioned with lock
+Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8, T9a and T9b
+depend on T2 to T7). Until T9b merges, nothing registers the workflow (amendment B-417: `block.discover()` reads
+`workflows/__init__.py`, which T9b creates). Calcs, points, rules and blocks are versioned with lock
 files, so a fix after runs have been journaled is a new version; old journals keep replaying against the version they
 recorded (engine §4.2) or stop with `ReplayDivergence`, never silently.
