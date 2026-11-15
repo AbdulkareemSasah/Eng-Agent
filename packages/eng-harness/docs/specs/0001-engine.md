@@ -328,8 +328,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC37. Invariant 1: given a write on a model, then before the next read on that model, any approval, any calc or
   decision, and the block's return, a `check_model` step runs; errors raise `ModelIntegrityError`; no ctx argument or
   setting disables it; and over generated step programs every write is followed by a check before any of those steps.
-  Tests: `tests/workflow/test_invariants.py::test_check_after_write`,
-  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`.
+  A success envelope whose summary is not clean is such an error (amendment B-503, §4.6 row 1). Tests:
+  `tests/workflow/test_invariants.py::test_check_after_write`,
+  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`,
+  `tests/workflow/test_invariants.py::test_unclean_check_stops_run` (plan task T22).
 - AC38. Invariant 2: given a literal (number, quantity object or `Quantity`) for a parameter the ToolPort or CalcPort
   marks `engineering_quantity`, then `ContractError` `INVALID_ARGUMENT` with `field`, and no port call. Test:
   `tests/workflow/test_invariants.py::test_engineering_literal_rejected`.
@@ -958,7 +960,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 
 | # | Where and how | Raises | Tests |
 |---|---|---|---|
-| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
+| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag. Clean means a success envelope whose summary validates as the `CheckModelSummary` of `issues.model_check/1` with `clean` true; any other summary (an `error` issue such as `READBACK_MISMATCH` or `READBACK_UNAVAILABLE`, or a summary of another shape) fails the check as a failure envelope does: the step fails, `check_enforced` is `fail` and the flag stays set (amendment B-503) | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
 | 2 References for engineering quantities (P2) | `_invariants`, before the port call: every argument at a path in `ToolInfo.engineering_params` or `CalcInfo.engineering_params` must be a `Ref` or a result; a number, a quantity object or a `Quantity` is refused | `ContractError` `INVALID_ARGUMENT` with `field` (contract §5 step 2) | AC38 |
 | 3 No stale inputs | `_invariants`: every reference to `calc`, `decide`, `approve` is resolved with `eng_contract.refs.resolve_ref` and a `current_revision` that knows every model attached in the run (contract Q4). For `calc`, each argument's `RefRule` is `CalcInfo.ref_rules[path]` (the argument's field path); a path not listed gets the default `RefRule` (no kinds, no unit, `stale_ok` false), so `stale_ok` exists only where the calc declares it (spec 0003 §4.13). `decide` and `approve` use the default `RefRule` | `ContractError` `REF_STALE` (and the contract's other `REF_*` codes) | AC39 |
 | 4 Decisions cannot produce numbers (P10) | `_decide`: options must be a `StrEnum` subclass or a sequence of `Ref`; the answer must be a member value or an index into the sequence; the block receives the member or the `Ref` | `BlockRuleViolation` (options), `DecisionInvalid` (answer) | AC40 |
