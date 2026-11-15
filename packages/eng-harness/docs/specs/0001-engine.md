@@ -534,8 +534,9 @@ standard library, `pydantic`, `eng_contract._unit_table` and `eng_contract.error
 `eng_harness.kinds.edit_cycle` also runs `eng_harness/kinds/__init__.py`; as for `FieldSpec` below, that is a run-time
 load, not an import statement of block code.
 
-**Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix).** `eng_harness.block` exports
-`FieldSpec` (§4.2) by importing it from `eng_harness.basis._fields`, never from the package `eng_harness.basis`. That
+**Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix; amendment B-511).**
+`eng_harness.block` exports `FieldSpec` (§4.2) from `eng_harness.basis._fields`, never from the package
+`eng_harness.basis`. That
 module imports only the standard library, `eng_contract` and `pydantic` (spec 0004 §4.1) and must keep doing so, so
 the import statements reachable from `eng_harness.block` gain no `eng_harness.basis` package, `eng_harness.templates`,
 `eng_harness.ports` or `eng_harness.journal`. This keeps spec 0005 AC42: its test
@@ -548,8 +549,12 @@ function would be found as well). The import of a private module is allowed beca
 gains one name, `FieldSpec`, a frozen data model with no I/O method, and still may not import `eng_harness.basis`.
 When Python loads `eng_harness.basis._fields` it also runs the package `eng_harness/basis/__init__.py`; that is a
 run-time load, not an import statement of block code, and Invariant 1's guard (§4.6) acts on the operations block
-code performs, not on which modules are loaded. No import cycle arises: `eng_harness.basis._fields` imports no
-`eng_harness` module. T6 of plan 0007 runs the AC42 test unchanged (EC4).
+code performs, not on which modules are loaded. That load runs `basis/_port.py`, which imports `eng_harness.ports`,
+whose chain reaches `eng_harness.decisions` and `decisions/_points.py`, which imports `eng_harness.block`: a
+module-level import of `eng_harness.basis._fields` in `block.py` is an import cycle (amendment B-511, shown on
+`build/v1`). So `block.py` exposes `FieldSpec` through a `TYPE_CHECKING` import and a module-level `__getattr__` that
+imports it on first use, and imports `check_declaration` inside `workflow()`. T6 of plan 0007 runs the AC42 test
+unchanged (EC4).
 
 ### 4.2 Blocks, workflows and the registry
 
@@ -658,7 +663,7 @@ options **[added: 11 §3 writes `**args`]**.
 | attempts | `attempts(limit: BasisCount) -> AsyncIterator[Attempt]` (use: `async for a in ctx.attempts(...)`) | `attempts`; scope |
 | escalate | `escalate(reason: str, evidence: Sequence[Ref]) -> NoReturn` | `escalate` |
 | promote | `promote(model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle` **[added]** | `promote`; write |
-| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E` | not a step (the basis is frozen and in the run header) |
+| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E`, `record_ref() -> Ref` (the reference `res_<id>` to the whole `basis.design_basis/1` result, for a calc input `basis`, spec 0003 §4.4; it reads no path and needs no declaration; amendment B-511, plan 0007 T6, criterion spec 0007 AC33) | not a step (the basis is frozen and in the run header) |
 
 Result types (frozen Pydantic models): `ToolResult` (`tool`, `ref: Ref`, `summary: Mapping[str, SummaryValue]`,
 `warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`), where `SummaryValue` is a JSON
@@ -1366,7 +1371,7 @@ The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload
 | Q27 | B-349: what the host-state check compares a model with when a write on it completed (not reconciled) after its last save | Owner | Draft decision B-427, owner queue: the latest completed or reconciled-`applied` result's `provenance.host`, as for a reconciled write (§4.5.4; AC34 amended to match) |
 | Q28 | B-349: the contract's `HostInfo` has no fingerprint, and `Precondition` has `model_open`, not `model_loaded` | Owner | Draft decision B-427, owner queue: against a result compare identity and revision only, and use `model_open`; no contract change (§4.5.4, §4.8; AC34 amended to match) |
 | Q29 | B-349: who refuses a step when `locate` returns `None`, where `first_use` `model_bound` lands, and which models resume step 6 covers | Owner | Draft decision B-427, owner queue: engine plan T13b (amendment B-454) refuses (`PRECONDITION_FAILED`, `model_open`), moves the seam so `model_bound` lands before `step_started`, and covers every model the journal addressed (§4.5.1, §4.8) |
-| Q30 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which imports it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
+| Q30 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which takes it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, through a `TYPE_CHECKING` import and a module-level `__getattr__`, because a module-level import is an import cycle, amendment B-511, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
 | Q31 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
 | Q32 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
 | Q33 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |

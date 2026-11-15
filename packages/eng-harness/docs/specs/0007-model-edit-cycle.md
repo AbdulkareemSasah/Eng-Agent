@@ -70,7 +70,8 @@ defines its method; values are synthetic and say so.
   `block.discover()` (§4.2; amendment B-417). Tests:
   `tests/unit/edit_cycle/test_definition.py::test_workflow_definition`, `::test_workflow_registered`.
 - AC2. Given the workflow, rule and point modules, then they import only what engine §4.1.2 allows, hold no numeric
-  literal (only integer indexes and `len` comparisons, OQ-Q11), no `while` and no I/O. Test:
+  literal (only integer indexes and `len` comparisons, OQ-Q11, and the integer `version=` of `workflow`, `block`,
+  `decision_point` and `rule`, gate spec §4.8 A4; amendment B-511), no `while` and no I/O. Test:
   `tests/rules/test_edit_cycle_modules.py::test_modules_follow_block_rules`.
 
 - AC33. Given the engine amendments of §11 (Q2, Q3, Q5, spec 0004 Q7), then: a workflow with `copy_on_open` gets its
@@ -81,7 +82,9 @@ defines its method; values are synthetic and say so.
   `::test_mode_resolved_approval_not_always_ask`, `::test_required_basis_from_fields`; and a save passed `under=` an
   approval is re-checked against the binding like a write and its result is the expected state of the next write under
   that approval, as is each engine `p~post.save`, and a save to a new file gets no `approve_each_write` preview (Q3).
-  Tests: `::test_save_under_approval_keeps_chain`, `::test_revision_save_no_write_preview`. Amendment B-415: the cases
+  Tests: `::test_save_under_approval_keeps_chain`, `::test_revision_save_no_write_preview`. And `ctx.basis.record_ref()`
+  is the reference `res_<id>` to the run's whole `basis.design_basis/1` result, given with no declared path (engine
+  §4.3.2; amendment B-511). Test: `::test_basis_view_record_ref`. Amendment B-415: the cases
   each test checks are engine spec 0001 §3.9 rules EC1 to EC6, which add no engine criterion; this criterion covers
   them.
 
@@ -193,8 +196,8 @@ defines its method; values are synthetic and say so.
 
 ### 3.4 Acceptance support (18 §5)
 
-- AC25. (A3) Given any journal of this workflow, when `audit_value_sources` runs, then it reports every write step
-  argument at an engineering parameter that is not a reference to `basis.design_basis/1` or `basis.engineer_input/1`;
+- AC25. (A3) Given any journal of this workflow and the engineering parameter names per tool (§4.9), when
+  `audit_value_sources` runs, then it reports every write step argument at an engineering parameter that is not a reference to `basis.design_basis/1` or `basis.engineer_input/1`;
   it reports nothing for every workflow test journal, reports a forged literal, and holds over generated change sets.
   Tests: `tests/unit/edit_cycle/test_audit.py::test_audit_finds_literal`,
   `tests/property/test_edit_cycle_sources.py::test_generated_change_sets_all_sourced`.
@@ -211,7 +214,8 @@ defines its method; values are synthetic and say so.
 - AC35. (A3, A7 on real journals; B-354) Given the module entry point `python -m eng_harness.report` (run from the
   workspace root as `uv run --package eng-harness python -m eng_harness.report ...`, spec 0006 §4.1) with the
   subcommand `audit-sources RUN_DIR` or `count-prompts RUN_DIR` (and `--json`), then it opens the run folder read-only
-  through `JournalReader` and the run's result store, calls `audit_value_sources` or `count_prompts` on it and prints
+  through `JournalReader` and the run's result store, calls `audit_value_sources` (with the CSI adapter's engineering
+  parameter names, §4.9; amendment B-511) or `count_prompts` on it and prints
   the result (one line per finding with the step path, tool and argument; one line per cycle with its count and the
   counted requests by kind and title; `--json` one JSON object), data-derived text sanitized as in spec 0006 AC21; the
   exit code is 0 (`audit-sources` with no finding; `count-prompts` always, because the A7 bound depends on the path,
@@ -398,7 +402,12 @@ another item's (amendment B-498).
 #### 4.4.3 `harness.host_design_verdicts` v1
 
 Maps `harness.csi_design_results/1` (spec 0002 §4.6.1 step 13, raw host output) to `verdicts.set/1` with
-`source: host`, so spec 0003's design summary can read it (resolves the spec 0003 Q7 conflict, §11 C4). Steel: one
+`source: host`, so spec 0003's design summary can read it (resolves the spec 0003 Q7 conflict, §11 C4). A calc cannot
+output `verdicts.set/1` (spec 0003 AC1; contract §4.10.1), so the output kind is open (§11 Q19; amendment B-511).
+Input: `results` (`harness.csi_design_results/1`), `kind` (`steel` or `concrete`, the `kind` argument of the step 13
+`csi_design_results` call), `basis` (`limits.ratio_limit_ratio`). One verdict per row: `source: host`, `check_id`
+`host.<kind>_design_ratio`, `code` `host_<kind>_design` (both recommendations for the owner, with Q19), `subject`
+`{kind: frame, id: row["frame"], case: row["combo"]}` (amendment B-511). Steel: one
 verdict per frame with the host's ratio and `ratio_limit` from the basis (`limits.ratio_limit_ratio`); the status is the
 contract's (`PASS` when the ratio is at most the limit, else `FAIL`, contract §4.9.1), computed by comparison only.
 Concrete: the host reply holds beam design output without a single ratio (S-12 §1 step 13), so every concrete frame
@@ -416,7 +425,8 @@ unclassified messages or drifts above the limit, `FAIL` on error messages). The 
 
 ### 4.5 Steps as ctx calls
 
-Notation: `m` is the model handle, `B` the basis view, `k` the cycle index. Steps run in the child blocks of §4.1, so
+Notation: `m` is the model handle, `B` the basis view, `k` the cycle index; every calc's `basis` input is
+`B.record_ref()`, the whole basis record (spec 0003 §4.4, engine §4.3.2; amendment B-511). Steps run in the child blocks of §4.1, so
 paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever the block does.
 
 | # | Calls | Checks the engine enforces |
@@ -425,7 +435,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 2 | `ctx.tool("csi_open_model", {"model": inp.model})` on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
 | — | `async for c in ctx.attempts(B.count("attempts.cycles"))`: one `ctx.block(edit_cycle_once, ...)` per cycle | Bounded loop; exhaustion escalates |
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
-| 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.ref(...)})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
+| 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.record_ref()})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
 | 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty. Then, before any write, `ctx.calc("harness.expected_effects", ...)` with the accepted item ids (none when skipped) | Binding to the model state (engine §4.9); single use |
 | 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
@@ -435,7 +445,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
 | 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", ...), ctx.tool("csi_design_results", ...))` (reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
-| 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; `ctx.calc("harness.host_design_verdicts", ...)`, `ctx.calc("harness.design_summary", {"verdicts", "frames", "previous": <cycle k-1>, "basis"})` | Invariant 3 |
+| 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; `ctx.calc("harness.host_design_verdicts", {"results", "kind", "basis"})` per design kind, `ctx.calc("harness.design_summary", {"verdicts", "frames", "previous": <cycle k-1>, "basis"})` | Invariant 3 |
 | 15 | `ctx.decide("edit_cycle_engineer_turn", EngineerTurn, TurnState(...), rules=(), policy=require_engineer)` | Invariant 4; the choice is on the page only (spec 0006 AC46) |
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
 | 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
@@ -573,6 +583,10 @@ the journal sufficient for B-1:
 - the report shows them in its timings section, and `report` also writes `report/cycle-timings.json` (base names
   only) for the owner's B-1 sheet.
 
+`audit_value_sources(reader, store, engineering_params)` takes `engineering_params: Mapping[str, frozenset[str]]`, per
+tool the parameter names that `ToolInfo.engineering_params` gives (the journal does not record them); the entry point
+of AC35 fills it from the CSI adapter's allowlist and argument models (amendment B-511).
+
 `count_prompts` counts, per cycle, every `input_requested`, `approval_requested` and engineer-decided decision request
 except the first step 6 approval of the cycle, the first change-set request of the cycle and the engineer turn. A
 repeated step 6 approval (after `ApprovalVoid` or `restore_previous`), a re-asked change set, an engine request
@@ -701,16 +715,17 @@ start at version 1 with lock entries.
 | Q9 | OQ-Q4: the v1 edit-kind list (WS §3.1) | Owner | Confirm; seismic parameters wait for a Sasaah tool (OQ-G8) |
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `edit_cycle_analysis_messages.clean` (an unknown message must not pass silently) |
 | Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule was lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) decided by the owner (OQ-Q44, amendment B-463): the last path segment may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464) before plan 0007 T2 and T8; (b), (c) and (d) done by amendment B-467, a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it (listed by B-467, not edited); all before plan 0003 T8b and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
-| Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
+| Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9 (T9b since B-511); plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
 | Q14 | **[added: B-503]** Engine invariant 1 stops on a `check_model` whose summary is not clean (engine §4.6 row 1, engine plan T22): at step 9 the inserted check before the S' read raises `ModelIntegrityError` on a `READBACK_MISMATCH`, so `harness.readback_check` and D-2 never see that write; the CSI `check_model` clears its written items even when the result is not clean, so the check that invariant 1 inserts before D-2 (a `decide`) passes on the tolerance-free checks alone | Owner | Writer's recommendation: the step 9 block catches `ModelIntegrityError` from the inserted check and opens D-2 with the reason `check_model_failed` and the stored `issues.model_check/1` result (the error's evidence) as evidence, so `restore_previous` works as for a read-back `FAIL` (AC17); the clearing stays, because a check that kept the items would stop D-2 itself. Until answered, plan T8 adds no routing: the stop escalates like any `StepError`, and AC17 is tested with a read-back `FAIL` that `check_model` does not see |
 | Q15 | **[added: B-503]** `load_combination_set` on a new combination is an `add` of the whole object, and spec 0003 §4.8 R2 compares an `add` leaf by leaf, list items index by index (D5); the after read set keeps the host's order (spec 0003 §4.6 F2 orders lists only inside the fingerprint), so a host that lists the items in another order gives a false `mismatch` | Owner | Writer's recommendation: spec 0003 §4.8 R2 matches the items of a keyed nested list (combination `items`, D2 key) by key, not by index, for an `add` as R3 and D2 already do; until then plan T3 keeps the change set's item order and no test pins another |
 | Q16 | **[added: B-503]** The model identity and revision of the working file that `restore_previous` opens (§4.5.1): ADR-0032 rule 3 and the merged `IdentityStore.resolve` give a file whose content is known at a new path a new model id `derived_from` the older one, which would break the binding of the model (no `model_bound` at a restore) and the staleness of its references | Owner | Writer's recommendation: the restored file keeps the bound model's id and becomes its next revision (`IdentityStore.record_save` on the new path), since it is the same model in the same run; ADR-0032 to say so for a restore. Interim reading for plan T13 until answered |
-| Q17 | **[added: B-503]** Whether the change-set model moves to a kinds-level module before plan T9 merges: it enters the content hash of the R1 edit-cycle calcs (spec 0003 §4.3, B-493) while its risk floor in §4.1 is block code; importing it runs `workflows/__init__.py`, which from T9 imports the shipped blocks; and plan 0013's calcs would import from a private module | Owner | Writer's recommendation: move `ChangeSetDraft` and its item and value models to a public kinds-level module under `eng_harness.kinds` (risk floor R2, as `kinds/edit_cycle.py`) before T9 merges, admit it in spec 0003 §4.3 in place of `_change_set`, and accept the one-time hash change of the calcs that import it (verification again, process/10 §5) |
+| Q17 | **[added: B-503]** Whether the change-set model moves to a kinds-level module before plan T9b merges: it enters the content hash of the R1 edit-cycle calcs (spec 0003 §4.3, B-493) while its risk floor in §4.1 is block code; importing it runs `workflows/__init__.py`, which from T9 imports the shipped blocks; and plan 0013's calcs would import from a private module | Owner | Writer's recommendation: move `ChangeSetDraft` and its item and value models to a public kinds-level module under `eng_harness.kinds` (risk floor R2, as `kinds/edit_cycle.py`) before T9 merges, admit it in spec 0003 §4.3 in place of `_change_set`, and accept the one-time hash change of the calcs that import it (verification again, process/10 §5) |
 | Q18 | **[added: B-513]** K3 (§4.4.1) refuses two items on one target and property and an item id with `/`, but says nothing of two terms of one `load_combination_set` item that have the same D2 item key (`case.case`, `case.case_type`, `case.step`); the merged check passes such an item without an issue | Owner | Decide whether K3 extends to the terms of one item and with which issue code (a golden case and a version rule of spec 0003 §4.2 follow). Until answered nothing refuses it and no test pins either behaviour; plan T14 builds only the item id rule |
+| Q19 | **[added: B-511]** `harness.host_design_verdicts` (§4.4.3) cannot output `verdicts.set/1`: the calc registry refuses an output kind outside the `harness.` family (spec 0003 AC1, AC47; contract §4.10.1 refuses a calc kind in a neutral family), and the calc port stores the body with `calc`, `draft` and `trace`, which the extra-forbidding `verdicts.set/1` model refuses; the merged design summary (spec 0003 §4.9) takes only a `verdicts.set/1` reference | Owner | Writer's recommendation: (a) a kind `harness.host_design_verdicts/1` in `kinds/edit_cycle.py` holding the verdict set's members plus the calc port's `calc`, `draft` and `trace`, which spec 0003 §4.9 `SummaryInput.verdicts` also accepts (the draft design summary's hash changes and its verification follows, spec 0003 §4.5), because it keeps contract §4.10.1 and spec 0003 AC1; the alternative (b) is a calc port that stores a neutral output kind without those members (contract §4.10.1, spec 0003 AC1 and AC47 change). The `check_id` and `code` values of §4.4.3 are decided with it. Interim reading for plan T4 and T4b until answered: T4 builds `harness.analysis_summary` alone and T4b waits for the answer |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |
-| C4 | Spec 0002 stores design results raw; spec 0003's summary needs `verdicts.set/1` | Owner | `harness.host_design_verdicts` (§4.4.3) |
+| C4 | Spec 0002 stores design results raw; spec 0003's summary needs `verdicts.set/1` | Owner | `harness.host_design_verdicts` (§4.4.3); its output kind is Q19 |
 | EC-G1 | Edit kinds refused in v1: H-G1, H-G2, H-G3, OQ-G8, CG-1 | Owner | Project lane or Sasaah changes; tests expect `NOT_IMPLEMENTED` (AC6) |
 | EC-G2 | Concrete design output has no single ratio; verdicts are `NEEDS_ENGINEER` | Owner | Map after the local test shows the reply fields; until then the engineer reads the host's concrete design |
 | EC-G3 | Analysis message severity is not known from the sources | Owner | Every message `unclassified` until the local test confirms the table's columns |
