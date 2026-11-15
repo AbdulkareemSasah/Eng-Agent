@@ -318,8 +318,11 @@ async def _checked(ctx: Any, inp: ChainInput) -> ChainOutput:
 
 
 def _meta_run_id(run_dir: Path) -> str:
-    with sqlite3.connect(run_dir / "journal.sqlite") as db:
+    db = sqlite3.connect(run_dir / "journal.sqlite")
+    try:
         return str(db.execute("SELECT value FROM meta WHERE key = 'run_id'").fetchone()[0])
+    finally:
+        db.close()
 
 
 def _tree(root: Path) -> list[str]:
