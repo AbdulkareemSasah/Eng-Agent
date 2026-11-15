@@ -1115,3 +1115,64 @@ def test_redaction_skip(tmp_path: Path) -> None:
         assert [x.outcome for x in sent.suggestions] == ["shadow", "shadow"]
         assert [r.state for r in model.requests] == [{"note": "Plain note", "cover_mm": 50}]
         assert len(llm.requests) == 1
+
+
+def test_accepted_tier_ends_the_cascade(tmp_path: Path) -> None:
+    """Tier 3 is asked only when tier 2 is not accepted; 1.0 and 0.0 are valid ratios; a given choice asks no one."""
+    model = FakeDecisionProvider(
+        choices=[ChoiceAnswer(choice="enlarge", confidence=1.0), ChoiceAnswer(choice="enlarge", confidence=0.0)]
+    )
+    llm = FakeLLMProvider(answers=[GOOD])
+    cascade, _ = _setup(tmp_path, settings=RELEASED, model=model, llm=llm)
+    taken = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(1))))
+    assert (taken.decided_by, taken.confidence, llm.requests) == (MODEL_BY, 1.0, [])
+    went_on = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(2))))
+    assert went_on.decided_by == LLM_BY
+    assert _core(went_on.suggestions[0]) == (
+        2,
+        MODEL_BY,
+        "below_threshold",
+        "enlarge",
+        0.0,
+        None,
+        False,
+        None,
+    )
+    assert len(llm.requests) == 1
+    # an engineer's choice that arrives without a stored request is answered, and no provider is asked
+    answer = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(3), choice=_answer("rebar"))))
+    assert answer.decided_by == "engineer:Engineer One"
+    assert (len(model.requests), len(llm.requests)) == (2, 1)
+
+
+def test_providers_get_reference_options_and_each_timeout(tmp_path: Path) -> None:
+    """Reference options reach a provider with their labels and no `Ref` field; each tier has its own timeout."""
+    model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="1", confidence=0.9)])
+    cascade, _ = _setup(
+        tmp_path / "refs", settings=DecisionSettings(shadow_released={"pick_member": RELEASE}), model=model
+    )
+    assert _decided(_decide(cascade, _call(point=MEMBER, policy=LIVE))).choice == "1"
+    assert model.requests[0].options == (
+        ProviderOption(value="0", label="Column C1"),
+        ProviderOption(value="1", label="Column C2"),
+    )
+    assert model.requests[0].state == {"members": ["Column C1", "Column C2"]}
+    # the model's timeout does not bound tier 3, and the language model's does not bound tier 2
+    cascade, _ = _setup(tmp_path / "slow", settings=RELEASED, llm=FakeLLMProvider(answers=[GOOD], delay_s=0.05))
+    slow = DecisionPolicy(llm=True, shadow=False, timeout_ms_model=1)
+    assert _decided(_decide(cascade, _call(policy=slow))).decided_by == LLM_BY
+    cascade, _ = _setup(tmp_path / "stuck", settings=RELEASED, llm=FakeLLMProvider(answers=[GOOD], delay_s=5.0))
+    stuck = DecisionPolicy(llm=True, shadow=False, timeout_ms_llm=1)
+    [item] = _pending(_decide(cascade, _call(policy=stuck))).screen.items
+    assert item.suggestions == (_suggestion(3, "timeout", error="TimeoutError"),)
+
+
+def test_local_only_skip_comes_before_the_redaction_skip(tmp_path: Path) -> None:
+    """A provider that may not be used at all is recorded as `skipped_local_only`, whatever the state holds."""
+    remote = FakeDecisionProvider(info=REMOTE)
+    settings = DecisionSettings(local_only=True, sensitive_values=("zeta tower",))
+    cascade, _ = _setup(tmp_path, settings=settings, model=remote)
+    noted = Noted(note="Zeta Tower east", cover_mm=50)
+    [item] = _pending(_decide(cascade, _call(point=NOTED, state=noted))).screen.items
+    assert [(x.by, x.outcome) for x in item.suggestions] == [("model:remote/big@2", "skipped_local_only")]
+    assert remote.requests == []
