@@ -152,13 +152,15 @@ def test_promotion_without_a_saved_working_copy_shows_the_binding_only(rig: Call
 
 def test_the_builders_are_the_three_kinds_of_this_task(rig: Callable[[], Rig]) -> None:
     r = rig()
-    assert set(approval_screens(r.store, lambda: JournalReader(r.engine.run_dir))) == {"change_set", "promotion", "info"}
+    assert set(approval_screens(r.store, lambda: JournalReader(r.engine.run_dir))) == {
+        "change_set",
+        "promotion",
+        "info",
+    }
 
 
 @pytest.mark.parametrize("item_id", ["bad id", "has:colon", "x" * 58])
-def test_change_set_with_an_id_that_is_no_field_name_is_a_refusal_screen(
-    rig: Callable[[], Rig], item_id: str
-) -> None:
+def test_change_set_with_an_id_that_is_no_field_name_is_a_refusal_screen(rig: Callable[[], Rig], item_id: str) -> None:
     r = rig()
     html = r.render(r.request("change_set", [_item(item_id, "x")]))
     assert "damaged" in html
