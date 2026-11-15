@@ -123,8 +123,9 @@ class PageHub:
         body.append(el(Tag.H2, trusted("Open requests")))
         return page(HTTPStatus.OK, trusted("Run"), [*body, el(Tag.UL, *rows) if rows else el(Tag.P, trusted("None"))])
 
-    def screen(self, kind: Kind, subject_id: str) -> Screen | None:
-        """The screen of an open request (its kind's builder, else a refusal screen), or the basis screen."""
+    def screen(self, kind: Kind, subject_id: str, *, answering: bool = False) -> Screen | None:
+        """The screen of an open request (its kind's builder, else a refusal screen), or the basis screen. A recorded
+        request has none, except for `answering`: its form token still binds, and `submit` refuses with 409 (AC30)."""
         if kind == "setup":
             return self._setup(subject_id)
         with self._cond:
@@ -142,7 +143,7 @@ class PageHub:
             return Screen(
                 trusted("Voided"), Subject("approval", subject_id, bound_sha256(request)), frozenset(), lambda _: body
             )
-        if entry.recorded:
+        if entry.recorded and not answering:
             return None
         if (builder := self._builders.get(request.kind)) is not None:
             return builder(self, request)
