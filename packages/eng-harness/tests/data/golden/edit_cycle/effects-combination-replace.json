@@ -1,0 +1,383 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 load_combination_set: replace of an existing combination per item key, add of a new combination",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. State: patterns DEAD, LIVE, WIND; combination COMB1 (linear_add) with items (DEAD, load_pattern) 1, (LIVE, load_pattern) 1, (ENV1, load_combination, step Max) 1, (ENV1, load_combination, step Min) 1; combination ENV1 (envelope) with (DEAD, load_pattern) 1. e1 replaces COMB1 as type envelope with terms (DEAD, load_pattern) 2, (WIND, load_pattern) 0.5, (ENV1, load_combination, Max) 1. The combination is in the state: a `set` of /type on [combinations, COMB1] (value envelope). Each term is matched to the state's items by the D2 item key (case, case_type, step; a null step is left out): DEAD/load_pattern is held, so a `set` of /scale_ratio 2 on [combinations, COMB1, items, DEAD, load_pattern]; WIND/load_pattern is not held, so an `add` of the whole item {case {case WIND, case_type load_pattern, step null}, scale_ratio 0.5}; ENV1/load_combination/Max is held with scale 1, so a `set` of /scale_ratio 1 (a no-op write). The held keys the set leaves out, LIVE/load_pattern and ENV1/load_combination/Min, are `remove`. The pattern DEAD and the combination ENV1 are not confused with any other key because case_type and step are part of the key. Sorted by key member by member (a key before every longer key it begins; DEAD < ENV1 < LIVE < WIND; Max < Min): type, DEAD, ENV1 Max, ENV1 Min, LIVE, WIND: ids e1/1 to e1/6. e2 defines the new combination COMB2 (linear_add) of (DEAD, load_pattern) 1 and (LIVE, load_pattern) 0.5: the state lacks it, so one `add` of the whole object, items in the change set's order (spec 0007 Q15, open); its key sorts after every COMB1 key, and it keeps the id e2.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "e1",
+          "kind": "load_combination_set",
+          "targets": [
+            "COMB1"
+          ],
+          "values": [
+            {
+              "pointer": "/items/0/scale_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/items/0/scale",
+              "unit": "1"
+            },
+            {
+              "pointer": "/items/1/scale_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/items/1/scale",
+              "unit": "1"
+            },
+            {
+              "pointer": "/items/2/scale_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/items/2/scale",
+              "unit": "1"
+            }
+          ]
+        },
+        {
+          "item_id": "e2",
+          "kind": "load_combination_set",
+          "targets": [
+            "COMB2"
+          ],
+          "values": [
+            {
+              "pointer": "/items/0/scale_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/1/items/0/scale",
+              "unit": "1"
+            },
+            {
+              "pointer": "/items/1/scale_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/1/items/1/scale",
+              "unit": "1"
+            }
+          ]
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "e1",
+      "e2"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "e1",
+          "kind": "load_combination_set",
+          "name": "COMB1",
+          "type": "envelope",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern"
+              },
+              "scale": {
+                "source": "input",
+                "value": 2.0,
+                "unit": "1"
+              }
+            },
+            {
+              "case": {
+                "case": "WIND",
+                "case_type": "load_pattern"
+              },
+              "scale": {
+                "source": "input",
+                "value": 0.5,
+                "unit": "1"
+              }
+            },
+            {
+              "case": {
+                "case": "ENV1",
+                "case_type": "load_combination",
+                "step": "Max"
+              },
+              "scale": {
+                "source": "input",
+                "value": 1.0,
+                "unit": "1"
+              }
+            }
+          ]
+        },
+        {
+          "id": "e2",
+          "kind": "load_combination_set",
+          "name": "COMB2",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern"
+              },
+              "scale": {
+                "source": "input",
+                "value": 1.0,
+                "unit": "1"
+              }
+            },
+            {
+              "case": {
+                "case": "LIVE",
+                "case_type": "load_pattern"
+              },
+              "scale": {
+                "source": "input",
+                "value": 0.5,
+                "unit": "1"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [
+        {
+          "name": "DEAD",
+          "type": "dead",
+          "self_weight_ratio": 1.0
+        },
+        {
+          "name": "LIVE",
+          "type": "live",
+          "self_weight_ratio": 0.0
+        },
+        {
+          "name": "WIND",
+          "type": "wind",
+          "self_weight_ratio": 0.0
+        }
+      ],
+      "combinations": [
+        {
+          "name": "COMB1",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            },
+            {
+              "case": {
+                "case": "LIVE",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            },
+            {
+              "case": {
+                "case": "ENV1",
+                "case_type": "load_combination",
+                "step": "Max"
+              },
+              "scale_ratio": 1.0
+            },
+            {
+              "case": {
+                "case": "ENV1",
+                "case_type": "load_combination",
+                "step": "Min"
+              },
+              "scale_ratio": 1.0
+            }
+          ]
+        },
+        {
+          "name": "ENV1",
+          "type": "envelope",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            }
+          ]
+        }
+      ],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {}
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "e1/1",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1"
+        ],
+        "op": "set",
+        "pointer": "/type",
+        "value": "envelope",
+        "unit": null
+      },
+      {
+        "item_id": "e1/2",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1",
+          "items",
+          "DEAD",
+          "load_pattern"
+        ],
+        "op": "set",
+        "pointer": "/scale_ratio",
+        "value": 2.0,
+        "unit": "1"
+      },
+      {
+        "item_id": "e1/3",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1",
+          "items",
+          "ENV1",
+          "load_combination",
+          "Max"
+        ],
+        "op": "set",
+        "pointer": "/scale_ratio",
+        "value": 1.0,
+        "unit": "1"
+      },
+      {
+        "item_id": "e1/4",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1",
+          "items",
+          "ENV1",
+          "load_combination",
+          "Min"
+        ],
+        "op": "remove",
+        "pointer": null,
+        "value": null,
+        "unit": null
+      },
+      {
+        "item_id": "e1/5",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1",
+          "items",
+          "LIVE",
+          "load_pattern"
+        ],
+        "op": "remove",
+        "pointer": null,
+        "value": null,
+        "unit": null
+      },
+      {
+        "item_id": "e1/6",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB1",
+          "items",
+          "WIND",
+          "load_pattern"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "case": {
+            "case": "WIND",
+            "case_type": "load_pattern",
+            "step": null
+          },
+          "scale_ratio": 0.5
+        },
+        "unit": null
+      },
+      {
+        "item_id": "e2",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB2"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "name": "COMB2",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            },
+            {
+              "case": {
+                "case": "LIVE",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 0.5
+            }
+          ]
+        },
+        "unit": null
+      }
+    ]
+  }
+}
