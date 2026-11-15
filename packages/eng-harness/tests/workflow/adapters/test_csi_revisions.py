@@ -432,7 +432,7 @@ def test_record_is_written_through_a_temporary_file_in_new_folders(
         swaps.append((Path(source).name, Path(destination).name))
         real(source, destination)
 
-    monkeypatch.setattr(_revisions.os, "replace", replace)
+    monkeypatch.setattr(os, "replace", replace)
     revisions = _revisions.Revisions(folder, record)
     revisions.snapshot(work, revisions.target(work))
     assert swaps == [("revisions.json.tmp", "revisions.json")]
