@@ -80,9 +80,13 @@ def inserted_path(base: str, phase: Literal["pre", "post", "end", "host"], kind:
 def resume_path(number: int, kind: str, key: str) -> str:
     """Path `@resume<number>.<kind>.<key>` of a housekeeping step of a resume (never replayed).
 
+    A `key` outside the grammar of a path key (a model key that is a file path) takes its hash form, spec 4.3.1.
+
     Raises:
         ValueError: the result does not fit the grammar.
     """
+    if re.fullmatch(_KEY, key) is None:
+        key = "h" + hashlib.sha256(key.encode()).hexdigest()[:12]
     return validate_path(f"@resume{number}.{kind}.{key}")
 
 

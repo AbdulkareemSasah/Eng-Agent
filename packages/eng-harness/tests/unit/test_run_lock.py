@@ -24,7 +24,7 @@ from pydantic import BaseModel, JsonValue
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, workflow
-from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest, RunStatus
+from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunOutcome, RunRequest, RunStatus
 from eng_harness.errors import HarnessCode, RunLocked
 from eng_harness.journal import EventType, JournalReader, is_locked
 from eng_harness.ports import HostInstance, RunClass, ToolInfo
@@ -151,7 +151,8 @@ def make_engine(root: Path) -> tuple[Engine, WatchingHost, Path]:
 
 def start(engine: Engine) -> Coroutine[Any, Any, RunOutcome]:
     """Start the run of the test workflow; the awaitable is run by `asyncio.run`."""
-    return engine.start(RunRequest(workflow="one_write", input={}, basis_ref=BASIS_REF, run_class=RunClass.PRODUCTION))
+    run = RunRequest(workflow="one_write", input={}, basis_ref=BASIS_REF, run_class=RunClass.PRODUCTION)
+    return engine.start(run.model_copy(update={"mode": PermissionMode.AUTONOMOUS_LOGGED}))
 
 
 def test_one_engine_per_run(tmp_path: Path) -> None:

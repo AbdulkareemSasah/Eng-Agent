@@ -35,7 +35,7 @@ from workflows.hoststate import (
     start,
     trace,
 )
-from workflows.rig import Rig, make_rig, request
+from workflows.rig import Rig, asking, make_rig
 
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
@@ -405,7 +405,7 @@ def test_approval_in_flight_is_presented_again_not_reconciled(tmp_path: Path) ->
         return []
 
     engine = rig.engine(flow(body))
-    run_id = asyncio.run(engine.start(request())).run_id
+    run_id = asyncio.run(engine.start(asking())).run_id
     rid, args = request_id(run_id, "0"), shown.model_dump(mode="json", by_alias=True)
     resolved = ev.ApprovalResolved(
         request_id=rid, shown_sha256=rig.approvals.presented[-1].shown_sha256, decision="approve",

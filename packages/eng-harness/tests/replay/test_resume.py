@@ -16,7 +16,7 @@ from fakes.ports import failure
 from pydantic import BaseModel
 from workflows.chain import ChainOutput, chain
 from workflows.ctx_flows import answer, change_set, flow, need_approval, reply, request_id
-from workflows.rig import Rig, hold_lock, make_rig, request, steps, watch_closing
+from workflows.rig import Rig, asking, hold_lock, make_rig, request, steps, watch_closing
 
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
@@ -333,7 +333,7 @@ def test_pending_requests_represented(tmp_path: Path) -> None:
         return [(await ctx.ask(Size, title="Size")).ref.ref]
 
     engine = rig.engine(flow(body))
-    run_id = asyncio.run(engine.start(request())).run_id
+    run_id = asyncio.run(engine.start(asking())).run_id
     apr = request_id(run_id, "0")
     ask = "ask_" + hashlib.sha256(f"{run_id}\n1".encode()).hexdigest()[:32]
     first = rig.approvals.presented[-1]

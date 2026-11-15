@@ -209,7 +209,7 @@
    "kind": "impl",
    "title": "Crash-matrix replay suite with a worker process",
    "branch": "feat/b118-harness-et19-crash-matrix-replay-suite",
-   "prTitle": "feat(eng-harness): crash-matrix replay suite with a worker process (B-118)",
+   "prTitle": "test(eng-harness): crash-matrix replay suite with a worker process (B-118)",
    "risk": "r1, r2, r3",
    "pending_deps": [
     "E.T13",
@@ -221,7 +221,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-509 (pull request 354): T19 is a test-only change: pull request title type `test`, one `test:` commit, test files only, no CHANGELOG line."
+   ]
   },
   {
    "id": "B-350",
@@ -832,7 +835,7 @@
    "planTask": "T10",
    "kind": "impl",
    "title": "Calc 4, design results summary",
-   "branch": "feat/b149-harness-ct10-calc-4-design-results",
+   "branch": "feat/b149-harness-ct10-calc-4-design-results-r2",
    "prTitle": "feat(eng-harness): calc 4, design results summary (B-149)",
    "risk": "r1, r2, r3",
    "pending_deps": [
@@ -845,7 +848,10 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "Rebuilt on the -r2 branch (lead decision D-22, TF004); merged as pull request 353; pull request 343 superseded."
+   ]
   },
   {
    "id": "B-150",
@@ -901,16 +907,15 @@
    "branch": "feat/b171-harness-dt7-cascade-core-validation-tier",
    "prTitle": "feat(eng-harness): cascade core (validation, tier 1, engineer tier, pending, record) (B-171)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "E.T14",
-    "E.T14b",
-    "E.T17"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "B-512 (pull request 356): T7 to T9 do not wait for engine T17; only T10 does."
+   ]
   },
   {
    "id": "B-172",
@@ -962,8 +967,6 @@
    "risk": "r1, r3",
    "pending_deps": [
     "D.T9",
-    "E.T14",
-    "E.T14b",
     "E.T17"
    ],
    "writer": "sonnet, medium",

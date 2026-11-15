@@ -107,7 +107,8 @@ defines its method; values are synthetic and say so.
   item gets the `warning` issue `CONFLICTS_WITH_ENGINEER_CHANGE` with both values, the status stays `PASS`, and the
   change-set preview marks the item. Test: golden cases `check-conflict-*`.
 - AC8. Given a resolved change set, when `harness.expected_effects` runs, then it gives the effects of §4.4.2 per kind
-  (a wall thickness of an existing section is one `set` effect on `model.sections/1`; a replace of an existing
+  (a wall section redefined on an existing section is a `set` of its thickness and a `set` of its material on
+  `model.sections/1`, amendment B-503; a replace of an existing
   combination is a `set` of its type and one effect per item under the item keys of spec 0003 §4.7 D2; a new object is
   one `add`; a delete is `remove`); a permutation of the items gives the same effects. Tests:
   `tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases`,
@@ -118,6 +119,11 @@ defines its method; values are synthetic and say so.
   those changes, then the status is `PASS` with no `unexpected` row; with the scale change missing from the after read
   set, `FAIL` with that effect `mismatch` (amendment B-498). Test:
   `tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back`.
+- AC37. **[added: B-503]** Given a resolved `wall_section` item that redefines a section the step 3 state holds with
+  another material and another thickness, when `harness.expected_effects` projects it and `harness.readback_check`
+  compares its effects with an after read set that holds exactly that material and thickness, then the status is
+  `PASS` with no `unexpected` row; with the old material still read, `FAIL` with the material effect `mismatch`. Test:
+  `tests/golden/edit_cycle/test_expected_effects.py::test_wall_section_material_reads_back`.
 
 ### 3.3 The cycle (§4.5)
 
@@ -233,6 +239,10 @@ defines its method; values are synthetic and say so.
   is copied to a new working file and opened, and the snapshot is unchanged; a snapshot whose hash differs from its
   `model_saved` is refused with `CONFLICT`. Tests: `tests/workflow/adapters/test_csi_read_state_tool.py::test_read_set`,
   `tests/workflow/adapters/test_csi_revisions.py::test_save_as_new_revision_and_open_revision`.
+- AC38. **[added: B-503]** Given a CSI tool port and host port wired together and a successful `csi_open_revision`,
+  then the host port's `model_files` names the new working file, `locate` finds it on the same bound instance, and the
+  first `model_state` after it reads that file with no `MODEL_CHANGED_OUTSIDE`; given a failed open, then the host
+  port still names the previous file. Test: `tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port`.
 - AC32. Given the kinds of §4.2, then the report renders them through registered renderers with a source on every value
   cell, and adds the timings of §4.9. Test: `tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources`.
 
@@ -362,13 +372,16 @@ before the first write, §4.5, so `state` is current), and `change_set` and `bas
 holds references, never numbers or combination terms: an effect's value is the item's value in its canonical unit (a
 literal converted by `eng_contract.units`, §4.3.1; a basis value from its field). Output: spec 0003's
 `harness.expected_effects/1`. Projection per kind: section assignments, loads and restraints are `set` effects per
-target at the property's pointer; `wall_section` is one `set` of `thickness_mm` on `model.sections/1` (spec 0003 §4.8
-edge cases); `load_pattern_add` is `add` on `model.load_set/1` patterns; `load_combination_set` on a combination that
+target at the property's pointer; `wall_section` on a section that `state` holds is a `set` of `thickness_mm` and a
+`set` of `material` on `model.sections/1` (one effect per property, never per-area effects, spec 0003 §4.8 edge cases;
+the item carries the material and the redefinition writes it, so a changed `/material` is explained by R3, and an
+unchanged one reads back as a no-op `match`; amendment B-503); `load_pattern_add` is `add` on `model.load_set/1`
+patterns; `load_combination_set` on a combination that
 `state` holds is a `set` of its `/type` and one effect per item against that combination's items in `state`, matched by
 the D2 item key (`case.case`, `case.case_type`, `case.step`), so a pattern and a combination of one name, or two
 envelope steps, stay apart: `set` of `/scale_ratio` for an item key it holds, `add` of the item (`case`, `scale_ratio`)
 for a new one, `remove` for one the change set leaves out; `load_combination_set` on a new combination is `add` of the
-whole object; `load_combination_delete` is `remove`; an unlock has no model effect. A `set` whose target object `state`
+whole object (the order of its items is open, §11 Q15); `load_combination_delete` is `remove`; an unlock has no model effect. A `set` whose target object `state`
 does not hold (a new load row, restraint row or wall section) is `add` of the whole object instead (a new wall section
 is the whole `AreaSection` row: `name`, `material`, `kind: wall`, `thickness_mm`; `shell_type` is not in the neutral
 kind), because the difference report shows that object as added, which a `set` at a property's pointer does not explain
@@ -589,12 +602,18 @@ server tool):
   the bound instance without saving the current one, and records `model_saved` (role `revision`); used by D-2
   `restore_previous` (§4.5.1). Amendment B-415: the engine, not the adapter, journals that `model_saved` (engine §4.6
   "Tool saves"): the tool's `ToolInfo.saves_new_file(args)` returns true and its result summary carries `saved_file`
-  (`name`, the new working file's base name; `sha256`, its file hash).
+  (`name`, the new working file's base name; `sha256`, its file hash). After a successful open the tool port tells the
+  host port the new working file (`AdapterHostPort.reopened(model_key, path)`, a callback the CSI tool port takes like
+  `wrote`), so `model_files`, `locate` and `model_state` name and find it on the same bound instance, its first
+  `model_state` is a new baseline for the outside-edit check, and the engine's `model_saved` and the next host-state
+  check find the file (amendment B-503, plan T13). Which model identity and revision the restored file takes is open
+  (§11 Q16).
 - `csi_read_analysis_messages` (effect `read`): the `Analysis Messages` table through `csi_db_table_read` (read
   only), stored as `harness.csi_analysis_messages/1`.
 - `csi_save_model` gains `as_new_revision`: saves the open file in place, then copies its files to a snapshot at a
   path in the run's copies folder chosen by the adapter (refuses an existing file) and verifies the copy's hash; the
-  host keeps the working file open (§4.5.1). The adapter refuses any write or save whose target is a snapshot.
+  host keeps the working file open (§4.5.1). The adapter refuses any write or save whose target is a snapshot, with
+  `CONFLICT` as for the other snapshot refusals (amendment B-503).
   Amendment B-415 (engine §4.6 "Tool saves", §4.8): with `as_new_revision` true, the CSI `ToolInfo.saves_new_file(args)`
   returns true and the result summary carries `saved_file` (`name`, the snapshot's base name; `sha256`, its verified
   file hash), which the engine checks against the model's file hash before it journals `model_saved` (role
@@ -653,9 +672,9 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30, AC36 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30, AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
-| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
+| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
 
 No host program and no network. Coverage floors 85% line and 75% branch; mutation score at least 80% on the R1
@@ -683,6 +702,11 @@ start at version 1 with lock entries.
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `edit_cycle_analysis_messages.clean` (an unknown message must not pass silently) |
 | Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule was lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) decided by the owner (OQ-Q44, amendment B-463): the last path segment may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464) before plan 0007 T2 and T8; (b), (c) and (d) done by amendment B-467, a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it (listed by B-467, not edited); all before plan 0003 T8b and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
 | Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9; plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
+| Q14 | **[added: B-503]** Engine invariant 1 stops on a `check_model` whose summary is not clean (engine §4.6 row 1, engine plan T22): at step 9 the inserted check before the S' read raises `ModelIntegrityError` on a `READBACK_MISMATCH`, so `harness.readback_check` and D-2 never see that write; the CSI `check_model` clears its written items even when the result is not clean, so the check that invariant 1 inserts before D-2 (a `decide`) passes on the tolerance-free checks alone | Owner | Writer's recommendation: the step 9 block catches `ModelIntegrityError` from the inserted check and opens D-2 with the reason `check_model_failed` and the stored `issues.model_check/1` result (the error's evidence) as evidence, so `restore_previous` works as for a read-back `FAIL` (AC17); the clearing stays, because a check that kept the items would stop D-2 itself. Until answered, plan T8 adds no routing: the stop escalates like any `StepError`, and AC17 is tested with a read-back `FAIL` that `check_model` does not see |
+| Q15 | **[added: B-503]** `load_combination_set` on a new combination is an `add` of the whole object, and spec 0003 §4.8 R2 compares an `add` leaf by leaf, list items index by index (D5); the after read set keeps the host's order (spec 0003 §4.6 F2 orders lists only inside the fingerprint), so a host that lists the items in another order gives a false `mismatch` | Owner | Writer's recommendation: spec 0003 §4.8 R2 matches the items of a keyed nested list (combination `items`, D2 key) by key, not by index, for an `add` as R3 and D2 already do; until then plan T3 keeps the change set's item order and no test pins another |
+| Q16 | **[added: B-503]** The model identity and revision of the working file that `restore_previous` opens (§4.5.1): ADR-0032 rule 3 and the merged `IdentityStore.resolve` give a file whose content is known at a new path a new model id `derived_from` the older one, which would break the binding of the model (no `model_bound` at a restore) and the staleness of its references | Owner | Writer's recommendation: the restored file keeps the bound model's id and becomes its next revision (`IdentityStore.record_save` on the new path), since it is the same model in the same run; ADR-0032 to say so for a restore. Interim reading for plan T13 until answered |
+| Q17 | **[added: B-503]** Whether the change-set model moves to a kinds-level module before plan T9 merges: it enters the content hash of the R1 edit-cycle calcs (spec 0003 §4.3, B-493) while its risk floor in §4.1 is block code; importing it runs `workflows/__init__.py`, which from T9 imports the shipped blocks; and plan 0013's calcs would import from a private module | Owner | Writer's recommendation: move `ChangeSetDraft` and its item and value models to a public kinds-level module under `eng_harness.kinds` (risk floor R2, as `kinds/edit_cycle.py`) before T9 merges, admit it in spec 0003 §4.3 in place of `_change_set`, and accept the one-time hash change of the calcs that import it (verification again, process/10 §5) |
+| Q18 | **[added: B-513]** K3 (§4.4.1) refuses two items on one target and property and an item id with `/`, but says nothing of two terms of one `load_combination_set` item that have the same D2 item key (`case.case`, `case.case_type`, `case.step`); the merged check passes such an item without an issue | Owner | Decide whether K3 extends to the terms of one item and with which issue code (a golden case and a version rule of spec 0003 §4.2 follow). Until answered nothing refuses it and no test pins either behaviour; plan T14 builds only the item id rule |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |
