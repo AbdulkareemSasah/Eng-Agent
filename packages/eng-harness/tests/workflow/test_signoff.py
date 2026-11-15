@@ -41,7 +41,7 @@ def _verdict(subject: str, status: str) -> dict[str, JsonValue]:
         "check_id": "steel:ratio",
         "code": "AISC",
         "subject": {"kind": "frame", "id": subject},
-        "ratio": 0.5,
+        "ratio": 1.2 if status == "FAIL" else 0.5,
         "ratio_limit": 1.0,
         "status": status,
         "governing": True,
@@ -120,19 +120,21 @@ def test_signoff_rules(tmp_path: Path) -> None:
         answer = future.result(timeout=5)
     assert answer is not None
     assert answer.decision == "approve"
-    assert dict(answer.item_reasons) == both
+    assert dict(answer.item_reasons) == {"exc_1": REASON, "exc_2": "second"}
     assert answer.acknowledged_unreleased is True
 
 
 def test_screen_shows_the_verdict_counts_and_the_exceptions(tmp_path: Path) -> None:
     with _signoff(tmp_path, marks=ReleaseMarks(records={})) as (w, request):
-        w.open(request)
+        future = w.open(request)
         body = w.client.get(f"/request/{request.request_id}").body
+        assert w.answer(request, decision="reject", reason="read only") == HTTPStatus.OK  # ends the stand-in's wait
+        future.result(timeout=5)
     for status in ("FAIL", "PASS", "NEEDS_ENGINEER", "NOT_APPLICABLE", "ERROR"):
         assert f">{status}<" in body
-    assert body.index("C1") < body.index("C3")  # report order: exc_1 is C1, exc_2 is C3
-    assert "C2" not in body
-    assert "C4" not in body
+    assert body.index("frame C1") < body.index("frame C3")  # report order: exc_1 is C1, exc_2 is C3
+    assert "frame C2" not in body
+    assert "frame C4" not in body
     assert "unreleased" not in body
     assert 'name="acknowledged_unreleased"' not in body
 
