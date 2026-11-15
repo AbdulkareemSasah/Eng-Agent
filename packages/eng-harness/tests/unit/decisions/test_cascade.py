@@ -15,14 +15,15 @@ import pytest
 from eng_contract.canonical import canonical_json, payload_sha256
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.kinds.basis import BasisField, DesignBasis
+from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
 from pydantic import BaseModel, ConfigDict
 
 from eng_harness.ctx import BasisView
-from eng_harness.decisions import Cascade, LabelStore
+from eng_harness.decisions import Cascade, LabelStore, StoreWriteError
 from eng_harness.decisions._points import DecisionPoint, Label, PointRegistry, Refs, decision_point
 from eng_harness.decisions._policy import DecisionPolicy, DecisionSettings
-from eng_harness.decisions._record import ScreenField, SuggestionCode
+from eng_harness.decisions._record import DecisionScreen, ScreenField, ScreenItem, SuggestionCode
 from eng_harness.decisions.interfaces import (
     DecisionAnswer,
     DecisionCall,
@@ -32,7 +33,7 @@ from eng_harness.decisions.interfaces import (
     Suggestion,
 )
 from eng_harness.decisions.types import Pick, RuleBasis, rule
-from eng_harness.errors import BlockRuleViolation, DecisionInvalid
+from eng_harness.errors import BlockRuleViolation, DecisionInvalid, Pause
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
 RES = "res_01ARZ3NDEKTSV4RRFFQ69G5FAV"
@@ -72,6 +73,31 @@ class Stranger(BaseModel):
     failing: bool
 
 
+class Noted(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    note: Label
+    cover_mm: int
+
+
+class Inner(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    n: int
+    ref: Ref
+
+
+class Wide(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    cover: Quantity
+    inner: Inner
+    links: tuple[Ref, ...]
+    sizes: tuple[Quantity, ...]
+    tags: tuple[Label, ...]
+    extras: tuple[Label, ...]
+
+
 ACTION = decision_point(name="pick_action", version=1, title="Pick an action", options=Action, state=State)(object)
 ACTION_V2 = decision_point(name="pick_action", version=2, title="Pick an action", options=Action, state=State)(object)
 MEMBER = decision_point(name="pick_member", version=1, title="Pick a member", options=Refs("members"), state=Members)(
@@ -80,6 +106,8 @@ MEMBER = decision_point(name="pick_member", version=1, title="Pick a member", op
 STRANGER = decision_point(name="pick_stranger", version=1, title="Pick a stranger", options=Action, state=Stranger)(
     object
 )
+NOTED = decision_point(name="pick_noted", version=1, title="Pick with a note", options=Action, state=Noted)(object)
+WIDE = decision_point(name="pick_wide", version=1, title="Pick with a wide state", options=Action, state=Wide)(object)
 REF = Ref.model_validate({"$ref": RES})
 STATE = State(failing=True, cover_mm=50, result=REF)
 CALM = State(failing=False, cover_mm=50, result=REF)
@@ -173,6 +201,23 @@ def raises(state: State, basis: RuleBasis) -> Pick[Action] | None:
     raise ValueError("a message that holds project data")
 
 
+@rule(
+    id="pick_action.undeclared",
+    version=1,
+    point="pick_action",
+    rationale="Reads a path it did not declare.",
+    thresholds=("limits.bearing_ratio",),
+)
+def undeclared(state: State, basis: RuleBasis) -> Pick[Action] | None:
+    basis.quantity("limits.other_ratio")
+    return None
+
+
+@rule(id="pick_action.stops", version=1, point="pick_action", rationale="Raises an engine stop.")
+def stops(state: State, basis: RuleBasis) -> Pick[Action] | None:
+    raise Pause("the run waits")
+
+
 @rule(id="pick_member.high", version=1, point="pick_member", rationale="Out of range index.")
 def high(state: Members, basis: RuleBasis) -> Pick[int] | None:
     return Pick(2)
@@ -221,7 +266,7 @@ def _setup(
     clock = FixedClock(START_MS, 1)
     labels = LabelStore(tmp_path, settings, clock, SeededIdSource(b"labels", clock))
     cascade = Cascade(
-        PointRegistry(points or (ACTION, MEMBER)),
+        PointRegistry(points or (ACTION, MEMBER, NOTED, WIDE)),
         settings,
         labels,
         clock=FixedClock(START_MS + 60_000, 1),
@@ -402,7 +447,10 @@ def test_phase1_rules_then_engineer(tmp_path: Path) -> None:
     assert (pending.request_id, pending.batch_id, pending.rejected) == (REQUEST, None, None)
     [item] = pending.screen.items
     assert (item.request_id, item.title, item.suggestions) == (REQUEST, "Pick an action", ())
-    assert item.options == (ProviderOption(value="enlarge", label="enlarge"), ProviderOption(value="rebar", label="rebar"))
+    assert item.options == (
+        ProviderOption(value="enlarge", label="enlarge"),
+        ProviderOption(value="rebar", label="rebar"),
+    )
     assert item.fields == (
         ScreenField(label="failing", value=False),
         ScreenField(label="cover_mm", value=50),
@@ -433,7 +481,10 @@ def test_phase1_rules_then_engineer(tmp_path: Path) -> None:
     refs = _call(point=MEMBER, request_id=OTHER_REQUEST)
     shown = _pending(_decide(cascade, refs))
     [member_item] = shown.screen.items
-    assert member_item.options == (ProviderOption(value="0", label="Column C1"), ProviderOption(value="1", label="Column C2"))
+    assert member_item.options == (
+        ProviderOption(value="0", label="Column C1"),
+        ProviderOption(value="1", label="Column C2"),
+    )
     assert member_item.fields == (
         ScreenField(label="members", value=["Column C1", "Column C2"]),
         ScreenField(label="result", ref=RES),
@@ -470,7 +521,9 @@ def test_invalid_engineer_choice(tmp_path: Path) -> None:
     assert early.screen.items[0].request_id == fresh.request_id
     assert labels.get_pending(fresh.request_id) is None
     # the right choice is then accepted
-    assert _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("enlarge")}))).choice == "enlarge"
+    assert (
+        _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("enlarge")}))).choice == "enlarge"
+    )
 
 
 def test_pending_is_idempotent(tmp_path: Path) -> None:
@@ -492,7 +545,9 @@ def test_pending_is_idempotent(tmp_path: Path) -> None:
     assert len(labels.read("pick_action")) == 1  # no second label
     # without a choice, or with another one, the recorded answer still comes back
     assert _decided(_decide(cascade, call)) == answered
-    other = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("enlarge", by="Engineer Two")})))
+    other = _decided(
+        _decide(cascade, call.model_copy(update={"engineer_choice": _answer("enlarge", by="Engineer Two")}))
+    )
     assert other == answered
     assert [(x.label, x.engineer) for x in labels.read("pick_action")] == [("rebar", "Engineer One")]
     assert CALLED == ["first"]
@@ -509,7 +564,7 @@ def test_rule_entry_has_hash(tmp_path: Path) -> None:
             outcome="accepted",
             choice="enlarge",
             confidence=None,
-            reasoning="Enlarge when the check fails.",
+            rationale="Enlarge when the check fails.",
             latency_ms=250,
             shadow=False,
             code=SuggestionCode(rule_version=1, rule_sha256=first.code_sha256),
@@ -523,3 +578,151 @@ def test_rule_entry_has_hash(tmp_path: Path) -> None:
     dumped = entry.model_dump(mode="json", by_alias=True)
     assert dumped["rationale"] == "Rebar is the fallback."
     assert dumped["code"] == {"rule_version": 3, "rule_sha256": second.code_sha256}
+
+
+def test_label_state_is_hash_only_when_it_fails_the_check(tmp_path: Path) -> None:
+    """AC36 through the cascade: sensitive values of the settings and of the call both make the label hash-only."""
+    noted = Noted(note="Zeta Tower east", cover_mm=50)
+    stored = {"note": "Zeta Tower east", "cover_mm": 50}
+    cases = [
+        (DecisionSettings(sensitive_values=("zeta tower",)), (), None),
+        (DecisionSettings(), ("zeta tower",), None),
+        (DecisionSettings(sensitive_values=("other site",)), ("another",), stored),
+    ]
+    for n, (settings, sensitive, expected) in enumerate(cases):
+        cascade, labels = _setup(tmp_path / str(n), settings=settings)
+        call = _call(point=NOTED, state=noted, sensitive=sensitive)
+        _pending(_decide(cascade, call))
+        answer = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")})))
+        [label] = labels.read("pick_noted")
+        assert label.state == expected, n
+        assert label.state_sha256 == answer.state_sha256 == payload_sha256(stored), n
+
+
+def test_screen_shows_nested_state_as_labeled_fields(tmp_path: Path) -> None:
+    """AC34: references anywhere in the state are shown as references; quantities and tuples as values."""
+    cascade, _ = _setup(tmp_path)
+    other = Ref.model_validate({"$ref": f"{RES}#/fields/a/value"})
+    wide = Wide(
+        cover=Quantity(40.0, "mm"),
+        inner=Inner(n=3, ref=REF),
+        links=(REF, other),
+        sizes=(Quantity(1.0, "m"),),
+        tags=("A", "B"),
+        extras=(),
+    )
+    [item] = _pending(_decide(cascade, _call(point=WIDE, state=wide))).screen.items
+    assert item.fields == (
+        ScreenField(label="cover", value={"value": 40.0, "unit": "mm"}),
+        ScreenField(label="inner.n", value=3),
+        ScreenField(label="inner.ref", ref=RES),
+        ScreenField(label="links.0", ref=RES),
+        ScreenField(label="links.1", ref=f"{RES}#/fields/a/value"),
+        ScreenField(label="sizes.0", value={"value": 1.0, "unit": "m"}),
+        ScreenField(label="tags", value=["A", "B"]),
+        ScreenField(label="extras", value=[]),
+    )
+
+
+def test_engine_stops_and_basis_violations_pass_through(tmp_path: Path) -> None:
+    """A rule reading an undeclared basis path is a BlockRuleViolation, and an engine stop is not an invalid rule."""
+    cascade, labels = _setup(tmp_path)
+    with pytest.raises(BlockRuleViolation) as info:
+        _decide(cascade, _call(rules=(undeclared, second)))
+    assert info.value.message == "basis path 'limits.other_ratio' is not in the rule's thresholds"
+    assert GUARD.active is False  # the guard was left
+    with pytest.raises(Pause):
+        _decide(cascade, _call(rules=(stops, second)))
+    assert GUARD.active is False
+    assert CALLED == []
+    assert labels.get_pending(REQUEST) is None
+
+
+def test_choice_without_a_stored_request(tmp_path: Path) -> None:
+    """A choice that arrives with no stored request is answered and labelled; latency is the monotonic one."""
+    cascade, labels = _setup(tmp_path)
+    answer = _decided(_decide(cascade, _call(state=CALM, rules=(first,), choice=_answer("rebar"))))
+    assert (answer.choice, answer.decided_by, answer.latency_ms) == ("rebar", "engineer:Engineer One", 250)
+    assert CALLED == ["first"]
+    assert labels.get_pending(REQUEST) is None
+    [label] = labels.read("pick_action")
+    assert (label.label, label.created_at) == ("rebar", ANSWERED_AT)
+
+
+def test_closing_and_label_times(tmp_path: Path) -> None:
+    """The label is stamped with the answer time and the request is closed at the cascade clock's time."""
+    cascade, labels = _setup(tmp_path)
+    call = _call(state=CALM)
+    _pending(_decide(cascade, call))
+    _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")})))
+    [label] = labels.read("pick_action")
+    assert label.created_at == ANSWERED_AT
+    assert label.label_id.startswith("lbl_")
+    assert len(label.label_id) == 36
+    closed = labels.get_pending(REQUEST)
+    assert closed is not None
+    assert closed.closed_at == "2026-01-01T00:01:00.000Z"
+    # an answer that is dated before the request was created has no negative latency
+    early = _call(state=CALM, request_id=OTHER_REQUEST)
+    _pending(_decide(cascade, early))
+    stale = EngineerChoice(choice="rebar", by="Engineer One", answered_at="2025-12-31T23:59:59.000Z")
+    assert _decided(_decide(cascade, early.model_copy(update={"engineer_choice": stale}))).latency_ms == 0
+
+
+def test_label_write_failure_keeps_the_request_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC37: a failed label write fails the step and leaves the request presented."""
+    cascade, labels = _setup(tmp_path)
+    call = _call(state=CALM)
+    _pending(_decide(cascade, call))
+
+    def refuse(label: object, findings: object) -> None:
+        raise StoreWriteError("decision store write failed: OperationalError", "inc_1")
+
+    monkeypatch.setattr(labels, "append", refuse)
+    with pytest.raises(StoreWriteError):
+        _decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")}))
+    stored = labels.get_pending(REQUEST)
+    assert stored is not None
+    assert stored.closed_at is None
+    monkeypatch.undo()
+    assert _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")}))).choice == "rebar"
+
+
+def test_closed_request_without_a_label_is_asked_again(tmp_path: Path) -> None:
+    """A closed request with no label (it cannot be answered from the store) goes to the engineer again."""
+    cascade, labels = _setup(tmp_path)
+    call = _call(state=CALM)
+    opened = _pending(_decide(cascade, call))
+    labels.close_pending(REQUEST, "2026-01-01T00:00:01.000Z")
+    assert _pending(_decide(cascade, call)) == opened
+    answer = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")})))
+    assert answer.choice == "rebar"
+    assert [x.label for x in labels.read("pick_action")] == ["rebar"]
+
+
+def test_stored_request_keeps_its_batch_and_suggestions(tmp_path: Path) -> None:
+    """A stored request is answered as stored: its batch id is kept, and its own suggestions go to the label."""
+    cascade, labels = _setup(tmp_path)
+    mine = Suggestion(
+        tier=2,
+        by="model:fake/fake-model@0",
+        outcome="shadow",
+        choice="enlarge",
+        confidence=0.9,
+        latency_ms=5,
+        shadow=True,
+    )
+    theirs = mine.model_copy(update={"choice": "rebar"})
+    options = (ProviderOption(value="enlarge", label="enlarge"), ProviderOption(value="rebar", label="rebar"))
+    items = (
+        ScreenItem(request_id=OTHER_REQUEST, title="Pick an action", options=options, suggestions=(theirs,)),
+        ScreenItem(request_id=REQUEST, title="Pick an action", options=options, suggestions=(mine,)),
+    )
+    labels.open_pending(REQUEST, "batch_x", DecisionScreen(items=items), {})
+    call = _call(state=CALM)
+    assert _pending(_decide(cascade, call)).batch_id == "batch_x"
+    refused = _pending(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("nope")})))
+    assert (refused.batch_id, refused.rejected) == ("batch_x", "not_an_option")
+    answer = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")})))
+    assert answer.suggestions == (mine,)
+    assert labels.read("pick_action")[0].suggestions == (mine,)
