@@ -201,7 +201,9 @@ class Ctx:
         prior = self._started.get(path)
         info = None if prior is not None else await self._tools.describe(name)
         journaled = None if prior is None else self._journaled(prior)
-        args, under = await self._modes.enter(self, path, name, args, info, prior, journaled, under)  # copy and approval (4.7)
+        args, under = await self._modes.enter(
+            self, path, name, args, info, prior, journaled, under
+        )  # copy and approval (4.7)
         recorded = self._look(path, "tool", name, args)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
             self._pending.replay(self, path, prior.model_key)

@@ -295,7 +295,9 @@ def test_an_inserted_approval_covers_the_rerun_of_a_write_in_flight(
         rig.host.models["m1"] = rig.host.models["m1"].model_copy(update={"revision": 7})
     done = asyncio.run(engine.resume(run_id))
     assert done.status is RunStatus.COMPLETED
-    assert [(e.attempt, e.payload.under) for e in _attempts(rig, run_id)] == [(1, rid)] + ([] if changed else [(2, rid)])
+    assert [(e.attempt, e.payload.under) for e in _attempts(rig, run_id)] == [(1, rid)] + (
+        [] if changed else [(2, rid)]
+    )
     assert (len(voided), len(rig.host.ledger)) == ((1, 0) if changed else (0, 1))  # a void ends before the call
 
 
