@@ -8,10 +8,12 @@ from pathlib import Path
 import pytest
 from helpers.engine_standin import SHA, approval_request, input_request, until, wired
 
+from eng_harness._html import SafeToken
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.pages import PageApprovalPort
 from eng_harness.pages._answers import (
+    CHOICE,
     NAME_MAX,
     REASON,
     REASON_MAX,
@@ -105,13 +107,13 @@ def test_accepted_forms_and_the_other_hash() -> None:
 
 def test_choices() -> None:
     choice = input_request()
-    got = parse(choice, {"shown_sha256": choice.fields_schema_sha256, "by": "ada", "choice:q": "a"})
+    got = parse(choice, {"shown_sha256": choice.fields_schema_sha256, "by": "ada", CHOICE + "q": "a"})
     assert isinstance(got, ChoiceSubmission)
     assert dict(got.choices) == {"q": "a"}
     with pytest.raises(AnswerError, match="choose an option"):
         parse(choice, {"shown_sha256": choice.fields_schema_sha256, "by": "ada"})
     with pytest.raises(AnswerError) as other:
-        parse(choice, {"shown_sha256": SHA, "by": "ada", "choice:q": "a"})
+        parse(choice, {"shown_sha256": SHA, "by": "ada", CHOICE + "q": "a"})
     assert other.value.status == HTTPStatus.CONFLICT
 
 
@@ -139,3 +141,15 @@ def test_name_rules_and_no_os_account(tmp_path: Path, monkeypatch: pytest.Monkey
         assert future.result(timeout=5) is not None
         until(lambda: w.approvals.hub.engineer == "Grace")
     assert w.approvals.hub.engineer == "Grace"  # remembered for the session
+
+
+def test_field_prefixes_are_tokens_and_one_prefix_is_stripped() -> None:
+    for prefix in (REJECT, REASON, CHOICE):
+        assert SafeToken(prefix + "i1") == prefix + "i1"  # a field name is a token (AC49)
+    assert len({REJECT, REASON, CHOICE}) == 3
+    odd = approval_request(items=("reject_a", "a"))  # an item whose id starts with a prefix
+    got = parse(odd, BASE | {"decision": "approve", REJECT + "reject_a": "on", REASON + "reject_a": "why"})
+    assert isinstance(got, ApprovalSubmission)
+    assert got.rejected_items == ("reject_a",)
+    with pytest.raises(AnswerError, match="not an item"):
+        parse(odd, BASE | {"decision": "approve", REJECT + "reason_a": "on"})

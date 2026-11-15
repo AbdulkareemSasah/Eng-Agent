@@ -1,7 +1,8 @@
-"""Cascade core: call validation, tier 1, the engineer tier, pending requests and the record.
+"""Cascade: call validation, tier 1, tiers 2 and 3, shadow mode, the engineer tier, pending requests and the record.
 
-Plan 0005 T7; spec 0005 AC5, AC14, AC15, AC17 to AC19, AC31 and AC34. No provider is configured (the phase 1
-deployment); the rules run under a recording guard, and the monotonic clock steps a quarter of a second per reading.
+Plan 0005 T7 and T8; spec 0005 AC5, AC8, AC14, AC15, AC17 to AC19, AC21 to AC26, AC31, AC33 and AC34. The rules run
+under a recording guard, and the monotonic clock steps a quarter of a second per reading. Tiers 2 and 3 are the fake
+providers of `tests/fakes/decision_providers.py`; none of them has a network or a clock.
 """
 
 import asyncio
@@ -17,20 +18,30 @@ from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
+from fakes.decision_providers import FakeDecisionProvider, FakeLLMProvider
 from pydantic import BaseModel, ConfigDict
 
 from eng_harness.ctx import BasisView
 from eng_harness.decisions import Cascade, LabelStore, StoreWriteError
 from eng_harness.decisions._points import DecisionPoint, Label, PointRegistry, Refs, decision_point
-from eng_harness.decisions._policy import DecisionPolicy, DecisionSettings
+from eng_harness.decisions._policy import DecisionPolicy, DecisionSettings, ShadowRelease
 from eng_harness.decisions._record import DecisionScreen, ScreenField, ScreenItem, SuggestionCode
 from eng_harness.decisions.interfaces import (
+    ChoiceAnswer,
     DecisionAnswer,
     DecisionCall,
+    DecisionProvider,
     EngineerChoice,
+    LLMAnswer,
+    LLMProvider,
     PendingAnswer,
+    ProviderError,
+    ProviderErrorCode,
+    ProviderInfo,
     ProviderOption,
+    ProviderRequest,
     Suggestion,
+    YesNoAnswer,
 )
 from eng_harness.decisions.types import Pick, RuleBasis, rule
 from eng_harness.errors import BlockRuleViolation, DecisionInvalid, Pause
@@ -50,6 +61,11 @@ class Action(StrEnum):
 class Other(StrEnum):
     ENLARGE = "enlarge"
     REBAR = "rebar"
+
+
+class Verdict(StrEnum):
+    YES = "yes"
+    NO = "no"
 
 
 class State(BaseModel):
@@ -106,6 +122,9 @@ MEMBER = decision_point(name="pick_member", version=1, title="Pick a member", op
 STRANGER = decision_point(name="pick_stranger", version=1, title="Pick a stranger", options=Action, state=Stranger)(
     object
 )
+FLAG = decision_point(
+    name="pick_flag", version=1, title="Pick a verdict", options=Verdict, state=State, yes_no=("yes", "no")
+)(object)
 NOTED = decision_point(name="pick_noted", version=1, title="Pick with a note", options=Action, state=Noted)(object)
 WIDE = decision_point(name="pick_wide", version=1, title="Pick with a wide state", options=Action, state=Wide)(object)
 REF = Ref.model_validate({"$ref": RES})
@@ -264,19 +283,30 @@ def _view() -> BasisView:
 
 
 def _setup(
-    tmp_path: Path, *, settings: DecisionSettings | None = None, points: tuple[DecisionPoint, ...] | None = None
+    tmp_path: Path,
+    *,
+    settings: DecisionSettings | None = None,
+    points: tuple[DecisionPoint, ...] | None = None,
+    model: DecisionProvider | None = None,
+    llm: LLMProvider | None = None,
 ) -> tuple[Cascade, LabelStore]:
     settings = settings or DecisionSettings()
+    providers: dict[str, Any] = {}  # the two keywords are given only when a test has the provider
+    if model is not None:
+        providers["model"] = model
+    if llm is not None:
+        providers["llm"] = llm
     clock = FixedClock(START_MS, 1)
     labels = LabelStore(tmp_path, settings, clock, SeededIdSource(b"labels", clock))
     STORES.append(labels)
     cascade = Cascade(
-        PointRegistry(points or (ACTION, MEMBER, NOTED, WIDE)),
+        PointRegistry(points or (ACTION, MEMBER, NOTED, WIDE, FLAG)),
         settings,
         labels,
         clock=FixedClock(START_MS + 60_000, 1),
         monotonic=Ticks(),
         rule_guard=GUARD,
+        **providers,
     )
     return cascade, labels
 
@@ -290,6 +320,7 @@ def _call(
     choice: EngineerChoice | None = None,
     request_id: str = REQUEST,
     sensitive: tuple[str, ...] = (),
+    policy: DecisionPolicy | None = None,
 ) -> DecisionCall:
     refs = isinstance(point.options, Refs)
     return DecisionCall(
@@ -300,7 +331,7 @@ def _call(
         options=options if options is not None else (REF_OPTIONS if refs else cast("type[StrEnum]", point.options)),
         state=state if state is not None else (MEMBERS if refs else STATE),
         rules=rules,
-        policy=DecisionPolicy(),
+        policy=policy or DecisionPolicy(),
         basis=_view(),
         engineer_choice=choice,
         sensitive_values=sensitive,
@@ -731,3 +762,417 @@ def test_stored_request_keeps_its_batch_and_suggestions(tmp_path: Path) -> None:
     answer = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("rebar")})))
     assert answer.suggestions == (mine,)
     assert labels.read("pick_action")[0].suggestions == (mine,)
+
+
+LLM_BY = "llm:fake/fake-model@0"
+MODEL_BY = "model:fake/fake-model@0"
+REMOTE = ProviderInfo(provider="remote", model="big", version="2", is_local=False, supports_batch=False)
+RELEASE = ShadowRelease(point_version=1, basis="owner", record="owner decision 1")
+RELEASED = DecisionSettings(shadow_released={"pick_action": RELEASE})
+LIVE = DecisionPolicy(shadow=False)
+BOTH = DecisionPolicy(llm=True)
+BOTH_LIVE = DecisionPolicy(llm=True, shadow=False)
+GOOD = LLMAnswer(choice="rebar", rationale="Rebar is the usual fix.")
+OPTIONS = (ProviderOption(value="enlarge", label="enlarge"), ProviderOption(value="rebar", label="rebar"))
+
+
+class Meeting:
+    """Both providers must be inside their call at the same time, or neither of them returns."""
+
+    def __init__(self) -> None:
+        self.arrived = 0
+        self.both = asyncio.Event()
+
+    async def meet(self) -> None:
+        self.arrived += 1
+        if self.arrived == 2:
+            self.both.set()
+        await self.both.wait()
+
+
+class MeetingModel(FakeDecisionProvider):
+    def __init__(self, meeting: Meeting, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._meeting = meeting
+
+    async def choose(self, request: ProviderRequest) -> ChoiceAnswer:
+        await self._meeting.meet()
+        return await super().choose(request)
+
+
+class MeetingLLM(FakeLLMProvider):
+    def __init__(self, meeting: Meeting, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        self._meeting = meeting
+
+    async def decide(self, request: ProviderRequest) -> LLMAnswer:
+        await self._meeting.meet()
+        return await super().decide(request)
+
+
+class StoppingModel(FakeDecisionProvider):
+    async def choose(self, request: ProviderRequest) -> ChoiceAnswer:
+        raise Pause("the run waits")
+
+
+def _rid(n: int) -> str:
+    return f"dec_{n:032x}"
+
+
+def _suggestion(tier: int, outcome: str, **fields: Any) -> Suggestion:
+    """The entry a fake provider with the default info leaves; ``latency_ms`` is 250 (two readings of the clock)."""
+    by = MODEL_BY if tier == 2 else LLM_BY
+    given: dict[str, Any] = {"tier": tier, "by": by, "outcome": outcome, "choice": None, "latency_ms": 250}
+    given.setdefault("shadow", False)
+    return Suggestion.model_validate(given | fields)
+
+
+def _core(entry: Suggestion) -> tuple[object, ...]:
+    """An entry without its timing."""
+    return (
+        entry.tier,
+        entry.by,
+        entry.outcome,
+        entry.choice,
+        entry.confidence,
+        entry.reasoning,
+        entry.shadow,
+        entry.error,
+    )
+
+
+def test_shadow_needs_release(tmp_path: Path) -> None:
+    """AC8: `policy.shadow=False` is not enough; without a release of this name and version, tiers 2 and 3 suggest."""
+    other_version = RELEASE.model_copy(update={"point_version": 2})
+    cases = [
+        ({}, False, True),
+        ({"pick_action": other_version}, False, True),
+        ({"pick_flag": RELEASE}, False, True),
+        ({"pick_action": RELEASE}, True, True),
+        ({"pick_action": RELEASE}, False, False),
+    ]
+    for n, (released, shadow, effective) in enumerate(cases):
+        model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="enlarge", confidence=0.95)])
+        settings = DecisionSettings(shadow_released=released)
+        cascade, labels = _setup(tmp_path / str(n), settings=settings, model=model)
+        result = _decide(cascade, _call(policy=DecisionPolicy(shadow=shadow)))
+        assert len(model.requests) == 1, n  # the provider is consulted either way
+        if effective:
+            [item] = _pending(result).screen.items
+            assert [_core(x) for x in item.suggestions] == [
+                (2, MODEL_BY, "shadow", "enlarge", 0.95, None, True, None)
+            ], n
+            assert labels.get_pending(REQUEST) is not None, n
+        else:
+            answer = _decided(result)
+            assert (answer.choice, answer.decided_by, answer.confidence) == ("enlarge", MODEL_BY, 0.95), n
+            assert [x.shadow for x in answer.suggestions] == [False], n
+            assert labels.get_pending(REQUEST) is None, n
+
+
+def test_tier2_threshold(tmp_path: Path) -> None:
+    """AC21: a rule decides before tier 2; a confidence at the threshold is taken, one below it is only recorded."""
+    choices = [
+        ChoiceAnswer(choice="enlarge", confidence=0.85),
+        ChoiceAnswer(choice="enlarge", confidence=0.8499),
+        ChoiceAnswer(choice="rebar", confidence=0.9),
+        ChoiceAnswer(choice="rebar", confidence=0.89),
+    ]
+    model = FakeDecisionProvider(choices=choices)
+    cascade, labels = _setup(tmp_path, settings=RELEASED, model=model)
+    ruled = _decided(_decide(cascade, _call(rules=(first,), policy=LIVE)))
+    assert ruled.decided_by == "rule:pick_action.first"  # tier 1 first, and only a rule that matches ends the cascade
+    assert model.requests == []
+    taken = _decided(_decide(cascade, _call(policy=LIVE, request_id=_rid(1))))
+    assert (taken.choice, taken.decided_by, taken.confidence, taken.latency_ms) == ("enlarge", MODEL_BY, 0.85, 750)
+    assert taken.options == ("enlarge", "rebar")
+    assert taken.suggestions == (_suggestion(2, "accepted", choice="enlarge", confidence=0.85),)
+    assert model.requests == [  # the state is sent without its Ref field (AC34)
+        ProviderRequest(
+            request_id=_rid(1),
+            point="pick_action",
+            point_version=1,
+            options=OPTIONS,
+            state={"failing": True, "cover_mm": 50},
+        )
+    ]
+    assert labels.get_pending(_rid(1)) is None  # a model answer is no engineer label
+    assert labels.read("pick_action") == ()
+    below = _pending(_decide(cascade, _call(policy=LIVE, request_id=_rid(2))))
+    [item] = below.screen.items
+    assert item.suggestions == (_suggestion(2, "below_threshold", choice="enlarge", confidence=0.8499),)
+    assert labels.get_pending(_rid(2)) is not None
+    raised = DecisionPolicy(shadow=False, min_confidence=0.9)
+    assert _decided(_decide(cascade, _call(policy=raised, request_id=_rid(3)))).choice == "rebar"
+    [again] = _pending(_decide(cascade, _call(policy=raised, request_id=_rid(4)))).screen.items
+    assert [_core(x) for x in again.suggestions] == [(2, MODEL_BY, "below_threshold", "rebar", 0.89, None, False, None)]
+
+
+def test_yes_no_point_asks_yes_no(tmp_path: Path) -> None:
+    """A point with `yes_no` is asked with `yes_no`, and the answer is the point's yes or no value (spec 4.7)."""
+    model = FakeDecisionProvider(
+        yes_nos=[YesNoAnswer(answer=True, confidence=0.9), YesNoAnswer(answer=False, confidence=0.95)]
+    )
+    settings = DecisionSettings(shadow_released={"pick_flag": RELEASE})
+    cascade, _ = _setup(tmp_path, settings=settings, model=model)
+    yes = _decided(_decide(cascade, _call(point=FLAG, request_id=_rid(1), policy=LIVE)))
+    no = _decided(_decide(cascade, _call(point=FLAG, request_id=_rid(2), policy=LIVE)))
+    assert [(x.choice, x.decided_by, x.confidence) for x in (yes, no)] == [
+        ("yes", MODEL_BY, 0.9),
+        ("no", MODEL_BY, 0.95),
+    ]
+    assert yes.options == ("yes", "no")
+
+
+def test_provider_failures_fall_through(tmp_path: Path) -> None:
+    """AC22: a timeout, an error or an invalid answer is a recorded outcome; nothing is raised; no message is kept."""
+    nan = ChoiceAnswer.model_construct(choice="enlarge", confidence=float("nan"))
+    infinite = ChoiceAnswer.model_construct(choice="enlarge", confidence=float("inf"))
+    high = ChoiceAnswer.model_construct(choice="enlarge", confidence=1.5)
+    negative = ChoiceAnswer.model_construct(choice="enlarge", confidence=-0.1)
+    outside = ChoiceAnswer(choice="elsewhere", confidence=0.99)
+    quick = DecisionPolicy(shadow=False, timeout_ms_model=1)
+    cases: list[tuple[FakeDecisionProvider, DecisionPolicy, str, str | None]] = [
+        (
+            FakeDecisionProvider(choices=[ChoiceAnswer(choice="enlarge", confidence=0.99)], delay_s=5.0),
+            quick,
+            "timeout",
+            "TimeoutError",
+        ),
+        (
+            FakeDecisionProvider(choices=[ProviderError(ProviderErrorCode.TIMEOUT)]),
+            LIVE,
+            "timeout",
+            "ProviderError:timeout",
+        ),
+        (
+            FakeDecisionProvider(choices=[ProviderError(ProviderErrorCode.NETWORK)]),
+            LIVE,
+            "error",
+            "ProviderError:network",
+        ),
+        (FakeDecisionProvider(choices=[RuntimeError("secret project text")]), LIVE, "error", "RuntimeError"),
+        (FakeDecisionProvider(choices=[outside]), LIVE, "invalid", None),
+        (FakeDecisionProvider(choices=[nan]), LIVE, "invalid", None),
+        (FakeDecisionProvider(choices=[infinite]), LIVE, "invalid", None),
+        (FakeDecisionProvider(choices=[high]), LIVE, "invalid", None),
+        (FakeDecisionProvider(choices=[negative]), LIVE, "invalid", None),
+    ]
+    for n, (model, policy, outcome, error) in enumerate(cases):
+        cascade, labels = _setup(tmp_path / str(n), settings=RELEASED, model=model)
+        asked = _pending(_decide(cascade, _call(policy=policy)))  # the engineer is asked
+        assert len(model.requests) == 1, n
+        [item] = asked.screen.items
+        assert item.suggestions == (_suggestion(2, outcome, error=error),), n
+        assert "secret project text" not in asked.model_dump_json(), n
+        assert labels.get_pending(REQUEST) is not None, n
+    # a failed tier 2 does not end the cascade: tier 3 answers next, and both entries are kept in tier order
+    model = FakeDecisionProvider(choices=[RuntimeError("secret project text")])
+    llm = FakeLLMProvider(answers=[GOOD])
+    cascade, _ = _setup(tmp_path / "next", settings=RELEASED, model=model, llm=llm)
+    answer = _decided(_decide(cascade, _call(policy=BOTH_LIVE)))
+    assert (answer.choice, answer.decided_by, answer.confidence, answer.latency_ms) == ("rebar", LLM_BY, None, 1250)
+    assert answer.suggestions == (
+        _suggestion(2, "error", error="RuntimeError"),
+        _suggestion(3, "accepted", choice="rebar", reasoning="Rebar is the usual fix."),
+    )
+    # an engine stop is no provider failure and passes through
+    cascade, labels = _setup(tmp_path / "stop", settings=RELEASED, model=StoppingModel())
+    with pytest.raises(Pause):
+        _decide(cascade, _call(policy=LIVE))
+    assert labels.get_pending(REQUEST) is None
+
+
+def test_tier3_rationale_and_option(tmp_path: Path) -> None:
+    """AC23: an LLM answer with a valid option and a rationale is taken; a digit or an outside option is invalid."""
+    digit = LLMAnswer.model_construct(choice="rebar", rationale="Add 2 bars.")
+    outside = LLMAnswer(choice="elsewhere", rationale="No such option.")
+    llm = FakeLLMProvider(answers=[GOOD, digit, outside, GOOD])
+    cascade, labels = _setup(tmp_path, settings=RELEASED, llm=llm)  # no tier 2 provider: tier 2 is not accepted
+    taken = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(1))))
+    assert (taken.choice, taken.decided_by, taken.confidence, taken.latency_ms) == ("rebar", LLM_BY, None, 750)
+    assert taken.suggestions == (_suggestion(3, "accepted", choice="rebar", reasoning="Rebar is the usual fix."),)
+    assert llm.requests[0].options == OPTIONS
+    for n in (2, 3):  # the invalid answers: the engineer is asked, and the entry keeps neither choice nor rationale
+        asked = _pending(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(n))))
+        [item] = asked.screen.items
+        assert item.suggestions == (_suggestion(3, "invalid"),), n
+        assert labels.get_pending(_rid(n)) is not None, n
+    # tier 2 below its threshold goes on to tier 3
+    model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="enlarge", confidence=0.8)])
+    cascade, _ = _setup(tmp_path / "both", settings=RELEASED, model=model, llm=FakeLLMProvider(answers=[GOOD]))
+    answer = _decided(_decide(cascade, _call(policy=BOTH_LIVE)))
+    assert (answer.choice, answer.decided_by) == ("rebar", LLM_BY)
+    assert [_core(x) for x in answer.suggestions] == [
+        (2, MODEL_BY, "below_threshold", "enlarge", 0.8, None, False, None),
+        (3, LLM_BY, "accepted", "rebar", None, "Rebar is the usual fix.", False, None),
+    ]
+
+
+def test_shadow_mode(tmp_path: Path) -> None:
+    """AC24: in shadow mode both providers run at the same time, only suggest, and the engineer is asked once."""
+    meeting = Meeting()
+    model = MeetingModel(meeting, choices=[ChoiceAnswer(choice="enlarge", confidence=1.0)])
+    llm = MeetingLLM(meeting, answers=[GOOD])
+    cascade, labels = _setup(tmp_path, model=model, llm=llm)
+    call = _call(policy=BOTH)
+    asked = _pending(_decide(cascade, call))
+    [item] = asked.screen.items
+    assert [_core(x) for x in item.suggestions] == [  # a confidence of 1.0 decides nothing in shadow mode
+        (2, MODEL_BY, "shadow", "enlarge", 1.0, None, True, None),
+        (3, LLM_BY, "shadow", "rebar", None, "Rebar is the usual fix.", True, None),
+    ]
+    assert (len(model.requests), len(llm.requests)) == (1, 1)
+    assert labels.get_pending(REQUEST) is not None
+    assert _pending(_decide(cascade, call)) == asked  # one prompt: asking again shows it, and asks no provider again
+    assert (len(model.requests), len(llm.requests)) == (1, 1)
+    answer = _decided(_decide(cascade, call.model_copy(update={"engineer_choice": _answer("enlarge")})))
+    assert (answer.choice, answer.decided_by) == ("enlarge", "engineer:Engineer One")
+    assert answer.suggestions == item.suggestions
+    [label] = labels.read("pick_action")
+    assert label.suggestions == item.suggestions
+
+
+def test_policy_switches(tmp_path: Path) -> None:
+    """AC25: `require_engineer` consults no provider and a switched-off tier is not called; each switch is paired."""
+    model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="enlarge", confidence=0.9)] * 3)
+    llm = FakeLLMProvider(answers=[GOOD] * 3)
+    cascade, _ = _setup(tmp_path, model=model, llm=llm)
+    asked = _pending(
+        _decide(cascade, _call(policy=DecisionPolicy(llm=True, require_engineer=True), request_id=_rid(1)))
+    )
+    assert (model.requests, llm.requests) == ([], [])
+    assert asked.screen.items[0].suggestions == ()
+    # the same cascade and the same providers with the switch off consult both of them
+    on = _pending(_decide(cascade, _call(policy=BOTH, request_id=_rid(2))))
+    assert (len(model.requests), len(llm.requests)) == (1, 1)
+    assert [x.tier for x in on.screen.items[0].suggestions] == [2, 3]
+    # `model=False`: only the language model is consulted
+    only_llm = _pending(_decide(cascade, _call(policy=DecisionPolicy(model=False, llm=True), request_id=_rid(3))))
+    assert (len(model.requests), len(llm.requests)) == (1, 2)
+    assert [x.tier for x in only_llm.screen.items[0].suggestions] == [3]
+    # `llm=False` (the default): only the model is consulted
+    only_model = _pending(_decide(cascade, _call(policy=DecisionPolicy(), request_id=_rid(4))))
+    assert (len(model.requests), len(llm.requests)) == (2, 2)
+    assert [x.tier for x in only_model.screen.items[0].suggestions] == [2]
+
+
+def test_local_only(tmp_path: Path) -> None:
+    """AC26: with `local_only` a provider that is not local is not called and is recorded; a local one is called."""
+    remote = FakeDecisionProvider(info=REMOTE, choices=[ChoiceAnswer(choice="enlarge", confidence=0.99)])
+    llm = FakeLLMProvider(answers=[GOOD])
+    settings = DecisionSettings(local_only=True, shadow_released={"pick_action": RELEASE})
+    cascade, _ = _setup(tmp_path / "local", settings=settings, model=remote, llm=llm)
+    answer = _decided(_decide(cascade, _call(policy=BOTH_LIVE)))
+    assert remote.requests == []
+    assert (answer.choice, answer.decided_by, answer.latency_ms) == ("rebar", LLM_BY, 750)
+    assert answer.suggestions == (
+        _suggestion(2, "skipped_local_only", by="model:remote/big@2", latency_ms=0),
+        _suggestion(3, "accepted", choice="rebar", reasoning="Rebar is the usual fix."),
+    )
+    # in shadow mode the skipped entry is a shadow entry, and the local provider only suggests
+    remote = FakeDecisionProvider(info=REMOTE, choices=[ChoiceAnswer(choice="enlarge", confidence=0.99)])
+    cascade, _ = _setup(
+        tmp_path / "shadow",
+        settings=DecisionSettings(local_only=True),
+        model=remote,
+        llm=FakeLLMProvider(answers=[GOOD]),
+    )
+    [item] = _pending(_decide(cascade, _call(policy=BOTH))).screen.items
+    assert [_core(x) for x in item.suggestions] == [
+        (2, "model:remote/big@2", "skipped_local_only", None, None, None, True, None),
+        (3, LLM_BY, "shadow", "rebar", None, "Rebar is the usual fix.", True, None),
+    ]
+    # the same provider is called when `local_only` is off
+    remote = FakeDecisionProvider(info=REMOTE, choices=[ChoiceAnswer(choice="enlarge", confidence=0.99)])
+    cascade, _ = _setup(tmp_path / "off", settings=RELEASED, model=remote)
+    taken = _decided(_decide(cascade, _call(policy=LIVE)))
+    assert (taken.choice, taken.decided_by) == ("enlarge", "model:remote/big@2")
+    assert len(remote.requests) == 1
+
+
+def test_redaction_skip(tmp_path: Path) -> None:
+    """AC33: a state that fails the redaction check reaches no provider, whoever supplied the sensitive value."""
+    noted = Noted(note="Zeta Tower east", cover_mm=50)
+    clean = Noted(note="Plain note", cover_mm=50)
+    cases = [(DecisionSettings(sensitive_values=("ZETA tower",)), ()), (DecisionSettings(), ("zeta TOWER",))]
+    for n, (settings, sensitive) in enumerate(cases):
+        model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="enlarge", confidence=0.99)])
+        llm = FakeLLMProvider(answers=[GOOD])
+        cascade, labels = _setup(tmp_path / str(n), settings=settings, model=model, llm=llm)
+        skipped = _pending(_decide(cascade, _call(point=NOTED, state=noted, sensitive=sensitive, policy=BOTH)))
+        assert (model.requests, llm.requests) == ([], [])
+        [item] = skipped.screen.items  # the engineer is asked, with both skips on the screen
+        assert [(x.tier, x.by, x.outcome, x.choice, x.latency_ms, x.shadow, x.error) for x in item.suggestions] == [
+            (2, MODEL_BY, "skipped_redaction", None, 0, True, None),
+            (3, LLM_BY, "skipped_redaction", None, 0, True, None),
+        ]
+        assert "zeta" not in " ".join(x.model_dump_json().casefold() for x in item.suggestions)
+        assert labels.get_pending(REQUEST) is not None
+        # the same cascade sends a state that passes the check
+        passed = _call(point=NOTED, state=clean, sensitive=sensitive, policy=BOTH, request_id=OTHER_REQUEST)
+        [sent] = _pending(_decide(cascade, passed)).screen.items
+        assert [x.outcome for x in sent.suggestions] == ["shadow", "shadow"]
+        assert [r.state for r in model.requests] == [{"note": "Plain note", "cover_mm": 50}]
+        assert len(llm.requests) == 1
+
+
+def test_accepted_tier_ends_the_cascade(tmp_path: Path) -> None:
+    """Tier 3 is asked only when tier 2 is not accepted; 1.0 and 0.0 are valid ratios; a given choice asks no one."""
+    model = FakeDecisionProvider(
+        choices=[ChoiceAnswer(choice="enlarge", confidence=1.0), ChoiceAnswer(choice="enlarge", confidence=0.0)]
+    )
+    llm = FakeLLMProvider(answers=[GOOD])
+    cascade, _ = _setup(tmp_path, settings=RELEASED, model=model, llm=llm)
+    taken = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(1))))
+    assert (taken.decided_by, taken.confidence, llm.requests) == (MODEL_BY, 1.0, [])
+    went_on = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(2))))
+    assert went_on.decided_by == LLM_BY
+    assert _core(went_on.suggestions[0]) == (
+        2,
+        MODEL_BY,
+        "below_threshold",
+        "enlarge",
+        0.0,
+        None,
+        False,
+        None,
+    )
+    assert len(llm.requests) == 1
+    # an engineer's choice that arrives without a stored request is answered, and no provider is asked
+    answer = _decided(_decide(cascade, _call(policy=BOTH_LIVE, request_id=_rid(3), choice=_answer("rebar"))))
+    assert answer.decided_by == "engineer:Engineer One"
+    assert (len(model.requests), len(llm.requests)) == (2, 1)
+
+
+def test_providers_get_reference_options_and_each_timeout(tmp_path: Path) -> None:
+    """Reference options reach a provider with their labels and no `Ref` field; each tier has its own timeout."""
+    model = FakeDecisionProvider(choices=[ChoiceAnswer(choice="1", confidence=0.9)])
+    cascade, _ = _setup(
+        tmp_path / "refs", settings=DecisionSettings(shadow_released={"pick_member": RELEASE}), model=model
+    )
+    assert _decided(_decide(cascade, _call(point=MEMBER, policy=LIVE))).choice == "1"
+    assert model.requests[0].options == (
+        ProviderOption(value="0", label="Column C1"),
+        ProviderOption(value="1", label="Column C2"),
+    )
+    assert model.requests[0].state == {"members": ["Column C1", "Column C2"]}
+    # the model's timeout does not bound tier 3, and the language model's does not bound tier 2
+    cascade, _ = _setup(tmp_path / "slow", settings=RELEASED, llm=FakeLLMProvider(answers=[GOOD], delay_s=0.05))
+    slow = DecisionPolicy(llm=True, shadow=False, timeout_ms_model=1)
+    assert _decided(_decide(cascade, _call(policy=slow))).decided_by == LLM_BY
+    cascade, _ = _setup(tmp_path / "stuck", settings=RELEASED, llm=FakeLLMProvider(answers=[GOOD], delay_s=5.0))
+    stuck = DecisionPolicy(llm=True, shadow=False, timeout_ms_llm=1)
+    [item] = _pending(_decide(cascade, _call(policy=stuck))).screen.items
+    assert item.suggestions == (_suggestion(3, "timeout", error="TimeoutError"),)
+
+
+def test_local_only_skip_comes_before_the_redaction_skip(tmp_path: Path) -> None:
+    """A provider that may not be used at all is recorded as `skipped_local_only`, whatever the state holds."""
+    remote = FakeDecisionProvider(info=REMOTE)
+    settings = DecisionSettings(local_only=True, sensitive_values=("zeta tower",))
+    cascade, _ = _setup(tmp_path, settings=settings, model=remote)
+    noted = Noted(note="Zeta Tower east", cover_mm=50)
+    [item] = _pending(_decide(cascade, _call(point=NOTED, state=noted))).screen.items
+    assert [(x.by, x.outcome) for x in item.suggestions] == [("model:remote/big@2", "skipped_local_only")]
+    assert remote.requests == []
