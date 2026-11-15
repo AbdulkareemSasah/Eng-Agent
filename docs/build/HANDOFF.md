@@ -1,5 +1,7 @@
 # Build handoff checkpoint (cloud session of 2026-11-14, after the pause)
 
+> **Newer state (2026-11-14, work item B-506):** the lead stopped all lanes at the owner's word on 2026-11-14 about 21:00 UTC. The state at that stop (lanes, run ids, queue, order of the next start, 193 of 331 plan tasks merged) is in [resume/RESUME.md](resume/RESUME.md); the speed-up measures the owner approved are in [lead-playbook.md](lead-playbook.md) section 7. The sections below describe the checkpoint of work item B-487.
+
 Committed directly to `build/v1` under lead decision D-4 (build state files). Work item B-487, written by the lead
 bookkeeper of the session for the next lead agent. This section is the newest; the checkpoint of 2026-11-12 below it
 and the one below that stay for the history they record. Read this section, then the lead playbook
