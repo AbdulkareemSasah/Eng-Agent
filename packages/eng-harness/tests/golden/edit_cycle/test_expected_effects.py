@@ -118,9 +118,10 @@ def test_golden_bodies_are_valid_payloads() -> None:
         assert (bare.calc, bare.draft, bare.trace) == (None, None, None), stem
         wrapped = ExpectedEffects.model_validate(case.expected | wrapper)
         assert wrapped.effects == bare.effects, stem
-        assert wrapped.calc is not None and wrapped.calc.id == CALC_ID, stem
-        assert wrapped.draft is True, stem
-        assert wrapped.trace is not None and wrapped.trace.calc_id == CALC_ID, stem
+        assert wrapped.calc is not None, stem
+        assert (wrapped.calc.id, wrapped.draft) == (CALC_ID, True), stem
+        assert wrapped.trace is not None, stem
+        assert wrapped.trace.calc_id == CALC_ID, stem
 
 
 def test_registered_with_its_kind_and_inputs() -> None:
