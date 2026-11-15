@@ -576,6 +576,8 @@ class Ctx:
         except ContractError as exc:
             self._fail(path, attempt, began, exc.detail, False)
             raise
+        except OSError as exc:  # the copy may be half done: in flight (spec 4.5.3)
+            raise errors.NeedsReconciliation(f"the file copy of step {path} failed: {exc}") from exc
         handle = ModelHandle(model_key=origin, model_id=state.model_id or "", revision=state.revision or 0)
         saved = state.model_dump(mode="json", exclude={"loaded"}) | {"model_key": origin, "role": "promoted"}
         saved |= {"file_name": originals[0].name, "origin_sha256": origin_sha256}
