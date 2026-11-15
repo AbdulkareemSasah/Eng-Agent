@@ -417,6 +417,8 @@ tasks:
     depends_on: [T14]
   - id: T16
     title: Command-line tool adapter (dxf-prep, etabs-model build)
+    # Amendment (B-504, documents only): tests/unit/test_runner.py joins the files for one test-helper fix: _meta_run_id
+    # closes its journal connection (the `with` form only commits), found by T16's local CI run (B-135); test code, not counted.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -425,6 +427,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
       - "packages/eng-harness/tests/fakes/sasaah_cli/**"
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"  # _meta_run_id closes its connection (B-504)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -473,7 +476,7 @@ tasks:
     depends_on: [T7]
   - id: T19a
     title: Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes
-    # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16 and T19;
+    # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16, T16b (B-499) and T19;
     # it also takes the two engine stops left out of T6b and T11 (AC9's engine clause, AC22), which fail at its base
     # because build_ports does not exist there yet.
     # Amendment (B-465, documents only): takes the saved fingerprint (B-451 L3) from the T12 split, about 13 counted
@@ -513,7 +516,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
     covers: [AC9, AC22, AC36, AC41, AC43]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
-    depends_on: [T14, T18, T20]  # external: engine plan 0001 T13, T15, T16 and T19 (section 3)
+    depends_on: [T14, T18, T20]  # external: engine plan 0001 T13, T15, T16, T16b and T19 (section 3)
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
     # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
@@ -779,8 +782,8 @@ they are used (plan 0014 T5, T7, T8).
 - Development: the root workspace group; no new development dependency.
 - Work items: the engine plan's ([0001-engine](0001-engine.md)) T1 (package skeleton) before this plan's T1; its T6
   (ports, port data types and fakes) before T8; its run loop, invariants and replay tasks before the workflow and
-  replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16 and T19 (T13 brings in T9 to
-  T12; B-413). No earlier task of this plan runs the real engine. T19a waits for no task of plan
+  replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
+  T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
   T19b waits for T16 and T19a. `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.

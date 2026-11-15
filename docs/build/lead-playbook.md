@@ -67,7 +67,8 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
    boundaries on both sides. Tests that read a file outside the member skip only when `MUTANT_UNDER_TEST` is set and the
    file is missing (pattern of B-369, B-444, B-449). A test that compares a calc content hash with the registry belongs
    only in `tests/contract/test_calc_lock.py`.
-5. Do not push and do not open a pull request. Leave the tree clean (everything committed). Write your handoff note to
+5. Do not open a pull request. Push only as section 7 item 6 says, and only when your role text tells you to push
+   (a role text that says "do not push" wins). Leave the tree clean (everything committed). Write your handoff note to
    `<lead>/reports/b<NNN>-writer.md` (done, how verified with command output tails, counted lines of budget,
    what is left, risks, anything a later task must know).
 6. Engineering tasks (code-pack checks, harness calcs): every expected value in a golden or case file carries its
@@ -97,8 +98,9 @@ echo $! > <lead>/logs/b<NNN>-gate.pid
 timeout 570 tail --pid=$(cat <lead>/logs/b<NNN>-gate.pid) -f /dev/null; tail -5 <lead>/logs/b<NNN>-gate.log
 ```
 
-Repeat the second command until the process has ended (a mutation step can take 30 to 120 minutes; do not give up, do
-not start a second run). Read the result from the log. If a step fails, fix it inside the task scope (usually: more
+Which run is due, and who fixes a failure, is in section 7 items 4 and 5 when your role text refers to them; otherwise
+run the full gate as above. Repeat the second command until the process has ended (a mutation step can take 30 to 120
+minutes; do not give up, do not start a second run). Read the result from the log. If a step fails, fix it inside the task scope (usually: more
 tests for surviving mutants; `uv run eng-gate check --package <member> --only mutation` reruns that step alone, under
 the same lock) and run again. Load-sensitive tests `tests/unit/progress/test_sink.py` and
 `tests/unit/pages/test_routes.py` may fail under load: rerun once before treating them as real.
@@ -192,10 +194,15 @@ in the repository) is the owner's instruction and takes precedence. Do not rewri
   carries its contract unit suffix in the specs and plans on `origin/build/v1` (for example
   `materials.concrete_fc_MPa`, `foundation.surcharge_kPa`, `durability.cover_footing_mm`, `compare.angle_deg`). The
   binding name is the one in the spec of your task on `origin/build/v1`, whatever a clause document, an older prompt or
-  an older branch says (the protected clause documents keep the old names until the owner renames them; the specs say
-  so). A writer finishing a branch written before the rename (b281, b395, b396) renames the fields in code, tests,
+  an older branch says (the ACI clause documents carry the same names since B-497, pull request 346, merged after the owner's
+  review on 2026-11-14). A writer finishing a branch written before the rename (b281, b395, b396) renames the fields in code, tests,
   golden data and verification records as part of its step and says so; a reviewer treats an old name left in the
   change as a finding of severity high. Inventory: `<lead>/reports/b484-writer.md`.
+- **Your task is your prompt, not the owner's latest chat line.** The owner's standing instruction to the lead is to
+  build the whole v1 project through subagents without stopping (section 0). If your context shows a later message of
+  the owner that is a status question (for example about the completion percentage), the lead answers it; it does not
+  replace or narrow the standing instruction and it is not your task. Do the work item your prompt gives you. Return
+  `NEEDS_OWNER` only for a decision the documents do not contain, never for lack of a request.
 - **Calc source and mutation.** mutmut turns a negative index literal such as `items[-1]` into `items[+1]`, and the
   calc-module rules test then fails on the mutated copy (FB005) before any mutant runs. In calc modules name the
   element without a numeric literal (see commit 69e9475 of pull request 324). Do not change the rules test for it.
@@ -216,3 +223,62 @@ in the repository) is the owner's instruction and takes precedence. Do not rewri
 Answer with the structured fields your prompt asks for. Status is one of `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`,
 `NEEDS_PLAN_AMENDMENT`, `NEEDS_OWNER` (an AGENTS.md section 7 item: say exactly what the owner must decide; do not
 guess). Three consecutive failed attempts at the same failure means stop and report, not a fourth attempt.
+
+## 7. Speed-up measures (owner instruction of 2026-11-14, work item B-506)
+
+The owner approved six measures on 2026-11-14 («طبق الاقتراحات فقط كتعديل على ملفات اسلوب العمل»). They change how work
+flows, never what is checked: test-first, the independent review, the adversarial verification of engineering content,
+the mutation step and local CI on the merged head stay exactly as sections 1 to 5 describe. Nothing here lets an agent
+skip a check, weaken a test or stretch a task past its file list or its budget. Items 4a, 5 and 6 apply to lanes started
+with lane script version 2 (`<lead>/build-lane-v2.workflow.js`); a lane resumed from an older run keeps its
+older role texts, and a role text always wins over this section for that role.
+
+1. **Pre-flight audit of the plans (lead step, in force at the next start).** Before a wave of tasks is launched the
+   lead runs `<lead>/plan-audit.workflow.js` over the plans of that wave (read-only: an auditor per plan checks
+   every remaining task's `files`, budget, `tests_first` and `depends_on` against the merged code; a second agent tries
+   to refute each finding), and turns the confirmed findings into ONE documents amendment per plan. First the plans on
+   the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0008, providers 0009),
+   later plans when their wave is near (an audit of code that will still change goes stale). Writers keep their own
+   duty: check the file list and the budget before writing everything, and stop early when the plan cannot hold the task.
+2. **Small edits of existing tests outside the file list (approved; NOT in force until the gate rule merges, work item
+   B-507).** A pull request is judged by the gate of its base commit, so until B-507's gate change is on `build/v1` the
+   rule of section 1 stands: a needed file outside `files` means `NEEDS_PLAN_AMENDMENT`. When the only out-of-list files
+   are existing test files with one-line to three-line edits, say so in `proposed_amendment` with the words
+   `test-only collateral` and the exact lines, so that the lead can batch it. The rule B-507 is to write into the gate
+   spec (the lead's proposal for the numbers; the owner sees the amendment): a change may edit test files that exist at
+   the base and are outside its task's `files` when all of this holds: at most 8 such files and at most 30 changed
+   lines in them together; no test is deleted, skipped or marked expected-to-fail; no expected engineering value,
+   tolerance or error code changes; each file is listed under a heading `Collateral test edits` in the pull request
+   body with its reason; the reviewer checks each one and says so. New test files, source files, configuration,
+   snapshots, lock files and documents stay under the old rule.
+3. **Documents-only pull requests in local CI (approved; NOT in force until work item B-508 merges).** Today a pull
+   request that changes only specs and plans runs `check --all`. B-508 may shorten that only where it is proven that
+   nothing is lost: a member's test job may be skipped only when no file of that member changed and no test of that
+   member reads a changed path (some tests read specs, clause documents, verification records and local-testing files:
+   they must still run). If that proof cannot be made mechanical in the gate, the item is dropped, not approximated.
+4. **Each gate step runs once before local CI.** (a) In force for version 2 lanes: the writer's (or the last fix
+   round's) handoff note records the head sha with the `check: pass` line of `uv run eng-gate check --package <member>
+   --skip mutation`. When the worktree head equals that sha, the gate runner runs only the mutation step:
+   `uv run eng-gate check --package <member> --only mutation`, under the machine lock and in the background exactly as
+   section 4 shows (log `<lead>/logs/b<NNN>-mutation.log`). When the head differs, or no such line is recorded,
+   it runs the full gate of section 4. Local CI then runs everything again on the merged head, as before.
+   (b) Approved, not in force until B-508: local CI may reuse a mutation result only for a member whose source and test
+   tree is byte-identical to the tree that result was computed on.
+5. **The gate runner runs and reports; a writer fixes (version 2 lanes).** The gate runner (a small model) edits no file
+   and commits nothing. It runs the due command, waits for the process however long it takes (the two commands of
+   section 4, the second repeated until the process has ended), and reports `DONE` with the result lines or `BLOCKED`
+   with the failing step, the failing lines from the log (every surviving mutant with file and line) and the log path.
+   A failure is fixed by a writer of the task's writer model in a `gate fix round` (tests only for mutants; never a
+   weakened check), which reruns the failed step alone under the lock, then the gate without mutation, records head sha
+   and result lines, and hands back to the gate runner. Source changes in a gate fix round go to the reviewer again.
+6. **Early push of the task branch (version 2 lanes; within the owner's approval of pushing task branches).** Work that
+   exists only in this container is lost if the container is reclaimed. So a writer, after its gate without mutation
+   passes and the tree is clean, pushes its own task branch: `git push -u origin <branch>` (retry rule of section 0).
+   Fast-forward only, never `--force`, never to `build/v1` or `main`, no pull request (the integrator opens it). A
+   writer that stops with `NEEDS_PLAN_AMENDMENT` commits what it has and pushes it too. Record the pushed sha in the
+   handoff note. If the remote branch already exists with another history, do not force: report it. A pushed branch is
+   never rebuilt in place: a rebuild (lead decision D-22) takes a fresh branch name (`-r2`).
+
+Lead bookkeeping for these measures: the queue and the order at the next start are in
+`<lead>/resume/RESUME.md`; the owner's words are in `<lead>/reports/owner-answers-2026-11-14.md`,
+section F.

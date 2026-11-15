@@ -62,7 +62,7 @@ tasks:
     title: SAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries
     # Amendment (B-475, documents only): test_safe_build_mismatch_stops_run (AC4's stop, engine AC44) returns here from
     # plan 0002 T19 (B-413 had moved it there). Plan 0002 T19a adds build_ports first, so the stop fails at T3's base for
-    # want of the SAFE entries and pinned SAFE fingerprint; T3 waits for 0002 T19a and engine plan 0001 T13, T15, T16, T19.
+    # want of the SAFE entries and pinned SAFE fingerprint; T3 waits for 0002 T19a and engine plan 0001 T13, T15, T16, T16b (B-499), T19.
     # Its expected error is defined in plan 0002 section 2, T19b.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
@@ -193,7 +193,7 @@ tasks:
   - id: T8
     title: Recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list
     # Amendment (B-413, documents only): runs the real engine, so it waits for plan 0002 T19a (B-475) and engine plan 0001 T13,
-    # T15, T16 and T19; the SAFE engine stop of AC4 is not here (no source file of T8 makes it fail at the base): T3 (B-475).
+    # T15, T16, T16b (B-499) and T19; the SAFE engine stop of AC4 is not here (no source file of T8 makes it fail at the base): T3 (B-475).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
@@ -338,7 +338,7 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   `build_ports` and T3 writes the SAFE engine stop of AC4 (`test_session.py::test_safe_build_mismatch_stops_run`) next
   to the ETABS one (B-475); T17 (record mode) before T8 of this plan.
   Engine plan 0001: T3 (the SAFE engine stop) and T8 of this plan run the real engine and wait for engine 0001 T13, T15,
-  T16 and T19 (T13 brings in T9 to T12), as plan 0002 T19a does (B-413, B-475). No cycle: plan 0002 waits for no task of
+  T16, T16b and T19 (T13 brings in T9 to T12; T16b, B-499), as plan 0002 T19a does (B-413, B-475). No cycle: plan 0002 waits for no task of
   this plan; T1 to T3 wait for plan 0002 T1 to T14 and T19a (0002 T15 only for T3's conditional `csi_unlock_model` entry).
 - First live run (amendment B-475, lead decision D-32): T1 to T3 are off its path (it runs ETABS only) and are not
   weakened; they return before T4, which the footing workflow (plan 0010 T10 and T11, through T5 to T7) and plan 0012
