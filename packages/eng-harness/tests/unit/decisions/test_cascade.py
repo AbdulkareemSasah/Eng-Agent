@@ -117,6 +117,7 @@ REF_OPTIONS = (f"{RES}#/fields/a/value", f"{RES}#/fields/b/value")
 CALLED: list[str] = []
 RATIOS: list[float] = []
 GUARDED: list[bool] = []
+STORES: list[LabelStore] = []
 
 
 class Guard:
@@ -244,12 +245,15 @@ def last(state: Members, basis: RuleBasis) -> Pick[int] | None:
 
 
 @pytest.fixture(autouse=True)
-def _reset() -> None:
+def _reset() -> Iterator[None]:
     CALLED.clear()
     RATIOS.clear()
     GUARDED.clear()
     GUARD.entries = 0
     GUARD.active = False
+    yield
+    while STORES:
+        STORES.pop().close()
 
 
 def _view() -> BasisView:
@@ -265,6 +269,7 @@ def _setup(
     settings = settings or DecisionSettings()
     clock = FixedClock(START_MS, 1)
     labels = LabelStore(tmp_path, settings, clock, SeededIdSource(b"labels", clock))
+    STORES.append(labels)
     cascade = Cascade(
         PointRegistry(points or (ACTION, MEMBER, NOTED, WIDE)),
         settings,

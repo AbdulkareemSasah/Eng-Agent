@@ -11,13 +11,13 @@ import hashlib
 from collections.abc import Callable
 from contextlib import AbstractContextManager
 from datetime import datetime, timedelta
+from typing import Any
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.ids import Clock, Timestamp
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
-from pydantic import BaseModel
-from pydantic_core import to_jsonable_python
+from pydantic import BaseModel, TypeAdapter
 
 from eng_harness.decisions._labels import LabeledExample, LabelStore, PendingRecord
 from eng_harness.decisions._points import PointRegistry, Refs, check_state_size
@@ -41,6 +41,7 @@ from eng_harness.errors import BlockRuleViolation, DecisionInvalid
 __all__ = ["Cascade"]
 
 _MILLISECOND = timedelta(milliseconds=1)
+_JSON: TypeAdapter[Any] = TypeAdapter(Any)
 
 
 def _values(call: DecisionCall) -> tuple[str, ...]:
@@ -70,7 +71,7 @@ def _field(label: str, value: object) -> list[ScreenField]:
         return _fields(value, label + ".")
     if isinstance(value, tuple) and any(isinstance(item, Ref | BaseModel) for item in value):
         return [shown for index, item in enumerate(value) for shown in _field(f"{label}.{index}", item)]
-    return [ScreenField(label=label, value=to_jsonable_python(value))]
+    return [ScreenField(label=label, value=_JSON.dump_python(value, mode="json"))]
 
 
 class Cascade:
