@@ -299,10 +299,10 @@ def test_concurrent_calls_are_bounded(tmp_path: Path) -> None:
     assert gauge.most == 3
     assert [_decided(a).decided_by for a in result] == [LLM_BY] * 5
     # a batching provider is asked once, whatever the limit
-    model = CountingModel(choices=answers, info=SINGLE.model_copy(update={"supports_batch": True}))
-    cascade, _ = _setup(tmp_path / "batch", model=model, limit=1)
+    batching = CountingModel(choices=answers, info=SINGLE.model_copy(update={"supports_batch": True}))
+    cascade, _ = _setup(tmp_path / "batch", model=batching, limit=1)
     assert [_decided(a).choice for a in _many(cascade, calls)] == ["rebar"] * 5
-    assert (model.sizes, model.singles) == ([5], 0)
+    assert (batching.sizes, batching.singles) == ([5], 0)
 
 
 def test_tiers_per_call(tmp_path: Path) -> None:
