@@ -1041,8 +1041,8 @@ keep their expectations. What the edit cycle does with this error at its step 9 
   defaults to `None`, so an `EnginePorts` built before the field existed (plan 0006 `cli/_wiring.py`, tests) still
   builds. `progress` `None` means no sink; `run_control` `None` means no stop request; `decision` `None` means
   `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
-  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T16b passes
-  all three in production once T14, T14b and T18 have merged.
+  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T14b passes
+  `decision` and plan 0006 T16b passes `progress` and `run_control` in production once T18 has merged (amendment B-510).
 
 ## 4. Verification
 
