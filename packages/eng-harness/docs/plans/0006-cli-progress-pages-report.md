@@ -629,7 +629,7 @@ tasks:
     # Amendment (B-412 sixth review, documents only): also binds decision_port_factory to the cascade of plan 0005 (waits for plan 0005 T7 and T10).
     # Amendment (B-412 eighth review, documents only): calc-port factory default spelled out; the port builder default waits for spec Q20; cli/_wiring.py added (under answer A, it draws the run id for run).
     # Amendment (B-412 tenth review, documents only): also binds the point_policies default (the point-policy mapping of step 5).
-    # Amendment (B-471, documents only): T18 split into T18a and T18b (owner instruction of 2026-11-12, spec Q20 answer A). T18a binds every default but the port builder; the workflow registry is plan 0007 T9's workflows/__init__.py (spec 0007 Q13), so T18a does not wait for plan 0010 T9; cli/_wiring.py moves to T18b.
+    # Amendment (B-471, documents only): T18 split into T18a and T18b (owner instruction of 2026-11-12, spec Q20 answer A). T18a binds every default but the port builder; the workflow registry is plan 0007 T9b's workflows/__init__.py (spec 0007 Q13), so T18a does not wait for plan 0010 T9; cli/_wiring.py moves to T18b.
     # Amendment (B-475, documents only): the decision assembler default is plan 0009 T10a's phase-1 assemble_decision_runtime (spec 0009 AC49), and the point_policies default is the empty mapping (spec Q16 (d)), not None.
     # Amendment (B-503, documents only): the tests-first test also checks the basis_fields map of the default calc port (spec 4.2.2 step 4); the port builder passes no basis (spec 0002 H-G9 closed); files and budget unchanged.
     # Amendment (B-510, documents only): load_providers_config and doctor.run are merged and bound by T14b and T16, not here (AC13 leaves covers: T16 covers it); T18a also binds basis_fields_of (T15) to the workflow's basis_fields (plan 0007 T6); budget unchanged.
@@ -862,7 +862,7 @@ test with such a workflow passes `--no-report`, and a fake-engine test that writ
 B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
 `resume` handlers there. Its fields include the engine factory, bound at once to the merged `eng_harness.engine.Engine`
 (engine plan T9 and T9b), and the workflow-registry field (default `None`; T18a binds it to the registry of
-`workflows/__init__.py` once plan 0007 T9, which creates it (spec 0007 Q13), merges; plan 0010 T9 adds its workflow
+`workflows/__init__.py` once plan 0007 T9b, which creates it (spec 0007 Q13), merges; plan 0010 T9 adds its workflow
 there; amendment B-471) (amendment B-412 fourth review); `_wiring.py` binds the page ports' `report` callable to `build_report` over the run's reader
 and store, and their stop check to `FileRunControl`; it builds `ReleaseMarks` from the configuration's
 `[project_lane.<tool>]` tables for `build_report` and the page ports (amendment B-412 ninth review). Amendment B-412 fifth review: the engine-factory field takes the
@@ -1054,7 +1054,7 @@ review; the eighth review spells the default out: it builds `HarnessCalcPort(reg
 run_class, clock, ids, basis_fields=...)` from the calc registry of spec 0003, the approvals file read by the merged
 `load_approvals` (`_calc/_approvals.py`), the calc settings from the configuration and the `basis_fields` map of spec
 0003 §4.12 and spec 0007 §4.5 (B-498), with the arguments T14 passes), the workflow registry of `src/eng_harness/workflows/__init__.py`
-(plan 0007 T9, the one task that creates that module and registers the model-edit-cycle workflow in it, spec 0007
+(plan 0007 T9b, the one task that creates that module and registers the model-edit-cycle workflow in it, spec 0007
 Q13; plan 0010 T9 and plan 0013 T11 and T13 add their blocks later, so T18a does not wait for them), `assemble_decision_runtime` (plan
 0009 T10a, the phase-1 assembly of spec 0009 AC49; amendment B-475), the point-policy mapping `point_policies` (amendment B-412 tenth review), bound to the empty mapping, the phase-1 value of spec Q16 (d), never `None` (amendment B-475), the cascade builder `decision_port_factory` (the `Cascade` of plan 0005 T7, wired to the engine by
 plan 0005 T10; amendment B-412 sixth review), and `basis_fields_of` (T15), bound to the workflow's `basis_fields`
@@ -1094,7 +1094,7 @@ decision, progress and run-control ports reach the real engine.
   T14b being merged; amendment B-510);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 T5 (`HarnessCalcPort` and its `preflight`, the `calc_port_factory` default); plan 0004
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 T6 (`WorkflowDef.basis_fields`) for T17c
-  and T18a, not T15, which injects `basis_fields_of` (amendment B-510); plan 0007 T9 for the workflow registry (`workflows/__init__.py`, spec 0007 Q13; plan 0010 T9 adds its workflow to it; amendment B-471); engine plan T20 (caller-chosen run id, for T18b; amendment B-471); for T14b (B-098),
+  and T18a, not T15, which injects `basis_fields_of` (amendment B-510); plan 0007 T9b for the workflow registry (`workflows/__init__.py`, spec 0007 Q13; plan 0010 T9 adds its workflow to it; amendment B-471); engine plan T20 (caller-chosen run id, for T18b; amendment B-471); for T14b (B-098),
   decision plan T7 (the `Cascade`) and T10 (the cascade's `runtime_summary()` and its engine wiring; amendment B-412
   sixth review: the cascade is the `decision_port_factory` default that T18a binds), engine plan T14b (`decision_runtime` in the header) and
   provider plan 0009 T1 (`load_providers_config`, merged; T14b binds it, amendment B-510) and T10a (`assemble_decision_runtime`, phase 1; amendment B-475). T14, T14c, T14b and T15 use
@@ -1148,7 +1148,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Launch-address opener (§4.4.4) | T3b (`opener`) | T3b | merged (`cli/_opener.py`) |
 | Clock and ids (§4.1) | T14 | T14 | merged (`eng_contract.ids`: `SystemClock` and the id helpers) |
 | Providers loader `load_providers_config` (step 1) | T14b (`providers_loader`) | T14b (amendment B-510) | merged (plan 0009 T1, `providers/_config.py`) |
-| Workflow registry (step 1) | T14 | T18a | plan 0007 T9 (`workflows/__init__.py`, spec 0007 Q13; amendment B-471) |
+| Workflow registry (step 1) | T14 | T18a | plan 0007 T9b (`workflows/__init__.py`, spec 0007 Q13; amendment B-471) |
 | Workflow basis fields, the `FieldSpec` list `build_draft` takes (step 3; amendment B-510) | T15 (`basis_fields_of`) | T18a (the workflow's `basis_fields`) | plan 0007 T6 (`WorkflowDef.basis_fields`) |
 | Workspace, `eng_contract.store.Workspace` (step 1, amendment B-412 seventh review) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |

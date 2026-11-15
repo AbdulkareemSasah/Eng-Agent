@@ -339,7 +339,7 @@ JSON line with `--json`, else a short text line. Exit codes are those of §6.
 | `open` | `--said-file F \| --said-stdin`, `--lang`, `--title`, `[--continues ID] [--project-label L] [--transcript-sha256 H] [--tool-session-id S]` | `task_opened` and `owner_words(request)`; echoes the stored text and `text_sha256` |
 | `said` | `--role`, `--said-file \| --said-stdin`, `--lang`, `[--gloss]` | `owner_words` |
 | `note` | `--text` | `narration` |
-| `search` | `--for --where --result [--detail] [--ref]...` | `searched`; `catalog: unavailable` while the workflow registry (plan 0007 T9) or allowlist module is absent in this build |
+| `search` | `--for --where --result [--detail] [--ref]...` | `searched`; `catalog: unavailable` while the workflow registry (plan 0007 T9b) or allowlist module is absent in this build |
 | `missing` | `--category --need [--target] [--gap-id] [--code] [--evidence]... [--blocking] [--words-ref]` | `not_found`; prints the `need_id` and, if an answered need matches (category plus target or gap id), the release that answered it |
 | `refused` | `--workflow --exit-code --code [--missing PATH]...` | `run_refused` and `not_found` (unknown workflow: `no_workflow`; `BASIS_INCOMPLETE`: `value_without_source`; "not available in this build": `harness_unavailable`) |
 | `instead` | `--way --text [--ref]...` | `did_instead` |

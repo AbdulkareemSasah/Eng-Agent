@@ -1,0 +1,255 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 uniform loads: set on a row the state holds, add of a new row",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. State: patterns DEAD and LIVE; frame load row (B1, DEAD, gravity) w 10 kN/m; area load row (F1, DEAD, gravity) q 2 kPa. c1 puts 12000 N/m on frames B1 and B2 in DEAD: 12000 N/m x 1 / 1000 = 12 kN/m. B1 has the row, so it is a `set` of /w_kN_m on [frame_loads, B1, DEAD, gravity]; B2 has none in that pattern, so it is an `add` of the whole row {frame B2, pattern DEAD, direction gravity, w_kN_m 12}. c2 puts the basis field loads.live_kPa = 3 kPa on area F1 in LIVE: F1 has no LIVE row, so an `add` {area F1, pattern LIVE, direction gravity, q_kPa 3}. c3 puts 2.5 kPa on F1 in DEAD: the row exists, so a `set` of /q_kPa 2.5. Sorted by key: area_loads before frame_loads; within area_loads (F1, DEAD) before (F1, LIVE); within frame_loads B1 before B2. c1 gives two effects: c1/1 (B1) and c1/2 (B2); c2 and c3 keep their ids.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "c1",
+          "kind": "frame_uniform_load",
+          "targets": [
+            "B1",
+            "B2"
+          ],
+          "values": [
+            {
+              "pointer": "/w_kN_m",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/w",
+              "unit": "kN/m"
+            }
+          ]
+        },
+        {
+          "item_id": "c2",
+          "kind": "area_uniform_load",
+          "targets": [
+            "F1"
+          ],
+          "values": [
+            {
+              "pointer": "/q_kPa",
+              "ref": "res_00000000000000000000000006#/fields/loads.live_kPa",
+              "unit": "kPa"
+            }
+          ]
+        },
+        {
+          "item_id": "c3",
+          "kind": "area_uniform_load",
+          "targets": [
+            "F1"
+          ],
+          "values": [
+            {
+              "pointer": "/q_kPa",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/2/q",
+              "unit": "kPa"
+            }
+          ]
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "c1",
+      "c2",
+      "c3"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "c1",
+          "kind": "frame_uniform_load",
+          "frames": [
+            "B1",
+            "B2"
+          ],
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "w": {
+            "source": "input",
+            "value": 12000.0,
+            "unit": "N/m"
+          }
+        },
+        {
+          "id": "c2",
+          "kind": "area_uniform_load",
+          "areas": [
+            "F1"
+          ],
+          "pattern": "LIVE",
+          "direction": "gravity",
+          "q": {
+            "source": "basis",
+            "path": "loads.live_kPa"
+          }
+        },
+        {
+          "id": "c3",
+          "kind": "area_uniform_load",
+          "areas": [
+            "F1"
+          ],
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "q": {
+            "source": "input",
+            "value": 2.5,
+            "unit": "kPa"
+          }
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [
+        {
+          "name": "DEAD",
+          "type": "dead",
+          "self_weight_ratio": 1.0
+        },
+        {
+          "name": "LIVE",
+          "type": "live",
+          "self_weight_ratio": 0.0
+        }
+      ],
+      "combinations": [],
+      "frame_loads": [
+        {
+          "frame": "B1",
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "w_kN_m": 10.0
+        }
+      ],
+      "area_loads": [
+        {
+          "area": "F1",
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "q_kPa": 2.0
+        }
+      ]
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "loads.live_kPa": {
+          "value": 3.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "c3",
+        "section": "model.load_set/1",
+        "key": [
+          "area_loads",
+          "F1",
+          "DEAD",
+          "gravity"
+        ],
+        "op": "set",
+        "pointer": "/q_kPa",
+        "value": 2.5,
+        "unit": "kPa"
+      },
+      {
+        "item_id": "c2",
+        "section": "model.load_set/1",
+        "key": [
+          "area_loads",
+          "F1",
+          "LIVE",
+          "gravity"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "area": "F1",
+          "pattern": "LIVE",
+          "direction": "gravity",
+          "q_kPa": 3.0
+        },
+        "unit": null
+      },
+      {
+        "item_id": "c1/1",
+        "section": "model.load_set/1",
+        "key": [
+          "frame_loads",
+          "B1",
+          "DEAD",
+          "gravity"
+        ],
+        "op": "set",
+        "pointer": "/w_kN_m",
+        "value": 12.0,
+        "unit": "kN/m"
+      },
+      {
+        "item_id": "c1/2",
+        "section": "model.load_set/1",
+        "key": [
+          "frame_loads",
+          "B2",
+          "DEAD",
+          "gravity"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "frame": "B2",
+          "pattern": "DEAD",
+          "direction": "gravity",
+          "w_kN_m": 12.0
+        },
+        "unit": null
+      }
+    ]
+  }
+}
