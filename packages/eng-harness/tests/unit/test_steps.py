@@ -156,6 +156,15 @@ def test_path_key_hashes_a_model_outside_the_grammar() -> None:
     assert path_key(raw) == "h" + hashlib.sha256(raw.encode()).hexdigest()[:12]
 
 
+def test_resume_path_hashes_model_keys() -> None:
+    """A housekeeping path takes the hash form of a model key outside the `key` grammar, as every path key (B-499)."""
+    raw = r"C:\models\a b@copy.edb"
+    assert resume_path(1, "units", raw) == "@resume1.units.h" + hashlib.sha256(raw.encode()).hexdigest()[:12]
+    assert resume_path(1, "units", "mod_1") == "@resume1.units.mod_1"
+    assert resume_path(3, "units", "k" * 200) == "@resume3.units." + "k" * 200
+    assert resume_path(3, "units", "k" * 201) == "@resume3.units.h" + hashlib.sha256(b"k" * 201).hexdigest()[:12]
+
+
 def test_path_length_limit() -> None:
     longest_allowed = Scope("/".join(["0"] * 511))  # 1021 characters; its first step is 1023 characters
     assert len(longest_allowed.begin()) == MAX_PATH_LENGTH - 1
