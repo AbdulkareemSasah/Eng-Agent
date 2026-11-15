@@ -1,11 +1,8 @@
 """Block and rule module rules (plan 0001 T17; spec 0001 4.1.2, AC19): imports, `.value`, arithmetic, loops, excepts."""
 
 import ast
-import os
 import tomllib
 from pathlib import Path
-
-import pytest
 
 import eng_harness.errors as errors_module
 
@@ -86,8 +83,6 @@ def check_source(source: str) -> list[str]:
 
 def _globs(*keys: str) -> list[str]:
     pyproject = PACKAGE / "pyproject.toml"
-    if not pyproject.is_file() and "MUTANT_UNDER_TEST" in os.environ:
-        pytest.skip("pyproject.toml is not part of the mutated copy")
     table = tomllib.loads(pyproject.read_text(encoding="utf-8"))["tool"]["eng-gate"]
     return [pattern for key in keys for pattern in table[key]]
 

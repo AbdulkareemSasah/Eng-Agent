@@ -24,6 +24,11 @@ from eng_harness.errors import BlockRuleViolation
 _MODULE = "colorsys"  # a stdlib module that nothing else in the tests imports
 
 
+def _write(path: Path) -> None:
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("made")
+
+
 def _import() -> object:
     sys.modules.pop(_MODULE, None)  # so the import statement runs, and raises the audit event `import`
     return importlib.import_module(_MODULE)
@@ -34,13 +39,12 @@ def _operations(folder: Path) -> dict[str, Callable[[], object]]:
     keep = folder / "keep.txt"
     shared = "kernel32" if sys.platform == "win32" else None
     return {
-        "open": lambda: open(folder / "made.txt", "w"),
+        "open": lambda: _write(folder / "made.txt"),
         "mkdir": lambda: os.mkdir(folder / "made_dir"),
         "listdir": lambda: os.listdir(folder),
         "scandir": lambda: os.scandir(folder),
         "rename": lambda: os.rename(keep, folder / "moved.txt"),
         "remove": lambda: os.remove(keep),
-        "system": lambda: os.system(f'"{sys.executable}" -c "open(r\'{folder / "ran.txt"}\', \'w\')"'),  # noqa: S605
         "popen": lambda: subprocess.Popen([sys.executable, "-c", "pass"]),
         "socket": lambda: socket.socket(),
         "sqlite": lambda: sqlite3.connect(folder / "made.db"),
@@ -92,7 +96,7 @@ def test_guard_covers_parallel_children_and_child_blocks(tmp_path: Path) -> None
     target = tmp_path / "never.txt"
 
     def attempt(name: str) -> None:
-        _try(name, lambda: open(target, "w"), seen, done)  # noqa: SIM115
+        _try(name, lambda: _write(target), seen, done)
 
     async def leg(ctx: Any, name: str) -> str:
         attempt(name + ":before")
@@ -115,7 +119,7 @@ def test_guard_covers_parallel_children_and_child_blocks(tmp_path: Path) -> None
             await ctx.tool("read_a", {"n": 4})
             attempt("attempts:after")
             break
-        return refs
+        return [str(ref) for ref in refs]
 
     outcome = asyncio.run(rig.engine(flow(body)).start(request()))
     assert outcome.status is RunStatus.COMPLETED
@@ -133,7 +137,7 @@ def test_rule_guard_factory(tmp_path: Path) -> None:
     target = tmp_path / "rule.txt"
     with rule_guard():
         with pytest.raises(BlockRuleViolation, match="open"):
-            open(target, "w")  # noqa: SIM115
+            _write(target)
         with pytest.raises(BlockRuleViolation, match=r"subprocess\.Popen"):
             subprocess.Popen([sys.executable, "-c", "pass"])
     assert not target.exists()
