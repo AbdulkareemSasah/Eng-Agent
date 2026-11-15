@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 from eng_contract.ids import FixedClock
-from eng_harness.cli._control import STOP_FILE, FileRunControl, StopRequest, read_stop, remove_stop, write_stop
 from pydantic import ValidationError
+
+from eng_harness.cli._control import STOP_FILE, FileRunControl, StopRequest, read_stop, remove_stop, write_stop
 
 AT = "2026-01-01T00:00:00.000Z"
 CLOCK_MS = 1_767_225_600_000

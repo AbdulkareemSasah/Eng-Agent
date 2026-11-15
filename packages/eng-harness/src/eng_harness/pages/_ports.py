@@ -14,6 +14,7 @@ from http import HTTPStatus
 
 from eng_harness import _html as h
 from eng_harness._html import SafeToken, Tag, el, trusted
+from eng_harness.errors import HarnessCode
 from eng_harness.journal import Event
 from eng_harness.journal import _events as ev
 from eng_harness.pages._answers import AnswerError, Request, bound_sha256, parse
@@ -24,6 +25,7 @@ from eng_harness.pages._wait import wait_for
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, InputRequest
 
 type ScreenBuilder = Callable[[PageHub, Request], Screen]  # T9 and T10 register theirs by `request.kind`
+_VOIDABLE = frozenset({"CHANGE_SET", "PROMOTION"})  # the approvals that bind a model (spec 0006 4.4.5)
 _NO_REPORT = h.document(trusted("Report"), [el(Tag.P, trusted("The report is not available yet."))], STYLESHEET)
 
 
@@ -58,6 +60,9 @@ class PageHub:
         self._report, self._ack_s, self._builders, self._setup = report, ack_timeout_s, builders, setup
         self._cond = threading.Condition()
         self._open: dict[str, _Open] = {}  # in the order the engine presented them, which is the journal's `seq` order
+        self._approved: list[str] = []  # approved `CHANGE_SET` and `PROMOTION` requests, in the order they resolved
+        self._voided: dict[str, str] = {}  # request id -> the message of the void (untrusted)
+        self._run_message: str | None = None  # a void with no request in this process (spec 0006 4.4.5)
 
     def register(self, request: Request) -> None:
         """Open `request` (engine loop); presenting it again, as after a refused answer, opens it afresh."""
@@ -77,8 +82,15 @@ class PageHub:
         return entry.answer
 
     def emit(self, event: Event) -> None:
-        """The page sink: an answer the journal now holds is recorded, and its waiting handler goes on."""
+        """The page sink: an answer the journal now holds is recorded, and its waiting handler goes on; an
+        `APPROVAL_VOID` failure marks the most recent approved change set or promotion voided."""
         match event.payload:
+            case ev.StepFailed(error=ev.HarnessError(harness_code=HarnessCode.APPROVAL_VOID, message=message)):
+                with self._cond:
+                    if self._approved:
+                        self._voided[self._approved[-1]] = message
+                    else:
+                        self._run_message = message
             case (
                 ev.ApprovalResolved(request_id=rid)
                 | ev.InputProvided(request_id=rid)
@@ -87,17 +99,28 @@ class PageHub:
                 with self._cond:
                     if (entry := self._open.get(rid)) is not None:
                         entry.recorded = True
+                        resolved = event.payload
+                        if (
+                            isinstance(resolved, ev.ApprovalResolved)
+                            and resolved.decision == "approve"
+                            and entry.request.kind in _VOIDABLE
+                        ):
+                            self._approved.append(rid)
                         self._cond.notify_all()
 
     def index(self) -> Response:
         """The open requests in `seq` order, each linked to its own page."""
         with self._cond:
             shown = [e.request for e in self._open.values() if not e.recorded]
+            message = self._run_message
         rows = [
             el(Tag.LI, _link(trusted("Open"), "request", r.request_id), h.field(trusted("Request"), r.title))
             for r in shown
         ]
-        body = [el(Tag.H1, trusted("Run")), _link(trusted("Report"), "report"), el(Tag.H2, trusted("Open requests"))]
+        body = [el(Tag.H1, trusted("Run")), _link(trusted("Report"), "report")]
+        if message is not None:
+            body.append(el(Tag.P, h.field(trusted("Voided approval"), message)))
+        body.append(el(Tag.H2, trusted("Open requests")))
         return page(HTTPStatus.OK, trusted("Run"), [*body, el(Tag.UL, *rows) if rows else el(Tag.P, trusted("None"))])
 
     def screen(self, kind: Kind, subject_id: str) -> Screen | None:
@@ -106,9 +129,21 @@ class PageHub:
             return self._setup(subject_id)
         with self._cond:
             entry = self._open.get(subject_id)
-        if entry is None or entry.recorded:
+            voided = self._voided.get(subject_id)
+        if entry is None:
             return None
         request = entry.request
+        if voided is not None:
+            body = [
+                el(Tag.H1, trusted("Voided")),
+                el(Tag.P, h.field(trusted("Reason"), voided)),
+                _link(trusted("Back")),
+            ]
+            return Screen(
+                trusted("Voided"), Subject("approval", subject_id, bound_sha256(request)), frozenset(), lambda _: body
+            )
+        if entry.recorded:
+            return None
         if (builder := self._builders.get(request.kind)) is not None:
             return builder(self, request)
         route: Route = "approval" if isinstance(request, ApprovalRequest) else "choice"
