@@ -1,6 +1,6 @@
 <!-- The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text. -->
 
-**Status of this copy:** the lead findings queue of the cloud session of 2026-11-14 (work item B-487), kept for the next lead and for the next engine and plan amendments. BUILD-STATUS section 6 holds the owner questions; this file holds the full list. `reports/b<NNN>-*.md` files it names lived in `<lead>/reports/` and are not kept.
+**Status of this copy:** the lead findings queue as it stood at the stop of 2026-11-14 about 21:00 UTC (work item B-506). `reports/b<NNN>-*.md` files it names lived in `<lead>/reports/` and are not kept here, except the ones saved beside this file.
 
 # Lead findings queue (for the next engine spec amendment and the owner queue)
 
@@ -66,3 +66,169 @@ replace its branch; Plan-Task line names T10.
 - OWNER O-3: 13 renames in 8 protected ACI clause documents (table in b484-writer.md section 2d) plus line 110 `limits.ratio_limit`.
 - LEAD O-2: aci318-14 tests/unit/test_bearing.py line 132 old name: fold into the next aci318-14 task that touches the file.
 - ADR-0034 merged as Proposed: owner acceptance and its six open questions (ADR section 'Open questions for the owner') go to the owner now.
+- 2026-11-14: lane editcycle-1 first run (wf_b258f30b-e6a): the B-196 writer refused the task (saw the owner's status question as the only request). Relaunched as wf_cbbe19b3-09c with an authority note; standing note added to playbook 5d.
+
+## From the engine-2 lane, completed 2026-11-14 (B-481 #322, B-113 E.T14 #326, B-350 E.T14b #332 merged; B-114 E.T15 NEEDS_PLAN_AMENDMENT)
+- B-114 (E.T15, approvals) is written in <worktrees>/b114 (commits ab0f9be test, 68568fc feat; 338 of 380 lines; gate pass without mutation). It needs engine/_runner.py in T15's files (one line: ports.approvals passed to Ctx). Amendment B-492 (B-488 to B-491 are registry entries of the checkpoint: I.T18b, I.T13b, S.T19b, P.T10b), then engine-3 lane continues B-114 to B-118.
+- read and decide steps always journal attempt 1 (_ctx_impl.py 259, 345-359); in a restored range ResumeIndex expects attempt+1 (calc and tool do that). Settle read and decide together (later engine amendment).
+- A hard kill after decision_made and before step_completed journals decision_made again for the same request id at the rerun; the reader takes the first. Spec 0001 4.5.3 or 4.4 could state it.
+- No DecisionPort wired: decide raises ContractError INTERNAL (no new code). Lead decision recorded here.
+- step_rerun reason for a rerun decision step is `read_in_flight` (enum has no decision reason); engineer-tier decide rerun: spec does not say whether it re-presents or reuses the answer.
+- ctx.ask stores quantity-typed fields with unit null: spec 0001 4.3.2 / plan T14b do not say how the unit is derived; needed before a block asks for a quantity (plans 0010, 0013).
+- tests/unit/test_runner.py::test_caller_chosen_run_id failed once under load on a leftover run.lock (flaky; watch).
+- E.T15 concerns: approval_requested.binding stored as dict (spec 4.9 writes a list); fingerprint and file-hash tracking after a step under an approval left to the task that journals tool saves (B-415 text); signed_off.outputs reading; only ctx.block is an expiry scope; approve step in flight resumes as NeedsReconciliation (as ask does; _inflight.py outside T15); need_approval helper kept.
+- Gate notice RT001: tools/eng-dev-gate noqa count fell 19 -> 18 (ratchet --update in a later gate task).
+
+## From the editcycle-1 lane (B-196 W.T2 NEEDS_PLAN_AMENDMENT, 2026-11-14)
+- B-196 written in <worktrees>/b196 (head aa802f6, 349 of 380 lines, nine hand-derived golden cases). The calc-module rules test (spec 0003 4.3 allowed imports) blocks eng_harness.kinds.edit_cycle and eng_harness.workflows.model_edit_cycle (ChangeSetDraft, refused_gap from T1b). Trial patch <lead>/reports/b196-trial-rules-test.patch. Amendment B-493 (spec 0003 4.3 plus plan 0007 T2 files), then B-196 continues in lane editcycle-2.
+- Spec questions recorded in the calc's verification record: harness.csi_name_lists/1 has no load-case list (K2 cannot check a load_case combination term); known joints = frame ends, area joints, restraint rows; a non-number basis value is SOURCE_MISSING; answer reference form #/fields/change_set/value/items/<i>/<field>.
+- W.T8 must pass the calc's BASIS_FIELDS as the CalcPort basis_fields.
+
+## Owner answers of 2026-11-14 («نفّذ التوصيات»)
+- Record: <lead>/reports/owner-answers-2026-11-14.md. Applied by B-495 (specs and plans) and B-494 (ADR-0034). Still unanswered: section C of the record (ADR-0034 acceptance, scenario C acceptance, clause documents route, combination factors, MODEL_CHANGED_OUTSIDE, point-policy mapping task). Next state checkpoint records the answers in BUILD-STATUS section 6.
+- QUEUED: B-496 (ADR-0034 status Proposed -> Accepted, README row, references, Arabic appendix with «أقبل») launches when lane owner-answers (wf_b225907a-526) has merged B-494.
+- B-497 (clause documents rename, owner-reviewed pull request, not merged by the integrator): lane clause-docs.
+
+## Lane calcs-3 finished (run wf_66240cfa-1a7), 2026-11-14
+
+- Merged: B-483 (#329), B-460 C.T8b (#333), B-148 C.T9 (#338). B-149 C.T10: REPAIR_BLOCKED at integration, pull request 343 open, not merged.
+- B-149 cause: TF004. `test_golden_expectations_are_valid_payloads` of the first test commit 15cb935 passes at the base
+  (it validates against `DesignSummary`, which exists at the base). The writer's local fix bfcfddc (not pushed) looks the
+  kind up through the calc registry, which fails at the base for the right reason, but test-first reads the first `test:`
+  commit, so the history must be rebuilt. LEAD DECISION (D-22): rebuild on a fresh branch
+  `feat/b149-harness-ct10-calc-4-design-results-r2`, new pull request replaces 343 (lane calcs-4). No force push.
+- DEFECT for the edit cycle (B-498, docs, before W.T3 = B-197): spec 0003 section 4.8 R3 with spec 0007 section 4.4.2:
+  a `set` or `add` effect on a whole combination (key [combinations, C]) cannot explain the item changes that D2 reports
+  under the nested key [combinations, C, items, case, case_type]; a correct load_combination_set edit gives `unexpected`
+  and FAIL. Either R3 lets a parent-key effect explain nested changes (then merged calc 3 needs a code follow-up), or
+  spec 0007 projects combination effects per item (only W.T3, not yet written, changes).
+- Spec 0003 wording gaps, merged code is the conservative reading (B-498 records them, no new behaviour): AC38 message
+  "no design results" has no field in harness.design_summary/1 (the code puts reasons in trace step `status_reasons`);
+  section 4.9 S5 `changes` when `previous` is absent (code: all lists empty); read-back: `remove` of an object still
+  present gives mismatch, an effect under a duplicated key is compared with every object, trace outputs are
+  [identical, status]; section 4.12 HarnessCalcPort signature lacks `basis_fields` (code has it, supplied at construction).
+- Open, not decided by documents (owner queue): Effect.unit is read by nothing (refuse a unit that differs from the
+  field's canonical unit?); section 4.9 does not say whether verdicts whose source is not `host` (Q7) or verdicts and
+  frames of different models are refused; R0 "(or its working copy)" cannot be recognised (RefMeta has no derived_from).
+- Still open from earlier: footing/subjects.py reads the old field `compare.angle`; the edit-cycle workflow (W.T8) must
+  pass BASIS_FIELDS as CalcPort basis_fields; RT001 notice (eng-dev-gate noqa count 19 -> 18) needs `ratchet --update`
+  in a separate change; golden cases of calc 3 use one tolerance for every kind (unit tests cover the lookup).
+- Count: plan tasks total is now 330 (plan 0015 adds 20, B-495 adds 1); merged 191 (188 + B-148, B-133, B-114).
+
+## Lane engine-3 finished (run wf_7e3d299f-d84), 2026-11-14
+
+- Merged: B-492 (#337), B-114 E.T15 (#341). B-115 E.T16: NEEDS_PLAN_AMENDMENT at the write stage; B-116 to B-118 skipped.
+- B-115: written and committed locally in <worktrees>/b115 (aaf8d4a test, 0add9db feat, 2326f2e test typing; not
+  pushed; note <lead>/reports/b115-writer.md): 408 counted lines against 380 (CHANGELOG 1, local-testing 2,
+  _ctx_impl 85, _modes 242, _promote 73, _runner 5), above the 400 cap, and files outside T16's list: engine/_runner.py
+  (5 lines) and six existing test files (one to three lines each). LEAD DECISION (D-12): split, never stretch:
+  amendment B-499 splits T16 into T16 (modes, always-ask, working copies) and T16b (file-copy promotion, work item
+  B-500); lane engine-4 then rebuilds B-115 to the amended T16 and writes B-500 from the same local work.
+- Findings the amendment B-499 must give a home or queue as open questions: (a) a promote step in flight is journaled
+  with effect "none" while spec table 4.3.2 says "write", and reconciling it through ToolPort.reconcile would be wrong;
+  (b) `ask` (and engineer-tier decision) is not in `_inflight._RERUN` although spec 4.5.3 says it is presented again
+  (AC36), T14b is merged; (c) DEFECT on the first-live-run path: `_steps.resume_path` does not hash model keys outside
+  the path grammar (@, /, backslash) and real keys are file paths: a resume raises ValueError; (d) spec 4.9 writes
+  `approval_requested.binding` as a list, merged code uses a map keyed by model key; (e) step_rerun of an approval
+  carries reason `read_in_flight`; (f) tool saves under an approval do not update the expected fingerprint and file
+  hash (plan 0007 T6 must extend Approvals.stepped); (g) FileOps.sha256 must use the adapter's file_sha256 definition;
+  writer readings where the spec is silent (every open model gets a copy at first write; promoting a model with no
+  working copy is a BlockRuleViolation; a rejected item rejects the whole write; grants are re-bound to the copy).
+- An approval asked inside an `attempts` or `parallel` child expires at the enclosing ctx.block return (B-114 note).
+
+## Usage limit stop and resume, 2026-11-14 (about 13:00 to 17:05 UTC)
+
+- All ten lanes died at the 5-hour usage limit (agents failed with "You've hit your 5-hour limit"). Nothing was lost:
+  worktrees intact, stale file integrate.owner.b196 removed (no flock process behind it).
+- Resume method that works: per-lane script <lead>/resume/resume-<lane>.js (the lane script with the exact
+  original args embedded as ARGS, taken from the session transcript; args also saved as <lane>.args.json and
+  args-by-run.json), copied to the session scratchpad (the Workflow tool only loads scripts from there or from paths it
+  returned), launched with resumeFromRunId = the lane's run id. Cached agents replay; only the dead agent runs again.
+- Resumed at 17:08 UTC: editcycle-2 (B-196 integrate), servers-2 (B-135 integrate, then B-136), clause-docs (B-497
+  integrate, no merge), owner-answers (B-494 review), calcs-4 (B-149 gate), editcycle-3 (B-498 review, B-199 write),
+  engine-4 (B-499 write), interface-2 (B-181, B-489 write). HELD until short lanes finish (pace, D-35):
+  amendments-zt5-gt2 (B-281 integrate, then B-282, B-283) and tasklog-docs (B-479 integrate).
+- Full lane results of the stopped runs: <lead>/reports/lane-results-2026-11-14.md.
+
+## Queue from those results (work items to open; numbers reserved)
+
+- B-501 (docs, structural-codes plan 0004 T5 files += packages/eng-harness/tests/unit/calcs/test_code_pack_route.py,
+  the third test that pins the registered check count; then B-334 Z.T5 applies the one-line test edit; pull request 331
+  is red until then). Deferred set.
+- B-502 (docs, plan 0015 gains task T0 "AGENTS template and workspace root rules for the task log (ADR-0034 PR B)" with
+  the 13 files, budget 100, so that B-477's commit 65a4e82 in <worktrees>/b477 has a Plan-Task; body Risk: r2, r3).
+  Task-log set; protected paths, owner review expected (AW02).
+- B-503 (docs, FIRST-LIVE-RUN PATH, after B-499 and B-498 merged): (1) the engine ignores summary.clean:
+  engine/_invariants.py Guard.check raises ModelIntegrityError only for a FailureEnvelope or ContractError, so a
+  READBACK_MISMATCH does not stop a run (spec 0001 invariant 1): needs an engine plan task; (2) gap H-G9 (spec 0002
+  line 992): no task hands the frozen basis value checks.readback_relative_tolerance_ratio to ReadBack.tolerance_ratio
+  (ports are built at step 1 of spec 0006 4.2.2, basis frozen at step 3, resume skips the freeze): decide how (a
+  build_ports argument, a setter on AdapterHostPort, or building the ports after step 3) and give it a task (T19a?);
+  until then every written quantity reads back READBACK_UNAVAILABLE; (3) T19a must add CSI_KINDS to the run's
+  KindRegistry, wire WrittenItems/host.wrote into CsiToolPort and Binding.pre_image_ref; (4) plan 0007 T4's inputs
+  harness.csi_design_results/1 and harness.csi_analysis_messages/1 use CsiRows from eng_harness.adapters.csi._replies,
+  which spec 0003 4.3 does not admit: move the model to a kinds module or type the inputs otherwise, before B-198;
+  (5) plan 0002 T14 names `preview` but the CSI preview is not built (ToolPort.preview came with engine T15): home in a
+  later task; (6) open questions, not to decide: does csi_design_run count as an adapter write (wrote())? audit-log
+  evidence of spec 0002 4.5.7 has no reader or format; a wanted value of zero is compared exactly; take_warnings() is
+  global (OQ-Q67); BUILD_CHANGED is not a HarnessCode member; attempt folder run_dir/tools/<op_id> against spec 4.7;
+  (7) decide before plan 0007 T9 merges whether the change-set model moves to a kinds-level module (calc hash closure,
+  circular import risk, plan 0013 imports private names from _change_set).
+- B-495 readings to confirm with the owner: the rerun cap stop uses the existing NeedsReconciliation stop (not a new
+  NEEDS_ENGINEER reason), and the one automatic rerun allowance starts again after each engineer decision; NOT_IMPLEMENTED
+  maps to exit 2 for every caller. B-495 added engine task T21 (30 lines) to plan 0001.
+- State checkpoint to do: BUILD-STATUS section 6 rows OQ-Q65, Q68, Q85, Q86, Q87, Q90 answered (2026-11-14); owner queue
+  ids for the B-465 questions; registry entries for T16b (B-500), T21, plan 0015 tasks; B-149 branch -r2.
+- B-497 notes: PR body Risk line (documents say r1); wording item at aci318_14.13_3_1_1 lines 62-63 ("Basis paths are
+  lower case ... not in a suffix") now contradicts the renamed rows: goes to the owner in the PR's "For the owner".
+- B-479: PR body Risk should be r3; local CI must pass --merged for PS005; lead runbook needs a push-scope step.
+
+## 2026-11-14 evening
+
+- B-196 W.T2 merged (#344): 192 of 330. Low spec findings of W.T2 for a later spec 0007 wording amendment: 4.4.1 input
+  `state` is flat fields in code; harness.csi_name_lists/1 has no load-case names (K2 cannot check a load_case term);
+  4.3.3 names no component for "dimension greater than zero" (thickness 0 passes when bounds.thickness_min_mm is 0);
+  a literal in a non-canonical unit is judged at its exact binary value (0.3 m = 299.999... mm is refused at min 300).
+- servers-2 ended: B-135 S.T16 REPAIR_NEEDS_PLAN_AMENDMENT (pull request 345 open). Cause of the CI failure, and of the
+  flaky test_caller_chosen_run_id noted earlier: helper `_meta_run_id` in tests/unit/test_runner.py never closes its
+  sqlite connection (wal/shm files vanish at garbage collection). Trial patch <lead>/reports/b135-trial-test-runner.patch.
+  The `trivial` Plan-Task reason excludes tests/, so: lane servers-3 (run wf_0d05cf16-f04): B-504 docs (T16 files +=
+  that test file) -> B-135 (apply patch, existing pull request 345) -> B-136 S.T17.
+- S.T16 spec notes: BUILD_CHANGED and LAUNCH_FAILED are not HarnessCode members (adapter uses HOST_ERROR with host_code);
+  attempt folder is run_dir/tools/<op_id>; script parameter names -Dxf and -Config are not in the spec (live check).
+- B-497 clause documents: pull request 346 OPEN, local CI PASS (9 jobs) on head 96c4f5d against base 4894701, NOT merged:
+  awaiting owner review (owner instruction of 2026-11-14). 12 files, 36 counted lines. Items for the owner in the body:
+  aci318_14.13_3_1_1 lines 62-63 wording now contradicts the renamed rows; test_bearing.py line 132 keeps the old name
+  (next aci318-14 code task); body Risk r0 while the documents say r1. After the owner merges: update playbook 5d and the
+  build/v1 copies (docs/build/lead-playbook.md line 195, lead-findings lines 58 and 66) at the next checkpoint.
+- tasklog-docs resumed (run wf_db726637-cfb) for the B-479 integration.
+- B-497 MERGED by the lead on the owner's instruction «راجعت الطلب 346، ادمجه» (squash d265bee, pull request 346).
+  Playbook 5d note updated. build/v1 copies (docs/build/lead-playbook.md line 195, lead-findings lines 58, 66) to update
+  at the next checkpoint. Follow-ups: wording of aci318_14.13_3_1_1 lines 62-63 (owner), test_bearing.py line 132 (next
+  aci318-14 code task). The integrator of B-494 was holding the lock at the time: it will see BEHIND and merge the base.
+- B-494 MERGED (#347): ADR-0034 records the four answers of 2026-11-14; status still Proposed. Lane adr-accept launched
+  (run wf_65fa107b-ac6): B-496 moves the status to Accepted on the owner's word «أقبل» and completes the Arabic appendix
+  from <lead>/reports/adr-0034-owner-words.md (the 16 answers of 2026-11-12, extracted from the session record;
+  all owner messages are in <lead>/reports/owner-words-transcript.txt). Checkpoint items: BUILD-STATUS lines 516
+  and 678 and docs/build/lead-findings.md line 68 still say six open questions.
+- B-498 MERGED (#348): repair (a), combination edits projected per item; new `change_set` and `basis` inputs of
+  harness.expected_effects. B-199 W.T5 NEEDS_PLAN_AMENDMENT: written (worktree b199, head 4aa388b), 371 counted lines
+  against 330. Lanes launched: editcycle-4 (run wf_985a361a-b3e): B-505 docs (T5 budget) -> B-199; run-gaps (run
+  wf_8090e001-2d6): B-503 docs (first-live-run gaps, seven items) -> B-197 W.T3.
+- Owner asked on 2026-11-14 whether this method guarantees working code; the lead's answer: it guarantees agreement
+  with the specs and with the fake server, not with the real host; the first live run is the real proof.
+
+## Speed-up measures approved by the owner, 2026-11-14 (work item B-506; no agent was run for it)
+
+- Applied as work-method edits only: playbook section 7 (and pointers in sections 2 and 4), lane script version 2
+  (`<lead>/build-lane-v2.workflow.js`: early push by writers, run-only gate runner on the small model with a
+  second runner if it dies, gate fixes by the writer model, mutation step alone when the head already passed the gate
+  without mutation), the audit script (`<lead>/plan-audit.workflow.js`), the order of the next start in
+  RESUME.md. Both scripts pass a syntax check; neither has run.
+- Numbers behind the measures (git log of build/v1 since 2026-11-12): 27 pull requests merged, 15 documents and 12
+  implementation; 7 of the 15 documents pull requests were plan amendments for a file list, a budget, an import rule or
+  a split, and 3 more of that kind were in flight at the stop (B-501, B-504, B-505). Local CI's gate job took 583 s on
+  a documents-only pull request (346). One integration at a time.
+- Not in force until code merges: measure 2 (B-507), measures 3 and 4b (B-508). Measure 3 may turn out small or be
+  dropped: some tests read specs, clause documents and verification records, so a documents-only pull request cannot
+  simply skip the tests.
