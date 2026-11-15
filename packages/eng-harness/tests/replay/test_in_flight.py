@@ -46,7 +46,15 @@ from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, JournalIntegrityError, RunRefused
 from eng_harness.journal import EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, HostLease, InputAnswer, Reconciliation, ServerCheck, UnitsState
+from eng_harness.ports import (
+    CalcInfo,
+    HostLease,
+    HostModelState,
+    InputAnswer,
+    Reconciliation,
+    ServerCheck,
+    UnitsState,
+)
 
 T = EventType
 WRITE_ARGS: dict[str, JsonValue] = {"n": 1, "model": "m1"}
@@ -539,3 +547,22 @@ def test_promote_in_flight_goes_to_the_engineer(
         assert last.attempt == 1
     else:  # run again as attempt 2 under its own op_id; the approval its first attempt used does not bar it
         assert (last.type, last.attempt) == (T.STEP_COMPLETED, 2)
+
+
+def test_a_promotion_found_applied_needs_the_working_copy_open(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spec §11 Q40: `applied` completes the promotion from the working copy's state; with none the step stays open."""
+    rig, engine, _, run_id, seen, _ = _cut_promotion(tmp_path, monkeypatch, "replace")
+    asyncio.run(engine.resume(run_id))
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(asked.request_id, answer(asked, "applied", "outcome"))
+    rig.host.models["m1.copy"] = HostModelState(loaded=False)
+    stopped = asyncio.run(engine.resume(run_id))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None
+    assert stopped.escalation.detail == (
+        "the promotion at step 2 was found applied, but the working copy m1.copy is not open"
+    )
+    assert (_events(rig, run_id, ev.StepReconciled), seen) == (
+        [],
+        [],
+    )  # still in flight: the next resume reads it again

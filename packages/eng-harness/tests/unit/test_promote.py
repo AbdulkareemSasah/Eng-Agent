@@ -212,3 +212,23 @@ def test_replay_promotion_is_a_gap(tmp_path: Path) -> None:
     assert "gap E-G1" in gap.message
     assert not [e for e in rig.events(outcome.run_id) if e.path and not e.path.startswith("@")]
     assert rig.host.ledger == []
+
+
+def test_promotion_without_a_working_copy_is_refused(tmp_path: Path) -> None:
+    """Spec §11 Q42: a model with no working copy has no target; `BlockRuleViolation`, no step journaled."""
+    rig = mode_rig(tmp_path)
+    caught: list[errors.BlockRuleViolation] = []
+    handle = ModelHandle(model_key="m1", model_id=rig.host.models["m1"].model_id or "", revision=0)
+    approval = Approval(request_id="apr_x", approved=True, rejected_items=(), item_reasons={}, reason=None)
+
+    async def body(ctx: Any) -> list[str]:
+        try:
+            await ctx.promote(handle, Promotion.FILE_COPY, approval)
+        except errors.BlockRuleViolation as exc:
+            caught.append(exc)
+        return []
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request(mode=PermissionMode.WORK_ON_COPY)))
+    assert outcome.status is RunStatus.COMPLETED
+    assert [c.message for c in caught] == ["model m1 has no working copy to promote"]
+    assert not [e for e in rig.events(outcome.run_id) if e.path and not e.path.startswith("@")]
