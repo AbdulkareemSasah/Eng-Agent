@@ -11,6 +11,7 @@ from eng_harness.servers._config import (
     ServersConfig,
     load_servers_config,
 )
+from eng_harness.servers._record import Recording, RecordMode, Sanitizer, verify_manifest
 from eng_harness.servers._session import CallEffect, ServerManager
 
 __all__ = [
@@ -20,9 +21,13 @@ __all__ = [
     "CliToolConfig",
     "ConfigError",
     "HostProgramConfig",
+    "RecordMode",
+    "Recording",
     "RoleConfig",
+    "Sanitizer",
     "ServerConfig",
     "ServerManager",
     "ServersConfig",
     "load_servers_config",
+    "verify_manifest",
 ]
