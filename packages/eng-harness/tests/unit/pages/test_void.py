@@ -72,6 +72,19 @@ def test_void_shown_on_resolved_request(tmp_path: Path) -> None:
         assert request.request_id not in w.client.get("/").body  # still not an open request
 
 
+def test_post_to_recorded_request_is_conflict_get_is_not_found(tmp_path: Path) -> None:
+    request = approval_request()
+    path = f"/request/{request.request_id}"
+    with wired(tmp_path) as w:
+        future = w.open(request)
+        token = w.client.token(path)  # a second answerer holds a token from before the first answer was recorded
+        assert w.answer(request, decision="approve") == HTTPStatus.OK
+        assert future.result(timeout=5) is not None
+        form = {"csrf": token, "shown_sha256": request.shown_sha256, "by": "bob", "decision": "approve"}
+        assert w.client.post(f"/answer/{request.request_id}", form).status == HTTPStatus.CONFLICT  # AC30
+        assert w.client.get(path).status == HTTPStatus.NOT_FOUND  # a recorded request is shown no more
+
+
 def test_void_marks_the_most_recent_approved_request() -> None:
     first, second = approval_request("apr_a"), approval_request("apr_b", kind="PROMOTION")
     port = _hub(first, second)
