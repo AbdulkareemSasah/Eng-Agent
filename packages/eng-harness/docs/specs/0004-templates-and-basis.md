@@ -212,7 +212,8 @@ section is optional and may be empty. Only these keys exist (AC3).
   `sha256 = payload_sha256({chain: [{name, version, file_sha256}...], resolved: <model>})`. The `file_sha256` of each
   link is the hash of its own validated model, not of its bytes, so formatting never changes identity (AC11).
 - `TemplateRepository(shipped_dir, user_dir, allow_synthetic=False)` finds `name@version` and lists templates. Shipped
-  templates are package data; the user folder comes from the settings file of spec 0006. Same name and version in both is
+  templates are package data; the user folder comes from the settings file of spec 0006 (its key is open: spec 0006
+  Q22, amendment B-510). Same name and version in both is
   an error, so a user file never silently shadows a shipped one.
 - `meta.status: draft` templates are usable and are flagged on the page and in the run report (§4.6). A shipped template
   moves to `approved` only with the owner's approval (process/10 §4).

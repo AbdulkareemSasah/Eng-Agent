@@ -371,8 +371,9 @@ modules it requires exist at T10b's base.
   needs T6; T10a needs T10 there, and T10b T9 there); engine plan T1, T2 and T6, and T14b for the header fields of AC48 and AC49; spec 0006
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
   0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
-  this plan (its tests use recorders); plan 0006 T18a (split from T18 by B-471) binds their defaults to `load_providers_config` and
-  `assemble_decision_runtime` once this plan's T1 and T10a have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18a there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
+  this plan (its tests use recorders); plan 0006 T14b binds the `providers_loader` default to `load_providers_config` (T1 is
+  merged; amendment B-510) and plan 0006 T18a (split from T18 by B-471) binds the `decision_assembler` default to
+  `assemble_decision_runtime` once this plan's T10a has merged. No task of this plan touches plan 0006's `cli/__init__.py`; T14b and T18a there bind the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - First live run (amendment B-475, lead decision D-32; phase 1 has no provider, spec 0005 AC17): T4, T6, T7 and T10b
   are off its path and are not weakened. They return with phase 2, before the first provider is configured (after spike
