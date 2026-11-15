@@ -2,12 +2,10 @@
 
 Purpose: a write whose `step_started` has no result is reconciled before the block is called (`applied` and
 `not_applied` become `step_reconciled`; anything else asks the engineer through `engine.in_flight`); a read, calc or
-similar step, or an ask, in flight gets `step_rerun`. A promotion in flight is a write with no reconciler (a file copy
-is no tool call): it goes to the engineer, and `applied` completes it from the working copy's state. `Fold` reads the
-steps a resume needs from the journal, and `ResumeIndex` replays a step marked for a rerun as one that runs again.
-Units: none.
-Errors: `Stopped` ends the resume with the journaled stop (or the abandoned run), also for a write found applied whose
-result could not be read; `JournalIntegrityError` for a write without an `op_id`; `ContractError` from a port call.
+similar step in flight gets `step_rerun`. `Fold` reads the steps a resume needs from the journal, and `ResumeIndex`
+replays a step marked for a rerun as one that runs again. Units: none. Errors: `Stopped` ends the resume with the
+journaled stop (or the abandoned run), also for a write found applied whose result could not be read;
+`JournalIntegrityError` for a write without an `op_id`; `ContractError` from a port call.
 """
 
 import logging
