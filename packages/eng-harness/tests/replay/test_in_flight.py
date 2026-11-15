@@ -9,6 +9,7 @@ rig's port-call log show what the resume asked of the ports.
 """
 
 import asyncio
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ import pytest
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from fakes.ports import failure
-from pydantic import JsonValue
+from pydantic import BaseModel, JsonValue
 from workflows.chain import ORIGINAL, ChainOutput, chain
 from workflows.ctx_flows import change_set, flow, request_id, success
 from workflows.hoststate import (
@@ -35,15 +36,17 @@ from workflows.hoststate import (
     start,
     trace,
 )
+from workflows.modes import approved, give_files, mode_rig, promoting, stored_writes
 from workflows.rig import Rig, asking, make_rig
 
 from eng_harness.calc import CalcStatus
+from eng_harness.ctx import ModelHandle
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, JournalIntegrityError, RunRefused
 from eng_harness.journal import EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import CalcInfo, HostLease, Reconciliation, ServerCheck, UnitsState
+from eng_harness.ports import CalcInfo, HostLease, InputAnswer, Reconciliation, ServerCheck, UnitsState
 
 T = EventType
 WRITE_ARGS: dict[str, JsonValue] = {"n": 1, "model": "m1"}
@@ -434,3 +437,105 @@ def test_approval_in_flight_is_presented_again_not_reconciled(tmp_path: Path) ->
     assert rerun.reason == "read_in_flight"
     assert len(rig.approvals.answers.get(rid, [])) == 0  # the journal's answer was used, the port was not asked
     assert [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.ApprovalResolved)] == [resolved]  # once
+
+
+class Size(BaseModel):
+    """The fields of the ask in `test_ask_in_flight_is_asked_again`."""
+
+    width: str
+
+
+def test_ask_in_flight_is_asked_again(tmp_path: Path) -> None:
+    """Spec 4.5.3, AC36: an ask whose `step_started` has no end is marked for a rerun and presented again."""
+    rig = make_rig(tmp_path)
+
+    async def body(ctx: Any) -> list[str]:
+        return [(await ctx.ask(Size, title="Size")).ref.ref]
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(asking())).run_id
+    ask = "ask_" + hashlib.sha256(f"{run_id}\n0".encode()).hexdigest()[:32]
+    args = {"title": "Size", "fields": Size.model_json_schema()}
+    began = {"kind": "ask", "name": "Size", "args": args, "args_sha256": payload_sha256(args), "effect": "none"}
+    writer = JournalWriter(rig.run_dir(run_id), rig.store, rig.clock, rig.ids)
+    writer.append(T.STEP_STARTED, began, path="0", attempt=1)  # the crash came after the step began
+    writer.close()
+    asked = rig.inputs.presented[-1]
+    rig.inputs.script(
+        ask, InputAnswer(request_id=ask, shown_sha256=asked.fields_schema_sha256, values={"width": "3"}, by="ada")
+    )
+    before = len(rig.events(run_id))
+    outcome = asyncio.run(engine.resume(run_id))
+    assert outcome.status is RunStatus.COMPLETED
+    assert [t for t in trace(rig, run_id, before) if t[1] == "0"] == [
+        ("step_rerun", "0", 1),
+        ("step_started", "0", 1),
+        ("step_completed", "0", 1),
+    ]
+    (rerun,) = _events(rig, run_id, ev.StepRerun)
+    assert rerun.reason == "read_in_flight"
+    assert [p.request_id for p in _events(rig, run_id, ev.InputProvided)] == [ask]  # answered once, not reconciled
+
+
+def _cut_promotion(
+    root: Path, patch: pytest.MonkeyPatch, at: str
+) -> tuple[Rig, Any, Any, str, list[object], tuple[Path, Path]]:
+    """A run cut off in the file copy of its promotion: before any copy (`at` `copy`) or after the replace."""
+    from eng_harness.engine import _promote  # here, so that the other tests of this file load without the module
+
+    rig = mode_rig(root)
+    files = give_files(rig, patch, root, "m1", b"original", b"accepted")
+    stored_writes(rig, patch)
+
+    class Cut(_promote.LocalFileOps):
+        def copy(self, source: Path, target: Path) -> None:
+            if at == "copy":
+                raise OSError("the power was cut")
+            super().copy(source, target)
+
+        def replace(self, source: Path, target: Path) -> None:
+            super().replace(source, target)
+            raise OSError("the power was cut")
+
+    workflow, seen = promoting(rig)
+    engine, run_id = approved(rig, workflow)
+    with patch.context() as cut:
+        cut.setattr(_promote, "LocalFileOps", Cut)
+        with pytest.raises(OSError, match="power"):
+            asyncio.run(engine.resume(run_id))
+    return rig, engine, workflow, run_id, seen, files
+
+
+@pytest.mark.parametrize(("choice", "at"), [("applied", "replace"), ("not_applied", "copy"), ("abandon", "copy")])
+def test_promote_in_flight_goes_to_the_engineer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, choice: str, at: str
+) -> None:
+    """Spec 4.5.3, §11 Q40: a promotion in flight is a write with no reconciler; the engineer says what became of it."""
+    rig, engine, _, run_id, seen, (original, copy) = _cut_promotion(tmp_path, monkeypatch, at)
+    (began,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepStarted) and e.path == "2"]
+    assert (began.kind, began.effect, began.op_id) == ("promote", "write", op_id(run_id, "2", 1))
+    stopped = asyncio.run(engine.resume(run_id))
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    asked = rig.inputs.presented[-1]
+    assert (asked.kind, options(asked, "outcome")) == ("engine.in_flight", ["applied", "not_applied", "abandon"])
+    assert not {"tool.reconcile", "tool.read_back"} & set(rig.log)  # a file copy is never sent to the tool port
+    rig.inputs.script(asked.request_id, answer(asked, choice, "outcome"))
+    outcome = asyncio.run(engine.resume(run_id))
+    state = rig.host.models["m1.copy"]
+    if choice == "abandon":
+        assert (outcome.status, seen) == (RunStatus.FAILED, [])
+        return
+    assert outcome.status is RunStatus.COMPLETED
+    (closing,) = _events(rig, run_id, ev.StepReconciled)
+    assert (closing.outcome, closing.decided_by) == (choice, "engineer:test")
+    handle = ModelHandle(model_key="m1", model_id=state.model_id or "", revision=state.revision or 0)
+    assert seen == [handle]
+    assert (original.read_bytes(), copy.read_bytes()) == (b"accepted", b"accepted")
+    assert (rig.run_dir(run_id) / "backups" / "m1.edb").read_bytes() == b"original"
+    last = [e for e in rig.events(run_id) if e.path == "2"][-1]
+    if choice == "applied":  # the result is the handle of the working copy's state, with no copy made again
+        assert closing.result is not None
+        assert closing.result.summary == handle.model_dump(mode="json")
+        assert last.attempt == 1
+    else:  # run again as attempt 2 under its own op_id; the approval its first attempt used does not bar it
+        assert (last.type, last.attempt) == (T.STEP_COMPLETED, 2)
