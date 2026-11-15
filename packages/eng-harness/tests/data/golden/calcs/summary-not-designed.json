@@ -1,0 +1,251 @@
+{
+  "source": "eng-harness spec 0003 §4.9 (S1 to S6) and §4.4; synthetic host verdicts, frames and basis, no project value",
+  "method_ref": "§4.9 S4",
+  "synthetic": true,
+  "derivation": "Frames F1, F2 (steel) and C1 (a concrete column the host design results do not cover). Host verdicts: F1 ratio 0.5 PASS, F2 ratio 0.7 PASS. report.top_n = 5. S2 order: F2 0.7, F1 0.5. S3: governing = F2; top = all 2 verdicts since 5 > 2, label 'top 2 of 2 by ratio'; failing = attention = []. S4: C1 has no verdict with subject (frame, C1): not_designed = ['C1']. S5 members: F1 PASS 0.5, F2 PASS 0.7. counts: PASS 2. S6: no FAIL; a frame is not designed: NEEDS_ENGINEER (not PASS).",
+  "inputs": {
+    "input": {
+      "verdicts": {
+        "verdicts": [
+          {
+            "source": "host",
+            "check_id": "host.csi.steel",
+            "code": "synthetic",
+            "clause": null,
+            "subject": {
+              "kind": "frame",
+              "id": "F1",
+              "station_mm": null,
+              "case": null
+            },
+            "demand": null,
+            "capacity": null,
+            "ratio": 0.5,
+            "ratio_limit": 1.0,
+            "status": "PASS",
+            "governing": false,
+            "trace_ref": null,
+            "assumptions": []
+          },
+          {
+            "source": "host",
+            "check_id": "host.csi.steel",
+            "code": "synthetic",
+            "clause": null,
+            "subject": {
+              "kind": "frame",
+              "id": "F2",
+              "station_mm": null,
+              "case": null
+            },
+            "demand": null,
+            "capacity": null,
+            "ratio": 0.7,
+            "ratio_limit": 1.0,
+            "status": "PASS",
+            "governing": false,
+            "trace_ref": null,
+            "assumptions": []
+          }
+        ],
+        "traces": [],
+        "counts": {
+          "PASS": 2,
+          "FAIL": 0,
+          "NOT_APPLICABLE": 0,
+          "NEEDS_ENGINEER": 0,
+          "ERROR": 0
+        },
+        "draft": false
+      },
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "C1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 12000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 12000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "report.top_n": {
+            "value": 5,
+            "unit": null,
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "verdicts": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "verdicts.set/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 5,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 5,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "NEEDS_ENGINEER",
+    "counts": {
+      "PASS": 2,
+      "FAIL": 0,
+      "NOT_APPLICABLE": 0,
+      "NEEDS_ENGINEER": 0,
+      "ERROR": 0
+    },
+    "governing": {
+      "subject_kind": "frame",
+      "subject_id": "F2",
+      "check_id": "host.csi.steel",
+      "case": null,
+      "station_mm": null,
+      "ratio": 0.7,
+      "ratio_limit": 1.0,
+      "status": "PASS"
+    },
+    "governing_by_group": [
+      {
+        "subject_kind": "frame",
+        "check_id": "host.csi.steel",
+        "row": {
+          "subject_kind": "frame",
+          "subject_id": "F2",
+          "check_id": "host.csi.steel",
+          "case": null,
+          "station_mm": null,
+          "ratio": 0.7,
+          "ratio_limit": 1.0,
+          "status": "PASS"
+        }
+      }
+    ],
+    "failing": [],
+    "failing_members": [],
+    "attention": [],
+    "top": {
+      "n": 2,
+      "of_total": 2,
+      "rows": [
+        {
+          "subject_kind": "frame",
+          "subject_id": "F2",
+          "check_id": "host.csi.steel",
+          "case": null,
+          "station_mm": null,
+          "ratio": 0.7,
+          "ratio_limit": 1.0,
+          "status": "PASS"
+        },
+        {
+          "subject_kind": "frame",
+          "subject_id": "F1",
+          "check_id": "host.csi.steel",
+          "case": null,
+          "station_mm": null,
+          "ratio": 0.5,
+          "ratio_limit": 1.0,
+          "status": "PASS"
+        }
+      ],
+      "label": "top 2 of 2 by ratio"
+    },
+    "not_designed": [
+      "C1"
+    ],
+    "members": [
+      {
+        "subject_kind": "frame",
+        "subject_id": "F1",
+        "check_id": "host.csi.steel",
+        "status": "PASS",
+        "ratio": 0.5
+      },
+      {
+        "subject_kind": "frame",
+        "subject_id": "F2",
+        "check_id": "host.csi.steel",
+        "status": "PASS",
+        "ratio": 0.7
+      }
+    ],
+    "changes": {
+      "newly_failing": [],
+      "newly_passing": [],
+      "other_changes": [],
+      "appeared": [],
+      "disappeared": []
+    },
+    "complete": true
+  }
+}

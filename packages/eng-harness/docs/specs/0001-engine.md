@@ -328,8 +328,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC37. Invariant 1: given a write on a model, then before the next read on that model, any approval, any calc or
   decision, and the block's return, a `check_model` step runs; errors raise `ModelIntegrityError`; no ctx argument or
   setting disables it; and over generated step programs every write is followed by a check before any of those steps.
-  Tests: `tests/workflow/test_invariants.py::test_check_after_write`,
-  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`.
+  A success envelope whose summary is not clean is such an error (amendment B-503, §4.6 row 1). Tests:
+  `tests/workflow/test_invariants.py::test_check_after_write`,
+  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`,
+  `tests/workflow/test_invariants.py::test_unclean_check_stops_run` (plan task T22).
 - AC38. Invariant 2: given a literal (number, quantity object or `Quantity`) for a parameter the ToolPort or CalcPort
   marks `engineering_quantity`, then `ContractError` `INVALID_ARGUMENT` with `field`, and no port call. Test:
   `tests/workflow/test_invariants.py::test_engineering_literal_rejected`.
@@ -514,11 +516,23 @@ modules (`rule_modules`: `src/eng_harness/rules/**`) may import only: `eng_harne
 `StepError` family of `eng_harness.errors`, other block modules (child blocks) and rule modules, `eng_contract.quantity`,
 `eng_contract.refs` (`Ref`, `RefString` only), `eng_contract.errors` (`ErrorCode` only, for routing),
 `eng_contract.verdicts` (`VerdictStatus` only), `eng_contract.kinds` and its submodules (payload types),
+`eng_contract.units` (`QUANTITY_KINDS`, `UNITS` only; amendment B-509), `eng_harness.kinds.edit_cycle` (payload
+types; amendment B-509),
 `eng_harness.decisions.types` (spec 0005 §4.1; it imports no engine, journal, port, network or database module), `pydantic`,
 `enum`, `typing`, `collections.abc`, and `__future__`. Everything else, in particular `eng_harness.engine`,
 `eng_harness.journal`, `eng_harness.ports`, adapters, the store, `asyncio` and any I/O module, is refused. This is
 types and the ctx API only, never I/O. Enforced by the block-module rules test (AC19) and by the gate's FB004 and FB005
 ([eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §4.8).
+
+**Kinds and units admitted by name (amendment B-509).** The merged workflow modules `model_edit_cycle._change_set` and
+`column_design._requests` import them. `eng_harness.kinds.edit_cycle` is admitted by that module's own name, never
+the package `eng_harness.kinds`. Its imports are limited to `collections.abc`, `typing`, `pydantic`,
+`eng_contract.refs` (`RefString`) and `eng_harness.kinds.calcs` (`CalcPayload`), whose chain reaches
+`eng_harness.calc` (`CalcStatus`), which `eng_harness.ctx` already imports: no engine, journal, port, adapter or I/O
+module. A new import in that module needs an amendment of this section first. `eng_contract.units` imports only the
+standard library, `pydantic`, `eng_contract._unit_table` and `eng_contract.errors`. Loading
+`eng_harness.kinds.edit_cycle` also runs `eng_harness/kinds/__init__.py`; as for `FieldSpec` below, that is a run-time
+load, not an import statement of block code.
 
 **Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix).** `eng_harness.block` exports
 `FieldSpec` (§4.2) by importing it from `eng_harness.basis._fields`, never from the package `eng_harness.basis`. That
@@ -946,7 +960,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 
 | # | Where and how | Raises | Tests |
 |---|---|---|---|
-| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
+| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag. Clean means a success envelope whose summary validates as the `CheckModelSummary` of `issues.model_check/1` with `clean` true; any other summary (an `error` issue such as `READBACK_MISMATCH` or `READBACK_UNAVAILABLE`, or a summary of another shape) fails the check as a failure envelope does: the step fails, `check_enforced` is `fail` and the flag stays set (amendment B-503) | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
 | 2 References for engineering quantities (P2) | `_invariants`, before the port call: every argument at a path in `ToolInfo.engineering_params` or `CalcInfo.engineering_params` must be a `Ref` or a result; a number, a quantity object or a `Quantity` is refused | `ContractError` `INVALID_ARGUMENT` with `field` (contract §5 step 2) | AC38 |
 | 3 No stale inputs | `_invariants`: every reference to `calc`, `decide`, `approve` is resolved with `eng_contract.refs.resolve_ref` and a `current_revision` that knows every model attached in the run (contract Q4). For `calc`, each argument's `RefRule` is `CalcInfo.ref_rules[path]` (the argument's field path); a path not listed gets the default `RefRule` (no kinds, no unit, `stale_ok` false), so `stale_ok` exists only where the calc declares it (spec 0003 §4.13). `decide` and `approve` use the default `RefRule` | `ContractError` `REF_STALE` (and the contract's other `REF_*` codes) | AC39 |
 | 4 Decisions cannot produce numbers (P10) | `_decide`: options must be a `StrEnum` subclass or a sequence of `Ref`; the answer must be a member value or an index into the sequence; the block receives the member or the `Ref` | `BlockRuleViolation` (options), `DecisionInvalid` (answer) | AC40 |

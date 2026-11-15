@@ -314,9 +314,11 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
 `enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
 (`eng_param`, for ref-capable inputs), `eng_harness.kinds.footing` (footing calcs), `eng_harness.kinds.column_design`
-(column calcs), `eng_harness.kinds.edit_cycle` (column and edit-cycle calcs, amendments B-462 and B-493) and
+(column calcs), `eng_harness.kinds.edit_cycle` (column and edit-cycle calcs, amendments B-462 and B-493),
 `eng_harness.workflows.model_edit_cycle._change_set` (the change-set model of spec 0007 §4.3, input of the edit-cycle
-calcs, amendment B-493). `calcs/__init__.py` may import
+calcs, amendment B-493) and `eng_harness.kinds.csi` (the payload models of the CSI harness kinds, among them `CsiRows`
+of `harness.csi_design_results/1` and `harness.csi_analysis_messages/1`, inputs of the edit-cycle calcs of spec 0007
+§4.4.3 and §4.4.4, amendment B-503). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
 
@@ -332,6 +334,13 @@ blocks and what those import (spec 0007 §4.1, §4.2) whenever `eng_harness.calc
 code (only its listed imports), and the two parents stay outside its `modules` (implicit parents, B-388). Therefore no
 module under `eng_harness.workflows`, nor any module it imports at load time, imports `eng_harness.calcs` at module
 level: that would be an import cycle (today only the `__main__` block of `_calc/_hash.py` imports it).
+
+`eng_harness.kinds.csi` is admitted by its own name (amendment B-503; spec 0002 §4.1, plan 0002 T21). It imports
+`pydantic` only: the adapter's reply mappers, which use `pathlib` and convert host replies, stay in
+`eng_harness.adapters.csi._replies`, which imports the models from it; an import from `eng_harness.adapters` stays
+refused. The module enters the `modules` (§4.5) of each calc that imports it, so a change to a CSI kind model changes
+those calcs' hashes, which then need verification again (process/10 §5); its parent `kinds/__init__.py` imports kind
+modules only.
 
 The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
 including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).

@@ -544,6 +544,9 @@ tasks:
     depends_on: [T16]
   - id: T17
     title: Runtime guard for block and rule code, and the block-module rules test
+    # Amendment (B-509, documents only): pre-flight audit. The rules test passes over the merged workflow modules, whose
+    # imports spec 4.1.2 now admits by name; tests/rules/test_block_modules.py leaves tests_first (it imports nothing
+    # T17 adds, so it is green at the base: TF004) and stays in files; AC19 stays covered here.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.engine (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -558,19 +561,22 @@ tasks:
       - "packages/eng-harness/tests/unit/test_guard.py::test_guard_blocks_io_in_block_code"
       - "packages/eng-harness/tests/unit/test_guard.py::test_guard_covers_parallel_children_and_child_blocks"
       - "packages/eng-harness/tests/unit/test_guard.py::test_rule_guard_factory"
-      - "packages/eng-harness/tests/rules/test_block_modules.py::test_rules_detect_violations"
-      - "packages/eng-harness/tests/rules/test_block_modules.py::test_package_block_modules_pass"
     covers: [AC18, AC19]
     depends_on: [T16b]  # B-499: after both halves of the former T16; T16b also edits _ctx_impl.py
   - id: T18
     title: Resource limits, progress sink, run control and the overhead benchmark
     # Amendment (B-412, documents only): adds the ProgressSink and RunControlPort fields of EnginePorts (None defaults, section 3) and the stop check between steps (spec 4.8 RunControlPort row); budget 220 -> 250.
+    # Amendment (B-509, documents only): pre-flight audit. The sink's seam is a hook in journal/_writer.py (AC58);
+    # estimate from merged engine tasks (_ctx_impl 45 to 83, _runner 1 to 40 in B-350, B-113, B-114, B-428):
+    # _resources.py about 100, _ctx_impl.py about 45, _runner.py about 40, _writer.py about 14, CHANGELOG 1: about 200,
+    # within 250 (an estimate, not a measurement).
     files:
       - "packages/eng-harness/pyproject.toml"
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/engine/_resources.py"
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/journal/_writer.py"  # optional on_commit hook, spec 4.10, AC58 (B-509)
       - "packages/eng-harness/tests/unit/test_resources.py"
       - "packages/eng-harness/tests/unit/test_progress.py"
       - "packages/eng-harness/tests/unit/test_run_control.py"
@@ -589,12 +595,13 @@ tasks:
     title: Crash-matrix replay suite with a worker process
     # Amendment (B-414, documents only): depends on T18, whose ProgressSink.emit is the only public seam right after each
     # journal commit; the worker crashes through it and through a ToolPort wrapper, and persists the fake ledger to a file.
+    # Amendment (B-509, documents only): pre-flight audit. The matrix passes against the merged engine, so this is a
+    # test-only pull request (title type test, test files only, no failing-first run; gate spec 4.7), as eng-contract
+    # plan T17; CHANGELOG.md and docs/local-testing.md leave files.
     files:
-      - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/tests/replay/test_crash_matrix.py"
       - "packages/eng-harness/tests/replay/_worker.py"
       - "packages/eng-harness/tests/workflows/**"
-      - "packages/eng-harness/docs/local-testing.md"
     max_changed_lines: 60
     max_sessions: 2
     tests_first:
@@ -636,6 +643,26 @@ tasks:
       - "packages/eng-harness/tests/replay/test_in_flight.py::test_second_not_applied_stops_for_the_engineer"
     covers: [AC71]
     depends_on: [T16b]
+  - id: T22
+    title: A check_model result whose summary is not clean stops the run (invariant 1)
+    # Amendment (B-503, documents only): new; the merged Guard.check raises only for a failure envelope or a
+    # ContractError and clears the dirty flag for any success envelope, so a READBACK_MISMATCH does not stop a run
+    # (spec 4.6 row 1, AC37). After T15 (merged), the last task that edited the test fakes; it shares only CHANGELOG.md
+    # with T16 to T21, so it does not wait for them. Plan 0007 T6 also edits _invariants.py and waits for T22 (that
+    # plan's section 3).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_invariants.py"
+      - "packages/eng-harness/tests/workflow/test_invariants.py"
+      - "packages/eng-harness/tests/fakes/ports.py"  # the fake's passing check answers a clean CheckModelSummary
+    # About 14 lines in _invariants.py (the summary validated as CheckModelSummary, the failed check journaled as for a
+    # failure envelope) and 1 of CHANGELOG.md (an estimate, not a measurement).
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_invariants.py::test_unclean_check_stops_run"
+    covers: [AC37]
+    depends_on: [T15]
 ---
 
 # Implementation plan: eng-harness engine
@@ -659,7 +686,7 @@ to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 an
 files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
 B-414: its worker crashes through T18's progress sink). T16 and T16b (the B-499 split) also share `_modes.py`,
 `tests/workflows/**` and `tests/replay/test_in_flight.py`, and T16b shares `_inflight.py` with T15 and T21, so T21
-follows T16b.
+follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -916,11 +943,27 @@ waits on them.
 **T17 Guard and block rules** (spec §4.3.4, §4.1.2). The audit hook with its context variable, wired into every ctx
 call so that it is off only during the engine's own step work and back on in parallel children, child blocks and
 attempts bodies, the public `rule_guard()` factory for the decision layer (exported from `engine/__init__.py`;
-budget 250 lines with it, B-068), and the AST rules test over fixture modules and over the package's block and rule globs (empty until later
-specs add blocks).
+budget 250 lines with it, B-068), and the AST rules test over fixture modules and over the package's block and rule
+globs. Amendment B-509 (pre-flight audit): the merged workflow modules `model_edit_cycle` and `column_design` must pass; the
+allowlist of spec §4.1.2 admits by name the `eng_harness.kinds.edit_cycle` and `eng_contract.units` they import, and
+the `|` of their type unions is a bitwise operator, not one of AC19's arithmetic operators.
+`tests/rules/test_block_modules.py` is written in the implementation commits, not in the first test commit: it scans
+fixtures and existing modules with its own helpers and is green at the base by nature (gate TF004). Its tests still
+gate AC19 at the head.
 
 **T18 Resources, progress, benchmark** (spec §4.10). Semaphores and host locks, sink delivery and detachment, and the
-overhead benchmark (also listed in `windows_tests`). Amendment B-412 (spec 0006 pre-flight): no other task wires the
+overhead benchmark (also listed in `windows_tests`). `test_engine_overhead_p95` runs the 1,000 write steps of AC60
+with a recording `ProgressSink` (defined in the test file) and `FakeRunControl` given as
+`EnginePorts(progress=..., run_control=...)`, so the measured overhead includes the sink delivery and the
+between-steps stop check. The test is red at the base because the fields do not exist. It still asserts a p95 below
+20 ms (amendment B-509). Every event goes through the one `JournalWriter`, whose `append` returns only the `seq`, so
+the sink's seam is in `journal/_writer.py` (amendment B-509, pre-flight audit): an optional
+`on_commit: Callable[[Event], None] | None` keyword, called after the commit and after `_seq` and `_chain` advance,
+with the `Event` built from the stored body (so `args_ref` is visible). `_resources.py` holds the sink fan-out, which
+catches every exception from `emit`, detaches the sink and logs; `_runner.py` passes it as `on_commit` at both
+`JournalWriter` constructions (start and resume, so `run_started` is delivered too). The hook tests go in
+`tests/unit/test_progress.py`: called once per append, not called when the write fails.
+Amendment B-412 (spec 0006 pre-flight): no other task wires the
 `RunControlPort`, so T18 adds the `progress` and `run_control` fields to `EnginePorts` (both `None` by default, §3) and
 the check of spec §4.8's `RunControlPort` row: between steps the runner calls `stop_requested(run_id)` when a port is
 given, and true pauses the run with `run_paused`, reason `stop_requested` (spec §4.4.2 event table), returning a paused
@@ -931,7 +974,11 @@ production.
 
 **T19 Crash matrix** (spec AC30). A worker process (`tests/replay/_worker.py`) runs a mixed test workflow and calls
 `os._exit` at each of S-10's four crash points for every step; the test resumes each and compares the fake host's
-ledger and the outputs with an uninterrupted run. Almost all of it is test code. Amendment B-414: the worker crashes
+ledger and the outputs with an uninterrupted run. Amendment B-509 (pre-flight audit): all of it is test code, and the
+matrix passes against the merged engine, so the gate's failing-first run cannot hold (TF004 for a `feat` pull
+request). T19 is a `test(eng-harness): ...` pull request: every commit changes test files only (TF007), its single
+commit is `test:`, and there is no `feat` commit and no CHANGELOG line. An engine defect the matrix finds is a separate
+work item with its own amendment, not part of T19. Amendment B-414: the worker crashes
 through a recording `ProgressSink` whose `emit` calls `os._exit` on the target event (before_started: on the event
 committed just before the step's `step_started`; after_started: on `step_started`; after_completed: on
 `step_completed` or `step_failed`) and through a wrapper of the fake `ToolPort` that exits right after the call
@@ -964,6 +1011,19 @@ engineer through the existing `engine.in_flight` request (`applied`, `not_applie
 checks that the next attempt runs. The merged T20 needs no change for spec Q38: a `SERVER_CHECK_FAILED` refusal removes
 nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses a start whose run folder exists.
 
+**T22 An unclean check stops the run** (spec §4.6 row 1, AC37; amendment B-503). `Guard.check` takes a success
+envelope as clean only when its summary validates as `eng_contract.issues.CheckModelSummary` with `clean` true (the
+summary of `issues.model_check/1`, spec 0002 §4.5.8). Any other success envelope is handled as a failure envelope is
+today: the step fails with harness code `MODEL_INTEGRITY` (the message names the summary's error count), `check_enforced`
+is `fail`, the dirty flag stays set, and the block's call raises `ModelIntegrityError` whose `evidence` holds the
+envelope's `result_id` (the stored check, so a block can show it). A summary of another shape counts
+as not clean. `test_unclean_check_stops_run` scripts, through the rig's `script_check`, a success envelope whose summary
+has one error and `clean` false after a write. It checks that the next read raises `ModelIntegrityError` with that
+evidence, that no port call follows, and that the journal holds the failed `p~pre.check_model` step and
+`check_enforced` `fail`. The fake host
+port's passing check (`tests/fakes/ports.py`) answers a clean summary (zero counts, `clean` true), so the merged tests
+keep their expectations. What the edit cycle does with this error at its step 9 is spec 0007 §11 Q14.
+
 ## 3. Dependencies
 
 - Runtime: `eng-contract` (workspace member) and `pydantic` (named by
@@ -991,7 +1051,7 @@ nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses
   coverage. The pull request links its CI run; local output is not evidence (process/05 §8).
 - Windows: `tests/windows/` and `tests/perf/` run in the Windows CI job (run lock on NTFS, overhead on the Windows
   runner's disk).
-- Needs local test (listed in `docs/local-testing.md` by T1, completed by T11b, T11c, T16, T16b and T19; items 1 to 4 need
+- Needs local test (listed in `docs/local-testing.md` by T1, completed by T11b, T11c, T16 and T16b; items 1 to 4 need
   no host program, but they need the owner's machine): (1) the overhead benchmark and the fsync cost on the owner's
   workstation disk, with antivirus active, against the 20 ms target; (2) the run lock released after killing the engine
   from Task Manager; (3) a resume after a forced power-off of a virtual machine (power loss is not covered by tests);
@@ -1000,7 +1060,7 @@ nothing the server checks wrote, and `test_caller_chosen_run_id` already refuses
   host is killed during a write (T11b), and the host-crash, reopen and restore items (T11c). Only the fakes run them
   here; every other step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
-  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16 and T16b additionally against the invariant
+  type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16, T16b and T22 additionally against the invariant
   and replay rules of the spec (R1: model writes); T16, T16b and T17 with the security lens (file paths, the audit hook).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 

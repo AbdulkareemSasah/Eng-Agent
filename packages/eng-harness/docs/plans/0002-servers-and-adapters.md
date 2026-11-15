@@ -417,6 +417,8 @@ tasks:
     depends_on: [T14]
   - id: T16
     title: Command-line tool adapter (dxf-prep, etabs-model build)
+    # Amendment (B-504, documents only): tests/unit/test_runner.py joins the files for one test-helper fix: _meta_run_id
+    # closes its journal connection (the `with` form only commits), found by T16's local CI run (B-135); test code, not counted.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -425,6 +427,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"
       - "packages/eng-harness/tests/fakes/sasaah_cli/**"
       - "packages/eng-harness/tests/workflow/adapters/test_cli.py"
+      - "packages/eng-harness/tests/unit/test_runner.py"  # _meta_run_id closes its connection (B-504)
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -486,12 +489,19 @@ tasks:
     # Amendment (B-495, documents only): owner answer of 2026-11-14 (spec section 11 Q9): the refusal exits 2 (USAGE),
     # not 70; cli/_exit.py maps its code NOT_IMPLEMENTED to 2 (spec 0006 section 6), about 1 line; budget 230 + 5.
     # The case ("NOT_IMPLEMENTED", 2) joins the error-code table test tests/unit/cli/test_exit_codes.py (test code).
+    # Amendment (B-503, documents only): the first-live-run wiring gaps (spec AC44, AC45; closes H-G9): the read-back
+    # tolerance provider (about 20 lines in adapters/__init__.py, 8 in _hostport.py), the shared written-items book,
+    # host.wrote, the CSI reconciler, the run's Revisions and host.reopened passed to CsiToolPort (about 10), the
+    # pre-image on a write's binding and ToolPort.preview in _toolport.py (about 8 and 28, its refusal of a binding without host included), 2 of
+    # CHANGELOG.md: budget 235 + 78 = 313 (an estimate). CSI_KINDS reach the run's registry through T21; Revisions comes from plan 0007 T5
+    # and reopened from plan 0007 T13, so T19a waits for both (section 3).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/_identity.py"  # record_save keeps the saved state's fingerprint (B-465)
-      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # save returns that fingerprint (B-465)
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # save returns that fingerprint (B-465); the tolerance provider (B-503)
+      - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"  # pre-image on a write's binding, preview (B-503)
       - "packages/eng-harness/src/eng_harness/cli/_exit.py"  # NOT_IMPLEMENTED to exit 2, spec 0006 section 6 (B-495)
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
@@ -502,7 +512,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"  # T10's test: the saved fingerprint (B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"  # the NOT_IMPLEMENTED case (B-495)
-    max_changed_lines: 235
+    max_changed_lines: 313
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
@@ -512,8 +522,11 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py::test_error_codes"  # case NOT_IMPLEMENTED -> 2 (B-495)
       - "packages/eng-harness/tests/workflow/servers/test_session.py::test_build_mismatch_stops_run"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py::test_units_trap"
-    covers: [AC9, AC22, AC36, AC41, AC43]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
-    depends_on: [T14, T18, T20]  # external: engine plan 0001 T13, T15, T16, T16b and T19 (section 3)
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_readback_tolerance_from_run_basis"  # AC44 (B-503)
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image"  # AC45 (B-503)
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_preview_sends_no_write"  # AC45 (B-503)
+    covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
+    depends_on: [T14, T18, T20, T21]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3)
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
     # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
@@ -558,6 +571,31 @@ tasks:
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py::test_unit_header_missing_on_unserved_tool"
     covers: [AC40, AC41, AC42]
     depends_on: [T7]
+  - id: T21
+    title: CSI harness kinds in a kinds module, registered in HARNESS_KINDS
+    # Amendment (B-503, documents only): new. A store over HARNESS_KINDS refuses an analysis or design result today, and
+    # the edit-cycle calcs of plan 0007 T4 cannot import CsiRows from adapters/csi/_replies.py (spec 0003 4.3). Moves the
+    # six payload models and CSI_KINDS (about 60 lines of _replies.py) to kinds/csi.py; _replies.py re-exports them;
+    # _kinds.py extends HARNESS_KINDS with CSI_KINDS. Three tests that extend HARNESS_KINDS with CSI_KINDS (two merged,
+    # one added by plan 0007 T5, which T21 follows) take HARNESS_KINDS as it is (one line each, test code). Budget: about
+    # 65 added and 60 removed lines, 2 in _kinds.py, 2 in pyproject.toml, 2 of CHANGELOG.md: 131; 150 (an estimate).
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.kinds.csi
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/kinds/csi.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_replies.py"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"
+      - "packages/eng-harness/tests/contract/test_csi_kinds.py"
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # the admitted module eng_harness.kinds.csi (spec 0003 4.3)
+      - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py"  # HARNESS_KINDS already holds CSI_KINDS
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_analysis.py"  # HARNESS_KINDS already holds CSI_KINDS
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_read_state_tool.py"  # added by plan 0007 T5; HARNESS_KINDS already holds CSI_KINDS
+    max_changed_lines: 150
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_csi_kinds.py::test_csi_kinds_registered"
+    covers: [AC46]
+    depends_on: [T13]  # external: plan 0007 T5 (section 3)
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -575,6 +613,7 @@ into the engine and runs the crash matrix, together with the two engine stops th
 build check, the units trap; B-413), and T19b, which adds the command-line tools to that wiring (amendment B-475: T19
 split so that the first live run, the edit cycle on ETABS, waits for neither the command-line adapter nor record mode).
 T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1) needs and that no CSI task uses.
+T21 (B-503) moves the CSI kind models to a kinds module and registers them, before T19a and edit-cycle plan 0007 T4.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line and
@@ -582,14 +621,18 @@ any public module to `[tool.eng-gate] public_modules`. Workflow tests start the 
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
-serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T12, T14, T16), `_hostport.py` (T10, T11b,
-T12b, T19a), `_identity.py` and `test_csi_session_ops.py` (T10, T19a), `adapters/__init__.py` and `test_build_ports.py`
+serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
+T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503), `_hostport.py` (T10, T11b,
+T12b, plan 0007 T13, T19a; B-503), `_identity.py` and `test_csi_session_ops.py` (T10, T19a), `adapters/__init__.py` and `test_build_ports.py`
 (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
-adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15),
+adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15; plan 0007 T5 and T13, B-503: T15 and
+those two are not ordered, so whichever lands second adapts),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
-T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` and
+T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T17), `servers/_config.py` and `test_config.py` (T1, T6, T20),
-`_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). Parallel tasks
+`_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). `_kinds.py` is shared by T21 and every
+later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0013 T2; B-503): none
+waits for T21 or T21 for it, and whichever lands second adds its registry to the line the other wrote. Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -699,7 +742,7 @@ compared "within the design basis field `checks.readback_relative_tolerance_rati
 quantities; never a constant here, §11 G-2)" (spec §4.5.8); by the owner answer of 2026-11-14 (amendment B-495,
 spec §11 Q8) that value comes from the basis field, passed by the workflow, and arrives as `ReadBack.tolerance_ratio`
 (`check_model(model_key)` takes no basis); when none is passed a quantity read back is `READBACK_UNAVAILABLE`, as
-merged. No task delivers the value yet (spec §11 H-G9). The write hook is in
+merged. T19a delivers the value from the run's frozen basis (spec §4.5.8, AC44; H-G9 closed by amendment B-503). The write hook is in
 `CsiToolPort` (`csi/_tools.py`): it wraps its edit
 builders (`EDIT_BUILDERS`), whose builder sees the canonical model and the binding before the send, to call the
 written-items book's `prepare`; `CsiToolPort.call` runs `commit` after a successful reply and then
@@ -711,7 +754,9 @@ three force kinds, analysis messages. The T11 mappers in `_replies.py` raise `HO
 of a bare `KeyError` or a pydantic `ValidationError` (B-451 L1, tested in `test_csi_replies.py`; amendment B-465).
 
 **T14 Reconciliation** (§4.5.7). The per-tool rules with pre-images and evidence, `read_back`, `preview`;
-analysis and design reconcile `unknown` while no proof of end exists (gap H-G7).
+analysis and design reconcile `unknown` while no proof of end exists (gap H-G7). The merged T14 built no `preview`
+(`ToolPort.preview` arrived later, with engine plan T15) and set no pre-image on a write's binding; both are T19a's
+(amendment B-503).
 
 **T15 ADR-0031 switch.** Blocked until the owner accepts ADR-0031 and `eng-contract` releases `model_unlocked` and
 `server_owned_instance`. Then: the new mappings, `csi_unlock_model` on the allowlist with action `unlock`, and the
@@ -753,6 +798,36 @@ answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries:
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
+Wiring list of the CSI ports (amendment B-503; spec AC44, AC45). `build_ports` builds one `WrittenItems` book and
+hands it to both ports: to `AdapterHostPort` inside its `ReadBack` (with the run's store and the server's
+`ServerCheck`) and to `CsiToolPort` as `written`, with `wrote=host.wrote`, the CSI `Reconciler` of
+`csi/_reconcile.py`, `revisions=Revisions(run_dir / "copies", run_dir / "adapter" / "revisions.json")` (plan 0007
+T5) and `reopened=host.reopened` (plan 0007 T13). The run's `KindRegistry` holds `CSI_KINDS` through
+`HARNESS_KINDS` (T21), so an analysis or design result is stored. Read-back tolerance (closes spec H-G9):
+`AdapterHostPort` gains a keyword `tolerance`, a callable answering the ratio or `None`; `check_model` calls it until
+it answers a value, keeps that value and uses it in place of `ReadBack.tolerance_ratio`. `build_ports` passes a
+provider that opens `JournalReader(run_dir)`, takes the `basis_ref` of `run_started`, loads it with
+`StoreBasisPort(store)` and answers the number at `checks.readback_relative_tolerance_ratio`; it answers `None` while
+the journal or header is missing (`JournalIntegrityError`), the basis does not load (`BasisInvalid`) or the field is
+absent or holds no number. This changes no engine port and needs nothing from the command line: `Engine.start` writes
+the header before any step, and a resume keeps it (spec §4.5.8, spec 0006 §4.2.2).
+`test_build_ports.py::test_readback_tolerance_from_run_basis` writes a quantity through the built ports in a run
+whose basis holds the field and checks the comparison within it, then resumes the run in a new engine with new ports
+and checks it again, and with a basis without the field checks `READBACK_UNAVAILABLE`. Pre-image (spec §4.5.7): the
+`ModelBinder` sees no call arguments, so `AdapterToolPort._call` itself, for a write tool when it has a reconciler,
+takes `read_back(tool, args)` before the ledger entry and sets the binding's `pre_image_ref` to
+`<result_id>#/value/observed` of that stored read (none when the tool has no read-back), so the ledger entry carries
+it. `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as `harness.run_output/1`, takes the
+pre-image as above, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the
+two stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no
+write is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with
+precondition `model_open` before it stores anything (as `AdapterHostPort._held` does).
+`test_csi_wiring_shares_book_and_pre_image` checks, through the built ports, that a written edit is in the book that
+`check_model` reads, that the next `model_state` gives no `MODEL_CHANGED_OUTSIDE`, that the ledger entry's
+`pre_image_ref` resolves to the value read before the write, and that `csi_save_model` with `as_new_revision` and
+`csi_open_revision` work on the run's copies folder; `test_csi_preview_sends_no_write` checks the preview, that the
+fake server logged no write, and that a binding without `host` is refused with nothing stored.
+
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
 routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`
 of such a tool reach it (`test_build_ports.py::test_cli_tool_routed_through_build_ports`); it replaces T19a's H-G8
@@ -773,6 +848,21 @@ descriptors and `Allowlist.units`, where a `missing` entry may name an unserved 
 0014 T1 and T3, which start after this task; the issue codes, host codes and harness kinds of A3 are implemented where
 they are used (plan 0014 T5, T7, T8).
 
+**T21 CSI kinds in a kinds module** (amendment B-503; spec AC46, §4.1; spec 0003 §4.3). The payload models of the
+harness kinds of spec A1 that T11 and T13 put in `adapters/csi/_replies.py` move unchanged to
+`src/eng_harness/kinds/csi.py`, which imports `pydantic` only: `CsiModelStatus`, `CsiAnalysisRun`, `CaseStatus`,
+`CsiAnalysisStatus`, `CsiDesignRun`, `CsiRows` (with their private base) and `CSI_KINDS`. `_replies.py` imports them
+from there and re-exports them under the same names, so `_state.py`, `_tools.py` and the merged tests keep their
+imports; its mappers (which use `pathlib` and convert host replies) stay. `_kinds.py` extends `HARNESS_KINDS` with
+`CSI_KINDS`, so the run's store keeps the analysis, design and result-message results (today it refuses them).
+`tests/rules/test_calc_modules.py` admits `eng_harness.kinds.csi` (spec 0003 §4.3), and the three tests that
+build `HARNESS_KINDS.extend(CSI_KINDS)` (`test_reconcile.py`, `test_csi_analysis.py` and plan 0007 T5's
+`test_csi_read_state_tool.py`) use `HARNESS_KINDS`, since `extend` refuses a kind already registered
+(`ContractDefinitionError`); T21 therefore lands after plan 0007 T5 (section 3). `tests/contract/test_csi_kinds.py::test_csi_kinds_registered` checks that
+each of the six kinds in `HARNESS_KINDS` is the model of `eng_harness.kinds.csi` and is the model `_replies.py`
+answers; it fails at the base, where `eng_harness.kinds.csi` does not exist. No calc imports the module yet, so no
+calc hash changes here; once plan 0007 T4's calcs import it, it enters their `modules` (spec 0003 §4.5).
+
 ## 3. Dependencies
 
 - Runtime: `mcp` 2.x (package ADR in T1, owner queue); `eng-contract`, `pydantic` as in the engine plan. No other.
@@ -782,7 +872,10 @@ they are used (plan 0014 T5, T7, T8).
   replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
   T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
-  T19b waits for T16 and T19a. `eng-contract`
+  T19a also waits for T21 and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5 (`Revisions`, the revision
+  tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
+  Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose
+  `test_csi_read_state_tool.py` it adapts to `HARNESS_KINDS` holding `CSI_KINDS`. T19b waits for T16 and T19a. `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
