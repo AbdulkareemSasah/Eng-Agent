@@ -367,3 +367,12 @@ def test_wall_section_material_reads_back() -> None:
     old = _readback(effects, "sections", before, _wall_sections("C30", 250.0))
     assert (old["status"], old["unexpected"]) == ("FAIL", [])
     assert [(i["item_id"], i["result"]) for i in old["items"]] == [("b1/1", "mismatch"), ("b1/2", "match")]
+
+
+def test_item_of_a_refused_kind_has_no_projection() -> None:
+    case = _case()
+    check = copy.deepcopy(case.input["check"])
+    check["resolved"] = [{"item_id": "z1", "kind": "seismic_parameters", "targets": ["Z"], "values": []}]
+    items = [{"id": "z1", "kind": "seismic_parameters"}]
+    message = "item z1 of kind seismic_parameters has no projection"
+    _refused(case, "check", message, check=check, change_set={"items": items}, approval_items=["z1"])
