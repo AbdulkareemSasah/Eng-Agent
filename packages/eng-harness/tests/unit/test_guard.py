@@ -142,3 +142,35 @@ def test_rule_guard_factory(tmp_path: Path) -> None:
     with pytest.raises(ZeroDivisionError), rule_guard():
         raise ZeroDivisionError  # an error of the body leaves the guard too
     target.write_text("again", encoding="utf-8")
+
+
+def test_blocked_events_are_the_ones_of_the_spec() -> None:
+    from eng_harness.engine._guard import blocked
+
+    listed = [
+        "open", "os.remove", "os.rename", "os.mkdir", "os.listdir", "os.scandir", "os.system", "os.exec",
+        "os.posix_spawn", "os.spawn", "os.startfile", "subprocess.Popen", "sqlite3.connect", "import",
+        "socket.connect", "socket.bind", "socket.__new__", "ctypes.dlopen", "ctypes.dlsym",
+    ]  # fmt: skip
+    assert [event for event in listed if not blocked(event)] == []
+    others = ["os.getcwd", "os.chmod", "sys.addaudithook", "exec", "compile", "socketserver", "sqlite3.execute"]
+    others += ["ctypesx", "opened"]
+    assert [event for event in others if blocked(event)] == []
+
+
+def test_the_guard_state_follows_the_calls() -> None:
+    from eng_harness.engine._guard import block_code, engine_work, in_block_code
+
+    @engine_work
+    async def inside() -> bool:
+        return in_block_code()
+
+    async def states() -> list[bool]:
+        outside = in_block_code()
+        with block_code():
+            guarded = in_block_code()
+            during = await inside()
+            after = in_block_code()
+        return [outside, guarded, during, after, in_block_code()]
+
+    assert asyncio.run(states()) == [False, True, False, True, False]
