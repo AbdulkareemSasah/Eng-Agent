@@ -286,16 +286,16 @@ def _status_html(run_dir: Path, store: ResultStore, ids: SeededIdSource, runtime
     return section(html, "Status", "Changes")
 
 
-def test_status_without_decision_runtime(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
-    """An empty decision runtime adds no row to the Status section."""
-    assert "Decision runtime" not in _status_html(run_dir, store, ids, {})
-
-
-def test_status_decision_runtime_caps(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> None:
-    """Spec 4.6.1: at most 200 rows, then one "N more" row; entries deeper than 4 levels count as omitted."""
+def test_status_decision_runtime_caps(
+    run_dir: Path, store: ResultStore, ids: SeededIdSource, tmp_path: Path
+) -> None:
+    """Spec 4.6.1: at most 200 rows, then one "N more" row; deeper entries count as omitted; empty adds nothing."""
     deep = {"a": {"b": {"c": {"d": {"e": 1, "f": 2}}}}}
     status = _status_html(run_dir, store, ids, {"p": {f"k{i}": i for i in range(205)}, **deep})
     assert status.count("Decision runtime /") == 200
     assert '<td><bdi dir="auto">7 more</bdi></td>' in status
     assert "/p/k0<" in status
     assert "/a/b/c/d" not in status
+    empty_dir = tmp_path / "runs" / f"run_{ids.new_ulid()}"
+    empty_dir.mkdir(parents=True)
+    assert "Decision runtime" not in _status_html(empty_dir, store, ids, {})
