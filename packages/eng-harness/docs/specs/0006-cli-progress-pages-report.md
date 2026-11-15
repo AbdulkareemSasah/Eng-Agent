@@ -489,7 +489,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
    §4.2, AC62); for `run`, draw the run id (`run_` + ULID from the ids source) and fill the run-id cell (§4.4.8,
-   Q20); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
+   Q20); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
+   ports take no basis: the CSI host port reads the read-back tolerance from the basis frozen at step 3, through the
+   run header, when its first check runs (spec 0002 §4.5.8, AC44; amendment B-503), so neither `run` nor `resume`
+   passes it.
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
    the request opens.

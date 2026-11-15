@@ -3,6 +3,7 @@
   "schema": 1,
   "calcs": {
     "harness.model_fingerprint": [],
+    "harness.design_summary": [],
     "harness.model_diff": [
       "before_areas",
       "before_frames",
