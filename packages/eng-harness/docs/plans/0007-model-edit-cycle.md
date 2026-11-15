@@ -482,6 +482,12 @@ is a golden change: the pull request carries the golden diff report and the chan
 is T9's (this task is at its 400-line cap): `block.discover()` stays empty here and `blocks.lock.json` is unchanged, so
 `test_workflow_definition` checks the definition and not the lock. Tests drive the child blocks through test
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
+Amendment (B-503): plan 0001 T22 stops on a `check_model` that is not clean, which the check inserted before the S'
+read of step 9 can meet; how the block routes that stop is spec Q14 (open). Until Q14 is answered this task adds no
+routing code: the inserted check's `ModelIntegrityError` escalates like any other `StepError`, and
+`test_readback_failure_routes` tests AC17 with a read-back `FAIL` that `check_model` does not see (the fake writes each
+wanted value and also changes an item the change set does not touch, so `harness.readback_check` reports it
+`unexpected`). Prose, files, tests and budget are otherwise unchanged.
 
 **T9 Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7). `run_and_summarize` (analysis, design, results, D-3,
 summaries; D-2 and D-3 are never open together, spec §4.6), the engineer turn, the cycle loop, promotion and sign-off in
@@ -540,10 +546,10 @@ T19a passes `host.reopened` in `build_ports`.
 | T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8b (difference report calc, split by B-458); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, the path rule of spec Q12 (a), owner decision OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
 | T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
-| T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
+| T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation); plan 0002 T21 waits for T5, not T5 for T21: T5's `test_csi_read_state_tool.py` builds `HARNESS_KINDS.extend(CSI_KINDS)`, which `extend` refuses once T21 registers `CSI_KINDS`, so T21 adapts that line (amendment B-503) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
-| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 meets; how the block routes it is spec Q14, whose recommendation is T8's interim reading; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16b (promotion; B-499); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |

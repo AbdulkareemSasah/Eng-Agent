@@ -284,8 +284,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `MODEL_CHANGED_OUTSIDE`; its ledger entry's `pre_image_ref` resolves to the `observed` value of a `read_back` taken
   before it (§4.5.7); the revision tools use the run's snapshot record (`run_dir/copies`,
   `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
-  AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9) and
-  sends no write to the host. Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
+  AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9),
+  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
   `::test_csi_preview_sends_no_write` (plan task T19a).
 - AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
   models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
@@ -730,7 +730,7 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new hidden instance (reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
 
 Adapter run state (`run_dir/adapter/state.json`, written atomically): instances, bindings, expected units, the
 `visible` flag of launches. It is a cache: where it disagrees with the journal (`host_started`, `model_bound`), the
