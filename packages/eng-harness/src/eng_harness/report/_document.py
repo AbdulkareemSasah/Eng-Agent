@@ -92,6 +92,7 @@ def _status(model: ReportModel, reader: JournalReader, store: ResultStore, versi
         _row("Status", model.run.status),
         _row("Integrity", f"{model.event_count} events; chain {model.chain_sha256}"),
         *(_row(label, value) for label, value in _basis_rows(store, header.basis_ref)),
+        *(_row(label, value) for label, value in _runtime_rows(model, reader, store)),
     ]
     return el(
         Tag.SECTION,
@@ -122,6 +123,14 @@ def _basis_rows(store: ResultStore, basis_ref: str) -> list[tuple[str, str]]:
             if isinstance(body, dict):
                 rows.append((f"Basis {key}", f"{body.get('source', '')} (confirmed={body.get('confirmed')})"))
     return rows
+
+
+def _runtime_rows(model: ReportModel, reader: JournalReader, store: ResultStore) -> list[tuple[str, str]]:
+    """The run header's decision runtime as label and value rows, under the caps of the generic renderer (4.6.1)."""
+    found: list[tuple[str, str]] = []
+    omitted = _Page(SourceBook(), model, reader, store).walk(dict(model.run.decision_runtime), "", 0, found)
+    rows = [(f"Decision runtime {pointer}", text) for pointer, text in found]
+    return [*rows, ("Decision runtime", f"{omitted} more")] if omitted else rows
 
 
 def _timings(model: ReportModel) -> Element:
