@@ -352,9 +352,13 @@ def test_revisions_refusals(tmp_path: Path) -> None:
     with pytest.raises(ContractError) as taken:
         revisions.target(work)
     assert taken.value.detail.code is ErrorCode.CONFLICT
+    assert taken.value.detail.message == "a file is already at the snapshot's path"
+    assert taken.value.detail.received == "model.rev001.EDB"
     with pytest.raises(ContractError) as raced:
         revisions.snapshot(work, folder / "model.rev001.EDB")
     assert raced.value.detail.code is ErrorCode.CONFLICT
+    assert raced.value.detail.message == "a file is already at the target"
+    assert raced.value.detail.received == "model.rev001.EDB"
     assert (folder / "model.rev001.EDB").read_bytes() == b"taken"
     assert not (tmp_path / "revisions.json").exists()  # a refused snapshot is not recorded
     (folder / "model.rev001.EDB").unlink()
@@ -363,6 +367,8 @@ def test_revisions_refusals(tmp_path: Path) -> None:
     with pytest.raises(ContractError) as changed:
         revisions.reopen(snapshot.name)
     assert changed.value.detail.code is ErrorCode.CONFLICT
+    assert changed.value.detail.message == "the snapshot's hash differs from the recorded one"
+    assert changed.value.detail.received == snapshot.name
     assert sorted(p.name for p in folder.iterdir()) == ["model.EDB", "model.rev001.EDB"]
     (folder / snapshot.name).unlink()
     with pytest.raises(ContractError) as missing:
@@ -372,6 +378,9 @@ def test_revisions_refusals(tmp_path: Path) -> None:
         revisions.reopen("model.rev005.EDB")
     assert unknown.value.detail.code is ErrorCode.NOT_FOUND
     assert unknown.value.detail.received == "model.rev005.EDB"
+    assert unknown.value.detail.message == "no snapshot of this run has that name"
+    assert missing.value.detail.message == "no snapshot of this run has that name"
+    assert missing.value.detail.received == snapshot.name
 
 
 def test_copy_with_a_different_hash_is_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -398,5 +407,33 @@ def test_copy_with_a_different_hash_is_removed(tmp_path: Path, monkeypatch: pyte
         revisions.snapshot(work, revisions.target(work))
     assert refused.value.detail.code is ErrorCode.CONFLICT
     assert refused.value.detail.received == "model.rev001.EDB"
+    assert refused.value.detail.message == "the copy's hash differs from the original"
     assert [p.name for p in folder.iterdir()] == ["model.EDB"]
     assert not (tmp_path / "revisions.json").exists()
+
+
+def test_record_is_written_through_a_temporary_file_in_new_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The record's folders are created as deep as needed and the file is swapped in from `<record>.tmp`."""
+    import os
+
+    from eng_harness.adapters.csi import _revisions
+
+    folder = tmp_path / "copies"
+    folder.mkdir()
+    work = folder / "model.EDB"
+    work.write_bytes(b"one")
+    record = tmp_path / "deep" / "er" / "revisions.json"
+    swaps: list[tuple[str, str]] = []
+    real = os.replace
+
+    def replace(source: Any, destination: Any) -> None:
+        swaps.append((Path(source).name, Path(destination).name))
+        real(source, destination)
+
+    monkeypatch.setattr(_revisions.os, "replace", replace)
+    revisions = _revisions.Revisions(folder, record)
+    revisions.snapshot(work, revisions.target(work))
+    assert swaps == [("revisions.json.tmp", "revisions.json")]
+    assert sorted(p.name for p in record.parent.iterdir()) == ["revisions.json"]

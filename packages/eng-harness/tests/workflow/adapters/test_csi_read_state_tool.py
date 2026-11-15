@@ -28,6 +28,7 @@ from .test_csi_state import _seed
 
 MESSAGES = "Analysis Messages"  # the ETABS table key of products/_etabs.py
 LIMIT = 2000
+STATUS = "harness.csi_model_status/1"
 KINDS = {
     "stories": "model.stories/1",
     "frames": "model.frame_placements/1",
@@ -143,6 +144,7 @@ def test_truncated_name_list_is_limit_exceeded(
         assert isinstance(answer, FailureEnvelope), answer
         assert answer.error.code is ErrorCode.LIMIT_EXCEEDED
         assert answer.error.received == LIMIT
+        assert answer.error.message == f"csi_list_{field} was truncated at {LIMIT} rows"
 
     run_port(make_config(), run_dir, store, body)
 
@@ -157,6 +159,9 @@ def test_name_row_without_name(make_config: ConfigFactory, control: Path, store:
         assert answer.error.code is ErrorCode.HOST_ERROR
         assert answer.error.host_code == "UNEXPECTED_REPLY"
         assert answer.error.host_method == "csi_list_materials"
+        assert answer.error.message == "a row of csi_list_materials has no name"
+        assert answer.error.field == "items"
+        assert answer.error.retryable is False
 
     run_port(make_config(), run_dir, store, body)
 
@@ -225,5 +230,42 @@ def test_analysis_messages_truncated(
         assert isinstance(answer, FailureEnvelope), answer
         assert answer.error.code is ErrorCode.LIMIT_EXCEEDED
         assert answer.error.received == LIMIT
+        assert answer.error.message == f"{MESSAGES} was truncated at {LIMIT} rows"
 
     run_port(make_config(), run_dir, store, body)
+
+
+def test_parts_of_both_tools(make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path) -> None:
+    """The parts, in order, with their keys and kinds; the status names the open file; the reads are host reads."""
+    from eng_harness.adapters._args import HostTarget
+    from eng_harness.adapters.csi._read_state_tool import READ_TOOLS
+
+    rows = [{"Type": "Warning", "Text": "first"}]
+    _seeded(control, tables={MESSAGES: rows})
+    opened = run_dir / "Tower.EDB"
+    opened.parent.mkdir(parents=True, exist_ok=True)
+    opened.write_bytes(b"model")
+
+    async def body(port: Any, recorder: Recorder, pid: int, manager: ServerManager) -> None:
+        seen: list[tuple[str, CallEffect]] = []
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            seen.append((tool, effect))
+            reply = await manager.call("csi", "main", tool, arguments, effect)
+            block = reply.content[0]
+            assert isinstance(block, types.TextContent)
+            decoded: dict[str, Any] = json.loads(block.text)
+            return decoded
+
+        target = HostTarget(product="ETABS", pid=pid)
+        parts = await READ_TOOLS["csi_read_model_state"](read, target)
+        assert [(key, kind) for key, kind, _ in parts] == [*KINDS.items(), ("status", STATUS)]
+        status = parts[-1][2]
+        assert status["file_name"] == "Tower.EDB"
+        assert status["units"] == "kN_m_C"
+        assert ("csi_model_info", CallEffect.READ) in seen
+        assert {effect for _tool, effect in seen} == {CallEffect.READ}
+        messages = await READ_TOOLS["csi_read_analysis_messages"](read, target)
+        assert messages == [("messages", "harness.csi_analysis_messages/1", {"rows": rows})]
+
+    run_port(make_config(), run_dir, store, body, opened=opened)
