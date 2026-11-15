@@ -286,9 +286,7 @@ def _status_html(run_dir: Path, store: ResultStore, ids: SeededIdSource, runtime
     return section(html, "Status", "Changes")
 
 
-def test_status_decision_runtime_caps(
-    run_dir: Path, store: ResultStore, ids: SeededIdSource, tmp_path: Path
-) -> None:
+def test_status_decision_runtime_caps(run_dir: Path, store: ResultStore, ids: SeededIdSource, tmp_path: Path) -> None:
     """Spec 4.6.1: at most 200 rows, then one "N more" row; deeper entries count as omitted; empty adds nothing."""
     deep = {"a": {"b": {"c": {"d": {"e": 1, "f": 2}}}}}
     status = _status_html(run_dir, store, ids, {"p": {f"k{i}": i for i in range(205)}, **deep})
