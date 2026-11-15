@@ -13,13 +13,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from workflows.ctx_flows import ChildInput, ChildOutput, flow
+from eng_contract.errors import ErrorCode
+from fakes.ports import failure
+from workflows.ctx_flows import ChildInput, ChildOutput, child, flow
 from workflows.rig import make_rig, request
 
 from eng_harness.block import block
 from eng_harness.ctx import BasisCount
 from eng_harness.engine import RunStatus
-from eng_harness.errors import BlockRuleViolation
+from eng_harness.errors import BlockRuleViolation, ToolFailed
 
 _MODULE = "colorsys"  # a stdlib module that nothing else in the tests imports
 
@@ -178,3 +180,91 @@ def test_the_guard_state_follows_the_calls() -> None:
         return [outside, guarded, during, after, in_block_code()]
 
     assert asyncio.run(states()) == [False, True, False, True, False]
+
+
+def test_guard_is_back_after_a_failing_ctx_call(tmp_path: Path) -> None:
+    """The state is restored on the exception paths of `engine_work`: a block that catches the error stays guarded."""
+    rig = make_rig(tmp_path / "run")
+    rig.host.outcomes["read_a"].append(failure(ErrorCode.NOT_FOUND, "gone"))
+    target = tmp_path / "never.txt"
+    seen: list[str] = []
+    done: list[str] = []
+
+    async def broken_child(ctx: Any) -> list[str]:
+        raise ZeroDivisionError
+
+    broken_block = child(broken_child)  # a block is built outside block code (its source is read for the hash)
+
+    async def broken_leg(ctx: Any) -> str:
+        raise KeyError("leg")
+
+    async def ok_leg(ctx: Any) -> str:
+        await ctx.tool("read_b", {"n": 9})
+        return "ok"
+
+    async def body(ctx: Any) -> list[str]:
+        caught: list[type[Exception]] = []
+        try:
+            await ctx.tool("read_a", {"n": 0})  # the call raised ...
+        except ToolFailed as failed:
+            caught.append(type(failed))
+        _try("after:tool", lambda: _write(target), seen, done)  # ... and the guard is on again
+        try:
+            await ctx.block(broken_block, ChildInput(n=1))
+        except ZeroDivisionError as failed:
+            caught.append(type(failed))
+        _try("after:block", lambda: _write(target), seen, done)
+        try:
+            await ctx.parallel(broken_leg(ctx), ok_leg(ctx))
+        except KeyError as failed:
+            caught.append(type(failed))
+        _try("after:parallel", lambda: _write(target), seen, done)
+        assert caught == [ToolFailed, ZeroDivisionError, KeyError]
+        return []
+
+    outcome = asyncio.run(rig.engine(flow(body)).start(request()))
+    assert outcome.status is RunStatus.COMPLETED
+    assert done == []
+    assert seen == ["after:tool", "after:block", "after:parallel"]
+    assert not target.exists()
+
+
+def test_engine_work_restores_the_state_when_the_call_raises() -> None:
+    from eng_harness.engine._guard import block_code, engine_work, in_block_code
+
+    states: list[bool] = []
+
+    @engine_work
+    async def failing() -> None:
+        states.append(in_block_code())  # the engine's own work is not block code
+        raise ZeroDivisionError
+
+    async def run() -> bool:
+        with block_code():
+            with pytest.raises(ZeroDivisionError):
+                await failing()
+            return in_block_code()
+
+    assert asyncio.run(run()) is True  # block code again after the raise
+    assert states == [False]
+
+
+def test_the_hook_is_installed_once_per_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    from eng_harness.engine import _guard
+
+    calls: list[object] = []
+    _guard._install.cache_clear()
+    monkeypatch.setattr(sys, "addaudithook", calls.append)
+    try:
+        with _guard.block_code():
+            pass
+        with _guard.block_code():
+            pass
+        with _guard.rule_guard():
+            pass
+        assert calls == [_guard._hook]
+    finally:
+        _guard._install.cache_clear()  # the real hook is installed already (and cannot be removed): restore the cache
+        monkeypatch.undo()
+        _guard._install.cache_clear()
+        _guard._install()
