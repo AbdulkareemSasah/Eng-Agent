@@ -602,7 +602,7 @@ def test_a_failing_copy_leaves_the_promotion_in_flight(tmp_path: Path, monkeypat
 def test_a_not_applied_promotion_of_a_replaced_original_is_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Spec §11 Q40, interim reading: `not_applied` runs the copy again, and its hash check refuses a replaced original."""
+    """Spec Q40, interim reading: `not_applied` runs the copy again; its hash check refuses a replaced original."""
     rig, engine, _, run_id, seen, (original, _) = _cut_promotion(tmp_path, monkeypatch, "replace")
     asyncio.run(engine.resume(run_id))
     asked = rig.inputs.presented[-1]
