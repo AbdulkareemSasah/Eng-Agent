@@ -206,6 +206,12 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/_control.py"
       - "packages/eng-harness/src/eng_harness/pages/_ports.py"
+      # Amendment (B-517, documents only): the router and the page test helper join T7b for one fix of merged T7 code
+      # that local CI found: a second answer that arrives after the first was recorded got 404 from the screen lookup
+      # in the router instead of the 409 of AC30, so tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins
+      # failed under load. The lookup takes an `answering` argument on POST (11 counted lines; 100 measured before it).
+      - "packages/eng-harness/src/eng_harness/pages/_routes.py"
+      - "packages/eng-harness/tests/helpers/page_client.py"
       - "packages/eng-harness/tests/unit/cli/test_control.py"
       - "packages/eng-harness/tests/unit/pages/test_void.py"
     # About 60 lines for FileRunControl and the write, read and remove helpers, 40 for the voided state and screen.
