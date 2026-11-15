@@ -274,6 +274,23 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap` (plan task T19a; replaced in T19b),
   `tests/unit/cli/test_exit_codes.py::test_error_codes` (the exit code, plan task T19a),
   `tests/workflow/test_build_ports.py::test_cli_tool_routed_through_build_ports` (plan task T19b).
+- AC44. **[added: B-503]** Given a run whose frozen basis holds `checks.readback_relative_tolerance_ratio`, when
+  `check_model` of the ports `build_ports` made reads back a quantity written through them, then it is compared within
+  that value, at start and after a resume of the run (§4.5.8); given a basis without the field, then the quantity is
+  `READBACK_UNAVAILABLE`. Test: `tests/workflow/test_build_ports.py::test_readback_tolerance_from_run_basis` (plan task
+  T19a; closes H-G9).
+- AC45. **[added: B-503]** Given the CSI ports `build_ports` made, then a write through the tool port is in the
+  written-items book that `check_model` reads and is marked on the host port (`wrote`), so it is not reported as
+  `MODEL_CHANGED_OUTSIDE`; its ledger entry's `pre_image_ref` resolves to the `observed` value of a `read_back` taken
+  before it (§4.5.7); the revision tools use the run's snapshot record (`run_dir/copies`,
+  `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
+  AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9) and
+  sends no write to the host. Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
+  `::test_csi_preview_sends_no_write` (plan task T19a).
+- AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
+  models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
+  `eng_harness.adapters.csi._replies` answers those same models. Test:
+  `tests/contract/test_csi_kinds.py::test_csi_kinds_registered` (plan task T21).
 
 ## 4. Design
 
@@ -286,6 +303,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 | `eng_harness.servers` | `ServersConfig`, `ServerConfig`, `RoleConfig`, `CliToolConfig`, `ConfigError`, `load_servers_config`, `ServerManager`, `ServerCheck` (re-export of the port type), `RecordMode` | engine wiring (0006), doctor, tests |
 | `eng_harness.adapters` | `build_ports(config, workspace, store, run_dir, clock, ids) -> AdapterPorts` (`tool_port`, `host_port`), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
 | `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=()) -> int`, `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
+| `eng_harness.kinds.csi` **[added: B-503]** | `CSI_KINDS` and the payload models of the harness kinds of A1 (`CsiModelStatus`, `CsiAnalysisRun`, `CaseStatus`, `CsiAnalysisStatus`, `CsiDesignRun`, `CsiRows`); imports `pydantic` only; registered in `HARNESS_KINDS` (`_kinds.py`), the registry of the run's store | adapters, calcs (spec 0003 §4.3), tests |
 
 Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
 `servers/_procinfo.py`, `servers/_transport.py`, `servers/_launch_args.py` (the argv of §4.3.2, **[added: B-085]**),
@@ -643,7 +661,9 @@ and one of these `host_code` values: `OFFLINE_STUB` (the reply is a result the s
 
 Before sending a write, the adapter appends `{op_id, tool, args_sha256, target, pre_image_ref, sent_at}` to
 `run_dir/adapter/ops.jsonl` (flushed and `fsync`ed), where `pre_image_ref` points to the last model-state read of the
-object (the adapter's state cache, refreshed by `check_model` and `model_state`). `reconcile(tool, args, op_id)`
+object: it resolves to the `observed` value of a `read_back(tool, args)` that the port takes and stores just before the
+write (`<result_id>#/value/observed`), and is absent for a tool with no read-back (amendment B-503; the binding of
+the call carries it, plan T19a). `reconcile(tool, args, op_id)`
 first waits for the host to answer `csi_model_info` within the `call` class (a timeout → `unknown`), then reads the
 object with the tool's read-back helper and decides as below. An answer from the new worker does not show that the
 abandoned host call has ended (S-12 §5: the abandoned worker "keeps whatever host call it was in"), so for the long
@@ -681,8 +701,16 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
   AC10). Quantities read back are compared within the design basis field
   `checks.readback_relative_tolerance_ratio` (required by every workflow that writes quantities; never a constant here,
   §11 G-2): the value comes from that basis field, passed by the workflow, and arrives as `ReadBack.tolerance_ratio`;
-  when none is passed a quantity read back is `READBACK_UNAVAILABLE` (owner answer of 2026-11-14, B-495, §11 Q8; the
-  delivery path is open, §11 H-G9). The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
+  when none is passed a quantity read back is `READBACK_UNAVAILABLE` (owner answer of 2026-11-14, B-495, §11 Q8).
+  Delivery (amendment B-503, closes H-G9): `build_ports` gives the CSI host port a provider (a keyword argument of
+  `AdapterHostPort`, a callable that answers the ratio or `None`); `check_model` calls it each time it runs until it
+  answers a value, keeps that value, and uses it in place of `ReadBack.tolerance_ratio`. The provider reads the
+  `basis_ref` of the run header (`run_started`) in `run_dir` through `JournalReader`, loads that frozen basis from the
+  store (`StoreBasisPort`) and takes the field's value. The header is written by `Engine.start` before any step and
+  kept at a resume, which freezes nothing, so a resumed run reads the basis its start froze. While the header cannot be
+  read, or the basis lacks the field or holds no number in it, the provider answers `None`: `READBACK_UNAVAILABLE`,
+  never a constant. No engine port signature changes, and the command line passes nothing (spec 0006 §4.2.2). Built by
+  plan T19a. The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
 - **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
   confirm=true)` on the `main` role, hashes the file, updates the identity store (ADR-0032) and returns `SavedModel`;
   the engine journals `model_saved` before the analysis.
@@ -702,7 +730,7 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new hidden instance (reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image, read-back helpers, true for every `write`, §4.5.7 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
 
 Adapter run state (`run_dir/adapter/state.json`, written atomically): instances, bindings, expected units, the
 `visible` flag of launches. It is a cache: where it disagrees with the journal (`host_started`, `model_bound`), the
@@ -952,8 +980,8 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC42 | Unit | `tests/unit/` |
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
-| AC10, AC16, AC34, AC35 | Contract (inventory, recordings; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 
@@ -979,8 +1007,14 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | Q5 | ADR-0032: harness-side identity by content and path hash | Owner | Accept; ask Sasaah for a typed `csi_set_project_info` (S12-G6) |
 | Q6 | Silent breakaway lets server helpers escape; the guard terminates recorded helpers | Owner | Accept; ask Sasaah to start hosts with `CREATE_BREAKAWAY_FROM_JOB`, then switch to `BREAKAWAY_OK` |
 | Q7 | A launched instance that cannot be exited gracefully and was visible is left running | Owner | Accept: an engineer may be using a visible instance; the run report lists it |
-| Q8 | Where `check_model(model_key)`, which takes no basis, takes the read-back tolerance from (B-465) | Owner | Decided (owner answer of 2026-11-14, B-495): from the basis field `checks.readback_relative_tolerance_ratio`, passed by the workflow (§4.5.8); the merged plan T12b code takes it as `ReadBack.tolerance_ratio` and reports `READBACK_UNAVAILABLE` for a quantity without it; the delivery path is open (H-G9) |
+| Q8 | Where `check_model(model_key)`, which takes no basis, takes the read-back tolerance from (B-465) | Owner | Decided (owner answer of 2026-11-14, B-495): from the basis field `checks.readback_relative_tolerance_ratio`, passed by the workflow (§4.5.8); the merged plan T12b code takes it as `ReadBack.tolerance_ratio` and reports `READBACK_UNAVAILABLE` for a quantity without it; delivered from the run's frozen basis by plan T19a (§4.5.8, AC44; H-G9 closed by amendment B-503) |
 | Q9 | Exit code of the H-G8 refusal of `[cli_tools.*]` entries (AC43) | Owner | Decided (owner answer of 2026-11-14, B-495): 2 (`USAGE`), not 70 (spec 0006 §4.2.3, §6); built by plan T19a |
+| Q10 | **[added: B-503]** Whether `csi_design_run` (and `csi_run_analysis`) count as adapter writes for the outside-edit check: a steel design with auto-select sections changes frame sections, `CsiToolPort` calls `wrote` only after the edit tools, so the next `model_state` reports `MODEL_CHANGED_OUTSIDE` and raises the revision (§4.6.4) | Owner | Writer's recommendation: yes for the outside-edit mark only: `CsiToolPort` calls `wrote(model_key)` after a successful analysis or design, which adds no read-back item; confirm in the local test which design settings change sections |
+| Q11 | **[added: B-503]** The reconciliation evidence names "the Sasaah audit-log lines for the op" (§4.5.7), but no reader, line format or rule that matches a line to an `op_id` is specified, and the merged reconciler stores reads only | Owner | Writer's recommendation: v1 stores the reads only and says so in the evidence; the audit-log lines join once the local test (§12) has recorded the log format and how a line names its call |
+| Q12 | **[added: B-503]** A requested value of zero is compared exactly: §4.5.8 defines only a relative tolerance, so `abs(read - 0) <= ratio * 0` passes only an exact zero, and a host that reads back a tiny non-zero value gives `READBACK_MISMATCH` | Owner | Writer's recommendation: keep the exact comparison in v1 (no constant may be added, §11 G-2); if the local test shows a non-zero read-back of a written zero, add an absolute floor as a design basis field with a source |
+| Q13 | **[added: B-503]** `AdapterHostPort.take_warnings()` drains the warnings of every model, so `check_model` of one model reports, and removes, the `MODEL_CHANGED_OUTSIDE` warnings that `model_state` found for another model (related to OQ-Q67, which asks which result reports them) | Owner | Writer's recommendation: keep the warnings per model key and let `check_model(model_key)` drain only that model's |
+| Q14 | **[added: B-503]** §4.7 and §6 name `BUILD_CHANGED` a harness code raised as `ToolFailed` (A1), but `HarnessCode` has no such member; the command-line adapter written for plan T16 (pull request 345) raises `HOST_ERROR` with `host_code` `BUILD_CHANGED`, and also a `host_code` `LAUNCH_FAILED` that this spec does not name | Owner | Writer's recommendation: amend §4.7, §6 and A1 to the contract code `HOST_ERROR` with the host codes `BUILD_CHANGED` and `LAUNCH_FAILED`, as A3 did for `OFFLINE_STUB` and `UNEXPECTED_REPLY`, rather than add a `HarnessCode` member |
+| Q15 | **[added: B-503]** §4.7 puts a command-line tool's attempt folder at `run_dir/tools/<step path>/<attempt>/`; the plan T16 adapter (pull request 345) uses `run_dir/tools/<op_id>`, where the engine's `op_id` already hashes the run, the step path and the attempt | Owner | Writer's recommendation: amend §4.7 to `run_dir/tools/<op_id>/`: one folder per attempt, and no step-path characters in a folder name |
 | H-G1 | `csi_define_area_section`, `csi_define_frame_section`, `csi_define_material` need CSi API `spec` keys not in the schema; slab thickness change is therefore not implemented | Owner | Confirm the keys locally and pin a method and key list (OQ-G11), or a Sasaah typed slab tool (the engine's `DefineSlabSection` exists unexposed); test `test_gaps_not_implemented` expects `NOT_IMPLEMENTED` |
 | H-G2 | Load directions other than `gravity` and frame point loads (S12-G9) | Owner | Local test of the direction codes, then a Sasaah fix |
 | H-G3 | Load pattern types `superimposed_dead`, `roof_live` and combination type `range` have no documented Sasaah value | Owner | Confirm the host names locally; until then refused |
@@ -989,7 +1023,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
 | H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then; the refusal exits 2 (Q9) |
-| H-G9 | **[added: B-495]** No plan task delivers the frozen basis value to `ReadBack.tolerance_ratio` (Q8): the ports are built at step 1 of spec 0006 §4.2.2, the basis is frozen at step 3, `resume` runs steps 1, 5 and 6 with no freeze, and `build_ports` (plan T19a) takes no basis. Until a task delivers it, every written quantity reads back `READBACK_UNAVAILABLE` on the first live run | Lead | Open: which task delivers the value and how (a `build_ports` argument, a later setter on the adapter host port, or the port build after step 3) |
+| H-G9 | **[added: B-495]** No plan task delivers the frozen basis value to `ReadBack.tolerance_ratio` (Q8): the ports are built at step 1 of spec 0006 §4.2.2, the basis is frozen at step 3, `resume` runs steps 1, 5 and 6 with no freeze, and `build_ports` (plan T19a) takes no basis. Until a task delivers it, every written quantity reads back `READBACK_UNAVAILABLE` on the first live run | Lead | Closed by amendment B-503: plan T19a gives the CSI host port a provider that reads the frozen basis named by the run header (§4.5.8, AC44); no engine port signature changes and the command line passes nothing |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |

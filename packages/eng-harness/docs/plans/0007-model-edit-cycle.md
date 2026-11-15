@@ -73,6 +73,9 @@ tasks:
     # Amendment (B-498, documents only): spec 4.4.2 projects combination edits per item under the D2 item keys, a set on
     # an object the state lacks as add, unique effect item ids, values from the inputs change_set and basis; covers AC36
     # (a combination edit passes read-back, test in the task's own golden file); max_changed_lines raised from 260 to 330.
+    # Amendment (B-503, documents only): a wall_section on a section the state holds also projects a set of /material
+    # (spec 4.4.2, AC37, about 6 lines); the item order of an added combination is spec Q15 (open, nothing to build);
+    # max_changed_lines 330 to 340 (an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -84,17 +87,20 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/effects-*.json"
       - "packages/eng-harness/tests/property/test_expected_effects.py"
-    max_changed_lines: 330
+    max_changed_lines: 340
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_wall_section_material_reads_back"  # AC37 (B-503)
       - "packages/eng-harness/tests/property/test_expected_effects.py::test_order_independent"
-    covers: [AC8, AC36]
+    covers: [AC8, AC36, AC37]
     depends_on: [T2]
   - id: T4
     title: Calcs harness.host_design_verdicts and harness.analysis_summary
     # Amendment (B-417, documents only): calcs/__init__.py registers both calcs in REGISTRY (spec 0003 4.2); depends on T3 so that T2, T3 and T4 edit the shared registry files in turn; reads limits.ratio_limit_ratio (spec 4.8).
+    # Amendment (B-503, documents only): the inputs harness.csi_design_results/1 and harness.csi_analysis_messages/1 are
+    # typed with CsiRows of eng_harness.kinds.csi (spec 0003 4.3), which plan 0002 T21 moves there (section 3); files and budget unchanged.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.analysis_summary and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -263,7 +269,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode"
     covers: [AC1, AC9, AC12, AC14, AC15, AC16, AC19, AC20, AC21, AC22, AC23, AC34]
-    depends_on: [T4, T8]
+    depends_on: [T4, T8, T13]  # T13: the reopened hook that restore_previous needs (amendment B-503)
   - id: T10
     title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
     files:
@@ -323,6 +329,24 @@ tasks:
       - "packages/eng-harness/tests/replay/edit_cycle_replay/test_replay.py::test_recorded_journal_replays"
     covers: [AC27, AC28]
     depends_on: [T9]
+  - id: T13
+    title: The host port follows the working file that csi_open_revision opens (reopened hook)
+    # Amendment (B-503, documents only): new. After csi_open_revision the AdapterHostPort keeps the old path, so
+    # model_files, locate and model_state, the engine's model_saved for the restore (EC2) and the next host-state check
+    # cannot find the restored file. AdapterHostPort.reopened(model_key, path) (about 14 lines) and a reopened callback
+    # of CsiToolPort called after a successful open (about 6), 1 of CHANGELOG.md: budget 40 (an estimate). Before T9,
+    # whose restore_previous needs it, and before plan 0002 T19a, which wires the callback and also edits _hostport.py.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_reopened.py"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port"
+    covers: [AC38]
+    depends_on: [T5]
 ---
 
 # Implementation plan: eng-harness model edit cycle (spec 0007)
@@ -373,13 +397,22 @@ for item order. Ships `draft`. Amendment (B-417): registers the calc in `REGISTR
 after T2. Amendment (B-498): combination edits are projected per item under the item keys of spec 0003 §4.7 D2, a
 `set` on an object the step 3 state lacks is an `add`, values come from the inputs `change_set` and `basis`, and
 `test_combination_edit_reads_back` runs the merged read-back check (plan 0003 T9) on the projected effects (AC36); the
-read-back calc is unchanged.
+read-back calc is unchanged. Amendment (B-503): a `wall_section` on a section the step 3 state holds projects a `set`
+of `/thickness_mm` and a `set` of `/material` on `model.sections/1` (the merged `WallSection` item carries `material`;
+spec §4.4.2), so a redefinition with another material is not `unexpected`;
+`test_wall_section_material_reads_back` runs the merged read-back check on that projection with an after read set
+holding the new material and thickness (`PASS`, no `unexpected` row) and with the old material still read (`FAIL`, the
+material effect `mismatch`) (AC37). The order of the items of an added combination is spec Q15, open: until it is
+answered the projection keeps the change set's item order and no test pins another.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
 `limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
 EC-G3). Golden cases with synthetic replies whose field names follow the S-12 inventory. Ship `draft`. Amendment
 (B-417): registers both calcs in `REGISTRY` through `calcs/__init__.py`; it depends on T3 so that T2, T3 and T4 edit
-`calcs/__init__.py`, `calcs/edit_cycle/__init__.py` and `calcs.lock.json` one after another.
+`calcs/__init__.py`, `calcs/edit_cycle/__init__.py` and `calcs.lock.json` one after another. Amendment (B-503): the
+inputs `harness.csi_design_results/1` and `harness.csi_analysis_messages/1` are typed with `CsiRows` imported from
+`eng_harness.kinds.csi`, the module spec 0003 §4.3 admits, never from `eng_harness.adapters.csi._replies`; plan 0002
+T21 moves the model there and adds the rules-test entry, so T4 waits for it (section 3).
 
 **T5 Adapter additions** (spec §4.10, Q1). `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages`
 and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no escape hatch: each composes allowlisted
@@ -479,6 +512,18 @@ journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-te
 T19's harness) and resumed with the same scripted answers; the replay test over a journal recorded by the
 uninterrupted run.
 
+**T13 Reopened hook** (amendment B-503; spec §4.10, AC38). `AdapterHostPort.reopened(model_key, path)` binds
+`model_key` to `path` on the instance it is already bound to (`model_files`, `locate` and `model_state` then use the new
+file), drops the last state read so that the next `model_state` starts a new outside-edit baseline, and persists the
+adapter run state; `CsiToolPort` takes a `reopened` callback like `wrote` and calls it with the model key and the new
+working file after a successful `csi_open_revision` only. The model identity of the restored file is spec Q16 (open):
+until it is answered, `reopened` keeps the binding's model id and records the file as its next revision
+(`IdentityStore.record_save`), and the test does not pin the revision number. `test_restore_moves_host_port` wires a
+`CsiToolPort` to an `AdapterHostPort` against the synthetic CSI fake, saves a snapshot, opens it with
+`csi_open_revision`, and checks the host port's `model_files`, `locate` and first `model_state` (no
+`MODEL_CHANGED_OUTSIDE`); a refused open (a changed snapshot, `CONFLICT`) leaves the previous file bound. Plan 0002
+T19a passes `host.reopened` in `build_ports`.
+
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new (Hypothesis and pytest from plan 0001 T1).
@@ -489,15 +534,16 @@ uninterrupted run.
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
 | T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8b (difference report calc, split by B-458); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, the path rule of spec Q12 (a), owner decision OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
-| T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
+| T4 | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation) |
-| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
+| T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4) |
-| T8 | plan 0001 T10 to T17; plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 meets; how the block routes it is spec Q14, whose recommendation is T8's interim reading; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9 | plan 0001 T16b (promotion; B-499); plan 0002 T13, T15 (for the final unlock test); plan 0006 T10 (engineer-turn labels) |
 | T10 | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
+| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 
 ## 4. Verification
 
