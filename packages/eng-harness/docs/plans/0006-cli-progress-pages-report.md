@@ -449,7 +449,7 @@ tasks:
     # Amendment (B-412 eighth review, documents only): the first interrupt reads the run-id cell; empty cell or missing run folder ends the process (exit 130); budget 120 -> 135.
     # Amendment (B-412 ninth review, documents only): decision_assembler call arguments fixed; the point policies of step 5 are supplied inside its default (T18).
     # Amendment (B-412 tenth review, documents only): point policies are a fourth decision_assembler argument from the CliDeps field point_policies (default None; T18 binds it), as spec 4.2.2 step 5 and Q16(a).
-    # Amendment (B-510, documents only): cli/_config.py added (the [decisions] section, refused by the merged configuration, becomes a typed HarnessConfig field) and its test; the providers_loader default is the merged load_providers_config; the default engine factory maps the cascade into the merged EnginePorts.decision; depends on T14c; budget 135 -> 145.
+    # Amendment (B-510, documents only): cli/_config.py added (the [decisions] section, refused by the merged configuration, becomes a typed HarnessConfig field) and its test; the providers_loader default is the merged load_providers_config (its own tests-first case); the default engine factory maps the cascade into the merged EnginePorts.decision; depends on T14c; budget 135 -> 145.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -471,6 +471,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_launch_address.py::test_address_never_on_stdout_or_stderr"
       - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled"
       - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py::test_decisions_section_reaches_assembler"
+      - "packages/eng-harness/tests/unit/cli/test_decision_wiring.py::test_providers_loader_default_is_load_providers_config"
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime"
     covers: [AC10, AC61, AC62, AC63]
     depends_on: [T14c]
@@ -506,7 +507,7 @@ tasks:
     # Amendment (B-412, documents only): cli/__init__.py added (handlers, doctor field); report and doctor handlers in cli/_status.py; stop test drives a fake engine (real one re-checked in T17).
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T16 extends the shared builder with the doctor field); T18 binds the doctor default.
     # Amendment (B-412 fourth review, documents only): stop writes the file only while the run lock is held; --wait waits for the lock release (spec 4.4.8).
-    # Amendment (B-510, documents only): eng_harness.doctor.run is merged, so T16 binds the doctor default itself (section 3 rule; two lines inside the budget).
+    # Amendment (B-510, documents only): eng_harness.doctor.run is merged, so T16 binds the doctor default itself (section 3 rule; two lines inside the budget; its own tests-first case).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -525,6 +526,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_stop.py::test_stop_pauses_at_safe_point"
       - "packages/eng-harness/tests/unit/cli/test_report_command.py::test_output_rules"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough"
+      - "packages/eng-harness/tests/unit/cli/test_doctor_command.py::test_doctor_default_is_doctor_run"
     covers: [AC9, AC11, AC12, AC13]
     depends_on: [T14b]
   - id: T16b
@@ -629,7 +631,7 @@ tasks:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/tests/unit/cli/test_default_deps.py"
-    # About 50 lines in cli/__init__.py for seven defaults and 5 of CHANGELOG.md (an estimate, not a measurement).
+    # About 50 lines in cli/__init__.py for six defaults and 5 of CHANGELOG.md (an estimate, not a measurement).
     max_changed_lines: 70
     max_sessions: 1
     tests_first:
@@ -790,11 +792,12 @@ engineer name, Sign and Reject; its labels in `pages/_labels.py`. The page ports
 parameter for the list, which T14 binds (amendment B-412 ninth review), and a check, by request kind, that the page
 runs on a posted form before the answer is taken (`PageHub.submit` has none), which refuses a signature while an
 exception has no reason or the list is not acknowledged. Which item an exception's reason belongs to is spec Q24;
-until it is answered T9b follows its interim reading: the preview items are the outputs (spec 0007 §4.5 step 17), an
-exception is a verdict whose status is not `PASS` or `NOT_APPLICABLE` in a verdict set an item refers to, each
-exception is its own row, and its reason field is the `item_reasons` entry (`REASON` + item id) of that item, so the
-exceptions of one output share one reason. `test_signoff_rules` opens the `SIGN_OFF` request through the T7 engine
-stand-in imported from `tests/helpers/engine_standin.py` and injects a stub `report` callable (amendments B-412 third
+until it is answered T9b follows its interim reading, which is the recommendation: an exception is a verdict whose
+status is not `PASS` or `NOT_APPLICABLE`, numbered n from 1 in report verdict order, and its row has its own reason
+field, the `item_reasons` entry (`REASON` + item id) of the request item `exc_<n>`; an exception without its `exc_<n>`
+item has no reason, so signing is refused (AC42). `test_signoff_rules` builds its own request with output items and
+`exc_<n>` items (`approval_request(kind="SIGN_OFF", items=...)`), so it needs no preview builder, opens it through the
+T7 engine stand-in imported from `tests/helpers/engine_standin.py` and injects a stub `report` callable (amendments B-412 third
 and fourth review); T17c re-checks AC42 with the real engine.
 
 **T10 Choice screens** (spec §4.4.6). Choice sets from the request's JSON Schema (engineer turn, batched decisions,
@@ -846,7 +849,10 @@ tests. Budget 355 lines (400 before amendment B-510; see the amendments below). 
 `run --answers` and `resume --answers` (AC46, AC64; about 50 lines) move to T14c with the page ports' wait mode, which
 the 400 cap could not take; `run` and `resume` of T14 reject an `--answers` option as "not available in this build"
 until T14c. For a workflow that declares no required basis field (step 3 does not run), T14 passes `basis_ref` `res_`
-followed by 26 zeros, the interim reading of spec Q23 (about 2 lines). Amendment
+followed by 26 zeros, the interim reading of spec Q23 (about 2 lines). The report of step 6 (at the end and on a
+pause) reads that reference through `report/_document.py` `_basis_rows`, which raises `REF_NOT_FOUND` on it, so a run
+test with such a workflow passes `--no-report`, and a fake-engine test that writes the report journals a header whose
+`basis_ref` names a result the test stored. Amendment
 B-412: T14 adds its `CliDeps` fields in `cli/__init__.py` under the defaults rule of §3 and registers the `run` and
 `resume` handlers there. Its fields include the engine factory, bound at once to the merged `eng_harness.engine.Engine`
 (engine plan T9 and T9b), and the workflow-registry field (default `None`; T18a binds it to the registry of
@@ -900,8 +906,9 @@ The merged engine calls `answer(request_id, wait=False)` at every request (`engi
 `ApprovalPort` and `InputPort` in a generic wrapper (`answer(request_id, *, wait) -> T | None`, naming no answer type,
 so the AC2 rules test holds) that ignores the engine's `wait` and calls the inner port with `not --no-wait`; the
 `--wait-timeout` value stays the page ports' parameter (T14). `test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine`
-runs the merged `Engine` with the page ports through `CliDeps` and a test workflow with one approval: answered on the
-page, `run` exits 0; with `--no-wait` it exits 10 at once. It fails at the merge base, where the engine's
+runs the merged `Engine` with the page ports through `CliDeps` and a test workflow with one approval and no required
+basis field, with `--no-report` (the Q23 reference cannot be reported, T14): answered on the page, `run` exits 0; with
+`--no-wait` it exits 10 at once. It fails at the merge base, where the engine's
 `wait=False` reaches the page ports. (2) The B-354 part of the former T14: `run --answers FILE` (AC64): the object is
 checked in step 2 and the page `InputPort` is wrapped so that the first data request is answered from it once through
 `pages.accept_answers_file`; and `resume --answers` (AC46) answers pending data requests from the keyed object (or
@@ -918,7 +925,7 @@ assembler (`assemble_decision_runtime`), with the cascade of spec 0005 as the `D
 on standard error (AC62); the run header records the runtime's summary (AC63, through engine AC69). About 30 lines of
 the 120. T15 and T16 follow T14b. Amendment B-412: `providers_loader` and `decision_assembler` are `CliDeps` fields in
 `cli/__init__.py` under the defaults rule of §3: until plan 0009 T1 and T10a merge they default to `None` (the
-decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18a binds the defaults once plan 0009 T1 and T10a have merged (amendment B-475). Amendment B-510: `load_providers_config` (plan 0009 T1) is merged, so T14b binds the `providers_loader` default to it (§3 rule); `decision_assembler` stays `None` until T18a. The merged configuration refuses `[decisions]` as an unknown section, so T14b adds `decisions: DecisionSettings = DecisionSettings()` to `HarnessConfig` in `cli/_config.py` (imported from `eng_harness.decisions._policy`; a bad value is a `ConfigError` naming `decisions.<key>`), and `_wiring.py` passes `config.decisions` as the assembler's `decision_settings`; `test_decision_wiring.py::test_decisions_section_reaches_assembler` checks that a `[decisions]` table reaches the recording assembler (it fails at the base, where the section is refused). `_wiring.py` calls the assembler as `decision_assembler(providers_config, decision_settings, workspace, point_policies)`, the four inputs of spec §4.2.2 step 5 and spec Q16(a), so the spec's default `assemble_decision_runtime` is called as the spec reads it; `point_policies` (the mapping from each point name to its `DecisionPolicy`) is a fourth `CliDeps` field in `cli/__init__.py`, default `None` under the defaults rule of §3 (while it is `None`, `run` and `resume` stay "not available in this build"), injected in AC62's tests (an empty mapping, recorded by the assembler recorder), and bound by T18a (amendment B-412 tenth review, replacing the ninth review's three-argument call). The
+decision layer is then not available and `run` and `resume` exit 2 "not available in this build"), AC62 is tested through injected recorders, and T18a binds the defaults once plan 0009 T1 and T10a have merged (amendment B-475). Amendment B-510: `load_providers_config` (plan 0009 T1) is merged, so T14b binds the `providers_loader` default to it (§3 rule), checked by `test_decision_wiring.py::test_providers_loader_default_is_load_providers_config` (the default `CliDeps().providers_loader` is that function); `decision_assembler` stays `None` until T18a. The merged configuration refuses `[decisions]` as an unknown section, so T14b adds `decisions: DecisionSettings = DecisionSettings()` to `HarnessConfig` in `cli/_config.py` (imported from `eng_harness.decisions._policy`; a bad value is a `ConfigError` naming `decisions.<key>`), and `_wiring.py` passes `config.decisions` as the assembler's `decision_settings`; `test_decision_wiring.py::test_decisions_section_reaches_assembler` checks that a `[decisions]` table reaches the recording assembler (it fails at the base, where the section is refused). `_wiring.py` calls the assembler as `decision_assembler(providers_config, decision_settings, workspace, point_policies)`, the four inputs of spec §4.2.2 step 5 and spec Q16(a), so the spec's default `assemble_decision_runtime` is called as the spec reads it; `point_policies` (the mapping from each point name to its `DecisionPolicy`) is a fourth `CliDeps` field in `cli/__init__.py`, default `None` under the defaults rule of §3 (while it is `None`, `run` and `resume` stay "not available in this build"), injected in AC62's tests (an empty mapping, recorded by the assembler recorder), and bound by T18a (amendment B-412 tenth review, replacing the ninth review's three-argument call). The
 first interrupt writes the stop file of spec §4.4.8 with `by` = `signal`. Amendment B-412 eighth review:
 `cli/_signals.py` reads the run-id cell of T14; while the cell is empty or the run folder does not exist yet (steps 1
 to 4 of spec §4.2.2, the basis screen included, or the start of `Engine.start`), the first interrupt ends the process
@@ -953,7 +960,8 @@ T6's). T15 adds the `CliDeps` field `basis_fields_of: Callable[[WorkflowDef], Se
 this build" (exit 2). `test_cli_basis.py` injects it with a test-local `FieldSpec` list and
 `tests/helpers/cli_deps.py` gains it; T18a binds the default (about 6 lines). (2) The template folders and the version
 rule of `--template` are spec Q22; until it is answered T15 follows its interim reading: shipped templates only (the
-user folder is a path that does not exist, which `TemplateRepository` reads as empty), and `--template NAME` without
+user folder is a path below a regular file of the package, `Path(eng_harness.templates.__file__) / "user"`, which can
+never exist, so `TemplateRepository` reads it as empty; no folder is created), and `--template NAME` without
 `@VERSION` exits 2 naming the form `NAME@VERSION`, a case in `test_cli_basis.py` (about 4 lines). Budget 330 to 340.
 
 **T16 status, stop, report, doctor** (spec §4.2.1, §4.3 heartbeat). Read-only status, the `stop` command in
@@ -961,7 +969,7 @@ user folder is a path that does not exist, which `TemplateRepository` reads as e
 released, spec §4.4.8; the stop-file protocol lives in `cli/_control.py`, T7b; amendment B-412 fourth and eighth reviews),
 the report command, the doctor pass-through. Amendment B-412: the report and doctor handlers live in `cli/_status.py`;
 T16 registers the four handlers in the `CliDeps` handler table in `cli/__init__.py`. The doctor callable is a `CliDeps`
-field under the defaults rule of §3, injected in `test_doctor_command`; `eng_harness.doctor.run` (plan 0002 T18) is merged, so T16 binds the default itself (amendment B-510; T18a does not).
+field under the defaults rule of §3, injected in `test_doctor_command`; `eng_harness.doctor.run` (plan 0002 T18) is merged, so T16 binds the default itself (amendment B-510; T18a does not), checked by `test_doctor_command.py::test_doctor_default_is_doctor_run` (the doctor field of a default `CliDeps()` is that function).
 `test_stop_pauses_at_safe_point` drives a fake engine from `CliDeps` that polls `FileRunControl`; the real-engine stop
 is re-checked in T17.
 
