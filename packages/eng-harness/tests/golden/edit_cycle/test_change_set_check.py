@@ -132,7 +132,7 @@ def test_item_id_without_a_slash_is_not_refused() -> None:
 def test_item_id_rule_changes_no_other_rule() -> None:
     """The slash issue comes first for its item; the issues of the other rules follow as without it."""
     case = _case()
-    items = [
+    items: list[dict[str, Any]] = [
         {"id": "a/1", "kind": "frame_section", "frames": ["B1"], "section": "NOPE"},
         {"id": "a/2", "kind": "frame_section", "frames": ["B1"], "section": "C400"},
     ]
