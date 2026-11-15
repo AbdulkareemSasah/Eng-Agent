@@ -33,11 +33,13 @@ from eng_harness.ctx import (
     CalcResult,
     Decision,
     DecisionRequest,
+    ModelHandle,
     Preview,
+    Promotion,
     ReadResult,
     ToolResult,
 )  # fmt: skip
-from eng_harness.engine import _approvals, _decide, _modes, _steps
+from eng_harness.engine import _approvals, _decide, _modes, _promote, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._invariants import SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
@@ -115,12 +117,12 @@ class Ctx:
         """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
         pending hosts, host leases, decisions, approvals, permission mode and always-ask tools."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending, self._leases, self._decider = pending, leases, decider
+        self._pending, self._leases, self._decider, self._host = pending, leases, decider, host
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._modes = _modes.Modes(
             mode, always_ask, run_dir, tools, host, store, writer, producer, leases, approvals, run_id, events
         )
-        self._approvals = self._modes.approvals
+        self._approvals, self._files = self._modes.approvals, _promote.LocalFileOps()
         self._guard = _approvals.ApprovalGuard(self._approvals, host, store, writer, producer)
         self._guard.install()
         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
@@ -537,3 +539,51 @@ class Ctx:
     async def escalate(self, reason: str, evidence: Sequence[Ref]) -> NoReturn:
         """Stop the block: the run needs an engineer (`run_escalated`, reason `block_escalation`, AC14)."""
         raise errors.Escalation(reason, evidence=[ref.ref for ref in evidence])
+
+    async def promote(self, model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle:
+        """Make the accepted revision of the working copy of `model` the model of record, as one step (spec 4.7, AC52).
+
+        The original is backed up in the run folder and its files are replaced by the copy's; `approval` answers a
+        `PROMOTION` approval bound to `model`. The step is a write with an `op_id` that is never sent to the `ToolPort`.
+
+        Raises:
+            NotImplementedGap: `Promotion.REPLAY_WRITES` (gap E-G1). BlockRuleViolation, ApprovalVoid: no working copy,
+                or see `ModeApprovals.promotable`. ContractError: `CONFLICT`, the original changed since the copy.
+        """
+        if how is Promotion.REPLAY_WRITES:
+            raise errors.NotImplementedGap(
+                "promotion by replaying writes is not implemented (gap E-G1)", evidence=["E-G1"]
+            )
+        return await _steps.step(lambda path: self._promoted(path, model, approval))
+
+    async def _promoted(self, path: str, model: ModelHandle, approval: Approval) -> ModelHandle:
+        key = model.model_key
+        copy = self._modes.copies.get(key, key)
+        args: _Obj = {"model": key, "copy": copy, "approval": approval.request_id}
+        recorded = self._look(path, "promote", Promotion.FILE_COPY.value, args)
+        if recorded is not None and (done := self._replayed(recorded)) is not None:
+            return ModelHandle.model_validate(done.summary)
+        if (record := self._modes.records.get(copy)) is None:
+            raise errors.BlockRuleViolation(f"model {key} has no working copy to promote")
+        state = await self._approvals.promotable(approval, key, path)
+        origin, origin_sha256 = str(record["model"]), str(cast(_Obj, record["before"])["file_sha256"])
+        originals, accepted = self._host.model_files(origin), self._host.model_files(copy)
+        attempt = 1 if recorded is None else recorded.attempt + 1  # a promotion reconciled `not_applied` runs again
+        op = _steps.op_id(self._run_id, path, attempt)  # no model_key: the host's model is not written (spec 4.5.4)
+        began = self._begin(path, attempt, "promote", Promotion.FILE_COPY.value, args, effect="write", op_id=op)
+        try:
+            _promote.copy_files(self._files, originals, accepted, self._modes.run_dir / "backups", origin_sha256)
+        except ContractError as exc:
+            self._fail(path, attempt, began, exc.detail, False)
+            raise
+        handle = ModelHandle(model_key=origin, model_id=state.model_id or "", revision=state.revision or 0)
+        saved = state.model_dump(mode="json", exclude={"loaded"}) | {"model_key": origin, "role": "promoted"}
+        saved |= {"file_name": originals[0].name, "origin_sha256": origin_sha256}
+        saved |= {"origin_file_names": [p.name for p in originals]}
+        self._writer.append(EventType.MODEL_SAVED, saved, path=path)
+        summary = handle.model_dump(mode="json")
+        stored = self._store.put("harness.journal_blob/1", {"value": summary}, self._producer())
+        self._done(
+            path, attempt, began, ev.StepResult(ref=stored.result_id, summary=summary, warnings=[], complete=True)
+        )
+        return handle

@@ -10,7 +10,6 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
-from eng_harness.engine._promote import LocalFileOps, copy_files
 from workflows.ctx_flows import flow, reply, request_id
 from workflows.modes import FakeFileOps, approved, give_files, mode_rig, promoting, sha, stored_writes
 from workflows.rig import request
@@ -18,6 +17,7 @@ from workflows.rig import request
 from eng_harness import errors
 from eng_harness.ctx import Approval, ApprovalKind, ModelHandle, Promotion
 from eng_harness.engine import PermissionMode, RunStatus
+from eng_harness.engine._promote import LocalFileOps, copy_files
 from eng_harness.engine._steps import op_id
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
@@ -108,7 +108,11 @@ def test_file_copy_promotion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     step = [e.payload for e in events if e.path == "2"]
     assert [type(p) for p in step] == [ev.StepStarted, ev.ModelSaved, ev.StepCompleted]
     assert isinstance(step[0], ev.StepStarted)
-    assert (step[0].kind, step[0].name, step[0].model_key) == ("promote", "file_copy", "m1.copy")
+    assert (step[0].kind, step[0].name, step[0].model_key) == (
+        "promote",
+        "file_copy",
+        None,
+    )  # the host's model is not written
     assert (step[0].effect, step[0].op_id) == ("write", op_id(run_id, "2", 1))  # spec 4.3.2: a promote is a write
 
     asyncio.run(rig.engine(workflow).resume(run_id))  # an ended run is not run again: nothing is copied twice
