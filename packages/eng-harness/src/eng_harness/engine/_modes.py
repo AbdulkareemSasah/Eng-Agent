@@ -124,12 +124,13 @@ class Modes:
         }  # fmt: skip
 
     async def enter(
-        self, ctx: _Step, path: str, name: str, args: _Obj, info: ToolInfo | None, journaled: _Obj | None,
-        under: Approval | None,
+        self, ctx: _Step, path: str, name: str, args: _Obj, info: ToolInfo | None, prior: ev.StepStarted | None,
+        journaled: _Obj | None, under: Approval | None,
     ) -> tuple[_Obj, Approval | None]:  # fmt: skip
         """The inserted steps before the tool step at `path`; the arguments and approval it runs with.
 
-        `info` is the tool of a live step; a recorded step (`journaled` its arguments) replays from the journal alone.
+        `info` is the tool of a live step; a recorded step (`prior` its latest start, `journaled` its arguments)
+        replays from the journal alone, and a write that ran under the inserted approval runs under it again.
         """
         async with self._lock:
             param = info.model_param if info is not None else None
@@ -149,10 +150,11 @@ class Modes:
             approval = await ctx._approved(apath, f"Apply {name}", preview, ApprovalKind.CHANGE_SET, engine=True)
             if not approval.approved or approval.rejected_items:
                 raise errors.ApprovalRejected(f"the approval of {name} was rejected", evidence=[approval.request_id])
+            if prior is not None:  # the approval the step ran under at its last start, not the preview's models
+                return args, approval if prior.under == approval.request_id else under
             bound = {m.model_key for m in preview.models}
-            written = info.effect == "write" if info is not None else under is None
-            named = {str(key), str(args.get(param or ""))}  # the model as the block names it, and its working copy
-            return args, approval if written and bound & named else under
+            named = {v for v in (key, args.get(param) if param else None) if isinstance(v, str)}
+            return args, approval if info is not None and info.effect == "write" and bound & named else under
 
     def _copies_first(self, info: ToolInfo, key: JsonValue) -> bool:
         """A write, in `work_on_copy`, to a model without a working copy (an `open` tool is none)."""
@@ -206,7 +208,9 @@ class Modes:
             "model": origin, "copy": copy, "before": before.model_dump(include=set(_STATE), mode="json"),
             "after": after.model_dump(include=set(_STATE), mode="json"),
         }  # fmt: skip
-        names = [file.name for file in self._host.model_files(copy)]
+        if not (names := [file.name for file in self._host.model_files(copy)]):
+            message = f"the working copy {copy} of {origin} has no model file"
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, message, precondition=Precondition.model_open)
         origins = [file.name for file in self._host.model_files(origin)]
         saved = {**cast(_Obj, kept["after"]), "model_key": copy, "file_name": names[0], "role": "working_copy"}
         saved |= {"origin_sha256": before.file_sha256, "origin_file_names": cast(JsonValue, origins)}
