@@ -10,6 +10,7 @@ from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.edit_cycle.expected_effects import EffectsInput, expected_effects
 from eng_harness.calcs.readback_check import ReadbackInput, readback_check
+from eng_harness.kinds.calcs import ExpectedEffects
 
 from . import EditCycleGoldenCase, load_cases
 
@@ -95,6 +96,31 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_effects(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_golden_bodies_are_valid_payloads() -> None:
+    """The kind takes each golden body bare and with the calc port's wrapper (calc, draft, trace); amendment B-513."""
+    wrapper = {
+        "calc": {"id": CALC_ID, "version": 1, "content_sha256": DIGEST, "status": "draft"},
+        "draft": True,
+        "trace": {
+            "calc_id": CALC_ID,
+            "calc_version": "1",
+            "content_sha256": DIGEST,
+            "inputs": [],
+            "constants": [],
+            "steps": [],
+            "outputs": [],
+        },
+    }
+    for stem, case in load_cases("effects").items():
+        bare = ExpectedEffects.model_validate(case.expected)
+        assert (bare.calc, bare.draft, bare.trace) == (None, None, None), stem
+        wrapped = ExpectedEffects.model_validate(case.expected | wrapper)
+        assert wrapped.effects == bare.effects, stem
+        assert wrapped.calc is not None and wrapped.calc.id == CALC_ID, stem
+        assert wrapped.draft is True, stem
+        assert wrapped.trace is not None and wrapped.trace.calc_id == CALC_ID, stem
 
 
 def test_registered_with_its_kind_and_inputs() -> None:
