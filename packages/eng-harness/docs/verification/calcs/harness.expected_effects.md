@@ -1,0 +1,16 @@
+# harness.expected_effects
+
+- Calc id, version and content hash: `harness.expected_effects` v1; the hash is the entry in `src/eng_harness/calcs/calcs.lock.json`
+- Status: draft (bootstrap mode, ADR-0028 section 4; owner approval awaited, spec 0007 EC-G4)
+- Method source: spec 0007 section 4.4.2 with spec 0003 section 4.8 (the read-back that consumes the effects) and 4.7 D2 (the reported key, list name included, amendment B-483). Only accepted items project; a property of an object the step 3 state holds is a `set`, an object it lacks an `add` of the whole object; a deleted combination is a `remove`; a wall section on a held section is a `set` of `/material` and of `/thickness_mm` (amendment B-503); an existing combination is a `set` of `/type` plus one effect per item key (case, case type, step when not null): `set` of `/scale_ratio`, `add`, `remove` (amendment B-498). Effects are sorted by section, key and pointer; an item with several effects numbers its ids `<item>/<position>`. A literal converts exactly with the factors of `eng_contract.units.unit`; a basis value is taken as stored.
+- Golden cases (`tests/data/golden/edit_cycle/`; each derived by hand in its `derivation` field, synthetic state):
+  - `effects-assignments.json` (§4.4.2): frame and area section assignments, ids and order, an item not accepted. Result: pass.
+  - `effects-wall-sections.json` (§4.4.2, B-503): a held wall section (material and thickness, 0.25 m is 250 mm) and a new one (add, thickness from the basis). Result: pass.
+  - `effects-loads.json` (§4.4.2): frame and area loads, `set` on a held row and `add` of a new row, 12000 N/m is 12 kN/m. Result: pass.
+  - `effects-pattern-and-delete.json` (§4.4.2): `add` of a pattern, `remove` of a combination, an item not accepted. Result: pass.
+  - `effects-combination-replace.json` (§4.4.2, B-498): an existing combination (type, scale `set`, `add`, two `remove`, an envelope step) and a new combination. Result: pass.
+  - `effects-restraints.json` (§4.4.2): six `set` effects on a held joint, `add` of a new row. Result: pass.
+  - `effects-none-accepted.json` (§4.4.2): no accepted item, no effect. Result: pass.
+- Boundary and contract tests: `tests/golden/edit_cycle/test_expected_effects.py` (registration and inputs, trace, a basis path traced once, 0.2 m is 200 mm (baseline د6), the item order of a new combination, the refusals with their fields, and the read-back checks of AC36 `test_combination_edit_reads_back` and AC37 `test_wall_section_material_reads_back` through `harness.readback_check`); `tests/property/test_expected_effects.py::test_order_independent` (AC8)
+- Reviewer and date: awaiting review
+- Findings and open gaps: (1) the order of the items of an added combination is spec 0007 Q15 (open): the effect keeps the change set's order. (2) `harness.change_set_check` does not yet raise `INVALID_ITEM_ID` (spec 0007 4.4.1 K3), so this calc refuses an accepted id with `/` itself. (3) Two terms of one combination item with the same key give two effects on one key; the check does not refuse them. (4) The basis paths read are the ones the accepted items name; the calc has no fixed `basis_fields`. (5) A basis value is taken as stored, as in `harness.change_set_check` (the suffix of its name carries the canonical unit).

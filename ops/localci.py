@@ -5,8 +5,10 @@ paid plan, so CI runs in the container and the result goes to GitHub). It reprod
   pull request mode: the head commit checked out with the base commit at .gate-base, each composite action's command
   (the base variant when the base has the action, the head variant otherwise), GITHUB_ACTIONS=true and a pull_request
   event file, so the gate is as strict as in GitHub Actions. Jobs: gate-check, risk-floor, test-first, agents-drift,
-  ci-review, security (secret scan), build, gate (check --all and the spike checks).
+  ci-review, security (secret scan), build, gate (check --all --skip mutation and the spike checks).
   push mode: build/v1 after merges: gate, agents-drift, security (secrets --tree), build.
+  Mutation step (owner decision 2026-11-15): a pull request run does not run it (it ran on the same code before the pull
+  request was opened); the push run on build/v1, done after every ten merges, runs the full check --all with it.
 
 Not run here, reported in every summary: the dependency audit (uv audit contacts api.osv.dev, which is outside the
 allowed services of AGENTS.md section 9 and is denied by the container's network policy) and the windows job.
@@ -70,7 +72,7 @@ def ci_env(out, event_name, event_path):
     return env
 
 
-def commands(wt, base, push):
+def commands(wt, base, push, skip_mutation=False):
     def has(job):
         return (wt / ".gate-base" / "tools/eng-dev-gate/actions" / job / "action.yml").is_file()
 
@@ -89,7 +91,8 @@ def commands(wt, base, push):
         "security": gate("security", scan),
         "build": f"names=$({gate('build', 'packages --names')}) && [ -n \"$names\" ] && while IFS= read -r name; do "
                  "uv build -q --package \"$name\" -o \"$TMPDIR_BUILD\" || exit 1; done <<< \"$names\"",
-        "gate": gate("gate", "check --all") + " && shopt -s nullglob && for f in spikes/*/check.py; do "
+        "gate": gate("gate", "check --all --skip mutation" if skip_mutation else "check --all") +
+                " && shopt -s nullglob && for f in spikes/*/check.py; do "
                 "echo \"== $f\"; uv run -q --script \"$f\" || exit 1; done",
     }
 
@@ -123,7 +126,7 @@ def execute(out, head, base, event_name, event_path, jobs, timeout):
         code, secs = sh(setup, wt, env, out / "setup.log", 1800)
         results["setup"] = dict(exit=code, seconds=secs, tail=tail(out / "setup.log") if code else "")
         if code == 0:
-            cmds = commands(wt, base, event_name == "push")
+            cmds = commands(wt, base, event_name == "push", skip_mutation=event_name != "push")
             for job in jobs:
                 (out / "status.txt").write_text(f"running {job}\n")
                 code, secs = sh(cmds[job], wt, env, out / f"{job}.log", timeout)
@@ -152,7 +155,9 @@ def finish(out, mode, head, base, results, jobs, started):
              f"{mode} mode, finished {doc['finished_at']}.", "", "| Job | Result | Seconds |", "|---|---|---|"]
     lines += [f"| {j} | {'pass' if r.get('exit') == 0 else 'FAIL (exit %s)' % r.get('exit')} | {r.get('seconds', '-')} |"
               for j, r in results.items() if j != "merged"]
-    lines += ["", NOT_RUN]
+    mutation = ("Mutation step: run" if mode == "push" else "Mutation step: not run in this pull request run (owner "
+                "decision of 2026-11-15); it runs on build/v1 after every ten merges")
+    lines += ["", mutation, "", NOT_RUN]
     (out / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (out / "status.txt").write_text(f"done {verdict}\n")
     return verdict, failing
