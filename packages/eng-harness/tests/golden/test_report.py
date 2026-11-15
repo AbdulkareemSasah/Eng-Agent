@@ -32,7 +32,9 @@ _HEADER: dict[str, Any] = {
     "always_ask": [],
 }  # fmt: skip
 _RUNTIME: dict[str, Any] = {
-    "providers": [{"name": "local1", "model": "m-7b", "version": "2", "is_local": True, "tier": "shadow", "status": "ok"}],
+    "providers": [
+        {"name": "local1", "model": "m-7b", "version": "2", "is_local": True, "tier": "shadow", "status": "ok"}
+    ],
     "released": {"cycle.turn": {"point": "cycle.turn", "release": "r1"}},
     "dropped": [{"point": "cycle.next", "reason": "PR-G1"}],
 }
@@ -294,6 +296,6 @@ def test_status_decision_runtime_caps(run_dir: Path, store: ResultStore, ids: Se
     deep = {"a": {"b": {"c": {"d": {"e": 1, "f": 2}}}}}
     status = _status_html(run_dir, store, ids, {"p": {f"k{i}": i for i in range(205)}, **deep})
     assert status.count("Decision runtime /") == 200
-    assert "<td><bdi dir=\"auto\">7 more</bdi></td>" in status
+    assert '<td><bdi dir="auto">7 more</bdi></td>' in status
     assert "/p/k0<" in status
     assert "/a/b/c/d" not in status
