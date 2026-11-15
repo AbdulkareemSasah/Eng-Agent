@@ -50,6 +50,12 @@ report shows the run's decision runtime (§4.6.1), and the command line draws th
 **Amendment B-495.** By the owner answer of 2026-11-14, the refusal of `[cli_tools.*]` entries before servers plan
 T19b (spec 0002 AC43, gap H-G8) exits 2 (`USAGE`), not 70 (§4.2.3, §6; spec 0002 §11 Q9).
 
+**Amendment B-510.** After the pre-flight audit of plan 0006: the merged engine asks the ports with `wait=False`, so
+the command line gives the page ports the process wait mode (§4.4.5 step 2); a file answer's `by` comes only from
+`[engine] engineer` and is refused while it is unset (§4.2.1, AC46, AC64); the inputs of `--template`, the
+`basis_ref` of a workflow without required basis fields and the item that carries a sign-off exception's reason are
+open (Q22 to Q24).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -159,7 +165,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   standard-error line holds a `base_url`, a `key_ref` or a key. Test:
   `tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime`.
 - AC64. Given `run --answers FILE` (B-354), then the file is read and checked to be one JSON object in step 2 of
-  §4.2.2, and a file that is missing, not valid JSON or not an object is a usage error (exit 2) with no run folder;
+  §4.2.2, and a file that is missing, not valid JSON or not an object is a usage error (exit 2) with no run folder, as
+  is any file while `[engine] engineer` is unset (§4.2.1, B-510);
   given a workflow whose first data request (kind `block`, marker `x-eng-input: data`) opens, then that request, and
   only that one, is answered from the file through `pages.accept_answers_file` (no page is served for it) and the
   journal holds `input_provided` for it with the same `by` as `resume --answers`; an answer that fails the request's
@@ -323,7 +330,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 - AC46. Given a `ctx.ask` data request (schema marker `x-eng-input: data`, §4.4.6), then the page shows its fields
   (name, type, unit, bounds) read-only with the text "provide the answers with `resume --answers FILE`"; given such a
   file, `pages.accept_answers_file` builds the `InputAnswer`, the engine validates it (engine AC61) and journals
-  `input_provided` with `by` = `engineer:<name>`. The file path refuses, with exit 2 and nothing journaled: an answer for
+  `input_provided` with `by` = `engineer:<name>` (`<name>` from `[engine] engineer`; while it is unset the file is
+  refused with exit 2 and nothing journaled, §4.2.1, B-510). The file path refuses, with exit 2 and nothing journaled: an answer for
   an unknown request id; a request that is not of kind `block`; any request whose id starts with `engine.`
   (`engine.in_flight`, `engine.host_state`, `engine.escalation`); and every request whose schema does not carry
   `x-eng-input: data`, which includes the engineer turn and batched decisions (choice requests, marker `choice` or no
@@ -475,7 +483,10 @@ an `InputAnswer` only through `pages.accept_answers_file(request, payload, by)`,
 kind `block`, its id does not start with `engine.`, and its schema carries the marker `x-eng-input: data` (the marker
 `ctx.ask` sets and the choice helpers never set, §4.4.6). The engineer turn, batched decisions and the engine's own
 requests are choices and can only be answered on the page; any other request is refused with exit 2 and nothing is
-journaled (AC46). For `run`, the CLI holds the file's object and wraps the page `InputPort`: the first `present` of a
+journaled (AC46). The answer's `by` is `engineer:<name>`, `<name>` being the `[engine] engineer` setting: no option
+names an engineer (AC1), the operating-system account is never used (AC39) and a file serves no page, so while the
+setting is unset `run --answers` and `resume --answers` are refused with exit 2 and a message naming
+`[engine] engineer`, before any run folder is created and with nothing journaled (B-510). For `run`, the CLI holds the file's object and wraps the page `InputPort`: the first `present` of a
 data request is answered from it once through `pages.accept_answers_file`; every other request, a later data request
 included, goes to the page port unchanged (AC64).
 
@@ -497,7 +508,8 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
    the request opens.
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
-   `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
+   `build_draft`; the template folders and the version rule are Q22, and the `basis_ref` of a workflow without
+   required basis fields is Q23). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
 4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3. The calc port is built
    with the run's store, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`, read before
@@ -678,8 +690,11 @@ process of the same user that has the terminal, reads the opener's command line 
    binding and the items, then calls `ApprovalPort.present(request)`. The page registers the request with its view and
    renders from the stored `harness.approval_preview/1` result after checking that its hash equals `shown_sha256`
    (else the screen says the preview is damaged and offers no button).
-2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file
-   (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
+2. The merged engine calls `answer(request_id, wait=False)` at every request and pauses on `None` (engine §4.9). The
+   process wait mode is the command line's (§4.2.1: wait unless `--no-wait`, up to `--wait-timeout`), so
+   `cli/_wiring.py` wraps the page ports: the wrapper ignores the engine's `wait` and asks the page port with the
+   process wait mode (B-510). Waiting, the port awaits an `asyncio.Event`, polling the stop file
+   (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once with `--no-wait`; the engine then pauses
    (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
 3. A POST that passes §4.4.2 and the answer checks (below) is parsed into an `ApprovalSubmission` (the validated form),
    turned into an `ApprovalAnswer` (an `InputAnswer` for a choice) and handed to the waiting `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
@@ -731,7 +746,8 @@ marker, and the engine refusing a request whose schema has `enum` properties but
 are an amendment of engine §4.9; the alignment with the engineer tier of spec 0005 is Q6.
 
 An exception on the sign-off screen is accepted with its own reason; the reasons travel as `item_reasons` of the answer
-(14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8). Sign-off is refused by the page
+(14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8; which item carries an exception's
+reason is Q24). Sign-off is refused by the page
 when an exception has no reason, and the engine appends `signed_off` for the approved `SIGN_OFF` request (engine §4.9).
 
 #### 4.4.7 Basis confirmation
@@ -965,12 +981,13 @@ heartbeat task runs on the engine loop.
 Staged engine (B-412): a workflow or replay test whose task is built before the engine it needs has merged drives the
 port under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds
 the events to the sink) or with a fake engine from `CliDeps`. This holds for every such criterion: AC29 and AC37 (plan
-T7), AC42 (plan T9), AC7, AC8, AC46 and AC64 (plan T14), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
+T7), AC42 (plan T9b), AC7 and AC8 (plan T14), AC46 and AC64 (plan T14c), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
 T16). AC33, AC34 and AC35 are tested end to end only in plan T17, with the real engine; the page's voided display that
 AC34 needs is built and unit-tested in plan T7b, so T17 adds tests only. Plans T17 and T17c wait for the real engine
 with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery and the
 run-control check between steps (engine plan T18; the run-control half is added to it by amendment B-412). Until the
-engine's `EnginePorts` holds the decision, progress and run-control fields (engine plan T14 and T18), `cli/_wiring.py`
+engine's `EnginePorts` holds the progress and run-control fields (engine plan T18; its `decision` field, engine plan
+T14, is merged and plan T14b maps the cascade into it, B-510), `cli/_wiring.py`
 builds those ports and gives them to the `CliDeps` engine factory, whose default passes the real engine only the
 fields `EnginePorts` holds; plan T16b completes that mapping, and plans T17 and T17c depend on it, so they re-check each
 staged criterion with the real engine through the production wiring; the engine half of AC19 is the one exception,
@@ -1030,4 +1047,7 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
 | Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py`. Decided: answer A (owner instruction of 2026-11-12; amendment B-471): engine §4.4.1, §4.5.1 and AC70 (engine plan T20, work item B-472); §4.2.2 and §4.4.8 here; plan T18 split into T18a (every default but the port builder) and T18b (the port builder and the run id at step 1, after engine plan T20; AC66) |
 | Q21 | Amendment B-412 (eighth review). `ApprovalVoid` carries no request id, so the page ties a void to the most recent approved `CHANGE_SET` or `PROMOTION` request of the process (§4.4.5); with nested approvals in force that may name the wrong one | Owner | Add the approval's `request_id` to the `ApprovalVoid` detail (engine §4.9, §6) at the engine's next amendment; the page then marks that request. Until then the rule of §4.4.5 holds, and the message itself is always shown |
+| Q22 | Amendment B-510. The inputs of `--template NAME[@VERSION]` (§4.2.1, §4.2.2 step 3) are not defined: spec 0004 §4.3 takes the user folder of `TemplateRepository(shipped_dir, user_dir)` from "the settings file of spec 0006", but §4.2.4 has no such key and `harness.toml` refuses an unknown section; and `TemplateRepository.get` needs an exact version, while no document says which version `NAME` alone means | Owner | Writer's recommendation (B-510): add `[templates] user_dir` (a path; unset means no user folder) to §4.2.4 and name it in spec 0004 §4.3; require `@VERSION` (`NAME` alone is a usage error, exit 2), because the template version is part of the basis's identity and a "highest version" rule would change the draft of one command when a file is added. Interim reading until answered (plan T15): shipped templates only (the user folder is a path that cannot exist, named in plan T15, which `TemplateRepository` reads as empty), and `--template NAME` without `@VERSION` exits 2 naming the form `NAME@VERSION` |
+| Q23 | Amendment B-510. `RunRequest.basis_ref` is required (engine §4.5.1), but step 3 of §4.2.2 freezes a basis only when the workflow declares required basis fields, and no document says what `run` passes for a workflow without them | Owner | Writer's recommendation (B-510): pass `res_` followed by 26 zeros, a well-formed reference that names no stored result; the engine loads the basis at the start only when a field is required (engine invariant 5), so such a run does not read it. Such workflows are test workflows in v1 (the shipped workflows declare required basis fields); a run that reaches a decision or the report's basis rows would fail on the reference, so a report guard or an optional `basis_ref` is a later amendment if such workflows are wanted in production. Interim reading until answered: the same value (plan T14) |
+| Q24 | Amendment B-510. Each sign-off exception is accepted with its own reason carried in `item_reasons` (§4.4.6, AC42), but the engine and the page accept `item_reasons` keys that are items of the request only (engine §4.9; `pages/_answers.py`), the preview items of the sign-off are the outputs (spec 0007 §4.5 step 17), and a verdict has no id (several verdicts can share one output): no key exists for one reason per verdict | Owner | Writer's recommendation (B-510): the `SIGN_OFF` preview holds one item per output and one item per exception, in report verdict order, with id `exc_<n>` (n from 1) and no refs, so `signed_off.outputs` is unchanged; an exception's reason is the `item_reasons` entry of its item, and the page refuses sign-off while an exception item has no reason (amend §4.4.6, AC42 and spec 0007 §4.5 step 17; plan T9b and plan 0007 T9b follow). Interim reading until answered (plan T9b): the page follows the recommendation, so each exception keeps its own reason field (AC42); an exception without its `exc_<n>` item has no reason and signing is refused, so a workflow run with exceptions can be signed only once its step 17 adds the items (spec 0007 §4.5 step 17 and plan 0007 T9b follow at the answer) |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

@@ -76,6 +76,7 @@ r1_modules = [
   "src/eng_harness/decisions/_policy.py",
   "src/eng_harness/decisions/_redaction.py",
   "src/eng_harness/decisions/_rules.py",
+  "src/eng_harness/adapters/csi/_read_state_tool.py", "src/eng_harness/adapters/csi/_revisions.py",
 
 ]
 r2_modules = ["src/eng_harness/journal/**", "src/eng_harness/kinds/**", "src/eng_harness/ctx.py", "src/eng_harness/block.py",

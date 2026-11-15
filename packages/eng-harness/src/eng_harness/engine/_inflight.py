@@ -23,6 +23,7 @@ from eng_contract.store import ResultStore
 from pydantic import JsonValue, TypeAdapter
 
 from eng_harness import errors
+from eng_harness.ctx import ModelHandle
 from eng_harness.engine._ctx_impl import _stored
 from eng_harness.engine._inputs import Evidence, Kind, Question, build_request, check_answer, choice_schema
 from eng_harness.engine._replay import Recorded, ReplayIndex
@@ -50,7 +51,7 @@ class _Stored(TypedDict):
 _STORED = TypeAdapter(_Stored)
 _Closing = ev.StepCompleted | ev.StepFailed | ev.StepReconciled
 _Reason = Literal["needs_reconciliation", "units_mismatch", "host_state_mismatch"]
-_RERUN = ("tool", "read", "calc", "decide", "decide_many", "approve")  # rerun when in flight; an ask is asked again
+_RERUN = ("tool", "read", "calc", "decide", "decide_many", "approve", "ask")  # an approval or ask is presented again
 
 
 class Stopped(errors.Escalation):
@@ -268,7 +269,9 @@ async def _write(rt: Resume, step: Step) -> None:
         began.args if began.args is not None else rt.store.payload(began.args_ref or "")["value"]
     )
     found, why = None, "the adapter has no reconciler for this tool"
-    if rt.tool.supports_reconcile(began.name):
+    if began.kind == "promote":  # never sent to the tool port (spec 11 Q40)
+        why = "a file copy has no reconciler"
+    elif rt.tool.supports_reconcile(began.name):
         try:
             found = await rt.tool.reconcile(began.name, args, op)
         except ContractError as exc:
@@ -297,6 +300,8 @@ async def _applied(
     The empty summary is only for an adapter with no read-back (`None`). A failure, returned or raised, stops the
     resume with the step still in flight, so that the next resume reads it again.
     """
+    if step.began.kind == "promote":
+        return await _promoted(rt, step, args)
     name, error = step.began.name, None
     reply = found.result if found is not None and found.outcome == "applied" else None
     try:
@@ -310,6 +315,19 @@ async def _applied(
         _LOG.warning("the result of the write at %s (%s) could not be read: %s", step.path, name, why)
         rt.stop(f"the write at step {step.path} was found applied, but its result could not be read: {why}", None)
     return _stored(reply) if isinstance(reply, SuccessEnvelope) else _nothing(rt, op)
+
+
+async def _promoted(rt: Resume, step: Step, args: dict[str, JsonValue]) -> ev.StepResult:
+    """The result of a promotion found applied (spec 11 Q40): the handle of the working copy's state, no read-back."""
+    copy = str(args["copy"])
+    instance = await rt.host.locate(copy)
+    state = None if instance is None else await rt.host.model_state(copy, instance.instance_id)
+    if state is None or not state.loaded:
+        rt.stop(f"the promotion at step {step.path} was found applied, but the working copy {copy} is not open")
+    handle = ModelHandle(model_key=str(args["model"]), model_id=state.model_id or "", revision=state.revision or 0)
+    summary = handle.model_dump(mode="json")
+    ref = rt.store.put("harness.journal_blob/1", {"value": summary}, rt.producer()).result_id
+    return ev.StepResult(ref=ref, summary=summary, warnings=[], complete=True)
 
 
 def _nothing(rt: Resume, op: str) -> ev.StepResult:

@@ -48,6 +48,10 @@ class ModeApprovals(_approvals.Approvals):
         """Serve one run in `mode`; `copies` maps a model to its working copy."""
         super().__init__(port, host, store, writer, producer, run_id, events)
         self._mode, self._copies = mode, copies
+        self.used = {
+            str((p.args or {}).get("approval")): str(e.path)
+            for e in events if isinstance(p := e.payload, ev.StepStarted) and p.kind == "promote"
+        }  # approval id to the step of the promotion that used it  # fmt: skip
 
     async def settle(
         self, path: str, title: str, preview: Preview, kind: ApprovalKind, args: _Obj, *, engine: bool = False
@@ -65,6 +69,26 @@ class ModeApprovals(_approvals.Approvals):
             self._writer.append(EventType.APPROVAL_RESOLVED, answer)
             self._answers[rid] = answer
         return self._grant(path, request, answer, preview), request.preview_ref
+
+    async def promotable(self, approval: Approval, key: str, path: str) -> HostModelState:
+        """The state of the working copy of `key`, once `approval` is an approved, unused `PROMOTION` of this run bound
+        to it and the copy is as bound; the approval is then used by the promotion at `path` (which a rerun of it may
+        use again). Raises `BlockRuleViolation` or `ApprovalVoid`."""
+        rid = approval.request_id
+        held, grant = self._asked.get(rid), self._grants.get(rid)
+        why = (
+            "is not a promotion approval of this run" if held is None or grant is None or held.kind != "promotion"
+            else "is not approved" if not (approval.approved and grant.approved)
+            else f"is not bound to model {key}" if key not in grant.binding
+            else "was used by an earlier promotion" if self.used.get(rid, path) != path else None
+        )  # fmt: skip
+        if grant is None or why is not None:
+            raise errors.BlockRuleViolation(f"approval {rid} {why}")
+        state, bound = await self._state(key), grant.binding[key]
+        if state is None or any(getattr(state, name) != getattr(bound, name) for name in _STATE):
+            raise errors.ApprovalVoid(f"model {key} changed since approval {rid} was shown", evidence=[rid])
+        self.used[rid] = path
+        return state
 
     def stored(self, path: str) -> Preview | None:
         """The stored preview of the request made at `path`, or `None`."""
