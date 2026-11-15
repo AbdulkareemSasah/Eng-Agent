@@ -35,6 +35,14 @@ from .test_readback import Binder
 store = base.store  # the fixture of the read-state tests, by name
 
 
+def _saved_name(envelope: SuccessEnvelope) -> str:
+    saved = envelope.summary["saved_file"]
+    assert isinstance(saved, dict)
+    name = saved["name"]
+    assert isinstance(name, str)
+    return name
+
+
 @dataclass
 class Rig:
     host: Any
@@ -50,7 +58,7 @@ class Rig:
     async def snapshot(self) -> Path:
         saved = await self.call("csi_save_model", as_new_revision=True)
         assert isinstance(saved, SuccessEnvelope), saved
-        return self.folder / str(saved.summary["saved_file"]["name"])  # type: ignore[index]
+        return self.folder / _saved_name(saved)
 
 
 @asynccontextmanager
@@ -120,7 +128,7 @@ def test_restore_moves_host_port(
         snapshot = await rig.snapshot()
         opened = await rig.call("csi_open_revision", revision=snapshot.name)
         assert isinstance(opened, SuccessEnvelope), opened
-        restored = rig.folder / str(opened.summary["saved_file"]["name"])  # type: ignore[index]
+        restored = rig.folder / _saved_name(opened)
         assert rig.calls == [(rig.key, restored)]
         assert rig.host.model_files(rig.key) == (restored.resolve(),)
         found = await rig.host.locate(rig.key)
