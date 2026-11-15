@@ -30,7 +30,8 @@ from workflows.ctx_flows import (
     success,
     written,
 )
-from workflows.rig import Rig, make_rig, request
+from workflows.rig import Rig, make_rig
+from workflows.rig import asking as request
 
 from eng_harness import errors
 from eng_harness.ctx import Approval, ApprovalKind, Preview, PreviewItem

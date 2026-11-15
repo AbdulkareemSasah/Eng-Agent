@@ -333,10 +333,13 @@ class Engine:
         decider = _decide.Decider(
             ports.decision, ports.inputs, view, rt.events, writer, self._clock, self._ids, run_id, events
         )
+        head = next(
+            e.payload for e in rt.events() if isinstance(e.payload, ev.RunHeader)
+        )  # the mode and always-ask list
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
             writer, events, _hostsafety.Pending(rt), leases, decider,
-            ports.approvals,
+            ports.approvals, head.mode, head.always_ask, rt.run_dir,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
