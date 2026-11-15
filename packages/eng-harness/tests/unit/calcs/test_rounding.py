@@ -185,11 +185,11 @@ def test_trace_and_schema() -> None:
         "modeling_section_increment_mm": (50, "mm", f"{basis_id}#/fields/{INCREMENT}"),
         "required": (437.5, "mm", REFS["required"]["result_id"]),
     }
-    steps = [(s.name, s.value, s.unit, s.source, list(s.uses)) for s in built.steps]
+    steps = [(s.name, s.value, s.unit, s.formula, s.source, list(s.uses)) for s in built.steps]
     assert steps == [
-        ("ratio", 8.75, None, "§4.10 N1", ["required", "modeling_section_increment_mm"]),
-        ("multiple", 9, None, "§4.10 N1", ["ratio"]),
-        ("size", 450.0, "mm", "§4.10 N2", ["multiple", "modeling_section_increment_mm"]),
+        ("ratio", 8.75, None, "r / i on exact fractions", "§4.10 N1", ["required", "modeling_section_increment_mm"]),
+        ("multiple", 9, None, "n = ceil(r / i)", "§4.10 N1", ["ratio"]),
+        ("size", 450.0, "mm", "n x i, to float once", "§4.10 N2", ["multiple", "modeling_section_increment_mm"]),
     ]
     assert list(built.outputs) == ["size"]
     literal = TraceBuilder()
