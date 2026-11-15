@@ -9,6 +9,7 @@ returns its recorded result, or raises its recorded failure again, with no port 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from eng_contract.canonical import payload_sha256
@@ -36,7 +37,7 @@ from eng_harness.ctx import (
     ReadResult,
     ToolResult,
 )  # fmt: skip
-from eng_harness.engine import _approvals, _decide, _steps
+from eng_harness.engine import _approvals, _decide, _modes, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._invariants import SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
@@ -108,14 +109,18 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort,
+        pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort, mode: str,
+        always_ask: Sequence[str], run_dir: Path,
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts,
-        host leases, decisions and approvals."""
+        """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
+        pending hosts, host leases, decisions, approvals, permission mode and always-ask tools."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
         self._pending, self._leases, self._decider = pending, leases, decider
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
-        self._approvals = _approvals.Approvals(approvals, host, store, writer, producer, run_id, events)
+        self._modes = _modes.Modes(
+            mode, always_ask, run_dir, tools, host, store, writer, producer, leases, approvals, run_id, events
+        )
+        self._approvals = self._modes.approvals
         self._guard = _approvals.ApprovalGuard(self._approvals, host, store, writer, producer)
         self._guard.install()
         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
@@ -187,11 +192,19 @@ class Ctx:
             args = cast(_Obj, _json(raw))
         return await self._tool_json(path, name, raw, args, under, item)
 
+    def _journaled(self, began: ev.StepStarted) -> _Obj:
+        return began.args if began.args is not None else cast(_Obj, self._store.payload(began.args_ref or "")["value"])
+
     async def _tool_json(
         self, path: str, name: str, raw: Mapping[str, ArgValue], args: _Obj, under: Approval | None, item: str | None
     ) -> ToolResult:  # fmt: skip
-        recorded = self._look(path, "tool", name, args)
         prior = self._started.get(path)
+        info = None if prior is not None else await self._tools.describe(name)
+        journaled = None if prior is None else self._journaled(prior)
+        args, under = await self._modes.enter(
+            self, path, name, args, info, prior, journaled, under
+        )  # copy and approval (4.7)
+        recorded = self._look(path, "tool", name, args)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
             self._pending.replay(self, path, prior.model_key)
             await self._guard.touch(prior.model_key, prior.effect == "write")
@@ -203,7 +216,7 @@ class Ctx:
                     self._approvals.stepped(prior.under, prior.model_key, done.ref)
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
-        info = await self._tools.describe(name)
+        info = info or await self._tools.describe(name)
         await self._leases.acquire(info.host_key)  # one driver per host: leased before the first step on it (4.6 #10)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
@@ -438,15 +451,17 @@ class Ctx:
             raise errors.BlockRuleViolation("the preview of ctx.approve must be a Preview")
         return await _steps.step(lambda path: self._approved(path, title, preview, kind))
 
-    async def _approved(self, path: str, title: str, preview: Preview, kind: ApprovalKind) -> Approval:
+    async def _approved(
+        self, path: str, title: str, preview: Preview, kind: ApprovalKind, *, engine: bool = False
+    ) -> Approval:  # fmt: skip
         args = cast(_Obj, preview.model_dump(mode="json", by_alias=True))
         recorded = self._look(path, "approve", kind.value, args)
-        await self._guard.sweep(self, path, "pre")  # an approval waits for the dirty models to be checked (spec 4.6 #1)
+        await self._guard.sweep(self, path.partition("~")[0], "pre")  # an approval waits for dirty models (spec 4.6 #1)
         if recorded is not None and self._replayed(recorded) is not None:
-            return (await self._approvals.settle(path, title, preview, kind, args))[0]
+            return (await self._approvals.settle(path, title, preview, kind, args, engine=engine))[0]
         held = {"diff_ref": preview.diff_ref, "items": [list(i.refs) for i in preview.items]}
         self._guard.refs(held, {})  # invariant 3: the default rule for every reference
-        approval, shown = await self._approvals.settle(path, title, preview, kind, args)
+        approval, shown = await self._approvals.settle(path, title, preview, kind, args, engine=engine)
         began = self._begin(path, 1, "approve", kind.value, args)
         summary: _Obj = {"request_id": approval.request_id, "approved": approval.approved}
         self._done(path, 1, began, ev.StepResult(ref=shown, summary=summary, warnings=[], complete=True))

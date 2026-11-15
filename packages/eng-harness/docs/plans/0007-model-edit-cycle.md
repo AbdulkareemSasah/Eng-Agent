@@ -76,13 +76,19 @@ tasks:
     # Amendment (B-503, documents only): a wall_section on a section the state holds also projects a set of /material
     # (spec 4.4.2, AC37, about 6 lines); the item order of an added combination is spec Q15 (open, nothing to build);
     # max_changed_lines 330 to 340 (an estimate).
+    # Amendment (B-513, documents only): the effects record carries the calc port's wrapper members (calc, draft, trace),
+    # so kinds/calcs.py gains three optional members on ExpectedEffects (3 lines); that module is in the hash closure of
+    # every calc, so calcs.lock.json moves seven entries and the footing record's hash literal follows. max_changed_lines
+    # stays 340 (311 measured with the trial).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.edit_cycle, eng_harness.calcs.edit_cycle.expected_effects (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/expected_effects.py"
+      - "packages/eng-harness/src/eng_harness/kinds/calcs.py"  # ExpectedEffects gains the optional calc, draft and trace members (amendment B-513)
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # its content-hash literal follows the lock (amendment B-513)
       - "packages/eng-harness/docs/verification/calcs/harness.expected_effects.md"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/effects-*.json"
@@ -93,6 +99,7 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_combination_edit_reads_back"
       - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_wall_section_material_reads_back"  # AC37 (B-503)
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_golden_bodies_are_valid_payloads"  # amendment B-513
       - "packages/eng-harness/tests/property/test_expected_effects.py::test_order_independent"
     covers: [AC8, AC36, AC37]
     depends_on: [T2]
@@ -350,6 +357,24 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port"
     covers: [AC38]
     depends_on: [T5]
+  - id: T14
+    title: Calc harness.change_set_check refuses an item id with a slash (INVALID_ITEM_ID)
+    # Amendment (B-513, documents only): new. Spec 4.4.1 K3 and AC4 require the issue INVALID_ITEM_ID and name the golden
+    # cases check-item-id-*; the merged calc (T2, B-196) raises none and holds no such case. After T3, which also edits
+    # calcs.lock.json. About 6 lines of the calc, 2 of the lock, 1 of CHANGELOG.md and 3 of the record: budget 40 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/check-item-id-*.json"
+    max_changed_lines: 40
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_item_id_with_a_slash_is_refused"
+    covers: [AC4]
+    depends_on: [T3]
 ---
 
 # Implementation plan: eng-harness model edit cycle (spec 0007)
@@ -407,6 +432,27 @@ spec §4.4.2), so a redefinition with another material is not `unexpected`;
 holding the new material and thickness (`PASS`, no `unexpected` row) and with the old material still read (`FAIL`, the
 material effect `mismatch`) (AC37). The order of the items of an added combination is spec Q15, open: until it is
 answered the projection keeps the change set's item order and no test pins another.
+Amendment (B-513): the calc port stores `body | {calc, draft, trace}` and the store validates that record against the
+kind (spec 0003 §4.2, §4.12 item 2), but `ExpectedEffects` in `kinds/calcs.py` is a plain model with `extra="forbid"`,
+so the effects record could not be stored and the read-back's `effects` input could not read it back. Form: the three
+members are added to `ExpectedEffects` as optional (`calc: CalcMeta | None = None`, `draft: StrictBool | None = None`,
+`trace: Trace | None = None`), and the kind does not take the `CalcPayload` base that `ModelDiff`, `ReadbackCheck`,
+`ChangeSetCheck` and the other calc kinds take, because that base requires the members and the merged bodies of this
+kind hold none: the kind fixture `tests/data/kinds/calcs/expected_effects.json`, `tests/unit/calcs/test_readback.py` and
+the four `readback-*.json` goldens (plan 0003 T4 and T9), which this task may not change. A trial with the base failed
+the kind fixture test, nine read-back unit tests and the four read-back goldens. Spec 0003 §4.8 lists the domain fields
+of the kind as it does for every calc kind, and spec 0003 §4.2 has the framework add `calc`, `draft` and `trace`, so
+no spec text contradicts the form and none changes. `kinds/calcs.py` is in the content-hash closure of every calc: the
+change moves seven entries of `calcs.lock.json` at the B-197 head (six merged calcs and this one; regenerate with
+`uv run python -m eng_harness._calc._hash --write-lock`), and the record `harness.footing_subjects.md` pins its hash
+literal (`tests/unit/footing/test_calcs_registered.py::test_metadata_and_constants`), so its literal follows; the
+hashes of the six merged calcs change, so the owner's re-verification of those drafts is as for any hash change (spec
+0003 §4.5). Trial on the head of B-197 in a scratch worktree (removed): the edit above, the regenerated lock and
+`test_golden_bodies_are_valid_payloads` (each `effects-*` golden body validates through the kind bare and with the
+wrapper; a test of the first commit, red at the base because its module imports the calc, and red at the
+implementation head until `kinds/calcs.py` changes) gave `uv run eng-gate check --package eng-harness --skip mutation`
+`check: pass`; files touched: `kinds/calcs.py`, `calcs.lock.json`, `harness.footing_subjects.md` and the golden test
+file; 311 counted lines of 340.
 
 **T4 Host design verdicts and analysis summary** (spec §4.4.3, §4.4.4). Steel mapping by comparison with
 `limits.ratio_limit_ratio` (amendment B-417, spec §4.8); concrete gives `NEEDS_ENGINEER` (gap EC-G2); messages `unclassified` until the local test (gap
@@ -535,6 +581,14 @@ until it is answered, `reopened` keeps the binding's model id and records the fi
 `MODEL_CHANGED_OUTSIDE`); a refused open (a changed snapshot, `CONFLICT`) leaves the previous file bound. Plan 0002
 T19a passes `host.reopened` in `build_ports`.
 
+**T14 Item id with a slash** (amendment B-513; spec §4.4.1 K3, AC4). `harness.change_set_check` raises the error issue
+`INVALID_ITEM_ID` for an item id that contains `/` (a refused kind included), and the golden cases `check-item-id-*` and
+`test_item_id_with_a_slash_is_refused` pin it. The merged calc (T2, B-196) gives none: a trial run of an item `a/b` gave
+only the issues of its other rules, and T2's golden files hold no such case. The task changes no other rule of the check.
+Open, not built (spec §11 Q18): two terms of one `load_combination_set` item with the same item key (`case.case`,
+`case.case_type`, `case.step`) are not refused either; K3 speaks of two items, so the spec does not require it and no
+test pins either behaviour.
+
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new (Hypothesis and pytest from plan 0001 T1).
@@ -555,6 +609,7 @@ T19a passes `host.reopened` in `build_ports`.
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 | T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
+| T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
 
 ## 4. Verification
 

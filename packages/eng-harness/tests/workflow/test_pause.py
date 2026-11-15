@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from workflows.ctx_flows import change_set, flow, request_id
-from workflows.rig import make_rig, request
+from workflows.rig import asking as request
+from workflows.rig import make_rig
 
 from eng_harness.engine import RunStatus
 from eng_harness.journal import _events as ev

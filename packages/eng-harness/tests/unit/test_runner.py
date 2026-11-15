@@ -162,7 +162,7 @@ def test_decision_runtime_recorded(tmp_path: Path) -> None:
 
 def test_start_journals_header_and_output(tmp_path: Path) -> None:
     rig = make_rig(tmp_path)
-    workflow_def = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"})], always_ask=("write_b",))
+    workflow_def = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"})], always_ask=("unlock_b",))
     settings = EngineSettings(step_retry_limit=3)
     given: dict[str, JsonValue] = {"label": "a", "count": 2}
     asked = request(values=given, mode=PermissionMode.AUTONOMOUS_LOGGED)
@@ -197,7 +197,7 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert (head.engine_version, head.contract_version) == (__version__, CONTRACT_VERSION)
     assert head.settings_sha256 == payload_sha256(settings.model_dump(mode="json"))
     assert head.settings_sha256 != payload_sha256(EngineSettings().model_dump(mode="json"))
-    assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["write_b"], {}, {})
+    assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["unlock_b"], {}, {})
     assert rig.store.payload(head.input_ref) == {"value": given}  # the input is stored, not copied into the journal
     assert head.input_sha256 == payload_sha256(given)
     read, read_done, bind, units, _units_done, units_enforced = events[1:7]
@@ -318,8 +318,11 @@ async def _checked(ctx: Any, inp: ChainInput) -> ChainOutput:
 
 
 def _meta_run_id(run_dir: Path) -> str:
-    with sqlite3.connect(run_dir / "journal.sqlite") as db:
+    db = sqlite3.connect(run_dir / "journal.sqlite")
+    try:
         return str(db.execute("SELECT value FROM meta WHERE key = 'run_id'").fetchone()[0])
+    finally:
+        db.close()
 
 
 def _tree(root: Path) -> list[str]:
