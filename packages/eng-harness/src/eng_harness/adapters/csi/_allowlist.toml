@@ -1,6 +1,7 @@
 # Allowlist of the Sasaah CSI server for ETABS (spec 0002 section 4.5.1), reviewed data: a change of an entry is a
 # reviewed data change. Pinned to the S-12 inventory (spikes/S-12-sasaah-tool-inventory/inventory/sasaah-csi-mcp.json),
 # built by static reading of the C# catalog at the commit below; the live tools/list needs a local test.
+# The adapter-local tools of spec 0007 4.10 are not here: this list is the server's (build check); see `_tools.py`.
 # `tool` is the array of the spec's [[tool]] entries, one inline table per line (tomllib reads TOML 1.0).
 adapter = "sasaah-csi-mcp"
 sasaah_commit = "61da80f61a6562c8e3553168056bc107e3f93013"
