@@ -254,7 +254,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   loads each adapter's allowlist for its server section's `route`. Tests:
   `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter` (also a `route` on a CSI
   section; amendment B-413: a `route` on a CSI section is decided at allowlist load),
-  `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data).
+  `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data,
+  given through the `allowlists` keyword of `build_ports`, §4.1; amendment B-530).
 - AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
   loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
   descriptor; `unit_status` is `declared`, `missing` or `confirmed`. An entry with status `missing` may name a tool the
@@ -286,7 +287,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
   AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9),
   sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
-  `::test_csi_preview_sends_no_write` (plan task T19a).
+  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530) (plan
+  task T19a).
 - AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
   models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
   `eng_harness.adapters.csi._replies` answers those same models. Test:
@@ -301,9 +303,25 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 | Module | Public names | Who may import |
 |---|---|---|
 | `eng_harness.servers` | `ServersConfig`, `ServerConfig`, `RoleConfig`, `CliToolConfig`, `ConfigError`, `load_servers_config`, `ServerManager`, `ServerCheck` (re-export of the port type), `RecordMode` | engine wiring (0006), doctor, tests |
-| `eng_harness.adapters` | `build_ports(config, workspace, store, run_dir, clock, ids) -> AdapterPorts` (`tool_port`, `host_port`), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
+| `eng_harness.adapters` | `build_ports(config, workspace, store, run_dir, clock, ids, *, inspector=None, launcher=None, lock_dir=None, files=None, checks=None, allowlists=None) -> AdapterPorts` (`tool_port`, `host_port`), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
 | `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=()) -> int`, `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
 | `eng_harness.kinds.csi` **[added: B-503]** | `CSI_KINDS` and the payload models of the harness kinds of A1 (`CsiModelStatus`, `CsiAnalysisRun`, `CaseStatus`, `CsiAnalysisStatus`, `CsiDesignRun`, `CsiRows`); imports `pydantic` only; registered in `HARNESS_KINDS` (`_kinds.py`), the registry of the run's store | adapters, calcs (spec 0003 §4.3), tests |
+
+`build_ports` keywords **[added: B-530]** (the six positional arguments stay, so spec 0006 calls it unchanged):
+
+1. `inspector` (`ProcessInspector`) defaults to the platform inspector (as the doctor's) and is given to the
+   launcher, the process guard, the CSI session and the host port; `launcher` defaults to the platform launcher over
+   that inspector.
+2. `lock_dir` defaults to `default_lock_dir` (§4.4.1). The engine identity in the holder record is
+   `inspector.identity(os.getpid())` and the run id is the name of `run_dir`, so no further seam is needed.
+3. `files` (`Mapping[str, Path]`, model key to file) defaults to empty; a key it lacks stays `NOT_FOUND`. Which
+   component fills it from the workflow's `harness.file_input/1` reference is gap H-G10.
+4. `checks` (`Mapping[str, ServerCheck]`, per server section) defaults, for a section it lacks, to a placeholder with
+   `ok` false, empty fingerprints and the build formatted as an unchecked `ServerCheck` of §4.3.4. The ports read only
+   its `build` (provenance); the engine's `preflight` result is the authority for a stop.
+5. `allowlists` (`Mapping[str, Allowlist]`, adapter name to an allowlist loaded without a route) defaults to the
+   shipped CSI allowlist under its adapter name; each server section's adapter selects its allowlist, served for the
+   section's `route` by the rule of AC41.
 
 Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
 `servers/_procinfo.py`, `servers/_transport.py`, `servers/_launch_args.py` (the argv of §4.3.2, **[added: B-085]**),
@@ -732,9 +750,16 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `started_instances`, `close_started` | §4.4.2 |
 | `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
 
-Adapter run state (`run_dir/adapter/state.json`, written atomically): instances, bindings, expected units, the
-`visible` flag of launches. It is a cache: where it disagrees with the journal (`host_started`, `model_bound`), the
-journal wins.
+Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time and exe
+name, amendment B-530), bindings, expected units, the `visible` flag of launches. A host port built over the same
+`run_dir` loads it at construction (amendment B-530), so a resumed run finds its working copy and re-locks its live
+instances (§4.4.1). It is a cache: where it disagrees with the journal (`host_started`, `model_bound`), the journal
+wins.
+
+Model binder **[added: B-530]**: the host port is the CSI tool port's `ModelBinder` (`binding`, `revision`). Decision:
+`Binding.host.version` is the program version of the last `model_state` read of that model key, and, when none was
+read since the model was bound, of one `csi_model_info` read on the bound instance (`""` when its reply has none, as
+the model-status mapping does); this reuses the reply the reader already maps and changes no outside-edit baseline.
 
 ### 4.6 CSI adapter for the edit cycle on ETABS
 
@@ -1024,6 +1049,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
 | H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then; the refusal exits 2 (Q9) |
 | H-G9 | **[added: B-495]** No plan task delivers the frozen basis value to `ReadBack.tolerance_ratio` (Q8): the ports are built at step 1 of spec 0006 §4.2.2, the basis is frozen at step 3, `resume` runs steps 1, 5 and 6 with no freeze, and `build_ports` (plan T19a) takes no basis. Until a task delivers it, every written quantity reads back `READBACK_UNAVAILABLE` on the first live run | Lead | Closed by amendment B-503: plan T19a gives the CSI host port a provider that reads the frozen basis named by the run header (§4.5.8, AC44); no engine port signature changes and the command line passes nothing |
+| H-G10 | **[added: B-530]** No component turns the workflow's `harness.file_input/1` model reference (base name, SHA-256, size) into the `files` mapping (model key to path) that `build_ports` gives the host port (§4.1); until one does, a run whose host port has no file for its model key fails `NOT_FOUND` at `working_copy` | Lead | Decide the producer (the command line at step 1 of spec 0006 §4.2.2, or the host port resolving the reference through the store) in a later amendment; plan T19a's tests pass `files` |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
