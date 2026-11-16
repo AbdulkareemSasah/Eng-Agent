@@ -228,7 +228,10 @@ def _benchmarks(
         ref = provided.get(r.request_id)
         if r.kind != "block" or ref is None or r.cycle is None:
             continue
-        fields = store.payload(parse_ref(ref)[0]).get("fields")
+        try:
+            fields = store.payload(parse_ref(ref)[0]).get("fields")
+        except ContractError:
+            continue
         body = fields.get("benchmark_request") if isinstance(fields, dict) else None
         label = body.get("value") if isinstance(body, dict) else None
         if isinstance(label, str):

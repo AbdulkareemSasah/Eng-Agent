@@ -23,6 +23,20 @@ TURN = "edit_cycle_engineer_turn"
 _KINDS = EventType
 
 
+def fail(s: Script, path: str, kind: str, name: str, start: float, ms: int) -> None:
+    """A step started at `start` that failed `ms` later."""
+    body = {"kind": kind, "name": name, "args": {}, "args_sha256": SHA, "effect": "read"}
+    error = {"harness_code": "NEEDS_ENGINEER", "message": "m"}
+    s.at(start, _KINDS.STEP_STARTED, body, path)
+    s.at(start + ms / 1000, _KINDS.STEP_FAILED, {"error": error, "retryable": False, "duration_ms": ms}, path)
+
+
+def started(s: Script, path: str, kind: str, name: str, start: float) -> None:
+    """A step that started and has not ended."""
+    body = {"kind": kind, "name": name, "args": {}, "args_sha256": SHA, "effect": "read"}
+    s.at(start, _KINDS.STEP_STARTED, body, path)
+
+
 def write_cycles(
     run_dir: Path, store: ResultStore, ids: IdSource, *, open_tail: bool = False, accept: bool = True
 ) -> JournalReader:
@@ -105,6 +119,21 @@ def test_benchmark_without_accept_or_label(run_dir: Path, store: ResultStore, id
     assert [(b.label, b.elapsed_ms, b.cycles) for b in edit_cycle_timings(reader, store).benchmarks] == [
         ("R1", None, 2)
     ]
+
+
+def test_benchmark_skips_a_missing_answer(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """A stored answer that cannot be read is skipped like a request without a label, not raised."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.at(13, _KINDS.INPUT_REQUESTED, {"request_id": "bad", "kind": "block", "title": "t", "fields_schema_sha256": SHA})
+    s.at(14, _KINDS.INPUT_PROVIDED, {"request_id": "bad", "answer_ref": "res_" + "0" * 26, "by": "engineer:x"})
+    s.asked("good", "block", "Change set", 15, 5, "R1")
+    s.end("1/0/0", 10, 30)
+    s.writer.close()
+    found = edit_cycle_timings(JournalReader(run_dir), store).benchmarks
+    assert [b.label for b in found] == ["R1"]
 
 
 def test_report_adds_the_cycle_timings(run_dir: Path, store: ResultStore, ids: IdSource, clock: FixedClock) -> None:
@@ -197,8 +226,8 @@ def test_machine_time_counts_only_completed_work_steps(run_dir: Path, store: Res
     s.step("1/0/0/2", "parallel", "p", 13, 5_000)
     s.step("1/0/0/3", "attempts", "a", 18, 7_000)
     s.step("1/0/0/4", "decide_many", "d", 25, 11_000)
-    s.fail("1/0/0/5", "tool", "csi_save_model", 36, 13_000)
-    s.started("1/0/0/6", "tool", "csi_frame_section", 49)
+    fail(s, "1/0/0/5", "tool", "csi_save_model", 36, 13_000)
+    started(s, "1/0/0/6", "tool", "csi_frame_section", 49)
     s.at(60, _KINDS.STEP_FAILED, {
         "error": {"harness_code": "NEEDS_ENGINEER", "message": "m"}, "retryable": False, "duration_ms": 50_000,
     }, "1/0/0")  # fmt: skip
