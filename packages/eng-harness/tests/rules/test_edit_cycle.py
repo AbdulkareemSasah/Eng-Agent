@@ -11,9 +11,15 @@ from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
 
 from eng_harness.ctx import BasisView
+from eng_harness.decisions import _points, _rules
+from eng_harness.decisions._points import DecisionPoint
+from eng_harness.decisions._rules import RuleRegistry
 from eng_harness.decisions.types import Pick, RuleBasis
 from eng_harness.rules.edit_cycle import analysis_messages_clean, readback_result_pass
 from eng_harness.workflows.model_edit_cycle._points import (
+    ANALYSIS_POLICY,
+    READBACK_POLICY,
+    TURN_POLICY,
     AnalysisAction,
     AnalysisState,
     ReadbackAction,
@@ -74,3 +80,31 @@ def test_clean_boundary() -> None:
     # The rule states nothing about the drift status: a drift above the limit does not leave it.
     drift = _analysis().model_copy(update={"drift_status": VerdictStatus.NEEDS_ENGINEER})
     assert analysis_messages_clean.fn(drift, _BASIS) == Pick(AnalysisAction.CONTINUE)
+
+
+def _values(point: DecisionPoint) -> list[str]:
+    assert isinstance(point.options, type)
+    return [str(member.value) for member in point.options]
+
+
+def test_discovery_finds_the_points_and_rules() -> None:
+    points, rules = _points.discover(), _rules.discover()
+    assert [p.name for p in points.points] == [
+        "edit_cycle_analysis_messages",
+        "edit_cycle_engineer_turn",
+        "edit_cycle_readback_result",
+    ]
+    assert [r.id for r in rules.rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
+    RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
+    assert {p.name: _values(p) for p in points.points} == {
+        "edit_cycle_analysis_messages": ["continue", "stop_cycle"],
+        "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
+        "edit_cycle_readback_result": ["continue", "restore_previous", "stop_cycle"],
+    }
+    assert all(r.thresholds == () and r.version == 1 for r in rules.rules)
+
+
+def test_policies_follow_the_table() -> None:
+    for policy in (READBACK_POLICY, ANALYSIS_POLICY):
+        assert (policy.require_engineer, policy.model, policy.llm) == (True, False, False)
+    assert TURN_POLICY.require_engineer is True
