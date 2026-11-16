@@ -60,6 +60,14 @@ open (Q22 to Q24).
 and catches the port builder's H-G8 refusal (§4.2.2 step 2, AC67, AC68; spec 0002 H-G10 closed), and `report` writes
 `report/cycle-timings.json` (AC69).
 
+**Amendment B-541.** First-live-run gaps, third set (launch): `main` resolves the workspace once, so `--workspace` and
+the default workspace reach the configuration lookup, the store and `doctor` (§4.2.1, AC70); the command line enters
+the ports around `Engine.start` and `Engine.resume`, so the servers start and shut down (§4.2.2 step 5; spec 0002
+§4.1, AC48); a configuration error from the port builder, a workspace that is not local and a host instance held by
+another engine have exit codes (§4.2.3, §6, AC71); `doctor` receives the configuration path and the environment
+(AC13); `run` prints the run id at step 1 (AC66); the `--basis` file's name member is `name` (§5); hand-written files
+may start with a byte-order mark (§4.7).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -149,7 +157,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   existing file without `--force`; an altered journal gives exit 5 and writes nothing. Test:
   `tests/unit/cli/test_report_command.py::test_output_rules`.
 - AC13. Given `doctor`, then it calls `eng_harness.doctor.run` of spec 0002 with the options passed through and returns
-  its exit code unchanged. Test: `tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough`.
+  its exit code unchanged. Test: `tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough`. **[added:
+  B-541]** It passes the `harness.toml` path `main` found (`None` when none was found) and the command's environment
+  (§4.2.1, AC70) as `env`; a `ConfigError` that `doctor.run` raises is a usage error (exit 2) naming the key. Test:
+  `tests/unit/cli/test_doctor_command.py::test_doctor_receives_config_path_and_environment`.
 - AC14. Given a workflow with an `options_model`, then `run` offers one `--<field-name>` option for each top-level
   field of type `str`, `int`, `bool`, enum or `Literal`, and offers none for a field that holds a quantity or a nested
   model: those values come from `--input FILE`, as references or literals (P2). Test:
@@ -187,7 +198,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 - AC66. Given `run` with the default `CliDeps()` (amendment B-471, Q20 answer A), then the `port_builder` default is
   spec 0002 `build_ports`; the run id (`run_` + ULID from the ids source) is drawn at step 1 of §4.2.2 and the run-id
   cell holds it before any port is built; the engine receives the same id in `RunRequest.run_id` (engine AC70); and
-  `run` and `resume` are available. Test: `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
+  `run` and `resume` are available. **[added: B-541]** Standard error holds the line `run id: <run_id>` before any port
+  is built, and the default passes `build_ports` the server sections converted by spec 0002 `servers_config`. Test:
+  `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
 - AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.Path` and an
   input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
   `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
@@ -204,6 +217,22 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   without an edit cycle, it writes no such file. Decision (B-536): only the `report` command writes it, not step 6 of
   `run`, because the owner's guide collects it with `report` and one writer keeps one rule. Test:
   `tests/unit/cli/test_report_command.py::test_cycle_timings_file`.
+- AC70. **[added: B-541]** Given neither `--config` nor `ENG_HARNESS_CONFIG`, then `harness.toml` is looked up in the
+  root of the workspace that `resolve_workspace` returns over the environment in which `--workspace`, when given, is
+  `ENG_WORKSPACE` (the default workspace `%LOCALAPPDATA%\eng\workspaces\default` included, contract §4.5.1); the
+  handler receives that environment; when `resolve_workspace` raises `LocalWorkspaceError`, no workspace file is looked
+  up and the command still reaches its handler; and a `harness.toml` that starts with a UTF-8 byte-order mark loads
+  as without it (§4.2.1, §4.7). Test: `tests/unit/cli/test_config.py::test_default_workspace_and_option_reach_lookup`.
+- AC71. **[added: B-541]** Given `run` or `resume`, then the ports the port builder returns are entered before
+  `Engine.start` or `Engine.resume` and left after it returns or raises (spec 0002 AC48); a `ConfigError` from the
+  port builder is printed and ends the command with exit 2 before any run folder, with nothing journaled; a
+  `ContractError` `HOST_LOCKED` from the engine ends it with exit 4; a `LocalWorkspaceError` while `run`, `resume`,
+  `status`, `stop` or `report` builds its workspace prints the error's message and remedy and ends it with exit 2,
+  nothing created; and an `--input` file that starts with a byte-order mark is read as without it (§4.2.2, §4.2.3,
+  §4.7). Tests: `tests/workflow/test_cli_run.py::test_ports_entered_around_engine_call`,
+  `tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run`, `tests/unit/cli/test_exit_codes.py::test_error_codes`
+  (plan T14), `tests/unit/cli/test_status.py::test_states_and_read_only` (the workspace case of `status`, `stop` and
+  `report`, plan T16).
 
 ### 3.2 Terminal progress
 
@@ -476,6 +505,18 @@ package's `[project.scripts]` entry is plan T3's.
 
 Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract §4.5.1), `--config FILE`.
 
+**[added: B-541]** `main` resolves the workspace once, before it loads the configuration: it calls the contract's
+`resolve_workspace` with the default location probe over a copy of the environment in which `--workspace`, when
+given, is `ENG_WORKSPACE`; the root it returns is the `<workspace>` of the configuration lookup (AC4), and the handler
+receives that environment (`CliDeps.environ`), so the `Workspace` and store of `run`, `resume`, `status`, `stop` and
+`report` and the workspace row of `doctor` use the same folder. `main` also keeps the path of the `harness.toml` it
+found (none when none was found) for `doctor` (AC13). When `resolve_workspace` raises `LocalWorkspaceError` (not
+configured, relative, not creatable or not local), the configuration is looked up by `--config` and
+`ENG_HARNESS_CONFIG` only and `main` still calls the handler: `doctor` reports the error in its workspace row, and the
+other commands refuse with exit 2 where they build their workspace (§4.2.3, AC71). Decision: `main` reuses
+`resolve_workspace` and passes `--workspace` as `ENG_WORKSPACE`, because the contract defines the default folder
+(`%LOCALAPPDATA%\eng\workspaces\default`) only there and that function reads the environment alone (AC70).
+
 | Command | Purpose and options |
 |---|---|
 | `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), `--answers FILE` (B-354, AC64: the bare JSON object of one answer, given to the first `ctx.ask` data request the run opens; the keyed form of `resume` is not taken, because request ids depend on the run id), generated `--<field>` options (AC14), and the shared options below |
@@ -519,8 +560,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
 #### 4.2.2 Flow of `run`
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
-   §4.2, AC62); for `run`, draw the run id (`run_` + ULID from the ids source) and fill the run-id cell (§4.4.8,
-   Q20); build the registry from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
+   §4.2, AC62; the workspace as §4.2.1 says, B-541); for `run`, draw the run id (`run_` + ULID from the ids source),
+   fill the run-id cell (§4.4.8, Q20) and print the line `run id: <run_id>` on standard error (AC66; B-541: the
+   engineer needs the id for `status`, `stop` and `resume` while the run waits, and the progress line of `run_started`
+   does not show it); build the registry from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
    ports (built at the end of step 2) take no basis: the CSI host port reads the read-back tolerance from the basis frozen at step 3, through the
    run header, when its first check runs (spec 0002 §4.5.8, AC44; amendment B-503), so neither `run` nor `resume`
    passes it.
@@ -536,7 +579,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
    copy exists the host port works on the copy in the run folder and never reads the original again (spec 0002 §4.5.9
    `working_copy`); a run that stopped before its copy existed meets `NOT_FOUND` at `working_copy`, as today. A
    `NotImplementedGap` from the port builder (spec 0002 AC43, gap H-G8) is printed on standard error and ends the
-   command with `exit_code_for(Outcome.USAGE)` (2), before any run folder and with nothing journaled (AC68). Decision
+   command with `exit_code_for(Outcome.USAGE)` (2), before any run folder and with nothing journaled (AC68). A
+   `ConfigError` from the port builder (an invalid server section, or no host program for a server's product, spec
+   0002 §4.1) is printed as `main` prints one and ends the command the same way (AC71; B-541); the default port
+   builder converts the server sections with spec 0002 `servers_config` (AC66). Decision
    (B-536): the command returns the usage exit itself rather than through `exit_code_for_error`, because the merged
    error-code table maps `NOT_IMPLEMENTED` only once servers plan T19a adds it. Decision (B-536): the
    command line builds `files`, because only it holds the file's path at `run` and at `resume`. Decision (B-536): a
@@ -546,7 +592,9 @@ or open the page; the approval is the engineer's. The rule is generated into the
    base names of model files only (engine §4.4.2 `model_saved`) and the workflow can derive it from its input.
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
    `build_draft`; the template folders and the version rule are Q22, and the `basis_ref` of a workflow without
-   required basis fields is Q23). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
+   required basis fields is Q23). **[added: B-541]** The `--basis` file is read with spec 0004's `load_strict` (YAML
+   1.2, which also reads a JSON file; a byte-order mark is accepted) and validated as `EngineerValues`
+   (`{name, values}`, §5); a refusal is a usage error (exit 2) naming the file. If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
 4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3. The calc port is built
    with the run's store, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`, read before
@@ -559,7 +607,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
    released points from the `DecisionSettings` it is given, spec 0005 §4.3) as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
    AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
    AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
-   `Engine.start` with the run id of step 1 in `RunRequest.run_id`.
+   `Engine.start` with the run id of step 1 in `RunRequest.run_id`. **[added: B-541]** The ports of step 2 are an async
+   context manager (spec 0002 §4.1 `AdapterPorts`): the command enters them just before `Engine.start` (and
+   `Engine.resume`) and leaves them when the call returns or raises, which shuts the servers down (spec 0002 §4.3.5,
+   AC71).
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
 `resume` is steps 1, 5 and 6 with `Engine.resume`, building its ports after step 1 by the rule of step 2 from the
@@ -572,9 +623,9 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 |---|---|---|
 | 0 | `OK` | Run completed; `status`, `stop`, `report` succeeded |
 | 1 | `RUN_FAILED` | The run ended `FAILED`; `doctor` reported a failed check (spec 0002 AC37) |
-| 2 | `USAGE` | Usage or configuration error; invalid input file; a configuration this build cannot serve (`[cli_tools.*]` entries before servers plan T19b, spec 0002 AC43, gap H-G8; owner answer of 2026-11-14, B-495) |
+| 2 | `USAGE` | Usage or configuration error; invalid input file; a configuration this build cannot serve (`[cli_tools.*]` entries before servers plan T19b, spec 0002 AC43, gap H-G8; owner answer of 2026-11-14, B-495); a workspace that is not configured or not local (`LocalWorkspaceError`, B-541) |
 | 3 | `REFUSED` | `RunRefused` (`BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`), unknown workflow, calcs refused, basis rejected on the page |
-| 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`) |
+| 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`), or another engine holds a host instance the run needs (`HOST_LOCKED`, B-541: the same remedy, wait for or stop the other run) |
 | 5 | `JOURNAL_INTEGRITY` | `JournalIntegrityError` |
 | 6 | `NOT_FOUND` | No such run |
 | 10 | `AWAITING_ENGINEER` | Paused at an open approval or input, or basis confirmation pending with `--no-wait` |
@@ -938,7 +989,10 @@ acknowledgement (AC42, AC54), so the engineer signs knowing which results came f
 contract `Timestamp` into `YYYY-MM-DD HH:MM:SS UTC`), `format_number` (`format(x, ".6g")`-style with an explicit
 specification, ASCII digits), `sanitize_terminal`, `sanitize_html`, `truncate`. Nothing in this spec imports `locale`
 or calls `strftime`, `%c`, `%x`, `%X`, `%A`, `%B`, `%p` or the `n` format type (AC58); `datetime` is used only to parse
-and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`; the standard streams are reconfigured at
+and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`, except that the files a person writes by hand
+(`harness.toml`, `--input`, `--answers` and `--basis`) are read as `utf-8-sig`, so a leading byte-order mark is
+accepted (B-541; Windows PowerShell 5 and older Notepad write one, and it carries no meaning; a UTF-16 file stays a
+usage error); the standard streams are reconfigured at
 start (AC5): redirected streams to UTF-8, a console keeps its encoding with `errors="backslashreplace"`. Paths are
 `pathlib.Path` values and are never encoded by hand, so Arabic folder names work; messages show base names unless a
 path is needed to act (the report path).
@@ -954,7 +1008,7 @@ heartbeat task runs on the engine loop.
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
 | `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref`; a model file (a `pathlib.Path` field) is an absolute path (§4.2.2 step 2) | engineer or agent |
-| `--basis` file | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
+| `--basis` file | YAML or JSON `{name, values}` (spec 0004 `EngineerValues`; B-541) | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
 | `--answers` file | JSON | per request fields | the request's model | no | engineer or agent |
 | Page form fields | `application/x-www-form-urlencoded` | none | §4.4.3; reasons 1 to 500; name 1 to 100; body at most `max_body_bytes` | no | engineer; carry decisions and option ids, never engineering values |
 | Final result (`--json`) | JSON object | none | AC7 | no | the process |
@@ -966,9 +1020,11 @@ heartbeat task runs on the engine loop.
 | Condition | Code | Exit |
 |---|---|---|
 | Usage, configuration, input file invalid | `INVALID_ARGUMENT` | 2 |
+| Workspace not configured or not local (B-541) | `PRECONDITION_FAILED` (`LocalWorkspaceError`, `local_workspace`), caught where the command builds its workspace, not through the error-code table | 2 |
 | Configuration this build cannot serve (spec 0002 AC43, gap H-G8; B-495) | `NOT_IMPLEMENTED` | 2 |
 | Basis incomplete or rejected, server check failed, calcs refused, unknown workflow | `BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`, `CALC_NOT_APPROVED`, `CALC_WITHDRAWN` (engine §6, spec 0003) | 3 |
 | Another process holds the run | `RUN_LOCKED` | 4 |
+| Another engine holds a host instance the run needs (B-541) | `HOST_LOCKED` (spec 0002 §4.4.1) | 4 |
 | Journal altered | `JOURNAL_INTEGRITY` | 5 |
 | Unknown run | `REF_NOT_FOUND` | 6 |
 | Page request refused | HTTP 400, 403, 404, 405, 409, 413, 415, 421, 503 (no run data in the body) | — |
@@ -1015,7 +1071,8 @@ heartbeat task runs on the engine loop.
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
 | AC67, AC68 (amendment B-536) | Fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/workflow/` |
-| AC69 (amendment B-536) | Unit | `tests/unit/cli/` |
+| AC69 (amendment B-536), AC70 (amendment B-541) | Unit | `tests/unit/cli/` |
+| AC71 (amendment B-541) | Unit and fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/unit/cli/`, `tests/workflow/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
