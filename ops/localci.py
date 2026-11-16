@@ -31,15 +31,25 @@ classic single run, unchanged. With companions every member gets the single run'
 own merged tree; the members that pass are merged one after the other onto the base (the batch tree, the tree build/v1
 has after their squash merges) and the gate job runs once on it (leader folder, subfolder batch/). PASS: every member
 gets PASS with a `batch` object in result.json and one more sentence in summary.md, and the leader holds the lock until
-every member merged or was released (ten minutes at most). The batch guarantees that the final tree passed the gate; the
-states between the squash merges of one batch are not tested singly. A member whose merge into the batch tree
-conflicts, every companion after a batch gate FAIL, and every companion after an error in the batch code goes back to
-waiting with the `single` marker and is tested alone by its own process; the leader then runs alone.
+every member merged or was released (ten minutes at most). The batch guarantees that the final tree passed the gate only
+when every member of the batch merges: all PASS members of one batch are merged or none is (a member left out puts on
+build/v1 a tree the gate never saw as a whole; the hold then writes `batch-incomplete.txt`). The states between the
+squash merges of one batch are not tested singly. The batch tree is built with plain merges, without the union merge
+that auto_union uses for CHANGELOG.md, because GitHub's squash merges use plain merges too (the repository has no
+.gitattributes): two members that append to the same CHANGELOG.md do not merge plainly, would conflict on GitHub at the
+second squash merge, and so are never batched together. A member that does not merge plainly onto the base and the
+members before it is taken out before its jobs run; a member whose merge into the batch tree conflicts after the jobs,
+every companion after a batch gate FAIL, and every companion after an error in the batch code goes back to waiting with
+the `single` marker and is tested alone by its own process; the leader then runs alone. A leader with a CONFLICT verdict
+does not look for companions, and a leader that fails a job gives every companion back untested (without `single`).
 Marker files in a run folder: `batched` (a leader took the run into its batch; with result.json, the verdict it wrote,
 which the run's own process takes over when it gets the lock: a PASS stands while batch_current() holds, else the run
-tests again), `single` (never batch this run), `released` (the merge step is done), `batch-verified` and
-`batch-tree-mismatch.txt` (build/v1's tree after the members' squash merges against the batch tree), `batch-error.log`
-(leader folder: an error in the batch code, after which the leader ran alone).
+tests again; a PASS of a pull request that has merged or has `released` is printed and never tested again), `single`
+(never batch this run), `released` (the merge step is done), `batch-verified` and `batch-tree-mismatch.txt` (build/v1's
+tree after the members' squash merges against the batch tree), `batch-incomplete.txt` (the hold ended with a member not
+merged; with a LOCAL-CI BATCH_INCOMPLETE line), `batch-error.log` (leader folder: an error in the batch code, after which
+the leader ran alone). A companion counts as waiting only when its `pid` names a live `localci.py run` process for its
+own folder (a reused pid does not count) and it is the newest run folder of its pull request number.
 """
 import argparse, fcntl, hashlib, json, os, pathlib, re, subprocess, sys, time
 
@@ -509,22 +519,32 @@ def status_of(d):
         return ""
 
 
+def run_alive(d):
+    """Whether d's `pid` file names a live `localci.py run ... --out d` process (a reused pid or a zombie does not count)."""
+    try:
+        args = pathlib.Path(f"/proc/{int((d / 'pid').read_text().strip())}/cmdline").read_bytes().decode(
+            errors="replace").split("\0")
+        return (any(x.endswith("localci.py") for x in args) and "--out" in args[:-1]
+                and pathlib.Path(args[args.index("--out") + 1]).resolve() == d.resolve())
+    except (OSError, ValueError):
+        return False
+
+
 def companions(out, number, limit):
-    """The run folders under RUNS that wait for the lock with a live process and no `single` marker, the newest run of
-    each other pull request number, oldest first, at most limit. Each gets the `batched` marker."""
+    """The newest run folder of each other pull request number under RUNS (any status), taken when it waits for the lock
+    with a live process of its own and no `single` marker; oldest first, at most limit. Each gets the `batched` marker
+    (a superseded run that still waits is never batched)."""
     found = {}
     for d in sorted(RUNS.iterdir()) if limit > 0 and RUNS.is_dir() else []:
         try:
-            if d.resolve() == out or not status_of(d).startswith(WAITING.split(" (")[0]) or (d / "single").exists():
-                continue
-            os.kill(int((d / "pid").read_text().strip()), 0)
             n = int(json.loads((d / "event.json").read_text(encoding="utf-8"))["pull_request"]["number"])
             since = (d / "pid").stat().st_mtime
         except (OSError, ValueError, KeyError, TypeError):
             continue
         if n != number and (n not in found or since > found[n][0]):
             found[n] = (since, d)
-    mates = [d for _, d in sorted(found.values())][:limit]
+    mates = [d for _, d in sorted(found.values()) if d.resolve() != out and status_of(d).startswith(WAITING.split(" (")[0])
+             and not (d / "single").exists() and run_alive(d)][:limit]
     for d in mates:
         (d / "batched").write_text(f"{out.name}\n")
     return mates
@@ -555,6 +575,12 @@ def run_batch(a, out, event_path, number, head, base, started, mates):
         if files is None:
             n = int(json.loads((d / "event.json").read_text(encoding="utf-8"))["pull_request"]["number"])
             members.append(dict(out=d, event=d / "event.json", number=n, head=m_head))
+    if members:  # plain merges as GitHub's squash merges do (see the module docstring): no jobs for a member left out
+        fit = batch_tree([leader] + members, base)[2]
+        for m in members:
+            if m not in fit:
+                leave(m["out"])
+        members = [m for m in members if m in fit]
     if not members:
         return None
     (out / "status.txt").write_text("running\n")
@@ -596,7 +622,9 @@ def run_batch(a, out, event_path, number, head, base, started, mates):
                 commit=commit, tree=tree, base=base, leader=number)
     (bdir / "batch.json").write_text(json.dumps(dict(info, taken_out=[m["number"] for m in kept if m not in inside]),
                                                 indent=1), encoding="utf-8")
-    for m in inside[1:]:
+    for f in bdir.glob("*.log"):  # a restarted folder: the logs describe this batch only
+        f.unlink()
+    for m in inside:
         (m["out"] / "status.txt").write_text(f"running gate in the batch of {refs} (leader {out.name})\n")
     ev = json.loads(event_path.read_text(encoding="utf-8"))
     ev["pull_request"]["head"]["sha"], ev["pull_request"]["base"]["sha"] = commit, base
@@ -616,7 +644,8 @@ def run_batch(a, out, event_path, number, head, base, started, mates):
 
 def batch_tree(members, base):
     """A worktree at base into which the members' heads are merged one after the other (--no-ff, no edit); a member whose
-    merge conflicts is taken out again (merge aborted). Returns the batch commit, its tree and the members merged."""
+    merge conflicts is taken out again (merge aborted). Returns the batch commit, its tree and the members merged. Plain
+    merges, never the union attributes of auto_union: GitHub squash-merges the members with plain merges."""
     wt = HERE / "worktrees" / f"localci-batch-{base[:10]}-{os.getpid()}"
     inside = []
 
@@ -636,12 +665,21 @@ def batch_tree(members, base):
         git("worktree", "prune", check=False)
 
 
+def log_commits(rng):
+    """(sha, parents, subject) of every commit in rng, newest first, or None when git log fails. NUL-separated records
+    (git log -z): no character of a subject splits a record."""
+    r = git("log", "-z", "--format=%H%x00%P%x00%s", rng, check=False)
+    if r.returncode != 0:
+        return None
+    f = r.stdout.split("\0")
+    return [tuple(f[i:i + 3]) for i in range(0, len(f) - 2, 3)]
+
+
 def merged_numbers(base, now):
     """The pull request numbers with a commit in base..now whose subject ends with "(#N)" (the squash merge title)."""
     if not now or now == base:
         return set()
-    subjects = git("log", "--format=%s", f"{base}..{now}", check=False).stdout.splitlines()
-    return {int(m.group(1)) for s in subjects if (m := re.search(r"\(#(\d+)\)$", s.strip()))}
+    return {int(m.group(1)) for _, _, s in log_commits(f"{base}..{now}") or [] if (m := re.search(r"\(#(\d+)\)$", s.strip()))}
 
 
 def hold_batch(members, info):
@@ -655,16 +693,25 @@ def hold_batch(members, info):
         time.sleep(15)
         done = merged_numbers(base, tip())
     now = tip()
-    if not set(numbers) <= merged_numbers(base, now):
+    merged = merged_numbers(base, now)
+    refs = ", ".join(f"#{n}" for n in numbers)
+    missing = [n for n in numbers if n not in merged]
+    if missing:  # all PASS members of one batch are merged or none is: say so in every member folder
+        text = (f"batch of {refs} on base {base}, batch tree {info['tree']}: when the hold ended "
+                f"{', '.join(f'#{n}' for n in numbers if n in merged) or 'no member'} had merged and "
+                f"{', '.join(f'#{n}' for n in missing)} had not; until every member merges, build/v1 holds a tree "
+                "the gate did not test as a whole\n")
+        for m in members:
+            (m["out"] / "batch-incomplete.txt").write_text(text)
+        print(f"LOCAL-CI BATCH_INCOMPLETE not merged: {', '.join(f'#{n}' for n in missing)} (batch {refs}, base {base[:7]})")
         return
     last = ""
-    for line in git("log", "--format=%H %s", f"{base}..{now}", check=False).stdout.splitlines():
-        m = re.search(r"\(#(\d+)\)$", line.strip())
+    for sha, _, subject in log_commits(f"{base}..{now}") or []:
+        m = re.search(r"\(#(\d+)\)$", subject.strip())
         if m and int(m.group(1)) in numbers:
-            last = line.split()[0]  # the newest member squash merge: build/v1 after all of them
+            last = sha  # the newest member squash merge: build/v1 after all of them
             break
     tree = git("rev-parse", f"{last}^{{tree}}", check=False).stdout.strip()
-    refs = ", ".join(f"#{n}" for n in numbers)
     for m in members:
         if tree == info["tree"]:
             (m["out"] / "batch-verified").write_text(f"build/v1 {last} after the squash merges of {refs} has tree "
@@ -694,11 +741,10 @@ def batch_current(doc, now):
     if git("merge-base", "--is-ancestor", base, now, check=False).returncode != 0:
         return False
     heads, seen = {int(n): h for n, h in (batch.get("heads") or {}).items()}, set()
-    log = git("log", "--format=%H%x00%P%x00%s", f"{base}..{now}", check=False)
-    if log.returncode != 0:
+    log = log_commits(f"{base}..{now}")
+    if log is None:
         return False
-    for line in log.stdout.splitlines():
-        sha, parents, subject = line.split("\0", 2)
+    for sha, parents, subject in log:
         if len(parents.split()) != 1:
             return False
         m = re.search(r"\(#(\d+)\)$", subject.strip())
@@ -720,7 +766,8 @@ def stored(out, event_path):
     """The run's own process got the lock after a batch leader wrote its verdict (marker `batched`, which the process
     takes over and removes). CONFLICT and FAIL stand as written. A batch PASS for the event's head stands while
     batch_current() holds: the verdict is printed and, when the pull request has not merged yet, the lock is held as a
-    single run holds it; nothing is tested again. Otherwise the result is stale: it is removed and None returned (the
+    single run holds it; nothing is tested again. A PASS of a pull request that has merged or has `released` stands as
+well (printed, no hold, no test). Otherwise the result is stale: it is removed and None returned (the
     caller goes on as a normal run on the new base)."""
     (out / "batched").unlink(missing_ok=True)
     try:
@@ -736,8 +783,10 @@ def stored(out, event_path):
             print(f"LOCAL-CI FAIL {' '.join(doc.get('failing', []))}".strip())
             return 1
         now = tip()
-        if batch_current(doc, now):
-            if int(pr["number"]) not in merged_numbers(doc["base"], now):
+        # staleness matters only before the merge: a pull request that has merged or was released is not tested again
+        done = int(pr["number"]) in merged_numbers(doc["base"], now) or (out / "released").exists()
+        if done or batch_current(doc, now):
+            if not done:
                 hold(out, int(pr["number"]), doc["base"])
             print("LOCAL-CI PASS")
             return 0
@@ -816,7 +865,8 @@ def cmd_start(a):
             (run_dir / f).unlink(missing_ok=True)
         print("LOCAL-CI ALREADY_RUNNING")
         return 0
-    for f in ("result.json", "released", "single", "batched", "batch-verified", "batch-tree-mismatch.txt"):
+    for f in ("result.json", "released", "single", "batched", "batch-verified", "batch-tree-mismatch.txt",
+              "batch-incomplete.txt"):
         (run_dir / f).unlink(missing_ok=True)
     run_dir.mkdir(parents=True, exist_ok=True)
     event = {"action": "synchronize", "number": n, "pull_request": {
