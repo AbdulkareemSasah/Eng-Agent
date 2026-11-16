@@ -124,6 +124,11 @@ def test_item_id_with_a_slash_is_refused(item_id: str) -> None:
     assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
 
 
+def test_item_id_without_a_slash_is_not_refused() -> None:
+    item = {"id": "a-b.c_1\\d", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    assert run_check(_case(), items=[item])["issues"] == []
+
+
 def test_item_id_rule_changes_no_other_rule() -> None:
     """The slash issue comes first for its item; the issues of the other rules follow as without it."""
     case = _case()
