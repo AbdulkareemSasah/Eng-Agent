@@ -5,6 +5,7 @@ from eng_contract.kinds import NEUTRAL_KINDS
 from pydantic import BaseModel, ConfigDict, JsonValue
 
 from eng_harness.kinds.calcs import CALC_KINDS
+from eng_harness.kinds.csi import CSI_KINDS
 from eng_harness.kinds.edit_cycle import EDIT_CYCLE_KINDS
 from eng_harness.kinds.footing import FOOTING_KINDS
 
@@ -31,5 +32,5 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.approval_preview/1": ApprovalPreview,
         "harness.file_input/1": FileSource,  # an engineer-provided file, hashed (spec 0002 section 4.7)
     }
-).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS)
-"""The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2) and edit-cycle kinds."""
+).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS | CSI_KINDS)
+"""The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2), edit-cycle and CSI (0002 4.6) kinds."""
