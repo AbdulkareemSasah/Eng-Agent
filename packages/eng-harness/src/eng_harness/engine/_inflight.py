@@ -1,8 +1,9 @@
 """Steps in flight at a resume, and the request the engine puts to the engineer (spec 0001 4.5.1 step 7, 4.5.3).
 
 Purpose: a write whose `step_started` has no result is reconciled before the block is called (`applied` and
-`not_applied` become `step_reconciled`; anything else asks the engineer through `engine.in_flight`); a read, calc or
-similar step in flight gets `step_rerun`. `Fold` reads the steps a resume needs from the journal, and `ResumeIndex`
+`not_applied` become `step_reconciled`, except an adapter `not_applied` for the rerun of an attempt it reconciled
+`not_applied`; anything else asks the engineer through `engine.in_flight`); a read, calc or similar step in flight
+gets `step_rerun`. `Fold` reads the steps a resume needs from the journal, and `ResumeIndex`
 replays a step marked for a rerun as one that runs again. Units: none. Errors: `Stopped` ends the resume with the
 journaled stop (or the abandoned run), also for a write found applied whose result could not be read;
 `JournalIntegrityError` for a write without an `op_id`; `ContractError` from a port call.
@@ -278,9 +279,11 @@ async def _write(rt: Resume, step: Step) -> None:
             why = f"the reconciler failed: {exc.detail.message}"
         else:
             why = f"the adapter could not decide: {found.outcome}" + "".join(f", missing {m}" for m in found.missing)
-    if found is not None and found.outcome in ("applied", "not_applied"):
+    again = found is not None and found.outcome == "not_applied" and _is_rerun(rt.events(), step)
+    if found is not None and found.outcome in ("applied", "not_applied") and not again:
         outcome, by, evidence = str(found.outcome), "adapter", [r.ref for r in found.evidence]
     else:
+        why = "the adapter again reports not_applied for the automatic rerun" if again else why  # AC71
         question = Question(
             name="outcome", prompt="What happened to the write", options=("applied", "not_applied", "abandon")
         )
@@ -290,6 +293,15 @@ async def _write(rt: Resume, step: Step) -> None:
     result = await _applied(rt, step, op, found, args) if outcome == "applied" else None
     payload = {"op_id": op, "outcome": outcome, "result": result and result.model_dump(mode="json"), "decided_by": by}
     rt.writer.append(EventType.STEP_RECONCILED, payload | {"evidence": evidence}, path=step.path, attempt=step.attempt)
+
+
+def _is_rerun(events: Sequence[Event], step: Step) -> bool:
+    """Whether `step` is the automatic rerun of an attempt the adapter reconciled `not_applied` (AC71)."""
+    return any(
+        e.path == step.path and e.attempt == step.attempt - 1 and isinstance(p := e.payload, ev.StepReconciled)
+        and (p.outcome, p.decided_by) == ("not_applied", "adapter")
+        for e in events
+    )  # fmt: skip
 
 
 async def _applied(
