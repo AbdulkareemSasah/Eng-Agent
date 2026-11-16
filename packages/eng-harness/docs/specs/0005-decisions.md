@@ -112,6 +112,10 @@ Test files are under `packages/eng-harness/tests/`. "Fake provider" is a test do
   reports `VERSION_BUMP_REQUIRED` for a changed hash with an unchanged version; the committed lock matches the registry that
   `decisions._rules.discover()` returns (§4.4). Tests:
   `test_rules.py::test_code_hash_is_stable`, `tests/contract/test_rule_lock.py::test_lock_matches_registry`.
+  Under mutation testing (environment variable `MUTANT_UNDER_TEST` set) `tests/contract/test_rule_lock.py` skips the
+  lock-versus-registry comparison with an issue reference and an expiry (2026-12-31), because mutants change the hashed
+  source of an R1 rule module by design; in every other run it compares in full. Amendment (B-542; the pattern of
+  spec 0003 §9, B-437).
 - AC11. Given a rule that reads a basis path not in its `thresholds`, then `BlockRuleViolation`; given a declared path,
   then `RuleBasis.quantity(path)` returns the basis `Quantity` and two quantities of one dimension compare. Test:
   `test_rules.py::test_rule_basis_is_restricted`.
