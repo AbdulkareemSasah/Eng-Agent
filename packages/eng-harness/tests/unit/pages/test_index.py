@@ -10,6 +10,7 @@ from eng_harness._html import Tag, Text, el, trusted
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.pages import PageApprovalPort, Screen
+from eng_harness.pages._answers import CHOICE
 from eng_harness.pages._security import Subject
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, InputRequest
 
@@ -43,7 +44,7 @@ def test_multiple_open_requests(tmp_path: Path) -> None:
             assert page.status == HTTPStatus.OK
             assert r.title in page.body  # each request has its own page
             assert w.answer(r, decision="reject", reason=f"no {r.title}") == HTTPStatus.OK
-        assert w.answer(choice, **{"choice:q": "b"}) == HTTPStatus.OK
+        assert w.answer(choice, **{CHOICE + "q": "b"}) == HTTPStatus.OK
         approved, asked = future.result(timeout=5)
     assert [a.request_id for a in approved if a is not None] == [r.request_id for r in requests]
     assert asked is not None
