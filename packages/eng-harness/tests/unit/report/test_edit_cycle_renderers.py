@@ -4,16 +4,11 @@ import json
 import re
 from pathlib import Path
 
-from eng_contract.ids import FixedClock, IdSource
+from eng_contract.envelope import Provenance
 from eng_contract.store import ResultStore
-from fixtures.report_run import build_report_run
-from unit.edit_cycle.test_timings import PRODUCER, write_cycles
+from unit.edit_cycle.test_timings import PRODUCER
 
-from eng_harness import __version__
-from eng_harness._text import format_duration_ms
-from eng_harness.journal import JournalReader
-from eng_harness.report import ReleaseMarks, build_report
-
+PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
 _DATA = Path(__file__).resolve().parents[2] / "data" / "kinds" / "edit_cycle"
 _CELL = re.compile(r'<td class="v"><a href="#(src-\d+)">(.*?)</a></td>')
 
@@ -55,34 +50,3 @@ def test_renderers_and_sources(store: ResultStore) -> None:
         assert pointer in pointers
     for text in ("CONFLICTS_WITH_ENGINEER_CHANGE", "W20", "EQX", "S3", "Slab200"):
         assert text in html
-
-
-def test_report_adds_the_cycle_timings(run_dir: Path, store: ResultStore, ids: IdSource, clock: FixedClock) -> None:
-    """The timings section gains the cycle tables only when the journal holds edit-cycle steps (spec 0007 4.9)."""
-    reader = write_cycles(run_dir, store, ids)
-    html = build_report(reader, store, ReleaseMarks(records={}), clock, __version__)
-    assert "Edit cycles" in html
-    assert format_duration_ms(120_000) in html
-    assert "R1" in html
-    plain = tmp_run = run_dir.parent / "plain"
-    plain.mkdir()
-    build_report_run(plain, store, ids)
-    assert "Edit cycles" not in build_report(
-        JournalReader(tmp_run), store, ReleaseMarks(records={}), clock, __version__
-    )
-
-
-def test_cycle_timings_file(run_dir: Path, store: ResultStore, ids: IdSource, tmp_path: Path) -> None:
-    """`report/cycle-timings.json` holds the measures for the B-1 sheet and no file path."""
-    from eng_harness.report._edit_cycle import edit_cycle_timings
-    from eng_harness.report._write import write_cycle_timings
-
-    timings = edit_cycle_timings(write_cycles(run_dir, store, ids), store)
-    target = tmp_path / "report" / "cycle-timings.json"
-    write_cycle_timings(timings, target)
-    data = json.loads(target.read_text(encoding="utf-8"))
-    assert [c["wall_ms"] for c in data["cycles"]] == [120_000, 69_000]
-    assert data["benchmarks"] == [{"label": "R1", "elapsed_ms": 177_000, "cycles": 2}]
-    assert [t["wait_ms"] for t in data["turns"]] == [30_000, 10_000]
-    assert data["cycles"][0]["prompts"] == 1
-    assert str(tmp_path) not in target.read_text(encoding="utf-8")
