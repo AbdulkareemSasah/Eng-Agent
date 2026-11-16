@@ -227,6 +227,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   block-module rules test reports each; and every module matching `block_modules` or `rule_modules` in this package
   passes. Tests: `tests/rules/test_block_modules.py::test_rules_detect_violations`,
   `::test_package_block_modules_pass`.
+  Under mutation testing (environment variable `MUTANT_UNDER_TEST` set) the test does not judge the
+  `mutmut` import that the mutation tool inserts into its copy of a rule or block module; it judges every other line of
+  that copy, and in every other run it judges in full. Amendment (B-542; the pattern of spec 0003 §9, B-437).
 
 ### 3.3 Journal
 
