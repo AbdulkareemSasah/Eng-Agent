@@ -478,10 +478,10 @@ tasks:
     title: HostPort lease, preflight and epoch, run-state reload and the saved fingerprint on the CSI host port
     # Amendment (B-530, documents only): new, split from T19a after the pre-flight audit. AdapterHostPort lacks the
     # HostPort methods preflight, session_epoch, acquire and release, never reads run_dir/adapter/state.json back, and
-    # its persisted instance rows lack the start time and exe name that HostLocks needs to re-lock (spec 4.4.1, 4.5.9).
-    # The saved fingerprint (B-451 L3) moves here from T19a. Estimate: host methods and reload about 50, the saved
-    # fingerprint about 13, the persisted rows about 10: about 73; budget 90 (merged analogs T10 400, T12b 380 bound
-    # it from above).
+    # its persisted instance rows lack the start time, observation time and exe name that HostLocks and OpenedInstance
+    # need (spec 4.4.1, 4.5.9; reloaded instances take session -1, bindings reload too). The saved fingerprint
+    # (B-451 L3) moves here from T19a. Estimate: host methods and reload about 55, the saved fingerprint about 13, the
+    # persisted rows about 12: about 80; budget 90 (merged analogs T10 400, T12b 380 bound it from above).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
@@ -494,7 +494,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py::test_save_records_the_state_fingerprint"  # B-451 L3
       - "packages/eng-harness/tests/workflow/adapters/test_csi_host_resume.py::test_lease_preflight_and_epoch"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_host_resume.py::test_new_port_restores_from_run_state"
-    covers: [AC15]
+    covers: [AC47]
     depends_on: [T12b]  # external: plan 0007 T13 (B-522, merged; also edits _hostport.py)
   - id: T19a
     title: Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes
@@ -809,16 +809,18 @@ JSON output, exit codes; the unreleased-tools check and the `extra_checks` exten
 
 **T19c Host port leases, run-state reload and the saved fingerprint** (amendment B-530, split from T19a after the
 pre-flight audit; spec §4.4.1, §4.5.9). `AdapterHostPort` (`_hostport.py`) gains the `HostPort` methods it lacks:
-`preflight` and `session_epoch` delegate to its `ServerManager`; `acquire(host_key)` answers a `HostLease` and
-re-locks, through `HostLocks.acquire`, every instance of the run state that is still alive with the same pid and start
-time; `release` calls `HostLocks.release_all`. At construction it loads `run_dir/adapter/state.json` when present, as
-a cache (the journal wins, §4.5.9): the files (the constructor's `files` win for a key both name), model ids, expected
-units and instance rows; the persisted rows gain `started_at` and `exe_name`, so a resumed port can re-lock and close
-them. `save` returns in `SavedModel.fingerprint` the fingerprint of the saved state instead of `""` (`_identity.py`
-`record_save`), so the engine's resume check does not report `model_differs` after a save (B-451 L3; from the T12
-split, amendment B-465). Tests: `test_csi_session_ops.py::test_save_records_the_state_fingerprint` (a new test,
-because the existing assertion compares `""` with `""` at the base: after `save`, `fingerprint` is not `""`, equals
-the `CsiStateReader` fingerprint of the saved model and the state store's),
+`preflight` and `session_epoch` delegate to its `ServerManager`; `acquire(host_key)` answers a `HostLease` and re-locks,
+through `HostLocks.acquire`, every instance of the run state that is still alive with the same pid and start time;
+`release` calls `HostLocks.release_all`. At construction it loads `run_dir/adapter/state.json` when present, as a cache
+(the journal wins, §4.5.9): the bindings (model key to instance id, model id and file; the constructor's `files` win for
+a key both name), expected units and instance rows; the persisted rows gain `started_at`, `observed_at` and `exe_name`,
+so a resumed port can rebuild each `OpenedInstance` (`_host` reads `observed_at`), re-lock and close them, and a
+reloaded instance takes the session value `-1` of the spec §4.5.9 decision, so `_reusable` and `restore` never treat it
+as launch-owned and launch anew. `save` returns in `SavedModel.fingerprint` the fingerprint of the saved state instead
+of `""` (`_identity.py` `record_save`), so the engine's resume check does not report `model_differs` after a save (B-451
+L3; from the T12 split, amendment B-465). Tests: `test_csi_session_ops.py::test_save_records_the_state_fingerprint` (a
+new test, because the existing assertion compares `""` with `""` at the base: after `save`, `fingerprint` is not `""`,
+equals the `CsiStateReader` fingerprint of the saved model and the state store's),
 `test_csi_host_resume.py::test_lease_preflight_and_epoch` and `::test_new_port_restores_from_run_state` (a new
 `AdapterHostPort` over the same `run_dir` restores `m@copy`).
 
@@ -843,17 +845,20 @@ answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries:
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
-Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks`
-and `allowlists`, with the defaults and rules of spec §4.1; the workflow and replay tests pass `files`, a test
-inspector and launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes its synthetic routed allowlist
-through `allowlists`. Production binder (amendment B-530): `AdapterHostPort` gains `binding(host_key, model,
-descriptor)` and `revision(model_id)` (`_hostport.py`), and `build_ports` passes the host port as `binder`
-(`CsiToolPort` wraps it in `_TokenBinder`). `binding` raises `PRECONDITION_FAILED` (`model_open`) when no instance is
-bound; target from the bound instance; `owned` from `CsiSession.owns`; `units_system` from the expected units of the
-open (the tool's `TOKENS` value overrides it in `_TokenBinder`); `host` from the identity record (model id, revision)
-and the program version of the spec §4.5.9 decision. `revision(model_id)` answers the revision in the `states` store,
-`None` when unknown or when no store is wired. `test_build_ports.py::test_binder_from_host_port` checks each source and
-the refusal.
+Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks` and
+`allowlists`, with the defaults and rules of spec §4.1; the workflow and replay tests pass `files`, a test inspector and
+launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes, through `allowlists`, a loader of its
+synthetic routed allowlist (a `load_allowlist` call with the route it is given). `allowlists` maps an adapter name to a
+loader taking the section's `route`, because `load_allowlist` refuses a routed allowlist without a route and
+`_for_route` is private; its default is `csi_allowlist`, which gains a `route` argument (`csi/__init__.py`). For CSI the
+result only validates the section's route, since `CsiToolPort` builds its own `tool_allowlist()`. Production binder
+(amendment B-530): `AdapterHostPort` gains `binding(host_key, model, descriptor)` and `revision(model_id)`
+(`_hostport.py`), and `build_ports` passes the host port as `binder` (`CsiToolPort` wraps it in `_TokenBinder`).
+`binding` raises `PRECONDITION_FAILED` (`model_open`) when no instance is bound; target from the bound instance; `owned`
+from `CsiSession.owns`; `units_system` from the expected units of the open (the tool's `TOKENS` value overrides it in
+`_TokenBinder`); `host` from the identity record (model id, revision) and the program version of the spec §4.5.9
+decision. `revision(model_id)` answers the revision in the `states` store, `None` when unknown or when no store is
+wired. `test_build_ports.py::test_binder_from_host_port` checks each source and the refusal.
 
 Wiring list of the CSI ports (amendment B-503; spec AC44, AC45). `build_ports` builds one `WrittenItems` book and
 hands it to both ports: to `AdapterHostPort` inside its `ReadBack` (with the run's store and the server's
@@ -878,18 +883,18 @@ and checks it again, and with a basis without the field checks `READBACK_UNAVAIL
 `tests/workflow/adapters/test_reconcile.py` keep their binder's pre-image) is set, for a write tool for which
 `self.supports_reconcile(tool)` holds (so not the saves and opens of `_UNRECONCILED`), takes `read_back(tool, args)`
 before the ledger entry and sets the binding's `pre_image_ref` to `<result_id>#/value/observed` of that stored read;
-none when the read-back answers `None` (analysis, design) or the tool is not reconciled, so the ledger entry carries
-it only then (amendment B-530). `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as
-`harness.run_output/1`, takes the
-pre-image as above, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the
-two stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no
-write is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with
-precondition `model_open` before it stores anything (as `AdapterHostPort._held` does).
-`test_csi_wiring_shares_book_and_pre_image` checks, through the built ports, that a written edit is in the book that
-`check_model` reads, that the next `model_state` gives no `MODEL_CHANGED_OUTSIDE`, that the ledger entry's
-`pre_image_ref` resolves to the value read before the write, and that `csi_save_model` with `as_new_revision` and
-`csi_open_revision` work on the run's copies folder; `test_csi_preview_sends_no_write` checks the preview, that the
-fake server logged no write, and that a binding without `host` is refused with nothing stored.
+none when the read-back answers `None` (analysis, design) or the tool is not reconciled, so the ledger entry carries it
+only then (amendment B-530). `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as
+`harness.run_output/1`, takes the pre-image as above when `record_pre_image` is set and otherwise uses the binding's own
+`pre_image_ref`, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the two
+stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no write
+is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with precondition
+`model_open` before it stores anything (as `AdapterHostPort._held` does). `test_csi_wiring_shares_book_and_pre_image`
+checks, through the built ports, that a written edit is in the book that `check_model` reads, that the next
+`model_state` gives no `MODEL_CHANGED_OUTSIDE`, that the ledger entry's `pre_image_ref` resolves to the value read
+before the write, and that `csi_save_model` with `as_new_revision` and `csi_open_revision` work on the run's copies
+folder; `test_csi_preview_sends_no_write` checks the preview, that the fake server logged no write, and that a binding
+without `host` is refused with nothing stored.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
 routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`

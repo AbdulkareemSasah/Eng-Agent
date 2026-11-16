@@ -293,6 +293,14 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
   `eng_harness.adapters.csi._replies` answers those same models. Test:
   `tests/contract/test_csi_kinds.py::test_csi_kinds_registered` (plan task T21).
+- AC47. **[added: B-530]** Given an `AdapterHostPort`, then `preflight` and `session_epoch` answer its
+  `ServerManager`'s, `acquire` answers a `HostLease` and `release` gives up every host lock; given a new host port over
+  the `run_dir` of an earlier one, then it loads `run_dir/adapter/state.json` (§4.5.9), finds the bound working copy
+  and re-locks at `acquire` each persisted instance still alive with the same pid and start time; and after `save`,
+  `SavedModel.fingerprint` is the fingerprint of the saved state, not `""`. Tests:
+  `tests/workflow/adapters/test_csi_host_resume.py::test_lease_preflight_and_epoch`,
+  `::test_new_port_restores_from_run_state`,
+  `tests/workflow/adapters/test_csi_session_ops.py::test_save_records_the_state_fingerprint` (plan task T19c).
 
 ## 4. Design
 
@@ -319,9 +327,12 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 4. `checks` (`Mapping[str, ServerCheck]`, per server section) defaults, for a section it lacks, to a placeholder with
    `ok` false, empty fingerprints and the build formatted as an unchecked `ServerCheck` of §4.3.4. The ports read only
    its `build` (provenance); the engine's `preflight` result is the authority for a stop.
-5. `allowlists` (`Mapping[str, Allowlist]`, adapter name to an allowlist loaded without a route) defaults to the
-   shipped CSI allowlist under its adapter name; each server section's adapter selects its allowlist, served for the
-   section's `route` by the rule of AC41.
+5. `allowlists` (`Mapping[str, Callable[[str | None], Allowlist]]`, adapter name to a loader that takes the server
+   section's `route`) defaults to `csi_allowlist` (which gains the `route` argument) under the CSI adapter name; each
+   server section's adapter selects its loader and calls it with the section's `route`, so the load applies the rule
+   of AC41. Decision: a loader, not a loaded allowlist, because `load_allowlist` refuses a routed allowlist loaded
+   without a route and its route filter is private. For CSI the result only validates the section's route (the CSI
+   allowlist declares none, so a route is refused): `CsiToolPort` builds its own `tool_allowlist()`.
 
 Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
 `servers/_procinfo.py`, `servers/_transport.py`, `servers/_launch_args.py` (the argv of §4.3.2, **[added: B-085]**),
@@ -750,11 +761,14 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `started_instances`, `close_started` | §4.4.2 |
 | `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
 
-Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time and exe
-name, amendment B-530), bindings, expected units, the `visible` flag of launches. A host port built over the same
-`run_dir` loads it at construction (amendment B-530), so a resumed run finds its working copy and re-locks its live
-instances (§4.4.1). It is a cache: where it disagrees with the journal (`host_started`, `model_bound`), the journal
-wins.
+Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time, the time
+it was observed and the exe name, amendment B-530), bindings (model key to instance id, model id and file), expected
+units, the `visible` flag of launches. A host port built over the same `run_dir` loads instances, bindings and expected
+units at construction (amendment B-530), so a resumed run finds its working copy and re-locks its live instances
+(§4.4.1). Decision (B-530): a reloaded instance gets the session value `-1`, which no role session counter (0 and
+growing) ever holds, so a resumed port never claims launch ownership of it (§4.4.2) and `open_file` and `restore` launch
+anew; the reason is that launch ownership is not proven across a restart of the engine. It is a cache: where it
+disagrees with the journal (`host_started`, `model_bound`), the journal wins.
 
 Model binder **[added: B-530]**: the host port is the CSI tool port's `ModelBinder` (`binding`, `revision`). Decision:
 `Binding.host.version` is the program version of the last `model_state` read of that model key, and, when none was
@@ -1006,7 +1020,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 
