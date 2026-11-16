@@ -364,7 +364,9 @@ area load: `kPa`, ratio: `1`); the value is converted to the canonical unit by `
 Amendment B-544: an input value also holds `value_<suffix>`, its value in the canonical unit of its dimension under
 the field suffix of that unit (contract §4.7.2: `value_mm`, `value_kN_m`, `value_kPa`, `value_ratio`), which the model
 fills by `eng_contract.units` when it is absent and refuses when it differs from that conversion, so a stored answer
-validates again on replay (the column workflow's requests, which reuse these value models, hold it too). Decision
+validates again on replay. The field is declared only on the four change-set input models (`LengthInput`,
+`LineLoadInput`, `AreaLoadInput`, `RatioInput`); the column workflow's `_Area`, which shares their base, is unchanged.
+Decision
 (B-544): step 8 passes each engineering argument as a reference, the contract resolves a reference to a number only
 under a key with a unit suffix and converts nothing (contract §4.6.2), and K4 accepts every unit of the dimension, so
 the converted number is stored in the answer, where a reference can reach it without a contract change.
@@ -596,7 +598,8 @@ reports no error, no unclassified message and no story whose drift ratio exceeds
 and asks the engineer. Decision (B-544): a summary with no drift row (`governing_drift` empty) gives `NEEDS_ENGINEER`
 too, because then no story was checked against the limit, while the merged calc reports `PASS` for it; the calc is
 unchanged. Both rules of `rules/edit_cycle.py` move to version 2, because the rule lock hashes the module source (spec
-0005 AC10); the D-2 point moves to version 2 for its new reason (spec 0005 AC4). **A failed check before the step 9
+0005 AC10); the D-2 point moves to version 2 for its new reason (spec 0005 AC4); the D-3 state model, docstring
+included, is unchanged, so the D-3 point stays at version 1. **A failed check before the step 9
 read (Q14, interim reading).** The step 9 block catches the `ModelIntegrityError` of the check that invariant 1
 inserts before the S' read and opens D-2 with the reason `check_model_failed`, status `NEEDS_ENGINEER`, every finding
 flag false and the step 6 expected effects as refs; the read-back check does not run, and `restore_previous` and

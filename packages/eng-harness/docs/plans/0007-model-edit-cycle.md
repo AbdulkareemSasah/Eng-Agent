@@ -264,7 +264,8 @@ tasks:
     # Amendment (B-544, documents only): new fix task for merged T7 code (owner decision of 2026-11-16, spec Q20; spec
     # Q14 interim reading; spec 4.6, AC18). edit_cycle_analysis_messages.clean also needs drift_status PASS (about 3
     # lines and the rationale), ReadbackReason gains check_model_failed (1), both rules and the D-2 point move to version
-    # 2 (3; the rule lock hashes the module source, the point lock its state schema), the two locks follow (about 6),
+    # 2 (3; the rule lock hashes the module source, the point lock its state schema, docstrings included, so the D-3
+    # point and AnalysisState stay unchanged at version 1), the two locks follow (about 6),
     # 1 of CHANGELOG.md: about 15; budget 30 (an estimate). T7 is not changed; T8 waits for this task.
     files:
       - "packages/eng-harness/CHANGELOG.md"
@@ -770,8 +771,10 @@ from 4 to 5. No other test and no budget changes.
 `rules/edit_cycle.py`, `edit_cycle_analysis_messages.clean` returns `continue` only when the state has no error, no
 unclassified message and `drift_status` `PASS` (the owner's decision of 2026-11-16), with a rationale that says so;
 `readback_result_pass` is unchanged. In `workflows/model_edit_cycle/_points.py`, `ReadbackReason` gains
-`check_model_failed` and `AnalysisState`'s docstring states how `drift_status` is read (spec §4.6); the state models
-keep their fields. Both rules move to version 2, because `rules.lock.json` hashes the module source, and the point
+`check_model_failed`; `AnalysisState`, its fields and its docstring stay as they are, because the point lock hashes
+the state's JSON schema, which carries the class docstring, so the D-3 point keeps version 1 (how `drift_status` is
+read, spec §4.6, is stated in the rule's docstring and rationale, which change anyway). Both rules move to version 2,
+because `rules.lock.json` hashes the module source, and the point
 `edit_cycle_readback_result` moves to version 2, because its state schema changes (spec 0005 AC4, AC10); both locks are
 regenerated with `uv run python -m eng_harness.decisions --write-lock`. The first `test:` commit changes the last
 assertion of `test_clean_boundary` (a drift state gives `None`; the spec changed, not the test's aim), adds
@@ -897,8 +900,10 @@ test pins either behaviour.
 **T16b Change-set values as write arguments** (amendment B-544; spec §4.3.1, §4.4.1 K4, AC40). In `_change_set.py`
 each input value model holds `value_<suffix>` (`value_mm`, `value_kN_m`, `value_kPa`, `value_ratio`): a `before`
 validator fills it from `value` and `unit` by `eng_contract.units` when it is absent and refuses a given one that
-differs from that conversion, so the stored answer validates again on replay; the column workflow's requests reuse the
-models and their round-trip test stays as it is. In `change_set_check.py` a resolved value's `ref` gains `/value`
+differs from that conversion, so the stored answer validates again on replay. The field and the validator are declared
+only on the four change-set models `LengthInput`, `LineLoadInput`, `AreaLoadInput` and `RatioInput`, not on
+`_InputValue`; the column workflow's `_Area` (frozen, `workflows/column_design/_requests.py`) and its round-trip test stay
+as they are. In `change_set_check.py` a resolved value's `ref` gains `/value`
 (basis) or `/value_<suffix>` (input). No bound, unit rule or issue changes, and the calc keeps version 1 (spec §4.4.1).
 The lock moves the entries of the check and of `harness.expected_effects` (both import the model); the record gains
 the reference form. `test_value_refs_are_write_arguments` stores an answer as the engine does, runs the check, and
