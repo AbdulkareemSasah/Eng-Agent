@@ -1,3 +1,38 @@
+# Build handoff checkpoint of 2026-11-16 (build/v1 at 4c4be4d, work item B-506)
+
+**State.** 209 of 340 plan tasks merged. The 340 is the number of `- id:` entries in the front matter of the plan files
+under `packages/*/docs/plans/` as the lead measured it; the 209 is the lead's count after pull request 378. Since then
+only documents amendments merged (#379, #380), so the count stands. 24 task pull requests merged since the checkpoint
+of 2026-11-14 (185 of 309): B-350 #332, B-460 #333, B-132 #334, B-148 #338, B-133 #339, B-114 #341, B-196 #344,
+B-181 #350, B-149 #353, B-135 #345, B-115 #357, B-171 #361, B-199 #362, B-500 #365, B-197 #366, B-172 #367, B-183 #368,
+B-429 #370, B-522 #369, B-173 #373, B-489 #374, B-116 #375, B-523 #376, B-518 #378. Documents amendments merged in
+the same period: B-478, B-462, B-492, B-493, B-495, B-497, B-494, B-498, B-499, B-504, B-505, B-509, B-503, B-512,
+B-513, B-510, B-517, B-511, B-529, B-531, B-533, B-535.
+
+**Registry.** `ops/remaining-tasks.json` now has B-518 to B-528 and B-534 and the changes of amendments B-510, B-511,
+B-513 and B-533. Merged dependencies are removed from `pending_deps`. Entries of merged items stay in the file.
+
+**Lanes not marked finished in [resume/RESUME.md](resume/RESUME.md)** (check each against `git log origin/build/v1`
+before relaunching): interface-4 (B-184 left), gaps-1 (B-519, B-520), engine-5 (B-117, B-118, B-521), interface-6,
+editcycle-8 (B-200, its hold removed after B-535), decisions-2 (B-174), editcycle-9 (B-204, B-534), providers-1 (B-229).
+Waiting to launch: B-198 after B-519; B-138 after B-530's task T19c, B-118, B-519 and the audit; B-188 after B-117, B-518
+and B-184.
+
+**Owner decisions that are open:** spec 0007 Q19; the protected gate change W.T15 (B-524); spec 0006 Q22, Q23, Q24;
+the interim readings of spec 0007 section 4.9; engine Q40, Q41 and Q43. Details: BUILD-STATUS section 6.6.
+The lead's batch-merge proposal (one local CI run for up to three ready pull requests) is also open: BUILD-STATUS
+section 6.6, row OD-3.
+
+**Where the lead's tooling is.** Copies are in this folder (`docs/build/`): lead-playbook.md, priority.txt,
+lead-findings.md, `resume/` (RESUME.md and the lane arguments), the lane scripts build-lane.workflow.js,
+build-lane-v2.workflow.js, build-lane-v3.workflow.js, build-lane-v31.workflow.js, build-lane-tail.workflow.js and
+plan-audit.workflow.js, `tools/integrate.sh` and `tools/periodic-mutation.sh`, and the confirmed findings of plan
+audit 2 (plan-audit-2-servers-0002-confirmed.md, plan-audit-2-providers-0009-confirmed.md). The originals live in the
+session's own lead folder and do not survive the container. Paths in the copies are placeholders (section 7, item 2
+below).
+
+The checkpoint of 2026-11-14 follows and stays for its history.
+
 # Build handoff checkpoint (cloud session of 2026-11-14, after the pause)
 
 > **Newer state (2026-11-14, work item B-506):** the lead stopped all lanes at the owner's word on 2026-11-14 about 21:00 UTC. The state at that stop (lanes, run ids, queue, order of the next start, 193 of 331 plan tasks merged) is in [resume/RESUME.md](resume/RESUME.md); the speed-up measures the owner approved are in [lead-playbook.md](lead-playbook.md) section 7. The sections below describe the checkpoint of work item B-487.

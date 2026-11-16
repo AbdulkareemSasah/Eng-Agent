@@ -24,7 +24,7 @@ from eng_contract.canonical import payload_sha256
 from eng_contract.ids import Clock, Timestamp
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
-from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic import BaseModel, JsonValue, TypeAdapter, ValidationError
 
 from eng_harness.decisions._batch import batch_id, bounded, refusal, restored, stored
 from eng_harness.decisions._labels import LabeledExample, LabelStore, PendingRecord
@@ -224,17 +224,24 @@ class Cascade:
         model: DecisionProvider | None = None,
         llm: LLMProvider | None = None,
         max_concurrent_decisions: int = 4,
+        runtime: Mapping[str, JsonValue] | None = None,
     ) -> None:
         """Build the cascade.
 
         ``monotonic`` reads seconds; ``rule_guard`` is the factory of the context manager that rules run in (the
         engine supplies its audit-hook guard, unit tests a no-op); ``clock`` stamps the closing of a request;
         ``model`` (tier 2) and ``llm`` (tier 3) are the providers, both ``None`` in phase 1;
-        ``max_concurrent_decisions`` bounds the single provider calls of ``decide_many`` (the engine's setting).
+        ``max_concurrent_decisions`` bounds the single provider calls of ``decide_many`` (the engine's setting);
+        ``runtime`` is the decision-runtime summary for the run header, kept as given (spec 0005 4.12).
         """
         self._points, self._settings, self._labels = points, settings, labels
         self._clock, self._monotonic, self._guard = clock, monotonic, rule_guard
         self._model, self._llm, self._limit = model, llm, max_concurrent_decisions
+        self._runtime: Mapping[str, JsonValue] = {} if runtime is None else runtime
+
+    def runtime_summary(self) -> Mapping[str, JsonValue]:
+        """The summary the cascade was built with, unchanged, or ``{}``; no I/O, no provider is called (AC43)."""
+        return self._runtime
 
     async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
         """Decide one call: the first matching rule, else an accepted provider answer, else the engineer.

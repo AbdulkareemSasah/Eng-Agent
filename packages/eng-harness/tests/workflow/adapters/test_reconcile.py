@@ -166,10 +166,9 @@ async def _rig(
 def store(tmp_path: Path, ids: SeededIdSource) -> ResultStore:
     """A result store that knows the harness kinds and the CSI kinds of the adapter."""
     from eng_harness._kinds import HARNESS_KINDS
-    from eng_harness.adapters.csi._replies import CSI_KINDS
 
     workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
-    return ResultStore(workspace, HARNESS_KINDS.extend(CSI_KINDS), ids, FixedClock(1_767_225_600_000, 1))
+    return ResultStore(workspace, HARNESS_KINDS, ids, FixedClock(1_767_225_600_000, 1))
 
 
 def _combo(rig: Rig) -> dict[str, Any]:
