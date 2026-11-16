@@ -289,15 +289,44 @@ def test_trace_and_schema() -> None:
     assert issubclass(input_type, CalcInput)
     properties = input_type.model_json_schema()["properties"]
     kinds = {
-        "verdicts": "verdicts.set/1",
-        "frames": "model.frame_placements/1",
-        "previous": "harness.design_summary/1",
-        "basis": "basis.design_basis/1",
+        "verdicts": ["harness.host_design_verdicts/1", "verdicts.set/1"],
+        "frames": ["model.frame_placements/1"],
+        "previous": ["harness.design_summary/1"],
+        "basis": ["basis.design_basis/1"],
     }
     assert set(properties) == set(kinds)
     for name, kind in kinds.items():
         mark = properties[name]["x-eng"]
-        assert (mark["ref_kinds"], mark["stale_ok"], mark["engineering_quantity"]) == ([kind], False, True), name
+        assert (mark["ref_kinds"], mark["stale_ok"], mark["engineering_quantity"]) == (kind, False, True), name
+
+
+def _host(*verdicts: dict[str, Any]) -> dict[str, Any]:
+    """The `harness.host_design_verdicts/1` payload of the verdicts: the set's members and the calc port's three."""
+    sha = "a" * 64
+    calc_id = "harness.host_design_verdicts"
+    trace = {"calc_id": calc_id, "calc_version": "1", "content_sha256": sha, "inputs": [], "constants": []}
+    return _set(*verdicts) | {
+        "calc": {"id": calc_id, "version": 1, "content_sha256": sha, "status": "draft"},
+        "trace": trace | {"steps": [], "outputs": []},
+        "draft": True,
+    }
+
+
+def _mixed() -> list[dict[str, Any]]:
+    return [
+        _verdict("F1", 0.97, "FAIL", case="COMB1", limit=0.95),
+        _verdict("F2", 0.4, "PASS", case="COMB2", limit=0.95),
+        _verdict("F3", None, "NEEDS_ENGINEER", check="host.concrete_design_ratio"),
+    ]
+
+
+def test_host_design_verdicts_input() -> None:
+    """Spec 0003 4.9 (B-538): a `harness.host_design_verdicts/1` reference gives the body of a `verdicts.set/1`."""
+    verdicts = _mixed()
+    refs = _refs(verdicts=_ref(1, "harness.host_design_verdicts/1"))
+    from_host = _run({"verdicts": _host(*verdicts)}, refs)
+    assert from_host == _run({"verdicts": _set(*verdicts)})
+    assert (from_host["status"], from_host["counts"]["FAIL"], from_host["governing"]["subject_id"]) == ("FAIL", 1, "F1")
 
 
 def test_golden_expectations_are_valid_payloads() -> None:
@@ -313,3 +342,13 @@ def test_golden_expectations_are_valid_payloads() -> None:
         output_type.model_validate(
             expected | {"calc": meta, "draft": True, "trace": trace | {"inputs": [], "constants": []}}
         )
+
+
+def test_both_verdict_kinds_give_the_same_trace() -> None:
+    """The summary reads the member `verdicts` only: the trace's inputs, steps and outputs do not depend on the kind."""
+    verdicts = _mixed()
+    host_trace, set_trace = TraceBuilder(), TraceBuilder()
+    _run({"verdicts": _host(*verdicts)}, _refs(verdicts=_ref(1, "harness.host_design_verdicts/1")), host_trace)
+    _run({"verdicts": _set(*verdicts)}, trace=set_trace)
+    built = [t.build(REGISTRY[CALC_ID], "ab" * 32) for t in (host_trace, set_trace)]
+    assert built[0] == built[1]
