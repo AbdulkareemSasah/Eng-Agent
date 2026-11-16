@@ -739,7 +739,7 @@ awaiting-owner notice and the owner approves the policy change; T7, and through 
 | T10, T10b | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
-| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
+| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
 
