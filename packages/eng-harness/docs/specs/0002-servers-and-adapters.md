@@ -288,9 +288,11 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   before it (§4.5.7); the revision tools use the run's snapshot record (`run_dir/copies`,
   `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
   AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9),
-  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
-  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530) (plan
-  task T19a).
+  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`),
+  except for a tool with action `open` on a key with no bound model, whose preview has `models` empty (amendment
+  B-543). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
+  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530),
+  `::test_open_preview_without_binding` (amendment B-543) (plan task T19a).
 - AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
   models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
   `eng_harness.adapters.csi._replies` answers those same models. Test:
@@ -303,7 +305,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `tests/workflow/adapters/test_csi_host_resume.py::test_lease_preflight_and_epoch`,
   `::test_new_port_restores_from_run_state`,
   `tests/workflow/adapters/test_csi_session_ops.py::test_save_records_the_state_fingerprint` (plan task T19c).
-- AC48. **[added: B-543]** Given a CSI tool port wired to its host port's `open_original` and a model key in the host
+- AC48. **[added: B-543]** Given a CSI tool port whose opener is its host port's `open_original` (the binder a test
+  binder until T19a wires the host port's own, B-530) and a model key in the host
   port's files, when `csi_open_model` is called with that key and no `path`, then the host port opens that file in the
   run's own instance (launching and locking one when the run has none), `locate` of the key finds it, `read_units`
   matches the units recorded at the open, the answer is a success envelope, and `working_copy` then opens the copy in
@@ -774,7 +777,9 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new instance (visible as configured; reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent; except that a tool with action `open` whose key has no binding with `host`, the step 2
+`csi_open_model` (amendment B-543), gets the same one item with `models` empty and no pre-image, and no binding is
+read), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
 
 Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time, the time
 it was observed and the exe name, amendment B-530), bindings (model key to instance id, model id and file), expected
@@ -794,11 +799,17 @@ Opening the original **[added: B-543]** (spec 0007 §4.5 step 2, AC48). The CSI 
 with a model key and no `path` by calling its `opener` (a keyword like `reopened`; `build_ports` passes the host
 port's `open_original`) and then the binder, and returns a success envelope (`harness.run_output/1`, payload the key and
 the file's base name, provenance from the binding's `host`). It refuses a `csi_open_model` that names a `path` (only
-`csi_open_revision` sends one, inside the port), and it gives that refusal and every error of the open as a failure
-envelope, never a raised error, because the engine treats an error raised from a write as an unknown outcome. Nothing
+`csi_open_revision` sends one, inside the port), and it gives that refusal, a key with no file, a port without opener
+and every `ContractError` or `ToolFailed` of the open as a failure envelope, never a raised error, because the engine
+treats an error raised from a write as an unknown outcome; any other exception stays that unknown outcome and goes to
+the engineer (`engine.in_flight`), as for every write. Nothing
 is ledgered for it: the open writes no model content and is not reconciled (row above). Decision (B-543): the host
 port opens the original, as it opens the working copy and a restore, because only it maps a key to a file and launches
-and locks instances; a block cannot name a path. Visible launch: `AdapterHostPort` and its `CsiSession` take
+and locks instances; a block cannot name a path. In `approve_each_write` the engine asks for an approval before the
+open (engine §4.7), when no model is bound yet: its preview (row above) names the tool and the key and carries no
+model. Decision (B-543): the open's preview reads no binding and binds no model, because the open writes no model
+content and the approval then has nothing to re-check; refusing it as `model_open` would stop every run in that mode
+at step 2. Visible launch: `AdapterHostPort` and its `CsiSession` take
 `visible` (default false; `build_ports` passes its `visible` keyword, §4.1) and every `csi_launch` of the run sends it,
 records it and keeps it in the run state, so a visible instance is reported, never terminated, at `close_started`
 (§4.4.2).

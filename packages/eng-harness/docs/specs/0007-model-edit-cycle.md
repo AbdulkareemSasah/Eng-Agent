@@ -509,7 +509,8 @@ copy (`copy_on_open`, engine §4.7), which the host port opens in the same insta
 read again (spec 0006 §4.2.2 step 2). Decision (B-543): the host port opens the original, as it already opens the
 working copy and a restore, because only it knows the file of a key and launches instances; the open writes no model
 content and, like every `csi_open_model`, is not reconciled, so a cut-off open goes to the engineer
-(`engine.in_flight`). **Models in previews and promotion.** `Preview(models=[m])` (step 6) and `ctx.promote(m, ...)`
+(`engine.in_flight`). In `approve_each_write` the open gets its own approval first, whose preview names the key and
+no model (spec 0002 §4.5.9, AC45), so the open works in every mode. **Models in previews and promotion.** `Preview(models=[m])` (step 6) and `ctx.promote(m, ...)`
 (step 16) take the key; `ToolResult.model` is `None` (engine §4.3.2). Decision (B-543): the engine binds an approval to
 the live state of each key and uses only the key of a model, so the key is enough and no model id or revision is
 invented in a stored preview. **v1 exit for a locked model.** Until plan 0002 T15 (ADR-0031) adds `csi_unlock_model`,
