@@ -4,7 +4,7 @@ issue: "B-061"
 spec: packages/eng-harness/docs/specs/0002-servers-and-adapters.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]           # binding for every pull request of this plan; r3 because T1 touches pyproject.toml and uv.lock
+risk: [r1, r2, r3]       # binding for every pull request of this plan; r3 because T1 touches pyproject.toml and uv.lock; r2 because T21 adds eng_harness/kinds/csi.py (amendment B-537)
 tasks:
   - id: T1
     title: MCP SDK dependency ADR, harness.toml server and tool sections
