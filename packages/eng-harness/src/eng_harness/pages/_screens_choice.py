@@ -4,7 +4,9 @@ Purpose: render an `InputRequest` from its JSON Schema. A schema whose `x-eng-in
 answer coming from `resume --answers FILE`; every other schema (marker `choice` or none, fail-safe) is a choice: a
 property with an `enum` is a question, a property marked `x-eng-evidence` is labeled read-only text. One question gives
 one button per option (one press is the answer); several give a radio group each and one Submit. Option labels come
-from the catalog `pages/_labels`, never from data; a property name or option that cannot be an attribute token makes
+from the catalog `pages/_labels`, never from data, except that an option without a catalog entry (a batched
+decision's option) shows its own id, escaped and token-checked; evidence named `<question>_...` is shown under that
+question, any other evidence before the questions; a property name or option that cannot be an attribute token makes
 the screen a refusal screen (no form, no button). Units: as the schema gives them. Errors: a refused answer is an
 `AnswerError`.
 """

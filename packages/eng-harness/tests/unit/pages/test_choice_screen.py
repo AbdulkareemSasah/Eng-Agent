@@ -21,10 +21,10 @@ IDS = SeededIdSource(b"choice", FixedClock(1_767_225_600_000, 1))
 
 
 @contextmanager
-def rig(root: Path) -> Iterator[Wired]:
+def rig(root: Path, engineer: str | None = None) -> Iterator[Wired]:
     """The page ports with the T10 screens, the stand-in engine feeding the sink, and a client."""
     builders, checks = choice_screens()
-    approvals = PageApprovalPort(builders=builders, checks=checks, wait_timeout_s=0.5)
+    approvals = PageApprovalPort(builders=builders, checks=checks, wait_timeout_s=0.5, engineer=engineer)
     engine = EngineStandIn(root, approvals.hub.emit)
     with PageServer(approvals.hub) as server:
         client = PageClient(server)
@@ -158,3 +158,54 @@ def test_data_request_is_read_only(tmp_path: Path) -> None:
         refused = w.client.post("/answer/inp_data", {"shown_sha256": request.fields_schema_sha256, "by": "ada"})
         assert refused.status >= HTTPStatus.BAD_REQUEST  # no form, no token: nothing answers
         assert future.result(5) is None
+
+
+def test_each_question_shows_its_own_evidence(tmp_path: Path) -> None:
+    questions = [Question(name=f"q{n}", prompt=f"Prompt {n}", options=("a", "b")) for n in (0, 1)]
+    evidence = [
+        Evidence(name="q1_why", label="Label one", text="text one"),
+        Evidence(name="q0_why", label="Label zero", text="text zero"),
+        Evidence(name="loose", label="Label loose", text="text loose"),
+    ]
+    request = ask("dec_own", "engine.decision", questions, evidence)
+    with rig(tmp_path) as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        body = shown(w, request)
+        at = {k: body.index(k) for k in ("Prompt 0", "text zero", "Prompt 1", "text one")}
+        assert at["Prompt 0"] < at["text zero"] < at["Prompt 1"] < at["text one"]  # each after its own heading
+        assert "Label loose" in body
+        assert "text loose" in body  # unpaired evidence still shows
+        assert body.index("text loose") < at["Prompt 0"]  # and before the questions
+        assert post(w, request, **{CHOICE + "q0": "a", CHOICE + "q1": "b"}) == HTTPStatus.OK
+        assert future.result(5) is not None
+
+
+def test_engineer_name_hint_and_by_reach_the_answer(tmp_path: Path) -> None:
+    request = ask("dec_by", "engine.decision", [Question(name="next", prompt="Next", options=("accept",))])
+    with rig(tmp_path / "none") as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        assert "Engineer named in the settings" not in shown(w, request)  # no engineer set: no hint
+        assert future.result(5) is None  # unanswered: the wait times out
+    with rig(tmp_path / "ada", engineer="Ada") as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        body = shown(w, request)
+        assert "Engineer named in the settings" in body
+        assert "Ada" in body
+        form = w.form(request, **{CHOICE + "next": "accept", "by": "Grace"})
+        del form["decision"]
+        assert HTTPStatus(w.client.post(f"/answer/{request.request_id}", form).status) == HTTPStatus.OK
+        answered = future.result(5)
+    assert answered is not None
+    assert answered.by == "Grace"
+
+
+def test_an_uncatalogued_option_shows_its_id(tmp_path: Path) -> None:
+    request = ask("dec_id", "engine.decision", [Question(name="next", prompt="Next", options=("a", "accept"))])
+    with rig(tmp_path) as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        body = shown(w, request)
+        # the id, no catalog label
+        assert re.search(r'<button [^>]*value="a"[^>]*><bdi dir="auto">a</bdi></button>', body)
+        assert "Accept this revision" in body
+        assert post(w, request, **{CHOICE + "next": "a"}) == HTTPStatus.OK
+        assert future.result(5) is not None
