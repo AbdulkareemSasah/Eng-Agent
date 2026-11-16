@@ -15,7 +15,7 @@ from eng_contract.refs import parse_ref
 from eng_contract.store import ResultStore
 from pydantic import JsonValue
 
-from eng_harness._html import Node, Tag, Text, el
+from eng_harness._html import Element, Node, Tag, Text, el
 from eng_harness._text import format_duration_ms
 from eng_harness.journal import Event, JournalReader
 from eng_harness.journal import _events as ev
@@ -322,95 +322,72 @@ def _page(book: SourceBook) -> _Page:
     return page
 
 
+def _row(page: _Page, rid: str, obj: Mapping[str, JsonValue], base: str, *columns: str) -> Element:
+    """A table row: `key` is shown as text, `*key` as a value cell citing `base/key` of the stored result."""
+    cells = [
+        page.cite(_text(obj.get(c[1:])), rid, f"{base}/{c[1:]}") if c[0] == "*" else page.bdi(_show(obj.get(c)))
+        for c in columns
+    ]
+    return el(Tag.TR, *cells)
+
+
 def _text(value: JsonValue) -> str:
     return ", ".join(_show(item) for item in value) if isinstance(value, list) else _show(value)
 
 
-def _change_set_check(payload: dict[str, JsonValue], result_id: str, book: SourceBook) -> list[Node]:
+def _change_set_check(payload: dict[str, JsonValue], rid: str, book: SourceBook) -> list[Node]:
     page = _page(book)
-    head = el(
-        Tag.TR,
-        page.cite(payload.get("status"), result_id, "/status"),
-        page.cite(payload.get("complete"), result_id, "/complete"),
-    )
-    items, values = [], []
+    items, values, issues = [], [], []
     for i, item in enumerate(page.dicts(payload.get("resolved"))):
-        name = _show(item.get("item_id"))
-        targets = page.cite(_text(item.get("targets")), result_id, f"/resolved/{i}/targets")
-        items.append(el(Tag.TR, page.bdi(name), page.bdi(_show(item.get("kind"))), targets))
+        items.append(_row(page, rid, item, f"/resolved/{i}", "item_id", "kind", "*targets"))
         for j, value in enumerate(page.dicts(item.get("values"))):
-            ref = page.cite(value.get("ref"), result_id, f"/resolved/{i}/values/{j}/ref")
-            values.append(
-                el(
-                    Tag.TR,
-                    page.bdi(name),
-                    page.bdi(_show(value.get("pointer"))),
-                    ref,
-                    page.bdi(_show(value.get("unit"))),
-                )
-            )
-    issues = []
+            held = {**value, "item": item.get("item_id")}
+            values.append(_row(page, rid, held, f"/resolved/{i}/values/{j}", "item", "pointer", "*ref", "unit"))
     for i, issue in enumerate(page.dicts(payload.get("issues"))):
-        detail = page.cite(issue.get("detail"), result_id, f"/issues/{i}/detail")
-        cells = [page.bdi(_show(issue.get(key))) for key in ("item_id", "severity", "code")]
-        issues.append(el(Tag.TR, *cells, detail, page.bdi(_show(issue.get("gap")))))
+        issues.append(_row(page, rid, issue, f"/issues/{i}", "item_id", "severity", "code", "*detail", "gap"))
     return [
-        page.table([head], "Status", "Complete"),
+        page.table([_row(page, rid, payload, "", "*status", "*complete")], "Status", "Complete"),
         page.table(items, "Item", "Kind", "Targets"),
         page.table(values, "Item", "Pointer", "Reference", "Unit"),
         page.table(issues, "Item", "Severity", "Code", "Detail", "Gap"),
     ]
 
 
-def _analysis_summary(payload: dict[str, JsonValue], result_id: str, book: SourceBook) -> list[Node]:
-    page = _page(book)
-    counts = [page.cite(payload.get("status"), result_id, "/status")]
-    counts += [
-        page.cite(_text(_count(payload, key)), result_id, f"/counts/{key}")
-        for key in ("error", "warning", "info", "unclassified")
+def _analysis_summary(payload: dict[str, JsonValue], rid: str, book: SourceBook) -> list[Node]:
+    page, counts, drift = _page(book), payload.get("counts"), payload.get("governing_drift")
+    governing = [
+        _row(
+            page,
+            rid,
+            {**row, "direction": key},
+            f"/governing_drift/{page.token(key)}",
+            "direction",
+            "story",
+            "case",
+            "*ratio",
+        )
+        for key, row in (drift.items() if isinstance(drift, dict) else [])
+        if isinstance(row, dict)
     ]
-    limit = el(
-        Tag.TR,
-        page.cite(payload.get("limit_ratio"), result_id, "/limit_ratio"),
-        page.cite(payload.get("limit_ref"), result_id, "/limit_ref"),
+    exceeding = [
+        _row(page, rid, row, f"/exceeding/{i}", "direction", "story", "case", "*ratio")
+        for i, row in enumerate(page.dicts(payload.get("exceeding")))
+    ]
+    head = _row(page, rid, payload, "", "*status", "*limit_ratio", "*limit_ref")
+    tally = _row(
+        page, rid, counts if isinstance(counts, dict) else {}, "/counts", "*error", "*warning", "*info", "*unclassified"
     )
-    drift = payload.get("governing_drift")
-    governing = []
-    for direction, row in drift.items() if isinstance(drift, dict) else []:
-        if isinstance(row, dict):
-            ratio = page.cite(row.get("ratio"), result_id, f"/governing_drift/{page.token(direction)}/ratio")
-            governing.append(
-                el(
-                    Tag.TR,
-                    page.bdi(direction),
-                    page.bdi(_show(row.get("story"))),
-                    page.bdi(_show(row.get("case"))),
-                    ratio,
-                )
-            )
-    exceeding = []
-    for i, row in enumerate(page.dicts(payload.get("exceeding"))):
-        ratio = page.cite(row.get("ratio"), result_id, f"/exceeding/{i}/ratio")
-        exceeding.append(el(Tag.TR, *(page.bdi(_show(row.get(key))) for key in ("direction", "story", "case")), ratio))
     return [
-        page.table([el(Tag.TR, *counts)], "Status", "Errors", "Warnings", "Info", "Unclassified"),
-        page.table([limit], "Limit ratio", "Limit source"),
+        page.table([head], "Status", "Limit ratio", "Limit source"),
+        page.table([tally], "Errors", "Warnings", "Info", "Unclassified"),
         page.table(governing, "Direction", "Story", "Case", "Ratio"),
         page.table(exceeding, "Direction", "Story", "Case", "Ratio"),
     ]
 
 
-def _count(payload: dict[str, JsonValue], key: str) -> JsonValue:
-    counts = payload.get("counts")
-    return counts.get(key) if isinstance(counts, dict) else None
-
-
-def _name_lists(payload: dict[str, JsonValue], result_id: str, book: SourceBook) -> list[Node]:
+def _name_lists(payload: dict[str, JsonValue], rid: str, book: SourceBook) -> list[Node]:
     page = _page(book)
-    rows = [
-        el(Tag.TR, page.bdi(name), page.cite(_text(payload.get(name)), result_id, f"/{name}"))
-        for name in sorted(payload)
-    ]
+    rows = [el(Tag.TR, page.bdi(name), _row(page, rid, payload, "", f"*{name}")) for name in sorted(payload)]
     return [page.table(rows, "List", "Names")]
 
 
@@ -424,25 +401,25 @@ def register() -> None:
 def cycle_timing_nodes(timings: CycleTimings) -> list[Node]:
     """The cycle tables of the report's timings section."""
     page, show = _page(SourceBook()), format_duration_ms
-    cycles = [
-        page.texts(
-            str(c.cycle), c.path, "" if c.wall_ms is None else show(c.wall_ms), show(c.machine_ms), show(c.host_ms),
-            show(c.wait_ms), str(c.prompts),
-        )
+
+    def wait(ms: int | None) -> str:
+        return "" if ms is None else show(ms)
+
+    rows = [
+        [str(c.cycle), c.path, wait(c.wall_ms), show(c.machine_ms), show(c.host_ms), show(c.wait_ms), str(c.prompts)]
         for c in timings.cycles
-    ]  # fmt: skip
-    nodes: list[Node] = [el(Tag.H3, Text("Edit cycles"))]
-    nodes.append(page.table(cycles, "Cycle", "Path", "Wall", "Machine", "Host", "Engineer wait", "Prompts"))
-    if timings.turns:
-        turns = [page.texts(str(t.cycle), show(t.wait_ms)) for t in timings.turns]
-        nodes += [el(Tag.H3, Text("Engineer turns")), page.table(turns, "Cycle", "Wait")]
-    if timings.benchmarks:
-        rows = [
-            page.texts(b.label, "" if b.elapsed_ms is None else show(b.elapsed_ms), str(b.cycles))
-            for b in timings.benchmarks
-        ]
-        nodes += [el(Tag.H3, Text("Benchmark requests")), page.table(rows, "Request", "Elapsed", "Cycles")]
-    return nodes
+    ]
+    turns = [[str(t.cycle), show(t.wait_ms)] for t in timings.turns]
+    marks = [[b.label, wait(b.elapsed_ms), str(b.cycles)] for b in timings.benchmarks]
+    head = ("Cycle", "Path", "Wall", "Machine", "Host", "Engineer wait", "Prompts")
+    tables = [("Edit cycles", head, rows), ("Engineer turns", head[:1] + ("Wait",), turns)]
+    tables.append(("Benchmark requests", ("Request", "Elapsed", "Cycles"), marks))
+    return [
+        node
+        for title, labels, data in tables
+        if data
+        for node in (el(Tag.H3, Text(title)), page.table([page.texts(*row) for row in data], *labels))
+    ]
 
 
 def cycle_timings_json(timings: CycleTimings) -> str:
