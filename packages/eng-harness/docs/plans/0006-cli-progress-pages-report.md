@@ -430,7 +430,7 @@ tasks:
   - id: T14c
     title: "Commands run and resume: the page ports' wait mode and the answers files"
     # Amendment (B-510, documents only): new, split from T14; the wrapper that gives the page ports the process wait mode (spec 4.4.5 step 2), run --answers and resume --answers through pages.accept_answers_file, and their refusal while [engine] engineer is unset (spec 4.2.1).
-    # Amendment (B-536, documents only): first-live-run gaps. The port builder is called at the end of step 2 with the model files of the input (spec 4.2.2 step 2, AC67; spec 0002 H-G10 closed), and its NotImplementedGap (spec 0002 AC43, gap H-G8) ends run and resume with exit 2 (AC68). cli/__init__.py (the port_builder field's type) and tests/helpers/cli_deps.py (the shared builder's fake port builder) added; budget 80 -> 115.
+    # Amendment (B-536, documents only): first-live-run gaps. The port builder is called at the end of step 2 with the model files of the input (spec 4.2.2 step 2, AC67; spec 0002 H-G10 closed), and its NotImplementedGap (spec 0002 AC43, gap H-G8) ends run and resume with exit 2 (AC68). cli/__init__.py (the port_builder field's type) and tests/helpers/cli_deps.py (the shared builder's fake port builder) added; budget 80 -> 130 (fix round 1 re-estimate).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"  # the port_builder field takes files (B-536)
@@ -440,8 +440,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
-    # Amendment B-536: about 20 lines for the model files (the Path fields, the three refusals, the stored input at resume), 3 for the field's type, 6 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 80 + 30 = 110, budget 115.
-    max_changed_lines: 115
+    # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's Path and Path | None fields, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
+    max_changed_lines: 130
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
@@ -938,9 +938,11 @@ engine. (4) Amendment B-536 (spec §4.2.2 step 2, AC67, AC68): the port builder 
 `port_builder(config, workspace, store, run_folder, clock, ids, files)`, `files` mapping the base name of each
 top-level `pathlib.Path` field of the workflow's input model to its value (absolute and existing; a relative path, a
 missing file or a repeated base name is exit 2 with no run folder); `resume` builds the same mapping from the run's
-input read through `input_ref` of the run header before `Engine.resume`. A `NotImplementedGap` from the port builder
-(spec 0002 AC43, gap H-G8) prints its message on standard error and ends `run` and `resume` with exit 2 through
-`exit_code_for_error` (the code `NOT_IMPLEMENTED` is mapped by plan 0002 T19a). `test_model_files_reach_the_port_builder`
+input read through `input_ref` of the run header before `Engine.resume`, without the existence check (a case of
+`test_model_files_reach_the_port_builder` removes the original before `resume`). A `NotImplementedGap` from the port
+builder (spec 0002 AC43, gap H-G8) prints its message on standard error and ends `run` and `resume` with
+`exit_code_for(Outcome.USAGE)` (2), returned by T14c itself, not through `exit_code_for_error`, whose
+`NOT_IMPLEMENTED` entry plan 0002 T19a adds later (T19a keeps its table case). `test_model_files_reach_the_port_builder`
 and `test_port_builder_gap_exits_2` inject a recording or raising port builder through `CliDeps`; both fail at the
 merge base, where the port builder takes no `files` and its exception is not caught.
 

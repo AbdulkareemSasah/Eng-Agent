@@ -841,7 +841,7 @@ command-line tool: given a configuration with any `[cli_tools.*]` entry it raise
 a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). The command line meets the
 refusal at step 2 of spec 0006 §4.2.2 (amendment B-536), outside the engine, and ends with exit 2 `USAGE` (spec AC43, §11 Q9; owner
 answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries: `cli/_exit.py` maps the code
-`NOT_IMPLEMENTED` to 2 (spec 0006 §6; plan 0006 T14c catches the exception, spec 0006 AC68, amendment B-536), pinned by the case `("NOT_IMPLEMENTED", 2)` added to the error-code table test
+`NOT_IMPLEMENTED` to 2 (spec 0006 §6; plan 0006 T14c catches the exception and returns the usage exit itself, spec 0006 AC68, amendment B-536), pinned by the case `("NOT_IMPLEMENTED", 2)` added to the error-code table test
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 

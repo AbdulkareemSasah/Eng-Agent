@@ -191,12 +191,12 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 - AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.Path` and an
   input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
   `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
-  mapping from the run's stored input; and a relative path, a missing file or two such fields with one base name ends
-  `run` with exit 2 and no run folder (§4.2.2 step 2). Test:
+  mapping from the run's stored input, also when the original file has been moved since `run`; and a relative path, a
+  missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2). Test:
   `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder`.
 - AC68. **[added: B-536]** Given a port builder that raises `NotImplementedGap` (spec 0002 AC43, gap H-G8), when `run`
   or `resume` is called, then its message, which names H-G8 and the entries, is printed on standard error, the exit
-  code is 2, no run folder is created by `run`, and nothing is journaled (§4.2.2 step 2). Test:
+  code is 2 (`exit_code_for(Outcome.USAGE)`, returned by the command itself), no run folder is created by `run`, and nothing is journaled (§4.2.2 step 2). Test:
   `tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2`.
 - AC69. **[added: B-536]** Given `report <run_id>` for a run whose journal holds at least one edit cycle (spec 0007
   §4.9), then after the HTML it writes `<run>/report/cycle-timings.json` by
@@ -531,8 +531,14 @@ or open the page; the approval is the engineer's. The rule is generated into the
    model key to a file for each top-level field of the workflow's input model annotated `pathlib.Path` (a model file);
    the key is the file's base name and the file is the field's value, which must be absolute and name an existing
    file. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
-   folder. A `NotImplementedGap` from the port builder (spec 0002 AC43, gap H-G8) is printed on standard error and
-   ends the command with exit 2, before any run folder and with nothing journaled (AC68). Decision (B-536): the
+   folder; these refusals apply to `run`. `resume` builds `files` from the run's stored input and does not check that
+   the files still exist. Decision (B-536): `resume` passes a moved original on unchecked, because once the working
+   copy exists the host port works on the copy in the run folder and never reads the original again (spec 0002 §4.5.9
+   `working_copy`); a run that stopped before its copy existed meets `NOT_FOUND` at `working_copy`, as today. A
+   `NotImplementedGap` from the port builder (spec 0002 AC43, gap H-G8) is printed on standard error and ends the
+   command with `exit_code_for(Outcome.USAGE)` (2), before any run folder and with nothing journaled (AC68). Decision
+   (B-536): the command returns the usage exit itself rather than through `exit_code_for_error`, because the merged
+   error-code table maps `NOT_IMPLEMENTED` only once servers plan T19a adds it. Decision (B-536): the
    command line builds `files`, because only it holds the file's path at `run` and at `resume`. Decision (B-536): a
    model file is written in `--input` as its absolute path, not as a `harness.file_input/1` reference, because a
    reference holds only the base name, hash and size, from which no component can find the file, while the path is
@@ -839,7 +845,7 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
     builder takes the run folder as a callable that reads the cell (and raises while it is empty), and its real
     default is bound with that fill (plan T18b).
   `Engine.start` takes the run id chosen by the caller (Q20 answer A, decided by amendment B-471; engine §4.5.1, AC70),
-  so the cell is filled for `run` as for `resume` before step 1 builds anything.
+  so the cell is filled for `run` as for `resume` before any port is built (end of step 2, amendment B-536).
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -1008,6 +1014,8 @@ heartbeat task runs on the engine loop.
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
+| AC67, AC68 (amendment B-536) | Fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/workflow/` |
+| AC69 (amendment B-536) | Unit | `tests/unit/cli/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
