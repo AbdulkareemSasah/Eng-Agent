@@ -8,9 +8,10 @@ from eng_harness.calc import CalcDef
 from eng_harness.calcs.edit_cycle.analysis_summary import analysis_summary
 from eng_harness.calcs.edit_cycle.change_set_check import change_set_check
 from eng_harness.calcs.edit_cycle.expected_effects import expected_effects
+from eng_harness.calcs.edit_cycle.host_design_verdicts import host_design_verdicts
 from eng_harness.kinds.edit_cycle import EDIT_CYCLE_KINDS
 
-EDIT_CYCLE_CALCS: tuple[CalcDef, ...] = (change_set_check, expected_effects, analysis_summary)
+EDIT_CYCLE_CALCS: tuple[CalcDef, ...] = (change_set_check, expected_effects, analysis_summary, host_design_verdicts)
 """The shipped edit-cycle calcs, in registration order."""
 
 __all__ = ["EDIT_CYCLE_CALCS", "EDIT_CYCLE_KINDS"]

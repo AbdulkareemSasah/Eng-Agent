@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
+from pydantic import ValidationError
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
@@ -352,3 +353,33 @@ def test_both_verdict_kinds_give_the_same_trace() -> None:
     _run({"verdicts": _set(*verdicts)}, trace=set_trace)
     built = [t.build(REGISTRY[CALC_ID], "ab" * 32) for t in (host_trace, set_trace)]
     assert built[0] == built[1]
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda p: p.pop("calc"),
+        lambda p: p.pop("trace"),
+        lambda p: p["counts"].update(PASS=9),
+        lambda p: p.update(unknown=1),
+    ],
+    ids=["no calc", "no trace", "counts", "extra member"],
+)
+def test_a_verdicts_payload_must_fit_one_of_its_kinds(mutate: Any) -> None:
+    """Each model forbids the other's extra members: a host payload that lacks a member or breaks a rule is refused."""
+    input_type = REGISTRY[CALC_ID].input_type
+    assert isinstance(input_type, type)
+    assert issubclass(input_type, CalcInput)
+    payload = _host(*_mixed())
+    mutate(payload)
+    with pytest.raises(ValidationError):
+        input_type.model_validate({"basis": _basis(), "verdicts": payload})
+
+
+def test_a_verdict_set_with_the_calc_ports_members_is_not_a_verdict_set() -> None:
+    """A `verdicts.set/1` payload that carries `calc` is refused (the kinds' members are not mixed)."""
+    input_type = REGISTRY[CALC_ID].input_type
+    assert isinstance(input_type, type)
+    assert issubclass(input_type, CalcInput)
+    with pytest.raises(ValidationError):
+        input_type.model_validate({"basis": _basis(), "verdicts": _set(*_mixed()) | {"calc": _host()["calc"]}})
