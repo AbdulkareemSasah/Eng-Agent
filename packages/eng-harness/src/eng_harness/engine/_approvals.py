@@ -43,14 +43,15 @@ def request_id(run_id: str, path: str) -> str:
 
 @dataclass
 class _Grant:
-    """What an answered approval authorizes; `next` is, per model, the revision the next write must find."""
+    """What an answered approval authorizes; `next` is, per model, the state the next step must find."""
 
     path: str
     approved: bool
     items: frozenset[str]
     rejected: frozenset[str]
     binding: dict[str, ModelBinding]
-    next: dict[str, int | None] = field(default_factory=dict)  # no entry: no write yet; `None`: revision unknown
+    next: dict[str, tuple[int | None, str | None, str | None]] = field(default_factory=dict)
+    """Revision, fingerprint, file hash. No entry: no write yet. Revision `None`: unknown; others: not compared."""
     expired: bool = False
 
 
@@ -167,6 +168,12 @@ class Approvals:
             item_reasons=dict(answer.item_reasons), reason=answer.reason,
         )  # fmt: skip
 
+    def engineer_approved(self, under: Approval, item: str | None) -> bool:
+        """True when `under` was resolved by an engineer, is approved and accepts `item`: an always-ask step is then
+        covered; a mode never covers one (spec 4.7, EC3)."""
+        answer = self._answers.get(under.request_id)
+        return answer is not None and answer.by.startswith("engineer:") and (item is None or under.accepts(item))
+
     async def authorize(self, under: Approval | None, item: str | None, key: str | None, *, write: bool) -> None:
         """Before a tool step passed `under=` and `item=`: refuse it unless the approval covers it (AC55, AC56).
 
@@ -201,7 +208,13 @@ class Approvals:
         step before left for the next."""
         bound, state = grant.binding[key], await self._state(key)
         if key in grant.next:
-            same = state is not None and state.revision == grant.next[key]
+            revision, fingerprint, file = grant.next[key]
+            same = state is not None and state.revision == revision
+            same = (
+                same
+                and fingerprint in (None, state and state.fingerprint)
+                and file in (None, state and state.file_sha256)
+            )
         else:
             same = state is not None and (state.revision, state.fingerprint, state.file_sha256) == (
                 bound.revision, bound.fingerprint, bound.file_sha256
@@ -209,8 +222,9 @@ class Approvals:
         if not same or state is None or state.model_id != bound.model_id:
             raise errors.ApprovalVoid(f"model {key} changed since approval {rid} was shown", evidence=[rid])
 
-    def stepped(self, under: str | None, key: str | None, ref: str) -> None:
-        """A write under `under` produced the stored result `ref`: the next write must find its revision."""
+    def stepped(self, under: str | None, key: str | None, ref: str, saved: ev.ModelSaved | None = None) -> None:
+        """A write under `under` produced the stored result `ref`: the next step must find its revision or, after a tool
+        save, the revision, fingerprint and file hash of its `model_saved` (spec 4.9, EC5)."""
         if under is None or key is None or (grant := self._grants.get(under)) is None:
             return
         try:
@@ -219,7 +233,9 @@ class Approvals:
             if exc.detail.code is not ErrorCode.REF_NOT_FOUND:
                 raise
             host = None
-        grant.next[key] = None if host is None else host.model_revision
+        grant.next[key] = (None if host is None else host.model_revision, None, None)
+        if saved is not None:
+            grant.next[key] = (saved.revision, saved.fingerprint, saved.file_sha256)
 
     def expire(self, model: str) -> None:
         """The first check of `model` ends every approval bound to it."""
