@@ -190,6 +190,10 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
       - "packages/eng-harness/src/eng_harness/ctx.py"  # BasisView.record_ref(), engine §4.3.2 (amendment B-511)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
+      # Amendment (B-535, documents only): a writer's trial (gate pass with exactly this file set, 259 counted lines).
+      # Engine 4.6 makes a tool save without provenance.host a ModelIntegrityError, so the save_s tool of two existing
+      # tests must name its revision (3 lines added, 1 changed, no expectation changed).
+      - "packages/eng-harness/tests/workflow/test_modes.py"
     # Amendment (B-415 review fix, documents only): block.py exposes FieldSpec through a TYPE_CHECKING import and a
     # module-level __getattr__, and imports check_declaration inside workflow(); a module-level import of
     # eng_harness.basis._fields is an import cycle (engine §4.1.2, amendment B-511). The gate also runs
