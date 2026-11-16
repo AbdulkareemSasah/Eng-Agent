@@ -1,0 +1,79 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.4 (analysis summary), gap EC-G3, synthetic fixture",
+  "method_ref": "\u00a74.4.4 every message is unclassified until the local test (gap EC-G3)",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. Four message rows, three of them carry a column named like a severity (Error, Warning, Info). The severity column of the Analysis Messages table is not confirmed (gap EC-G3), so no row is classified: unclassified 4, error 0, warning 0, info 0, has_errors false, has_unclassified true. One drift row S1 EQY 0.003 in Y under the limit 0.01. Unclassified messages give NEEDS_ENGINEER.",
+  "input": {
+    "messages": {
+      "rows": [
+        {
+          "Message Type": "Error",
+          "Message Text": "synthetic row one"
+        },
+        {
+          "Message Type": "Warning",
+          "Message Text": "synthetic row two"
+        },
+        {
+          "Message Type": "Info",
+          "Message Text": "synthetic row three"
+        },
+        {
+          "Message Text": "synthetic row four without a type"
+        }
+      ]
+    },
+    "drifts": {
+      "rows": [
+        {
+          "story": "S1",
+          "case": {
+            "case": "EQY",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "Y",
+          "drift_ratio": 0.003
+        }
+      ]
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.drift_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "messages": "res_00000000000000000000000001",
+    "drifts": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "status": "NEEDS_ENGINEER",
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0,
+      "unclassified": 4
+    },
+    "has_errors": false,
+    "has_unclassified": true,
+    "limit_ratio": 0.01,
+    "limit_ref": "res_00000000000000000000000003#/fields/limits.drift_ratio",
+    "governing_drift": {
+      "Y": {
+        "story": "S1",
+        "case": "EQY",
+        "ratio": 0.003
+      }
+    },
+    "exceeding": []
+  }
+}
