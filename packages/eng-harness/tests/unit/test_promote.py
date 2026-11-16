@@ -125,11 +125,9 @@ def test_conflict_when_the_original_changed(tmp_path: Path, monkeypatch: pytest.
     original, copy = give_files(rig, monkeypatch, tmp_path, "m1", ORIGINAL, ACCEPTED)
     stored_writes(rig, monkeypatch)
 
-    def edit_original() -> None:
-        original.write_bytes(b"edited by hand")
-
-    workflow, seen = promoting(rig, between=edit_original)
+    workflow, seen = promoting(rig)
     engine, run_id = approved(rig, workflow)
+    original.write_bytes(b"edited by hand")  # between the approval and the promotion, outside block code
     assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
     (refused,) = seen
     assert isinstance(refused, ContractError)
