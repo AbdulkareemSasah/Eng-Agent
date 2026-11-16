@@ -14,7 +14,7 @@ error; the engine's stops and cancellation pass through.
 import asyncio
 import hashlib
 import math
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractContextManager
 from datetime import datetime, timedelta
 from functools import partial
@@ -26,6 +26,7 @@ from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from eng_harness.decisions._batch import batch_id, bounded, refusal, restored, stored
 from eng_harness.decisions._labels import LabeledExample, LabelStore, PendingRecord
 from eng_harness.decisions._points import PointRegistry, Refs, check_state_size
 from eng_harness.decisions._policy import DecisionSettings
@@ -47,6 +48,7 @@ from eng_harness.decisions.interfaces import (
     LLMProvider,
     ProviderError,
     ProviderErrorCode,
+    ProviderFailure,
     ProviderInfo,
     ProviderRequest,
 )
@@ -128,6 +130,12 @@ def _failure(error: Exception) -> tuple[Literal["timeout", "error"], str]:
     return ("timeout" if isinstance(error, TimeoutError) else "error"), type(error).__name__
 
 
+def _failed(tier: Literal[2, 3], info: ProviderInfo, error: Exception, shadow: bool, latency: int) -> Suggestion:
+    """The entry of a provider call that failed (AC22)."""
+    outcome, name = _failure(error)
+    return _suggestion(tier, info, outcome, shadow, error=name, latency_ms=latency)
+
+
 def _reasoning(raw: object) -> str | None:
     """The rationale when it is a ``Rationale`` (no digit), else ``None``."""
     try:
@@ -164,6 +172,11 @@ def _llm_entry(
     return _suggestion(
         3, info, "shadow" if shadow else "accepted", shadow, choice=choice, rationale=reasoning, latency_ms=latency
     )
+
+
+def _sha(call: DecisionCall) -> str:
+    """The hash of the call's state, as recorded in the answer and the label."""
+    return payload_sha256(call.state.model_dump(mode="json"))
 
 
 def _values(call: DecisionCall) -> tuple[str, ...]:
@@ -210,16 +223,18 @@ class Cascade:
         rule_guard: Callable[[], AbstractContextManager[object]],
         model: DecisionProvider | None = None,
         llm: LLMProvider | None = None,
+        max_concurrent_decisions: int = 4,
     ) -> None:
         """Build the cascade.
 
         ``monotonic`` reads seconds; ``rule_guard`` is the factory of the context manager that rules run in (the
         engine supplies its audit-hook guard, unit tests a no-op); ``clock`` stamps the closing of a request;
-        ``model`` (tier 2) and ``llm`` (tier 3) are the providers, both ``None`` in phase 1.
+        ``model`` (tier 2) and ``llm`` (tier 3) are the providers, both ``None`` in phase 1;
+        ``max_concurrent_decisions`` bounds the single provider calls of ``decide_many`` (the engine's setting).
         """
         self._points, self._settings, self._labels = points, settings, labels
         self._clock, self._monotonic, self._guard = clock, monotonic, rule_guard
-        self._model, self._llm = model, llm
+        self._model, self._llm, self._limit = model, llm, max_concurrent_decisions
 
     async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
         """Decide one call: the first matching rule, else an accepted provider answer, else the engineer.
@@ -234,20 +249,24 @@ class Cascade:
         started = self._monotonic()
         self._validate(call)
         values = _values(call)
-        sha = payload_sha256(call.state.model_dump(mode="json"))
+        sha = _sha(call)
         pending = self._labels.get_pending(call.request_id)
         if pending is not None and pending.closed_at is not None and (given := self._recorded(call, pending)):
             return given
         if pending is None and (by_rule := self._rules(call, values, sha, started)) is not None:
             return by_rule
-        state = outgoing_state(call.state)
-        sent = _Outgoing(state, check_state(state, (*self._settings.sensitive_values, *call.sensitive_values)))
+        sent = self._outgoing(call)
         tried: tuple[Suggestion, ...] = ()
         if pending is None and call.engineer_choice is None and not call.policy.require_engineer:
             tried = await self._providers(call, values, sent)
             if (by_provider := self._by_provider(tried, values, sha, started)) is not None:
                 return by_provider
         return self._engineer(call, values, sha, pending, started, tried, sent)
+
+    def _outgoing(self, call: DecisionCall) -> _Outgoing:
+        """The state that may leave the machine and the redaction findings over the settings' and the call's values."""
+        state = outgoing_state(call.state)
+        return _Outgoing(state, check_state(state, (*self._settings.sensitive_values, *call.sensitive_values)))
 
     def _validate(self, call: DecisionCall) -> None:
         """AC5: the point is registered as given, options and state fit it and the state is not too large."""
@@ -349,6 +368,16 @@ class Cascade:
             tiers.append(_Tier(3, llm.info, partial(_reason, llm), policy.timeout_ms_llm))
         return tiers
 
+    def _request(self, call: DecisionCall, values: tuple[str, ...], sent: _Outgoing) -> ProviderRequest:
+        """The only data a provider receives for ``call``."""
+        return ProviderRequest(
+            request_id=call.request_id,
+            point=call.point.name,
+            point_version=call.point.version,
+            options=self._options(call, values),
+            state=sent.state,
+        )
+
     async def _providers(self, call: DecisionCall, values: tuple[str, ...], sent: _Outgoing) -> tuple[Suggestion, ...]:
         """Tiers 2 and 3 (spec 4.5 step 5): the entries in tier order, the last one accepted when a provider decided.
 
@@ -356,13 +385,7 @@ class Cascade:
         tier 3 only when tier 2 is not accepted.
         """
         shadow = self._shadowed(call)
-        request = ProviderRequest(
-            request_id=call.request_id,
-            point=call.point.name,
-            point_version=call.point.version,
-            options=self._options(call, values),
-            state=sent.state,
-        )
+        request = self._request(call, values, sent)
 
         def ask(tier: _Tier) -> Awaitable[Suggestion]:
             return self._tier(tier, request, values, sent, shadow, call.policy.min_confidence)
@@ -376,6 +399,14 @@ class Cascade:
                 break
         return tuple(entries)
 
+    def _skipped(self, tier: _Tier, sent: _Outgoing, shadow: bool) -> Suggestion | None:
+        """The entry of a provider that is not called: not local under ``local_only``, or a failing state."""
+        if self._settings.local_only and not tier.info.is_local:
+            return _suggestion(tier.number, tier.info, "skipped_local_only", shadow)
+        if sent.findings:
+            return _suggestion(tier.number, tier.info, "skipped_redaction", shadow)
+        return None
+
     async def _tier(
         self,
         tier: _Tier,
@@ -386,17 +417,14 @@ class Cascade:
         minimum: float,
     ) -> Suggestion:
         """One provider call as an entry: a skip (AC26, AC33), a failure (AC22) or a judged answer."""
-        if self._settings.local_only and not tier.info.is_local:
-            return _suggestion(tier.number, tier.info, "skipped_local_only", shadow)
-        if sent.findings:
-            return _suggestion(tier.number, tier.info, "skipped_redaction", shadow)
+        if (skipped := self._skipped(tier, sent, shadow)) is not None:
+            return skipped
         began = self._monotonic()
         try:
             async with asyncio.timeout(tier.timeout_ms / 1000):
                 choice, extra = await tier.ask(request)
         except Exception as error:
-            outcome, name = _failure(error)
-            return _suggestion(tier.number, tier.info, outcome, shadow, error=name, latency_ms=self._elapsed_ms(began))
+            return _failed(tier.number, tier.info, error, shadow, self._elapsed_ms(began))
         latency = self._elapsed_ms(began)
         if tier.number == 2:
             return _model_entry(tier.info, choice, extra, values, shadow, minimum, latency)
@@ -461,3 +489,148 @@ class Cascade:
             choice=label.label, decided_by=f"engineer:{label.engineer}", latency_ms=latency, options=label.options,
             state_sha256=label.state_sha256, suggestions=label.suggestions,
         )  # fmt: skip
+
+    async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
+        """Decide the calls of one step (spec 4.8): rules for each call, then the providers, then one screen.
+
+        The unresolved calls share one batch id and one screen, which each stored request keeps with the outcomes of
+        the resolved calls, so a repeated call returns them and asks no provider again (AC29). The engineer's choices
+        are taken for all open requests of the batch or for none (AC28). The result has one entry per call, in order.
+
+        Raises:
+            BlockRuleViolation: a call does not fit its point (AC5); nothing has been evaluated or stored.
+            DecisionInvalid: a rule returned an invalid result or raised (AC15).
+            StoreWriteError: the label or pending write failed.
+        """
+        for call in calls:
+            self._validate(call)
+        rows = {c.request_id: row for c in calls if (row := self._labels.get_pending(c.request_id)) is not None}
+        if rows or any(c.engineer_choice is not None for c in calls):
+            return await self._again(calls, rows)
+        return await self._fresh(calls)
+
+    async def _fresh(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
+        """The first run of a batch: tier 1 for each call, tiers 2 and 3 for the rest, then one screen (AC27, AC28)."""
+        started, answers = self._monotonic(), {}
+        for call in calls:
+            if (by_rule := self._rules(call, _values(call), _sha(call), started)) is not None:
+                answers[call.request_id] = by_rule
+        todo = [c for c in calls if c.request_id not in answers]
+        sents = {c.request_id: self._outgoing(c) for c in todo}
+        tried = await self._providers_many([c for c in todo if not c.policy.require_engineer], sents)
+        for call in todo:
+            entries = tried.get(call.request_id, ())
+            if (by_provider := self._by_provider(entries, _values(call), _sha(call), started)) is not None:
+                answers[call.request_id] = by_provider
+        open_calls = [c for c in todo if c.request_id not in answers]
+        if not open_calls:
+            return [answers[c.request_id] for c in calls]
+        batch = batch_id(c.request_id for c in open_calls)
+        shown = (self._screen(c, _values(c), tried.get(c.request_id, ())).items[0] for c in open_calls)
+        screen = DecisionScreen(items=tuple(shown))
+        for call in open_calls:
+            self._labels.open_pending(call.request_id, batch, screen, stored(answers))
+        return [
+            answers[c.request_id]
+            if c.request_id in answers
+            else PendingAnswer(request_id=c.request_id, batch_id=batch, screen=screen)
+            for c in calls
+        ]
+
+    async def _again(
+        self, calls: Sequence[DecisionCall], rows: Mapping[str, PendingRecord]
+    ) -> list[DecisionAnswer | PendingAnswer]:
+        """A repeated batch or the engineer's choices: stored outcomes come back, the choices count all or none."""
+        known = restored(next(iter(rows.values())).outcomes) if rows else {}
+        screened = {i.request_id for row in rows.values() if row.closed_at is None for i in row.screen.items}
+        expected = {request_id for request_id in screened if self._is_open(request_id)}
+        given = {c.request_id: c.engineer_choice.choice for c in calls if c.engineer_choice is not None}
+        why = refusal(expected, given, {c.request_id: _values(c) for c in calls})
+        answers: list[DecisionAnswer | PendingAnswer] = []
+        for call in calls:
+            row = rows.get(call.request_id)
+            if row is None and call.request_id in known:
+                answers.append(known[call.request_id])
+            elif why is not None and row is not None and row.closed_at is None:
+                answers.append(
+                    PendingAnswer(request_id=call.request_id, batch_id=row.batch_id, screen=row.screen, rejected=why)
+                )
+            else:
+                answers.append(await self.decide(call))
+        return answers
+
+    def _is_open(self, request_id: str) -> bool:
+        """Whether the request is stored and not yet answered."""
+        row = self._labels.get_pending(request_id)
+        return row is not None and row.closed_at is None
+
+    async def _providers_many(
+        self, calls: Sequence[DecisionCall], sents: Mapping[str, _Outgoing]
+    ) -> dict[str, tuple[Suggestion, ...]]:
+        """Tiers 2 and 3 over many calls: each call gets the entries ``_providers`` would give it alone."""
+        shadowed = [c for c in calls if self._shadowed(c)]
+        two, three = await asyncio.gather(self._tier_many(2, calls, sents), self._tier_many(3, shadowed, sents))
+        later = [
+            c
+            for c in calls
+            if not self._shadowed(c) and (c.request_id not in two or two[c.request_id].outcome != "accepted")
+        ]
+        three |= await self._tier_many(3, later, sents)
+        return {
+            c.request_id: tuple(e for e in (two.get(c.request_id), three.get(c.request_id)) if e is not None)
+            for c in calls
+        }
+
+    async def _tier_many(
+        self, number: Literal[2, 3], calls: Sequence[DecisionCall], sents: Mapping[str, _Outgoing]
+    ) -> dict[str, Suggestion]:
+        """One tier over many calls: the skips, then one ``batch`` request or bounded single calls."""
+        found: dict[str, Suggestion] = {}
+        batched: list[DecisionCall] = []
+        singles: list[DecisionCall] = []
+        jobs: list[Callable[[], Awaitable[Suggestion]]] = []
+        via: DecisionProvider | None = None
+        for call in calls:
+            tier = next((t for t in self._tiers(call) if t.number == number), None)
+            if tier is None:
+                continue
+            sent, shadow, values = sents[call.request_id], self._shadowed(call), _values(call)
+            if (skipped := self._skipped(tier, sent, shadow)) is not None:
+                found[call.request_id] = skipped
+            elif number == 2 and (via := self._model) is not None and via.info.supports_batch and not call.point.yes_no:
+                batched.append(call)
+            else:
+                singles.append(call)
+                request = self._request(call, values, sent)
+                jobs.append(partial(self._tier, tier, request, values, sent, shadow, call.policy.min_confidence))
+        if batched and via is not None:
+            found |= await self._batched(via, batched, sents)
+        for call, entry in zip(singles, await bounded(self._limit, jobs), strict=True):
+            found[call.request_id] = entry
+        return found
+
+    async def _batched(
+        self, model: DecisionProvider, calls: Sequence[DecisionCall], sents: Mapping[str, _Outgoing]
+    ) -> dict[str, Suggestion]:
+        """Tier 2 for ``calls`` in one ``batch`` request: a failed request is its own entry, a failed batch all."""
+        began = self._monotonic()
+        requests = [self._request(c, _values(c), sents[c.request_id]) for c in calls]
+        try:
+            async with asyncio.timeout(max(c.policy.timeout_ms_model for c in calls) / 1000):
+                got = await model.batch(requests)
+            if len(got) != len(calls):
+                raise ProviderError(ProviderErrorCode.BAD_RESPONSE)
+        except Exception as error:
+            latency = self._elapsed_ms(began)
+            return {c.request_id: _failed(2, model.info, error, self._shadowed(c), latency) for c in calls}
+        latency, entries = self._elapsed_ms(began), {}
+        for call, answer in zip(calls, got, strict=True):
+            shadow = self._shadowed(call)
+            if isinstance(answer, ProviderFailure):
+                entries[call.request_id] = _failed(2, model.info, ProviderError(answer.code), shadow, latency)
+            else:
+                minimum, values = call.policy.min_confidence, _values(call)
+                entries[call.request_id] = _model_entry(
+                    model.info, answer.choice, answer.confidence, values, shadow, minimum, latency
+                )
+        return entries

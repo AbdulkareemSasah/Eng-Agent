@@ -141,6 +141,20 @@ class AdapterHostPort:
         """Mark an adapter write: the next fingerprint change of `model_key` is the adapter's, not an outside edit."""
         self._written.add(model_key)
 
+    def reopened(self, model_key: str, path: Path) -> None:
+        """Bind `model_key` to `path`, the file the bound instance now has open (spec 0007 4.10: `csi_open_revision`).
+
+        The binding keeps its model id and the file is recorded as its next revision (spec 0007 Q16 is open). The last
+        state read is dropped, so the next `model_state` is a new baseline. `ContractError` `NOT_FOUND`: no such key.
+        """
+        self._file(model_key)
+        resolved = path.resolve()
+        self._files[model_key] = resolved
+        self._identity.record_save(self._models[model_key], resolved)
+        self._reads.pop(model_key, None)
+        self._written.discard(model_key)
+        self._persist()
+
     def take_warnings(self) -> list[tuple[str, WarningCode]]:
         """The `MODEL_CHANGED_OUTSIDE` warnings (model key, code) noted by `model_state` since the last call."""
         taken, self._warnings = self._warnings, []
