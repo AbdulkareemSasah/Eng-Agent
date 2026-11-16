@@ -30,6 +30,7 @@ from eng_harness.block import Registry, WorkflowDef
 from eng_harness.ctx import BasisView
 from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
+from eng_harness.engine._guard import block_code
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
@@ -344,7 +345,8 @@ class Engine:
         ctx.index = _inflight.ResumeIndex(events)
         try:
             with root_scope():
-                out = await workflow.fn(ctx, inp)
+                with block_code():  # the root block is block code, spec 4.3.4
+                    out = await workflow.fn(ctx, inp)
                 await ctx.finish()  # ~end checks for models the root block left dirty (spec 4.6 #1)
             if not isinstance(out, workflow.output_model):
                 wanted = workflow.output_model.__name__
