@@ -242,6 +242,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
       - "packages/eng-harness/tests/rules/test_edit_cycle.py"
+      - "packages/eng-harness/tests/contract/test_rule_lock.py"  # skips its lock comparison under the mutation step (MUTANT_UNDER_TEST), because rules/edit_cycle.py is an R1 module and the mutated copy no longer matches rules.lock.json (amendment B-542)
+      - "packages/eng-harness/tests/rules/test_block_modules.py"  # does not judge the mutmut import in the mutation step's copy of rules/edit_cycle.py, only under MUTANT_UNDER_TEST (amendment B-542)
+      - ".gate/ratchet.json"  # eng-harness skip count 4 -> 5 for the lock-test skip (amendment B-542)
       - "packages/eng-harness/tests/unit/decisions/test_points.py"  # isolates the two phase-1 discovery tests from the shipped points (amendment B-417)
       - "packages/eng-harness/tests/unit/decisions/test_rules.py"  # isolates two phase-1 discovery tests from the shipped rules and points (amendment B-417)
     max_changed_lines: 260
@@ -254,11 +257,13 @@ tasks:
     covers: [AC18]
     # Amendment (B-511, documents only): after T15, without which FB005 refuses the version=1 of every point and rule
     # (T8 and T9a, T9b follow through T7).
+    # Amendment (B-542, documents only): tests/contract/test_rule_lock.py, tests/rules/test_block_modules.py and .gate/ratchet.json join the files; trial: the mutation baseline passes with exactly these (see T7 prose).
     depends_on: [T1b, T15]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap); T9b since the split (B-511).
     # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) as a cross-plan dependency.
+    # Amendment (B-536, documents only): EditCycleInput.model is the absolute pathlib.Path of the model file, and step 2 passes its base name as the model key (spec 4.2, 4.5; spec 0006 4.2.2 step 2); a type change, files and budget unchanged.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -640,6 +645,12 @@ both tests the same way, keeping their expectations: the first monkeypatches `im
 `_points.discover` and `_rules.discover` to return empty registries before the first write and still expects both
 locks empty. That the real discovery finds the three points and the two rules is checked by
 `tests/contract/test_decision_lock.py` and `tests/contract/test_rule_lock.py` against the regenerated locks.
+Amendment (B-542): `rules/edit_cycle.py` is in `r1_modules` of `pyproject.toml` (that entry is already in the files), so the
+mutation step rewrites it in its copy of the package: the hash no longer matches `rules.lock.json` and mutmut inserts
+`from mutmut.mutation.trampoline import ...`. Two tests tolerate that copy, only when `MUTANT_UNDER_TEST` is set:
+`tests/contract/test_rule_lock.py` skips its lock comparison (spec 0005 AC10) and `tests/rules/test_block_modules.py`
+does not judge the mutmut import (spec 0001 AC19). The skip raises the eng-harness skip count in `.gate/ratchet.json`
+from 4 to 5. No other test and no budget changes.
 
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the
@@ -690,7 +701,8 @@ the journal holds edit-cycle steps, so the existing report snapshots stay unchan
 list. `audit_value_sources` takes `engineering_params` (tool name to parameter names, spec §4.9, AC25); its tests pass
 it explicitly (a forged literal at a listed parameter is reported, a literal at an unlisted one is not).
 Amendment (B-533): `edit_cycle_timings(reader, store=None)` takes the optional store for the `benchmark_request` label
-(spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006).
+(spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006 T16,
+which exports both functions from `report/__init__.py`; amendment B-536).
 
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the

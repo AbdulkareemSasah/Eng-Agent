@@ -1,0 +1,73 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.4 (analysis summary), gap EC-G3, synthetic fixture",
+  "method_ref": "\u00a74.4.4 no message and every drift at or below the limit is PASS",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. No analysis message: every severity count is 0, so has_errors and has_unclassified are false. Drift rows in X: S1 0.004 and S2 0.01; limit 0.01. Governing X is the highest ratio, S2 EQX 0.01. A ratio equal to the limit does not exceed it (strictly above), so exceeding is empty. No row in Y: no Y entry. No error, no unclassified message and no exceeding story give PASS.",
+  "input": {
+    "messages": {
+      "rows": []
+    },
+    "drifts": {
+      "rows": [
+        {
+          "story": "S1",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.004
+        },
+        {
+          "story": "S2",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.01
+        }
+      ]
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.drift_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "messages": "res_00000000000000000000000001",
+    "drifts": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "status": "PASS",
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0,
+      "unclassified": 0
+    },
+    "has_errors": false,
+    "has_unclassified": false,
+    "limit_ratio": 0.01,
+    "limit_ref": "res_00000000000000000000000003#/fields/limits.drift_ratio",
+    "governing_drift": {
+      "X": {
+        "story": "S2",
+        "case": "EQX",
+        "ratio": 0.01
+      }
+    },
+    "exceeding": []
+  }
+}
