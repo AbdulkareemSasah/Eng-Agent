@@ -1,8 +1,11 @@
 """Block and rule module rules (plan 0001 T17; spec 0001 4.1.2, AC19): imports, `.value`, arithmetic, loops, excepts."""
 
 import ast
+import os
 import tomllib
 from pathlib import Path
+
+import pytest
 
 import eng_harness.errors as errors_module
 
@@ -40,6 +43,16 @@ ALLOWED_NAMES = {
 ARITHMETIC = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.MatMult)
 
 
+def _mutation_import(node: ast.Import | ast.ImportFrom) -> bool:
+    """The import mutmut inserts so a rewritten module can select the active mutant (B-542); only under mutation."""
+    if "MUTANT_UNDER_TEST" not in os.environ:
+        return False
+    if isinstance(node, ast.Import):
+        return all(alias.name == "mutmut" or alias.name.startswith("mutmut.") for alias in node.names)
+    module = node.module or ""
+    return module == "mutmut" or module.startswith("mutmut.")
+
+
 def _module_ok(name: str) -> bool:
     return any(name == allowed or name.startswith(allowed + ".") for allowed in ALLOWED_MODULES)
 
@@ -69,6 +82,8 @@ def check_source(source: str) -> list[str]:
     found: list[tuple[int, str]] = []
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import | ast.ImportFrom):
+            if _mutation_import(node):
+                continue
             found += [(int(p.partition(":")[0]), p) for p in _import_problems(node)]
         elif isinstance(node, ast.Attribute) and node.attr == "value" and isinstance(node.ctx, ast.Load):
             found.append((node.lineno, f"{node.lineno}: read of the attribute value"))
@@ -173,6 +188,18 @@ def test_rules_detect_violations() -> None:
         "25: arithmetic operator Sub",
     ]  # line 3 passes: `import eng_harness.ctx` is allowed; line 23 names BaseException in a tuple
     assert check_source(CLEAN) == []  # the `|` of a union is not arithmetic; allowed names and modules pass
+
+
+def test_mutation_runner_import_is_judged_only_under_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = "from mutmut.mutation.trampoline import wrap_in_trampoline\nimport mutmut\nimport os\n"
+    monkeypatch.delenv("MUTANT_UNDER_TEST", raising=False)
+    assert check_source(source) == [
+        "1: import from mutmut.mutation.trampoline",
+        "2: import of mutmut",
+        "3: import of os",
+    ]
+    monkeypatch.setenv("MUTANT_UNDER_TEST", "x")
+    assert check_source(source) == ["3: import of os"]  # only what mutmut inserts is tolerated
 
 
 def test_module_discovery(tmp_path: Path) -> None:
