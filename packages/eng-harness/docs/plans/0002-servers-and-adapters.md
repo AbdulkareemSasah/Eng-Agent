@@ -867,7 +867,8 @@ provider that opens `JournalReader(run_dir)`, takes the `basis_ref` of `run_star
 `StoreBasisPort(store)` and answers the number at `checks.readback_relative_tolerance_ratio`; it answers `None` while
 the journal or header is missing (`JournalIntegrityError`), the basis does not load (`BasisInvalid`) or the field is
 absent or holds no number. `CsiReconciler` takes the same provider as a keyword `tolerance` beside its fixed
-`tolerance_ratio` and asks it the same way (`csi/_reconcile.py`, amendment B-530). This changes no engine port and needs nothing from the command line: `Engine.start` writes
+`tolerance_ratio` and asks it the same way (`csi/_reconcile.py`, amendment B-530). This changes no engine port and
+needs nothing from the command line: `Engine.start` writes
 the header before any step, and a resume keeps it (spec §4.5.8, spec 0006 §4.2.2).
 `test_build_ports.py::test_readback_tolerance_from_run_basis` writes a quantity through the built ports in a run
 whose basis holds the field and checks the comparison within it, then resumes the run in a new engine with new ports
@@ -878,7 +879,8 @@ and checks it again, and with a basis without the field checks `READBACK_UNAVAIL
 `self.supports_reconcile(tool)` holds (so not the saves and opens of `_UNRECONCILED`), takes `read_back(tool, args)`
 before the ledger entry and sets the binding's `pre_image_ref` to `<result_id>#/value/observed` of that stored read;
 none when the read-back answers `None` (analysis, design) or the tool is not reconciled, so the ledger entry carries
-it only then (amendment B-530). `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as `harness.run_output/1`, takes the
+it only then (amendment B-530). `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as
+`harness.run_output/1`, takes the
 pre-image as above, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the
 two stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no
 write is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with
@@ -933,7 +935,8 @@ calc hash changes here; once plan 0007 T4's calcs import it, it enters their `mo
   replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
   T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
-  T19a also waits for T19c (amendment B-530) and T21, and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5 (`Revisions`, the revision
+  T19a also waits for T19c (amendment B-530) and T21, and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
+  (`Revisions`, the revision
   tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
   Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose
   `test_csi_read_state_tool.py` it adapts to `HARNESS_KINDS` holding `CSI_KINDS`. T19b waits for T16 and T19a. `eng-contract`
