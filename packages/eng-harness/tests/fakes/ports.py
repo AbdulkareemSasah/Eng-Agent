@@ -207,7 +207,8 @@ class FakeHost:
 
     async def check_model(self, model_key: str) -> ENVELOPE:
         """A success envelope standing for `issues.model_check/1`."""
-        return self._success("check_model")
+        clean = {"errors": 0, "warnings": 0, "infos": 0, "clean": True}
+        return self._success("check_model").model_copy(update={"summary": clean})
 
     async def save(self, model_key: str, role: str) -> SavedModel:
         """Save the model at its current revision."""
