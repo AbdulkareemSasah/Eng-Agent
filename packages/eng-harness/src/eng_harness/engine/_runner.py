@@ -360,7 +360,7 @@ class Engine:
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
             writer, events, _hostsafety.Pending(rt), leases, decider,
-            ports.approvals, head.mode, head.always_ask, rt.run_dir, limits,
+            ports.approvals, head.mode, head.always_ask, rt.run_dir, limits, workflow.copy_on_open,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:

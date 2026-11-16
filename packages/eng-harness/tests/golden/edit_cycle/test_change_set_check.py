@@ -18,6 +18,8 @@ STEMS = [
     "check-bounds-unit-scale",
     "check-conflict-engineer",
     "check-duplicate-target",
+    "check-item-id-refused-kind",
+    "check-item-id-slash",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -101,6 +103,47 @@ def test_trace_records_bounds_count_and_status() -> None:
     assert steps["status"].uses == ["errors"]
     assert steps["errors"].uses == ["items", *(path.replace(".", "_") for path in BASIS_FIELDS)]
     assert built.outputs == ["status"]
+
+
+@pytest.mark.parametrize("item_id", ["a/b", "/a", "a/", "/", "a//b"])
+def test_item_id_with_a_slash_is_refused(item_id: str) -> None:
+    """K3 and AC4: an item id that contains `/` is the error INVALID_ITEM_ID, wherever the slash is."""
+    case = _case()
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(case, items=[item])
+    assert body["issues"] == [
+        {
+            "item_id": item_id,
+            "severity": "error",
+            "code": "INVALID_ITEM_ID",
+            "detail": f"item id {item_id} contains / (spec 0007 4.4.1 K3)",
+            "gap": None,
+        }
+    ]
+    assert body["status"] == "FAIL"
+    assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
+
+
+def test_item_id_without_a_slash_is_not_refused() -> None:
+    item = {"id": "a-b.c_1\\d", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    assert run_check(_case(), items=[item])["issues"] == []
+
+
+def test_item_id_rule_changes_no_other_rule() -> None:
+    """The slash issue comes first for its item; the issues of the other rules follow as without it."""
+    case = _case()
+    items: list[dict[str, Any]] = [
+        {"id": "a/1", "kind": "frame_section", "frames": ["B1"], "section": "NOPE"},
+        {"id": "a/2", "kind": "frame_section", "frames": ["B1"], "section": "C400"},
+    ]
+    assert _issues(run_check(case, items=items)) == [
+        ("a/1", "INVALID_ITEM_ID"),
+        ("a/1", "UNKNOWN_SECTION"),
+        ("a/2", "INVALID_ITEM_ID"),
+        ("a/2", "DUPLICATE_TARGET"),
+    ]
+    ok = [item | {"id": item["id"].replace("/", "-")} for item in items]
+    assert _issues(run_check(case, items=ok)) == [("a-1", "UNKNOWN_SECTION"), ("a-2", "DUPLICATE_TARGET")]
 
 
 def test_warnings_counted_in_the_trace() -> None:
