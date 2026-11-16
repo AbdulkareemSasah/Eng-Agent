@@ -1,5 +1,6 @@
 """Decision points, state field rules, size limit and lock check (plan 0005 T2; spec 0005 AC1 to AC4, section 4.2)."""
 
+import importlib.util
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any
@@ -278,11 +279,16 @@ def test_write_lock_roundtrip_and_refusal(tmp_path: Path) -> None:
 def test_main_requires_write_lock_flag_and_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     target = tmp_path / "out.lock.json"
     monkeypatch.setattr(_points, "LOCK_PATH", target)
+    monkeypatch.setattr(_points, "discover", lambda: PointRegistry([]))
     assert main(["--write-lock"]) == 0
     assert load_lock(target) == []
     with pytest.raises(SystemExit):
         main([])
 
 
-def test_discover_is_empty_without_workflows() -> None:
+def test_discover_is_empty_without_workflows(monkeypatch: pytest.MonkeyPatch) -> None:
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name, *a: None if name == "eng_harness.workflows" else real(name, *a)
+    )
     assert discover().points == ()

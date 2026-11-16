@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "name": "edit_cycle_analysis_messages",
+    "version": 1,
+    "schema_sha256": "de2e7d03ab64e162e3709d06b29acc402f1a89d9e4f0cf447d07ed57b92f40d5"
+  },
+  {
+    "name": "edit_cycle_engineer_turn",
+    "version": 1,
+    "schema_sha256": "8b6108fd17736ed80b1eb90152ee4699f182653fecdc516a3f585cc150b92af2"
+  },
+  {
+    "name": "edit_cycle_readback_result",
+    "version": 1,
+    "schema_sha256": "3a3d99fb4b8278b2e896c69f7023c161a1b118f00d9b9326ee81a1352f7791dd"
+  }
+]
