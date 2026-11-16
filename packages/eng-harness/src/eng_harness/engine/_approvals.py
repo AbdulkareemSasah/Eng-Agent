@@ -172,7 +172,8 @@ class Approvals:
         """True when `under` was resolved by an engineer, is approved and accepts `item`: an always-ask step is then
         covered; a mode never covers one (spec 4.7, EC3)."""
         answer = self._answers.get(under.request_id)
-        return answer is not None and answer.by.startswith("engineer:") and (item is None or under.accepts(item))
+        by = "" if answer is None else answer.by
+        return under.approved and by.startswith("engineer:") and (item is None or under.accepts(item))
 
     async def authorize(self, under: Approval | None, item: str | None, key: str | None, *, write: bool) -> None:
         """Before a tool step passed `under=` and `item=`: refuse it unless the approval covers it (AC55, AC56).

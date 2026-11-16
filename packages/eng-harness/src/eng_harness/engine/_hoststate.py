@@ -117,21 +117,19 @@ async def _revision(rt: Resume, f: Fold, key: str, state: HostModelState) -> Non
     has no `model_saved` (the process stopped between the two, or it was reconciled): append it, role `revision`, from
     the check's own read `state`. A result without `provenance.host`, or a new-file save without `saved_file`, gets none
     and raises nothing (spec 4.6 "Tool saves", EC2)."""
-    last = max(f.writes(key), key=lambda s: s.seq)
+    last = max(f.writes(key), key=lambda s: s.seq, default=None)
+    if last is None or last.began.kind != "tool" or last.began.action not in ("save", "open"):
+        return  # no port call for any other step: only a save, or an open that may save to a new file, is asked about
     done = last.closing.result if isinstance(last.closing, ev.StepCompleted | ev.StepReconciled) else None
-    if (
-        done is None
-        or last.began.kind != "tool"
-        or any(e.path == last.path for e in rt.events() if isinstance(e.payload, ev.ModelSaved))
-    ):
+    if done is None or any(e.path == last.path for e in rt.events() if isinstance(e.payload, ev.ModelSaved)):
         return
     info, args = await rt.tool.describe(last.began.name), last.began.args
     new = info.saves_new_file(
         args if args is not None else cast(_Obj, rt.store.payload(last.began.args_ref or "")["value"])
     )
-    if (host := rt.store.get(done.ref).producer.host) is None or not (info.action == "save" or new):
+    if not (info.action == "save" or new) or (new and not isinstance(done.summary.get("saved_file"), dict)):
         return
-    if new and not isinstance(done.summary.get("saved_file"), dict):
+    if (host := rt.store.get(done.ref).producer.host) is None:
         return
     body = {"model_key": key, "model_id": host.model_id, "revision": host.model_revision, "role": "revision"}
     body |= state.model_dump(include={"fingerprint", "file_sha256"}) | {"file_name": rt.host.model_files(key)[0].name}
