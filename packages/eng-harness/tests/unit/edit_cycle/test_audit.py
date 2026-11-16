@@ -5,6 +5,7 @@ an unlisted one is not.
 """
 
 from pathlib import Path
+from typing import Any
 
 from eng_contract.ids import IdSource
 from eng_contract.store import ResultStore
@@ -19,7 +20,7 @@ _PARAMS = {"csi_frame_section": frozenset({"depth_mm", "width_mm"}), "csi_other"
 
 def _basis(store: ResultStore, kind: str, field: str) -> dict[str, str]:
     body = {"value": 300, "unit": "mm", "source": "template:t@1", "confirmed": True, "citation": "c"}
-    payload = {"template": {"name": "t", "version": "1", "sha256": SHA}, "fields": {field: body}}
+    payload: dict[str, Any] = {"template": {"name": "t", "version": "1", "sha256": SHA}, "fields": {field: body}}
     if kind == "basis.engineer_input/1":
         payload = {
             "step": "1",
@@ -39,7 +40,7 @@ def test_audit_finds_literal(run_dir: Path, store: ResultStore, ids: IdSource) -
     design = _basis(store, "basis.design_basis/1", "geometry.depth_mm")
     entered = _basis(store, "basis.engineer_input/1", "geometry.width_mm")
     blob = {"$ref": f"{s.base}#/value"}
-    write = {"effect": "write"}
+    write: dict[str, Any] = {"effect": "write"}
     s.step(
         "0", "tool", "csi_frame_section", 1, 10, **write, args={"model": "m", "depth_mm": design, "width_mm": entered}
     )

@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from eng_contract.envelope import Provenance
 from eng_contract.store import ResultStore
@@ -12,10 +13,10 @@ _DATA = Path(__file__).resolve().parents[2] / "data" / "kinds" / "edit_cycle"
 _CELL = re.compile(r'<td class="v"><a href="#(src-\d+)">(.*?)</a></td>')
 
 
-def _resolve(payload: object, pointer: str) -> object:
+def _resolve(payload: Any, pointer: str) -> Any:
     for token in pointer.split("/")[1:]:
         key = token.replace("~1", "/").replace("~0", "~")
-        payload = payload[int(key)] if isinstance(payload, list) else payload[key]  # type: ignore[index]
+        payload = payload[int(key)] if isinstance(payload, list) else payload[key]
     return payload
 
 

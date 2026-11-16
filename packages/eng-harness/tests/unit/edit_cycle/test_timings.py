@@ -56,8 +56,9 @@ class Script:
     def answer(self, label: str | None) -> str:
         """The stored change-set answer, carrying the optional `benchmark_request` label."""
         who = {"unit": None, "entered_by": "x", "entered_at": "2026-01-01T00:00:00.000Z"}
-        fields = {} if label is None else {"benchmark_request": {"value": label, **who}}
-        return self.store.put("basis.engineer_input/1", {"step": "1", "fields": fields}, PRODUCER).result_id
+        fields: dict[str, Any] = {} if label is None else {"benchmark_request": {"value": label, **who}}
+        body: dict[str, Any] = {"step": "1", "fields": fields}
+        return self.store.put("basis.engineer_input/1", body, PRODUCER).result_id
 
     def asked(self, rid: str, kind: str, title: str, start: float, wait: float, label: str | None = None) -> None:
         """An input request answered `wait` seconds later by the engineer."""
@@ -170,7 +171,7 @@ def test_cycle_and_turn_timings(run_dir: Path, store: ResultStore, ids: IdSource
     assert (third.cycle, third.wall_ms, third.machine_ms, third.wait_ms, third.prompts) == (3, None, 0, 0, 1)
     assert [(t.cycle, t.wait_ms) for t in timings.turns] == [(1, 30_000), (2, 10_000)]
     assert [(b.label, b.elapsed_ms, b.cycles) for b in timings.benchmarks] == [("R1", 177_000, 2)]
-    machine = [s.duration_ms for s in timings.steps if s.kind not in {"block", "ask", "approve", "decide"}]
+    machine = [s.duration_ms or 0 for s in timings.steps if s.kind not in {"block", "ask", "approve", "decide"}]
     assert sum(machine) == first.machine_ms + second.machine_ms == 12_000
     steps = [(s.path, s.kind, s.name, s.duration_ms) for s in timings.steps]
     assert steps[0] == ("1/0/0", "block", "edit_cycle_once", 120_000)

@@ -412,7 +412,7 @@ def cycle_timing_nodes(timings: CycleTimings) -> list[Node]:
     turns = [[str(t.cycle), show(t.wait_ms)] for t in timings.turns]
     marks = [[b.label, wait(b.elapsed_ms), str(b.cycles)] for b in timings.benchmarks]
     head = ("Cycle", "Path", "Wall", "Machine", "Host", "Engineer wait", "Prompts")
-    tables = [("Edit cycles", head, rows), ("Engineer turns", head[:1] + ("Wait",), turns)]
+    tables = [("Edit cycles", head, rows), ("Engineer turns", ("Cycle", "Wait"), turns)]
     tables.append(("Benchmark requests", ("Request", "Elapsed", "Cycles"), marks))
     return [
         node
