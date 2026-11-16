@@ -96,7 +96,7 @@ def _refuse(field: str, message: str) -> ContractError:
     version=1,
     output_kind="harness.analysis_summary/1",
     title="Analysis messages and story drifts of one cycle",
-    method_source="eng-harness spec 0007 §4.4.4; 18 §4 step 13",
+    method_source="eng-harness spec 0007 §4.4.4; 18 §4 step 14",
     verification="draft",
 )
 def analysis_summary(inp: SummaryInput, meta: InputMeta, trace: TraceBuilder) -> SummaryBody:
