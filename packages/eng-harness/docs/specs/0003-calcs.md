@@ -606,8 +606,8 @@ turn and the run report.
 `ref_kinds` `verdicts.set/1` and `harness.host_design_verdicts/1`; the referenced payload validates as the model of its
 kind (each model forbids the other's extra members). The summary reads only the member `verdicts`, the list of
 contract `Verdict`s that both kinds hold under that name; it reads none of `traces`, `counts`, `draft`, `calc` and
-`trace`. S1 to S6 apply to that list unchanged, so for a `verdicts.set/1` input every result, the trace included, is
-the same as before. The new input schema and the import change the content hash of the draft calc (§4.5), and its
+`trace`. S1 to S6 apply to that list unchanged, so for a `verdicts.set/1` input the body and the trace's inputs, steps and
+outputs are the same as before; only the content hash in `calc` and `trace` changes. The new input schema and the import change the content hash of the draft calc (§4.5), and its
 verification record follows; the version stays 1 (§4.2: no output changes for an input it already took).
 
 **Output kind** `harness.design_summary/1`: `status`, `counts` (per `VerdictStatus`), `governing` (one verdict row:

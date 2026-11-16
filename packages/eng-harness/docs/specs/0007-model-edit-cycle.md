@@ -234,9 +234,11 @@ defines its method; values are synthetic and say so.
 - AC29. (B-1) Given a fixture journal, when `edit_cycle_timings` runs, then it gives the measures of §4.9 and their sums
   equal the sums over the fixture events. Test: `tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings`.
 - AC30. Given synthetic host design results and analysis messages, then `harness.host_design_verdicts` and
-  `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4. Tests:
-  `tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases`,
-  `tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases`.
+  `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4, and `harness.design_summary` given a
+  `harness.host_design_verdicts/1` reference gives the body it gives for the same verdicts in a `verdicts.set/1`
+  (spec 0003 §4.9). Tests: `tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases`,
+  `tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases`,
+  `tests/unit/calcs/test_summary.py::test_host_design_verdicts_input`.
 - AC31. Given the read tool of §4.10 against the fake, then it stores the read set and the name lists; a truncated list
   raises `LIMIT_EXCEEDED`; a read-back gap leaves its section out (`not_read` downstream). Given `as_new_revision`,
   then the open working file is saved in place, its files are copied to a new snapshot file in the run's copies folder,
@@ -697,7 +699,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30, AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
 | AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
