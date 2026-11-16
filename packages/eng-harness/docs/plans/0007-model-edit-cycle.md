@@ -242,6 +242,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
       - "packages/eng-harness/src/eng_harness/rules.lock.json"
       - "packages/eng-harness/tests/rules/test_edit_cycle.py"
+      - "packages/eng-harness/tests/contract/test_rule_lock.py"  # skips its lock comparison under the mutation step (MUTANT_UNDER_TEST), because rules/edit_cycle.py is an R1 module and the mutated copy no longer matches rules.lock.json (amendment B-542)
+      - "packages/eng-harness/tests/rules/test_block_modules.py"  # does not judge the mutmut import in the mutation step's copy of rules/edit_cycle.py, only under MUTANT_UNDER_TEST (amendment B-542)
+      - ".gate/ratchet.json"  # eng-harness skip count 4 -> 5 for the lock-test skip (amendment B-542)
       - "packages/eng-harness/tests/unit/decisions/test_points.py"  # isolates the two phase-1 discovery tests from the shipped points (amendment B-417)
       - "packages/eng-harness/tests/unit/decisions/test_rules.py"  # isolates two phase-1 discovery tests from the shipped rules and points (amendment B-417)
     max_changed_lines: 260
@@ -254,6 +257,7 @@ tasks:
     covers: [AC18]
     # Amendment (B-511, documents only): after T15, without which FB005 refuses the version=1 of every point and rule
     # (T8 and T9a, T9b follow through T7).
+    # Amendment (B-542, documents only): tests/contract/test_rule_lock.py, tests/rules/test_block_modules.py and .gate/ratchet.json join the files; trial: the mutation baseline passes with exactly these (see T7 prose).
     depends_on: [T1b, T15]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
@@ -641,6 +645,12 @@ both tests the same way, keeping their expectations: the first monkeypatches `im
 `_points.discover` and `_rules.discover` to return empty registries before the first write and still expects both
 locks empty. That the real discovery finds the three points and the two rules is checked by
 `tests/contract/test_decision_lock.py` and `tests/contract/test_rule_lock.py` against the regenerated locks.
+Amendment (B-542): `rules/edit_cycle.py` is in `r1_modules` of `pyproject.toml` (that entry is already in the files), so the
+mutation step rewrites it in its copy of the package: the hash no longer matches `rules.lock.json` and mutmut inserts
+`from mutmut.mutation.trampoline import ...`. Two tests tolerate that copy, only when `MUTANT_UNDER_TEST` is set:
+`tests/contract/test_rule_lock.py` skips its lock comparison (spec 0005 AC10) and `tests/rules/test_block_modules.py`
+does not judge the mutmut import (spec 0001 AC19). The skip raises the eng-harness skip count in `.gate/ratchet.json`
+from 4 to 5. No other test and no budget changes.
 
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the
