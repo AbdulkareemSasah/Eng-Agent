@@ -1,28 +1,33 @@
 {
   "calcs": [
     {
-      "content_sha256": "fc7c7ed8e0486a0dec4951bbfb8db09dd4c671cd7756c1229de1b6f6cd5dbb7a",
+      "content_sha256": "e40ccb4d714afe0c301b0a1d995545e8c20bbaf67d4209fa49ad584a448d8a0b",
       "id": "harness.analysis_summary",
       "version": 1
     },
     {
-      "content_sha256": "a900625176c21417d54b37b8c16d7ea62e5faef306946f8b4cd9b92227889ae4",
+      "content_sha256": "7918b46459fe585dc71723eadf78987f7e5b8e496deb1ab32603eaf33fa8680b",
       "id": "harness.change_set_check",
       "version": 1
     },
     {
-      "content_sha256": "56e9d29b230f1d426ddde94d0799e0ebbe8a7c218059b1abcdf470ab3008712a",
+      "content_sha256": "1b93811f8ab8eb623f777a80ce8fa367d94464bd4ffec19724172ea2fd419ffb",
       "id": "harness.design_summary",
       "version": 1
     },
     {
-      "content_sha256": "ddacadbd047695d090e8d83e9b6efa6693d1b483f53564ca332a8112d041e277",
+      "content_sha256": "8f1e9d144e7fab54ae70b399e780725a82396e46b5b7b1ebbf176f1fca83b7ef",
       "id": "harness.expected_effects",
       "version": 1
     },
     {
       "content_sha256": "a95883b3249a9660a7cfe1e9b01ccec6c23cb218271df9a5b1d9eab274cb2e5b",
       "id": "harness.footing_subjects",
+      "version": 1
+    },
+    {
+      "content_sha256": "eccecd4304f03a881883a55c06ee2252b85ca01df5ceb853f7053c91abfec75e",
+      "id": "harness.host_design_verdicts",
       "version": 1
     },
     {
