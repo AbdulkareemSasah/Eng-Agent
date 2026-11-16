@@ -113,7 +113,7 @@ class Ctx:
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
         pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort, mode: str,
-        always_ask: Sequence[str], run_dir: Path,
+        always_ask: Sequence[str], run_dir: Path, copy_on_open: bool = False,
     ) -> None:  # fmt: skip
         """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
         pending hosts, host leases, decisions, approvals, permission mode and always-ask tools."""
@@ -121,7 +121,19 @@ class Ctx:
         self._pending, self._leases, self._decider, self._host = pending, leases, decider, host
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._modes = _modes.Modes(
-            mode, always_ask, run_dir, tools, host, store, writer, producer, leases, approvals, run_id, events
+            mode,
+            always_ask,
+            run_dir,
+            tools,
+            host,
+            store,
+            writer,
+            producer,
+            leases,
+            approvals,
+            run_id,
+            events,
+            copy_on_open,
         )
         self._approvals, self._files = self._modes.approvals, _promote.LocalFileOps()
         self._guard = _approvals.ApprovalGuard(self._approvals, host, store, writer, producer)
@@ -129,6 +141,9 @@ class Ctx:
         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
         done = [(e.path, e.payload.calc) for e in events if isinstance(e.payload, ev.StepCompleted) and e.payload.calc]
         self._calcs, self.draft = dict(done), False  # the calc of each completed calc step, for its replay
+        self._revised = {  # the `model_saved` of each tool save, for the approvals it keeps its chain with (4.9)
+            e.path: p for e in events if isinstance(p := e.payload, ev.ModelSaved) and p.role == "revision" and e.path
+        }
 
     def _begin(self, path: str, attempt: int, kind: str, name: str, args: _Obj, **fields: object) -> int:
         started = {"kind": kind, "name": name, "args": args, "args_sha256": payload_sha256(args), "effect": "none"}
@@ -206,7 +221,7 @@ class Ctx:
         info = None if prior is not None else await self._tools.describe(name)
         journaled = None if prior is None else self._journaled(prior)
         args, under = await self._modes.enter(
-            self, path, name, args, info, prior, journaled, under
+            self, path, name, args, info, prior, journaled, under, item
         )  # copy and approval (4.7)
         recorded = self._look(path, "tool", name, args)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
@@ -217,7 +232,8 @@ class Ctx:
                 if prior.effect == "write":
                     self._guard.mark(prior.model_key)
                     self._guard.note_stored(done.ref)
-                    self._approvals.stepped(prior.under, prior.model_key, done.ref)
+                    self._approvals.stepped(prior.under, prior.model_key, done.ref, self._revised.get(path))
+                await self._modes.opened(self, path, prior.action, prior.model_key, prior.host_key)
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
         info = info or await self._tools.describe(name)
@@ -257,8 +273,10 @@ class Ctx:
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
                     self._guard.mark(key)
-                    self._approvals.stepped(approval, key, envelope.result_id)
+                    saved = await self._guard.revised(path, key, info, args, envelope)  # a tool save (4.6)
+                    self._approvals.stepped(approval, key, envelope.result_id, saved)
                 await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
+                await self._modes.opened(self, path, info.action, key, info.host_key)
                 return _result(name, done)
             if envelope is None or envelope.error.code in _TIMEOUTS:
                 self._pending.timed_out(info.host_key)  # read or write: the units are read before the next step
