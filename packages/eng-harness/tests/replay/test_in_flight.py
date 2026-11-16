@@ -211,6 +211,49 @@ def test_a_refused_answer_leaves_the_request_open(tmp_path: Path) -> None:
     assert host.ledger == []
 
 
+def test_second_not_applied_stops_for_the_engineer(tmp_path: Path) -> None:
+    """The rerun of a write the adapter reconciled `not_applied`, reconciled so again, goes to the engineer (AC71)."""
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    reconciled: dict[str, JsonValue] = {
+        "op_id": OP,
+        "outcome": "not_applied",
+        "result": None,
+        "decided_by": "adapter",
+        "evidence": [],
+    }
+    steps = (
+        start("0", "read_a", {"n": 0}),
+        done("0"),
+        start("1", "write_b", WRITE_ARGS, write=True),
+        bound("m1", INSTANCE),
+        (T.STEP_RECONCILED, "1", 1, reconciled),
+        start("1", "write_b", WRITE_ARGS, attempt=2, write=True),
+    )
+    run_id = forge(rig, chain(ORIGINAL), *steps)
+    host.reconciliations[OP] = Reconciliation(outcome="not_applied")
+    before = len(rig.events(run_id))
+    stopped = resume(rig, chain(ORIGINAL), run_id)
+    assert stopped.status is RunStatus.NEEDS_ENGINEER
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "needs_reconciliation"
+    asked = rig.inputs.presented[-1]
+    assert (asked.kind, options(asked, "outcome")) == ("engine.in_flight", ["applied", "not_applied", "abandon"])
+    assert stopped.escalation.request_id == asked.request_id
+    assert host.ledger == []  # the write is not sent again
+    assert trace(rig, run_id, before) == [
+        ("run_resumed", None, None),
+        ("input_requested", None, None),
+        ("run_escalated", None, None),
+    ]  # no step_reconciled from the adapter
+    rig.inputs.script(asked.request_id, answer(asked, "not_applied", "outcome"))
+    outcome = resume(rig, chain(ORIGINAL), run_id)
+    assert outcome.status is RunStatus.COMPLETED
+    closing = _events(rig, run_id, ev.StepReconciled)[-1]
+    assert (closing.outcome, closing.decided_by) == ("not_applied", "engineer:test")
+    assert [(c.tool, c.op_id) for c in host.ledger][:1] == [("write_b", op_id(run_id, "1", 3))]  # the engineer's rerun
+
+
 @pytest.mark.parametrize("attempt", [1, 2])
 def test_read_in_flight(tmp_path: Path, attempt: int) -> None:
     rig, host = scripted_rig(tmp_path)
