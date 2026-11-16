@@ -517,7 +517,7 @@ or open the page; the approval is the engineer's. The rule is generated into the
    settings are those of spec 0003 §4.12 (B-412), and so is its `basis_fields` map (spec 0007 §4.5; amendment B-498).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
    `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
-   standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
+   standard error, and build the cascade of spec 0005 from the returned runtime (`model`, `llm`, `releases`, `summary`; spec 0009 §4.1)
    as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
    AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
    AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
