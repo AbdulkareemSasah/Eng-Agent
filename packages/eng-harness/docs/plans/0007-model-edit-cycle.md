@@ -190,6 +190,10 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
       - "packages/eng-harness/src/eng_harness/ctx.py"  # BasisView.record_ref(), engine §4.3.2 (amendment B-511)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
+      # Amendment (B-535, documents only): a writer's trial (gate pass with exactly this file set, 259 counted lines).
+      # Engine 4.6 makes a tool save without provenance.host a ModelIntegrityError, so the save_s tool of two existing
+      # tests must name its revision (3 lines added, 1 changed, no expectation changed).
+      - "packages/eng-harness/tests/workflow/test_modes.py"
     # Amendment (B-415 review fix, documents only): block.py exposes FieldSpec through a TYPE_CHECKING import and a
     # module-level __getattr__, and imports check_declaration inside workflow(); a module-level import of
     # eng_harness.basis._fields is an import cycle (engine §4.1.2, amendment B-511). The gate also runs
@@ -735,7 +739,7 @@ awaiting-owner notice and the owner approves the policy change; T7, and through 
 | T10, T10b | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
-| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
+| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
 

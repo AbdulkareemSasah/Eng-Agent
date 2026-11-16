@@ -1,5 +1,3 @@
-<!-- The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text. -->
-
 # Lead playbook for workflow agents (v1 build of the Eng-Agent platform)
 
 You are one agent in a chain run by the lead engineer. The repository is `AbdulkareemSasah/Eng-Agent`; the integration
@@ -103,7 +101,7 @@ run the full gate as above. Repeat the second command until the process has ende
 minutes; do not give up, do not start a second run). Read the result from the log. If a step fails, fix it inside the task scope (usually: more
 tests for surviving mutants; `uv run eng-gate check --package <member> --only mutation` reruns that step alone, under
 the same lock) and run again. Load-sensitive tests `tests/unit/progress/test_sink.py` and
-`tests/unit/pages/test_routes.py` may fail under load: rerun once before treating them as real.
+`tests/unit/pages/test_routes.py` and `tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins` may fail under load: rerun once before treating them as real.
 
 ## 5. Integrator (push, pull request, local CI, merge)
 
@@ -237,7 +235,7 @@ older role texts, and a role text always wins over this section for that role.
    lead runs `<lead>/plan-audit.workflow.js` over the plans of that wave (read-only: an auditor per plan checks
    every remaining task's `files`, budget, `tests_first` and `depends_on` against the merged code; a second agent tries
    to refute each finding), and turns the confirmed findings into ONE documents amendment per plan. First the plans on
-   the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0008, providers 0009),
+   the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0005, providers 0009),
    later plans when their wave is near (an audit of code that will still change goes stale). Writers keep their own
    duty: check the file list and the budget before writing everything, and stop early when the plan cannot hold the task.
 2. **Small edits of existing tests outside the file list (approved; NOT in force until the gate rule merges, work item
@@ -282,3 +280,80 @@ older role texts, and a role text always wins over this section for that role.
 Lead bookkeeping for these measures: the queue and the order at the next start are in
 `<lead>/resume/RESUME.md`; the owner's words are in `<lead>/reports/owner-answers-2026-11-14.md`,
 section F.
+
+## 8. Low-cost mode (owner's demand of 2026-11-15 for the fastest finish on a limited usage allowance; work item B-514)
+
+Measured over the whole session (agent records): about 140 million fresh tokens for about 75 merged pull requests, that
+is about 1.9 million per merged pull request, plus about 2.7 billion cache-read tokens from agents that wait in many
+turns. The integrator role alone used 29 million fresh tokens (74 agents), almost as much as all Sonnet writers (32
+million, 55 agents); Opus roles (writers of amendments and calcs, reviewers, fix rounds, verifiers) used 46 million.
+The checks do not change (test-first, independent review, adversarial verification of engineering content, mutation,
+local CI on the merged head); what changes is who does the mechanical work and which model does which role. Applies to
+lanes started with lane script version 3 (`<lead>/build-lane-v3.workflow.js`).
+
+1. **Models.** Opus only where the content is engineering (harness calcs, code-pack checks: writer, reviewer,
+   verifiers) or a documents amendment that must decide a design question. Every other writer and reviewer is Sonnet.
+   The gate runner is the small model (section 7 item 5). The integrator is Sonnet at low effort with the fixed sequence
+   below.
+2. **The writer writes the pull request body.** Before it pushes, the writer (code and documents alike) writes
+   `<lead>/pr/b<NNN>-body.md` exactly as section 5 step 3 describes (the three first lines `Work-Item:`,
+   `Plan-Task:`, `Risk:`; acceptance criteria table; Verification; Engineering impact; Version impact; the self-review
+   checklist filled with facts), WITHOUT a `## Review` and WITHOUT a `## Local CI` section: the script adds both. A fix
+   round that changes facts in the body (counted lines, commit shas, results) updates the file.
+3. **The integrator runs a fixed sequence** with `<lead>/tools/integrate.sh` (same lock, merge rules, local
+   CI and merge conditions as section 5): `merge <NNN>` (takes the lock, merges `origin/build/v1`, keeps both sides of
+   CHANGELOG.md and docs/local-testing.md, says whether the gate without mutation must be rerun), `gate <NNN> <member>`
+   when asked, `push <NNN>`, `body <NNN>` (appends the Review section from the review record), then the pull request
+   is found or created with the GitHub tools, `ci <NNN> <number>` (starts local CI and waits; appends the Local CI
+   section on PASS), the body is updated and the pull request squash-merged with `expectedHeadSha`, and always last
+   `finish <NNN>` (releases local CI and the lock). Exit code 3 means run the same command again; 4 conflict; 7 behind
+   (start again from `merge`); 1 failed. The integrator edits no file and decides nothing; on anything unexpected it
+   runs `finish` and reports.
+4. **Fewer turns.** Every turn of an agent re-reads its whole context. Batch independent commands into one call, wait
+   for a long process with one blocking command per call (never a loop of short sleeps), read the sections of a spec
+   your task covers and not the whole file, and stop reading once you can act.
+5. **Scope.** Until the first live run works on the owner's machine, only the first-live-run path is built (lead
+   decision D-32 as the owner restated it on 2026-11-15). Off the path and frozen: the task log (plan 0015), the gate
+   changes B-507 and B-508, the column workflow, the footing design, the adapters of other hosts, calcs T11 and T12,
+   servers T17 and T19b.
+6. **Mechanical plan amendments are written by the lead (owner's permission of 2026-11-15: «نعم، اكتب التعديلات
+   الآلية مباشرة»).** Mechanical means: a file added to a task's `files` with the evidence of a writer's trial (the
+   gate passed with exactly that file set), a `max_changed_lines` number set from a measured count (never above 400),
+   a `tests_first` entry moved to the implementation commits because it cannot be red at the base (TF004), a
+   `depends_on` id corrected after a split, stale prose corrected to what merged. The lead edits the plan in a
+   worktree, opens a documents pull request (`Plan-Task: none (spec and plan)`, `Risk: r0`, the Review section says
+   "mechanical plan amendment written by the lead under the owner's permission of 2026-11-15; no independent review;
+   evidence: ..."), runs `integrate.sh` and merges on a local CI PASS. NOT mechanical, full cycle with a writer and an
+   independent reviewer: any spec sentence, acceptance criterion, error code, engineering rule, a task split, a new
+   task, anything that needs a decision.
+7. **The machine has 4 processor cores (measured 2026-11-15: load average 9 with seven lanes).** More lanes than the
+   cores can serve make every gate and every local CI run two to three times slower and make load-sensitive tests fail
+   (a failed local CI run costs the queue about half an hour). The lead runs at most three lanes that write code at the
+   same time; lanes that only wait for the integration lock do not count. The lead pushes no state file to `build/v1`
+   while a local CI run is in progress (a moved base makes the run `BEHIND`). An agent never starts a CPU-heavy job
+   (a full test run, a stress loop) that its role does not require.
+8. **Mutation runs once per change and once per ten merges (owner decision of 2026-11-15, work item B-516).** The gate
+   runner still runs the mutation step on every code change before its pull request is opened (sections 4 and 7). The
+   local CI run of a pull request runs everything else (`check --all --skip mutation`). After every ten merges the lead
+   runs `bash <lead>/tools/periodic-mutation.sh <the build/v1 commit of the previous periodic run>` in the
+   background: the mutation step over every R1 and R2 module changed since that commit, on `origin/build/v1` as it is
+   now, in the separate worktree `<worktrees>/full-ci`, at low priority, judged by the base's gate as local CI does.
+   The base is required: run on `build/v1` without one, the mutation step finds no changed module and mutates nothing
+   (measured on 2026-11-16). The push mode of `ops/localci.py` is not used for this: it holds the local CI lock for the
+   whole run and stops the merge queue. A failure there becomes a fix work item at once. A pull request
+   body never says the mutation step ran in local CI: the summary states which run it was.
+
+9. **No second gate run under the integration lock (lead decision of 2026-11-15, follows B-516).** The local CI run of
+   a pull request now is the gate without mutation over all packages on the merged head. The gate rerun "after a merge
+   that brought changes" of section 5 would run the same checks on the same head while the lock is held, so the
+   integrator skips it (`integrate.sh merge` always answers `NEED_GATE=0`) and goes straight to push, pull request and
+   local CI. A failure shows in the CI gate job with the same lines; the repair writer then runs the whole gate without
+   mutation (never only the tests) before the next attempt.
+10. **Hold marker.** `locks/hold.b<NNN>` (written and removed by the lead only) makes `integrate.sh merge <NNN>` wait
+   (exit 3) until a dependency of that task, usually its plan amendment, has merged.
+11. **The writer runs the test-first check before its first push (lead decision of 2026-11-16, after B-489 and B-149).**
+   A test in the first `test:` commit that passes at the base (TF004) cannot be repaired once the branch is pushed: it
+   costs a rebuild on a fresh branch. So, in the worktree, before the first push and again after any change to the
+   first `test:` commit: `uv run -q eng-gate test-first --base $(git merge-base origin/build/v1 HEAD) --head HEAD
+   --title "<pull request title>"`, and the result goes into the handoff note. If it reports TF004 before anything is
+   pushed, rewrite the local commits (nothing is published yet); after a push, stop and report it to the lead.
