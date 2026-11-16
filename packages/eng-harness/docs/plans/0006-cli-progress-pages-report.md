@@ -399,7 +399,7 @@ tasks:
     # Amendment (B-412 eighth review, documents only): depends on T7b (cli/_control.py); port builder takes the run folder from the cell; calc-port factory arguments fixed; ExpectedTimes index; budget 390 -> 400.
     # Amendment (B-412 ninth review, documents only): resume removes a stale stop file at the start of the command (spec 4.4.8); ReleaseMarks from [project_lane.*] built in _wiring.py; paragraph budget text fixed to 400.
     # Amendment (B-510, documents only): split; the page ports' wait mode (spec 4.4.5 step 2) and the engineer-name rule of file answers (spec 4.2.1) did not fit the 400 cap, so they go with run --answers and resume --answers (AC46, AC64, test_cli_answers.py) to the new T14c; basis_ref of a workflow without required basis fields (spec Q23, interim); EnginePorts prose corrected (decision merged); depends on T9b (marks); budget 400 -> 355.
-    # Amendment (B-541, documents only): first-live-run gaps, third set (spec 4.2.2 step 5, 4.2.3, 4.7, AC71; spec 0002 AC48): run and resume enter the ports around Engine.start and Engine.resume; a ConfigError from the port builder exits 2; a LocalWorkspaceError where the workspace is built exits 2; HOST_LOCKED maps to exit 4 (cli/_exit.py and its table test added); the --input file is read as utf-8-sig; budget 355 -> 375.
+    # Amendment (B-541, documents only): first-live-run gaps, third set (spec 4.2.2 step 5, 4.2.3, 4.7, AC71; spec 0002 AC48): run and resume enter the ports around Engine.start and Engine.resume; a ConfigError from the port builder exits 2; a LocalWorkspaceError where the workspace is built exits 2; HOST_LOCKED maps to exit 4 (cli/_exit.py and its table test added); the --input file is read as utf-8-sig; the port builder's result is the cli-local Protocol RunPorts in cli/__init__.py (T14 does not wait for plan 0002 T22); budget 355 -> 380.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -419,8 +419,8 @@ tasks:
     # Amendment B-412 seventh review: the run-id cell, about 30 lines; budget 360 -> 390.
     # Amendment B-412 eighth review: the ExpectedTimes index and the port builder's run-folder callable, about 10 lines; budget 390 -> 400 (the cap).
     # Amendment B-510: run --answers (about 30 lines) and resume --answers (about 20) move to T14c; the basis_ref placeholder, about 2 lines; budget 400 -> 355.
-    # Amendment B-541: the ports' context around both engine calls about 8, the port builder's ConfigError about 3, the workspace refusal about 4, the HOST_LOCKED entry 1 (an estimate): 355 + 16 = 371; budget 375.
-    max_changed_lines: 375
+    # Amendment B-541: the ports' context around both engine calls about 8, the port builder's ConfigError about 3, the workspace refusal about 4, the HOST_LOCKED entry 1, the RunPorts Protocol about 6 (an estimate): 355 + 22 = 377; budget 380.
+    max_changed_lines: 380
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run"
@@ -437,7 +437,7 @@ tasks:
     title: "Commands run and resume: the page ports' wait mode and the answers files"
     # Amendment (B-510, documents only): new, split from T14; the wrapper that gives the page ports the process wait mode (spec 4.4.5 step 2), run --answers and resume --answers through pages.accept_answers_file, and their refusal while [engine] engineer is unset (spec 4.2.1).
     # Amendment (B-536, documents only): first-live-run gaps. The port builder is called at the end of step 2 with the model files of the input (spec 4.2.2 step 2, AC67; spec 0002 H-G10 closed), and its NotImplementedGap (spec 0002 AC43, gap H-G8) ends run and resume with exit 2 (AC68). cli/__init__.py (the port_builder field's type) and tests/helpers/cli_deps.py (the shared builder's fake port builder) added; budget 80 -> 130 (fix round 1 re-estimate).
-    # Amendment (B-541, documents only): when T14c moves the port builder call to the end of step 2 it keeps T14's ConfigError exit beside its H-G8 exit, and it reads the --answers file as utf-8-sig (spec 4.7); no counted line added; files and budget unchanged.
+    # Amendment (B-541, documents only): when T14c moves the port builder call to the end of step 2 it keeps T14's ConfigError exit beside its H-G8 exit, and it reads the --answers file as utf-8-sig (spec 4.7); the moved ConfigError clause is deleted at T14's place and added at the end of step 2 (about 6 counted lines; the encoding is an argument of a line T14c writes anyway); budget 130 -> 136 (estimate 135); files unchanged.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"  # the port_builder field takes files (B-536)
@@ -448,7 +448,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
     # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's Path and Path | None fields, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
-    max_changed_lines: 130
+    # Amendment B-541: the moved ConfigError clause, about 3 lines deleted at T14's place and 3 added at the end of step 2 (an estimate): 129 + 6 = 135; budget 136.
+    max_changed_lines: 136
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
@@ -879,7 +880,7 @@ of `tests/golden/test_report.py` gains a decision runtime and the snapshot its r
 
 **T14 Run and resume** (spec §4.2.2). Generated options, `CliDeps` wiring of engine, adapters, calcs and page ports,
 outcome mapping, report at the end. Fake-host workflow and replay
-tests. Budget 375 lines (400 before amendment B-510, 355 after it, 375 after amendment B-541; see the amendments below). The original T14 (430 lines) was split by B-342 (D-12). Amendment B-510:
+tests. Budget 380 lines (400 before amendment B-510, 355 after it, 380 after amendment B-541; see the amendments below). The original T14 (430 lines) was split by B-342 (D-12). Amendment B-510:
 `run --answers` and `resume --answers` (AC46, AC64; about 50 lines) move to T14c with the page ports' wait mode, which
 the 400 cap could not take; `run` and `resume` of T14 reject an `--answers` option as "not available in this build"
 until T14c. For a workflow that declares no required basis field (step 3 does not run), T14 passes `basis_ref` `res_`
@@ -935,7 +936,11 @@ B-510 split). The engine's `BasisPort` is the merged `StoreBasisPort` over the r
 built in `_wiring.py` with no field; the `Workspace`, the `ResultStore` and the `EngineSettings` that `Engine(...)`
 takes are built in `_wiring.py` too (collaborator map of §3).
 Amendment B-541 (spec §4.2.2 step 5, §4.2.3, §4.7, AC71; spec 0002 §4.1, AC48): (a) the port builder returns the ports
-as an async context manager (spec 0002 `AdapterPorts`, plan 0002 T22); `cli/_run.py` enters them just before
+as an async context manager (spec 0002 `AdapterPorts`, plan 0002 T22). T14 does not wait for T22, so `cli/__init__.py`
+types the result of `CliDeps.port_builder` as a cli-local structural type, a `Protocol` `RunPorts` whose
+`__aenter__` answers an object exposing `tool_port` (`ToolPort`) and `host_port` (`HostPort`) and whose `__aexit__`
+takes the exception triple; both the test fake and `AdapterPorts` fit it, and the command line imports no adapter
+module (about 6 lines); `cli/_run.py` enters them just before
 `Engine.start` and `Engine.resume` and leaves them when the call returns or raises, so the servers start inside the
 manager's task group and shut down at the end (about 8 lines); the fake port builder of `tests/helpers/cli_deps.py`
 returns ports that record entering and leaving, and `test_cli_run.py::test_ports_entered_around_engine_call` checks
@@ -948,7 +953,8 @@ ends `run` or `resume` with exit 2, nothing created (about 4 lines). (b) and (c)
 `test_refusals_create_no_run`. (d) `cli/_exit.py` maps `HOST_LOCKED` to `RUN_LOCKED` (4), written beside the
 `RUN_LOCKED` entry so that plan 0002 T19a's `NOT_IMPLEMENTED` entry, beside `INVALID_ARGUMENT`, merges without a
 conflict whichever lands second; the case joins `test_error_codes` (1 line). (e) The `--input` file is read as
-`utf-8-sig` (spec §4.7), a case of `test_run_completes_and_writes_report`. Budget 355 to 375.
+`utf-8-sig` (spec §4.7), a case of `test_run_completes_and_writes_report`. Budget 355 to 380 (fix round 1 of B-541:
+the `RunPorts` type, about 6 lines).
 
 **T14c Wait mode and answers files** (amendment B-510, split from T14; spec §4.2.1, §4.4.5 step 2, AC46, AC64). (1)
 The merged engine calls `answer(request_id, wait=False)` at every request (`engine/_approvals.py`, `_decide.py`,
@@ -978,7 +984,8 @@ builder (spec 0002 AC43, gap H-G8) prints its message on standard error and ends
 and `test_port_builder_gap_exits_2` inject a recording or raising port builder through `CliDeps`; both fail at the
 merge base, where the port builder takes no `files` and its exception is not caught. Amendment B-541: the moved call
 keeps T14's `ConfigError` exit beside the H-G8 exit, and the `--answers` file is read as `utf-8-sig` (spec §4.7), a
-case of `test_run_answers_first_data_request`; no counted line is added.
+case of `test_run_answers_first_data_request`. The move deletes the `ConfigError` clause at T14's place and adds it at
+the end of step 2 (about 6 counted lines; the encoding is an argument of the read T14c writes), hence 130 to 136.
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
@@ -1295,7 +1302,10 @@ displays correctly, forms submit, a second tab opens by cookie; (2) the report o
 watermark and the layout; (3) a workstation with an Arabic regional setting, the Hijri calendar and a cp1256 console:
 `run`, `status`, `report`; (4) expected times and the heartbeat on a real analysis run, with the host programs (this
 needs spec 0007's workflow and the Sasaah servers); (5) opening the launch address through the default browser when
-the default is not Chromium-based. Nothing here drives a host program in CI.
+the default is not Chromium-based; (6) the first run with no workspace configured (amendment B-541): `main`
+(`cli/__init__.py`, T14b) calls `resolve_workspace` with `default_location_probe()`, which must classify
+`%LOCALAPPDATA%\eng\workspaces\default` as local on the owner's Windows machine, so that every command finds the
+`harness.toml` there. Nothing here drives a host program in CI.
 
 ## 5. Rollback
 

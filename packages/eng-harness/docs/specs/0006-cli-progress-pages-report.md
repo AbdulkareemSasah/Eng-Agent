@@ -1108,7 +1108,9 @@ No engineering value is computed here, so there are no golden engineering tests.
 and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
 (process/05 §2); mutation score at least 80% on `pages/_security.py`, `pages/_answers.py`, `pages/_ports.py`,
 `_html.py`, `_text.py` and `report/_lineage.py`. Browser-level checks need the owner's machine
-(`docs/local-testing.md`).
+(`docs/local-testing.md`), and so does the Windows location probe that must classify the default workspace
+`%LOCALAPPDATA%\eng\workspaces\default` as local, which `main` reaches through `resolve_workspace` for every command
+on a first run with no workspace configured (§4.2.1, AC70; B-541; plan item (6) of the local-test list).
 
 ## 10. Version impact
 

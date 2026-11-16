@@ -527,8 +527,8 @@ tasks:
     # Amendment (B-541, documents only): first-live-run gaps, third set. T19a waits for the new T22, which defines
     # AdapterPorts (with its servers field and async context), the platform launcher and inspector, servers_config and
     # ServersConfig.host_program (spec 4.1, AC48 to AC50). build_ports types config as ServersConfig, returns
-    # AdapterPorts(tool_port, host_port, servers) and takes the host program, exe_name and host_exes from
-    # host_program(product) (spec 4.1); its workflow tests enter the ports around Engine.start and Engine.resume (test
+    # AdapterPorts(tool_port, host_port, servers), names the host port's program product.lower() and takes exe_name
+    # and host_exes from host_program(product) (spec 4.1); its workflow tests enter the ports around Engine.start and Engine.resume (test
     # code). Estimate unchanged at about 371: the AdapterPorts class and the platform default it no longer writes offset
     # the servers field and the host_program call; files and budget unchanged.
     files:
@@ -639,9 +639,11 @@ tasks:
     # the POSIX launcher (fails on Windows at construction) and windows_launcher() had no caller; nothing entered or left
     # the ServerManager context; build_ports' config was untyped; no rule named a server's host program (spec 4.1,
     # 4.2 rule 6, 4.9; AC48 to AC50). Before T19a, which builds AdapterPorts with these pieces, and before plan 0006
-    # T16, which calls doctor.run with the new arguments. Estimate: the factory about 20 (doctor's private _inspector
-    # moves into it, about 8 removed), doctor about 10, servers_config and the byte-order mark about 8,
-    # host_program about 7, AdapterPorts about 15, exports about 5, local-testing.md 2, CHANGELOG.md 2: about 77; budget 85.
+    # T16, which calls doctor.run with the new arguments. Estimate (fix round 1 of B-541, docstrings counted): the
+    # factory with its importlib branches and the POSIX narrowing about 30, doctor's private _inspector removed about 8,
+    # doctor (LiveRoles.__init__, the _gather parameter, run's config_path=None and env) about 15, servers_config split
+    # out of load_servers_config with the byte-order mark about 15, host_program about 10, AdapterPorts about 22,
+    # exports about 5, local-testing.md 3, CHANGELOG.md 3: about 111; budget 115.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/local-testing.md"
@@ -655,7 +657,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py"
       - "packages/eng-harness/tests/unit/adapters/test_ports.py"
       - "packages/eng-harness/tests/windows/test_platform_windows.py"
-    max_changed_lines: 85
+    max_changed_lines: 115
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/unit/adapters/test_ports.py::test_ports_enter_and_leave_server_manager"
@@ -899,9 +901,11 @@ loader taking the section's `route`, because `load_allowlist` refuses a routed a
 result only validates the section's route, since `CsiToolPort` builds its own `tool_allowlist()`. Amendment B-541
 (spec §4.1): `config` is a `ServersConfig`; the result is T22's `AdapterPorts(tool_port, host_port, servers)`; the
 `inspector` and `launcher` defaults are T22's `platform_inspector()` and `platform_launcher(inspector)`; the host
-port's `program` and `exe_name` and the guard's `host_exes` come from `config.host_program(product)` (T22), whose
+port's `program` (the host-lock key) is the entry name `product.lower()`, and its `exe_name` and the guard's
+`host_exes` come from `config.host_program(product)` (T22), whose
 `ConfigError` the command line ends with exit 2 (spec 0006 AC71); and every workflow and replay test of T19a that
-runs the engine over the built ports enters them around `Engine.start` and `Engine.resume` (test code; spec AC48).
+runs the engine over the built ports enters them around `Engine.start` and `Engine.resume` (test code; spec AC48),
+as does every later task whose tests run the real engine over `build_ports` (section 3).
 Production binder
 (amendment B-530): `AdapterHostPort` gains `binding(host_key, model, descriptor)` and `revision(model_id)`
 (`_hostport.py`), and `build_ports` passes the host port as `binder` (`CsiToolPort` wraps it in `_TokenBinder`).
@@ -962,18 +966,23 @@ and that server's `ServerCheck` has `ok` false with the reason "tool-list finger
 **T22 Platform launcher, ports lifetime, server sections, host program** (amendment B-541; spec §4.1, §4.2 rule 6,
 §4.3.5, §4.9; AC48 to AC50). (1) `servers/_platform.py`: `platform_inspector()` answers `PosixProcessInspector()` on
 POSIX and, on Windows, `WindowsProcessInspector(CtypesKernel32(PROCESS_SIGNATURES))` (doctor's private `_inspector`
-moves here); `platform_launcher(inspector)` answers `PosixLauncher(inspector)` on POSIX and, on Windows, the Job
+moves here); `platform_launcher(inspector: ProcessInspector)` answers `PosixLauncher(inspector)` on POSIX, after
+narrowing the type with `isinstance(inspector, PosixProcessInspector)` (any other inspector raises `TypeError`,
+because `PosixLauncher` takes only the POSIX inspector and mypy strict needs the narrowing), and, on Windows, the Job
 Object launcher over a `CtypesKernel32` with the process and job signatures and that inspector (what
 `windows_launcher()` builds, with the given inspector); both are exported from `eng_harness.servers`; the Windows
 branches are imported through `importlib` as the doctor does today, so mypy checks both platforms.
 `test_platform.py::test_platform_pair` checks the POSIX pair (the launcher holds the given inspector); the Windows pair
 is checked by `tests/windows/test_platform_windows.py` in the Windows job and in the owner's local test (spec §12 item
 12). (2) `doctor.py`: `default_deps` takes its inspector from `platform_inspector()`, and `LiveRoles` builds its
-`ServerManager` with `launcher=platform_launcher(inspector)` over that inspector
-(`test_doctor.py::test_live_roles_use_platform_launcher`); `run` accepts `config_path=None` (no section is checked)
+`ServerManager` with `launcher=platform_launcher(inspector)` over that inspector, passed to `_gather` as a parameter;
+`LiveRoles.__init__(inspector: ProcessInspector | None = None)` keeps a default (`platform_inspector()`), so the merged
+`doctor.LiveRoles()` call of `test_doctor.py` stays valid (`test_doctor.py::test_live_roles_use_platform_launcher`); `run` accepts `config_path=None` (no section is checked)
 and a keyword `env` that replaces `deps.env` for the workspace and lock-directory rows
 (`test_doctor.py::test_no_config_file_and_environment`). (3) `servers/_config.py`: `servers_config(data)` validates the
-three sections of parsed tables with the error mapping of `load_servers_config`, which now reads the file as
+three sections of parsed tables (one mapping holding the `servers`, `cli_tools` and `host_programs` tables; plan
+0006 T18b passes those three fields of the command line's `HarnessConfig`) with the error mapping of
+`load_servers_config`, which now reads the file as
 `utf-8-sig` and calls it; `ServersConfig.host_program(product)` answers `host_programs[product.lower()]` or raises
 `ConfigError("host_programs.<name>", ...)` (`test_config.py::test_servers_config_from_tables`,
 `::test_byte_order_mark_accepted`, `::test_host_program_of_product`). (4) `adapters/__init__.py`: the frozen dataclass
@@ -1021,7 +1030,9 @@ calc hash changes here; once plan 0007 T4's calcs import it, it enters their `mo
   tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
   Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose
   `test_csi_read_state_tool.py` it adapts to `HARNESS_KINDS` holding `CSI_KINDS`. T19b waits for T16 and T19a. T19a and
-  plan [0006](0006-cli-progress-pages-report.md) T16 (the doctor's new arguments) wait for T22 (amendment B-541). `eng-contract`
+  plan [0006](0006-cli-progress-pages-report.md) T16 (the doctor's new arguments) wait for T22 (amendment B-541).
+  Every later task whose tests run the real engine over `build_ports` (T19b, plan 0008 T1 and T3, plan 0012 T1) enters
+  the returned `AdapterPorts` around `Engine.start` and `Engine.resume` in its tests, as T19a does (spec AC48). `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each

@@ -313,7 +313,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `doctor.run(None, ...)` checks no server section, while its `env` argument replaces the environment of the
   workspace and lock-directory rows (§4.9). Tests: `tests/unit/servers/test_platform.py::test_platform_pair`,
   `tests/unit/test_doctor.py::test_live_roles_use_platform_launcher`,
-  `tests/unit/test_doctor.py::test_no_config_file_and_environment` (plan task T22).
+  `tests/unit/test_doctor.py::test_no_config_file_and_environment`, and for the Windows pair, in the Windows job,
+  `tests/windows/test_platform_windows.py` (plan task T22).
 - AC50. **[added: B-541]** Given the parsed tables of a `harness.toml`, then `servers_config(data)` validates its
   server, tool and host-program sections as `load_servers_config` does (a `ConfigError` naming the dotted key); given
   a file that starts with a UTF-8 byte-order mark, then `load_servers_config` reads it as without the mark; and
@@ -370,7 +371,10 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   creates the manager and no engine port has a close method.
 - The host program of a server section is the `[host_programs.<name>]` entry whose name is the adapter's product in
   lower case (`etabs` for the CSI adapter's ETABS profile), found by `ServersConfig.host_program(product)`; the host
-  port's `exe_name` is its first executable and the process guard's `host_exes` are all its executables. A missing
+  port's `program` (the host-lock key of §4.4.1 and `HostInstance.program`) is that entry name, its `exe_name` is the
+  entry's first executable and the process guard's `host_exes` are all its executables. Decision: `program` is the
+  entry name, because `[host_programs.*]` holds only executables and install folders and the name is the one stable
+  key both the lock file and the configuration share. A missing
   entry is a `ConfigError` naming `host_programs.<name>`. Decision: the product names the entry, because the server
   section names no program and the product is what the adapter drives; the example of §4.2 already names it so.
 
@@ -1074,7 +1078,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 |---|---|---|
 | AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC42, AC48 to AC50 | Unit | `tests/unit/` |
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
-| AC5, AC6, AC7, AC37 (Windows) | Unit, marker `windows` | `tests/windows/` |
+| AC5, AC6, AC7, AC37, AC49 (Windows; AC49 in `tests/windows/test_platform_windows.py`, B-541) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
 | AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
