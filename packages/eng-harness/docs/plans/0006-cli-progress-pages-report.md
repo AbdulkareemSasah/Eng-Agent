@@ -280,6 +280,22 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_signoff.py::test_signoff_rules"
     covers: [AC42]
     depends_on: [T8, T9]
+  - id: T9c
+    title: "Sign-off screen reads the edit cycle's design verdicts (harness.host_design_verdicts/1)"
+    # Amendment (B-544, documents only): new fix task for merged T9b code (first-live-run walk-through C25, C32; spec
+    # 4.4.6, AC42, Q24). _facts counts only results of kind verdicts.set/1, which the edit cycle never stores, so its
+    # sign-off shows no exception and refuses nothing. About 6 lines of pages/_screens_approval.py (the kind filter and
+    # one model per kind) and 1 of CHANGELOG.md: budget 20 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/pages/_screens_approval.py"
+      - "packages/eng-harness/tests/workflow/test_signoff.py"
+    max_changed_lines: 20
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_signoff.py::test_signoff_reads_host_design_verdicts"
+    covers: [AC42]
+    depends_on: [T9b]
   - id: T10
     title: "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate"
     # Amendment (B-412, documents only): depends on T9 (_labels.py); pages/__init__.py, _labels.py and _ports.py added.
@@ -648,7 +664,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime_real_engine"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request_real_engine"
     covers: [AC7, AC8, AC42, AC46, AC47, AC61, AC63, AC64]
-    depends_on: [T15, T16, T16b]
+    depends_on: [T15, T16, T16b, T9c]  # T9c: both edit test_signoff.py (amendment B-544)
   - id: T18a
     title: "Bind the CliDeps defaults to the merged real implementations, except the port builder"
     # Amendment (B-412 second review, documents only): new; the one task that replaces the None defaults of the section 3 rule.
@@ -708,7 +724,8 @@ lets the rest stack on them:
 - T6 is the riskiest task (the security checks of 16 §5): bind, session, Host, Origin, CSRF, headers, routes,
   lockdown, tested against a real loopback server. T7 adds the answer path (hash binding, single use, reasons) and
   the durable wait, and T7b the stop-file protocol and the voided display; T9, T9b and T10 add the screens; T10c
-  fixes the voided display's request kinds and the input screen's text (amendment B-545). T8 (release marks) precedes T9b because the sign-off screen lists the
+  fixes the voided display's request kinds and the input screen's text (amendment B-545); T9c makes the sign-off
+  screen read the edit cycle's design verdicts, before T17c, which also edits `test_signoff.py` (amendment B-544). T8 (release marks) precedes T9b because the sign-off screen lists the
   marked results.
 - T11 to T13 build the report from the journal and the store only. T11 folds the data; T12 renders sections and the
   source links (sections 2 to 5); T13 adds the status section, the timings and run events sections, the marks, the
@@ -835,6 +852,16 @@ item has no reason, so signing is refused (AC42). `test_signoff_rules` builds it
 `exc_<n>` items (`approval_request(kind="SIGN_OFF", items=...)`), so it needs no preview builder, opens it through the
 T7 engine stand-in imported from `tests/helpers/engine_standin.py` and injects a stub `report` callable (amendments B-412 third
 and fourth review); T17c re-checks AC42 with the real engine.
+
+**T9c Sign-off verdicts of the edit cycle** (amendment B-544; spec §4.4.6, AC42, Q24). `_facts` in
+`pages/_screens_approval.py` takes the step results of kind `verdicts.set/1` or `harness.host_design_verdicts/1`, in
+journal step order, and validates each as the model of its kind (`VerdictSet`, or `HostDesignVerdicts` of
+`eng_harness.kinds.edit_cycle`, merged with plan 0007 T4b), because `VerdictSet` refuses the calc port's `calc` and
+`trace`; counting and the `exc_<n>` numbering are unchanged. `test_signoff_reads_host_design_verdicts` stores a
+`harness.host_design_verdicts/1` result with a `NEEDS_ENGINEER` and a `FAIL` verdict as a step result, and checks the
+counts, the two exception rows with their reason fields and the refusal of a signature without both reasons; it fails
+at the merge base, where the counts are zero and nothing is refused. Plan 0007 T9c adds the items to the edit cycle's
+request in this order.
 
 **T10 Choice screens** (spec §4.4.6). Choice sets from the request's JSON Schema (engineer turn, batched decisions,
 engine requests) and the read-only input screen; `pages.accept_answers_file`, the only way a file becomes an

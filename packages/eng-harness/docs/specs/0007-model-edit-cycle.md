@@ -127,6 +127,13 @@ defines its method; values are synthetic and say so.
   compares its effects with an after read set that holds exactly that material and thickness, then the status is
   `PASS` with no `unexpected` row; with the old material still read, `FAIL` with the material effect `mismatch`. Test:
   `tests/golden/edit_cycle/test_expected_effects.py::test_wall_section_material_reads_back`.
+- AC40. **[added: B-544]** Given a change set with a `wall_section` whose thickness is an input value in `m`, a
+  `frame_uniform_load` whose `w` is a basis value and a `load_pattern_add` whose `self_weight` is an input value in `1`,
+  stored as the engine stores the answer, when `harness.change_set_check` resolves it and each resolved `ref` is given
+  as the tool's engineering parameter (`thickness_mm`, `w_kN_m`, `self_weight_ratio`) and validated as the CSI tool
+  port validates arguments (`require_refs`), then each validates to the value in the parameter's canonical unit
+  (§4.3.1, §4.4.1 K4); and an input value whose `value_<suffix>` differs from that conversion is refused by
+  `ChangeSetDraft`. Test: `tests/unit/edit_cycle/test_change_set.py::test_value_refs_are_write_arguments`.
 
 ### 3.3 The cycle (§4.5)
 
@@ -163,7 +170,10 @@ defines its method; values are synthetic and say so.
   `::test_save_before_analysis_and_design`, `::test_stale_build_stops_before_any_write`.
 - AC17. Given a read-back `FAIL` or `NEEDS_ENGINEER`, then the D-2 screen opens and analysis does not run;
   `restore_previous` opens a new working file copied from this cycle's step 7 snapshot `P[k]` (§4.5.1) and returns to
-  step 3. Test: `tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes`.
+  step 3. Test: `tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes`. Given a write whose
+  `check_model` before the step 9 read is not clean (a `READBACK_MISMATCH` or `READBACK_UNAVAILABLE` issue), then the
+  run does not escalate: D-2 opens with the reason `check_model_failed` (§4.6, Q14), analysis does not run, and
+  `restore_previous` acts as above (amendment B-544). Test: `tests/workflow/edit_cycle/test_apply.py::test_check_failure_routes`.
 - AC34. (A5) Given a fake hand edit between cycles 1 and 2, then a read-back `FAIL` in cycle 2 and the choice
   `restore_previous`, then the restored model holds the engineer's value, `P[2]` is unchanged on disk, and the next
   step 4 still shows the edit; given a snapshot whose file hash no longer equals its `model_saved`, then the restore
@@ -175,11 +185,26 @@ defines its method; values are synthetic and say so.
   `tests/rules/test_edit_cycle.py::test_pass_typical`, `::test_pass_boundary`, `::test_clean_typical`,
   `::test_clean_boundary` (spec 0005 AC12 names: the rule module `rules/edit_cycle.py`, the rule ids
   `edit_cycle_readback_result.pass` and `edit_cycle_analysis_messages.clean`, each prefixed with its point name as
-  spec 0005 AC9 requires, the point names matching spec 0005 AC1, which allows no dot; amendment B-417).
+  spec 0005 AC9 requires, the point names matching spec 0005 AC1, which allows no dot; amendment B-417). Amendment
+  B-544 (owner decision of 2026-11-16, Q20): a D-3 state whose `drift_status` is not `PASS` gives `None`; the rule test
+  derives one state from an analysis summary whose highest drift ratio equals the limit (`drift_status` `PASS`, so
+  `continue`) and one from a ratio just above it (`NEEDS_ENGINEER`, so `None`); and a D-2 state with the reason
+  `check_model_failed` gives `None`. Tests: `::test_clean_boundary`, `::test_clean_drift_at_and_above_the_limit`,
+  `::test_pass_boundary`.
 - AC19. Given the engineer turn, then it is a choice request with the three options of §4.6 even in
   `autonomous_logged`; `accept` goes to step 16, `more_edits` asks for a change set in the next cycle, and `hand_edit`
   starts the next cycle with an empty change set, no step 6 approval and a saved revision. Test:
   `tests/workflow/edit_cycle/test_turn.py::test_engineer_turn_branches`.
+- AC41. **[added: B-544]** Given a cycle that reaches step 14 with `design.run` `steel_and_concrete`, then step 13
+  also reads the model state, the story-drift read names every combination of `R[k]`'s `harness.csi_name_lists/1` in
+  `combos` and no case, `harness.design_summary` runs once per design kind with that kind's verdicts, the step 13
+  `frames` and that kind's summary of cycle `k-1` as `previous`, no calc is refused with `REF_STALE`,
+  `EditCycleOutput.summaries` holds the analysis summary and one design summary per kind, and the turn's design status
+  is the worse of the two (§4.5). Test: `tests/workflow/edit_cycle/test_long_runs.py::test_step_13_and_14_inputs`.
+- AC42. **[added: B-544]** Given the fake returning no analysis message and story drifts whose highest ratio equals
+  `limits.drift_ratio`, then the D-3 `drift_status` is `PASS` and the rule continues; given one row just above the
+  limit, or no drift row, then it is `NEEDS_ENGINEER` and D-3 reaches the engineer (§4.6, Q20). Test:
+  `tests/workflow/edit_cycle/test_turn.py::test_drift_at_d3`.
 - AC20. Given more cycles than `attempts.cycles`, then the run escalates with `attempts_exhausted`. Test:
   `tests/workflow/edit_cycle/test_cycle.py::test_cycle_limit`.
 - AC21. Given `accept`, then a `PROMOTION` approval precedes `ctx.promote(..., Promotion.FILE_COPY, ...)`, the backup
@@ -187,6 +212,10 @@ defines its method; values are synthetic and say so.
   nothing is copied, and the run escalates. Test: `tests/workflow/edit_cycle/test_promotion.py::test_promote_and_conflict`.
 - AC22. Given promotion, then a `SIGN_OFF` approval follows, `signed_off` is journaled, and `run_completed.draft` is
   true while any calc or rule used is draft. Test: `tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft`.
+  Given host design verdicts with `FAIL` or `NEEDS_ENGINEER` in two cycles, then the `SIGN_OFF` preview holds, after
+  the outputs, one item `exc_<n>` per exception in the order of spec 0006 §4.4.6, the sign-off screen shows a reason
+  field for each, and the run is signed with a reason per exception or rejected (§4.5 step 17; amendment B-544). Test:
+  `tests/workflow/edit_cycle/test_promotion.py::test_sign_off_exception_items`.
 - AC23. Given the same scripted cycle in each permission mode, then the approvals journaled match the table of §4.7.
   Test: `tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode`.
 - AC24. Given the change-set data request, then it carries `x-eng-input: data`; an answer that fails `ChangeSetDraft`
@@ -205,7 +234,8 @@ defines its method; values are synthetic and say so.
 - AC26. (A7) Given a journal, when `count_prompts` runs, then it counts per cycle the engineer requests of §4.9 (a
   repeated step 6 approval, a re-asked change set and every engine request count; the first step 6 approval, the
   first change-set request, the engineer turn and the run-level steps 16 and 17 do not); every normal-path scenario of
-  §4.9 (AC9 to AC12, AC15, AC19, AC21, AC22, with the fake returning no analysis messages) in `work_on_copy` has at
+  §4.9 (AC9 to AC12, AC15, AC19, AC21, AC22, with the fake returning no analysis messages and story drifts not above
+  `limits.drift_ratio`, amendment B-544) in `work_on_copy` has at
   most one per cycle; given the fake returning analysis messages (all `unclassified`, EC-G3), then D-3 reaches the
   engineer and is that cycle's one prompt; and the interruption, failure and escalation scenarios (AC13, AC14, AC16,
   AC17, AC20, AC24, AC34) are counted and reported but not bounded. Tests:
@@ -294,8 +324,9 @@ and T13) add their blocks to the same tuple. Decision points and rules are found
   the `harness.file_input/1` reference, from which no component can find the file), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
   spec 0002 §4.6.1 step 2). No engineering value is part of the input.
 - Output `EditCycleOutput`: `accepted_revision` (the `model_saved` identity, revision, fingerprint, file hash),
-  `cycles` (count), `promoted` (model handle), `summaries` (references to the last `harness.design_summary/1` and
-  `harness.analysis_summary/1`), `signed: bool`.
+  `cycles` (count), `promoted` (model handle), `summaries` (references, in this order, to the last
+  `harness.analysis_summary/1` and to the last `harness.design_summary/1` of each kind of `design.run`, steel before
+  concrete; amendment B-544, §4.5), `signed: bool`.
 - Kinds (registered with `KindRegistry.extend` beside spec 0003's): `harness.change_set_check/1`,
   `harness.analysis_summary/1`, `harness.csi_name_lists/1` (§4.10), `harness.host_design_verdicts/1` (§4.4.3, Q19).
   `harness.expected_effects/1` is spec 0003's.
@@ -330,6 +361,13 @@ engineer inputs with `entered_by` and `entered_at`, and the change-set approval 
 A **value** is `{"source": "basis", "path": "<basis path>"}` or `{"source": "input", "value": <number>, "unit":
 "<unit>"}`. The unit must be one of contract §4.7.3 with the dimension of the field (length: `mm`, line load: `kN/m`,
 area load: `kPa`, ratio: `1`); the value is converted to the canonical unit by `eng_contract.units`, never by hand.
+Amendment B-544: an input value also holds `value_<suffix>`, its value in the canonical unit of its dimension under
+the field suffix of that unit (contract §4.7.2: `value_mm`, `value_kN_m`, `value_kPa`, `value_ratio`), which the model
+fills by `eng_contract.units` when it is absent and refuses when it differs from that conversion, so a stored answer
+validates again on replay (the column workflow's requests, which reuse these value models, hold it too). Decision
+(B-544): step 8 passes each engineering argument as a reference, the contract resolves a reference to a number only
+under a key with a unit suffix and converts nothing (contract §4.6.2), and K4 accepts every unit of the dimension, so
+the converted number is stored in the answer, where a reference can reach it without a contract change.
 Names (frames, sections, patterns) are strings, never engineering values; each must exist in the step 3 model state or
 be added by an earlier item of the same set (a pattern for a load or combination, a wall section for an area
 assignment).
@@ -379,6 +417,9 @@ because it is a draft that no run has journaled. K4 each value: a `basis` path p
 comparison of canonical values (`OUT_OF_BOUNDS`): `bounds.thickness_min_mm` and `bounds.thickness_max_mm` for a length,
 `bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line load, `bounds.area_load_min_kPa` and
 `bounds.area_load_max_kPa` for an area load, `bounds.ratio_min_ratio` and `bounds.ratio_max_ratio` for a ratio (§4.8).
+The `ref` of a resolved value points at the number itself, `<basis>#/fields/<path>/value` for a basis value and
+`<answer>#/fields/change_set/value/items/<i>/<field>/value_<suffix>` for an input value (§4.3.1), so step 8 passes
+it unchanged as the tool's engineering argument (amendment B-544, AC40; the calc stays version 1, as for B-545).
 K5 refused kinds (§4.3.2). K6 an item whose target and property appear in `diff.changes` (keys of the form of §4.4.2)
 gets the warning `CONFLICTS_WITH_ENGINEER_CHANGE`. K7 `FAIL` on any error.
 
@@ -436,8 +477,9 @@ those of the S-12 inventory and need a local test (§12).
 
 Input: `messages` (`harness.csi_analysis_messages/1`), `drifts` (`forces.story_drifts/1`), `basis`
 (`limits.drift_ratio`). Output `harness.analysis_summary/1`: message counts by the severity the host reports
-(`error`, `warning`, `info`, `unclassified`), `has_errors`, `has_unclassified`, governing drift per direction (story,
-case, ratio, by ordering only), stories whose drift ratio exceeds the limit, `status` (`PASS`, `NEEDS_ENGINEER` on
+(`error`, `warning`, `info`, `unclassified`), `has_errors`, `has_unclassified`, governing drift per direction
+(`governing_drift`: story, case, ratio, by ordering only), stories whose drift ratio exceeds the limit (`exceeding`;
+D-3 reads both members, §4.6), `status` (`PASS`, `NEEDS_ENGINEER` on
 unclassified messages or drifts above the limit, `FAIL` on error messages). The severity column of the
 `Analysis Messages` table needs a local test (§12); until it is confirmed every message is `unclassified`.
 
@@ -462,11 +504,11 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
 | 12 | Per kind in `B.choice("design.run", DesignRun)`: `ctx.tool("csi_design_run", {"model": m, "kind": ...})` | Same as step 11 |
-| 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", ...), ctx.tool("csi_design_results", ...))` (reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
-| 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; `ctx.calc("harness.host_design_verdicts", {"results", "kind", "basis"})` per design kind, `ctx.calc("harness.design_summary", {"verdicts", "frames", "previous": <cycle k-1>, "basis"})` | Invariant 3 |
+| 13 | `ctx.parallel(ctx.tool("csi_read_analysis_messages", ...), ctx.tool("csi_results_story_drifts", {"model": m, "cases": [], "combos": <every combination of R[k]'s name lists>}), ctx.tool("csi_design_results", ...), ctx.tool("csi_read_model_state", {"model": m}))` (the last is `F`; amendment B-544; reads of one model in one parallel are allowed, engine §4.3.1) | Invariant 1; units labels converted by the adapter |
+| 14 | `ctx.calc("harness.analysis_summary", ...)`, then D-3; per kind of `design.run`, steel before concrete: `ctx.calc("harness.host_design_verdicts", {"results", "kind", "basis"})`, then `ctx.calc("harness.design_summary", {"verdicts": <that kind's>, "frames": F.frames, "previous": <that kind's summary of cycle k-1>, "basis"})` (amendment B-544) | Invariant 3 |
 | 15 | `ctx.decide("edit_cycle_engineer_turn", EngineerTurn, TurnState(...), rules=(), policy=require_engineer)` | Invariant 4; the choice is on the page only (spec 0006 AC46) |
 | 16 | `ctx.approve(..., kind=PROMOTION)`, `ctx.promote(m, Promotion.FILE_COPY, approval)` | Always ask; binding with file hashes; original unchanged (`CONFLICT`) (engine §4.7) |
-| 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
+| 17 | `ctx.approve(..., kind=SIGN_OFF)` with the outputs as preview items, then one item `exc_<n>` per exception (amendment B-544, below) | Always ask; `signed_off`; the page refuses exceptions without a reason (spec 0006 AC42) |
 
 `X.frames` is the `model.frame_placements/1` reference of read `X` (likewise per read-set field). Each calc's basis
 paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 for `harness.model_diff`, §4.8 for
@@ -474,6 +516,25 @@ paths (the spec 0003 §4.4 rows whose "Used by" names the calc's section: §4.7 
 does not pass them at call time: the command line's calc-port factory supplies them when it constructs the port (spec
 0003 §4.12; spec 0006 §4.2.2 step 4), mapping both calc ids to the `BASIS_FIELDS` of `calcs/model_diff.py` (amendment
 B-498).
+
+Amendment B-544. **Step 13 read.** Decision: the design summary takes the `frames` of `F`, the model-state read of
+step 13, because the step 10 save and the `pre_analysis` saves before steps 11 and 12 raise the model revision, so the
+step 9 or step 3 read is stale at step 14 (`REF_STALE`, invariant 3), spec 0003 §4.13 and AC49 keep `frames` not
+`stale_ok`, and leaving it out would drop the summary's frames without design results. **Drift names.** Decision:
+`combos` is every combination name of `R[k]`'s `harness.csi_name_lists/1` and `cases` is empty, because no basis field
+or name list names drift cases, and a limit checked over all combinations never passes a drift that a subset of them
+would fail; a model without combinations gives no drift row, which D-3 does not pass (§4.6). Which combinations the
+limit applies to is Q21; what the host returns for combinations with no case is §12 (1). **Two design kinds.**
+Decision: one design summary per kind of `design.run`, because spec 0003 §4.9 takes one verdicts reference and a
+merge would be a new calc; with `steel_and_concrete` each summary lists the other kind's frames among its frames
+without design results. The engineer turn's design status is the worse of the summaries' statuses in the order of
+spec 0003 §4.9 S5 (`FAIL`, `ERROR`, `NEEDS_ENGINEER`, `PASS`, `NOT_APPLICABLE`); its refs and counts name each.
+**Step 17 exceptions.** An exception is a verdict whose status is neither `PASS` nor `NOT_APPLICABLE`, taken from the
+`harness.host_design_verdicts/1` results of every cycle of the run in the order the journal holds their steps, each
+result's verdicts in stored order, numbered `exc_1`, `exc_2`, ...: the rule of the sign-off page (spec 0006 §4.4.6),
+since no other result of this workflow is a verdict kind. Each item has no refs, so `signed_off.outputs` is unchanged
+(spec 0006 Q24). Decision: the block numbers them from the results it produced, in call order, which is the journal's
+order, because a block cannot read the journal.
 
 `R[k]` is the recorded state of revision `k`: the step 9 read of cycle `k`, or its step 3 read when the cycle wrote
 nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itself only for completeness). `S[k]` is
@@ -514,8 +575,8 @@ statuses, booleans and labels only; no rule holds a number (thresholds are in th
 
 | Point | Options | State | Rules, in order | Policy |
 |---|---|---|---|---|
-| `edit_cycle_readback_result` (D-2) | `continue`, `restore_previous`, `stop_cycle` | readback status, counts of mismatch, missing, unexpected and not-read items as booleans (`has_mismatch`, ...), reason (`readback`, `model_changed_during_apply`), refs | `edit_cycle_readback_result.pass`: status `PASS` and reason `readback` → `continue` | `require_engineer=True` after the rules; `model=False`, `llm=False` |
-| `edit_cycle_analysis_messages` (D-3) | `continue`, `stop_cycle` | `has_errors`, `has_unclassified`, drift status, refs | `edit_cycle_analysis_messages.clean`: not `has_errors`, not `has_unclassified` → `continue` | same |
+| `edit_cycle_readback_result` (D-2) | `continue`, `restore_previous`, `stop_cycle` | readback status, counts of mismatch, missing, unexpected and not-read items as booleans (`has_mismatch`, ...), reason (`readback`, `model_changed_during_apply`, `check_model_failed`; amendment B-544), refs | `edit_cycle_readback_result.pass`: status `PASS` and reason `readback` → `continue` | `require_engineer=True` after the rules; `model=False`, `llm=False` |
+| `edit_cycle_analysis_messages` (D-3) | `continue`, `stop_cycle` | `has_errors`, `has_unclassified`, `drift_status` (below; amendment B-544), refs | `edit_cycle_analysis_messages.clean`: not `has_errors`, not `has_unclassified`, `drift_status` `PASS` → `continue` (Q20) | same |
 | `edit_cycle_engineer_turn` (D-6) | `accept`, `more_edits`, `hand_edit` | readback, analysis and design statuses, counts as labels, refs to the summaries and the difference report | none | `require_engineer=True` |
 
 D-2 and D-3 are never open at the same time: D-2 is asked before analysis and an open D-2 means analysis does not
@@ -527,6 +588,22 @@ the engine's in-flight request (engine §4.5.3), not a workflow point. `stop_cyc
 same cycle with the summaries available so far; `restore_previous` runs `ctx.tool("csi_open_revision", {"model": m,
 "revision": P[k]})` (§4.5.1, §4.10, Q4) and starts the next approval-void iteration (a new step 3 read, a step 4
 difference report against `R[k-1]` that still shows the engineer's changes, and a new approval).
+
+Amendment B-544. **Drift at D-3 (owner decision of 2026-11-16, Q20).** `clean` holds only when the analysis summary
+reports no error, no unclassified message and no story whose drift ratio exceeds the limit. The D-3 state's
+`drift_status` is `PASS` when the summary's `exceeding` is empty and its `governing_drift` is not, else
+`NEEDS_ENGINEER`; the limit and "exceeds" are those of §4.4.4. So a story drift above the limit stops the cycle at D-3
+and asks the engineer. Decision (B-544): a summary with no drift row (`governing_drift` empty) gives `NEEDS_ENGINEER`
+too, because then no story was checked against the limit, while the merged calc reports `PASS` for it; the calc is
+unchanged. Both rules of `rules/edit_cycle.py` move to version 2, because the rule lock hashes the module source (spec
+0005 AC10); the D-2 point moves to version 2 for its new reason (spec 0005 AC4). **A failed check before the step 9
+read (Q14, interim reading).** The step 9 block catches the `ModelIntegrityError` of the check that invariant 1
+inserts before the S' read and opens D-2 with the reason `check_model_failed`, status `NEEDS_ENGINEER`, every finding
+flag false and the step 6 expected effects as refs; the read-back check does not run, and `restore_previous` and
+`stop_cycle` act as for a read-back failure. The check inserted before the D-2 request passes, because the CSI
+`check_model` clears its written items even when it is not clean (Q14); if it fails, the run escalates as before.
+Decision (B-544): the state names no check result, because the journal's `step_failed` of that check holds its message
+and no result reference, so a replay could not name it.
 
 ### 4.7 Approvals, permission modes and the engineer turn
 
@@ -620,7 +697,8 @@ screen each count; one batched screen counts once. Steps 16 and 17 are once per 
 counted. Interim reading (B-533): an engine decision request still open at the end of the journal is not counted,
 because it cannot be told from the engineer turn until it is answered, and an approval answered by a `mode:` caller is
 not counted, because no engineer was asked. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC15, AC19, AC21 and AC22.
-In those fake-host scenarios the fake returns no analysis messages, so D-3 resolves by `edit_cycle_analysis_messages.clean` and no request is
+In those fake-host scenarios the fake returns no analysis messages and story drifts not above `limits.drift_ratio`
+(amendment B-544, §4.6), so D-3 resolves by `edit_cycle_analysis_messages.clean` and no request is
 counted; one added scenario has the fake return messages, which are `unclassified` (EC-G3), and shows D-3 as that
 cycle's one prompt. Interruption, failure and escalation paths (resume after a stop with its `engine.host_state`
 request, approval void, read-back failure and restore, timeout, change-set re-asks and exhaustion, cycle limit: AC13,
@@ -710,12 +788,12 @@ Errors of the engine, adapters and calcs pass through unchanged.
 
 | Criteria | Layer | Location |
 |---|---|---|
-| AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
+| AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35, AC40 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
 | AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
-| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
+| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38, AC41, AC42 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
 
 No host program and no network. Coverage floors 85% line and 75% branch; mutation score at least 80% on the R1
@@ -743,12 +821,14 @@ start at version 1 with lock entries.
 | Q10 | A7 depends in practice on EC-G3: while every analysis message is `unclassified`, D-3 asks the engineer in almost every real cycle, so the CI scenarios hold A7 only because the fake returns no messages, and in the local B-1 runs any other request in a cycle with messages exceeds the bound | Owner | Resolve EC-G3 in local test (1) of §12 before the B-1 acceptance runs; until then report A7 per cycle with the D-3 prompts shown separately, and do not relax `edit_cycle_analysis_messages.clean` (an unknown message must not pass silently) |
 | Q12 | Amendment B-417: the §4.8 quantity paths gain their contract §4.7.2 suffixes. Three things follow outside this spec: (a) the contract's `basis.design_basis/1` path rule was lowercase only, so the eight paths with `_MPa`, `_kN_m3`, `_kN_m` or `_kPa` cannot be stored (spec 0004 Q1, spec 0003 Q1); (b) spec 0003 §4.4 (and the prose of specs 0010, 0011 and 0013, and plans 0011 and 0013) name `compare.length`, `compare.angle` and the other `compare.*` fields without suffixes; (c) specs 0002 §4.5.8, 0008, 0011, 0013 and 0014 and plan 0014 name `checks.readback_relative_tolerance` without the `_ratio` suffix; (d) specs 0004 (§4.8 field proposal), 0010 and 0013 (Table A, which reuses the §4.8 fields) name `limits.ratio_limit`, which §4.8 renames `limits.ratio_limit_ratio`, and so do structural-codes plan 0002 (Q2) and the clause document `aci318_14.13_3_1_1` (basis `limits.ratio_limit`) | Owner | (a) decided by the owner (OQ-Q44, amendment B-463): the last path segment may end with a contract §4.7.2 suffix (contract spec §4.10.2, AC48a), built by eng-contract plan 0001 T19 (B-464) before plan 0007 T2 and T8; (b), (c) and (d) done by amendment B-467, a documents work item that renames those paths in specs 0002, 0003, 0004, 0008, 0010, 0011, 0013 and 0014 and plans 0011, 0013 and 0014 to the names of §4.8, and renames `limits.ratio_limit` in structural-codes plan 0002 (Q2) in the same item; the clause document `aci318_14.13_3_1_1` is protected engineering content, so its rename goes to the owner queue with it (listed by B-467, not edited); all before plan 0003 T8b and T9 and plan 0002's `check_model` are written, so that the calcs' `basis_fields` equal the paths this workflow declares |
 | Q13 | Amendment B-417: how the shipped workflow is registered; `block.discover()` returns an empty registry and no plan task listed a file that fills it | Owner | `workflows/__init__.py` exports the shipped blocks and `discover()` reads it lazily (§4.2), built by plan 0007 T9 (T9b since B-511); plan 0010 T9 and plan 0013 T11 and T13 add their blocks there (each lists `workflows/__init__.py`) |
-| Q14 | **[added: B-503]** Engine invariant 1 stops on a `check_model` whose summary is not clean (engine §4.6 row 1, engine plan T22): at step 9 the inserted check before the S' read raises `ModelIntegrityError` on a `READBACK_MISMATCH`, so `harness.readback_check` and D-2 never see that write; the CSI `check_model` clears its written items even when the result is not clean, so the check that invariant 1 inserts before D-2 (a `decide`) passes on the tolerance-free checks alone | Owner | Writer's recommendation: the step 9 block catches `ModelIntegrityError` from the inserted check and opens D-2 with the reason `check_model_failed` and the stored `issues.model_check/1` result (the error's evidence) as evidence, so `restore_previous` works as for a read-back `FAIL` (AC17); the clearing stays, because a check that kept the items would stop D-2 itself. Until answered, plan T8 adds no routing: the stop escalates like any `StepError`, and AC17 is tested with a read-back `FAIL` that `check_model` does not see |
+| Q14 | **[added: B-503]** Engine invariant 1 stops on a `check_model` whose summary is not clean (engine §4.6 row 1, engine plan T22): at step 9 the inserted check before the S' read raises `ModelIntegrityError` on a `READBACK_MISMATCH`, so `harness.readback_check` and D-2 never see that write; the CSI `check_model` clears its written items even when the result is not clean, so the check that invariant 1 inserts before D-2 (a `decide`) passes on the tolerance-free checks alone | Owner | Writer's recommendation: the step 9 block catches `ModelIntegrityError` from the inserted check and opens D-2 with the reason `check_model_failed` and the stored `issues.model_check/1` result (the error's evidence) as evidence, so `restore_previous` works as for a read-back `FAIL` (AC17); the clearing stays, because a check that kept the items would stop D-2 itself. Interim reading (amendment B-544, lead decision until the owner answers): the recommendation is built as §4.6 states it, with no check result among the refs (a replay cannot name it), by plan T9c (AC17 second clause); plan T8 adds no routing and tests AC17's first clause with a read-back `FAIL` that `check_model` does not see |
 | Q15 | **[added: B-503]** `load_combination_set` on a new combination is an `add` of the whole object, and spec 0003 §4.8 R2 compares an `add` leaf by leaf, list items index by index (D5); the after read set keeps the host's order (spec 0003 §4.6 F2 orders lists only inside the fingerprint), so a host that lists the items in another order gives a false `mismatch` | Owner | Writer's recommendation: spec 0003 §4.8 R2 matches the items of a keyed nested list (combination `items`, D2 key) by key, not by index, for an `add` as R3 and D2 already do; until then plan T3 keeps the change set's item order and no test pins another |
 | Q16 | **[added: B-503]** The model identity and revision of the working file that `restore_previous` opens (§4.5.1): ADR-0032 rule 3 and the merged `IdentityStore.resolve` give a file whose content is known at a new path a new model id `derived_from` the older one, which would break the binding of the model (no `model_bound` at a restore) and the staleness of its references | Owner | Writer's recommendation: the restored file keeps the bound model's id and becomes its next revision (`IdentityStore.record_save` on the new path), since it is the same model in the same run; ADR-0032 to say so for a restore. Interim reading for plan T13 until answered |
 | Q17 | **[added: B-503]** Whether the change-set model moves to a kinds-level module before plan T9b merges: it enters the content hash of the R1 edit-cycle calcs (spec 0003 §4.3, B-493) while its risk floor in §4.1 is block code; importing it runs `workflows/__init__.py`, which from T9b imports the shipped blocks; and plan 0013's calcs would import from a private module | Owner | Writer's recommendation: move `ChangeSetDraft` and its item and value models to a public kinds-level module under `eng_harness.kinds` (risk floor R2, as `kinds/edit_cycle.py`) before T9 merges, admit it in spec 0003 §4.3 in place of `_change_set`, and accept the one-time hash change of the calcs that import it (verification again, process/10 §5) |
 | Q18 | **[added: B-513]** K3 (§4.4.1) refuses two items on one target and property and an item id with `/`, but says nothing of two terms of one `load_combination_set` item that have the same D2 item key (`case.case`, `case.case_type`, `case.step`); the merged check passes such an item without an issue | Owner | Decide whether K3 extends to the terms of one item and with which issue code (a golden case and a version rule of spec 0003 §4.2 follow). Until answered nothing refuses it and no test pins either behaviour; plan T14 builds only the item id rule |
 | Q19 | **[added: B-511]** `harness.host_design_verdicts` (§4.4.3) cannot output `verdicts.set/1`: the calc registry refuses an output kind outside the `harness.` family (spec 0003 AC1, AC47; contract §4.10.1 refuses a calc kind in a neutral family), and the calc port stores the body with `calc`, `draft` and `trace`, which the extra-forbidding `verdicts.set/1` model refuses; the merged design summary (spec 0003 §4.9) takes only a `verdicts.set/1` reference | Owner | Answered by the owner on 2026-11-16 (amendment B-538): option (a). The output kind is `harness.host_design_verdicts/1` in `kinds/edit_cycle.py`, holding the members of the verdict set plus the calc port's `calc`, `draft` and `trace` (§4.4.3); spec 0003 §4.9 `SummaryInput.verdicts` also accepts it (the draft design summary's content hash changes and its verification record follows, spec 0003 §4.5); the `check_id` and `code` values of §4.4.3 are as recommended (`host.<kind>_design_ratio`, `host_<kind>_design`); contract §4.10.1 and spec 0003 AC1 and AC47 do not change. Built by plan T4b |
+| Q20 | **[added: B-544]** §4.6 put a drift status into the D-3 state while §4.4.4 defines one combined status, and `edit_cycle_analysis_messages.clean` ignored drift, so a story drift above the limit passed D-3 without the engineer (raised by the reviewers of plan T4 and T7) | Owner | Answered by the owner on 2026-11-16: a story drift above the limit stops the cycle at D-3 and asks the engineer. `clean` holds only when the analysis summary reports no error, no unclassified message and no story whose drift ratio exceeds the limit; the D-3 state carries it as `drift_status`, read from the summary's `exceeding` (§4.6); built by plan T7b (rule) and T9a (state) |
+| Q21 | **[added: B-544]** Which load cases and combinations the story-drift read of step 13 names: no basis field or name list names them | Owner | Interim reading (lead decision B-544): every combination of the cycle's name lists and no case (§4.5), and a summary with no drift row does not pass D-3 (§4.6); naming the drift combinations would need a basis field that holds names, which §4.8 does not have |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |
@@ -761,7 +841,10 @@ start at version 1 with lock entries.
 ## 12. Needs local test
 
 Listed in `docs/local-testing.md` by the plan: (1) a full cycle on a copy of a real model, with the reply fields of
-`csi_design_results` (steel and concrete) and the columns of `Analysis Messages`; (2) `csi_save_model` as a new
+`csi_design_results` (steel and concrete) and the columns of `Analysis Messages`, and (amendment B-544) the rows
+`csi_results_story_drifts` returns for named combinations and no case (received by step 13 in
+`workflows/model_edit_cycle/_cycle.py`, plan T9a) and whether `check_model` reports `READBACK_UNAVAILABLE` after a
+first write (received by the step 9 route, plan T9c); (2) `csi_save_model` as a new
 revision and `csi_open_revision` on a server-launched instance; (3) the engineer editing by hand in the visible
 launched instance, saving, and pressing "I edited by hand"; (4) acceptance A1 to A7 on benchmark B-1, all of A4, with
 `cycle-timings.json` filled into the owner's sheet; (5) an ETABS kill and a process kill at analysis, apply and
