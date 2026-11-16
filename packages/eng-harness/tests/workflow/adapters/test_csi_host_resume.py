@@ -55,7 +55,7 @@ def _setup(
 
 
 def test_lease_preflight_and_epoch(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
-    """`preflight` and `session_epoch` come from the server manager; a lease locks the live instance, `release` frees it."""
+    """`preflight` and `session_epoch` are the server manager's; a lease locks the live instance, `release` frees it."""
     clock = FixedClock(_START)
 
     async def body() -> None:
@@ -89,7 +89,7 @@ def test_lease_preflight_and_epoch(tmp_path: Path, make_config: ConfigFactory, c
 
 
 def test_new_port_restores_from_run_state(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
-    """A port over the same `run_dir` finds the working copy, its units and its instance; the instance is not launch-owned."""
+    """A port over the same `run_dir` finds the working copy, units and instance; the instance is not launch-owned."""
     clock = FixedClock(_START)
 
     async def body() -> None:

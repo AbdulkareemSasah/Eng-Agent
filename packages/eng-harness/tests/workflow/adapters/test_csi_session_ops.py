@@ -240,7 +240,7 @@ def test_restore_after_timeout(tmp_path: Path, make_config: ConfigFactory, contr
 
 
 def test_save_records_the_state_fingerprint(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
-    """`save` keeps the fingerprint of the saved state, so the engine's resume check sees no `model_differs` (B-451 L3)."""
+    """`save` keeps the saved state's fingerprint, so the engine's resume check sees no `model_differs` (B-451 L3)."""
     clock = FixedClock(_START)
     ids = SeededIdSource(b"fingerprint", clock)
 

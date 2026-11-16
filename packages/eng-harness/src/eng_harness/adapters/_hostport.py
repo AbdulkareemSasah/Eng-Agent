@@ -55,7 +55,7 @@ class AdapterHostPort:
         return self._sessions.session_epoch(host_key)
 
     async def acquire(self, host_key: str) -> HostLease:
-        """Lease the host: lock again every instance of the run state still alive (`HOST_LOCKED` when held elsewhere)."""
+        """Lease the host: lock again each live instance of the run state (`HOST_LOCKED` when held elsewhere)."""
         if host_key == self._host_key:
             for opened in self._instances.values():
                 if self._session.alive(opened):
