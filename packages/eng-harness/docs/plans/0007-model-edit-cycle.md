@@ -384,6 +384,23 @@ tasks:
       - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings"
     covers: [AC26, AC29, AC32]
     depends_on: [T10]
+  - id: T10c
+    title: The B-1 timings read the benchmark request where the engine stores the change-set answer
+    # Amendment (B-545, documents only): new fix task for merged T10b code (first-live-run walk-through C31; spec 4.9, AC29).
+    # _benchmarks reads fields.benchmark_request.value, but the engine stores one entry per field of ChangeSetRequest, so the
+    # label is at fields.change_set.value.benchmark_request and benchmarks is always empty for a real run. About 4 lines of
+    # report/_edit_cycle.py and 1 of CHANGELOG.md: budget 15 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/report/_edit_cycle.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/journal_script.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py"
+    max_changed_lines: 15
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py::test_benchmark_label_in_the_change_set_answer"
+    covers: [AC29]
+    depends_on: [T10b]
   - id: T11
     title: Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list
     # Amendment (B-511, documents only): pre-flight audit. The workflow prompt tests and the property test pin merged
@@ -477,6 +494,26 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py::test_version_keyword_of_versioned_callable"
     covers: [AC2]
     depends_on: []
+  - id: T16
+    title: Calc harness.change_set_check refuses an item id that is not a page token, or is revision or unlock (INVALID_ITEM_ID)
+    # Amendment (B-545, documents only): new fix task for merged T2 and T14 code (first-live-run walk-through C20, C29; spec
+    # 4.4.1 K3, AC4). An id the check accepts but that is not a page token of at most 57 characters makes the step 6
+    # change-set screen a refusal screen with no button. After T4b, which also edits calcs.lock.json and moves the hashes of
+    # the calcs that import kinds/edit_cycle.py. About 8 lines of the calc, 4 of the lock, 3 of the record and 1 of
+    # CHANGELOG.md: budget 30 (an estimate, measured analog T14).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/check-item-id-*.json"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_item_id_not_a_page_token_is_refused"
+    covers: [AC4]
+    depends_on: [T14, T4b]
 ---
 
 # Implementation plan: eng-harness model edit cycle (spec 0007)
@@ -494,7 +531,8 @@ amended in its own documents pull request (spec Q2, Q3, Q5 and spec 0004 Q7), as
 The decision points and rules (T7) are R1 and reviewed separately from the block. The block is split in three (T8 steps
 1 to 10, T9a steps 11 to 15, T9b steps 16 and 17, the loop and registration; amendment B-511), each tested end to end against the synthetic CSI fake server process. The
 report and audit (T10), the prompt counter and timings (T10b) are pure functions over the journal. T11 and T12 add the acceptance
-support and the replay suite, mostly tests.
+support and the replay suite, mostly tests. T10c and T16 fix merged code found by the first-live-run walk-through
+(amendment B-545): the benchmark label's place in the stored answer, and the item ids the change-set screen can carry.
 
 Reuse (spec §2): everything from plans 0001 to 0006; no code is copied from Sasaah or elsewhere (A12). Tests use the
 synthetic CSI fake of plan 0002 T4 (extended by T5 here with the `Analysis Messages` table, design replies, a lock
@@ -694,6 +732,16 @@ Amendment (B-533): `edit_cycle_timings(reader, store=None)` takes the optional s
 (spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006 T16,
 which exports both functions from `report/__init__.py`; amendment B-536).
 
+**T10c Benchmark label in the stored answer** (amendment B-545; spec §4.9, AC29). `_benchmarks` in
+`report/_edit_cycle.py` reads the label at `fields["benchmark_request"]["value"]`; the engine's `ask` stores one entry
+per field of the asked model, and `ChangeSetRequest` has the one field `change_set` (spec §4.3.1), so the label is at
+`fields["change_set"]["value"]["benchmark_request"]`. T10c reads it there and nowhere else (one shape, the one a real
+run journals). `Script.answer` in `journal_script.py` stores the answer in that shape
+(`{"change_set": {"value": {"items": [...], "benchmark_request": label}, ...}}`), so the existing benchmark tests
+follow the fix; `test_benchmark_label_in_the_change_set_answer` builds such an answer itself and checks the label and
+its elapsed time, and fails at the merge base, where `benchmarks` is empty. `ChangeSetRequest` is not merged (T8), so
+the test writes the dictionary, not the model.
+
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
@@ -741,6 +789,18 @@ the test reads the committed policy. Gate spec §4.8 A4 already says "initially"
 listed callable, so no gate document changes. `.gate/**` is protected (r3 floor): the pull request shows the
 awaiting-owner notice and the owner approves the policy change; T7, and through it T8, T9a and T9b, start after it.
 
+**T16 Item id that is not a page token** (amendment B-545; spec §4.4.1 K3, AC4). `harness.change_set_check` raises
+`INVALID_ITEM_ID` for an item id that does not fully match `[A-Za-z0-9_.-]{1,57}` (ASCII) or that is `revision` or
+`unlock`, with a `detail` naming the rule and spec 0007 §4.4.1 K3; an id with `/` keeps T14's detail and golden cases
+(one issue per id). The merged `test_item_id_without_a_slash_is_not_refused` uses the id literal `"a-b.c_1\\d"` (a backslash), which the token
+rule refuses: it takes a token id in the implementation commit (it passes at the base, so it is not in the `test:`
+commit). The calc carries the pattern and the two ids itself (it imports nothing from `pages`), citing
+spec 0006 AC49 and the 7-character field prefixes. A new golden case `check-item-id-token.json` (ids with a space, a
+non-ASCII letter, 58 characters, `revision` and `unlock` refused; 57 characters and `a.b_c-1` accepted; derivations by
+hand) and `test_item_id_not_a_page_token_is_refused`, which fails at the merge base (an id `beam 1` gives no issue);
+the verification record and the lock follow. Version 1 stays (spec §4.4.1 decision). T16 waits for T4b (both edit
+`calcs.lock.json`).
+
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new (Hypothesis and pytest from plan 0001 T1).
@@ -763,6 +823,8 @@ awaiting-owner notice and the owner approves the policy change; T7, and through 
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 | T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
+| T10c | nothing outside this plan (amendment B-545) |
+| T16 | T4b of this plan (both edit `calcs.lock.json`; amendment B-545) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
 
 ## 4. Verification

@@ -302,6 +302,23 @@ tasks:
       - "packages/eng-harness/tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests"
     covers: [AC43, AC44, AC45, AC46]
     depends_on: [T2, T7, T9]
+  - id: T10c
+    title: "Page fixes: the voided display matches the engine's request kinds, the input screen tells how a waiting run takes a data answer"
+    # Amendment (B-545, documents only): new fix task for merged T7b and T10 code (first-live-run walk-through C28, C27; spec 4.4.5, AC34, AC46).
+    # About 2 lines in pages/_ports.py (_VOIDABLE gains change_set and promotion), 3 in pages/_labels.py (INPUT_NOTE) and 1 of CHANGELOG.md: budget 15 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/pages/_ports.py"
+      - "packages/eng-harness/src/eng_harness/pages/_labels.py"
+      - "packages/eng-harness/tests/unit/pages/test_void.py"
+      - "packages/eng-harness/tests/unit/pages/test_choice_screen.py"
+    max_changed_lines: 15
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/pages/test_void.py::test_void_marks_the_engine_kinds"
+      - "packages/eng-harness/tests/unit/pages/test_choice_screen.py::test_data_request_names_stop_and_resume"
+    covers: [AC34, AC46]
+    depends_on: [T7b, T10]
   - id: T11
     title: "Report model: fold the journal and the store; timings, waiting and machine time"
     files:
@@ -494,6 +511,7 @@ tasks:
     # Amendment (B-412 third review, documents only): workflow tests use a fake engine from CliDeps; T17c re-checks AC47 with the real engine.
     # Amendment (B-412 fourth review, documents only): freeze and BasisSetupPort are merged, so T15 binds those CliDeps defaults itself.
     # Amendment (B-510, documents only): the CliDeps field basis_fields_of (default None; WorkflowDef.basis_fields is plan 0007 T6's) gives step 3 its FieldSpec list; the --template inputs follow the interim reading of spec Q22; budget 330 -> 340.
+    # Amendment (B-545, documents only): depends on T10c, which also edits pages/_ports.py; files and budget unchanged.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.pages (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -513,7 +531,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_stale_draft_hash_refused"
       - "packages/eng-harness/tests/workflow/test_cli_basis.py::test_no_wait_basis_exits_10_nothing_stored"
     covers: [AC47]
-    depends_on: [T14b]
+    depends_on: [T14b, T10c]  # T10c: both edit pages/_ports.py (amendment B-545)
   - id: T16
     title: "Commands status, stop, report and doctor"
     # Amendment (B-412, documents only): cli/__init__.py added (handlers, doctor field); report and doctor handlers in cli/_status.py; stop test drives a fake engine (real one re-checked in T17).
@@ -689,7 +707,8 @@ lets the rest stack on them:
 - T4 and T5 (progress) have no page dependency and can be built in parallel with T6 to T10 by another agent.
 - T6 is the riskiest task (the security checks of 16 §5): bind, session, Host, Origin, CSRF, headers, routes,
   lockdown, tested against a real loopback server. T7 adds the answer path (hash binding, single use, reasons) and
-  the durable wait, and T7b the stop-file protocol and the voided display; T9, T9b and T10 add the screens. T8 (release marks) precedes T9b because the sign-off screen lists the
+  the durable wait, and T7b the stop-file protocol and the voided display; T9, T9b and T10 add the screens; T10c
+  fixes the voided display's request kinds and the input screen's text (amendment B-545). T8 (release marks) precedes T9b because the sign-off screen lists the
   marked results.
 - T11 to T13 build the report from the journal and the store only. T11 folds the data; T12 renders sections and the
   source links (sections 2 to 5); T13 adds the status section, the timings and run events sections, the marks, the
@@ -825,6 +844,19 @@ wording, and the engine-request option labels) to `pages/_labels.py`; it exports
 `pages/__init__.py` and registers the choice and input screens in the dispatch mapping of `pages/_ports.py`.
 Amendment B-510: an option group is named `CHOICE` + property name (token-safe since T9); a property name that is not
 a token makes the screen a refusal screen, as in T9.
+
+**T10c Page fixes from the first-live-run walk-through** (amendment B-545; spec §4.4.5, AC34, AC46). (1) The hub's
+`_VOIDABLE` in `pages/_ports.py` holds `CHANGE_SET` and `PROMOTION` only, while `engine/_approvals.py` journals
+`ApprovalKind.value` (`change_set`, `promotion`), so with the real engine an approved request is never marked voided;
+T10c adds the lower-case values and keeps the upper-case names for the stand-in (spec §4.4.5 decision).
+`test_void_marks_the_engine_kinds` presents `approval_request(kind="change_set")` and one of kind `promotion`, resolves
+each approved and feeds an `APPROVAL_VOID` `step_failed`, and checks that the screen shows "voided"; it fails at the
+merge base, where the message goes to the index. (2) `INPUT_NOTE` in `pages/_labels.py` becomes the text of spec
+§4.4.5 step 2 (stop the run, then `resume RUN_ID --answers FILE`; `status` lists the run ids);
+`test_data_request_names_stop_and_resume` checks the rendered input screen holds `stop RUN_ID` and
+`resume RUN_ID --answers FILE`, and fails at the merge base. The existing assertion of `resume --answers FILE` in
+`test_choice_screen.py` changes with the text, in the implementation commit. No other screen changes; T15 waits for
+T10c because both edit `pages/_ports.py`.
 
 **T11 Report model** (spec §4.6.1 sections 5 to 7). Folding `JournalReader` views and store records into a
 `ReportModel`; waiting and machine time. A shared fixture run (`tests/fixtures/report_run.py`) is reused by T12 and T13.
@@ -1198,7 +1230,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Run-id cell, read by the page ports' `stop_requested` and `report`, the first interrupt, the heartbeat and the port builder's `run_folder` (§4.4.8) | none (`cli/_wiring.py`, T14) | not applicable | T14 (filled for `resume` and from `ApprovalRequest.run_id`); T16b (filled from `run_started`); T18b (filled at step 1 for `run`, spec Q20 answer A, amendment B-471) |
 | `FileRunControl` as the `RunControlPort` (step 5, §4.4.8) | none (built by `cli/_wiring.py`, T14) | not applicable | T7b (`cli/_control.py`); reaches the real `EnginePorts` in T16b (engine plan T18) |
 | Page settings (`[page]` configuration, the `[engine] engineer` name) and the `--wait-timeout` value given to the page ports (§4.2.1, §4.2.4, §4.4.5 step 2) | none (`cli/_wiring.py`, T14) | not applicable | merged (`PageSettings`, `pages/_server.py`, T6); the timeout is T7's port parameter |
-| Voided approval display (§4.4.5, AC34) | none (`pages/_ports.py`) | not applicable | T7b |
+| Voided approval display (§4.4.5, AC34) | none (`pages/_ports.py`) | not applicable | T7b; the engine's request kinds by T10c (amendment B-545) |
 | Page `ApprovalPort` and `InputPort` (step 5), wrapped with the process wait mode (§4.4.5 step 2) | none (`cli/_wiring.py`, T14; the wait-mode wrapper T14c, amendment B-510) | not applicable | T7 (approval, dispatch), T7b (voided display), T9 and T9b (review screens), T10 (choice and input screens) |
 | Page server `PageServer` (§4.4.1, started lazily) | none | not applicable | merged (`pages/_server.py`, T6) |
 | Page ports' stop check `stop_requested` (§4.4.5 step 2) | none (injected into the page ports, T7) | bound to `FileRunControl` through the run-id cell by T14 (`cli/_wiring.py`) | T7 |
