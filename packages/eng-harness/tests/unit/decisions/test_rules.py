@@ -2,6 +2,7 @@
 
 import hashlib
 import importlib
+import importlib.util
 import inspect
 import json
 import pkgutil
@@ -192,7 +193,11 @@ def test_lock_check_and_write(tmp_path: Path) -> None:
         load_rule_lock(path)
 
 
-def test_discover_is_empty_without_rules_package() -> None:
+def test_discover_is_empty_without_rules_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    real = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name, *a: None if name == "eng_harness.rules" else real(name, *a)
+    )
     assert discover().rules == ()
     assert _rules.RULES_LOCK_PATH.name == "rules.lock.json"
 
@@ -242,6 +247,8 @@ def test_write_lock_command_writes_both_and_refuses_a_bump(tmp_path: Path, monke
     points_lock, rules_lock = tmp_path / "decisions.lock.json", tmp_path / "rules.lock.json"
     monkeypatch.setattr(_points, "LOCK_PATH", points_lock)
     monkeypatch.setattr(_rules, "RULES_LOCK_PATH", rules_lock)
+    monkeypatch.setattr(_points, "discover", lambda: PointRegistry([]))
+    monkeypatch.setattr(_rules, "discover", lambda: RuleRegistry([]))
     assert command.main(["--write-lock"]) == 0
     assert json.loads(points_lock.read_text(encoding="utf-8")) == []
     assert json.loads(rules_lock.read_text(encoding="utf-8")) == []
