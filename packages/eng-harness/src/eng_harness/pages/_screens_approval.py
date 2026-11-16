@@ -1,19 +1,23 @@
-"""The change-set, promotion and info screens (spec 0006 4.4.6; AC40, AC41).
+"""The change-set, promotion, info and sign-off screens (spec 0006 4.4.6; AC40 to AC42).
 
 Purpose: render an approval request from its stored preview (checked against `shown_sha256`, else a screen with no
 button) and the journal's `model_saved` records. Every value shown is read from a stored result and named with its unit
 and source; none is computed here. A field name is a prefix and an item id and must be a token (AC49): an id that is
-not one makes the change-set screen a refusal screen. Units: as stored with each value. Errors: a damaged preview is a
-screen, never an exception.
+not one makes the change-set screen a refusal screen. The sign-off screen reads the verdict sets of the run's steps and
+the release marks; a refused signature is an `AnswerError`. Units: as stored with each value. Errors: a damaged preview
+is a screen, never an exception.
 """
 
-from collections.abc import Callable, Sequence
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
 from typing import cast
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError
+from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.refs import Ref, parse_ref
 from eng_contract.store import ResultStore
+from eng_contract.verdicts import VerdictStatus
 from pydantic import JsonValue, ValidationError
 
 from eng_harness import _html as h
@@ -23,14 +27,21 @@ from eng_harness.ctx import ApprovalKind, Preview
 from eng_harness.journal import JournalReader
 from eng_harness.kinds.calcs import Change, ModelDiff
 from eng_harness.pages import _labels as lb
-from eng_harness.pages._answers import REASON, REJECT, Request, bound_sha256
-from eng_harness.pages._ports import PageHub, ScreenBuilder
+from eng_harness.pages._answers import REASON, REJECT, AnswerError, Request, bound_sha256
+from eng_harness.pages._ports import FormCheck, PageHub, ScreenBuilder
 from eng_harness.pages._routes import Screen
 from eng_harness.pages._security import CSRF_FIELD, Subject
 from eng_harness.ports import ApprovalRequest
+from eng_harness.report._lineage import ReportError, unreleased_dependencies
 
 _SHORT = 12  # characters of a hash shown on the change-set screen; a promotion shows the whole hash
 type _Journal = Callable[[], JournalReader]
+_ACK = "acknowledged_unreleased"
+_OK = frozenset({VerdictStatus.PASS, VerdictStatus.NOT_APPLICABLE})  # the other statuses are exceptions (AC42)
+type _Exception = tuple[
+    str, str, str, str
+]  # item `exc_<n>` (carries the reason; spec 0006 Q24), subject, check, status
+type _Facts = tuple[Counter[VerdictStatus], list[_Exception], list[str]]  # counts, exceptions, unreleased texts
 
 
 def _inline(text: str) -> Element:
@@ -102,6 +113,7 @@ class _Screens:
     def _screen(
         self, request: ApprovalRequest, preview: Preview | None, top: Callable[[Preview], list[Node]],
         inside: Callable[[Preview], list[Node]] = lambda _: [], *, accept: Trusted = lb.APPROVE,
+        names: frozenset[str] | None = None,
     ) -> Screen:  # fmt: skip
         """One screen: the title, `top`, and a form with `inside`, the name, the reason and Approve and Reject."""
         subject = Subject("approval", request.request_id, bound_sha256(request))
@@ -110,7 +122,9 @@ class _Screens:
             body = [el(Tag.H1, title), el(Tag.P, lb.DAMAGED), el(Tag.P, el(Tag.A, lb.BACK, href=h.href()))]
             return Screen(lb.TITLE, subject, frozenset(), lambda _: body)
         fields = frozenset({"shown_sha256", "by", "decision", "reason"})
-        if preview.items and inside(preview):  # the item boxes of the change set
+        if names is not None:  # the sign-off form names its own fields
+            fields |= names
+        elif preview.items and inside(preview):  # the item boxes of the change set
             fields |= frozenset(p + item.id for item in preview.items for p in (REJECT, REASON))
 
         def render(token: str) -> list[Node]:
@@ -206,6 +220,80 @@ class _Screens:
             lambda p: [el(Tag.UL, *(el(Tag.LI, _inline(i.label)) for i in p.items))], accept=lb.ACKNOWLEDGE,
         )  # fmt: skip
 
+    # sign-off ---------------------------------------------------------------------------------------------------
+
+    def _facts(self, hub: PageHub) -> _Facts | None:
+        """Counts and exceptions of the verdict sets of the run's steps, in step order, and the unreleased tools."""
+        reader = self._journal()
+        try:
+            marked = unreleased_dependencies(reader, self._store, hub.marks)
+            ids = dict.fromkeys(parse_ref(s.result_ref)[0] for s in reader.steps() if s.result_ref is not None)
+            counts: Counter[VerdictStatus] = Counter()
+            exceptions: list[_Exception] = []
+            for result_id in (i for i in ids if self._store.get(i).kind == "verdicts.set/1"):
+                for v in VerdictSet.model_validate(self._store.payload(result_id)).verdicts:
+                    counts[v.status] += 1
+                    if v.status not in _OK:
+                        exceptions.append(
+                            (f"exc_{len(exceptions) + 1}", f"{v.subject.kind} {v.subject.id}", v.check_id, v.status)
+                        )
+        except ContractError, ValidationError, ReportError:
+            return None
+        finally:
+            reader.close()
+        return counts, exceptions, sorted({text for mark in marked.values() for text in mark.texts})
+
+    def sign_off(self, hub: PageHub, request: Request) -> Screen:
+        approval = cast(ApprovalRequest, request)
+        preview = self._preview(approval, fields=True)
+        facts = None if preview is None else self._facts(hub)
+        if facts is None:
+            return self._screen(approval, None, lambda _: [])
+        _, exceptions, unreleased = facts
+        names = frozenset(REASON + item for item, *_ in exceptions if item in approval.items)
+        names |= frozenset({_ACK}) if unreleased else frozenset()
+        return self._screen(
+            approval, preview, lambda _: self._sign_top(facts), lambda _: self._sign_form(approval, facts),
+            accept=lb.SIGN, names=names,
+        )  # fmt: skip
+
+    def _sign_top(self, facts: _Facts) -> list[Node]:
+        link = el(Tag.P, el(Tag.A, lb.REPORT_LINK, href=h.href(SafeToken("report"))))
+        counts = _table(lb.VERDICTS, [_row(s.value, str(facts[0][s])) for s in VerdictStatus])
+        return [link, el(Tag.H2, lb.VERDICTS_HEADING), counts]
+
+    def _sign_form(self, request: ApprovalRequest, facts: _Facts) -> list[Node]:
+        _, exceptions, unreleased = facts
+        shown: list[Node] = []
+        if exceptions:
+            rows = []
+            for exception in exceptions:  # an exception whose item the request lacks has no field: it cannot be signed
+                field = [el(Tag.INPUT, type=SafeToken("text"), name=SafeToken(REASON + exception[0]))]
+                cells = [el(Tag.TD, _inline(t)) for t in exception]
+                rows.append(el(Tag.TR, *cells, el(Tag.TD, *(field if exception[0] in request.items else []))))
+            shown += [el(Tag.H2, lb.EXCEPTIONS_HEADING), _table(lb.EXCEPTIONS, rows)]
+        if unreleased:
+            box = el(Tag.INPUT, type=SafeToken("checkbox"), name=SafeToken(_ACK))
+            listed = [el(Tag.LI, _inline(text)) for text in unreleased]
+            ack = el(Tag.P, el(Tag.LABEL, box, lb.ACKNOWLEDGE_UNRELEASED))
+            shown += [el(Tag.H2, lb.UNRELEASED_HEADING), el(Tag.UL, *listed), ack]
+        return shown
+
+    def check_sign_off(self, hub: PageHub, request: Request, form: Mapping[str, str]) -> None:
+        """The page's rules of a signature (AC42): a reason for every exception and the acknowledgement."""
+        if form.get("decision") != "approve":
+            return
+        approval = cast(ApprovalRequest, request)
+        facts = None if self._preview(approval, fields=True) is None else self._facts(hub)
+        if facts is None:
+            raise AnswerError("the verdicts or the release marks cannot be read: nothing can be signed")
+        _, exceptions, unreleased = facts
+        for item, *_ in exceptions:
+            if item not in approval.items or not form.get(REASON + item, "").strip():
+                raise AnswerError(f"exception {item} has no reason")
+        if unreleased and _ACK not in form:
+            raise AnswerError("acknowledge the results that depend on an unreleased tool")
+
 
 def approval_screens(store: ResultStore, journal: _Journal) -> dict[str, ScreenBuilder]:
     """The builders of the `change_set`, `promotion` and `info` requests; `journal` opens a reader the screen closes."""
@@ -215,3 +303,9 @@ def approval_screens(store: ResultStore, journal: _Journal) -> dict[str, ScreenB
         ApprovalKind.PROMOTION.value: screens.promotion,
         ApprovalKind.INFO.value: screens.info,
     }
+
+
+def sign_off_screens(store: ResultStore, journal: _Journal) -> tuple[dict[str, ScreenBuilder], dict[str, FormCheck]]:
+    """The builder of the `sign_off` request and the check the page makes of a posted signature (the hub's `checks`)."""
+    screens = _Screens(store, journal)
+    return {ApprovalKind.SIGN_OFF.value: screens.sign_off}, {ApprovalKind.SIGN_OFF.value: screens.check_sign_off}
