@@ -28,7 +28,7 @@ from workflows.rig import Host, make_rig, request, watch_closing
 from eng_harness.block import workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.engine import RunStatus
-from eng_harness.errors import HarnessCode, RunRefused, ToolFailed
+from eng_harness.errors import HarnessCode, ModelIntegrityError, RunRefused, ToolFailed
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
 from eng_harness.ports import CalcInfo, HostInstance, HostLease, LoadedBasis, ServerCheck, ToolInfo, UnitsState
@@ -150,6 +150,42 @@ def test_check_after_write(tmp_path: Path) -> None:
     assert "m1" in failed.escalation.detail
     bad = [e.payload for e in rig.events(failed.run_id) if isinstance(e.payload, ev.CheckEnforced)]
     assert bad[-1] == ev.CheckEnforced(invariant=1, model_key="m1", outcome="fail")
+
+
+def test_unclean_check_stops_run(tmp_path: Path) -> None:
+    """A check whose summary is not clean stops the run like a failed check; the evidence is the stored check (AC37)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    unclean = rig.host._success("check_model").model_copy(
+        update={"summary": {"errors": 1, "warnings": 0, "infos": 0, "clean": False}}
+    )
+    rig.host.script_check("m1", unclean)
+    caught: list[ModelIntegrityError] = []
+
+    async def read_after_write(ctx: Any) -> list[str]:
+        await ctx.tool("write_m", {"model": "m1"})
+        try:
+            await ctx.tool("read_m", {"model": "m1"})
+        except ModelIntegrityError as exc:
+            caught.append(exc)
+            raise
+        return []
+
+    done = asyncio.run(rig.engine(flow(read_after_write)).start(request()))
+    assert done.status is RunStatus.NEEDS_ENGINEER
+    assert [exc.evidence for exc in caught] == [(unclean.result_id,)]
+    assert [entry.tool for entry in rig.host.ledger] == ["write_m"]  # no port call follows the unclean check
+    events = rig.events(done.run_id)
+    failed = [e for e in events if e.type is EventType.STEP_FAILED and e.path == "1~pre.check_model.m1"]
+    assert len(failed) == 1
+    assert isinstance(failed[0].payload, ev.StepFailed)
+    error = failed[0].payload.error
+    assert isinstance(error, ev.HarnessError)
+    assert error.harness_code is HarnessCode.MODEL_INTEGRITY
+    assert error.message == "the check of m1 failed: the summary reports 1 errors"
+    enforced = [e.payload for e in events if isinstance(e.payload, ev.CheckEnforced)]
+    assert enforced[-1] == ev.CheckEnforced(invariant=1, model_key="m1", outcome="fail")
+    assert ev.CheckEnforced(invariant=1, model_key="m1", outcome="pass") not in enforced
 
 
 def test_engineering_literal_rejected(tmp_path: Path) -> None:
