@@ -430,20 +430,26 @@ tasks:
   - id: T14c
     title: "Commands run and resume: the page ports' wait mode and the answers files"
     # Amendment (B-510, documents only): new, split from T14; the wrapper that gives the page ports the process wait mode (spec 4.4.5 step 2), run --answers and resume --answers through pages.accept_answers_file, and their refusal while [engine] engineer is unset (spec 4.2.1).
+    # Amendment (B-536, documents only): first-live-run gaps. The port builder is called at the end of step 2 with the model files of the input (spec 4.2.2 step 2, AC67; spec 0002 H-G10 closed), and its NotImplementedGap (spec 0002 AC43, gap H-G8) ends run and resume with exit 2 (AC68). cli/__init__.py (the port_builder field's type) and tests/helpers/cli_deps.py (the shared builder's fake port builder) added; budget 80 -> 115.
     files:
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/cli/__init__.py"  # the port_builder field takes files (B-536)
       - "packages/eng-harness/src/eng_harness/cli/_run.py"
       - "packages/eng-harness/src/eng_harness/cli/_wiring.py"
+      - "packages/eng-harness/tests/helpers/cli_deps.py"  # the fake port builder takes files (B-536)
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
-    max_changed_lines: 80
+    # Amendment B-536: about 20 lines for the model files (the Path fields, the three refusals, the stored input at resume), 3 for the field's type, 6 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 80 + 30 = 110, budget 115.
+    max_changed_lines: 115
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_form_request_answers_file"
       - "packages/eng-harness/tests/workflow/test_cli_answers.py::test_run_answers_first_data_request"
-    covers: [AC46, AC64]
+      - "packages/eng-harness/tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder"  # AC67 (B-536)
+      - "packages/eng-harness/tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2"  # AC68 (B-536)
+    covers: [AC46, AC64, AC67, AC68]
     depends_on: [T10, T14]
   - id: T14b
     title: "Commands run and resume: signals, launch address on the terminal only, decision layer wiring"
@@ -514,18 +520,21 @@ tasks:
     # Amendment (B-412 second review, documents only): tests/helpers/cli_deps.py added (T16 extends the shared builder with the doctor field); T18 binds the doctor default.
     # Amendment (B-412 fourth review, documents only): stop writes the file only while the run lock is held; --wait waits for the lock release (spec 4.4.8).
     # Amendment (B-510, documents only): eng_harness.doctor.run is merged, so T16 binds the doctor default itself (section 3 rule; two lines inside the budget; its own tests-first case).
+    # Amendment (B-536, documents only): the report command also writes report/cycle-timings.json (spec AC69, spec 0007 4.9); report/__init__.py added (exports edit_cycle_timings and write_cycle_timings of plan 0007 T10b, which T16 waits for, section 3); budget 330 -> 345.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.cli (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
       - "packages/eng-harness/src/eng_harness/cli/_status.py"
       - "packages/eng-harness/src/eng_harness/cli/_stop.py"
+      - "packages/eng-harness/src/eng_harness/report/__init__.py"  # exports the cycle-timings functions (B-536)
       - "packages/eng-harness/tests/helpers/cli_deps.py"
       - "packages/eng-harness/tests/unit/cli/test_status.py"
       - "packages/eng-harness/tests/unit/cli/test_report_command.py"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py"
       - "packages/eng-harness/tests/workflow/test_cli_stop.py"
-    max_changed_lines: 330
+    # Amendment B-536: about 4 lines of exports in report/__init__.py and 8 in cli/_status.py (an estimate); budget 330 + 15.
+    max_changed_lines: 345
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/unit/cli/test_status.py::test_states_and_read_only"
@@ -533,8 +542,9 @@ tasks:
       - "packages/eng-harness/tests/unit/cli/test_report_command.py::test_output_rules"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough"
       - "packages/eng-harness/tests/unit/cli/test_doctor_command.py::test_doctor_default_is_doctor_run"
-    covers: [AC9, AC11, AC12, AC13]
-    depends_on: [T14b]
+      - "packages/eng-harness/tests/unit/cli/test_report_command.py::test_cycle_timings_file"  # AC69 (B-536)
+    covers: [AC9, AC11, AC12, AC13, AC69]
+    depends_on: [T14b]  # external: plan 0007 T10b (edit_cycle_timings, write_cycle_timings; B-536)
   - id: T16b
     title: "Production wiring: the decision, progress and run-control ports reach the real engine"
     # Amendment (B-412 fifth review, documents only): new; waits for engine plan T14, T14b and T18 (EnginePorts gains the decision, progress and run-control fields); the one non-test task that completes cli/_wiring.py for them.
@@ -647,6 +657,7 @@ tasks:
   - id: T18b
     title: "Bind the port builder default and draw the run id at step 1 for run"
     # Amendment (B-471, documents only): new, split from T18 (spec Q20 answer A, owner instruction of 2026-11-12); waits for engine plan T20 (work item B-472) and plan 0002 T19a (B-475).
+    # Amendment (B-536, documents only): the default passes the files argument of T14c on to build_ports (spec 4.2.2 step 2); files and budget unchanged.
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/cli/__init__.py"
@@ -683,8 +694,8 @@ lets the rest stack on them:
 - T11 to T13 build the report from the journal and the store only. T11 folds the data; T12 renders sections and the
   source links (sections 2 to 5); T13 adds the status section, the timings and run events sections, the marks, the
   integrity line, the policy and the atomic write; T13b adds the run's decision runtime to the status section (B-471).
-- T14 to T16 wire the commands: run and resume first (T14, then T14c for the page ports' wait mode and the answers
-  files, then T14b for signals, the launch address and the decision layer; they exercise everything), then the basis
+- T14 to T16 wire the commands: run and resume first (T14, then T14c for the page ports' wait mode, the answers
+  files and the model files of the port builder (amendment B-536), then T14b for signals, the launch address and the decision layer; they exercise everything), then the basis
   confirmation inside `run`, then status, stop, report and doctor;
   T16b completes the production wiring of the progress and run-control ports once the engine holds them. T17 closes with the cross-cutting end-to-end tests, the Windows Arabic
   environment test and the real-engine re-checks (test files only); T17b adds the local testing list and the agent
@@ -897,7 +908,8 @@ read through the merged `JournalReader` before `Engine.resume`), the clock and t
 registry, the approvals file, the calc settings and the `basis_fields` map (spec 0003 §4.12, spec 0007 §4.5; B-498)
 are the default factory's business (T18a). Step 4's preflight is
 that port's `preflight`, so no separate preflight field exists. (c) The port builder field `port_builder` (default
-`None`) is called as `port_builder(config, workspace, store, run_folder, clock, ids)`, where `run_folder` is a
+`None`) is called as `port_builder(config, workspace, store, run_folder, clock, ids)` (T14c adds `files` and moves
+the call to the end of step 2, amendment B-536), where `run_folder` is a
 callable that reads the run-id cell and raises while it is empty (spec §4.4.8); `build_ports` (spec 0002) builds
 only the tool and host ports, and T18b binds the default (spec Q20 answer A, amendment B-471). (d) `_wiring.py` builds the
 `ExpectedTimes` index once before the engine starts (`ExpectedTimes.build(workspace, workflow, settings)`, merged T4,
@@ -922,7 +934,15 @@ the bare one when one data request is pending) the same way. (3) The answer's `b
 `[engine] engineer`; while it is unset, both are refused with exit 2 naming `[engine] engineer`, before any run folder
 (`run`, step 2) and with nothing journaled (spec §4.2.1, AC46, AC64), a case of `test_form_request_answers_file`.
 Workflow tests use a fake engine from `CliDeps` except the wait test; T17c re-checks AC46 and AC64 with the real
-engine.
+engine. (4) Amendment B-536 (spec §4.2.2 step 2, AC67, AC68): the port builder is called at the end of step 2 as
+`port_builder(config, workspace, store, run_folder, clock, ids, files)`, `files` mapping the base name of each
+top-level `pathlib.Path` field of the workflow's input model to its value (absolute and existing; a relative path, a
+missing file or a repeated base name is exit 2 with no run folder); `resume` builds the same mapping from the run's
+input read through `input_ref` of the run header before `Engine.resume`. A `NotImplementedGap` from the port builder
+(spec 0002 AC43, gap H-G8) prints its message on standard error and ends `run` and `resume` with exit 2 through
+`exit_code_for_error` (the code `NOT_IMPLEMENTED` is mapped by plan 0002 T19a). `test_model_files_reach_the_port_builder`
+and `test_port_builder_gap_exits_2` inject a recording or raising port builder through `CliDeps`; both fail at the
+merge base, where the port builder takes no `files` and its exception is not caught.
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).
@@ -977,7 +997,10 @@ the report command, the doctor pass-through. Amendment B-412: the report and doc
 T16 registers the four handlers in the `CliDeps` handler table in `cli/__init__.py`. The doctor callable is a `CliDeps`
 field under the defaults rule of §3, injected in `test_doctor_command`; `eng_harness.doctor.run` (plan 0002 T18) is merged, so T16 binds the default itself (amendment B-510; T18a does not), checked by `test_doctor_command.py::test_doctor_default_is_doctor_run` (the doctor field of a default `CliDeps()` is that function).
 `test_stop_pauses_at_safe_point` drives a fake engine from `CliDeps` that polls `FileRunControl`; the real-engine stop
-is re-checked in T17.
+is re-checked in T17. Amendment B-536 (spec AC69): after the HTML, the report command writes
+`<run>/report/cycle-timings.json` by `write_cycle_timings(edit_cycle_timings(reader, store), path)` (plan 0007 T10b,
+exported from `report/__init__.py` here) when the timings hold at least one cycle, whatever `--out` says;
+`test_cycle_timings_file` checks a scripted edit-cycle journal and one without a cycle.
 
 **T16b Production wiring of the decision, progress and run-control ports** (amendment B-412 fifth review; spec
 §4.2.2 step 5, AC9, AC37, AC62). The merged `EnginePorts` holds the tool, host, calc, basis, approval and input
@@ -1074,7 +1097,7 @@ run header (spec 0002 §4.5.8, closed gap H-G9; amendment B-503), so T18a and T1
 Q20 answer A). `cli/_wiring.py` draws the run id for `run` at step 1 (`run_` + ULID from the ids source), fills the
 run-id cell at once, as for `resume`, and passes the id in `RunRequest.run_id` (engine plan T20, work item B-472,
 engine AC70); the `port_builder` default is `build_ports` (plan 0002 T19a; amendment B-475), so the default calls `build_ports(config,
-workspace, store, run_folder(), clock, ids)`. `test_port_builder_bound_and_run_id_drawn` checks that the default is
+workspace, store, run_folder(), clock, ids, files=files)` (the `files` of T14c, amendment B-536). `test_port_builder_bound_and_run_id_drawn` checks that the default is
 `build_ports`, that for `run` the cell holds the id before any port is built and the engine receives the same id, and
 that `run` and `resume` are then available with `CliDeps()`; it fails at the merge base because the default is `None`.
 It covers AC66. With the cell filled at step 1, the rule of spec §4.4.8 for a run id not yet known (AC10, tested by
@@ -1094,7 +1117,8 @@ decision, progress and run-control ports reach the real engine.
   T14b being merged; amendment B-510);
   plan 0002 T18 (doctor) and the adapter wiring `build_ports`; plan 0003 T5 (`HarnessCalcPort` and its `preflight`, the `calc_port_factory` default); plan 0004
   T7 (`BasisSetupPort`, `build_setup_view`) and T8 (`freeze`); plan 0007 T6 (`WorkflowDef.basis_fields`) for T17c
-  and T18a, not T15, which injects `basis_fields_of` (amendment B-510); plan 0007 T9b for the workflow registry (`workflows/__init__.py`, spec 0007 Q13; plan 0010 T9 adds its workflow to it; amendment B-471); engine plan T20 (caller-chosen run id, for T18b; amendment B-471); for T14b (B-098),
+  and T18a, not T15, which injects `basis_fields_of` (amendment B-510); plan 0007 T9b for the workflow registry (`workflows/__init__.py`, spec 0007 Q13; plan 0010 T9 adds its workflow to it; amendment B-471); engine plan T20 (caller-chosen run id, for T18b; amendment B-471); plan 0007 T10b (`edit_cycle_timings`,
+  `write_cycle_timings`, for T16's `report/cycle-timings.json`; amendment B-536); for T14b (B-098),
   decision plan T7 (the `Cascade`) and T10 (the cascade's `runtime_summary()` and its engine wiring; amendment B-412
   sixth review: the cascade is the `decision_port_factory` default that T18a binds), engine plan T14b (`decision_runtime` in the header) and
   provider plan 0009 T1 (`load_providers_config`, merged; T14b binds it, amendment B-510) and T10a (`assemble_decision_runtime`, phase 1; amendment B-475). T14, T14c, T14b and T15 use
@@ -1114,7 +1138,7 @@ decision, progress and run-control ports reach the real engine.
   plan T9 and T9b) in T14, `freeze` and any basis-port factory (plan 0004 T7 and T8) in T15 (amendment B-412 fourth
   review: they were listed as not merged, which was out of date), the providers loader (`load_providers_config`, plan
   0009 T1) in T14b and the doctor callable (`eng_harness.doctor.run`, plan 0002 T18) in T16 (amendment B-510). Tests build a fully set `CliDeps` through the shared helper
-  `tests/helpers/cli_deps.py`, which T14 creates and T14b, T15 and T16 extend with the fields they add, so that a new
+  `tests/helpers/cli_deps.py`, which T14 creates and T14c (the `files` argument of the port builder, amendment B-536), T14b, T15 and T16 extend with the fields they add, so that a new
   field does not turn an earlier task's `run` or `resume` test into exit 2 (amendment B-412 second review).
   (Amendment B-412 review: the earlier wording "no default and required" would make `CliDeps()` raise `TypeError`.)
 - Staged engine (amendment B-412; extended by the third review to every staged criterion, matching spec §9). The
@@ -1153,7 +1177,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Workspace, `eng_contract.store.Workspace` (step 1, amendment B-412 seventh review) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `EngineSettings` from the `[engine]` limits of the configuration, engine §4.10 defaults otherwise (step 5, spec §4.2.4) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`engine/_runner.py`) |
-| Port builder `build_ports`: tool and host ports only (step 1), called as `port_builder(config, workspace, store, run_folder, clock, ids)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) | T14 (`port_builder`) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`) | plan 0002 T19a (amendment B-475); engine plan T20 (caller-chosen run id, work item B-472) |
+| Port builder `build_ports`: tool and host ports only (end of step 2 since amendment B-536), called as `port_builder(config, workspace, store, run_folder, clock, ids, files)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) and `files` the model files of the input (T14c, amendment B-536) | T14 (`port_builder`; T14c adds `files`) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`) | plan 0002 T19a (amendment B-475); engine plan T20 (caller-chosen run id, work item B-472) |
 | Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)` (steps 4 and 5), called as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth review) | T14 (`calc_port_factory`) | T18a (the default supplies the calc registry, the approvals file through the merged `load_approvals`, the calc settings and the `basis_fields` map, B-498) | plan 0003 T5; `load_approvals` merged (`_calc/_approvals.py`) |
 | Run class: `--run-class` for `run`, the run header's `run_class` for `resume` (steps 4 and 5) | none (`cli/_wiring.py`, T14) | not applicable | merged (`cli/_parser.py`, T3; `JournalReader`, engine T4) |
 | Engine `BasisPort`, `StoreBasisPort` over the `ResultStore` (step 5) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`basis/_port.py`, plan 0004 T8) |
@@ -1180,6 +1204,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Engine factory (step 5) | T14 | T14 | merged (engine plan T9 and T9b); the decision field mapped by T14b, the progress and run-control fields by T16b (amendment B-510) |
 | `ReleaseMarks` from the `[project_lane.<tool>]` tables of the configuration (spec §4.6.3, Q5; amendment B-412 ninth review) | none (built in `cli/_wiring.py`, T14, from the merged `HarnessConfig.project_lane`) | not applicable | merged (`report/_lineage.py`, T8; `cli/_config.py`, T3); passed by T14 to `build_report` (step 6 and the page ports' `report` callable) and to the page ports for the sign-off screen (AC42, AC54), whose `marks` parameter T9b adds in `pages/_ports.py` (amendment B-510) |
 | Report at the end (step 6) | none | not applicable | T13 (`build_report`, `write_report`), called by T14 |
+| `report/cycle-timings.json` of the `report` command (spec AC69; amendment B-536) | none | not applicable | plan 0007 T10b (`edit_cycle_timings`, `write_cycle_timings`), called and exported by T16 |
 | Outcome to exit code (step 6, §4.2.3) | none (`cli/_run.py`, T14) | not applicable | merged (`cli/_exit.py`, T3) |
 | Stop-file removals (§4.4.8) | none (`cli/_run.py`) | not applicable | T14 |
 | First interrupt writes the stop file (§4.4.8, AC10): reads the run-id cell; empty cell or missing run folder ends the process (exit 130) | none (`cli/_signals.py`) | not applicable | T14b, through `cli/_control.py` (T7b) and the cell (T14) |

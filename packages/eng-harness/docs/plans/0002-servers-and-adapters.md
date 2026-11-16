@@ -839,14 +839,15 @@ pinned fingerprint and the units through the allowlist loader and the ports. Unt
 command-line tool: given a configuration with any `[cli_tools.*]` entry it raises `NotImplementedGap`
 (`NOT_IMPLEMENTED`, gap H-G8) naming the entries, rather than drop them, so `ToolPort.unreleased_tools()` never lists
 a tool that no port can reach (AC43; `test_build_ports.py::test_cli_tools_not_wired_gap`). The command line meets the
-refusal at step 1 of spec 0006 §4.2.2, outside the engine, and ends with exit 2 `USAGE` (spec AC43, §11 Q9; owner
+refusal at step 2 of spec 0006 §4.2.2 (amendment B-536), outside the engine, and ends with exit 2 `USAGE` (spec AC43, §11 Q9; owner
 answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries: `cli/_exit.py` maps the code
-`NOT_IMPLEMENTED` to 2 (spec 0006 §6), pinned by the case `("NOT_IMPLEMENTED", 2)` added to the error-code table test
+`NOT_IMPLEMENTED` to 2 (spec 0006 §6; plan 0006 T14c catches the exception, spec 0006 AC68, amendment B-536), pinned by the case `("NOT_IMPLEMENTED", 2)` added to the error-code table test
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
 Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks` and
-`allowlists`, with the defaults and rules of spec §4.1; the workflow and replay tests pass `files`, a test inspector and
+`allowlists`, with the defaults and rules of spec §4.1 (in production the command line fills `files`, plan 0006 T14c,
+amendment B-536); the workflow and replay tests pass `files`, a test inspector and
 launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes, through `allowlists`, a loader of its
 synthetic routed allowlist (a `load_allowlist` call with the route it is given). `allowlists` maps an adapter name to a
 loader taking the section's `route`, because `load_allowlist` refuses a routed allowlist without a route and

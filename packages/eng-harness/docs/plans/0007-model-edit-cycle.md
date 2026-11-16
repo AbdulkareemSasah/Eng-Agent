@@ -244,6 +244,7 @@ tasks:
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap); T9b since the split (B-511).
     # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) as a cross-plan dependency.
+    # Amendment (B-536, documents only): EditCycleInput.model is the absolute pathlib.Path of the model file, and step 2 passes its base name as the model key (spec 4.2, 4.5; spec 0006 4.2.2 step 2); a type change, files and budget unchanged.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -670,7 +671,8 @@ the journal holds edit-cycle steps, so the existing report snapshots stay unchan
 list. `audit_value_sources` takes `engineering_params` (tool name to parameter names, spec §4.9, AC25); its tests pass
 it explicitly (a forged literal at a listed parameter is reported, a literal at an unlisted one is not).
 Amendment (B-533): `edit_cycle_timings(reader, store=None)` takes the optional store for the `benchmark_request` label
-(spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006).
+(spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006 T16,
+which exports both functions from `report/__init__.py`; amendment B-536).
 
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the

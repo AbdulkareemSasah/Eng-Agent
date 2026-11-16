@@ -285,8 +285,9 @@ Registration (amendment B-417, Q13): the block registry is immutable and has no 
 `block` and the workflow modules do not import each other at load time. Later workflows (plan 0010 T9, plan 0013 T11
 and T13) add their blocks to the same tuple. Decision points and rules are found by spec 0005's own discovery (§4.6).
 
-- Input `EditCycleInput`: `model` (the model file as the command line passes it, a `harness.file_input/1` reference,
-  spec 0002 §4.7), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
+- Input `EditCycleInput`: `model` (`pathlib.Path`, the absolute path of the model file; the command line gives the
+  host port that file under its base name, which is the model key, spec 0006 §4.2.2 step 2; amendment B-536 replaces
+  the `harness.file_input/1` reference, from which no component can find the file), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
   spec 0002 §4.6.1 step 2). No engineering value is part of the input.
 - Output `EditCycleOutput`: `accepted_revision` (the `model_saved` identity, revision, fingerprint, file hash),
   `cycles` (count), `promoted` (model handle), `summaries` (references to the last `harness.design_summary/1` and
@@ -433,7 +434,7 @@ paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever 
 | # | Calls | Checks the engine enforces |
 |---|---|---|
 | 1 | none (run start) | Invariant 8: build and tool-list fingerprint, before `run_started` (`RunRefused SERVER_CHECK_FAILED`); invariant 5: every §4.8 field present and confirmed |
-| 2 | `ctx.tool("csi_open_model", {"model": inp.model})` on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
+| 2 | `ctx.tool("csi_open_model", {"model": inp.model.name})` (the model key, amendment B-536) on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
 | — | `async for c in ctx.attempts(B.count("attempts.cycles"))`: one `ctx.block(edit_cycle_once, ...)` per cycle | Bounded loop; exhaustion escalates |
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
 | 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.record_ref()})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
@@ -645,7 +646,7 @@ server tool):
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| `EditCycleInput.model` | `harness.file_input/1` reference | — | an existing `.EDB` | yes | engineer (`--input`) |
+| `EditCycleInput.model` | `pathlib.Path`, absolute (amendment B-536) | — | an existing `.EDB` | no | engineer (`--input`) |
 | `EditCycleInput.visible_host` | bool | — | — | no | engineer |
 | `ChangeSetDraft` values | basis path or number with unit | length, line load, area load, ratio (§4.3.1) | `bounds.*` (§4.8) and contract kind bounds | yes (basis) | design basis or engineer input |
 | Names in items | `str` | — | 1 to 200 characters, must exist | no | engineer; model state |
