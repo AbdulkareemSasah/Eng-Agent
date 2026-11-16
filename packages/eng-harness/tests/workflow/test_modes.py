@@ -12,7 +12,7 @@ import pytest
 from eng_contract.errors import ContractError, ErrorCode, Precondition
 from pydantic import JsonValue
 from workflows.chain import chain
-from workflows.ctx_flows import change_set, flow, reply, request_id
+from workflows.ctx_flows import change_set, flow, reply, request_id, written
 from workflows.modes import mode_rig, stored_writes
 from workflows.rig import Rig, request
 
@@ -198,6 +198,7 @@ def test_always_ask_in_every_mode(tmp_path: Path, mode: PermissionMode, case: st
     rig = mode_rig(tmp_path)
     (tool, _), *_ = ALWAYS[case]
     rig.host.previews[tool] = change_set(rig, "i1")
+    rig.host.script("save_s", written(rig, "m1", 1))  # a tool save names its revision (engine 4.6 "Tool saves")
     engine = rig.engine(chain(ALWAYS[case], always_ask=("write_b",)))
     paused = asyncio.run(engine.start(request(mode=mode)))
     run_id, rid = paused.run_id, request_id(paused.run_id, "0~pre.approve")
@@ -246,6 +247,7 @@ def test_a_save_to_a_new_file_is_not_asked(tmp_path: Path, mode: PermissionMode)
     rig = mode_rig(tmp_path)
     flow_of = chain([("save_s", {"n": 0, "model": "m1", "target": "new"}), ("delete_d", {"n": 1, "model": "m2"})])
     rig.host.previews["delete_d"] = change_set(rig, "i1", models=["m2"])
+    rig.host.script("save_s", written(rig, "m1", 1))
     paused = asyncio.run(rig.engine(flow_of).start(request(mode=mode)))
     assert [e.tool for e in rig.host.ledger] == ["save_s"]  # the save ran; the delete after it waits
     assert [p.title for p in rig.approvals.presented] == ["Apply delete_d"]

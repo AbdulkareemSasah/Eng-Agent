@@ -11,7 +11,7 @@ Units: none. Errors: `ApprovalRejected`, `ApprovalVoid`, `BlockRuleViolation`, `
 import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Literal, Protocol, cast
 
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError, ErrorCode, Precondition
@@ -28,6 +28,7 @@ from eng_harness.journal import _events as ev
 from eng_harness.ports import ApprovalPort, HostModelState, HostPort, ModelBinding, ToolInfo, ToolPort
 
 _Obj = dict[str, JsonValue]
+_Phase = Literal["pre", "post"]
 _AUTONOMOUS, _COPY, _EACH = "autonomous_logged", "work_on_copy", "approve_each_write"
 _STATE = ("model_id", "revision", "fingerprint", "file_sha256")
 
@@ -110,9 +111,9 @@ class ModeApprovals(_approvals.Approvals):
         named = key if under is None or key is None else self._named(under.request_id, key)
         await super().authorize(under, item, named, write=write)
 
-    def stepped(self, under: str | None, key: str | None, ref: str) -> None:
+    def stepped(self, under: str | None, key: str | None, ref: str, saved: ev.ModelSaved | None = None) -> None:
         """As `Approvals.stepped`, for the model name the approval binds."""
-        super().stepped(under, key if under is None or key is None else self._named(under, key), ref)
+        super().stepped(under, key if under is None or key is None else self._named(under, key), ref, saved)
 
     def expire(self, model: str) -> None:
         """As `Approvals.expire`, also for approvals bound to the original of the copy `model`."""
@@ -133,23 +134,24 @@ class Modes:
     def __init__(
         self, mode: str, always_ask: Sequence[str], run_dir: Path, tools: ToolPort, host: HostPort, store: ResultStore,
         writer: JournalWriter, producer: Callable[[], Provenance], leases: _Leases, port: ApprovalPort, run_id: str,
-        events: Sequence[Event],
+        events: Sequence[Event], copy_on_open: bool = False,
     ) -> None:  # fmt: skip
-        """Serve the run in `run_dir`; `events` are the journal replayed."""
+        """Serve the run in `run_dir`; `events` are the journal replayed; `copy_on_open` is the workflow's."""
         self.run_dir, self.copies = run_dir, dict[str, str]()
         self.records: dict[str, Mapping[str, JsonValue]] = {}  # working copy key to the record of the step that took it
         self.approvals = ModeApprovals(mode, self.copies, port, host, store, writer, producer, run_id, events)
         self._mode, self._always, self._tools, self._host, self._store = mode, frozenset(always_ask), tools, host, store
         self._writer, self._producer, self._leases, self._lock = writer, producer, leases, asyncio.Lock()
+        self._on_open = copy_on_open
         copied = {e.path for e in events if isinstance(p := e.payload, ev.StepStarted) and p.name == "working_copy"}
-        self._taken = {
-            e.path.split("~")[0]: p.result.summary for e in events
+        self._taken: dict[str, tuple[_Phase, Mapping[str, JsonValue]]] = {
+            e.path.split("~")[0]: ("post" if "~post." in e.path else "pre", p.result.summary) for e in events
             if e.path in copied and e.path and isinstance(p := e.payload, ev.StepCompleted) and p.result
         }  # fmt: skip
 
     async def enter(
         self, ctx: _Step, path: str, name: str, args: _Obj, info: ToolInfo | None, prior: ev.StepStarted | None,
-        journaled: _Obj | None, under: Approval | None,
+        journaled: _Obj | None, under: Approval | None, item: str | None,
     ) -> tuple[_Obj, Approval | None]:  # fmt: skip
         """The inserted steps before the tool step at `path`; the arguments and approval it runs with.
 
@@ -160,13 +162,13 @@ class Modes:
             param = info.model_param if info is not None else None
             key = args.get(param) if param is not None else None
             if (taken := self._taken.get(path)) is not None:
-                await self._copy(ctx, path, str(taken["model"]), None)
+                await self._copy(ctx, path, str(taken[1]["model"]), None, taken[0])
             elif info is not None and self._copies_first(info, key):
-                await self._copy(ctx, path, str(key), info.host_key)
+                await self._copy(ctx, path, str(key), info.host_key, "pre")
             args = {k: self._swap(k, v, param, journaled) for k, v in args.items()}
             apath = inserted_path(path, "pre", "approve")
             preview = self.approvals.stored(apath)
-            if preview is None and info is not None and under is None and self._asks(name, info, args):
+            if preview is None and info is not None and not self._covered(name, info, args, under, item):
                 await self._leases.acquire(info.host_key)
                 preview = await self._tools.preview(name, args)
             if preview is None:
@@ -176,9 +178,18 @@ class Modes:
                 raise errors.ApprovalRejected(f"the approval of {name} was rejected", evidence=[approval.request_id])
             if prior is not None:  # the approval the step ran under at its last start, not the preview's models
                 return args, approval if prior.under == approval.request_id else under
+            if under is not None:  # the approval it was given keeps its re-check and items (spec 4.7, EC3)
+                return args, under
             bound = {m.model_key for m in preview.models}
             named = {v for v in (key, args.get(param) if param else None) if isinstance(v, str)}
             return args, approval if info is not None and info.effect == "write" and bound & named else under
+
+    async def opened(self, ctx: _Step, path: str, action: str | None, key: str | None, host_key: str | None) -> None:
+        """After the tool step at `path` completed: with `copy_on_open`, the first open of a model takes its copy as
+        `<path>~post.working_copy.<model>` before any other step on it, in every mode (spec 4.7, EC1)."""
+        if self._on_open and action == "open" and key is not None and key not in {*self.copies, *self.records}:
+            async with self._lock:
+                await self._copy(ctx, path, key, host_key, "post")
 
     def _copies_first(self, info: ToolInfo, key: JsonValue) -> bool:
         """A write, in `work_on_copy`, to a model without a working copy (an `open` tool is none)."""
@@ -192,21 +203,23 @@ class Modes:
         wanted = key == param if journaled is None else journaled.get(key) == copy
         return copy if copy is not None and wanted else value
 
-    def _asks(self, name: str, info: ToolInfo, args: _Obj) -> bool:
-        """A delete, a save over an original, an always-ask tool, or any write in `approve_each_write`."""
-        return (
-            info.action == "delete" or info.overwrites_original(args) or name in self._always
-            or (self._mode == _EACH and info.effect == "write")
-        )  # fmt: skip
+    def _covered(self, name: str, info: ToolInfo, args: _Obj, under: Approval | None, item: str | None) -> bool:
+        """No approval is inserted: the step asks for none, or `under` covers it. A delete, a save over an original and
+        an always-ask tool need an engineer's approval; any other write in `approve_each_write` needs any, and a save
+        to a new file overwriting no original is no write to preview there (spec 4.7, EC3, EC6)."""
+        if info.action == "delete" or info.overwrites_original(args) or name in self._always:
+            return under is not None and self.approvals.engineer_approved(under, item)
+        revision = info.action == "save" and info.saves_new_file(args)
+        return under is not None or not (self._mode == _EACH and info.effect == "write") or revision
 
     async def _state(self, key: str) -> HostModelState | None:
         instance = await self._host.locate(key)
         state = None if instance is None else await self._host.model_state(key, instance.instance_id)
         return state if state is not None and state.loaded else None
 
-    async def _copy(self, ctx: _Step, path: str, origin: str, host_key: str | None) -> None:
-        """Take, or replay, the working copy of `origin` as `<path>~pre.working_copy.<origin>` (spec 4.7)."""
-        step, args = inserted_path(path, "pre", "working_copy", path_key(origin)), _Obj(model=origin)
+    async def _copy(self, ctx: _Step, path: str, origin: str, host_key: str | None, phase: _Phase) -> None:
+        """Take, or replay, the working copy of `origin` as `<path>~<phase>.working_copy.<origin>` (spec 4.7)."""
+        step, args = inserted_path(path, phase, "working_copy", path_key(origin)), _Obj(model=origin)
         recorded = ctx._look(step, "read", "working_copy", args)
         done = None if recorded is None else ctx._replayed(recorded)
         if done is None and host_key is not None:
