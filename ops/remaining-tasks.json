@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file.",
- "count": 155,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies.",
+ "count": 167,
  "tasks": [
   {
    "id": "B-437",
@@ -191,10 +191,7 @@
    "branch": "feat/b117-harness-et18-resource-limits-progress-sink",
    "prTitle": "feat(eng-harness): resource limits, progress sink and the overhead benchmark (B-117)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T14b",
-    "E.T17"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -212,9 +209,6 @@
    "prTitle": "test(eng-harness): crash-matrix replay suite with a worker process (B-118)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T13",
-    "E.T15",
-    "E.T16",
     "E.T18"
    ],
    "writer": "sonnet, high",
@@ -368,9 +362,7 @@
    "branch": "feat/b136-harness-st17-record-mode-sanitizer-and",
    "prTitle": "feat(eng-harness): record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings (B-136)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T16"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -405,13 +397,8 @@
    "prTitle": "feat(eng-harness): port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
    "risk": "r1, r3",
    "pending_deps": [
-    "E.T13",
-    "E.T15",
-    "E.T16",
     "E.T19",
-    "S.T14",
-    "S.T18",
-    "S.T20"
+    "S.T21"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -419,7 +406,8 @@
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "B-487: T19 was split by amendment B-475 into T19a (this item: CSI only, on the first-live-run path) and T19b (command-line tools: B-490); T17 left the dependencies; the plan waits for engine T13, T15, T16 and T19; it also edits tests/fakes/sasaah_csi/** like W.T5 (B-199), so run after W.T5"
+    "B-487: T19 was split by amendment B-475 into T19a (this item: CSI only, on the first-live-run path) and T19b (command-line tools: B-490); T17 left the dependencies; the plan waits for engine T13, T15, T16 and T19; it also edits tests/fakes/sasaah_csi/** like W.T5 (B-199), so run after W.T5",
+    "Plan audit 2 found seven blockers; amendment B-530 adds T19c before T19a."
    ]
   },
   {
@@ -464,9 +452,9 @@
    "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
    "planTask": "T9",
    "kind": "impl",
-   "title": "Approval screens: change set, promotion, info and sign-off",
-   "branch": "feat/b183-harness-it9-approval-screens-change-set",
-   "prTitle": "feat(eng-harness): approval screens: change set, promotion, info and sign-off (B-183)",
+   "title": "Approval screens: change set, promotion and info",
+   "branch": "feat/b183-harness-it9-approval-screens-r2",
+   "prTitle": "feat(eng-harness): approval screens: change set, promotion and info (B-183)",
    "risk": "r3",
    "pending_deps": [
     "I.T7"
@@ -487,10 +475,7 @@
    "branch": "feat/b184-harness-it10-choice-screens-engineer-turn",
    "prTitle": "feat(eng-harness): choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate (B-184)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T7",
-    "I.T9"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -547,12 +532,8 @@
    "prTitle": "feat(eng-harness): commands run and resume: wiring, generated options, answers file, outcome mapping (B-188)",
    "risk": "r3",
    "pending_deps": [
-    "E.T15",
     "E.T18",
-    "I.T10",
-    "I.T13",
-    "I.T7",
-    "I.T9"
+    "I.T10"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -590,8 +571,7 @@
    "prTitle": "feat(eng-harness): commands status, stop, report and doctor (B-190)",
    "risk": "r3",
    "pending_deps": [
-    "I.T14b",
-    "S.T18"
+    "I.T14b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
@@ -610,7 +590,6 @@
    "prTitle": "feat(eng-harness): end-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule (B-191)",
    "risk": "r3",
    "pending_deps": [
-    "E.T15",
     "E.T18",
     "I.T15",
     "I.T16",
@@ -633,9 +612,8 @@
    "prTitle": "feat(eng-harness): commands run and resume: signals, launch address on the terminal only, decision layer wiring (B-353)",
    "risk": "r3",
    "pending_deps": [
-    "E.T15",
     "E.T18",
-    "I.T14"
+    "I.T14c"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -675,8 +653,6 @@
    "pending_deps": [
     "I.T14b",
     "I.T16",
-    "E.T14",
-    "E.T14b",
     "E.T18"
    ],
    "writer": "sonnet, high",
@@ -718,7 +694,7 @@
     "I.T15",
     "I.T16",
     "I.T16b",
-    "E.T15"
+    "W.T6"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -741,11 +717,10 @@
     "I.T15",
     "I.T16",
     "I.T16b",
-    "D.T7",
     "D.T10",
-    "P.T1",
     "P.T10a",
-    "W.T9"
+    "W.T9",
+    "W.T6"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -863,9 +838,7 @@
    "branch": "feat/b150-harness-ct11-calc-5-section-size",
    "prTitle": "feat(eng-harness): calc 5, section size rounding (B-150)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T10"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -965,10 +938,7 @@
    "branch": "feat/b174-harness-dt10-engine-wiring-workflow-replay",
    "prTitle": "feat(eng-harness): engine wiring, workflow, replay, conformance and performance tests, local-testing notes (B-174)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "D.T9",
-    "E.T17"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
@@ -1045,9 +1015,7 @@
    "branch": "feat/b223-harness-pt4-jev-adapter-over-a",
    "prTitle": "feat(eng-harness): jev adapter over a format boundary; formats not implemented until S-07 (B-223)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1084,9 +1052,7 @@
    "prTitle": "feat(eng-harness): pydanticAI adapter (the only importer), conformance of both adapters (B-225)",
    "risk": "r1, r3",
    "pending_deps": [
-    "P.T3",
-    "P.T4",
-    "P.T5"
+    "P.T4"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1105,7 +1071,6 @@
    "prTitle": "feat(eng-harness): provider factory, local_only, run summary (B-226)",
    "risk": "r1, r3",
    "pending_deps": [
-    "P.T2",
     "P.T4",
     "P.T6",
     "P.T10a"
@@ -1165,9 +1130,7 @@
    "prTitle": "feat(eng-harness): phase-1 runtime assembly, rules and engineer (B-229)",
    "risk": "r1, r3",
    "pending_deps": [
-    "P.T1",
-    "D.T10",
-    "E.T14b"
+    "D.T10"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1188,9 +1151,7 @@
    "branch": "feat/b164-harness-bt10-property-tests-and-the",
    "prTitle": "feat(eng-harness): property tests and the fake-host workflow with replay (B-164)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T13"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1224,9 +1185,7 @@
    "branch": "feat/b281-harness-gt2-calc-harness-column-select",
    "prTitle": "feat(eng-harness): calc harness.column_select with golden and property tests (B-281)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T1"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1362,10 +1321,7 @@
    "branch": "feat/b288-harness-gt9-decision-points-and-rules",
    "prTitle": "feat(eng-harness): decision points and rules of the column workflow (B-288)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "D.T9",
-    "G.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1383,12 +1339,7 @@
    "prTitle": "feat(eng-harness): engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets) (B-289)",
    "risk": "r1, r3",
    "pending_deps": [
-    "E.T13",
-    "E.T14",
-    "E.T14b",
     "E.T18",
-    "G.T1",
-    "W.T2",
     "W.T8",
     "W.T9"
    ],
@@ -1483,7 +1434,6 @@
    "risk": "r1, r3",
    "pending_deps": [
     "G.T13",
-    "I.T12",
     "W.T10"
    ],
    "writer": "sonnet, medium",
@@ -1675,11 +1625,7 @@
    "branch": "feat/b334-codes-zt5-register-the-column-checks",
    "prTitle": "feat(structural-codes): register the column checks, pack-level tests, changelog and local-testing rows (B-334)",
    "risk": "r1",
-   "pending_deps": [
-    "Z.T2",
-    "Z.T3",
-    "Z.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1740,14 +1686,12 @@
    "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
    "planTask": "T4",
    "kind": "impl",
-   "title": "Calcs harness.host_design_verdicts and harness.analysis_summary",
-   "branch": "feat/b198-harness-wt4-calcs-harness-host-design",
-   "prTitle": "feat(eng-harness): calcs harness.host_design_verdicts and harness.analysis_summary (B-198)",
+   "title": "Calc harness.analysis_summary",
+   "branch": "feat/b198-harness-wt4-calc-analysis-summary",
+   "prTitle": "feat(eng-harness): calc harness.analysis_summary (B-198)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "C.T10",
-    "S.T13",
-    "W.T3"
+    "S.T21"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1790,10 +1734,7 @@
    "branch": "feat/b200-harness-wt6-engine-amendments-copy-on",
    "prTitle": "feat(eng-harness): engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields) (B-200)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T15",
-    "E.T16"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1810,9 +1751,7 @@
    "branch": "feat/b201-harness-wt7-decision-points-and-rules",
    "prTitle": "feat(eng-harness): decision points and rules of the edit cycle (B-201)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "D.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1832,18 +1771,7 @@
    "pending_deps": [
     "B.T10",
     "D.T10",
-    "E.T12",
-    "E.T13",
-    "E.T14",
-    "E.T14b",
-    "E.T15",
-    "E.T16",
-    "E.T17",
-    "I.T7",
     "S.T19a",
-    "W.T2",
-    "W.T3",
-    "W.T5",
     "W.T6",
     "W.T7"
    ],
@@ -1864,9 +1792,7 @@
    "prTitle": "feat(eng-harness): workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop (B-203)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T16",
     "I.T10",
-    "S.T13",
     "W.T4",
     "W.T8"
    ],
@@ -1874,7 +1800,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "Replaced by B-526 (T9a) and B-527 (T9b) after amendment B-511."
+   ]
   },
   {
    "id": "B-204",
@@ -1882,14 +1811,11 @@
    "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
    "planTask": "T10",
    "kind": "impl",
-   "title": "Report renderers, value-source audit, prompt counter and B-1 cycle timings",
-   "branch": "feat/b204-harness-wt10-report-renderers-value-source",
-   "prTitle": "feat(eng-harness): report renderers, value-source audit, prompt counter and B-1 cycle timings (B-204)",
+   "title": "Report renderers and value-source audit",
+   "branch": "feat/b204-harness-wt10-report-renderers-and-audit-r2",
+   "prTitle": "feat(eng-harness): report renderers and value-source audit (B-204)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "I.T12",
-    "I.T13"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1907,8 +1833,8 @@
    "prTitle": "feat(eng-harness): acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list (B-205)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T10",
-    "W.T9"
+    "W.T10b",
+    "W.T9b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1923,13 +1849,13 @@
    "planTask": "T12",
    "kind": "impl",
    "title": "Replay test and crash matrix of the workflow (A6)",
-   "branch": "feat/b206-harness-wt12-replay-test-and-crash",
-   "prTitle": "feat(eng-harness): replay test and crash matrix of the workflow (A6) (B-206)",
+   "branch": "test/b206-harness-wt12-replay-test-and-crash",
+   "prTitle": "test(eng-harness): replay test and crash matrix of the workflow (A6) (B-206)",
    "risk": "r1, r2, r3",
    "pending_deps": [
     "E.T19",
     "S.T19a",
-    "W.T9"
+    "W.T9b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1992,9 +1918,7 @@
    "branch": "feat/b395-harness-xt4-footing-plan-size-and-resize",
    "prTitle": "feat(eng-harness): calcs harness.footing_plan_size and harness.footing_resize (B-395)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -2014,9 +1938,7 @@
    "branch": "feat/b396-harness-xt5-footing-layout-calc",
    "prTitle": "feat(eng-harness): calc harness.footing_layout (B-396)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -2036,9 +1958,7 @@
    "branch": "feat/b397-harness-xt6-footing-status-and-schedule",
    "prTitle": "feat(eng-harness): calcs harness.footing_status and harness.footing_schedule (with clearance) (B-397)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -2058,9 +1978,7 @@
    "branch": "feat/b398-harness-xt7-footing-points-and-rules",
    "prTitle": "feat(eng-harness): decision points footing_fix_strategy and footing_review, and the footing rules (B-398)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "D.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2078,10 +1996,6 @@
    "prTitle": "feat(eng-harness): block design_isolated_footing (rounds, batched checks, decisions, engineer dimensions, resize) (B-399)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "D.T9",
-    "E.T14",
-    "E.T14b",
-    "X.T2",
     "X.T4",
     "X.T5",
     "X.T6",
@@ -2105,11 +2019,7 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "B.T10",
-    "E.T16",
-    "E.T17",
     "I.T10",
-    "S.T11",
-    "S.T13",
     "S.T19a",
     "W.T6",
     "X.T8",
@@ -2132,8 +2042,7 @@
    "prTitle": "feat(eng-harness): calcs harness.reactions_to_joint_loads and harness.safe_equilibrium (B-401)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "F.T5",
-    "X.T3"
+    "F.T5"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -2177,8 +2086,6 @@
    "prTitle": "feat(eng-harness): report sections (schedule, calculation notes), acceptance audits and the local-testing list (B-403)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "I.T12",
-    "I.T13",
     "W.T10",
     "X.T9"
    ],
@@ -2219,13 +2126,7 @@
    "branch": "feat/b210-harness-ft1-product-profile-per-product",
    "prTitle": "feat(eng-harness): product profile, per-product fingerprint, SAFE server section and product resolution (B-210)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T10",
-    "S.T11",
-    "S.T12",
-    "S.T13",
-    "S.T14"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2263,8 +2164,7 @@
    "risk": "r1, r3",
    "pending_deps": [
     "F.T1",
-    "F.T2",
-    "S.T10"
+    "F.T2"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2302,10 +2202,7 @@
    "prTitle": "feat(eng-harness): sAFE model-state reader, points and joint-load kinds, fingerprint (B-214)",
    "risk": "r1, r3",
    "pending_deps": [
-    "C.T7",
-    "F.T4",
-    "S.T10",
-    "S.T11"
+    "F.T4"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2324,10 +2221,7 @@
    "prTitle": "feat(eng-harness): joint-load import, pattern and combination edits for SAFE, read-back, SAFE check_model, point-load reconciliation (B-215)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T5",
-    "S.T12",
-    "S.T13",
-    "S.T14"
+    "F.T5"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2346,8 +2240,7 @@
    "prTitle": "feat(eng-harness): sAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps (B-216)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T6",
-    "S.T13"
+    "F.T6"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2502,8 +2395,7 @@
    "prTitle": "feat(eng-harness): revit state reader, chunked reads, fingerprint and the neutral kinds (B-236)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T6",
-    "S.T11"
+    "R.T6"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2522,8 +2414,7 @@
    "prTitle": "feat(eng-harness): revit edit kinds, value encoding, call preconditions (identity, active document, shared type, parameter resolution) (B-237)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T7",
-    "S.T12"
+    "R.T7"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2561,8 +2452,7 @@
    "prTitle": "feat(eng-harness): reconciliation by reading for the Revit write tools (B-239)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T9",
-    "S.T14"
+    "R.T9"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2581,8 +2471,7 @@
    "prTitle": "feat(eng-harness): revit session operations (working copy, gaps), Revit identity rules and the pipe-keyed host lock (B-240)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T7",
-    "S.T10"
+    "R.T7"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2641,8 +2530,7 @@
    "prTitle": "feat(eng-harness): doctor checks for the Revit server (B-243)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T4",
-    "S.T18"
+    "R.T4"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2688,11 +2576,6 @@
     "F.T1",
     "F.T2",
     "F.T3",
-    "S.T10",
-    "S.T11",
-    "S.T12",
-    "S.T13",
-    "S.T14",
     "S.T17"
    ],
    "writer": "sonnet, medium",
@@ -2734,8 +2617,7 @@
    "pending_deps": [
     "A.T1",
     "A.T2",
-    "F.T3",
-    "S.T10"
+    "F.T3"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2755,7 +2637,6 @@
    "risk": "r1, r3",
    "pending_deps": [
     "A.T3",
-    "C.T7",
     "F.T4"
    ],
    "writer": "sonnet, medium",
@@ -2776,9 +2657,7 @@
    "risk": "r1, r3",
    "pending_deps": [
     "A.T4",
-    "F.T6",
-    "S.T12",
-    "S.T14"
+    "F.T6"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2797,8 +2676,7 @@
    "prTitle": "feat(eng-harness): analysis, result readers and design run and results for SAP2000 (B-250)",
    "risk": "r1, r3",
    "pending_deps": [
-    "A.T4",
-    "S.T13"
+    "A.T4"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2838,11 +2716,7 @@
    "branch": "feat/b300-harness-ht1-the-idea-server-section",
    "prTitle": "feat(eng-harness): the IDEA server section on the framework additions of plan 0002 T20 (routes, audit_log flag) (B-300)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T10",
-    "S.T14",
-    "S.T20"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2880,10 +2754,7 @@
    "risk": "r1, r3",
    "pending_deps": [
     "H.T1",
-    "H.T2",
-    "S.T10",
-    "S.T14",
-    "S.T20"
+    "H.T2"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2999,8 +2870,7 @@
    "prTitle": "feat(eng-harness): end-to-end cycles, crash matrix, recorded-reply contract tests, doctor section and the IDEA local-testing steps (B-308)",
    "risk": "r1, r3",
    "pending_deps": [
-    "H.T8",
-    "S.T18"
+    "H.T8"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3146,9 +3016,7 @@
    "branch": "feat/b485-harness-xt3b-footing-subjects-read-the-suffixed",
    "prTitle": "feat(eng-harness): the merged footing subjects calc and its test data read the suffixed basis names (B-485)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -3213,7 +3081,7 @@
    "planTask": "T13b",
    "kind": "impl",
    "title": "Report status section: the run's decision runtime",
-   "branch": "feat/b489-harness-it13b-report-status-section-decision-runtime",
+   "branch": "feat/b489-harness-it13b-report-status-section-decision-runtime-r2",
    "prTitle": "feat(eng-harness): report status section shows the run's decision runtime (B-489)",
    "risk": "r3",
    "pending_deps": [
@@ -3240,7 +3108,6 @@
    "prTitle": "feat(eng-harness): command-line tool adapter in build_ports, closes gap H-G8 (B-490)",
    "risk": "r1, r3",
    "pending_deps": [
-    "S.T16",
     "S.T19a"
    ],
    "writer": "sonnet, high",
@@ -3264,9 +3131,7 @@
    "risk": "r1, r3",
    "pending_deps": [
     "P.T7",
-    "P.T9",
-    "P.T10a",
-    "D.T9"
+    "P.T10a"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3276,6 +3141,232 @@
    "lead_notes": [
     "B-487: second half of the T10 split of amendment B-475 (budget 200, three sessions); off the first-live-run path; the plan prose names decisions T9 (decide_many) for it; needs the real point-policy mapping, which no plan task builds (OQ-Q88)"
    ]
+  },
+  {
+   "id": "B-518",
+   "task": "I.T9b",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T9b",
+   "kind": "impl",
+   "title": "Sign-off screen: verdict counts, exceptions with reasons, unreleased tools and the acknowledgement",
+   "branch": "feat/b518-harness-it9b-sign-off-screen",
+   "prTitle": "feat(eng-harness): sign-off screen: verdict counts, exceptions with reasons, unreleased tools and the acknowledgement (B-518)",
+   "risk": "r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-519",
+   "task": "S.T21",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T21",
+   "kind": "impl",
+   "title": "CSI harness kinds in a kinds module, registered in HARNESS_KINDS",
+   "branch": "feat/b519-harness-st21-csi-kinds-module",
+   "prTitle": "feat(eng-harness): harness kinds of the CSI adapter in a kinds module, registered in HARNESS_KINDS (B-519)",
+   "risk": "r1, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-520",
+   "task": "E.T22",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": "T22",
+   "kind": "impl",
+   "title": "A check_model result whose summary is not clean stops the run (invariant 1)",
+   "branch": "feat/b520-harness-et22-unclean-check-stops-run",
+   "prTitle": "feat(eng-harness): a check_model result whose summary is not clean stops the run (B-520)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-521",
+   "task": "E.T21",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": "T21",
+   "kind": "impl",
+   "title": "One automatic rerun of a write reconciled not_applied, then the engineer",
+   "branch": "feat/b521-harness-et21-one-rerun-of-a-not-applied-write",
+   "prTitle": "feat(eng-harness): one automatic rerun of a write reconciled not_applied, then the engineer (B-521)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-522",
+   "task": "W.T13",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T13",
+   "kind": "impl",
+   "title": "The host port follows the working file that csi_open_revision opens (reopened hook)",
+   "branch": "feat/b522-harness-wt13-host-port-follows-reopened-file",
+   "prTitle": "feat(eng-harness): the host port follows the working file that csi_open_revision opens (B-522)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-523",
+   "task": "W.T14",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T14",
+   "kind": "impl",
+   "title": "Calc harness.change_set_check refuses an item id with a slash (INVALID_ITEM_ID)",
+   "branch": "fix/b523-harness-wt14-item-id-with-a-slash-refused-r2",
+   "prTitle": "fix(eng-harness): calc harness.change_set_check refuses an item id with a slash (B-523)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-524",
+   "task": "W.T15",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T15",
+   "kind": "impl",
+   "title": "FB005 admits the integer version of block, workflow, decision_point and rule (gate configuration)",
+   "branch": "fix/b524-gate-wt15-fb005-version-of-block-workflow-rule",
+   "prTitle": "fix(eng-dev-gate): FB005 admits the integer version of block, workflow, decision_point and rule (B-524)",
+   "risk": "r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Protected path .gate/forbidden.yml: waits for the owner's approval (asked on 2026-11-15)."
+   ]
+  },
+  {
+   "id": "B-525",
+   "task": "W.T4b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T4b",
+   "kind": "impl",
+   "title": "Calc harness.host_design_verdicts (held until spec Q19 is answered)",
+   "branch": "feat/b525-harness-wt4b-calc-host-design-verdicts",
+   "prTitle": "feat(eng-harness): calc harness.host_design_verdicts (B-525)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T4"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "source",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Waits for the owner's answer to spec 0007 Q19 (asked on 2026-11-15)."
+   ]
+  },
+  {
+   "id": "B-526",
+   "task": "W.T9a",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T9a",
+   "kind": "impl",
+   "title": "Workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn)",
+   "branch": "feat/b526-harness-wt9a-workflow-part-2a-steps-11-to-15",
+   "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T4",
+    "W.T4b",
+    "W.T8"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-527",
+   "task": "W.T9b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T9b",
+   "kind": "impl",
+   "title": "Workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration",
+   "branch": "feat/b527-harness-wt9b-workflow-part-2b-steps-16-and-17",
+   "prTitle": "feat(eng-harness): workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration (B-527)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T9a"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-528",
+   "task": "I.T14c",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T14c",
+   "kind": "impl",
+   "title": "Commands run and resume: the page ports' wait mode and the answers files",
+   "branch": "feat/b528-harness-it14c-commands-run-and-resume-page-ports",
+   "prTitle": "feat(eng-harness): commands run and resume: the page ports' wait mode and the answers files (B-528)",
+   "risk": "r3",
+   "pending_deps": [
+    "I.T10",
+    "I.T14"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
+  },
+  {
+   "id": "B-534",
+   "task": "W.T10b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T10b",
+   "kind": "impl",
+   "title": "Prompt counter and B-1 cycle timings",
+   "branch": "feat/b534-harness-wt10b-prompt-counter-and-cycle-timings",
+   "prTitle": "feat(eng-harness): prompt counter and B-1 cycle timings (B-534)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T10"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false
   }
  ]
 }

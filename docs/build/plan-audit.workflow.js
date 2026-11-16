@@ -1,5 +1,5 @@
 // The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text.
-// Plan pre-flight audit script (work item B-506, playbook section 7 item 1). Not yet run when saved. Read-only: it edits no repository file.
+// Plan pre-flight audit script (work item B-506, playbook section 7 item 1). Read-only: it edits no repository file.
 export const meta = {
   name: 'plan-audit',
   description: 'Pre-flight audit of the remaining plan tasks against the merged code (owner-approved speed-up 1, B-506): find file lists, budgets, tests-first tests and dependencies that would stop a writer, verify each finding adversarially, write one findings file per plan. Read-only: it edits no repository file.',
