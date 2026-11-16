@@ -555,6 +555,13 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_guard.py"
       - "packages/eng-harness/tests/rules/**"
+      # Amendment (B-529, documents only): a writer's trial (gate pass with exactly this file set, 122 counted lines).
+      # Engine._drive in _runner.py is the only place that can make the root block block code (AC18 "directly"); three
+      # existing tests ran I/O inside block code, which the guard now refuses (no expectation changes).
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
+      - "packages/eng-harness/tests/unit/test_promote.py"
     max_changed_lines: 250
     max_sessions: 2
     tests_first:

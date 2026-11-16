@@ -52,7 +52,7 @@ class StubApp:
         self._enter("index")
         return page(HTTPStatus.OK, trusted("Run"), [el(Tag.P, Text(RUN_DATA))])
 
-    def screen(self, kind: Kind, subject_id: str) -> Screen | None:
+    def screen(self, kind: Kind, subject_id: str, *, answering: bool = False) -> Screen | None:
         self._enter("screen")
         spec = SPECS.get((kind, subject_id))
         if spec is None:
