@@ -1,8 +1,8 @@
 """Calc `harness.change_set_check` v1: the change set against the model and the basis (spec 0007 4.4.1, K1 to K7).
 
 Purpose: resolve each item's selection to sorted explicit names (K1), check every name (K2), refuse two items on one
-target and property (K3), check each value's source, unit and bounds (K4), name the gap of a refused kind (K5), warn
-where the engineer changed a property an item also sets (K6), and fail on any error (K7).
+target and property and an item id with `/` (K3), check each value's source, unit and bounds (K4), name the gap of a
+refused kind (K5), warn where the engineer changed a property an item also sets (K6), and fail on any error (K7).
 Inputs: `change_set` (the answer field), the step 3 read set as flat fields (`frames`, `areas`, `sections`,
 `restraints`), `names` (`harness.csi_name_lists/1`), `diff` (the step 4 `harness.model_diff/1`) and `basis`.
 Units: a value is compared exactly in the canonical unit of its quantity kind (the unit of its bounds), converted by
@@ -288,6 +288,8 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
         changes.setdefault((change.section, tuple(change.key)), []).append(change)
     resolved: list[ResolvedItem] = []
     for index, item in enumerate(items):
+        if "/" in item.id:  # K3: effect ids join the item id with `/` (spec 0007 4.4.2)
+            check.issue(item.id, "INVALID_ITEM_ID", f"item id {item.id} contains / (spec 0007 4.4.1 K3)")
         if (gap := refused_gap(item)) is not None:  # K5
             check.issue(item.id, "NOT_IMPLEMENTED", f"{item.kind} is refused in v1 (spec 0007 4.3.2)", gap=gap)
             continue
