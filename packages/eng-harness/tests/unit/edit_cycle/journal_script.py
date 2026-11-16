@@ -47,6 +47,18 @@ class Script:
             path,
         )
 
+    def fail(self, path: str, kind: str, name: str, start: float, ms: int) -> None:
+        """A step started at `start` that failed `ms` later."""
+        body = {"kind": kind, "name": name, "args": {}, "args_sha256": SHA, "effect": "read"}
+        error = {"harness_code": "NEEDS_ENGINEER", "message": "m"}
+        self.at(start, _KINDS.STEP_STARTED, body, path)
+        self.at(start + ms / 1000, _KINDS.STEP_FAILED, {"error": error, "retryable": False, "duration_ms": ms}, path)
+
+    def started(self, path: str, kind: str, name: str, start: float) -> None:
+        """A step that started and has not ended."""
+        body = {"kind": kind, "name": name, "args": {}, "args_sha256": SHA, "effect": "read"}
+        self.at(start, _KINDS.STEP_STARTED, body, path)
+
     def answer(self, label: str | None) -> str:
         """The stored change-set answer, carrying the optional `benchmark_request` label."""
         who = {"unit": None, "entered_by": "x", "entered_at": "2026-01-01T00:00:00.000Z"}

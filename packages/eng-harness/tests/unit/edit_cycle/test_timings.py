@@ -7,6 +7,7 @@ expected number below is the sum of the scripted times it names.
 import json
 from pathlib import Path
 
+import pytest
 from eng_contract.ids import FixedClock, IdSource
 from eng_contract.store import ResultStore
 from fixtures.report_run import HEADER, SHA, build_report_run
@@ -135,3 +136,72 @@ def test_cycle_timings_file(run_dir: Path, store: ResultStore, ids: IdSource, tm
     assert [t["wait_ms"] for t in data["turns"]] == [30_000, 10_000]
     assert data["cycles"][0]["prompts"] == 1
     assert str(tmp_path) not in target.read_text(encoding="utf-8")
+
+
+def _script(run_dir: Path, store: ResultStore, ids: IdSource) -> Script:
+    s = Script(run_dir, store, ids)
+    s.at(0, _KINDS.RUN_STARTED, {**HEADER, "input_ref": s.base, "basis_ref": s.base})
+    return s
+
+
+def test_an_answer_before_its_request_is_an_error(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """An answer dated before its request is a `ReportError`, not a negative wait."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+    from eng_harness.report._lineage import ReportError
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.asked("early", "block", "Change set", 20, -5)
+    s.end("1/0/0", 10, 30)
+    s.writer.close()
+    with pytest.raises(ReportError):
+        edit_cycle_timings(JournalReader(run_dir))
+
+
+def test_a_cycle_ending_before_it_starts_is_an_error(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """A cycle whose end is dated before its start is a `ReportError`."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+    from eng_harness.report._lineage import ReportError
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.at(5, _KINDS.STEP_COMPLETED, {"output_ref": s.base, "duration_ms": 0}, "1/0/0")
+    s.writer.close()
+    with pytest.raises(ReportError):
+        edit_cycle_timings(JournalReader(run_dir))
+
+
+def test_a_step_belongs_to_a_cycle_by_whole_path_segments(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """`1/0/01/0` is not inside `1/0/0`: its time is in no cycle and it is not listed."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.step("1/0/0/0", "tool", "csi_read_model_state", 10, 1_000)
+    s.step("1/0/01/0", "tool", "csi_open_model", 12, 4_000)
+    s.end("1/0/0", 10, 20)
+    s.writer.close()
+    timings = edit_cycle_timings(JournalReader(run_dir))
+    assert [(c.machine_ms, c.host_ms) for c in timings.cycles] == [(1_000, 1_000)]
+    assert [s.path for s in timings.steps] == ["1/0/0", "1/0/0/0"]
+
+
+def test_machine_time_counts_only_completed_work_steps(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """Scopes, engineer steps, failed and unfinished steps are not machine time; a failure ends the cycle."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.step("1/0/0/0", "tool", "csi_read_model_state", 10, 1_000)
+    s.step("1/0/0/1", "calc", "harness.model_diff", 11, 2_000)
+    s.step("1/0/0/2", "parallel", "p", 13, 5_000)
+    s.step("1/0/0/3", "attempts", "a", 18, 7_000)
+    s.step("1/0/0/4", "decide_many", "d", 25, 11_000)
+    s.fail("1/0/0/5", "tool", "csi_save_model", 36, 13_000)
+    s.started("1/0/0/6", "tool", "csi_frame_section", 49)
+    s.at(60, _KINDS.STEP_FAILED, {
+        "error": {"harness_code": "NEEDS_ENGINEER", "message": "m"}, "retryable": False, "duration_ms": 50_000,
+    }, "1/0/0")  # fmt: skip
+    s.writer.close()
+    (cycle,) = edit_cycle_timings(JournalReader(run_dir)).cycles
+    assert (cycle.wall_ms, cycle.machine_ms, cycle.host_ms) == (50_000, 3_000, 1_000)
