@@ -85,6 +85,7 @@ def test_cascade_conforms(tmp_path: Path) -> None:
             PendingAnswer,
             DecisionAnswer,
         ]  # one entry per call, in order
+        assert isinstance(many[1], PendingAnswer)
         assert many[1].request_id == _call(2, ready=False).request_id
         assert port.runtime_summary() == {}  # built without a summary: empty, and no I/O
     summary: dict[str, JsonValue] = {"providers": {"local": {"tier": "advisory"}}, "points": {"pick_choice": 1}}
