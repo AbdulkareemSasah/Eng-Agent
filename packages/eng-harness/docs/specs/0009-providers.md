@@ -329,7 +329,14 @@ calls `assemble_decision_runtime` and builds the cascade with it (spec 0006 §4.
 signature (amendment B-471, spec 0006 Q16 (a)) is `assemble_decision_runtime(providers_config: ProvidersConfig,
 decision_settings: DecisionSettings, workspace: Workspace, point_policies: Mapping[str, DecisionPolicy]) ->
 DecisionRuntime`: `point_policies` are the `policies` of `verify_releases` (AC42), and the result holds the providers,
-the verified releases and the summary (AC29). Until the provider factory and release verification are wired (gap
+the verified releases and the summary (AC29).
+`DecisionRuntime` is a frozen model with `model: DecisionProvider | None`, `llm: LLMProvider | None` (the `model=` and
+`llm=` of `Cascade`), `releases: Mapping[str, ShadowRelease]`, `warnings: tuple[str, ...]` and `summary: Mapping[str,
+JsonValue]`. `warnings` holds, as plain strings, one line per `ConfigWarning` of `ProvidersConfig.warnings` (code and
+table), per provider build failure or skip, per dropped release (AC49, phase 1) and per `ReleaseFinding` (from
+`verify_releases`); spec 0006 §4.2.2 step 5 prints them all to standard error. `workspace` is
+`eng_contract.store.Workspace`, unused until PR-G1 closes. Until the provider factory and release verification are wired
+(gap
 PR-G1), the same function is the phase-1 assembly of AC49: it builds no provider, keeps no release and reads no point
 policy (amendment B-475).
 

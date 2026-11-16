@@ -155,8 +155,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   a usage error (exit 2) naming the key, with no run folder, no journal event and no credential-store access; then
   `assemble_decision_runtime` (spec 0009 §4.1, §4.10) is called exactly once, in step 5 of §4.2.2, before
   `Engine.start` or `Engine.resume`, also when no `[providers.*]` table exists, and the `DecisionPort` given to the
-  engine is the cascade of spec 0005 built from the returned runtime (its providers, its verified releases and its
-  summary); the runtime's build warnings and release findings are printed to standard error as warnings and are not an
+  engine is the cascade of spec 0005 built from the returned runtime (its `model`, its `llm` and its
+  summary); the runtime's warnings (which include the release findings) are printed to standard error and are not an
   error. Test: `tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled` (with
   `CliDeps` holding a recording assembler).
 - AC63. Given a run started through `run` with a runtime whose summary is a known JSON object, then the journal's
@@ -516,9 +516,10 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `Engine.resume`), the clock and the ids; the calc registry, the approvals file of spec 0003 (`src/eng_harness/calcs/approvals.yaml`) and the calc
    settings are those of spec 0003 §4.12 (B-412), and so is its `basis_fields` map (spec 0007 §4.5; amendment B-498).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
-   `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
-   standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
-   as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
+   `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release
+   check needs (Q16), print its `warnings` (which include the release findings) to standard error, and build the
+   cascade of spec 0005 from the returned runtime (`model`, `llm` and `summary`; spec 0009 §4.1; the cascade reads
+   released points from the `DecisionSettings` it is given, spec 0005 §4.3) as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
    AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
    AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
    `Engine.start` with the run id of step 1 in `RunRequest.run_id`.
