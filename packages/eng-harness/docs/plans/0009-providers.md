@@ -204,7 +204,8 @@ tasks:
     # the summary's (point, reason) entries, which run_started.decision_runtime records as given (engine AC69, merged);
     # no new event. Re-estimated: about 100 lines (_runtime.py about 85 with DecisionRuntime, the provider entries, the
     # warnings and the drop entries; __init__.py 3, pyproject.toml 1, CHANGELOG.md 3; an estimate); budget 150 stays.
-    # Amendment (B-531, documents only): DecisionRuntime has the fields of spec 4.1 (model, llm, releases, warnings, summary); no file or budget change.
+    # Amendment (B-531, documents only): DecisionRuntime has the fields of spec 4.1 (model, llm, releases, warnings,
+    # summary); no file or budget change.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
