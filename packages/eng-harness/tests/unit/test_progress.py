@@ -18,6 +18,7 @@ from workflows.rig import Rig, make_rig, request, steps
 
 from eng_harness.block import Registry
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunStatus
+from eng_harness.engine._resources import commit_hook
 from eng_harness.journal import INLINE_EVENT_BYTES, Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import ProgressSink
@@ -144,3 +145,19 @@ def test_commit_hook_runs_once_per_append_after_the_commit(tmp_path: Path) -> No
         _Failing.fail = False
     assert (len(seen), writer.last_seq) == (2, seq + 1)
     writer.close()
+
+
+def test_commit_hook_detaches_a_failing_sink(caplog: pytest.LogCaptureFixture) -> None:
+    assert commit_hook(None) is None
+    sink = Failing(1)
+    hook = commit_hook(sink)
+    assert hook is not None
+    payload = ev.RunPaused(reason="stop_requested", request_ids=[])
+    events = [Event(n, T.RUN_PAUSED, None, None, "2026-01-01T00:00:00.000Z", payload) for n in (1, 2, 3)]
+    with caplog.at_level(logging.WARNING):
+        for event in events:
+            hook(event)  # the failure at event 2 does not escape
+    assert (sink.events, sink.attempts) == (events[:1], 2)
+    assert [r.levelno for r in caplog.records] == [logging.WARNING]
+    assert "event 2" in caplog.text
+    assert "the sink broke" in caplog.text
