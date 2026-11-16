@@ -17,7 +17,11 @@ from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, Inpu
 
 REASON_MAX = 500  # characters of a reason after trimming (spec 0006 AC31)
 NAME_MAX = 100  # characters of the engineer's name (spec 0006 AC39)
-REJECT, REASON, CHOICE = "reject:", "reason:", "choice:"  # form field prefixes: a rejected item, its reason, an option
+REJECT, REASON, CHOICE = (
+    "reject_",
+    "reason_",
+    "choice_",
+)  # field prefixes (token-safe, AC49): rejected item, reason, option
 type Request = ApprovalRequest | InputRequest
 
 
@@ -92,11 +96,16 @@ def parse(request: Request, form: Mapping[str, str]) -> ApprovalSubmission | Cho
     return ChoiceSubmission.model_validate({**base, "choices": choices})
 
 
+def _item_of(key: str) -> str:
+    """The item id of a `REJECT` or `REASON` field: the key without the one prefix it starts with."""
+    return key.removeprefix(REJECT if key.startswith(REJECT) else REASON)
+
+
 def _approval(request: ApprovalRequest, form: Mapping[str, str], base: Mapping[str, str]) -> ApprovalSubmission:
     if (decision := form.get("decision")) not in ("approve", "reject"):
         raise AnswerError("choose approve or reject")
     items = set(request.items)
-    if any(k.startswith((REJECT, REASON)) and k.partition(":")[2] not in items for k in form):
+    if any(_item_of(k) not in items for k in form if k.startswith((REJECT, REASON))):
         raise AnswerError("the form names an item that is not an item of this request")
     rejected = tuple(i for i in request.items if REJECT + i in form)
     reasons = {i: text for i in request.items if (text := form.get(REASON + i, "").strip())}
