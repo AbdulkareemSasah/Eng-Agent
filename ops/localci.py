@@ -46,10 +46,11 @@ Marker files in a run folder: `batched` (a leader took the run into its batch; w
 which the run's own process takes over when it gets the lock: a PASS stands while batch_current() holds, else the run
 tests again; a PASS of a pull request that has merged or has `released` is printed and never tested again), `single`
 (never batch this run), `released` (the merge step is done), `batch-verified` and `batch-tree-mismatch.txt` (build/v1's
-tree after the members' squash merges against the batch tree), `batch-incomplete.txt` (the hold ended with a member not
-merged; with a LOCAL-CI BATCH_INCOMPLETE line), `batch-error.log` (leader folder: an error in the batch code, after which
-the leader ran alone). A companion counts as waiting only when its `pid` names a live `localci.py run` process for its
-own folder (a reused pid does not count) and it is the newest run folder of its pull request number.
+tree after the members' squash merges against the batch tree, state files ignored), `batch-incomplete.txt` (the hold
+ended with a member not merged; with a LOCAL-CI BATCH_INCOMPLETE line), `batch-error.log` (leader folder: an error in
+the batch code, after which the leader ran alone). A companion counts as waiting only when its `pid` names a live
+`localci.py run` process for its own folder (a reused pid does not count) and it is the newest run folder of its pull
+request number.
 """
 import argparse, fcntl, hashlib, json, os, pathlib, re, subprocess, sys, time
 
@@ -64,6 +65,12 @@ WAITING = "waiting for the local CI lock (another run is in progress)\n"
 # a lead state commit (subject "docs(build)...") that touches only these files does not change what the gate tests
 STATE_FILES = ("BUILD-STATUS.md", "HANDOFF.md", "LOCAL-TESTING.md", "ops/remaining-tasks.json")
 STATE_DIRS = ("docs/build/",)
+
+
+def state_path(p):
+    return p in STATE_FILES or p.startswith(STATE_DIRS)
+
+
 NOT_RUN = ("Not run in the container: the dependency audit (`uv audit --locked`; api.osv.dev is outside AGENTS.md "
            "section 9 and denied by the network policy) and the windows job (no Windows here). Both are owner "
            "local-test items (LOCAL-TESTING.md).")
@@ -685,7 +692,8 @@ def merged_numbers(base, now):
 def hold_batch(members, info):
     """The leader's hold after a batch PASS: until every member's pull request has merged or has `released`, at most
     ten minutes. When every member merged, build/v1's tree after the last member's squash merge is compared with the
-    batch tree: `batch-verified`, or `batch-tree-mismatch.txt` and a LOCAL-CI BATCH_TREE_MISMATCH line."""
+    batch tree outside the state files (state_path(), the files batch_current() lets lead state commits change between
+    the squash merges): `batch-verified`, or `batch-tree-mismatch.txt` and a LOCAL-CI BATCH_TREE_MISMATCH line."""
     base, numbers = info["base"], [m["number"] for m in members]
     deadline = time.time() + 600
     done = set()
@@ -712,16 +720,23 @@ def hold_batch(members, info):
             last = sha  # the newest member squash merge: build/v1 after all of them
             break
     tree = git("rev-parse", f"{last}^{{tree}}", check=False).stdout.strip()
+    diff = git("diff", "--name-only", "--no-renames", info["tree"], tree, check=False) if tree else None
+    differ = [p for p in diff.stdout.splitlines() if not state_path(p)] if diff and diff.returncode == 0 else None
+    how = ("compared with git diff --name-only, ignoring the state files (" + ", ".join(STATE_FILES + STATE_DIRS) +
+           "), which lead state commits between the squash merges may change")
     for m in members:
-        if tree == info["tree"]:
+        if differ == []:
             (m["out"] / "batch-verified").write_text(f"build/v1 {last} after the squash merges of {refs} has tree "
-                                                     f"{tree}, the batch tree\n")
+                                                     f"{tree}, the batch tree {info['tree']} outside the state files "
+                                                     f"({how})\n")
         else:
             (m["out"] / "batch-tree-mismatch.txt").write_text(
                 f"batch tree {info['tree']} (batch commit {info['commit']} on base {base})\n"
-                f"build/v1 tree {tree} at {last} after the squash merges of {refs}\n")
-    if tree != info["tree"]:
-        print(f"LOCAL-CI BATCH_TREE_MISMATCH batch tree {info['tree']}, build/v1 tree {tree} at {last[:7]} ({refs})")
+                f"build/v1 tree {tree} at {last} after the squash merges of {refs}\n"
+                f"{how}; differing paths: {' '.join(differ) if differ is not None else 'git diff failed'}\n")
+    if differ != []:
+        print(f"LOCAL-CI BATCH_TREE_MISMATCH batch tree {info['tree']}, build/v1 tree {tree} at {last[:7]} ({refs}), "
+              "state files ignored")
 
 
 def batch_current(doc, now):
@@ -757,7 +772,7 @@ def batch_current(doc, now):
             continue
         paths = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha, check=False).stdout.splitlines()
         if not (subject.startswith("docs(build)") and paths
-                and all(p in STATE_FILES or p.startswith(STATE_DIRS) for p in paths)):
+                and all(state_path(p) for p in paths)):
             return False
     return True
 
@@ -776,6 +791,8 @@ well (printed, no hold, no test). Otherwise the result is stale: it is removed a
     except (OSError, ValueError, KeyError):
         return None
     if doc.get("head") == pr["head"]["sha"]:
+        if doc.get("verdict") in ("CONFLICT", "FAIL"):  # also when this process started after the leader finished
+            (out / "status.txt").write_text(f"done {doc['verdict']}\n")
         if doc.get("verdict") == "CONFLICT":
             print(f"LOCAL-CI CONFLICT with build/v1 {doc['base'][:7]} in: {' '.join(doc.get('files', [])[:20])}")
             return 5
@@ -786,12 +803,14 @@ well (printed, no hold, no test). Otherwise the result is stale: it is removed a
         # staleness matters only before the merge: a pull request that has merged or was released is not tested again
         done = int(pr["number"]) in merged_numbers(doc["base"], now) or (out / "released").exists()
         if done or batch_current(doc, now):
+            (out / "status.txt").write_text("done PASS\n")
             if not done:
                 hold(out, int(pr["number"]), doc["base"])
             print("LOCAL-CI PASS")
             return 0
     (out / "status.txt").write_text("running\n")
-    (out / "result.json").unlink(missing_ok=True)
+    for f in ("result.json", "released"):  # a stale `released` would end the re-test's hold at once
+        (out / f).unlink(missing_ok=True)
     return None
 
 
@@ -861,7 +880,8 @@ def cmd_start(a):
         # a batch leader wrote this verdict while the run's own process still waits for the lock, and build/v1 has moved
         # past it: that process tests again when it gets the lock (never a second process for one folder)
         (run_dir / "status.txt").write_text(WAITING)
-        for f in ("result.json", "batched"):
+        for f in ("result.json", "released", "batched", "batch-verified", "batch-tree-mismatch.txt",
+                  "batch-incomplete.txt"):  # as the restart below; a stale `released` would end the re-test's hold at once
             (run_dir / f).unlink(missing_ok=True)
         print("LOCAL-CI ALREADY_RUNNING")
         return 0
