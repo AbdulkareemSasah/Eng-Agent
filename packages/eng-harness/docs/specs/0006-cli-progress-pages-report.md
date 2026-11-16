@@ -192,8 +192,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
   `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
   mapping from the run's stored input, also when the original file has been moved since `run`; and a relative path, a
-  missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2). Test:
-  `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder`.
+  missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2); and the
+  port builder receives `visible` equal to the input's `visible_host`, or false for an input model without that field
+  (amendment B-543). Test: `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder`.
 - AC68. **[added: B-536]** Given a port builder that raises `NotImplementedGap` (spec 0002 AC43, gap H-G8), when `run`
   or `resume` is called, then its message, which names H-G8 and the entries, is printed on standard error, the exit
   code is 2 (`exit_code_for(Outcome.USAGE)`, returned by the command itself), no run folder is created by `run`, and nothing is journaled (§4.2.2 step 2). Test:
@@ -527,10 +528,12 @@ or open the page; the approval is the engineer's. The rule is generated into the
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
    the request opens. Then build the tool and host ports as
-   `port_builder(config, workspace, store, run_folder, clock, ids, files)` (amendment B-536, AC67): `files` maps a
+   `port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` (amendment B-536, AC67): `files` maps a
    model key to a file for each top-level field of the workflow's input model annotated `pathlib.Path` (a model file);
    the key is the file's base name and the file is the field's value, which must be absolute and name an existing
-   file. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
+   file. `visible` is the input's top-level `visible_host` when the input model declares that `bool` field, else
+   false (amendment B-543, spec 0007 §4.2; spec 0002 §4.1 keyword `visible`), at `run` and at `resume` from the stored
+   input. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
    folder; these refusals apply to `run`. `resume` builds `files` from the run's stored input and does not check that
    the files still exist. Decision (B-536): `resume` passes a moved original on unchecked, because once the working
    copy exists the host port works on the copy in the run folder and never reads the original again (spec 0002 §4.5.9

@@ -69,6 +69,13 @@ and T16b): the journal and port forms of the approval binding as merged (§4.9),
 flight (§4.5.3), a rejected item of an inserted approval (§4.7), and five open questions (§11 Q40 to Q44); it adds no
 criterion.
 
+**Amendment B-543.** Spec 0007 (§4.5, first-live-run walk) found that no component gives block code a `ModelHandle`
+(`ToolResult.model` is always `None`, and a handle's model id and revision are in the envelope's provenance, which a
+block cannot read), while `Preview.models` and `ctx.promote` take one. Both now also take a model key (`str`), and
+`ToolResult.model` stays `None` in v1 (§4.3.2, §4.9). Decision: the engine binds an approval to the live state of each
+named key and uses only `model_key` of a handle (approval binding, promotion), so the key carries everything it needs
+and a block never invents a model id or revision. The new criterion is AC72, built by plan T23.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -396,6 +403,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `::test_promotion_rechecks_approval`.
 - AC53. Given `ctx.promote(model, Promotion.REPLAY_WRITES)`, then `NotImplementedGap` (`NOT_IMPLEMENTED`, gap E-G1).
   Test: `tests/unit/test_promote.py::test_replay_promotion_is_a_gap`.
+- AC72. **[added: B-543]** Given a `Preview` whose `models` names a model by its key (a `str`) and a `ctx.promote`
+  given a key, then the approval is bound to that key's live state exactly as for a `ModelHandle` of the same key
+  (the original's key followed to its working copy, §4.7), the stored preview holds the key and no model id or
+  revision, and the promotion runs as AC52 and returns the promoted `ModelHandle`. Test:
+  `tests/workflow/test_model_keys.py::test_preview_and_promote_take_a_key`.
 
 ### 3.7 Approvals (11 §3)
 
@@ -662,11 +674,12 @@ options **[added: 11 §3 writes `**args`]**.
 | parallel | `parallel(*steps: Awaitable[T]) -> list[T]` (typed overloads up to six arguments return tuples) | `parallel`; scope |
 | attempts | `attempts(limit: BasisCount) -> AsyncIterator[Attempt]` (use: `async for a in ctx.attempts(...)`) | `attempts`; scope |
 | escalate | `escalate(reason: str, evidence: Sequence[Ref]) -> NoReturn` | `escalate` |
-| promote | `promote(model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle` **[added]** | `promote`; write |
+| promote | `promote(model: ModelHandle \| str, how: Promotion, approval: Approval) -> ModelHandle` **[added]**; a `str` is a model key (amendment B-543, AC72) | `promote`; write |
 | basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E`, `record_ref() -> Ref` (the reference `res_<id>` to the whole `basis.design_basis/1` result, for a calc input `basis`, spec 0003 §4.4; it reads no path and needs no declaration; amendment B-511, plan 0007 T6, criterion spec 0007 AC33) | not a step (the basis is frozen and in the run header) |
 
 Result types (frozen Pydantic models): `ToolResult` (`tool`, `ref: Ref`, `summary: Mapping[str, SummaryValue]`,
-`warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`), where `SummaryValue` is a JSON
+`warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`, `None` in v1: a block names a
+model by its key, amendment B-543), where `SummaryValue` is a JSON
 value in which every quantity object of contract §4.8 is a `Quantity` or `LabeledQuantity`; `ReadResult` (`ref`,
 `kind`, `value`); `CalcResult` (`calc_id`, `calc_version`, `status`, `ref`, `summary`, `draft: bool`); `Decision`
 (`choice`, `decided_by`, `confidence: float | None`); `Answered[M]` (`value: M`, `ref: Ref` of the
@@ -1153,7 +1166,8 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 
 - `ctx.approve(title, preview, kind)`: `request_id = "apr_" + sha256(run_id + "\n" + path).hexdigest()[:32]`, stable
   across replay. `Preview` (`items: list[PreviewItem]` with unique `id`, `label`, `refs`; `diff_ref: Ref | None`;
-  `models: list[ModelHandle]`) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
+  `models: list[ModelHandle | str]`, a `str` being a model key, of which the engine uses only the key, amendment B-543,
+  AC72) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
   `binding` holds `model_id`, `revision`, `fingerprint` and `file_sha256` of every model in `preview.models`, read from
   HostPort when the request is made (after invariant 1 has checked them): in `approval_requested` a map keyed by model
   key, in `ApprovalRequest.binding` a list of `ModelBinding` with its `model_key` (amendment B-499, as merged).
@@ -1311,7 +1325,7 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 | AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
-| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51, AC71 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
+| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51, AC71, AC72 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
 | AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 to AC64, AC71 (resume case) | Replay (process/05 §1) | `tests/replay/` |
 | AC37 (generated programs) | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC60 | Performance | `tests/perf/` |

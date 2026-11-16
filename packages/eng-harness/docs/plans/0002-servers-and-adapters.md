@@ -524,6 +524,10 @@ tasks:
     # (spec 4.1, about 25), the route argument of csi_allowlist (csi/__init__.py, about 2) and record_pre_image in
     # _toolport.py (about 3). Estimate 313 - 13 + 35 + 6 + 25 + 2 + 3 = about 371; budget 380 (the cap). If the writer
     # measures more, it stops with NEEDS_PLAN_AMENDMENT; the binder is the next split candidate.
+    # Amendment (B-543, documents only): build_ports takes the keyword visible and gives it to AdapterHostPort, and
+    # passes host.open_original to CsiToolPort as opener (spec 4.1 item 6, 4.5.9; built by T22, which T19a now waits
+    # for); about 4 lines in adapters/__init__.py: estimate 371 to 375, budget 380 unchanged. test_cycle_steps opens the
+    # original through the step 2 tool step (spec 0007 4.5).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -556,7 +560,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_preview_sends_no_write"  # AC45 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_binder_from_host_port"  # the production binder (B-530)
     covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
-    depends_on: [T14, T18, T19c, T20, T21]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3)
+    depends_on: [T14, T18, T19c, T20, T21, T22]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3); T22 by amendment B-543
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
     # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
@@ -626,6 +630,30 @@ tasks:
       - "packages/eng-harness/tests/contract/test_csi_kinds.py::test_csi_kinds_registered"
     covers: [AC46]
     depends_on: [T13]  # external: plan 0007 T5 (section 3)
+  - id: T22
+    title: The CSI host port opens the original for the step 2 open and launches visible on request
+    # Amendment (B-543, documents only): new (spec 4.5.9 "Opening the original", AC48; spec 0007 4.5 step 2). The merged
+    # CsiToolPort refuses csi_open_model by name, outside its try (an unknown-outcome write for the engine), and nothing
+    # opens and binds the original, so copy_on_open takes no working copy; every launch is hidden. Estimate:
+    # AdapterHostPort.open_original and the visible keyword about 16 (_hostport.py), the visible launch about 5
+    # (csi/_session_ops.py), the opener keyword, the routing of csi_open_model inside the try and the optional path of
+    # OpenModelArgs about 22 (csi/_tools.py), 1 of CHANGELOG.md: about 44; budget 60. Before T19a, whose cycle test
+    # opens the original through it and which wires opener and visible in build_ports; after T19c (merged), the last
+    # task that edited _hostport.py; plan 0002 T15 also edits csi/_tools.py, without an order (whichever lands second adapts).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_open_refusals_are_envelopes"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_visible_launch"
+    covers: [AC48]
+    depends_on: [T19c]  # external: plan 0007 T5 and T13 (merged; csi/_tools.py and _hostport.py)
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -845,8 +873,9 @@ answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries:
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
-Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks` and
-`allowlists`, with the defaults and rules of spec §4.1 (in production the command line fills `files`, plan 0006 T14c,
+Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks`,
+`allowlists` and `visible` (amendment B-543, given to the host port; `build_ports` also passes `host.open_original` as
+the tool port's `opener`, T22), with the defaults and rules of spec §4.1 (in production the command line fills `files`, plan 0006 T14c,
 amendment B-536); the workflow and replay tests pass `files`, a test inspector and
 launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes, through `allowlists`, a loader of its
 synthetic routed allowlist (a `load_allowlist` call with the route it is given). `allowlists` maps an adapter name to a
@@ -932,6 +961,20 @@ each of the six kinds in `HARNESS_KINDS` is the model of `eng_harness.kinds.csi`
 answers; it fails at the base, where `eng_harness.kinds.csi` does not exist. No calc imports the module yet, so no
 calc hash changes here; once plan 0007 T4's calcs import it, it enters their `modules` (spec 0003 §4.5).
 
+**T22 Opening the original, visible launch** (amendment B-543; spec §4.5.9 "Opening the original", AC48; spec 0007
+§4.5 step 2). `AdapterHostPort.open_original(model_key)` does what `restore` does without the hash check: the file of
+the key, `CsiSession.open_file` on the reusable owned instance (or a launch), `_keep`, the units read and `_persist`.
+`AdapterHostPort` and `CsiSession` take `visible: bool = False`; `_launch` sends it to `csi_launch`, to
+`record_launch` and to the `OpenedInstance`. `CsiToolPort` takes `opener` (like `reopened`); in `call`, the
+`csi_open_model` branch moves inside the `try`: with a `path` it answers `INVALID_ARGUMENT` as today, without one it
+validates the arguments (`OpenModelArgs.path` becomes optional), calls `opener(key)` (`INTERNAL` when the port has
+none), takes the binding of the key and answers a success envelope of kind `harness.run_output/1` with the key and the
+file's base name; it writes no ledger entry (the open is not reconciled, `_UNRECONCILED`). `csi_open_revision` keeps
+sending its `path` through `super().call`. `test_open_original_then_working_copy` runs, against the CSI fake server
+process, the open through the tool port wired to a host port, then `locate`, `read_units` and `working_copy` (one
+launch, the copy in the same instance); `test_open_refusals_are_envelopes` checks the three refusals of AC48 return
+failure envelopes; `test_visible_launch` checks the fake's recorded `visible` flag, the run state's and the default.
+
 ## 3. Dependencies
 
 - Runtime: `mcp` 2.x (package ADR in T1, owner queue); `eng-contract`, `pydantic` as in the engine plan. No other.
@@ -941,7 +984,8 @@ calc hash changes here; once plan 0007 T4's calcs import it, it enters their `mo
   replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
   T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
-  T19a also waits for T19c (amendment B-530) and T21, and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
+  T19a also waits for T19c (amendment B-530), T21 and T22 (amendment B-543: T22 edits `_hostport.py` and
+  `csi/_tools.py` first, and T19a wires its opener and `visible`), and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
   (`Revisions`, the revision
   tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
   Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose

@@ -441,7 +441,8 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
     # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's Path and Path | None fields, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
-    max_changed_lines: 130
+    # Amendment (B-543, documents only): the port builder also receives visible, the input's top-level visible_host bool or false (spec 4.2.2 step 2, AC67; spec 0007 4.2, spec 0002 4.1 item 6), at run and at resume from the stored input, passed by keyword as files is (build_ports takes both keyword-only); about 6 lines beside the model-files walk and 1 in the field's type: 129 + 7 = 136, budget 140; test_model_files_reach_the_port_builder also checks visible.
+    max_changed_lines: 140
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
