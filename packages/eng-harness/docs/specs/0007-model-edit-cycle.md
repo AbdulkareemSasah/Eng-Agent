@@ -124,12 +124,6 @@ defines its method; values are synthetic and say so.
   one `add`; a delete is `remove`); a permutation of the items gives the same effects. Tests:
   `tests/golden/edit_cycle/test_expected_effects.py::test_golden_cases`,
   `tests/property/test_expected_effects.py::test_order_independent`.
-- AC39. **[added: B-543]** Given a read set without `model.sections/1` (§4.4.1, §4.4.2), then `harness.change_set_check`
-  runs, a `select` with `area_kind` is `EMPTY_SELECTION` whose detail names the unread area kinds and every other rule
-  gives what it gives with the record; and `harness.expected_effects` runs and projects a `wall_section` as two `set`
-  effects on `model.sections/1`. Tests: `tests/golden/edit_cycle/test_change_set_check.py::test_sections_absent`
-  (cases `check-no-sections-*`), `tests/golden/edit_cycle/test_expected_effects.py::test_sections_absent` (cases
-  `effects-no-sections-*`).
 - AC36. Given a resolved change set that changes one scale, adds one case and drops one case of an existing
   combination, and puts a frame load on a frame that has none in that pattern, when `harness.expected_effects` projects
   it and `harness.readback_check` compares its effects with a before read set and an after read set that holds exactly
@@ -268,6 +262,12 @@ defines its method; values are synthetic and say so.
   then the host port's `model_files` names the new working file, `locate` finds it on the same bound instance, and the
   first `model_state` after it reads that file with no `MODEL_CHANGED_OUTSIDE`; given a failed open, then the host
   port still names the previous file. Test: `tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port`.
+- AC39. **[added: B-543]** Given a read set without `model.sections/1` (§4.4.1, §4.4.2), then `harness.change_set_check`
+  runs, a `select` with `area_kind` is `EMPTY_SELECTION` whose detail names the unread area kinds and every other rule
+  gives what it gives with the record; and `harness.expected_effects` runs and projects a `wall_section` as two `set`
+  effects on `model.sections/1`. Tests: `tests/golden/edit_cycle/test_change_set_check.py::test_sections_absent`
+  (cases `check-no-sections-*`), `tests/golden/edit_cycle/test_expected_effects.py::test_sections_absent` (cases
+  `effects-no-sections-*`).
 - AC32. Given the kinds of §4.2, then the report renders them through registered renderers with a source on every value
   cell, and adds the timings of §4.9. Test: `tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources`.
 
