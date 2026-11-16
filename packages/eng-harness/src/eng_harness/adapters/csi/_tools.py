@@ -185,14 +185,17 @@ class CsiToolPort(AdapterToolPort):
 
     `written` is the book that `AdapterHostPort.check_model` reads (its `ReadBack`) and `wrote` is the host port's; a
     port made without them records into a book nobody reads. `revisions` holds the run's snapshots: without it
-    `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked.
+    `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked. `reopened`
+    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file after a
+    successful `csi_open_revision` only.
     """
 
     def __init__(
         self, *, binder: ModelBinder, written: WrittenItems | None = None, wrote: Callable[[str], None] | None = None,
-        revisions: Revisions | None = None, **wiring: Any,
+        revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None, **wiring: Any,
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
+        self._reopened = reopened or (lambda key, path: None)
         builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
@@ -299,7 +302,10 @@ class CsiToolPort(AdapterToolPort):
         reply = await super().call(
             "csi_open_model", {"model": validated.model.model, "path": str(path)}, op_id=op_id, model=model
         )
-        return _with_saved_file(reply, saved) if isinstance(reply, SuccessEnvelope) else reply
+        if not isinstance(reply, SuccessEnvelope):
+            return reply
+        self._reopened(validated.model.model, path)
+        return _with_saved_file(reply, saved)
 
 
 def _with_saved_file(reply: SuccessEnvelope, saved: SavedFile) -> SuccessEnvelope:
