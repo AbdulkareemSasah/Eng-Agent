@@ -10,6 +10,7 @@ from eng_harness._text import format_duration_ms, format_timestamp, truncate
 from eng_harness.journal import Event, JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.pages._css import STYLESHEET
+from eng_harness.report._edit_cycle import cycle_timing_nodes, edit_cycle_timings
 from eng_harness.report._lineage import ReleaseMarks, ReportError, ResultMark, unreleased_dependencies
 from eng_harness.report._model import ReportModel, fold_report
 from eng_harness.report._sections import SourceBook, _Page
@@ -38,7 +39,7 @@ def build_report(
         _banner(model, signed, marked, last_seq),
         _status(model, reader, store, version),
         *_section_nodes(model, reader, store),
-        _timings(model),
+        _timings(model, reader, store),
         _run_events(model),
     ]
     return document(title, parts, STYLESHEET)
@@ -124,7 +125,7 @@ def _basis_rows(store: ResultStore, basis_ref: str) -> list[tuple[str, str]]:
     return rows
 
 
-def _timings(model: ReportModel) -> Element:
+def _timings(model: ReportModel, reader: JournalReader, store: ResultStore) -> Element:
     steps = [
         el(
             Tag.TR,
@@ -146,10 +147,12 @@ def _timings(model: ReportModel) -> Element:
         f"machine {format_duration_ms(model.timings.machine_ms)}; resumes {model.timings.resumes}",
     )
     head = el(Tag.TR, *(el(Tag.TH, Text(label)) for label in ("Path", "Name", "Started", "Duration")))
+    cycles = edit_cycle_timings(reader, store)
     return el(
         Tag.SECTION,
         el(Tag.H2, trusted("Timings")),
         el(Tag.TABLE, el(Tag.THEAD, head), el(Tag.TBODY, *steps, summary)),
+        *(cycle_timing_nodes(cycles) if cycles.cycles else []),
         id=SafeToken("timings"),
     )
 

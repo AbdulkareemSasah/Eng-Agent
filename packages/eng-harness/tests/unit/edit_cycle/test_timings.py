@@ -173,3 +173,14 @@ def test_cycle_and_turn_timings(run_dir: Path, store: ResultStore, ids: IdSource
     assert ("1/0/0/9", "decide", TURN, 30_000) in steps
     assert not any(path == "0" for path, *_ in steps)
     assert len(steps) == 1 + 10 + 1 + 4 + 1
+
+
+def test_benchmark_without_accept_or_label(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """Without the store no label is known; a label with no accept has no elapsed time and runs to the last cycle."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+
+    reader = write_cycles(run_dir, store, ids, accept=False)
+    assert edit_cycle_timings(reader).benchmarks == ()
+    assert [(b.label, b.elapsed_ms, b.cycles) for b in edit_cycle_timings(reader, store).benchmarks] == [
+        ("R1", None, 2)
+    ]

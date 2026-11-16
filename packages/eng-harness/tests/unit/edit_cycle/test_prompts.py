@@ -19,3 +19,10 @@ def test_prompt_counter(run_dir: Path, store: ResultStore, ids: IdSource) -> Non
         ("CHANGE_SET", "ap3"), ("engine.in_flight", "In flight"), ("engine.decision", "edit_cycle_analysis_messages"),
     ]  # fmt: skip
     assert [(r.kind, r.title) for r in counts[2].requests] == [("INFO", "open1")]
+
+
+def test_prompt_count_is_the_number_of_requests() -> None:
+    """The count is the length of the counted requests."""
+    from eng_harness.report._edit_cycle import PromptCount
+
+    assert PromptCount(cycle=1, requests=()).count == 0

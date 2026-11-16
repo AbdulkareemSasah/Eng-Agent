@@ -18,7 +18,7 @@ _PARAMS = {"csi_frame_section": frozenset({"depth_mm", "width_mm"}), "csi_other"
 
 
 def _basis(store: ResultStore, kind: str, field: str) -> dict[str, str]:
-    body = {"value": 300, "unit": "mm", "source": "basis", "confirmed": True, "citation": "c"}
+    body = {"value": 300, "unit": "mm", "source": "template:t@1", "confirmed": True, "citation": "c"}
     payload = {"template": {"name": "t", "version": "1", "sha256": SHA}, "fields": {field: body}}
     if kind == "basis.engineer_input/1":
         payload = {
@@ -54,6 +54,8 @@ def test_audit_finds_literal(run_dir: Path, store: ResultStore, ids: IdSource) -
     s.step("7", "calc", "csi_frame_section", 8, 10, **write, args={"depth_mm": 300})
     long = {"model": "m", "depth_mm": 301, "note": "x" * 5000}
     s.step("8", "tool", "csi_frame_section", 9, 10, **write, args=long)
+    gone = {"$ref": "res_" + "0" * 26}
+    s.step("9", "tool", "csi_frame_section", 10, 10, **write, args={"depth_mm": gone})
     s.writer.close()
     found = audit_value_sources(JournalReader(run_dir), store, _PARAMS)
     assert found == [
@@ -62,5 +64,6 @@ def test_audit_finds_literal(run_dir: Path, store: ResultStore, ids: IdSource) -
         SourceFinding("2", "csi_frame_section", "width_mm"),
         SourceFinding("5", "csi_other", "depth_mm"),
         SourceFinding("8", "csi_frame_section", "depth_mm"),
+        SourceFinding("9", "csi_frame_section", "depth_mm"),
     ]
     assert audit_value_sources(JournalReader(run_dir), store, {}) == []
