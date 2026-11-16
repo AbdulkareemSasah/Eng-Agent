@@ -41,6 +41,7 @@ from eng_harness.ctx import (
 )  # fmt: skip
 from eng_harness.engine import _approvals, _decide, _modes, _promote, _steps
 from eng_harness.engine._codec import decode, decode_summary
+from eng_harness.engine._guard import block_code, engine_work, enter_block_code
 from eng_harness.engine._invariants import SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
 from eng_harness.journal import Event, EventType, JournalWriter
@@ -175,6 +176,7 @@ class Ctx:
             raise errors.ReplayDivergence(f"a step recorded the harness code {done.harness_code}")
         return done
 
+    @engine_work
     async def tool(
         self, name: str, args: Mapping[str, ArgValue] | None = None, *, under: Approval | None = None,
         item: str | None = None,
@@ -297,6 +299,7 @@ class Ctx:
     def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
         return self.index.lookup(path, kind, name, payload_sha256(args), child)
 
+    @engine_work
     async def read(self, ref: Ref | ToolResult | CalcResult, pointer: str = "") -> ReadResult:
         """Read the value at `pointer` (added to the one in `ref`) of a stored result as one step.
 
@@ -327,6 +330,7 @@ class Ctx:
         self._done(path, 1, began, ev.StepResult(ref=target, summary={"kind": read.kind}, warnings=[], complete=True))
         return read
 
+    @engine_work
     async def calc(self, calc_id: str, args: Mapping[str, ArgValue] | None = None) -> CalcResult:
         """Run the calc `calc_id` as one step; a draft or verified calc marks the run's outputs DRAFT (AC13).
 
@@ -370,6 +374,7 @@ class Ctx:
             draft=status in _DRAFT,
         )  # fmt: skip
 
+    @engine_work
     async def decide(
         self, question: str, options: object, state: BaseModel, rules: Sequence[object], policy: object
     ) -> Decision[Any]:
@@ -384,6 +389,7 @@ class Ctx:
         request = DecisionRequest(question, options, state, rules, policy)
         return (await _steps.step(lambda path: self._decided(path, "decide", question, [request])))[0]
 
+    @engine_work
     async def decide_many(self, requests: Sequence[DecisionRequest]) -> list[Decision[Any]]:
         """Decide the requests as one step; the calls the engineer must choose are one input request (AC66)."""
         return await _steps.step(lambda path: self._decided(path, "decide_many", "decide_many", list(requests)))
@@ -421,6 +427,7 @@ class Ctx:
         self._done(path, 1, began, result)
         return out
 
+    @engine_work
     async def ask[M: BaseModel](self, fields: type[M], *, title: str) -> Answered[M]:
         """Ask the engineer for the values of `fields` as one step; the run pauses until a valid answer is given.
 
@@ -454,6 +461,7 @@ class Ctx:
         self._done(path, 1, began, ev.StepResult(ref=stored.result_id, summary={}, warnings=[], complete=True))
         return Answered(value=cast(M, given), ref=Ref.model_validate({"$ref": stored.result_id}))
 
+    @engine_work
     async def approve(
         self, title: str, preview: Preview, *, kind: ApprovalKind = ApprovalKind.CHANGE_SET
     ) -> Approval:  # fmt: skip
@@ -487,6 +495,7 @@ class Ctx:
         self._done(path, 1, began, ev.StepResult(ref=shown, summary=summary, warnings=[], complete=True))
         return approval
 
+    @engine_work
     async def block[I: BaseModel, O: BaseModel](self, child: BlockDef[I, O], inp: I) -> O:
         """Run `child` as a scope: its steps are `<path>/0`, `<path>/1`; input and output are checked (AC15).
 
@@ -507,7 +516,8 @@ class Ctx:
         except errors.NeedsReconciliation:  # entered, not completed
             begun = True
         began = self._clock.now_ms() if begun else self._begin(path, 1, "block", ref.name, args, child=ref.model_dump())
-        out = await child.fn(self, inp)
+        with block_code():  # the child's own code runs as block code, its ctx calls as engine work
+            out = await child.fn(self, inp)
         await self._guard.sweep(self, path, "end")  # the child block's return checks the models it left dirty
         self._approvals.leave(path)  # and ends the approvals asked inside it (spec 4.9)
         if not isinstance(out, child.output_model):
@@ -518,6 +528,7 @@ class Ctx:
             self._done(path, 1, began, result, output_ref=stored.result_id)
         return out
 
+    @engine_work
     async def parallel[T](self, *steps: Awaitable[T]) -> list[T]:
         """Run the steps concurrently, child `i` in scope `<path>/i`; results come in argument order (AC5, AC8)."""
         board = SiblingBoard()
@@ -525,15 +536,20 @@ class Ctx:
         async def before(path: str) -> None:
             await self._guard.sweep(self, path, "pre")  # children read no model the parent left dirty (spec 4.3.1)
 
+        def enter(index: int) -> None:
+            enter_block_code()  # this child's task runs block code; its own context, so nothing to restore
+            self._guard.enter(board, index)
+
         async def after(path: str, models: Sequence[str]) -> None:
             for model in models:
                 await self._guard.check(self, path, "post", model)
 
         return await _steps.parallel(
-            steps, before=before, after=after, enter=lambda index: self._guard.enter(board, index),
+            steps, before=before, after=after, enter=enter,
             leave=self._guard.dirty_models,
         )  # fmt: skip
 
+    @engine_work
     async def finish(self) -> None:
         """`~end` checks after the root returns; an early end diverges before a live check (spec 4.5.2, 4.6 #1)."""
         await self._guard.sweep(self, "", "end", live=False)
@@ -558,6 +574,7 @@ class Ctx:
         """Stop the block: the run needs an engineer (`run_escalated`, reason `block_escalation`, AC14)."""
         raise errors.Escalation(reason, evidence=[ref.ref for ref in evidence])
 
+    @engine_work
     async def promote(self, model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle:
         """Make the accepted revision of the working copy of `model` the model of record, as one step (spec 4.7, AC52).
 

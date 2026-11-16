@@ -32,3 +32,13 @@ PROMOTION: Final[tuple[Trusted, ...]] = tuple(
     trusted(w) for w in ("Model", "Target", "Backup in the run folder", "Original hash", "Working copy hash")
 )  # fmt: skip
 NO_WORKING_COPY: Final[Trusted] = trusted("No working copy is recorded for this model; the bound file hash is shown.")
+SIGN: Final[Trusted] = trusted("Sign")
+REPORT_LINK: Final[Trusted] = trusted("Report so far (DRAFT)")
+VERDICTS_HEADING: Final[Trusted] = trusted("Verdicts")
+VERDICTS: Final[tuple[Trusted, ...]] = (trusted("Status"), trusted("Count"))
+EXCEPTIONS_HEADING: Final[Trusted] = trusted("Exceptions: each needs a written reason to sign")
+EXCEPTIONS: Final[tuple[Trusted, ...]] = tuple(
+    trusted(w) for w in ("Exception", "Subject", "Check", "Status", "Reason")
+)
+UNRELEASED_HEADING: Final[Trusted] = trusted("Results that depend on an unreleased tool")
+ACKNOWLEDGE_UNRELEASED: Final[Trusted] = trusted("I sign knowing that these results depend on an unreleased tool")

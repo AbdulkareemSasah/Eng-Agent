@@ -190,6 +190,10 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_runner.py"  # model_saved of a resumed tool save appended after the host-state check, before the root block, engine §4.5.1 step 8a (amendment B-415)
       - "packages/eng-harness/src/eng_harness/ctx.py"  # BasisView.record_ref(), engine §4.3.2 (amendment B-511)
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
+      # Amendment (B-535, documents only): a writer's trial (gate pass with exactly this file set, 259 counted lines).
+      # Engine 4.6 makes a tool save without provenance.host a ModelIntegrityError, so the save_s tool of two existing
+      # tests must name its revision (3 lines added, 1 changed, no expectation changed).
+      - "packages/eng-harness/tests/workflow/test_modes.py"
     # Amendment (B-415 review fix, documents only): block.py exposes FieldSpec through a TYPE_CHECKING import and a
     # module-level __getattr__, and imports check_declaration inside workflow(); a module-level import of
     # eng_harness.basis._fields is an import cycle (engine §4.1.2, amendment B-511). The gate also runs
@@ -324,34 +328,50 @@ tasks:
     covers: [AC1, AC9, AC12, AC14, AC15, AC20, AC21, AC22, AC23, AC34]
     depends_on: [T9a, T13]  # T13: the reopened hook that restore_previous needs (amendment B-503)
   - id: T10
-    title: Report renderers, value-source audit, prompt counter and B-1 cycle timings
-    # Amendment (B-511, documents only): pre-flight audit. The timings section is _timings() in report/_document.py,
-    # so that file joins; audit_value_sources takes the engineering parameter names as an input (spec 4.9, AC25).
+    title: Report renderers and value-source audit
+    # Amendment (B-511, documents only): pre-flight audit. audit_value_sources takes the engineering parameter names as an input (spec 4.9, AC25).
+    # Amendment (B-533, documents only): the former T10 (renderers, audit, prompt counter, timings) measured 451 counted lines against its
+    # budget of 380 and the cap of 400 (B-204, complete implementation at d1cc688). Split into T10 (measured 157: _edit_cycle.py 147,
+    # _sections.py 9, CHANGELOG.md 1) and T10b (measured 301). The scripted-journal helper `Script` and `PRODUCER` go to
+    # `journal_script.py` so that T10 does not import T10b's tests; pyproject.toml needs no edit (`eng_harness.report` is already in
+    # public_modules); tests/data/journals/edit_cycle/** is dropped (the journals are scripted in Python).
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.report (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/report/_edit_cycle.py"
-      - "packages/eng-harness/src/eng_harness/report/_document.py"  # the timings section (amendment B-511)
       - "packages/eng-harness/src/eng_harness/report/_sections.py"
-      - "packages/eng-harness/src/eng_harness/report/_write.py"
       - "packages/eng-harness/tests/unit/report/test_edit_cycle_renderers.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/journal_script.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_audit.py"
-      - "packages/eng-harness/tests/unit/edit_cycle/test_prompts.py"
-      - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py"
-      - "packages/eng-harness/tests/data/journals/edit_cycle/**"
-    max_changed_lines: 380
+    max_changed_lines: 170
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources"
       - "packages/eng-harness/tests/unit/edit_cycle/test_audit.py::test_audit_finds_literal"
+    covers: [AC25, AC32]
+    depends_on: [T1b]
+  - id: T10b
+    title: Prompt counter and B-1 cycle timings
+    # Amendment (B-533, documents only): new, split from T10 (see T10). Measured 301 counted lines: _edit_cycle.py 286, _document.py 7,
+    # _write.py 7, CHANGELOG.md 1. The timings section is _timings() in report/_document.py (amendment B-511 of T10). T10 and T10b both edit
+    # _edit_cycle.py and CHANGELOG.md, so T10b depends on T10. `write_cycles` stays in test_timings.py, which test_prompts.py imports.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/report/_edit_cycle.py"
+      - "packages/eng-harness/src/eng_harness/report/_document.py"  # the timings section (amendment B-511)
+      - "packages/eng-harness/src/eng_harness/report/_write.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_prompts.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py"
+    max_changed_lines: 315
+    max_sessions: 3
+    tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_prompts.py::test_prompt_counter"
       - "packages/eng-harness/tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings"
-    covers: [AC29, AC32]
-    depends_on: [T1b]
+    covers: [AC26, AC29, AC32]
+    depends_on: [T10]
   - id: T11
     title: Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list
     # Amendment (B-511, documents only): pre-flight audit. The workflow prompt tests and the property test pin merged
-    # T9a, T9b and T10 and pass at the base (TF004): they leave tests_first and stay in files (as B-482). The entry
+    # T9a, T9b and T10b and pass at the base (TF004): they leave tests_first and stay in files (as B-482). The entry
     # point takes the engineering parameter names from engineering_params() in adapters/csi/_tools.py (spec AC35),
     # about 8 lines; budget unchanged (an estimate). Pull request title type feat.
     files:
@@ -370,7 +390,8 @@ tasks:
       - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_audit_and_count_read_run_folder"
       - "packages/eng-harness/tests/unit/edit_cycle/test_acceptance_entry.py::test_entry_is_read_only_and_exit_codes"
     covers: [AC25, AC26, AC35]
-    depends_on: [T9b, T10]
+    # Amendment (B-533, documents only): T10 was split; the report functions are complete with T10b.
+    depends_on: [T9b, T10b]
   - id: T12
     title: Replay test and crash matrix of the workflow (A6)
     # Amendment (B-417, documents only): folder renamed from tests/replay/edit_cycle/ so that its package name differs from tests/unit/edit_cycle/ (mypy duplicate module); no tests/replay/__init__.py.
@@ -456,7 +477,7 @@ and the engine amendments (T6) are small, separate and reviewable on their own; 
 amended in its own documents pull request (spec Q2, Q3, Q5 and spec 0004 Q7), as B-068 does for earlier amendments.
 The decision points and rules (T7) are R1 and reviewed separately from the block. The block is split in three (T8 steps
 1 to 10, T9a steps 11 to 15, T9b steps 16 and 17, the loop and registration; amendment B-511), each tested end to end against the synthetic CSI fake server process. The
-report, audit, prompt counter and timings (T10) are pure functions over the journal. T11 and T12 add the acceptance
+report and audit (T10), the prompt counter and timings (T10b) are pure functions over the journal. T11 and T12 add the acceptance
 support and the replay suite, mostly tests.
 
 Reuse (spec §2): everything from plans 0001 to 0006; no code is copied from Sasaah or elsewhere (A12). Tests use the
@@ -609,6 +630,8 @@ is a golden change: the pull request carries the golden diff report and the chan
 is T9b's (this task is at its 400-line cap): `block.discover()` stays empty here and `blocks.lock.json` is unchanged, so
 `test_workflow_definition` checks the definition and not the lock. Tests drive the child blocks through test
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
+Amendment (B-533): the report support of T10b identifies a cycle by the `block` step whose `child.name` is `edit_cycle_once`;
+T8 keeps that block name (and its `block` step kind) for the cycle child block.
 Amendment (B-503): plan 0001 T22 stops on a `check_model` that is not clean, which the check inserted before the S'
 read of step 9 can meet; how the block routes that stop is spec Q14 (open). Until Q14 is answered this task adds no
 routing code: the inserted check's `ModelIntegrityError` escalates like any other `StepError`, and
@@ -635,20 +658,25 @@ The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main
 and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
 are is checked by `test_block_lock.py` and `test_workflow_registered`).
 
-**T10 Report and B-1 support** (spec §4.9). Renderers for the kinds of T1a and value cells with sources (spec 0006
-AC52), `audit_value_sources`, `count_prompts`, `edit_cycle_timings`, the timings section and
-`report/cycle-timings.json` (base names only).
-Amendment (B-511): the timings section is extended in `_document.py` by calling `edit_cycle_timings(reader)`, only when
+**T10 and T10b Report and B-1 support** (spec §4.9; split by amendment B-533). T10: renderers for the kinds of T1a and
+value cells with sources (spec 0006 AC52) and `audit_value_sources`. T10b: `count_prompts`, `edit_cycle_timings`, the
+timings section and `report/cycle-timings.json` (base names only). Both edit `report/_edit_cycle.py` and `CHANGELOG.md`
+(T10b after T10); `_sections.py` is T10's alone, `_document.py` and `_write.py` T10b's. The scripted-journal helper
+(`Script`, `PRODUCER`) is `tests/unit/edit_cycle/journal_script.py` (T10); `write_cycles` is in `test_timings.py` (T10b).
+Budgets from the counts measured on the complete implementation: T10 157 (limit 170), T10b 301 (limit 315).
+Amendment (B-511): the timings section is extended in `_document.py` by calling `edit_cycle_timings`, only when
 the journal holds edit-cycle steps, so the existing report snapshots stay unchanged. Renderers are registered from
 `_sections.py` by a lazy import of `_edit_cycle`, not from `report/__init__.py` or `_model.py`, which T10 does not
 list. `audit_value_sources` takes `engineering_params` (tool name to parameter names, spec §4.9, AC25); its tests pass
 it explicitly (a forged literal at a listed parameter is reported, a literal at an unlisted one is not).
+Amendment (B-533): `edit_cycle_timings(reader, store=None)` takes the optional store for the `benchmark_request` label
+(spec §4.9). `write_cycle_timings` in `_write.py` has no caller until the report command is wired (plan 0006).
 
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
 property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
 Amendment B-354 (spec AC35, Q11): `python -m eng_harness.report` with `audit-sources RUN_DIR` and
-`count-prompts RUN_DIR`, a read-only wrapper over the T10 functions so that the owner can run A3 and A7 on the
+`count-prompts RUN_DIR`, a read-only wrapper over the T10 and T10b functions so that the owner can run A3 and A7 on the
 journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-testing.md` names the command form
 `uv run --package eng-harness python -m eng_harness.report ...` (spec 0006 §4.1).
 Amendment (B-511): `audit-sources` passes `engineering_params()` of `adapters/csi/_tools.py`: per tool of
@@ -708,10 +736,10 @@ awaiting-owner notice and the owner approves the policy change; T7, and through 
 | T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
 | T9a | plan 0002 T13 (analysis and design tools); plan 0006 T10 (engineer-turn labels) |
 | T9b | plan 0001 T16b (promotion; B-499); plan 0002 T15 (for the final unlock test) |
-| T10 | plan 0006 T11 to T13 (report model, sections, document) |
+| T10, T10b | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
-| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19a waits for T13 (both edit `adapters/_hostport.py`), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
+| T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
 

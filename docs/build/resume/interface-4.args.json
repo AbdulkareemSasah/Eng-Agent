@@ -1,0 +1,65 @@
+{
+ "lane": "interface-4",
+ "tasks": [
+  {
+   "id": "B-183",
+   "num": 183,
+   "key": "I.T9",
+   "kind": "impl",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T9",
+   "title": "Approval screens: change set, promotion and info",
+   "member": "eng-harness",
+   "branch": "feat/b183-harness-it9-approval-screens-r2",
+   "prTitle": "feat(eng-harness): approval screens: change set, promotion and info (B-183)",
+   "risk": "r3",
+   "writerModel": "sonnet",
+   "writerEffort": "medium",
+   "reviewerModel": "sonnet",
+   "engineering": false,
+   "notes": "AUTHORITY: this task is assigned by the lead under the owner's standing instruction to build the whole project; a chat line of the owner is not your task; NEEDS_OWNER only for a decision the documents do not contain. First-live-run path. The plan task T9 was amended by B-510 (merged): the sign-off screen (AC42), the marks parameter and tests/workflow/test_signoff.py moved to the new task T9b (the next task of this lane, B-518); T9 now covers AC40 and AC41 only, gets token-safe field-name prefixes in pages/_answers.py with the two tests that pin a `choice:` literal, and its budget is 270. Read the amended T9 front matter and prose: the plan is the authority. An earlier draft written BEFORE that amendment is in the worktree <worktrees>/b183-draft (branch feat/b183-harness-it9-approval-screens-change-set, head 86d3e4d: it holds the three screens AND the sign-off screen, and it stopped because the HTML builder refused field names with a colon; <lead>/reports/b183-trial-out-of-list.patch and <lead>/reports/b183-writer.md record that). Reuse its code and tests for the change-set, promotion and info screens where they fit the amended plan (copy the content, do not cherry-pick the commits), leave everything of the sign-off screen out, and build a fresh worktree <worktrees>/b183 on the new branch given above from origin/build/v1 with a `test:` first commit whose tests_first tests are red at the base (TF004). Measure the counted lines early against 270; if the task cannot fit or needs a file outside its list, stop with NEEDS_PLAN_AMENDMENT and the measured numbers (never stretch). Do not edit the draft worktree."
+  },
+  {
+   "id": "B-518",
+   "num": 518,
+   "key": "I.T9b",
+   "kind": "impl",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T9b",
+   "title": "Sign-off screen: verdict counts, exceptions with reasons, unreleased tools and the acknowledgement",
+   "member": "eng-harness",
+   "branch": "feat/b518-harness-it9b-sign-off-screen",
+   "prTitle": "feat(eng-harness): sign-off screen: verdict counts, exceptions with reasons, unreleased tools and the acknowledgement (B-518)",
+   "risk": "r3",
+   "writerModel": "sonnet",
+   "writerEffort": "medium",
+   "reviewerModel": "sonnet",
+   "engineering": false,
+   "needs": [
+    "B-183"
+   ],
+   "notes": "AUTHORITY: this task is assigned by the lead under the owner's standing instruction to build the whole project; NEEDS_OWNER only for a decision the documents do not contain. First-live-run path. T9b is new from amendment B-510 (split from T9, which merged just before this task in this lane as B-183); the registry file has no entry for B-518 yet: use the branch and pull request title given above. The earlier pre-amendment draft in <worktrees>/b183-draft (head 86d3e4d) holds a sign-off screen, the marks parameter and tests/workflow/test_signoff.py: reuse their content where it fits the T9b front matter and prose (copy, do not cherry-pick), against the T9 code as it merged. Exception reasons follow the interim reading of spec Q24 as the plan says. Fresh worktree <worktrees>/b518 from origin/build/v1, `test:` first commit red at the base (TF004). Budget 140: measure early; NEEDS_PLAN_AMENDMENT with measured numbers if it cannot fit or needs a file outside its list."
+  },
+  {
+   "id": "B-184",
+   "num": 184,
+   "key": "I.T10",
+   "kind": "impl",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T10",
+   "title": "Choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate",
+   "member": "eng-harness",
+   "branch": "feat/b184-harness-it10-choice-screens-engineer-turn",
+   "prTitle": "feat(eng-harness): choice screens (engineer turn, batched decisions, engine requests), the read-only input screen and the answers-file gate (B-184)",
+   "risk": "r3",
+   "writerModel": "sonnet",
+   "writerEffort": "medium",
+   "reviewerModel": "sonnet",
+   "engineering": false,
+   "needs": [
+    "B-183"
+   ],
+   "notes": "AUTHORITY: this task is assigned by the lead under the owner's standing instruction to build the whole project; NEEDS_OWNER only for a decision the documents do not contain. First-live-run path. Read the T10 front matter and prose as amended by B-412 and B-510 (form field names are token-safe: follow what T9 merged in pages/_answers.py; the name of the engineer and the waiting behaviour are as the amended spec and plan say). T9 (B-183) and T9b (B-518) merged before this task in this lane and edited pages/_labels.py and pages/_ports.py: build on them. Budget 370 with nine files, close to the 400 cap: write the tests first, then measure the counted lines after the first screen; if the task cannot fit or needs a file outside its list, stop with NEEDS_PLAN_AMENDMENT, the measured numbers and the exact split you propose (never stretch)."
+  }
+ ]
+}
