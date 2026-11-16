@@ -8,7 +8,7 @@ from pathlib import Path
 
 from eng_contract.envelope import Envelope, HostInfo
 from eng_contract.errors import ContractError, ContractWarning, ErrorCode, Precondition, WarningCode
-from eng_contract.ids import Clock, IdSource
+from eng_contract.ids import Clock, IdSource, Timestamp
 from eng_contract.store import ModelStateStore
 
 from eng_harness.adapters._identity import IdentityStore
@@ -16,10 +16,10 @@ from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of, snapshot
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
 from eng_harness.adapters.csi._state import CsiStateReader, StateRead
-from eng_harness.ports import HostInstance, HostModelState, SavedModel, UnitsState
+from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
-from eng_harness.servers._procinfo import ProcessInspector
+from eng_harness.servers._procinfo import ProcessIdentity, ProcessInspector
 from eng_harness.servers._session import ServerManager
 
 
@@ -30,7 +30,7 @@ class AdapterHostPort:
         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
         readback: ReadBack | None = None,
     ) -> None:  # fmt: skip
-        self._identity, self._clock, self._ids = identity, clock, ids
+        self._identity, self._clock, self._ids, self._sessions, self._locks = identity, clock, ids, sessions, locks
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
         self._product, self._profile, self._readback = product, products.profile(product), readback
         self._files = {key: path.resolve() for key, path in files.items()}
@@ -46,6 +46,24 @@ class AdapterHostPort:
             sessions, guard, inspector, locks, ids, server=server, product=product, program=program, exe_name=exe_name
         )
         self._reader = CsiStateReader(product=product, call=self._session._call)  # B-451: no public read on CsiSession
+        self._load(files)
+
+    async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
+        return await self._sessions.preflight(min_builds)
+
+    def session_epoch(self, host_key: str) -> int:
+        return self._sessions.session_epoch(host_key)
+
+    async def acquire(self, host_key: str) -> HostLease:
+        """Lease the host: lock again every instance of the run state still alive (`HOST_LOCKED` when held elsewhere)."""
+        if host_key == self._host_key:
+            for opened in self._instances.values():
+                if self._session.alive(opened):
+                    self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
+        return HostLease(host_key=host_key, lease_id=self._ids.new_ulid())
+
+    async def release(self, lease: HostLease) -> None:
+        self._locks.release_all()
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         source = self._file(model_key)
@@ -61,7 +79,8 @@ class AdapterHostPort:
     async def save(self, model_key: str, role: str) -> SavedModel:
         path, opened = self._held(model_key)
         await self._session.save(path, opened)
-        s = self._identity.record_save(self._models[model_key], path)
+        fingerprint = (await self._reader.read(opened.pid, path)).fingerprint  # B-451 L3: the saved state's own
+        s = self._identity.record_save(self._models[model_key], path, fingerprint)
         digest = s.file_sha256
         if digest is None:
             raise ContractError(ErrorCode.INTERNAL, "the save recorded no file hash", incident_id=self._ids.new_ulid())
@@ -227,10 +246,39 @@ class AdapterHostPort:
             instance_id=opened.instance_id, pid=opened.pid, process_started_at=at, program=self._program
         )
 
+    def _load(self, files: Mapping[str, Path]) -> None:
+        """Take the run state of an earlier port as a cache (spec 4.5.9; the journal wins); instances get session -1."""
+        path = self._run_dir / "adapter" / "state.json"
+        if not path.is_file():
+            return
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        for r in saved["instances"]:
+            opened = OpenedInstance(
+                r["instance_id"],
+                r["pid"],
+                r["started_at"],
+                Timestamp(r["observed_at"]),
+                r["exe_name"],
+                -1,
+                r["visible"],
+            )
+            self._instances[opened.instance_id] = opened
+        for key, b in saved["bindings"].items():
+            self._bound[key], self._models[key] = b["instance_id"], b["model_id"]
+            self._files.setdefault(key, Path(b["file"]))
+        self._units.update(saved["expected_units"])
+        self._files.update({key: path.resolve() for key, path in files.items()})  # the constructor's files win
+
     def _persist(self) -> None:
         path = self._run_dir / "adapter" / "state.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        rows = [{"instance_id": i.instance_id, "pid": i.pid, "visible": i.visible} for i in self._instances.values()]
+        rows = [
+            {
+                "instance_id": i.instance_id, "pid": i.pid, "visible": i.visible, "started_at": i.started_at,
+                "observed_at": i.observed_at, "exe_name": i.exe_name,
+            }
+            for i in self._instances.values()
+        ]  # fmt: skip
         bound: dict[str, dict[str, str]] = {}
         for key in self._bound:
             bound[key] = {"instance_id": self._bound[key], "model_id": self._models[key], "file": str(self._files[key])}

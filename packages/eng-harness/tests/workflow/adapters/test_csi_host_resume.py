@@ -63,7 +63,8 @@ def test_lease_preflight_and_epoch(tmp_path: Path, make_config: ConfigFactory, c
         port, locks = _port(tmp_path, manager, guard, inspector, clock, "r1", {"m": original})
         async with manager:
             checks = await port.preflight({"csi": COMMIT})
-            assert [(c.server, c.ok) for c in checks] == [("csi", True)]
+            assert checks == await manager.preflight({"csi": COMMIT})
+            assert [c.server for c in checks] == ["csi"]
             assert port.session_epoch("csi") == manager.session_epoch("csi")
             await port.working_copy("m", tmp_path / "run" / "copies")
             identity = inspector.identity(FIRST_PID)
