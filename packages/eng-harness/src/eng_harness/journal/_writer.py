@@ -18,7 +18,7 @@ from pydantic import BaseModel, JsonValue, ValidationError
 
 from eng_harness import __version__
 from eng_harness.errors import JournalIntegrityError
-from eng_harness.journal._events import PAYLOAD_MODELS, EventType
+from eng_harness.journal._events import PAYLOAD_MODELS, Event, EventType
 from eng_harness.journal._schema import SCHEMA, SCHEMA_VERSION, ZERO_CHAIN, chain_hash, iter_events
 
 INLINE_EVENT_BYTES = INLINE_DATA_LIMIT_BYTES
@@ -49,15 +49,17 @@ class JournalWriter:
         ids: IdSource,
         *,
         connect: Callable[[str], sqlite3.Connection] = _connect,
+        on_commit: Callable[[Event], None] | None = None,
     ) -> None:
         """Create `<run_dir>/journal.sqlite` (meta: `schema_version`, `run_id` = folder name, `created_at`) or open it.
 
         `connect` opens the SQLite connection with `isolation_level=None`; tests wrap it to observe commits.
+        `on_commit` is called with each appended event after its commit (the progress sink's seam, spec 4.10).
 
         Raises:
             JournalIntegrityError: the existing journal fails verification (AC21, AC26).
         """
-        self._store, self._clock, self._ids = store, clock, ids
+        self._store, self._clock, self._ids, self._on_commit = store, clock, ids, on_commit
         path = run_dir / "journal.sqlite"
         fresh = not path.exists()
         self._conn = connect(str(path))
@@ -136,6 +138,8 @@ class JournalWriter:
         except sqlite3.Error as exc:
             raise self._internal(f"journal write failed: {exc}") from exc
         self._seq, self._chain = seq, chain
+        if self._on_commit is not None:
+            self._on_commit(Event(seq, type_, path, attempt, at, PAYLOAD_MODELS[type_].model_validate(body)))
         return seq
 
     def _blob(self, value: JsonValue) -> str:
