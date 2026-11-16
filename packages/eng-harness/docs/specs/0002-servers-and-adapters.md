@@ -3,7 +3,7 @@ id: spec-0002-servers-and-adapters
 issue: "B-061"
 status: draft        # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]
+risk: [r1, r2, r3]   # r2 added by amendment B-537 (T21 adds a kinds module)
 ---
 
 # Spec 0002: eng-harness servers and adapters
