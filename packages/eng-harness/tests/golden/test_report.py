@@ -31,6 +31,13 @@ _HEADER: dict[str, Any] = {
     "engine_version": "1", "contract_version": "eng-contract/1", "settings_sha256": SHA, "servers": [],
     "always_ask": [],
 }  # fmt: skip
+_RUNTIME: dict[str, Any] = {
+    "providers": [
+        {"name": "local1", "model": "m-7b", "version": "2", "is_local": True, "tier": "shadow", "status": "ok"}
+    ],
+    "released": {"cycle.turn": {"point": "cycle.turn", "release": "r1"}},
+    "dropped": [{"point": "cycle.next", "reason": "PR-G1"}],
+}
 
 
 @dataclass
@@ -68,7 +75,9 @@ def _step(name: str, **extra: Any) -> dict[str, Any]:
     return {"kind": "tool", "name": name, "args": {}, "args_sha256": SHA, "effect": "read", **extra}
 
 
-def load_sections_run(run_dir: Path, store: ResultStore, ids: SeededIdSource) -> SectionsRun:
+def load_sections_run(
+    run_dir: Path, store: ResultStore, ids: SeededIdSource, runtime: dict[str, Any] | None = None
+) -> SectionsRun:
     """Write the AC51 fixture and fold it. The caller closes the returned reader."""
     blob = store.put(
         "harness.journal_blob/1",
@@ -184,7 +193,8 @@ def load_sections_run(run_dir: Path, store: ResultStore, ids: SeededIdSource) ->
         writer.append(type_, payload, path=path, attempt=1 if path else None)
 
     kinds = EventType
-    add(kinds.RUN_STARTED, {**_HEADER, "input_ref": blob.result_id, "basis_ref": basis.result_id})
+    header = {**_HEADER, "decision_runtime": _RUNTIME if runtime is None else runtime}
+    add(kinds.RUN_STARTED, {**header, "input_ref": blob.result_id, "basis_ref": basis.result_id})
     add(kinds.MODEL_SAVED, _saved(1, "fp-1", "rev-1.edb", "revision"))
     add(kinds.MODEL_SAVED, _saved(2, "fp-2", "rev-2.edb", "revision"))
     add(kinds.STEP_STARTED, _step("verdicts"), "0")
@@ -260,3 +270,30 @@ def test_report_snapshot(run_dir: Path, store: ResultStore, ids: SeededIdSource)
         assert html == SNAPSHOT.read_text(encoding="utf-8")
     finally:
         run.close()
+
+
+def _status_html(run_dir: Path, store: ResultStore, ids: SeededIdSource, runtime: dict[str, Any]) -> str:
+    from eng_contract.ids import FixedClock
+
+    from eng_harness import __version__
+    from eng_harness.report import ReleaseMarks, build_report
+
+    run = load_sections_run(run_dir, store, ids, runtime)
+    try:
+        html = build_report(run.reader, store, ReleaseMarks(records={}), FixedClock(START_MS, 1_000), __version__)
+    finally:
+        run.close()
+    return section(html, "Status", "Changes")
+
+
+def test_status_decision_runtime_caps(run_dir: Path, store: ResultStore, ids: SeededIdSource, tmp_path: Path) -> None:
+    """Spec 4.6.1: at most 200 rows, then one "N more" row; deeper entries count as omitted; empty adds nothing."""
+    deep = {"a": {"b": {"c": {"d": {"e": 1, "f": 2}}}}}
+    status = _status_html(run_dir, store, ids, {"p": {f"k{i}": i for i in range(205)}, **deep})
+    assert status.count("Decision runtime /") == 200
+    assert '<td><bdi dir="auto">7 more</bdi></td>' in status
+    assert "/p/k0<" in status
+    assert "/a/b/c/d" not in status
+    empty_dir = tmp_path / "runs" / f"run_{ids.new_ulid()}"
+    empty_dir.mkdir(parents=True)
+    assert "Decision runtime" not in _status_html(empty_dir, store, ids, {})
