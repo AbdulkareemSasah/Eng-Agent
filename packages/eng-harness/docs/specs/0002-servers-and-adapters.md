@@ -269,11 +269,13 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   adapter (§4.7), and `ToolPort.describe` and `ToolPort.call` of such a tool reach it. Until plan task T19b,
   `build_ports` refuses a configuration with any `[cli_tools.*]` entry with `NotImplementedGap` (`NOT_IMPLEMENTED`, gap
   H-G8) naming the entries, rather than drop them; raised where the command line builds its ports (spec 0006 §4.2.2
-  step 1, outside the engine, so nothing is journaled), it ends `run` and `resume` with exit 2 `USAGE` (a
+  step 2, outside the engine, so nothing is journaled; amendment B-536), it ends `run` and `resume` with exit 2 `USAGE` (a
   configuration this build cannot serve: spec 0006 §4.2.3 and §6 map its `NOT_IMPLEMENTED` to 2; owner answer of
   2026-11-14, B-495, §11 Q9), and its message, printed on standard error, names H-G8 and the entries. Tests:
   `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap` (plan task T19a; replaced in T19b),
   `tests/unit/cli/test_exit_codes.py::test_error_codes` (the exit code, plan task T19a),
+  `tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2` (the command line catches it, spec 0006 AC68, plan
+  0006 task T14c; amendment B-536),
   `tests/workflow/test_build_ports.py::test_cli_tool_routed_through_build_ports` (plan task T19b).
 - AC44. **[added: B-503]** Given a run whose frozen basis holds `checks.readback_relative_tolerance_ratio`, when
   `check_model` of the ports `build_ports` made reads back a quantity written through them, then it is compared within
@@ -322,8 +324,8 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
    that inspector.
 2. `lock_dir` defaults to `default_lock_dir` (§4.4.1). The engine identity in the holder record is
    `inspector.identity(os.getpid())` and the run id is the name of `run_dir`, so no further seam is needed.
-3. `files` (`Mapping[str, Path]`, model key to file) defaults to empty; a key it lacks stays `NOT_FOUND`. Which
-   component fills it from the workflow's `harness.file_input/1` reference is gap H-G10.
+3. `files` (`Mapping[str, Path]`, model key to file) defaults to empty; a key it lacks stays `NOT_FOUND`. The command
+   line fills it from the run's input (spec 0006 §4.2.2 step 2; amendment B-536 closes gap H-G10).
 4. `checks` (`Mapping[str, ServerCheck]`, per server section) defaults, for a section it lacks, to a placeholder with
    `ok` false, empty fingerprints and the build formatted as an unchecked `ServerCheck` of §4.3.4. The ports read only
    its `build` (provenance); the engine's `preflight` result is the authority for a stop.
@@ -759,7 +761,7 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new hidden instance (reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, true for every `write`, §4.5.7 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
 
 Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time, the time
 it was observed and the exe name, amendment B-530), bindings (model key to instance id, model id and file), expected
@@ -1063,7 +1065,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
 | H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then; the refusal exits 2 (Q9) |
 | H-G9 | **[added: B-495]** No plan task delivers the frozen basis value to `ReadBack.tolerance_ratio` (Q8): the ports are built at step 1 of spec 0006 §4.2.2, the basis is frozen at step 3, `resume` runs steps 1, 5 and 6 with no freeze, and `build_ports` (plan T19a) takes no basis. Until a task delivers it, every written quantity reads back `READBACK_UNAVAILABLE` on the first live run | Lead | Closed by amendment B-503: plan T19a gives the CSI host port a provider that reads the frozen basis named by the run header (§4.5.8, AC44); no engine port signature changes and the command line passes nothing |
-| H-G10 | **[added: B-530]** No component turns the workflow's `harness.file_input/1` model reference (base name, SHA-256, size) into the `files` mapping (model key to path) that `build_ports` gives the host port (§4.1); until one does, a run whose host port has no file for its model key fails `NOT_FOUND` at `working_copy` | Lead | Decide the producer (the command line at step 1 of spec 0006 §4.2.2, or the host port resolving the reference through the store) in a later amendment; plan T19a's tests pass `files` |
+| H-G10 | **[added: B-530]** No component turns the workflow's `harness.file_input/1` model reference (base name, SHA-256, size) into the `files` mapping (model key to path) that `build_ports` gives the host port (§4.1); until one does, a run whose host port has no file for its model key fails `NOT_FOUND` at `working_copy` | Lead | Closed by amendment B-536: the command line builds `files` from the model-file fields of the run's input (spec 0006 §4.2.2 step 2, AC67; plan 0006 T14c), and spec 0007 §4.2 gives the edit cycle's model as such a field; plan T19a's tests pass `files` |
 | G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
 | A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
 | A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
