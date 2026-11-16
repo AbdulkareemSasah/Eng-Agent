@@ -576,8 +576,12 @@ the journal sufficient for B-1:
 
 - each cycle is the scope `<loop path>/<k>`, so every event's cycle follows from its step path;
 - the change set carries the optional `benchmark_request` label, recorded through the answer;
-- `edit_cycle_timings(reader) -> CycleTimings` (pure, over `JournalReader`) gives per step its kind, name and duration;
-  per cycle the wall time, machine time (completed step durations), host time (tool steps), engineer wait (approval,
+- `edit_cycle_timings(reader, store=None) -> CycleTimings` (pure, over `JournalReader`; amendment B-533: the optional
+  `ResultStore` is where the `benchmark_request` label is read, because the label is only in the stored change-set
+  answer, so without a store `benchmarks` is empty) gives per step its kind, name and duration;
+  per cycle the wall time, machine time (completed step durations; interim reading, B-533: scope steps (`block`,
+  `parallel`, `attempts`) and engineer steps (`ask`, `approve`, `decide`, `decide_many`) are excluded, so that an
+  engineer's wait is not counted as machine time), host time (tool steps), engineer wait (approval,
   input and decision waits), and prompt count (§3.4 AC26); per engineer turn the wait from request to answer (hand
   editing happens inside it); per `benchmark_request` the time from the first change-set `input_requested` to the
   `accept` decision, engineer time included, and the cycles it took;
@@ -593,7 +597,9 @@ except the first step 6 approval of the cycle, the first change-set request of t
 repeated step 6 approval (after `ApprovalVoid` or `restore_previous`), a re-asked change set, an engine request
 (`engine.in_flight`, `engine.host_state`, `engine.escalation`), a separately asked always-ask approval and a D-2 or D-3
 screen each count; one batched screen counts once. Steps 16 and 17 are once per run, outside the cycle, and are not
-counted. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC15, AC19, AC21 and AC22.
+counted. Interim reading (B-533): an engine decision request still open at the end of the journal is not counted,
+because it cannot be told from the engineer turn until it is answered, and an approval answered by a `mode:` caller is
+not counted, because no engineer was asked. The A7 bound (at most one per cycle) applies to the normal paths: AC9 to AC12, AC15, AC19, AC21 and AC22.
 In those fake-host scenarios the fake returns no analysis messages, so D-3 resolves by `edit_cycle_analysis_messages.clean` and no request is
 counted; one added scenario has the fake return messages, which are `unclassified` (EC-G3), and shows D-3 as that
 cycle's one prompt. Interruption, failure and escalation paths (resume after a stop with its `engine.host_state`
