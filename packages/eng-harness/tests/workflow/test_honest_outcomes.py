@@ -167,6 +167,31 @@ def test_a_second_unknown_outcome_is_reconciled_as_its_own_attempt(tmp_path: Pat
     assert [c.tool for c in host.ledger] == ["write_b", "write_b", "read_c"]
 
 
+def test_not_applied_write_reruns_once(tmp_path: Path) -> None:
+    """A write reconciled `not_applied` reruns once; reconciled so again, it goes to the engineer (AC71)."""
+    rig, host = _rig(tmp_path)
+    host.outcomes["write_b"].extend([_CAUSES["timeout"], _CAUSES["timeout"]])
+    host.queue = [Reconciliation(outcome="not_applied"), Reconciliation(outcome="not_applied")]
+    outcome = asyncio.run(rig.engine(flow(_write_then_read, name="honest")).start(request(workflow="honest")))
+    run_id = outcome.run_id
+    assert outcome.status is RunStatus.NEEDS_ENGINEER
+    assert outcome.escalation is not None
+    assert outcome.escalation.reason == "needs_reconciliation"
+    assert [(c.tool, c.op_id) for c in host.ledger] == [
+        ("write_b", op_id(run_id, "0", 1)), ("write_b", op_id(run_id, "0", 2)),
+    ]  # fmt: skip  # two calls and no third
+    assert host.ops == [op_id(run_id, "0", 1), op_id(run_id, "0", 2)]
+    (reconciled,) = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.StepReconciled)]
+    assert (reconciled.op_id, reconciled.outcome, reconciled.decided_by) == (
+        op_id(run_id, "0", 1),
+        "not_applied",
+        "adapter",
+    )
+    assert [r.kind for r in rig.inputs.presented] == ["engine.in_flight"]  # the second attempt is in flight
+    assert outcome.escalation.request_id == rig.inputs.presented[0].request_id
+    assert [e.type for e in rig.events(run_id)][-2:] == [T.INPUT_REQUESTED, T.RUN_ESCALATED]
+
+
 def test_a_reconciliation_that_journals_nothing_is_a_journal_error(tmp_path: Path) -> None:
     """`resolve` reads the step's `step_reconciled` back from the journal; none there is a journal integrity error."""
     rig, host = _rig(tmp_path)
