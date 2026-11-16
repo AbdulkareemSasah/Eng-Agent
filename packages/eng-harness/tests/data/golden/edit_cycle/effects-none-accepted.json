@@ -1,0 +1,79 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 no accepted item gives no effect",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. The change set holds one item g1 (delete combination COMB9), but the engineer accepted none (step 6 skipped or every item rejected, spec 0007 4.5 step 6: none): an item that is not accepted gives no effect, so the effects are an empty list. The record still names the change set and the model.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "g1",
+          "kind": "load_combination_delete",
+          "targets": [
+            "COMB9"
+          ],
+          "values": []
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [],
+    "change_set": {
+      "items": [
+        {
+          "id": "g1",
+          "kind": "load_combination_delete",
+          "name": "COMB9"
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {}
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": []
+  }
+}
