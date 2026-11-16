@@ -18,13 +18,17 @@ from dataclasses import dataclass, field
 from importlib.machinery import SourceFileLoader
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from eng_harness.basis._fields import FieldSpec
 
 __all__ = [
     "LOCK_PATH",
     "BlockDef",
+    "FieldSpec",
     "LockFinding",
     "Registry",
     "RegistryError",
@@ -63,13 +67,19 @@ class BlockDef[I: BaseModel, O: BaseModel]:
 
 @dataclass(frozen=True)
 class WorkflowDef[I: BaseModel, O: BaseModel](BlockDef[I, O]):
-    """A block that is also a workflow: description, required basis paths, server builds and always-ask tools."""
+    """A block that is also a workflow: description, required basis paths, server builds and always-ask tools.
+
+    `basis_fields` are the basis fields it uses (`required_basis` derives from them); `copy_on_open` takes the working
+    copy at the first open of a model, in every mode (engine spec 4.2, 4.7).
+    """
 
     description: str = ""
     required_basis: tuple[str, ...] = ()
     min_server_builds: Mapping[str, str] = field(default_factory=dict)
     always_ask: tuple[str, ...] = ()
     options_model: type[BaseModel] | None = None
+    basis_fields: tuple[FieldSpec, ...] = ()
+    copy_on_open: bool = False
 
 
 @dataclass(frozen=True)
@@ -145,14 +155,29 @@ def workflow[I: BaseModel, O: BaseModel](
     name: str,
     version: int,
     description: str,
-    required_basis: tuple[str, ...] = (),
+    required_basis: tuple[str, ...] | None = None,
     min_server_builds: Mapping[str, str] | None = None,
     always_ask: tuple[str, ...] = (),
     options_model: type[BaseModel] | None = None,
+    basis_fields: tuple[FieldSpec, ...] = (),
+    copy_on_open: bool = False,
 ) -> Callable[[_Fn[I, O]], WorkflowDef[I, O]]:
-    """Build a `WorkflowDef` (a block with a 1 to 500 character description). Errors: `RegistryError`."""
+    """Build a `WorkflowDef` (a block with a 1 to 500 character description). Errors: `RegistryError`.
+
+    With `basis_fields`, `required_basis` is the paths of the required fields, in order; one passed beside them must
+    hold the same paths (`check_declaration`, spec 0004 AC21), else `RegistryError` carrying its reason.
+    """
     if not 1 <= len(description) <= 500:
         raise RegistryError(f"{name}: description must be 1 to 500 characters")
+    if basis_fields:
+        from eng_harness.basis._fields import BasisInvalid, check_declaration  # a module-level import is a cycle
+
+        derived = tuple(spec.path for spec in basis_fields if spec.required)
+        try:
+            check_declaration(basis_fields, derived if required_basis is None else required_basis)
+        except BasisInvalid as exc:
+            raise RegistryError(f"{name}: {exc.reason} at {exc.path}") from exc
+        required_basis = derived
 
     def decorate(fn: _Fn[I, O]) -> WorkflowDef[I, O]:
         input_model, output_model, digest = _checked(name, version, fn)
@@ -165,10 +190,12 @@ def workflow[I: BaseModel, O: BaseModel](
             fn.__module__,
             digest,
             description,
-            required_basis,
+            required_basis or (),
             min_server_builds or {},
             always_ask,
             options_model,
+            basis_fields,
+            copy_on_open,
         )
 
     return decorate
@@ -191,6 +218,15 @@ class Registry:
     def with_(self, *more: BlockDef[Any, Any]) -> Registry:
         """Return a new registry that also holds `more`."""
         return Registry([*self.blocks, *more])
+
+
+def __getattr__(name: str) -> object:
+    """`FieldSpec`, imported on first use: a module-level import is an import cycle (engine spec 4.1.2)."""
+    if name == "FieldSpec":
+        from eng_harness.basis._fields import FieldSpec
+
+        return FieldSpec
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def discover() -> Registry:
