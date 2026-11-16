@@ -314,7 +314,8 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
 `enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
 (`eng_param`, for ref-capable inputs), `eng_harness.kinds.footing` (footing calcs), `eng_harness.kinds.column_design`
-(column calcs), `eng_harness.kinds.edit_cycle` (column and edit-cycle calcs, amendments B-462 and B-493),
+(column calcs), `eng_harness.kinds.edit_cycle` (column and edit-cycle calcs, amendments B-462 and B-493, and the
+design summary's input kind of §4.9, amendment B-538),
 `eng_harness.workflows.model_edit_cycle._change_set` (the change-set model of spec 0007 §4.3, input of the edit-cycle
 calcs, amendment B-493) and `eng_harness.kinds.csi` (the payload models of the CSI harness kinds, among them `CsiRows`
 of `harness.csi_design_results/1` and `harness.csi_analysis_messages/1`, inputs of the edit-cycle calcs of spec 0007
@@ -597,8 +598,17 @@ not read (`NEEDS_ENGINEER`); before and after given the same records (refused, R
 turn and the run report.
 
 **Input** `SummaryInput`: `verdicts` (reference to `verdicts.set/1` with `source: host` verdicts, as spec 0002 maps
-`csi_design_results`, Q7), optional `frames` (`model.frame_placements/1`), optional `previous`
-(`harness.design_summary/1`), `basis` (`report.top_n`).
+`csi_design_results`, Q7, or to `harness.host_design_verdicts/1`, the output of spec 0007 §4.4.3), optional `frames`
+(`model.frame_placements/1`), optional `previous` (`harness.design_summary/1`), `basis` (`report.top_n`).
+
+**Either verdicts kind** (amendment B-538; spec 0007 Q19, answered by the owner on 2026-11-16). `verdicts` is typed
+`VerdictSet | HostDesignVerdicts` (the model of `harness.host_design_verdicts/1` in `eng_harness.kinds.edit_cycle`) with
+`ref_kinds` `verdicts.set/1` and `harness.host_design_verdicts/1`; the referenced payload validates as the model of its
+kind (each model forbids the other's extra members). The summary reads only the member `verdicts`, the list of
+contract `Verdict`s that both kinds hold under that name; it reads none of `traces`, `counts`, `draft`, `calc` and
+`trace`. S1 to S6 apply to that list unchanged, so for a `verdicts.set/1` input every result, the trace included, is
+the same as before. The new input schema and the import change the content hash of the draft calc (§4.5), and its
+verification record follows; the version stays 1 (§4.2: no output changes for an input it already took).
 
 **Output kind** `harness.design_summary/1`: `status`, `counts` (per `VerdictStatus`), `governing` (one verdict row:
 subject, check id, case, ratio, ratio limit, status), `governing_by_group` (per subject kind and check id),
@@ -796,7 +806,7 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 | Read-set fields (§4.6) | `model.*` payloads | canonical | contract kinds | references only; `stale_ok` only as in §4.13 | Read tools, spec 0002 |
 | `basis` | `basis.design_basis/1` | per field (§4.4) | §4.4 | reference only | Spec 0004 |
 | `effects` | `harness.expected_effects/1` | canonical | §4.8 | reference only | Spec 0007 |
-| `verdicts` | `verdicts.set/1` (host) | — | contract §4.9.1 | reference only | Spec 0002 |
+| `verdicts` | `verdicts.set/1` (host) or `harness.host_design_verdicts/1` | — | contract §4.9.1 | reference only | Spec 0002; spec 0007 §4.4.3 |
 | `required` | length quantity | `mm` | > 0 | reference only | Calc output or engineer input |
 | `CalcSettings.max_items` | `int` | — | ≥ 1 | no | `harness.toml` (spec 0006) |
 | Outputs | the six `harness.*` kinds | canonical | §4.6 to §4.11 | stored results | this spec |
@@ -873,7 +883,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q4 | 06 §6 includes the file save time and only counts and names. This spec hashes full content (positions, ج9) and leaves out the save time (a save without changes is not a change) | Owner | Accept. Amend 06 §6 by a hub change after S-04 |
 | Q5 | Host object names compared exactly (D2). ETABS may treat names case-insensitively | Owner, local test | Exact for v1 (a case-only rename shows as removed plus added, which is safe). Revisit after the first local run |
 | Q6 | The projection from the change set to `harness.expected_effects/1` belongs to spec 0007 | Owner, B-066 | Make it a calc of spec 0007 (approved like these), so the expected effects are as rigorous as the check |
-| Q7 | The design summary assumes spec 0002 maps `csi_design_results` to host verdicts in `verdicts.set/1`, with `ratio_limit` from the basis | Owner, B-061 | Confirm in spec 0002 |
+| Q7 | The design summary assumes spec 0002 maps `csi_design_results` to host verdicts in `verdicts.set/1`, with `ratio_limit` from the basis | Owner, B-061 | Done by spec 0007 §4.4.3: `harness.host_design_verdicts` maps them to `harness.host_design_verdicts/1`, which §4.9 accepts (spec 0007 Q19, answered by the owner on 2026-11-16; amendment B-538) |
 | Q8 | The content hash covers `eng-contract`'s version but not third-party libraries (Pydantic) | Owner | Accept. Golden tests run on every dependency update. Including them would invalidate every approval on each patch release |
 | Q9 | `approvals.yaml` needs a YAML parser, which is a runtime dependency (ADR needed) | Owner | One package ADR for a safe YAML parser shared with plan 0004 (templates). Whichever task lands first writes it |
 | Q10 | All six calcs ship `draft`: `harness.model_fingerprint`, `harness.model_diff`, `harness.readback_check`, `harness.design_summary`, `harness.section_round`, `harness.placement_compare` | Owner | Review the verification records and approve by `approvals.yaml` entries after the local tests |
