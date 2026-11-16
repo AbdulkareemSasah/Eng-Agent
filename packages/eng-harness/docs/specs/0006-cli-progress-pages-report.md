@@ -60,6 +60,10 @@ open (Q22 to Q24).
 and catches the port builder's H-G8 refusal (§4.2.2 step 2, AC67, AC68; spec 0002 H-G10 closed), and `report` writes
 `report/cycle-timings.json` (AC69).
 
+**Amendment B-545.** First-live-run gaps of the page: the voided display matches the request kinds the engine journals
+(§4.4.5, AC34); the input screen tells how a waiting run takes a data answer (§4.4.5, AC46); a closed browser is
+recovered by stop and resume (§4.4.4); a change-set item id is a page token, refused upstream by spec 0007 §4.4.1 K3.
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -304,7 +308,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   write, then `ApprovalVoid` is raised before the write (engine AC55), nothing is written, and the page shows the
   request as voided with the engine's message. Test: `tests/workflow/test_page_approval.py::test_void_after_model_change`
   (plan T17, real engine). The page half (§4.4.5: a `step_failed` with code `APPROVAL_VOID` marks the approved request
-  voided) is tested by `tests/unit/pages/test_void.py::test_void_shown_on_resolved_request` (plan T7b, B-412).
+  voided) is tested by `tests/unit/pages/test_void.py::test_void_shown_on_resolved_request` (plan T7b, B-412), and
+  for the kinds the engine journals (`change_set`, `promotion`) by
+  `tests/unit/pages/test_void.py::test_void_marks_the_engine_kinds` (plan T10c, amendment B-545).
 - AC35. Given a run waiting at an approval whose process is killed, when it is resumed, then the same request id with
   the same preview hash is shown again, an answer completes the run, and no `approval_resolved` exists for the killed
   wait. Test: `tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume`.
@@ -348,7 +354,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   choice screens showing the reason and the evidence, and they can be answered only there (the file path refuses them, AC46). Test:
   `tests/unit/pages/test_choice_screen.py::test_engine_requests_choices`.
 - AC46. Given a `ctx.ask` data request (schema marker `x-eng-input: data`, §4.4.6), then the page shows its fields
-  (name, type, unit, bounds) read-only with the text "provide the answers with `resume --answers FILE`"; given such a
+  (name, type, unit, bounds) read-only with the text of §4.4.5 (stop the run, then `resume RUN_ID --answers FILE`;
+  amendment B-545); given such a
   file, `pages.accept_answers_file` builds the `InputAnswer`, the engine validates it (engine AC61) and journals
   `input_provided` with `by` = `engineer:<name>` (`<name>` from `[engine] engineer`; while it is unset the file is
   refused with exit 2 and nothing journaled, §4.2.1, B-510). The file path refuses, with exit 2 and nothing journaled: an answer for
@@ -356,6 +363,7 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   (`engine.in_flight`, `engine.host_state`, `engine.escalation`); and every request whose schema does not carry
   `x-eng-input: data`, which includes the engineer turn and batched decisions (choice requests, marker `choice` or no
   marker). Tests: `tests/workflow/test_cli_answers.py::test_form_request_answers_file`,
+  `tests/unit/pages/test_choice_screen.py::test_data_request_names_stop_and_resume` (the text, plan T10c),
   `tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests` (an answers file for
   the engineer turn, a batched decision and `engine.in_flight` is refused and the journal bytes are unchanged).
 - AC47. Given a basis draft with every required field present, when `run` is called, then the page shows the sections
@@ -720,7 +728,11 @@ honours `BROWSER`: the default opener is `os.startfile` on Windows, `open` on ma
 If opening fails, or with `--no-browser`, the address is written only to the controlling terminal (`/dev/tty`, or
 `CONOUT$` on Windows). When there is no controlling terminal the process prints "the launch address cannot be shown
 here; run from a terminal, or use --no-wait and resume later", and the page cannot be reached (AC61). After the first
-launch the cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. This does not protect against a
+launch the cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. A closed browser, or a launch
+code already spent, leaves no way back to that process's server: the engineer stops the run (`stop <run_id>`, or the
+first interrupt) and resumes it, and the new process serves a new address (§4.4.5 step 5 re-presents the open
+requests). Decision (B-545): no second launch code is issued, because the code is single use by design (§4.4.2) and
+`resume` already gives a new one. This does not protect against a
 process of the same user that has the terminal, reads the opener's command line or drives the server itself (Q2).
 
 #### 4.4.5 How the run waits, and the approval binding
@@ -734,7 +746,14 @@ process of the same user that has the terminal, reads the opener's command line 
    `cli/_wiring.py` wraps the page ports: the wrapper ignores the engine's `wait` and asks the page port with the
    process wait mode (B-510). Waiting, the port awaits an `asyncio.Event`, polling the stop file
    (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once with `--no-wait`; the engine then pauses
-   (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
+   (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop). A data request (§4.4.6
+   Input; a re-asked change set or a first change set the engine refused included) is answered by a file only, and
+   `resume --answers` exits 4 while the waiting process holds the run lock, so the input screen says: "These fields
+   are read-only here. To answer them, stop the run (`stop RUN_ID` from another terminal, or Ctrl+C once in its
+   terminal), then run `resume RUN_ID --answers FILE`; `status` lists the run ids." (plan T10c). Decision (B-545): a
+   waiting run takes a data answer only through stop and `resume --answers`, because values never travel in a page
+   form (§4.2.1) and no other file is read (step 3), and those commands exist (`stop`, the first interrupt,
+   `resume --answers`), so only the page text changes.
 3. A POST that passes §4.4.2 and the answer checks (below) is parsed into an `ApprovalSubmission` (the validated form),
    turned into an `ApprovalAnswer` (an `InputAnswer` for a choice) and handed to the waiting `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
    `approval_resolved` event, FULL durability. There is no answer file in the run folder, so nothing else can place an
@@ -756,6 +775,9 @@ first write under the approval and voids the approval on a mismatch (engine §4.
 single use and ends at the first `check_model` of a bound model. No journal event names a void: `ApprovalVoid` is a
 `StepError`, journaled as `step_failed` with code `APPROVAL_VOID`, and it carries no request id (Q21). When the page
 sink sees such a `step_failed`, the page marks as voided the most recent approved `CHANGE_SET` or `PROMOTION` request
+(amendment B-545: the kind `change_set` or `promotion`, the `ApprovalKind` value the engine journals, which the
+merged hub missed by comparing only the upper-case names; decision (B-545): the upper-case names stay accepted, as in
+the report's change-set section (`report/_sections.py`), because the shared test stand-in journals them)
 resolved in this process, and its screen shows "voided" with the error's message (an untrusted `field`), no form and
 no button (AC34, B-412). With no such request in this process (the answer was given before a resume), the message is
 shown on the index page as a run message.
@@ -764,14 +786,14 @@ shown on the index page as a run message.
 
 | Screen | Request | Content and answers |
 |---|---|---|
-| Change set (18 step 6) | `CHANGE_SET` | Title; items (label, referenced values with their sources); differences from the last revision as a table (`diff_ref`), engineer changes marked; binding table; preview hash; per-item reject boxes with a reason field each; Approve; Reject with a reason |
+| Change set (18 step 6) | `CHANGE_SET` | Title; items (label, referenced values with their sources); differences from the last revision as a table (`diff_ref`), engineer changes marked; binding table; preview hash; per-item reject boxes with a reason field each (named by the item id, so an id that is not a page token gives the refusal screen of §4.4.5 step 1; spec 0007 §4.4.1 K3 refuses such an id first, amendment B-545); Approve; Reject with a reason |
 | Promotion (18 step 16) | `PROMOTION` | Target and backup by base name; hash of the original and the working copy's `origin_sha256`; Approve; Reject |
 | Info | `INFO` | The text; Acknowledge (approve) or Reject |
 | Sign-off (18 step 17) | `SIGN_OFF` | Link to `/report`; verdict counts; each exception (a verdict whose status is not `PASS` or `NOT_APPLICABLE`) with an accept box and a written reason; the unreleased-tool list with an acknowledgement box when it is not empty; the engineer name; Sign; Reject |
 | Engineer turn (18 step 15) | choice request | Three buttons: accept this revision, ask for more edits, I edited by hand: continue. One press, one option id |
 | Batched decisions (11 §3 `decide_many`) | choice request, N questions | One form: per question the prompt, labeled evidence, one option group; one Submit |
 | Engine requests | `engine.in_flight`, `engine.host_state`, `engine.escalation` | The reason, the evidence references, the choices of engine §4.5 (`applied`, `not_applied`, `abandon`; `accept`, `restore`, `abandon`) |
-| Input | `block` data request (`x-eng-input: data`) | The fields read-only (name, type, unit, bounds) and the instruction to use `resume --answers FILE` |
+| Input | `block` data request (`x-eng-input: data`) | The fields read-only (name, type, unit, bounds) and the instruction of §4.4.5 step 2 (stop the run, then `resume RUN_ID --answers FILE`) |
 | Basis confirmation (13 §4) | `BasisSetupView` | §4.4.7 |
 
 An input request carries a marker in its JSON Schema, `x-eng-input`, with the value `data` (set by `ctx.ask`: values
