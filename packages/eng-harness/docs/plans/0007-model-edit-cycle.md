@@ -128,10 +128,17 @@ tasks:
     covers: [AC30]
     depends_on: [T3]
   - id: T4b
-    title: Calc harness.host_design_verdicts (held until spec Q19 is answered)
+    title: Calc harness.host_design_verdicts, its kind harness.host_design_verdicts/1 and the design summary's input
     # Amendment (B-511, documents only): split from T4. Its output kind is spec Q19 (open): the registry refuses
     # verdicts.set/1 as a calc output. Not started before the answer; the documents amendment that records the answer
     # adds the files of the chosen option (spec Q19) and sets the budget. 240 is an estimate for option (a).
+    # Amendment (B-538, documents only): the owner answered spec Q19 on 2026-11-16 with option (a). This task carries
+    # the kind (kinds/edit_cycle.py, its fixture and contract test) and the design summary's acceptance of it (spec 0003
+    # 4.9: design_summary.py, its record, its unit test; the calc lock). Measured analogs: B-197 (expected_effects)
+    # 311 counted lines, module 267; B-149 (design summary) 264, module 237. Estimate: calc module about 170 (a mapping
+    # by comparison), kind about 35, summary change about 15, lock about 15 (the new entry and the moved hashes of the
+    # calcs that import kinds/edit_cycle.py), records about 20, registration, pyproject and CHANGELOG about 10: about
+    # 265. max_changed_lines 240 to 320.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs.edit_cycle.host_design_verdicts (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -142,11 +149,19 @@ tasks:
       - "packages/eng-harness/docs/verification/calcs/harness.host_design_verdicts.md"
       - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/verdicts-*.json"
-    max_changed_lines: 240
+      - "packages/eng-harness/src/eng_harness/kinds/edit_cycle.py"  # harness.host_design_verdicts/1 (amendment B-538)
+      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py"
+      - "packages/eng-harness/tests/data/kinds/edit_cycle/host_design_verdicts*.json"
+      - "packages/eng-harness/src/eng_harness/calcs/design_summary.py"  # spec 0003 4.9 input kind (amendment B-538)
+      - "packages/eng-harness/docs/verification/calcs/harness.design_summary.md"
+      - "packages/eng-harness/tests/unit/calcs/test_summary.py"
+    max_changed_lines: 320
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases"
-    covers: [AC30]
+      - "packages/eng-harness/tests/contract/test_edit_cycle_kinds.py::test_fixtures"  # amendment B-538
+      - "packages/eng-harness/tests/unit/calcs/test_summary.py::test_host_design_verdicts_input"  # amendment B-538
+    covers: [AC3, AC30]
     depends_on: [T4]
   - id: T5
     title: CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment)
@@ -551,14 +566,19 @@ inputs `harness.csi_design_results/1` and `harness.csi_analysis_messages/1` are 
 T21 moves the model there and adds the rules-test entry, so T4 waits for it (section 3).
 Amendment (B-511): the registry refuses an output kind outside the `harness.` family (spec 0003 AC1; contract §4.10.1
 refuses a calc kind in a neutral family), so `harness.host_design_verdicts` cannot output `verdicts.set/1` as spec
-§4.4.3 said; the output kind is spec Q19 (open). Interim reading until Q19 is answered: T4 builds
-`harness.analysis_summary` alone (its golden test and record), and `harness.host_design_verdicts` is T4b.
+§4.4.3 said; the output kind was spec Q19. T4 builds `harness.analysis_summary` alone (its golden test and record),
+and `harness.host_design_verdicts` is T4b.
 
-**T4b Host design verdicts** (amendment B-511; spec §4.4.3, AC30). The calc as spec §4.4.3 states it, with the input
-list B-511 adds there. Not started before the owner answers spec Q19; the documents amendment that records the answer
-adds the files of the chosen option (for the recommended option (a): the wrapper kind in `kinds/edit_cycle.py` with its
-fixture test and data, and the design summary's acceptance of that kind in `calcs/design_summary.py`, its record and
-the calc lock) and sets the budget. T9a waits for it (step 14).
+**T4b Host design verdicts** (amendments B-511 and B-538; spec §4.4.3, AC3, AC30; spec 0003 §4.9). The calc as spec
+§4.4.3 states it, with the input list B-511 adds there and the output kind of the owner's answer to spec Q19 (option
+(a), 2026-11-16): `harness.host_design_verdicts/1` in `kinds/edit_cycle.py`, registered through `EDIT_CYCLE_KINDS`,
+with its fixture under `tests/data/kinds/edit_cycle/` in `test_fixtures` (and the kind set of
+`test_kinds_are_harness_family_and_registered`). The task also makes the merged design summary (plan 0003 T10, B-149)
+accept that kind as spec 0003 §4.9 states: `test_host_design_verdicts_input` runs the summary on a
+`harness.host_design_verdicts/1` reference and gets the body it gives for the same verdicts in a `verdicts.set/1`; the
+summary's existing tests and goldens stay as they are, except the `ref_kinds` mark of `verdicts` in its schema test.
+The lock moves the summary's hash and those of the calcs that import `kinds/edit_cycle.py`; the summary's record
+follows. T9a waits for it (step 14).
 
 **T5 Adapter additions** (spec §4.10, Q1). `csi_read_model_state`, `csi_open_revision`, `csi_read_analysis_messages`
 and the `as_new_revision` argument of `csi_save_model`; allowlist entries (no escape hatch: each composes allowlisted
@@ -731,7 +751,7 @@ awaiting-owner notice and the owner approves the policy change; T7, and through 
 | T1a, T1b | eng-contract T11, T12 (kinds); plan 0001 T1, T3 (`_kinds.py`); plan 0003 T4 (kinds package) |
 | T2 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader), T8b (difference report calc, split by B-458); plan 0004 T5 (`FieldSpec`); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, the path rule of spec Q12 (a), owner decision OQ-Q44), because the `_kN_m` and `_kPa` bounds cannot be stored in `basis.design_basis/1` before it |
 | T3 | plan 0003 T9 (`harness.expected_effects/1`, read-back check) |
-| T4, T4b | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8); T4b also the owner's answer to spec Q19 (amendment B-511) |
+| T4, T4b | plan 0003 T10 (design summary); plan 0002 T13 (design results and analysis kinds) and T21 (`CsiRows` in `eng_harness.kinds.csi`, amendment B-503); B-417 (`limits.ratio_limit_ratio`, spec §4.8); T4b also T4 (both edit the calc registry files); the owner's answer to spec Q19 is recorded (amendment B-538) |
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation); plan 0002 T21 waits for T5, not T5 for T21: T5's `test_csi_read_state_tool.py` builds `HARNESS_KINDS.extend(CSI_KINDS)`, which `extend` refuses once T21 registers `CSI_KINDS`, so T21 adapts that line (amendment B-503) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4); T15 of this plan (FB005, amendment B-511) |

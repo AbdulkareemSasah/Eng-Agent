@@ -3,6 +3,7 @@
 Purpose: one place for the screen texts, so that no text of a run reaches a label. Units: none. Errors: none.
 """
 
+from collections.abc import Mapping
 from typing import Final
 
 from eng_harness._html import Trusted, trusted
@@ -42,3 +43,21 @@ EXCEPTIONS: Final[tuple[Trusted, ...]] = tuple(
 )
 UNRELEASED_HEADING: Final[Trusted] = trusted("Results that depend on an unreleased tool")
 ACKNOWLEDGE_UNRELEASED: Final[Trusted] = trusted("I sign knowing that these results depend on an unreleased tool")
+SUBMIT: Final[Trusted] = trusted("Submit")
+EVIDENCE: Final[Trusted] = trusted("Evidence")
+REFERENCES: Final[Trusted] = trusted("Evidence references")
+NOT_SHOWN: Final[Trusted] = trusted("This request cannot be shown safely: no answer can be given here. Cause:")
+OPTIONS: Final[Mapping[str, Trusted]] = {
+    "accept": trusted("Accept this revision"),
+    "more_edits": trusted("Ask for more edits"),
+    "hand_edit": trusted("I edited by hand: continue (save the model in the host program first)"),
+    "applied": trusted("The change was applied"),
+    "not_applied": trusted("The change was not applied"),
+    "restore": trusted("Restore the saved copy"),
+    "abandon": trusted("Abandon the run"),
+}  # the engineer turn (spec 0007) and the engine's own requests (engine 4.5): option id to its label
+INPUT_NOTE: Final[Trusted] = trusted(
+    "These fields are read-only here: provide the answers with `resume --answers FILE`."
+)
+INPUT_FIELDS: Final[tuple[Trusted, ...]] = tuple(trusted(w) for w in ("Field", "Type", "Unit", "Bounds"))
+NAME_PROPOSED: Final[Trusted] = trusted("Engineer named in the settings")
