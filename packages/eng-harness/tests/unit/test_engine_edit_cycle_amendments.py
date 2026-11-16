@@ -372,6 +372,11 @@ def test_required_basis_from_fields() -> None:
     ):
         with pytest.raises(RegistryError, match=reason):
             make(**options)
+    with pytest.raises(RegistryError) as refused:
+        make(basis_fields=(first, second), required_basis=("limits.drift_ratio",))
+    assert str(refused.value) == "wf_fields: declaration_mismatch at limits.sway_ratio"
+    with pytest.raises(AttributeError, match="no attribute 'Nope'"):
+        _ = eng_harness.block.Nope
     assert eng_harness.block.FieldSpec is eng_harness.basis.FieldSpec
 
 
