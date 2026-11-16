@@ -234,9 +234,11 @@ defines its method; values are synthetic and say so.
 - AC29. (B-1) Given a fixture journal, when `edit_cycle_timings` runs, then it gives the measures of §4.9 and their sums
   equal the sums over the fixture events. Test: `tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings`.
 - AC30. Given synthetic host design results and analysis messages, then `harness.host_design_verdicts` and
-  `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4. Tests:
-  `tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases`,
-  `tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases`.
+  `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4, and `harness.design_summary` given a
+  `harness.host_design_verdicts/1` reference gives the body it gives for the same verdicts in a `verdicts.set/1`
+  (spec 0003 §4.9). Tests: `tests/golden/edit_cycle/test_design_verdicts.py::test_golden_cases`,
+  `tests/golden/edit_cycle/test_analysis_summary.py::test_golden_cases`,
+  `tests/unit/calcs/test_summary.py::test_host_design_verdicts_input`.
 - AC31. Given the read tool of §4.10 against the fake, then it stores the read set and the name lists; a truncated list
   raises `LIMIT_EXCEEDED`; a read-back gap leaves its section out (`not_read` downstream). Given `as_new_revision`,
   then the open working file is saved in place, its files are copied to a new snapshot file in the run's copies folder,
@@ -292,8 +294,8 @@ and T13) add their blocks to the same tuple. Decision points and rules are found
   `cycles` (count), `promoted` (model handle), `summaries` (references to the last `harness.design_summary/1` and
   `harness.analysis_summary/1`), `signed: bool`.
 - Kinds (registered with `KindRegistry.extend` beside spec 0003's): `harness.change_set_check/1`,
-  `harness.analysis_summary/1`, `harness.csi_name_lists/1` (§4.10). Host design results become `verdicts.set/1`
-  (§4.4.3). `harness.expected_effects/1` is spec 0003's.
+  `harness.analysis_summary/1`, `harness.csi_name_lists/1` (§4.10), `harness.host_design_verdicts/1` (§4.4.3, Q19).
+  `harness.expected_effects/1` is spec 0003's.
 
 ### 4.3 The change-set model
 
@@ -402,12 +404,16 @@ another item's (amendment B-498).
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
-Maps `harness.csi_design_results/1` (spec 0002 §4.6.1 step 13, raw host output) to `verdicts.set/1` with
-`source: host`, so spec 0003's design summary can read it (resolves the spec 0003 Q7 conflict, §11 C4). A calc cannot
-output `verdicts.set/1` (spec 0003 AC1; contract §4.10.1), so the output kind is open (§11 Q19; amendment B-511).
+Maps `harness.csi_design_results/1` (spec 0002 §4.6.1 step 13, raw host output) to verdicts with `source: host`, so
+spec 0003's design summary can read them (resolves the spec 0003 Q7 conflict, §11 C4). A calc cannot output
+`verdicts.set/1` (spec 0003 AC1; contract §4.10.1). Output kind (owner's answer to Q19 of 2026-11-16, option (a);
+amendment B-538): `harness.host_design_verdicts/1` in `kinds/edit_cycle.py`, holding the members of `verdicts.set/1`
+(`verdicts`, `traces`, `counts`, `draft`, with their rules, contract §4.10.2) plus the calc port's `calc`, `draft` and
+`trace` (`draft` is the one member both name); spec 0003 §4.9 `SummaryInput.verdicts` accepts it. Contract §4.10.1 and
+spec 0003 AC1 and AC47 do not change.
 Input: `results` (`harness.csi_design_results/1`), `kind` (`steel` or `concrete`, the `kind` argument of the step 13
 `csi_design_results` call), `basis` (`limits.ratio_limit_ratio`). One verdict per row: `source: host`, `check_id`
-`host.<kind>_design_ratio`, `code` `host_<kind>_design` (both recommendations for the owner, with Q19), `subject`
+`host.<kind>_design_ratio`, `code` `host_<kind>_design` (both decided with Q19, as recommended), `subject`
 `{kind: frame, id: row["frame"], case: row["combo"]}` (amendment B-511). Steel: one
 verdict per frame with the host's ratio and `ratio_limit` from the basis (`limits.ratio_limit_ratio`); the status is the
 contract's (`PASS` when the ratio is at most the limit, else `FAIL`, contract §4.9.1), computed by comparison only.
@@ -693,7 +699,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30, AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
 | AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
@@ -728,11 +734,11 @@ start at version 1 with lock entries.
 | Q16 | **[added: B-503]** The model identity and revision of the working file that `restore_previous` opens (§4.5.1): ADR-0032 rule 3 and the merged `IdentityStore.resolve` give a file whose content is known at a new path a new model id `derived_from` the older one, which would break the binding of the model (no `model_bound` at a restore) and the staleness of its references | Owner | Writer's recommendation: the restored file keeps the bound model's id and becomes its next revision (`IdentityStore.record_save` on the new path), since it is the same model in the same run; ADR-0032 to say so for a restore. Interim reading for plan T13 until answered |
 | Q17 | **[added: B-503]** Whether the change-set model moves to a kinds-level module before plan T9b merges: it enters the content hash of the R1 edit-cycle calcs (spec 0003 §4.3, B-493) while its risk floor in §4.1 is block code; importing it runs `workflows/__init__.py`, which from T9b imports the shipped blocks; and plan 0013's calcs would import from a private module | Owner | Writer's recommendation: move `ChangeSetDraft` and its item and value models to a public kinds-level module under `eng_harness.kinds` (risk floor R2, as `kinds/edit_cycle.py`) before T9 merges, admit it in spec 0003 §4.3 in place of `_change_set`, and accept the one-time hash change of the calcs that import it (verification again, process/10 §5) |
 | Q18 | **[added: B-513]** K3 (§4.4.1) refuses two items on one target and property and an item id with `/`, but says nothing of two terms of one `load_combination_set` item that have the same D2 item key (`case.case`, `case.case_type`, `case.step`); the merged check passes such an item without an issue | Owner | Decide whether K3 extends to the terms of one item and with which issue code (a golden case and a version rule of spec 0003 §4.2 follow). Until answered nothing refuses it and no test pins either behaviour; plan T14 builds only the item id rule |
-| Q19 | **[added: B-511]** `harness.host_design_verdicts` (§4.4.3) cannot output `verdicts.set/1`: the calc registry refuses an output kind outside the `harness.` family (spec 0003 AC1, AC47; contract §4.10.1 refuses a calc kind in a neutral family), and the calc port stores the body with `calc`, `draft` and `trace`, which the extra-forbidding `verdicts.set/1` model refuses; the merged design summary (spec 0003 §4.9) takes only a `verdicts.set/1` reference | Owner | Writer's recommendation: (a) a kind `harness.host_design_verdicts/1` in `kinds/edit_cycle.py` holding the verdict set's members plus the calc port's `calc`, `draft` and `trace`, which spec 0003 §4.9 `SummaryInput.verdicts` also accepts (the draft design summary's hash changes and its verification follows, spec 0003 §4.5), because it keeps contract §4.10.1 and spec 0003 AC1; the alternative (b) is a calc port that stores a neutral output kind without those members (contract §4.10.1, spec 0003 AC1 and AC47 change). The `check_id` and `code` values of §4.4.3 are decided with it. Interim reading for plan T4 and T4b until answered: T4 builds `harness.analysis_summary` alone and T4b waits for the answer |
+| Q19 | **[added: B-511]** `harness.host_design_verdicts` (§4.4.3) cannot output `verdicts.set/1`: the calc registry refuses an output kind outside the `harness.` family (spec 0003 AC1, AC47; contract §4.10.1 refuses a calc kind in a neutral family), and the calc port stores the body with `calc`, `draft` and `trace`, which the extra-forbidding `verdicts.set/1` model refuses; the merged design summary (spec 0003 §4.9) takes only a `verdicts.set/1` reference | Owner | Answered by the owner on 2026-11-16 (amendment B-538): option (a). The output kind is `harness.host_design_verdicts/1` in `kinds/edit_cycle.py`, holding the members of the verdict set plus the calc port's `calc`, `draft` and `trace` (§4.4.3); spec 0003 §4.9 `SummaryInput.verdicts` also accepts it (the draft design summary's content hash changes and its verification record follows, spec 0003 §4.5); the `check_id` and `code` values of §4.4.3 are as recommended (`host.<kind>_design_ratio`, `host_<kind>_design`); contract §4.10.1 and spec 0003 AC1 and AC47 do not change. Built by plan T4b |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |
-| C4 | Spec 0002 stores design results raw; spec 0003's summary needs `verdicts.set/1` | Owner | `harness.host_design_verdicts` (§4.4.3); its output kind is Q19 |
+| C4 | Spec 0002 stores design results raw; spec 0003's summary needs `verdicts.set/1` | Owner | `harness.host_design_verdicts` (§4.4.3) outputs `harness.host_design_verdicts/1`, which the summary reads (Q19, answered by the owner on 2026-11-16) |
 | EC-G1 | Edit kinds refused in v1: H-G1, H-G2, H-G3, OQ-G8, CG-1 | Owner | Project lane or Sasaah changes; tests expect `NOT_IMPLEMENTED` (AC6) |
 | EC-G2 | Concrete design output has no single ratio; verdicts are `NEEDS_ENGINEER` | Owner | Map after the local test shows the reply fields; until then the engineer reads the host's concrete design |
 | EC-G3 | Analysis message severity is not known from the sources | Owner | Every message `unclassified` until the local test confirms the table's columns |
