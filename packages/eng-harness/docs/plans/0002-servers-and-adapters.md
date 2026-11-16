@@ -4,7 +4,7 @@ issue: "B-061"
 spec: packages/eng-harness/docs/specs/0002-servers-and-adapters.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: [r1, r3]           # binding for every pull request of this plan; r3 because T1 touches pyproject.toml and uv.lock
+risk: [r1, r2, r3]       # binding for every pull request of this plan; r3 because T1 touches pyproject.toml and uv.lock; r2 because T21 adds eng_harness/kinds/csi.py (amendment B-537)
 tasks:
   - id: T1
     title: MCP SDK dependency ADR, harness.toml server and tool sections
@@ -474,6 +474,28 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools"
     covers: [AC37, AC39]
     depends_on: [T7]
+  - id: T19c
+    title: HostPort lease, preflight and epoch, run-state reload and the saved fingerprint on the CSI host port
+    # Amendment (B-530, documents only): new, split from T19a after the pre-flight audit. AdapterHostPort lacks the
+    # HostPort methods preflight, session_epoch, acquire and release, never reads run_dir/adapter/state.json back, and
+    # its persisted instance rows lack the start time, observation time and exe name that HostLocks and OpenedInstance
+    # need (spec 4.4.1, 4.5.9; reloaded instances take session -1, bindings reload too). The saved fingerprint
+    # (B-451 L3) moves here from T19a. Estimate: host methods and reload about 55, the saved fingerprint about 13, the
+    # persisted rows about 12: about 80; budget 90 (merged analogs T10 400, T12b 380 bound it from above).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/_identity.py"  # record_save keeps the saved state's fingerprint (B-465)
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"  # T10's test: the saved fingerprint (B-465)
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_host_resume.py"
+    max_changed_lines: 90
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py::test_save_records_the_state_fingerprint"  # B-451 L3
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_host_resume.py::test_lease_preflight_and_epoch"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_host_resume.py::test_new_port_restores_from_run_state"
+    covers: [AC47]
+    depends_on: [T12b]  # external: plan 0007 T13 (B-522, merged; also edits _hostport.py)
   - id: T19a
     title: Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes
     # Amendment (B-413, documents only): runs the real engine, so it waits for engine plan 0001 T13, T15, T16, T16b (B-499) and T19;
@@ -495,13 +517,21 @@ tasks:
     # pre-image on a write's binding and ToolPort.preview in _toolport.py (about 8 and 28, its refusal of a binding without host included), 2 of
     # CHANGELOG.md: budget 235 + 78 = 313 (an estimate). CSI_KINDS reach the run's registry through T21; Revisions comes from plan 0007 T5
     # and reopened from plan 0007 T13, so T19a waits for both (section 3).
+    # Amendment (B-530, documents only): pre-flight audit. The HostPort methods, the run-state reload and the saved
+    # fingerprint move to the new T19c, which T19a waits for (the crash matrix needs them); _identity.py and
+    # test_csi_session_ops.py leave the files. Added: the production binder (AdapterHostPort.binding and revision,
+    # about 35), the reconciler's tolerance provider (csi/_reconcile.py, about 6), the keyword seams of build_ports
+    # (spec 4.1, about 25), the route argument of csi_allowlist (csi/__init__.py, about 2) and record_pre_image in
+    # _toolport.py (about 3). Estimate 313 - 13 + 35 + 6 + 25 + 2 + 3 = about 371; budget 380 (the cap). If the writer
+    # measures more, it stops with NEEDS_PLAN_AMENDMENT; the binder is the next split candidate.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/__init__.py"
-      - "packages/eng-harness/src/eng_harness/adapters/_identity.py"  # record_save keeps the saved state's fingerprint (B-465)
-      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # save returns that fingerprint (B-465); the tolerance provider (B-503)
-      - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"  # pre-image on a write's binding, preview (B-503)
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # the tolerance provider (B-503); binding and revision (B-530)
+      - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"  # pre-image on a write's binding, preview (B-503); record_pre_image (B-530)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"  # the tolerance provider of CsiReconciler (B-530)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/__init__.py"  # csi_allowlist takes a route (B-530)
       - "packages/eng-harness/src/eng_harness/cli/_exit.py"  # NOT_IMPLEMENTED to exit 2, spec 0006 section 6 (B-495)
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
@@ -509,10 +539,9 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_build_ports.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b), B-413; the SAFE stop is plan 0008 T3's (B-475)
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
-      - "packages/eng-harness/tests/workflow/adapters/test_csi_session_ops.py"  # T10's test: the saved fingerprint (B-465)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"  # the NOT_IMPLEMENTED case (B-495)
-    max_changed_lines: 313
+    max_changed_lines: 380
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
@@ -525,8 +554,9 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_readback_tolerance_from_run_basis"  # AC44 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image"  # AC45 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_preview_sends_no_write"  # AC45 (B-503)
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_binder_from_host_port"  # the production binder (B-530)
     covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
-    depends_on: [T14, T18, T20, T21]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3)
+    depends_on: [T14, T18, T19c, T20, T21]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3)
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
     # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
@@ -608,7 +638,8 @@ synthetic fake (T4), which every later workflow test runs as a real process; the
 and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock and guard (T7); the adapter framework (T8,
 T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), reply mapping and model state (T11, T11b), edits
 (T12) and read-back (T12b), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
-command-line tools (T16); record mode (T17); the doctor (T18); and an end-to-end task (T19a) that wires the CSI ports
+command-line tools (T16); record mode (T17); the doctor (T18); the remaining `HostPort` methods of the CSI host port
+(T19c, amendment B-530); and an end-to-end task (T19a) that wires the CSI ports
 into the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
 build check, the units trap; B-413), and T19b, which adds the command-line tools to that wiring (amendment B-475: T19
 split so that the first live run, the edit cycle on ETABS, waits for neither the command-line adapter nor record mode).
@@ -623,7 +654,8 @@ CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools 
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
 T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503), `_hostport.py` (T10, T11b,
-T12b, plan 0007 T13, T19a; B-503), `_identity.py` and `test_csi_session_ops.py` (T10, T19a), `adapters/__init__.py` and `test_build_ports.py`
+T12b, plan 0007 T13, T19c, T19a; B-503, B-530), `_identity.py` and `test_csi_session_ops.py` (T10, T19c; B-530),
+`csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them), `adapters/__init__.py` and `test_build_ports.py`
 (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
 adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15; plan 0007 T5 and T13, B-503: T15 and
 those two are not ordered, so whichever lands second adapts),
@@ -775,12 +807,27 @@ script and its README.
 **T18 Doctor** (§4.9). The checks behind interfaces (installed programs, integrity level, location probe), table and
 JSON output, exit codes; the unreleased-tools check and the `extra_checks` extension point for spec 0006 (AC39, B-068).
 
+**T19c Host port leases, run-state reload and the saved fingerprint** (amendment B-530, split from T19a after the
+pre-flight audit; spec §4.4.1, §4.5.9). `AdapterHostPort` (`_hostport.py`) gains the `HostPort` methods it lacks:
+`preflight` and `session_epoch` delegate to its `ServerManager`; `acquire(host_key)` answers a `HostLease` and re-locks,
+through `HostLocks.acquire`, every instance of the run state that is still alive with the same pid and start time;
+`release` calls `HostLocks.release_all`. At construction it loads `run_dir/adapter/state.json` when present, as a cache
+(the journal wins, §4.5.9): the bindings (model key to instance id, model id and file; the constructor's `files` win for
+a key both name), expected units and instance rows; the persisted rows gain `started_at`, `observed_at` and `exe_name`,
+so a resumed port can rebuild each `OpenedInstance` (`_host` reads `observed_at`), re-lock and close them, and a
+reloaded instance takes the session value `-1` of the spec §4.5.9 decision, so `_reusable` and `restore` never treat it
+as launch-owned and launch anew. `save` returns in `SavedModel.fingerprint` the fingerprint of the saved state instead
+of `""` (`_identity.py` `record_save`), so the engine's resume check does not report `model_differs` after a save (B-451
+L3; from the T12 split, amendment B-465). Tests: `test_csi_session_ops.py::test_save_records_the_state_fingerprint` (a
+new test, because the existing assertion compares `""` with `""` at the base: after `save`, `fingerprint` is not `""`,
+equals the `CsiStateReader` fingerprint of the saved model and the state store's),
+`test_csi_host_resume.py::test_lease_preflight_and_epoch` and `::test_new_port_restores_from_run_state` (a new
+`AdapterHostPort` over the same `run_dir` restores `m@copy`).
+
 **T19a End to end on ETABS** (split from T19 by amendment B-475). `build_ports` wiring for the CSI adapter; a test
 block that runs the cycle's steps through the real engine and real
-fake-server processes; the crash matrix that kills the engine at each write step and resumes. `save` returns in
-`SavedModel.fingerprint` the fingerprint of the saved state instead of `""` (`_identity.py` `record_save`, tested in
-T10's `test_csi_session_ops.py`), so the engine's resume check does not report `model_differs` after a save (B-451 L3;
-from the T12 split, amendment B-465). Completes
+fake-server processes; the crash matrix that kills the engine at each write step and resumes (the host port's lease
+and run-state reload are T19c's, amendment B-530). Completes
 `docs/local-testing.md`. `build_ports` loads each allowlist for its server section's `route` (T20); the route-bearing
 case is tested in `test_build_ports.py` with a synthetic routed allowlist (test data, product-neutral), since the CSI
 cycle has no route (AC41). The two engine stops moved out of T6b and T11 (B-413):
@@ -798,6 +845,21 @@ answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries:
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
+Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks` and
+`allowlists`, with the defaults and rules of spec §4.1; the workflow and replay tests pass `files`, a test inspector and
+launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes, through `allowlists`, a loader of its
+synthetic routed allowlist (a `load_allowlist` call with the route it is given). `allowlists` maps an adapter name to a
+loader taking the section's `route`, because `load_allowlist` refuses a routed allowlist without a route and
+`_for_route` is private; its default is `csi_allowlist`, which gains a `route` argument (`csi/__init__.py`). For CSI the
+result only validates the section's route, since `CsiToolPort` builds its own `tool_allowlist()`. Production binder
+(amendment B-530): `AdapterHostPort` gains `binding(host_key, model, descriptor)` and `revision(model_id)`
+(`_hostport.py`), and `build_ports` passes the host port as `binder` (`CsiToolPort` wraps it in `_TokenBinder`).
+`binding` raises `PRECONDITION_FAILED` (`model_open`) when no instance is bound; target from the bound instance; `owned`
+from `CsiSession.owns`; `units_system` from the expected units of the open (the tool's `TOKENS` value overrides it in
+`_TokenBinder`); `host` from the identity record (model id, revision) and the program version of the spec §4.5.9
+decision. `revision(model_id)` answers the revision in the `states` store, `None` when unknown or when no store is
+wired. `test_build_ports.py::test_binder_from_host_port` checks each source and the refusal.
+
 Wiring list of the CSI ports (amendment B-503; spec AC44, AC45). `build_ports` builds one `WrittenItems` book and
 hands it to both ports: to `AdapterHostPort` inside its `ReadBack` (with the run's store and the server's
 `ServerCheck`) and to `CsiToolPort` as `written`, with `wrote=host.wrote`, the CSI `Reconciler` of
@@ -809,24 +871,30 @@ it answers a value, keeps that value and uses it in place of `ReadBack.tolerance
 provider that opens `JournalReader(run_dir)`, takes the `basis_ref` of `run_started`, loads it with
 `StoreBasisPort(store)` and answers the number at `checks.readback_relative_tolerance_ratio`; it answers `None` while
 the journal or header is missing (`JournalIntegrityError`), the basis does not load (`BasisInvalid`) or the field is
-absent or holds no number. This changes no engine port and needs nothing from the command line: `Engine.start` writes
+absent or holds no number. `CsiReconciler` takes the same provider as a keyword `tolerance` beside its fixed
+`tolerance_ratio` and asks it the same way (`csi/_reconcile.py`, amendment B-530). This changes no engine port and
+needs nothing from the command line: `Engine.start` writes
 the header before any step, and a resume keeps it (spec §4.5.8, spec 0006 §4.2.2).
 `test_build_ports.py::test_readback_tolerance_from_run_basis` writes a quantity through the built ports in a run
 whose basis holds the field and checks the comparison within it, then resumes the run in a new engine with new ports
 and checks it again, and with a basis without the field checks `READBACK_UNAVAILABLE`. Pre-image (spec §4.5.7): the
-`ModelBinder` sees no call arguments, so `AdapterToolPort._call` itself, for a write tool when it has a reconciler,
-takes `read_back(tool, args)` before the ledger entry and sets the binding's `pre_image_ref` to
-`<result_id>#/value/observed` of that stored read (none when the tool has no read-back), so the ledger entry carries
-it. `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as `harness.run_output/1`, takes the
-pre-image as above, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the
-two stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no
-write is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with
-precondition `model_open` before it stores anything (as `AdapterHostPort._held` does).
-`test_csi_wiring_shares_book_and_pre_image` checks, through the built ports, that a written edit is in the book that
-`check_model` reads, that the next `model_state` gives no `MODEL_CHANGED_OUTSIDE`, that the ledger entry's
-`pre_image_ref` resolves to the value read before the write, and that `csi_save_model` with `as_new_revision` and
-`csi_open_revision` work on the run's copies folder; `test_csi_preview_sends_no_write` checks the preview, that the
-fake server logged no write, and that a binding without `host` is refused with nothing stored.
+`ModelBinder` sees no call arguments, so `AdapterToolPort._call` itself, when its new keyword `record_pre_image`
+(default false; `build_ports` passes true, so hand-wired ports such as those of
+`tests/workflow/adapters/test_reconcile.py` keep their binder's pre-image) is set, for a write tool for which
+`self.supports_reconcile(tool)` holds (so not the saves and opens of `_UNRECONCILED`), takes `read_back(tool, args)`
+before the ledger entry and sets the binding's `pre_image_ref` to `<result_id>#/value/observed` of that stored read;
+none when the read-back answers `None` (analysis, design) or the tool is not reconciled, so the ledger entry carries it
+only then (amendment B-530). `ToolPort.preview` (spec §4.5.9 row) validates the arguments, stores them as
+`harness.run_output/1`, takes the pre-image as above when `record_pre_image` is set and otherwise uses the binding's own
+`pre_image_ref`, and answers a `Preview` with one item (id the tool name, label the tool and its target, refs the two
+stored results), no `diff_ref` and the call's model handle from the binding's `host` (model id and revision); no write
+is sent. A binding without `host` carries no model identity, so `preview` raises `PRECONDITION_FAILED` with precondition
+`model_open` before it stores anything (as `AdapterHostPort._held` does). `test_csi_wiring_shares_book_and_pre_image`
+checks, through the built ports, that a written edit is in the book that `check_model` reads, that the next
+`model_state` gives no `MODEL_CHANGED_OUTSIDE`, that the ledger entry's `pre_image_ref` resolves to the value read
+before the write, and that `csi_save_model` with `as_new_revision` and `csi_open_revision` work on the run's copies
+folder; `test_csi_preview_sends_no_write` checks the preview, that the fake server logged no write, and that a binding
+without `host` is refused with nothing stored.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
 routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`
@@ -872,7 +940,8 @@ calc hash changes here; once plan 0007 T4's calcs import it, it enters their `mo
   replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
   T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
-  T19a also waits for T21 and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5 (`Revisions`, the revision
+  T19a also waits for T19c (amendment B-530) and T21, and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
+  (`Revisions`, the revision
   tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
   Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose
   `test_csi_read_state_tool.py` it adapts to `HARNESS_KINDS` holding `CSI_KINDS`. T19b waits for T16 and T19a. `eng-contract`
