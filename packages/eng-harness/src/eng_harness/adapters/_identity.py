@@ -42,10 +42,12 @@ class IdentityStore:
             return self._known(created.model_id)
         return self._outside(location[0], path, digest)
 
-    def record_save(self, model_id: str, path: Path) -> ModelState:
+    def record_save(self, model_id: str, path: Path, fingerprint: str | None = None) -> ModelState:
         path = path.resolve()
         digest, state = _sha256(path), self._require(model_id)
-        updated = self._states.increment(model_id, state.revision, state.fingerprint, digest)
+        updated = self._states.increment(
+            model_id, state.revision, state.fingerprint if fingerprint is None else fingerprint, digest
+        )
         self._write_content(digest, updated.model_id, updated.revision, keep_older=True)
         self._write_location(path, updated.model_id, digest)
         return updated

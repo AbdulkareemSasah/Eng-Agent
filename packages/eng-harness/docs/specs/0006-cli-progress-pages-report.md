@@ -56,6 +56,10 @@ the command line gives the page ports the process wait mode (§4.4.5 step 2); a 
 `basis_ref` of a workflow without required basis fields and the item that carries a sign-off exception's reason are
 open (Q22 to Q24).
 
+**Amendment B-536.** First-live-run gaps: the command line builds the host port's model files from the run's input
+and catches the port builder's H-G8 refusal (§4.2.2 step 2, AC67, AC68; spec 0002 H-G10 closed), and `report` writes
+`report/cycle-timings.json` (AC69).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -184,6 +188,22 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   spec 0002 `build_ports`; the run id (`run_` + ULID from the ids source) is drawn at step 1 of §4.2.2 and the run-id
   cell holds it before any port is built; the engine receives the same id in `RunRequest.run_id` (engine AC70); and
   `run` and `resume` are available. Test: `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
+- AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.Path` and an
+  input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
+  `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
+  mapping from the run's stored input, also when the original file has been moved since `run`; and a relative path, a
+  missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2). Test:
+  `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder`.
+- AC68. **[added: B-536]** Given a port builder that raises `NotImplementedGap` (spec 0002 AC43, gap H-G8), when `run`
+  or `resume` is called, then its message, which names H-G8 and the entries, is printed on standard error, the exit
+  code is 2 (`exit_code_for(Outcome.USAGE)`, returned by the command itself), no run folder is created by `run`, and nothing is journaled (§4.2.2 step 2). Test:
+  `tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2`.
+- AC69. **[added: B-536]** Given `report <run_id>` for a run whose journal holds at least one edit cycle (spec 0007
+  §4.9), then after the HTML it writes `<run>/report/cycle-timings.json` by
+  `write_cycle_timings(edit_cycle_timings(reader, store), path)`, in the run folder whatever `--out` says; given a run
+  without an edit cycle, it writes no such file. Decision (B-536): only the `report` command writes it, not step 6 of
+  `run`, because the owner's guide collects it with `report` and one writer keeps one rule. Test:
+  `tests/unit/cli/test_report_command.py::test_cycle_timings_file`.
 
 ### 3.2 Terminal progress
 
@@ -421,7 +441,7 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 | `eng_harness.cli` | `main(argv, *, deps) -> int`, `ExitCode`, `CliDeps`, `HarnessConfig`, `ConfigError` | the entry point, tests |
 | `eng_harness.progress` | `ExpectedTimes`, `ProgressRenderer`, `TerminalProgress` (the `ProgressSink`), `Heartbeat`, `Liveness`, `read_liveness` | `cli`, tests |
 | `eng_harness.pages` | `PageServer`, `PageApprovalPort`, `PageInputPort`, `PageBasisSetupPort`, `Screen`, `accept_answers_file` | `cli` (only `PageServer`, the ports and `accept_answers_file`, AC2), tests |
-| `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError` | `cli`, `pages` (sign-off screen), tests |
+| `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError`, `edit_cycle_timings` and `write_cycle_timings` (spec 0007 §4.9; amendment B-536) | `cli`, `pages` (sign-off screen), tests |
 
 Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_html.py` (§4.5), `cli/_parser.py`,
 `_exit.py`, `_config.py`, `_encoding.py`, `_opener.py` (launch-address opener and terminal writer, §4.4.4), `_options.py`,
@@ -462,7 +482,7 @@ Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract
 | `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers pending `ctx.ask` data requests only (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one data request is pending; and the shared options |
 | `status [<run_id>]` | Without an id: the 20 most recent runs. With an id: AC11. `--json`. Read-only |
 | `stop <run_id>` | Ask a live run to pause at the next safe point (`--wait SECONDS` waits for it to end) |
-| `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force` |
+| `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force`. Also writes `<run>/report/cycle-timings.json` (spec 0007 §4.9; AC69) |
 | `doctor` | Spec 0002 §4.9 (`--json`, `--show-paths`) |
 
 Shared options of `run` and `resume`: `--no-wait` (never wait for an answer: exit 10 at the first open request),
@@ -500,13 +520,30 @@ or open the page; the approval is the engineer's. The rule is generated into the
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
    §4.2, AC62); for `run`, draw the run id (`run_` + ULID from the ids source) and fill the run-id cell (§4.4.8,
-   Q20); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
-   ports take no basis: the CSI host port reads the read-back tolerance from the basis frozen at step 3, through the
+   Q20); build the registry from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
+   ports (built at the end of step 2) take no basis: the CSI host port reads the read-back tolerance from the basis frozen at step 3, through the
    run header, when its first check runs (spec 0002 §4.5.8, AC44; amendment B-503), so neither `run` nor `resume`
    passes it.
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
-   the request opens.
+   the request opens. Then build the tool and host ports as
+   `port_builder(config, workspace, store, run_folder, clock, ids, files)` (amendment B-536, AC67): `files` maps a
+   model key to a file for each top-level field of the workflow's input model annotated `pathlib.Path` (a model file);
+   the key is the file's base name and the file is the field's value, which must be absolute and name an existing
+   file. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
+   folder; these refusals apply to `run`. `resume` builds `files` from the run's stored input and does not check that
+   the files still exist. Decision (B-536): `resume` passes a moved original on unchecked, because once the working
+   copy exists the host port works on the copy in the run folder and never reads the original again (spec 0002 §4.5.9
+   `working_copy`); a run that stopped before its copy existed meets `NOT_FOUND` at `working_copy`, as today. A
+   `NotImplementedGap` from the port builder (spec 0002 AC43, gap H-G8) is printed on standard error and ends the
+   command with `exit_code_for(Outcome.USAGE)` (2), before any run folder and with nothing journaled (AC68). Decision
+   (B-536): the command returns the usage exit itself rather than through `exit_code_for_error`, because the merged
+   error-code table maps `NOT_IMPLEMENTED` only once servers plan T19a adds it. Decision (B-536): the
+   command line builds `files`, because only it holds the file's path at `run` and at `resume`. Decision (B-536): a
+   model file is written in `--input` as its absolute path, not as a `harness.file_input/1` reference, because a
+   reference holds only the base name, hash and size, from which no component can find the file, while the path is
+   kept in the run's input for `resume`. Decision (B-536): the model key is the base name, because the journal records
+   base names of model files only (engine §4.4.2 `model_saved`) and the workflow can derive it from its input.
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
    `build_draft`; the template folders and the version rule are Q22, and the `basis_ref` of a workflow without
    required basis fields is Q23). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
@@ -525,7 +562,8 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `Engine.start` with the run id of step 1 in `RunRequest.run_id`.
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
-`resume` is steps 1, 5 and 6 with `Engine.resume`; it removes a stale stop file first, at the start of the command, before step 1 (§4.4.8). The page server starts lazily at
+`resume` is steps 1, 5 and 6 with `Engine.resume`, building its ports after step 1 by the rule of step 2 from the
+run's input (the run header's `input_ref`, read before `Engine.resume` as step 4 reads `run_class`; AC67); it removes a stale stop file first, at the start of the command, before step 1 (§4.4.8). The page server starts lazily at
 the first `present` (never when `--no-wait` is given or no request opens) and stops when the process returns.
 
 #### 4.2.3 Exit codes
@@ -807,7 +845,7 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
     builder takes the run folder as a callable that reads the cell (and raises while it is empty), and its real
     default is bound with that fill (plan T18b).
   `Engine.start` takes the run id chosen by the caller (Q20 answer A, decided by amendment B-471; engine §4.5.1, AC70),
-  so the cell is filled for `run` as for `resume` before step 1 builds anything.
+  so the cell is filled for `run` as for `resume` before any port is built (end of step 2, amendment B-536).
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -915,7 +953,7 @@ heartbeat task runs on the engine loop.
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref` | engineer or agent |
+| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref`; a model file (a `pathlib.Path` field) is an absolute path (§4.2.2 step 2) | engineer or agent |
 | `--basis` file | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
 | `--answers` file | JSON | per request fields | the request's model | no | engineer or agent |
 | Page form fields | `application/x-www-form-urlencoded` | none | §4.4.3; reasons 1 to 500; name 1 to 100; body at most `max_body_bytes` | no | engineer; carry decisions and option ids, never engineering values |
@@ -976,6 +1014,8 @@ heartbeat task runs on the engine loop.
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
+| AC67, AC68 (amendment B-536) | Fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/workflow/` |
+| AC69 (amendment B-536) | Unit | `tests/unit/cli/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
