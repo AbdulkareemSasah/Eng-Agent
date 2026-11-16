@@ -188,6 +188,24 @@ def test_unclean_check_stops_run(tmp_path: Path) -> None:
     assert ev.CheckEnforced(invariant=1, model_key="m1", outcome="pass") not in enforced
 
 
+def test_other_summary_shape_counts_as_not_clean(tmp_path: Path) -> None:
+    """A summary that is not an `issues.model_check/1` summary is not clean either (AC37)."""
+    rig = make_rig(tmp_path)
+    _tools(rig.host)
+    rig.host.script_check("m1", rig.host._success("check_model"))  # the summary is {"tool": "check_model"}
+
+    async def read_after_write(ctx: Any) -> list[str]:
+        await ctx.tool("write_m", {"model": "m1"})
+        await ctx.tool("read_m", {"model": "m1"})
+        return []
+
+    done = asyncio.run(rig.engine(flow(read_after_write)).start(request()))
+    assert done.status is RunStatus.NEEDS_ENGINEER
+    assert done.escalation is not None
+    assert "the summary is not a model check summary" in done.escalation.detail
+    assert [entry.tool for entry in rig.host.ledger] == ["write_m"]
+
+
 def test_engineering_literal_rejected(tmp_path: Path) -> None:
     """A number, a quantity object or a Quantity for an engineering parameter never reaches the port (AC38)."""
     literals: tuple[object, ...] = (3, 1.5, Quantity(450.0, "mm"), {"value": 450.0, "unit": "mm"})

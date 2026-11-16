@@ -18,9 +18,10 @@ from typing import Literal, Protocol
 
 from eng_contract.envelope import FailureEnvelope, HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
+from eng_contract.issues import CheckModelSummary
 from eng_contract.refs import Ref, RefRule, resolve_ref
 from eng_contract.store import ResultStore
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 
 from eng_harness import errors
 from eng_harness.ctx import CalcResult, ReadResult, ToolResult
@@ -89,6 +90,15 @@ class SiblingBoard:
 def _stored(envelope: SuccessEnvelope) -> ev.StepResult:
     warned = [w.model_dump(mode="json") for w in envelope.warnings]
     return ev.StepResult(ref=envelope.result_id, summary=envelope.summary, warnings=warned, complete=envelope.complete)
+
+
+def _unclean(envelope: SuccessEnvelope) -> str | None:
+    """Why the summary is not a clean `issues.model_check/1` (another shape counts as not clean), None when clean."""
+    try:
+        summary = CheckModelSummary.model_validate(envelope.summary)
+    except ValidationError:
+        return "the summary is not a model check summary"
+    return None if summary.clean else f"the summary reports {summary.errors} errors"
 
 
 def _walk(value: object, path: str = "") -> Iterator[tuple[str, _REF]]:
@@ -204,6 +214,10 @@ class Guard:
         if isinstance(envelope, FailureEnvelope):
             self._failed(ctx, path, began, model, envelope.error.message)
             raise errors.ModelIntegrityError(f"the check of {model} failed: {envelope.error.message}")
+        unclean = _unclean(envelope)
+        if unclean is not None:  # spec 4.6 row 1: only a clean summary clears the flag
+            self._failed(ctx, path, began, model, unclean)
+            raise errors.ModelIntegrityError(f"the check of {model} failed: {unclean}", evidence=(envelope.result_id,))
         ctx._done(path, 1, began, _stored(envelope))
         self._enforced(path, 1, model, "pass")
         dirty_flags()[model] = False
