@@ -1,0 +1,149 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.4 (analysis summary), gap EC-G3, synthetic fixture",
+  "method_ref": "\u00a74.4.4 stories above the limit, governing per direction by ordering only",
+  "synthetic": true,
+  "derivation": "Synthetic fixture, limit 0.01, no message. X rows: S1 EQX 0.004; S2 EQX 0.01 (equal to the limit, not above); S3 EQX at two points 0.012 and 0.0125 (one row per story and case: the highest, 0.0125); S3 WX 0.0125. Y rows: S1 EQY 0.006; S2 EQY 0.0105. Governing X: highest ratio 0.0125 is held by S3 EQX and S3 WX; a tie takes the first by story then case, S3 EQX. Governing Y: S2 EQY 0.0105. Exceeding rows, by direction, story, case: X S3 EQX 0.0125, X S3 WX 0.0125, Y S2 EQY 0.0105 (S2 EQX at 0.01 is left out). A story above the limit gives NEEDS_ENGINEER.",
+  "input": {
+    "messages": {
+      "rows": []
+    },
+    "drifts": {
+      "rows": [
+        {
+          "story": "S1",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.004
+        },
+        {
+          "story": "S2",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.01
+        },
+        {
+          "story": "S3",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.0125,
+          "point": "P2"
+        },
+        {
+          "story": "S3",
+          "case": {
+            "case": "EQX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.012,
+          "point": "P1"
+        },
+        {
+          "story": "S3",
+          "case": {
+            "case": "WX",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "X",
+          "drift_ratio": 0.0125
+        },
+        {
+          "story": "S2",
+          "case": {
+            "case": "EQY",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "Y",
+          "drift_ratio": 0.0105
+        },
+        {
+          "story": "S1",
+          "case": {
+            "case": "EQY",
+            "case_type": "load_case",
+            "step": null
+          },
+          "direction": "Y",
+          "drift_ratio": 0.006
+        }
+      ]
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.drift_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "messages": "res_00000000000000000000000001",
+    "drifts": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "status": "NEEDS_ENGINEER",
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0,
+      "unclassified": 0
+    },
+    "has_errors": false,
+    "has_unclassified": false,
+    "limit_ratio": 0.01,
+    "limit_ref": "res_00000000000000000000000003#/fields/limits.drift_ratio",
+    "governing_drift": {
+      "X": {
+        "story": "S3",
+        "case": "EQX",
+        "ratio": 0.0125
+      },
+      "Y": {
+        "story": "S2",
+        "case": "EQY",
+        "ratio": 0.0105
+      }
+    },
+    "exceeding": [
+      {
+        "direction": "X",
+        "story": "S3",
+        "case": "EQX",
+        "ratio": 0.0125
+      },
+      {
+        "direction": "X",
+        "story": "S3",
+        "case": "WX",
+        "ratio": 0.0125
+      },
+      {
+        "direction": "Y",
+        "story": "S2",
+        "case": "EQY",
+        "ratio": 0.0105
+      }
+    ]
+  }
+}
