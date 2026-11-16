@@ -229,6 +229,10 @@ class BasisView:
         self._field(path)
         return Ref.model_validate({"$ref": f"{self._id}#/fields/{path}/value"})
 
+    def record_ref(self) -> Ref:
+        """Reference `res_<id>` to the whole basis record, a calc's `basis` input (engine 4.3.2); reads no path."""
+        return Ref.model_validate({"$ref": self._id})
+
     def quantity(self, path: str) -> Quantity:
         """The field as a `Quantity` in its declared unit."""
         value, unit = self._field(path)

@@ -65,6 +65,11 @@ class ToolInfo(_M):
         """True when a call with `args` would overwrite the engineer's original file; plain tools never do."""
         return False
 
+    def saves_new_file(self, args: _Obj) -> bool:
+        """True when a call with `args` writes the saved model to a new file and changes no existing file's content
+        (engine spec 4.8); plain tools never do."""
+        return False
+
 
 class Reconciliation(_M):
     """What reconciliation found about an in-flight operation (spec 0001 section 4.5.3)."""

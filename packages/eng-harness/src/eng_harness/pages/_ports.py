@@ -23,8 +23,10 @@ from eng_harness.pages._routes import Kind, Response, Screen, page
 from eng_harness.pages._security import RefusalError, Route, Subject
 from eng_harness.pages._wait import wait_for
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, InputRequest
+from eng_harness.report._lineage import ReleaseMarks  # not `eng_harness.report`: its document module imports pages._css
 
-type ScreenBuilder = Callable[[PageHub, Request], Screen]  # T9 and T10 register theirs by `request.kind`
+type ScreenBuilder = Callable[[PageHub, Request], Screen]  # T9, T9b and T10 register theirs by `request.kind`
+type FormCheck = Callable[[PageHub, Request, Mapping[str, str]], None]  # raises `AnswerError`; by `request.kind`
 _VOIDABLE = frozenset({"CHANGE_SET", "PROMOTION"})  # the approvals that bind a model (spec 0006 4.4.5)
 _NO_REPORT = h.document(trusted("Report"), [el(Tag.P, trusted("The report is not available yet."))], STYLESHEET)
 
@@ -46,16 +48,18 @@ class _Open:
 class PageHub:
     """What the page serves (a `PageApp`) and the sink that tells it what the journal holds. Thread-safe.
 
-    `builders` maps a request kind to its screen; a kind without one gets the refusal screen. `setup` serves the basis
-    screen. `wait_timeout_s` and `ack_timeout_s` are the `--wait-timeout` and `[page] ack_timeout_s` settings.
+    `builders` maps a request kind to its screen (none: the refusal screen), `checks` a kind to the check of a posted
+    form (sign-off), `marks` are the unreleased tools. `setup` serves the basis screen. `wait_timeout_s` and
+    `ack_timeout_s` are the `--wait-timeout` and `[page] ack_timeout_s` settings.
     """
 
     def __init__(
         self, *, engineer: str | None, stop_requested: Callable[[], bool], report: Callable[[], str],
         wait_timeout_s: float | None, ack_timeout_s: float, builders: Mapping[str, ScreenBuilder],
-        setup: Callable[[str], Screen | None],
+        setup: Callable[[str], Screen | None], marks: ReleaseMarks, checks: Mapping[str, FormCheck],
     ) -> None:  # fmt: skip
         self.engineer = engineer  # proposed on the forms; the last valid name given, for the session
+        self.marks, self._checks = marks, checks
         self.stop_requested, self.wait_timeout_s = stop_requested, wait_timeout_s
         self._report, self._ack_s, self._builders, self._setup = report, ack_timeout_s, builders, setup
         self._cond = threading.Condition()
@@ -170,6 +174,8 @@ class PageHub:
                 if entry.accepted or entry.recorded:  # the lock makes the first of two simultaneous answers the one
                     raise AnswerError("this request has been answered already", HTTPStatus.CONFLICT)
                 submission = parse(entry.request, form)
+                if (check := self._checks.get(entry.request.kind)) is not None:
+                    check(self, entry.request, form)
             except AnswerError as refused:
                 again = el(Tag.P, _link(trusted("Show the request again"), "request", subject_id))
                 text = el(Tag.P, h.Text(str(refused)))
@@ -189,11 +195,13 @@ class PageApprovalPort:
         self, *, engineer: str | None = None, stop_requested: Callable[[], bool] = lambda: False,
         report: Callable[[], str] = lambda: _NO_REPORT, wait_timeout_s: float | None = None,
         ack_timeout_s: float = 10, builders: Mapping[str, ScreenBuilder] | None = None,
-        setup: Callable[[str], Screen | None] = lambda _: None,
+        setup: Callable[[str], Screen | None] = lambda _: None, marks: ReleaseMarks | None = None,
+        checks: Mapping[str, FormCheck] | None = None,
     ) -> None:  # fmt: skip
         self.hub = PageHub(
             engineer=engineer, stop_requested=stop_requested, report=report, wait_timeout_s=wait_timeout_s,
             ack_timeout_s=ack_timeout_s, builders=builders or {}, setup=setup,
+            marks=marks or ReleaseMarks(records={}), checks=checks or {},
         )  # fmt: skip
 
     async def present(self, request: ApprovalRequest) -> None:

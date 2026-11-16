@@ -1,7 +1,3 @@
-<!-- The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text. -->
-
-**Status of this copy:** the lead findings queue as it stood at the stop of 2026-11-14 about 21:00 UTC (work item B-506). `reports/b<NNN>-*.md` files it names lived in `<lead>/reports/` and are not kept here, except the ones saved beside this file.
-
 # Lead findings queue (for the next engine spec amendment and the owner queue)
 
 ## From the engine lane (B-455 E.T13b #308, B-456 E.T13c #316, B-113 E.T14)
@@ -232,3 +228,221 @@ replace its branch; Plan-Task line names T10.
 - Not in force until code merges: measure 2 (B-507), measures 3 and 4b (B-508). Measure 3 may turn out small or be
   dropped: some tests read specs, clause documents and verification records, so a documents-only pull request cannot
   simply skip the tests.
+
+## Plan pre-flight audit, first run (2026-11-15, run wf_469071df-21c; measure 1 of playbook section 7)
+
+- 47 agents, 5.5 million tokens, 52 minutes; 28 tasks of four plans checked. 43 findings: 28 confirmed by the
+  adversarial verifier, 15 rejected. Files: <lead>/reports/plan-audit/<slug>-confirmed.md (confirmed with the
+  corrected edits; rejected listed at the end) and <slug>.md (the raw record).
+- engine 0001 (5): T17 block-module allowlist of spec 4.1.2 against merged workflow modules (eng_harness.kinds.edit_cycle,
+  eng_contract.units); T17 rules tests cannot be red at the base (TF004); T18 progress sink has no seam in its files
+  (AC58); T18 overhead test is green at the base; T19 (crash matrix) adds no source, so its test is green at the base.
+- interface 0006 (9): T14 the merged engine always calls answer(rid, wait=False) while spec 4.4.5 says wait=True;
+  T14b `[decisions]` is refused by the merged configuration; T15 needs WorkflowDef.basis_fields (plan 0007 T6) and the
+  inputs of --template are undefined; T14 RunRequest.basis_ref for a workflow without basis fields; T9 the HTML builder
+  cannot render the form field names with ':' and where sign-off exception reasons travel is undefined; T14 `by` of a
+  file answer when [engine] engineer is unset; stale prose on EnginePorts in T14, T14b, T16b.
+- edit cycle 0007 (10): T4 calc cannot output verdicts.set/1 (registry refuses a non-harness output kind) and has no
+  input list; T6 import cycle block.py -> basis._fields; T7 to T9 gate FB005 flags the literal in version=1 of
+  @decision_point, @rule, @workflow, @block (.gate/forbidden.yml lists only calc and CheckMeta); T8 calcs take the
+  whole basis record but BasisView offers only ref(path); T9 is planned at the 400 cap; T10 timings section lives in
+  report/_document.py (not listed) and the value-source audit lacks the list of engineering parameters; T11 and T12
+  tests_first are green at the base (T12 has no source file).
+- decisions 0005 (4): T8 redaction paths have no field in the merged Suggestion model; T10 and T8 tests_first green at
+  the base; T7 to T9 do NOT need engine T17 (only T10 does): the decisions wave can start as soon as the plan says so.
+- Lane plan-fixes-1 (first lane on lane script version 2, run wf_36c0dc39-8de): B-509 engine amendment, B-512 decisions
+  amendment. Queued: B-510 interface amendment (when a lane frees), B-511 edit-cycle amendment (after B-503 merges,
+  same plan parts). Test-only tasks (engine T19, edit-cycle T12) need a pull request title type the gate exempts from
+  the red-at-base run: set prTitle when launching them, as B-509 and B-511 will state.
+
+## 2026-11-15 about 16:00 UTC
+
+- Merged since the resume: B-505 (#352), B-504, B-149 C.T10 (#353, the rebuilt branch), B-509 (engine audit fixes),
+  B-503 (first-live-run gaps). Count 194 of 334 (B-503 added three tasks).
+- The owner said the progress is slow. LEAD DECISION (follows D-32, first live run first): all capacity goes to the
+  first-live-run path. Lane calcs-4 stopped after B-149 merged (B-150 C.T11 and B-151 C.T12 are off the path; resume
+  with resume-calcs-4.js later). Held and off the path until the path lanes thin out: tasklog-docs, amendments-zt5-gt2,
+  B-501, B-502, B-507, B-508. adr-accept (B-496) is short and stays queued behind the path lanes.
+- Path still to merge, about 36 tasks: engine T16, T16b, T17, T18, T19, T21 and the task B-503 added; servers T16
+  (in integration), T19a; interface T7b, T9, T10, T13b, T14, T14b, T15, T16, T16b, T18a; edit cycle T3 to T12;
+  decisions T7 to T10; providers T10a; templates T10 (B-164 rebuild).
+- B-509 (#354) and B-512 (#356) MERGED: lane script version 2 worked for documents tasks (early push by the writer).
+  Lanes launched on version 2: decisions-1 (run wf_05f38bb6-2eb): B-171 D.T7 -> B-172 D.T8 -> B-173 D.T9;
+  plan-fixes-2 (run wf_edee707e-81a): B-510 interface audit fixes -> B-511 edit-cycle audit fixes.
+- Owner question to collect: decisions spec Q16 (redaction paths: optional `paths` on Suggestion; interim: recorded
+  without paths). Engine T18 budget of about 200 is an estimate. local-testing.md line 3 still names T19 (T16 or T16b).
+- Registry pushed directly (state file): B-118 title type `test`, B-171 deps emptied, B-174 deps, B-149 branch -r2
+  (commits 6563f01 and 34040c3; the first collapsed the file to one line by mistake, the second restored its layout).
+  B-503 new task ids and B-500, T21 entries still to add at the checkpoint.
+- run-gaps ended: B-503 MERGED (#355): new tasks engine T22 (not-clean summary stops the run), servers T21, edit-cycle
+  T13 (budgets are estimates: T19a 310, T21 150, T13 40, T3 340, T22 30); T19a now waits for plan 0007 T5 and T13 and
+  plan 0002 T21; plan 0007 T8 waits for engine T22. Unordered file pairs that may conflict at integration: T19a and
+  servers T16 (_toolport.py), T21 and plan 0013 T2 (_kinds.py), plan 0007 T13 and servers T15 (csi/_tools.py).
+  Lead findings: RUN THE PLAN AUDIT ON servers T19a before launching it (AdapterHostPort has no preflight, acquire,
+  release, session_epoch; no production ModelBinder; ServerCheck exists only after preflight); host_design_verdicts
+  reads limits.ratio_limit_ratio but the basis_fields map names only model_diff and readback_check (for B-511).
+- B-197 W.T3 NEEDS_PLAN_AMENDMENT: written (worktree b197, head bda000f, 294 lines); the kind harness.expected_effects/1
+  lacks the calc payload wrapper members, so the record cannot be stored; fix is in kinds/calcs.py (not in T3's files)
+  plus the footing verification record's hash line. Lane editcycle-5 (version 2, run wf_7550c639-02c): B-513 docs ->
+  B-197. Defects of merged harness.change_set_check found by the T3 writer (homed by B-513): no INVALID_ITEM_ID for an
+  item id containing '/', duplicate terms of one combination item not refused.
+
+## Usage limit again, 2026-11-15 about 17:20 to 18:40 UTC
+
+- The 5-hour limit stopped five lanes (resets 18:40 UTC): plan-fixes-2 (B-510 at review round 2, B-511 not started),
+  decisions-1 (B-171 D.T7 written and reviewed, died at the gate), editcycle-4 (B-199 at the gate; B-505 merged #352),
+  editcycle-5 (B-513 reviewed, died at integration), interface-2 (B-489 at the gate). engine-4 (B-115 at integration,
+  pull request 357, local CI running) and servers-3 (B-135 at integration) were still alive at 18:13 UTC.
+- The owner said «كمل» at about 18:10 UTC; a scheduled message wakes the lead at 18:43 UTC to resume (resume scripts
+  for the version 2 lanes are built: resume-plan-fixes-2.js, resume-decisions-1.js, resume-editcycle-5.js).
+- interface-2 results: B-429 I.T7b GATE_BLOCKED: written and reviewed (worktree b429, head f08f758) but its gate never
+  ran: it was not in PRIORITY.txt and priority items kept the lock (playbook 5b starvation). FIX: every path item is in
+  PRIORITY.txt now (B-429, B-183, B-184, B-489, B-171 to B-174, B-500, B-116 to B-118, B-198, B-200 to B-203, B-138,
+  B-229, B-136). B-183 I.T9 NEEDS_PLAN_AMENDMENT: written (worktree b183, head 86d3e4d): the HTML builder needs a
+  FieldName type in _html.py for the answer field names with ':' (audit finding F6, amendment B-510); 382 lines in
+  list against 380, 399 with _html.py; trial patch <lead>/reports/b183-trial-out-of-list.patch.
+- Lead findings: the merged engine passes wait=False on every port call (spec 0006 4.4.5 says wait=True; B-510 F1);
+  AC31 refusal re-render needs _routes.py; POLL_S is 0.5 s against "every second"; load-sensitive test
+  tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins (add to the playbook list); D.T7: the plan's
+  risk set is r1, r3 (not r1, r2, r3); label state stores the outgoing state while the hash is of the full state
+  (spec 4.10/4.11 should say so); spec 0007 section 4.10 says the adapter-local tools are "in the CSI allowlist"
+  (they are in _tools.py); spec 0007 section 6 lacks rows for T5's error codes; B-513: six draft calc hashes move
+  (owner re-verification bookkeeping); spec 0007 Q18 (same-key terms) is an owner question.
+- Measured: today's window lasted about 3.5 hours with six to seven lanes plus the audit (5.5 million tokens).
+
+## Low-cost mode, 2026-11-15 about 19:30 UTC (work item B-514; the owner: the slow method used up his allowance)
+
+- Measured from the agent records of the whole session: opus 174 agents (6.5M output, 42M cache-write, 1.22 billion
+  cache-read), sonnet 284 agents (9.2M output, 82M cache-write, 1.47 billion cache-read). By role (fresh tokens):
+  write sonnet 32.3M (55), integrate sonnet 29.3M (74), write opus 20.8M (41), review opus 17.5M (81), gate sonnet 6.6M
+  (34), review sonnet 6.0M (29), fix opus 4.8M, refute 4.0M, audit 3.4M, verify opus 2.5M. About 1.9M per merged PR.
+- Done: <lead>/tools/integrate.sh (the integrator's mechanical steps), lane script version 3
+  (<lead>/build-lane-v3.workflow.js: writer writes the PR body file, integrator is a fixed sequence at low
+  effort), playbook section 8. Neither has run yet: watch the first version 3 lane.
+- servers-3 stopped (B-136 S.T17 is off the path). Off the path and frozen: task log, B-507, B-508, B-501, B-502,
+  calcs T11 and T12, columns, footing, other hosts, S.T17, S.T19b. B-496 (ADR-0034 Accepted) stays queued: short.
+
+## 2026-11-15 about 19:45 UTC: the merge queue is stuck behind one failed local CI run
+
+- B-115 (engine T16, pull request 357) holds the integration lock since about 18:13 UTC. Its first local CI run (1651 s)
+  FAILED on the flaky merged test tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins ([200, 404]
+  where [200, 409] is expected; from T7, pull request 350); the second run started 19:17 UTC. Waiting behind it:
+  B-171, B-199, B-429, B-489, B-513. No merge since 18:36 UTC.
+- A read-only diagnosis agent (sonnet) is finding the root cause and the smallest fix; results in
+  <lead>/reports/flaky-single-use.md and .patch. Then: a home for the fix (a file added to an unwritten or
+  waiting task is a mechanical amendment by the lead; a new task is not).
+- Lesson for the estimate: a local CI run of an engine pull request takes about 27 minutes and a flaky test doubles it.
+- Measured at 19:45 UTC: the container has 4 cores and the load average was 8.9 with seven lanes, a local CI run with
+  mutation and the diagnosis agent's stress loop. Rule added (playbook section 8 item 7): at most three writing lanes.
+  ops/localci.py entered build/v1 by a direct state commit of the earlier lead (c7ef1f6): it is lead tooling, but it is
+  not in the list of files the owner let this session push directly; a change to it (per-pull-request CI without the
+  mutation step, full CI on build/v1 every ten merges) needs the owner's word. Asked on 2026-11-15.
+- Owner approved (verbatim «نعم موافق، طبّق وكمل»): per-pull-request local CI without the mutation step, full run on
+  build/v1 every ten merges (B-516, playbook section 8 item 8). A sonnet agent is changing ops/localci.py in
+  <worktrees>/b516 (no push); the lead pushes it to build/v1 under the integration lock when no local CI run is in
+  progress, then updates the reference checkout. Merges since the last full run with mutation: count from this push.
+- Flaky test diagnosed (report <lead>/reports/flaky-single-use.md, patch flaky-single-use.patch): a PRODUCT
+  defect of merged T7 code, not a test defect. Router.handle (pages/_routes.py 110 to 112) fetches the screen before
+  submit; PageHub.screen (pages/_ports.py 109) returns None once the request is recorded, so the loser of two
+  concurrent answers gets 404 where AC30 requires 409. Failure rate under load 19 to 30 percent of runs, 0 of 400 with
+  the fix (an `answering` keyword of the screen lookup on POST; 11 counted lines in _ports.py and _routes.py, 2 lines in
+  tests/helpers/page_client.py).
+- Home: T7b (B-429, written, not merged, already lists _ports.py). FIRST lead-written mechanical amendment: B-517
+  (worktree <worktrees>/b517, commit a04c082: plan 0006 T7b files += pages/_routes.py, tests/helpers/page_client.py;
+  budget 130 unchanged, 111 with the fix); integrating with tools/integrate.sh run by the lead in the background
+  (first real use of the script). interface-3 stopped; after B-517 merges relaunch B-429 on lane script version 3 with
+  the patch applied as a `fix` commit plus the reviewer on the delta.
+- B-516 (ops/localci.py without the mutation step in pull request runs): commit 52a8848 in <worktrees>/b516, reviewed
+  by the lead, waiting on the integration lock to be pushed (background job).
+
+## 2026-11-15 22:15 UTC, lane editcycle-4 finished (B-505 #352, B-199 W.T5 #362 merged)
+- Spec 0007 section 4.10 line 578 says "three adapter-local tools in the CSI allowlist": they are in adapters/csi/_tools.py, not in the allowlist file; T5 prose "allowlist entries" has the same stale wording. Mechanical prose correction (lead-written, section 8 item 6) with the next edit-cycle amendment.
+- Spec 0007 section 6 lacks rows for the codes T5 chose: CONFLICT (write or save while a snapshot is open, existing snapshot target, copy hash differs), NOT_FOUND (unknown snapshot name), INTERNAL (no revision wiring). This is an error-code change: full documents cycle, with the B-503 follow-ups.
+- With revisions wired every write costs one extra csi_model_info read; csi_run_analysis is refused while a snapshot is open: note for the edit-cycle workflow host-call budget.
+- Known gaps listed in the pull request: AdapterHostPort not told of the new working file after csi_open_revision; production wiring of Revisions belongs to servers T19a; host table names are unconfirmed host facts (OQ-G10, local-testing row 5d).
+B-517 merged #363 (6cfd75d) 22:24 UTC: first use of integrate.sh by the lead; local CI without mutation took 11 minutes (gate job 668 s). Merges since the B-516 push (aad1561): 1.
+
+## 2026-11-15 22:30 UTC, lane interface-2 finished (B-181 merged earlier; B-429 and B-183 moved to lanes interface-5 and interface-4; B-489 stopped at integration)
+- B-489 (I.T13b): the repair commit 80dee90 left one test signature unformatted; the gate after merge failed at the format step ST001. Tail lane `tail-489` (run wf_ed0e3c4a-91b, script <lead>/build-lane-tail.workflow.js: named repair, then the fixed integrator sequence) runs the formatter and integrates. Lesson for the playbook: a repair writer runs the whole gate without mutation, never only the tests.
+- I.T7 lead findings still open: (L1, first-live-run path) the merged engine passes wait=False on every port call (engine/_approvals.py:126, _decide.py:222 and :274, _inflight.py:230) while spec 0006 4.4.5 step 2 says the run waits on the page: B-510 dealt with "waiting on the page" in the plan (check T14 covers the wait mode before launching T14); (L2) AC31 "re-renders the screen with the message" against the refusal page with a link back; (L3) stop poll 0.5 s against "every second" in spec 4.4.5.
+- Process measurement: B-489's integrator waited about 1.5 hours for the integration lock. With B-516 the queue now moves at about 11 minutes per pull request.
+
+## 2026-11-15 22:40 UTC, lane plan-fixes-2 finished (B-510 #359, B-511 #364 merged); plan tasks total now 340
+- OWNER, on the path: spec 0007 Q19 (output kind of harness.host_design_verdicts: (a) wrapper kind harness.host_design_verdicts/1 accepted by the design summary, recommended; (b) calc port and contract change). Blocks W.T4b, W.T9a, W.T9b, W.T11, W.T12. Asked on 2026-11-15.
+- OWNER, on the path: W.T15 (B-524) changes the protected .gate/forbidden.yml (FB005 admits version=1 of block, workflow, decision_point, rule; 10 lines); T7 waits for it. Asked on 2026-11-15.
+- OWNER, later: spec 0006 Q22, Q23, Q24 (each has an interim reading in its task; Q24: an edit-cycle run whose report has exceptions cannot be signed until Q24 is answered and spec 0007 step 17 adds the exc_<n> items; reject still works).
+- New ids: B-524 W.T15 (gate member eng-dev-gate, title type fix or feat so that test-first applies), B-525 W.T4b, B-526 W.T9a, B-527 W.T9b (B-203 is replaced by these two), B-528 I.T14c.
+- Registry changes due at the checkpoint: B-183 drops AC42 and the sign-off title; B-188 drops AC46 and AC64; B-353 deps I.T14 -> I.T14c; B-430 drops E.T14 and E.T14b; B-432 and B-433 add W.T6; B-433 drops P.T1; B-198 retitled analysis_summary only; B-206 prTitle and branch type `test(eng-harness)`.
+- Budgets that are estimates: W.T4 200, W.T4b 240, W.T9a 200, W.T9b 230, W.T11 150, W.T6 300 (doubtful). Writers measure early.
+- Spec 0013 step 12 passes "basis": ...: becomes B.record_ref() with the column wave (frozen).
+
+## 2026-11-15 22:50 UTC, lane editcycle-5 finished (B-513 #358, B-197 W.T3 #366 merged); B-500 E.T16b merged #365. Count 200 of 340. Merges since the B-516 push: 4 (#363, #364, #365, #366).
+- The hashes of six merged draft calcs moved with kinds/calcs.py (B-197): owner re-verification of drafts as for any hash change (spec 0003 4.5); list them in LOCAL-TESTING at the checkpoint.
+- Spec 0007: 4.4.1 and 4.4.2 name an input `state` while both calcs take flat fields (mechanical prose correction); nothing says what a wall_section item does when its name matches a slab or deck section (K2; read-back fails on the safe side): owner or documents item, later.
+- expected_effects does not check that `check` belongs to the given `change_set`: the workflow (T8) supplies both; note for the T8 writer.
+- Q18 (same-key terms) open; T14 must not build it.
+
+## 2026-11-15 23:25 UTC, lane engine-4 finished (B-499 #349, B-115 #357, B-500 #365 merged; B-116 NEEDS_PLAN_AMENDMENT; B-117, B-118 skipped)
+- B-116 (E.T17) written at 32e9689 (122 of 250, gate pass): needs engine/_runner.py and three collateral tests in the T17 list. Mechanical amendment B-529 written by the lead; lane engine-5 continues B-116 (review, mutation, integration held until B-529 merges), then B-117, B-118, B-521.
+- integrate.sh has a hold marker now: `locks/hold.b<NNN>` makes `merge <NNN>` wait.
+- B-500 findings for the Q40 answer (owner queue): a promotion resolved `applied` at a resume journals no model_saved role promoted (report lists no promoted model, about 12 lines); the backups folder is flat (two models with the same base name overwrite each other's backup; needs a spec sentence); the promote step journals no model_key (spec 4.3.2 and 4.5.3 should state it).
+- B-115 findings: AC49's saves_new_file exception and the engineer-only under= rule (EC3) belong to plan 0007 T6 (B-200): until it merges any under= approval suppresses the inserted always-ask approval. T6 is therefore on the first-live-run path before any live write. Q41 and Q43 are built as the writer's recommendation (owner queue). _steps.resume_path repeats _invariants.path_key (merge them in a later task that lists both).
+
+## 2026-11-16 00:12 UTC
+- Merged: B-172 D.T8 #367, B-183 I.T9 #368 (first task merged by lane script version 3). Count 202 of 340. Merges since the B-516 push: 6.
+- B-489: the tail lane could not repair it (first `test:` commit 77e9110 holds a test green at the base; TF004; pushed history). Pull request 360 closed by the lead; rebuild on branch -r2 in lane interface-6 (D-22).
+- Lesson for the playbook (section 2): before the first push every writer runs the test-first check itself, not only the gate; a test added to the first `test:` commit that passes at the base costs a full rebuild.
+
+## 2026-11-16 00:20 UTC
+- Merged: B-429 I.T7b with the single-use race fix #370. Count 203 of 340. Merges since the B-516 push: 7. B-529 opened as #371 (lead-written), local CI running.
+- LEAD ERRORS in lane arguments (cost: one writer agent each): (1) B-198 W.T4 launched before its dependency S.T21 (B-519, lane gaps-1): the writer returned BLOCKED with nothing written; relaunch B-198 when B-519 has merged (worktree wt/b198 exists, empty branch). (2) B-522 launched with `Risk: r1, r3` while plan 0007's set is r1, r2, r3: risk-floor RF002 failed in local CI, repaired by the lane. Before a launch: read the plan's risk set from its front matter and every `depends_on` including the prose "waits for".
+- B-429 lead finding (low): with `answering`, a POST to a recorded request builds the screen only for the router to discard it before submit answers 409.
+B-529 merged #371 (adc9a61) 00:29 UTC; hold on B-116 removed. Merges since the B-516 push: 8 (#363 to #368, #370, #371). Local CI gate job 652 s.
+
+## 2026-11-16 00:40 UTC, plan audit 2 finished (1.6 million tokens, 15 minutes): servers T19a 7 confirmed, 3 rejected; providers T10a 1 confirmed, 1 rejected
+- Servers T19a could not have been written: AdapterHostPort lacks the HostPort protocol methods and never reloads adapter/state.json (new T19c), no production ModelBinder exists, build_ports is given no inspector, launcher, lock folder, files, checks or allowlists, the pre-image rule raises TypeError on saves and opens and breaks four reconcile tests, one tests_first gap, budget 313 against about 420 real. Amendment B-530 (Opus writer: design choices), lane plan-fixes-3.
+- Providers T10a: DecisionRuntime fields and warning type undefined. Amendment B-531.
+- Cross-plan note (not confirmed, low confidence): no task of plan 0006 catches NotImplementedGap from the port builder for the exit 2 clause of spec AC43.
+- After B-531: launch B-229 (P.T10a). After B-530, B-519, B-522 and B-118: T19c (new id B-532) then B-138 (S.T19a).
+
+## 2026-11-16 00:45 UTC, lane editcycle-6 finished without a merge
+- B-523 (W.T14): third rebuild for TF004 (after B-149 and B-489): a negative-control test, green at the base, sat in the first `test:` commit. Pull request 372 closed; rebuild by the tail lane rebuild-523 (byte-identical content, no second review or mutation run). Playbook section 8 item 11 and lane script version 3.1 now make the writer run the test-first check before the first push.
+- B-523 lead findings: plan 0007 T14 prose names only the change_set_check hash, but the expected_effects hash moves too (import closure): prose touch-up; spec 0007 4.4.1 does not set the order of issues within one item (INVALID_ITEM_ID first is pinned by two golden cases).
+
+## 2026-11-16 01:05 UTC, lane decisions-1 finished (B-171 #361, B-172 #367, B-173 D.T9 #373 merged)
+- Decisions plan risk set is [r1, r3] (the plan wins over the prompt).
+- T10 (B-174) must pass max_concurrent_decisions from EngineSettings when it builds the Cascade; Cascade satisfies DecisionPort only after T10 adds runtime_summary.
+- Spec 0005 open points decided by writers and tested (state them at the next documents amendment): 4.8 batch timeout is the largest timeout_ms_model, a yes/no point is never batched, the batch id hashes the sorted request ids joined by newline, a refused answer set returns stored outcomes for resolved calls; 4.5 a call with an engineer_choice and no stored request consults no provider; the recorded error form `ProviderError:<code>` and the `error` key missing from the entry shape of 4.9; 4.10/4.11 the label stores the outgoing state while state_sha256 is of the full state (AC30, AC35). Q16 (paths on a skipped_redaction entry) open, interim reading applied.
+
+## 2026-11-16 01:15 UTC, measured numbers after ten merges under the new settings (B-516 pushed 22:09 UTC as aad1561)
+- Ten pull requests merged in 2 h 54 min (22:09 to 01:03): seven plan tasks (B-500, B-197, B-172, B-183, B-429, B-522, B-173) and three documents amendments (B-517, B-511, B-529). Count 205 of 340. Rate 2.4 tasks per hour, 3.4 pull requests per hour.
+- Tokens, lanes on script version 3 (62 agents so far): 7.5 million fresh, 113 million cache-read. A complete task costs 0.55 to 0.9 million fresh tokens (B-183 0.88, B-522 0.80 with one repair, B-518 0.57 before its repair) against 1.9 million per merged pull request before. Integrator 0.15 million per run (0.40 before). Writers hold 55 of the 113 million cache-read tokens: long writer sessions are the next cost to cut.
+- Failures in the period and their cost: three TF004 rebuilds (B-489, B-523; rule added), two lead launch errors (B-198 dependency, B-522 risk line), one budget overrun found only after writing (B-204, 451 against 380: split B-533), one merge conflict (B-518, repair running).
+- B-204 (W.T10) NEEDS_PLAN_AMENDMENT: split into T10 and T10b by B-533 (lane plan-fixes-4).
+- Periodic full gate with mutation started on build/v1 at 995d893.
+
+## 2026-11-16 01:20 UTC, the periodic run and what the mutation step really covers
+- `eng-gate check --all` on build/v1 at 995d893 passed in 12 minutes, but its mutation step mutated nothing: the step mutates the R1 and R2 modules changed against the merge base with origin/build/v1, and on build/v1 itself that set is empty. The lead's first "full run" therefore proved the tests, not the mutation score. Corrected: <lead>/tools/periodic-mutation.sh <base> runs the mutation step with a pull-request event whose base is the previous periodic commit (first run: base aad1561, head 995d893, in progress).
+- Per-change mutation in the lanes (gate runner, in the task worktree) was always real: there the merge base is the task's base.
+- Measured gate-job seconds of local CI: code pull requests with mutation 1184 to 2127 (B-171, B-199, B-149, B-115); documents pull requests 690 to 770; after B-516 every pull request 580 to 670.
+
+## 2026-11-16 01:25 UTC: B-489 I.T13b merged #374 (rebuild). Count 206 of 340. Low finding: test_status_decision_runtime_caps tests the depth cap only on the omitted side.
+
+## 2026-11-16 01:35 UTC, lane editcycle-7 finished: B-204 (split, B-533) and B-200 (one collateral test file, B-535) both written and pushed, neither merged yet
+- B-200 (W.T6) at fca68e6: 259 of 300, test-first pass; needs tests/workflow/test_modes.py in the list: lead-written mechanical amendment B-535 (in the queue), lane editcycle-8 continues (review, mutation, integration held).
+- B-200 writer concerns for the documents queue: EC5's `p~post.save` clause has nothing to attach to in the merged engine (not built, no test: the reviewer decides whether a criterion is uncovered); a tool save whose integrity check fails raises after step_completed and a replay does not raise again; a save reconciled applied in-process journals no model_saved until the next resume; csi_open_revision (effect write, action open) keeps its approve_each_write preview (EC6 names action save only); the resume `describe` call is limited to a latest write with action save or open because replay tests pin the port-call list.
+
+## 2026-11-16 01:50 UTC: merged B-116 E.T17 #375 and B-523 W.T14 #376 (rebuild by the tail lane: 0.19 million tokens, two agents). Count 208 of 340. Merges since the periodic checkpoint 995d893: 3 (#374, #375, #376).
+- The periodic mutation run (base aad1561) uses four mutmut workers at nice 10: load 6 on four cores while it runs. If a local CI run fails on a load-sensitive test while it runs, stop it and rerun it when the queue is short.
+
+## 2026-11-16 01:57 UTC: periodic mutation run PASS (base aad1561, head 995d893, 40 minutes, all six members; log logs/periodic-mutation-995d893.log). Next periodic run: base 995d893, due after ten merges counted from it (three so far: #374, #375, #376).
+
+## 2026-11-16 02:30 UTC, lane plan-fixes-4 finished (B-533 merged #379: T10 split into T10 and T10b)
+- ON THE PATH, no task wires report/cycle-timings.json: spec 0007 4.9 says the report also writes it and LOCAL-TESTING tells the owner to collect it for the B-1 sheet, but write_cycle_timings has no caller and plan 0006 T14 calls write_report only. Add it to plan 0006 T14 (or a new small task) in the documents item that precedes the T14 launch.
+- Stale cross-references naming T10 for count_prompts: spec 0010 line 49, plan 0010 line 449, LOCAL-TESTING line 517 (should read T10 and T10b): mechanical, at the checkpoint.
+- T11 still lists pyproject.toml for a public_modules entry that exists at the base (its r3 risk from that file would go): mechanical.
+- OWNER QUEUE (interim readings stated in spec 0007 4.9): (a) the A7 prompt counter does not count a decision request still open at the end of the journal, nor approvals answered by a mode caller; (b) machine time per cycle excludes scope steps and engineer steps, which differs from the run-level machine time of spec 0006 AC56 (sum of every completed step): the report shows two machine figures with different rules: which one is the B-1 figure?
+
+## 2026-11-16 02:35 UTC: merged B-531 #377 (providers documents), B-518 I.T9b #378, B-533 #379. Count 209 of 340. Merges since the periodic checkpoint 995d893: 6 (#374 to #379).
+
+## 2026-11-16 02:43 UTC: B-535 merged #380 (4c4be4d), hold on B-200 removed. Merges since the periodic checkpoint 995d893: 7.
