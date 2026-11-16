@@ -6,7 +6,6 @@ from pathlib import Path
 
 from eng_contract.envelope import Provenance
 from eng_contract.store import ResultStore
-from unit.edit_cycle.test_timings import PRODUCER
 
 PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
 _DATA = Path(__file__).resolve().parents[2] / "data" / "kinds" / "edit_cycle"
