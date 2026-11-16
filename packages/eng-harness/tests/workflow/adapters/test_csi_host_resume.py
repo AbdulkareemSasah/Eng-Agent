@@ -24,6 +24,7 @@ from ..conftest import COMMIT
 from .test_csi_session_ops import ETABS_EXE, FIRST_PID, ConfigFactory, LaunchInspector, _calls
 
 _START = 1_700_000_000_000
+GONE_PID = 31_337  # no process of the test inspector
 
 
 def _port(tmp_path: Path, manager: ServerManager, guard: ProcessGuard, inspector: LaunchInspector, clock: Clock,
@@ -84,6 +85,59 @@ def test_lease_preflight_and_epoch(tmp_path: Path, make_config: ConfigFactory, c
             await other.acquire("csi")
             assert other_locks.holder("ETABS", identity) is not None
             assert (await other.acquire("other")).host_key == "other"  # no instance of another host key is locked
+
+    anyio.run(body)
+
+
+def test_acquire_skips_reloaded_instances_that_are_gone_or_restarted(
+    tmp_path: Path, make_config: ConfigFactory, control: Path
+) -> None:
+    """Only a reloaded instance alive with the same pid and start time is locked again (spec 4.4.1, AC47)."""
+    clock = FixedClock(_START)
+
+    async def body() -> None:
+        manager, guard, inspector, original = _setup(tmp_path, make_config, control)
+        first, locks = _port(tmp_path, manager, guard, inspector, clock, "r1", {"m": original})
+        async with manager:
+            await first.working_copy("m", tmp_path / "run" / "copies")
+            identity = inspector.identity(FIRST_PID)
+            assert identity is not None
+            locks.release_all()
+
+            inspector.running[FIRST_PID] = ProcessIdentity(FIRST_PID, "t9", ETABS_EXE)  # same pid, another start time
+            restarted, restarted_locks = _port(tmp_path, manager, guard, inspector, clock, "r2", {"m": original})
+            await restarted.acquire("csi")
+            stale = restarted_locks.holder("ETABS", identity)  # lock files stay: r1's record, no r2 holder written
+            assert stale is not None
+            assert stale.run_id == "r1"
+            assert restarted_locks.holder("ETABS", inspector.running[FIRST_PID]) is None
+
+            inspector.running[FIRST_PID] = identity  # alive again, but the saved row names a process that is gone
+            state = tmp_path / "run" / "adapter" / "state.json"
+            saved = json.loads(state.read_text())
+            saved["instances"][0]["pid"] = GONE_PID
+            state.write_text(json.dumps(saved))
+            gone, gone_locks = _port(tmp_path, manager, guard, inspector, clock, "r3", {"m": original})
+            await gone.acquire("csi")
+            assert gone_locks.holder("ETABS", ProcessIdentity(GONE_PID, "t1", ETABS_EXE)) is None
+
+    anyio.run(body)
+
+
+def test_constructor_files_win_over_run_state(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
+    """A key named by both the constructor and `state.json` resolves to the constructor's file."""
+    clock = FixedClock(_START)
+
+    async def body() -> None:
+        manager, guard, inspector, original = _setup(tmp_path, make_config, control)
+        first, _ = _port(tmp_path, manager, guard, inspector, clock, "r1", {"m": original})
+        async with manager:
+            key = await first.working_copy("m", tmp_path / "run" / "copies")
+            elsewhere = tmp_path / "elsewhere.EDB"
+            elsewhere.write_bytes(b"other")
+            assert first.model_files(key) != (elsewhere.resolve(),)
+            second, _ = _port(tmp_path, manager, guard, inspector, clock, "r2", {"m": original, key: elsewhere})
+            assert second.model_files(key) == (elsewhere.resolve(),)
 
     anyio.run(body)
 
