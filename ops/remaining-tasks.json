@@ -1,5 +1,5 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 now depends on DOC.B561.",
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged.",
  "count": 183,
  "tasks": [
   {
@@ -1727,7 +1727,6 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "B.T10",
-    "E.T23",
     "S.T19a",
     "W.T7b"
    ],
@@ -3452,8 +3451,10 @@
     "Current checkpoint 2026-11-17: B-560 merged as PR #413; the DOC.B560 dependency is satisfied. B-551 implementation remains in progress.",
     "Integrated B-560 as PR #413; DOC.B560 dependency is satisfied. Implementation remains in progress on the existing task branch.",
     "Writer continuation 2026-11-17: pushed head b55b965b0d979b57d1751c07a4403bc74493047d. Focused tests: 14 passed; eng-harness package gate and formal test-first passed; independent review APPROVE. Per-change mutation is running and result is pending; no PR or local CI yet.",
-    "Mutation update 2026-11-17: per-change mutation is running; result pending. Log: <lead>/logs/b551-mutation.log."
-   ]
+    "Mutation update 2026-11-17: per-change mutation is running; result pending. Log: <lead>/logs/b551-mutation.log.",
+    "Integrated 2026-11-17 as PR #415, squash 9c26ab3435c9dd3867313bdef2eb60e63633c218 after batch local CI PASS. Per-change mutation passed the configured 80% floor; exact score was not emitted and is not claimed."
+   ],
+   "merged_pr": 415
   },
   {
    "id": "B-552",
@@ -3489,10 +3490,8 @@
    "title": "GC009 reports the changed-line count as a notice; no cap on max_changed_lines",
    "branch": "fix/b553-gate-gc009-notice",
    "prTitle": "fix(eng-dev-gate): GC009 reports the changed-line count as a notice; no cap on max_changed_lines (B-553)",
-   "risk": "r3",
-   "pending_deps": [
-    "DOC.B561"
-   ],
+   "risk": "r2, r3",
+   "pending_deps": [],
    "writer": "opus, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -3505,8 +3504,10 @@
     "Integrated B-552 as PR #412; DOC.B552 dependency is satisfied. Implementation is in progress; the base risk-floor check currently reports RF001 after the plan change increased the effective risk set.",
     "Writer update 2026-11-17: worktree <worktrees>/b553 at 7d9e169e; implementation committed, formal test-first PASS, 182/260 counted lines across 46 files. Old-base gate-check has only awaiting-owner notices. Base risk-floor fails RF001 (effective r2,r3 vs plan r3) due required .gate/agents.yml and AGENTS renders; needs documents risk amendment. Package check --skip mutation running; not pushed.",
     "Writer/review update 2026-11-17: pushed head 5d2b2549a4b9f5fd2303fde31f17366e572e0d40. Six failing-first cases and formal test-first PASS; full eng-dev-gate package check PASS; independent review APPROVE. Count is 182/260 across 46 scoped files. B-561 is pushed/reviewed/gated but not merged, so DOC.B561 remains pending. Per-change mutation, PR, local CI and integration remain incomplete. Standard package mutation selectors are unconfigured; no mutation score is claimed.",
-    "Risk state clarification 2026-11-17: the current base plan remains r3. B-561 amends the spec and plan to r2,r3; that future set applies only after B-561 merges. DOC.B561 remains pending until then."
-   ]
+    "Risk state clarification 2026-11-17: the current base plan remains r3. B-561 amends the spec and plan to r2,r3; that future set applies only after B-561 merges. DOC.B561 remains pending until then.",
+    "Integrated 2026-11-17 as PR #416, squash 1ec7566c016aacf75c15aacb260435df44f23c67 after batch local CI PASS; risk r2, r3 is satisfied by merged B-561/#414. Eng-dev-gate mutation selector passed with no eligible R1/R2 modules; no score is claimed."
+   ],
+   "merged_pr": 416
   },
   {
    "id": "B-554",
@@ -3633,16 +3634,15 @@
    "branch": "feat/b559-harness-it9c-signoff-design-verdicts",
    "prTitle": "feat(eng-harness): sign-off screen reads the edit cycle design verdicts (harness.host_design_verdicts/1) (B-559)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T9b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "From documents item B-544."
+    "From documents item B-544.",
+    "Checkpoint 232: I.T9b is already merged as B-518/PR #378; cleared this fulfilled dependency."
    ]
   },
   {
@@ -3687,8 +3687,10 @@
    "branch_pushed": true,
    "lead_notes": [
     "Delegated writer: b561_risk_amendment. Documents-only amendment changes the gate spec and plan risk sets from r3 to r2, r3 because B-553 T40 must edit eng-contract AGENTS.md and .gate/agents.yml renders; RF001 reports those required paths raise the effective risk. This is a real plan risk-floor amendment, not a PR-body exception. It adds no plan task and does not change B-553 T40 scope. Independent review, gate and integration are pending.",
-    "Update 2026-11-17: pushed head 77ce9dd07475471d54809e1a1244ca7d063a44b5; independent review APPROVE; eng-dev-gate package check PASS; formal test-first correctly exempt as documents-only. No PR or local CI yet; merge required before B-553 can clear DOC.B561."
-   ]
+    "Update 2026-11-17: pushed head 77ce9dd07475471d54809e1a1244ca7d063a44b5; independent review APPROVE; eng-dev-gate package check PASS; formal test-first correctly exempt as documents-only. No PR or local CI yet; merge required before B-553 can clear DOC.B561.",
+    "Integrated 2026-11-17 as PR #414, squash c803dad7f65f1f9a4f3b770dcb12bb080504e02c after local CI PASS. The automatic base merge commit 6fda1a2beea771e1223d9acd6c2355247c414f06 lacked an Assisted-by trailer; it was already published and was preserved. Final squash has the required sole trailer."
+   ],
+   "merged_pr": 414
   }
  ]
 }

@@ -89,7 +89,7 @@ Return MERGED with the pull request number and the merge commit sha, or CI_FAIL,
     if (m && m.status === 'MERGED') return { id: t.id, key: t.key, outcome: 'MERGED', pr: m.pr, merged_sha: m.merged_sha, lead_findings: lead, concerns: w.concerns || '' }
     if (!m || tries >= 1 || m.status === 'BLOCKED') return { id: t.id, key: t.key, outcome: m ? m.status : 'INTEGRATOR_DIED', stage: 'integrate', detail: m, lead_findings: lead }
     const f = await agent(PRE + H +
-      `ROLE: writer, repair after integration (playbook sections 1, 2 and 4). The pull request for this branch exists but integration stopped with ${m.status}. Fix the cause inside the task scope and budget in the worktree (merge origin/build/v1 first, never rebase; resolve conflicts as playbook section 5 step 1 says), rerun the failing step locally until it passes (the full gate under the lock when the failure was in the gate job), commit, do not push. Detail from the integrator:\n` + m.detail,
+      `ROLE: writer, repair after integration (playbook sections 1, 2 and 4). The pull request for this branch exists but integration stopped with ${m.status}. Fix the cause inside the task scope in the worktree (merge origin/build/v1 first, never rebase; resolve conflicts as playbook section 5 step 1 says), rerun the failing step locally until it passes (the full gate under the lock when the failure was in the gate job), commit, do not push. Detail from the integrator:\n` + m.detail,
       { label: `repair ${t.id}`, phase: 'Write', model: t.writerModel, effort: t.writerEffort, schema: OUT })
     if (!ok(f)) return { id: t.id, key: t.key, outcome: 'REPAIR_' + (f ? f.status : 'DIED'), stage: 'integrate', detail: f, lead_findings: lead }
     tries++

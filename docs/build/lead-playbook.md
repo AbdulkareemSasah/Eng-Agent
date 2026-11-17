@@ -29,13 +29,12 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
 
 - Never invent an engineering number. Every constant is cited (code clause, design basis) exactly as the spec says. An
   uncertain clause is an explicit `NOT_IMPLEMENTED` gap with a test. Never change a test expectation to make it pass.
-- Stay inside the plan task: only its `files` globs, at most its `max_changed_lines` counted lines. Counted lines =
+- Stay inside the plan task: only its `files` globs. Measure counted lines for reporting; `max_changed_lines` is an estimate, never a limit or reason to stop, split or amend a plan. Reviewability remains part of review. Counted lines =
   additions + deletions over `git diff --numstat -M $(git merge-base origin/build/v1 HEAD) HEAD`, excluding test files
   (`**/tests/**`, `test_*.py`, `conftest.py`), generated files (`uv.lock`, `AGENTS.md`, `**/docs/schema/**`) and
   `spikes/**`. A member's `CHANGELOG.md`, `docs/local-testing.md` and `.gate/ratchet.json` are in scope when another
   in-scope file of that member changes.
-- If the task cannot fit its budget or needs a file outside its list, STOP and report `NEEDS_PLAN_AMENDMENT` with the
-  measured numbers and the exact amendment you propose. Before you report missing files, make the proposal COMPLETE:
+- If the task needs a file outside its list or more than `max_sessions`, STOP and report `NEEDS_PLAN_AMENDMENT` with the exact file or session amendment you propose. A counted-line estimate alone is never a stop or amendment reason. Before you report missing files, make the proposal COMPLETE:
   apply every out-of-list edit the task needs as an uncommitted trial, run the gate (`--skip mutation`) for every
   workspace member the change can affect (a contract change affects eng-harness; a calc input change affects the calc
   lock, the calc's verification record and the tests that pin them) until each says `check: pass`, list every file
@@ -67,7 +66,7 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
    only in `tests/contract/test_calc_lock.py`.
 5. Do not open a pull request. Push only as section 7 item 6 says, and only when your role text tells you to push
    (a role text that says "do not push" wins). Leave the tree clean (everything committed). Write your handoff note to
-   `<lead>/reports/b<NNN>-writer.md` (done, how verified with command output tails, counted lines of budget,
+   `<lead>/reports/b<NNN>-writer.md` (done, how verified with command output tails, counted lines and the plan estimate,
    what is left, risks, anything a later task must know).
 6. Engineering tasks (code-pack checks, harness calcs): every expected value in a golden or case file carries its
    derivation by hand from the clause spec; watch X/Y swaps, sign conventions, units and which side a boundary falls on.
@@ -75,7 +74,7 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
 ## 3. Reviewer (you did not write the change; you never edit the code)
 
 Review the full diff `git diff $(git merge-base origin/build/v1 HEAD) HEAD` in the task worktree against the plan task
-and the spec: scope (files), budget (counted lines), test-first (first commit is `test:` and its tests fail at the merge
+and the spec: scope (files), counted lines for information, test-first (first commit is `test:` and its tests fail at the merge
 base for the right reason), correctness against each acceptance criterion in `covers`, error codes and units per the
 contract, no weakened checks, no invented number. For engineering content recompute expected values by hand from the
 clause spec. Mark every finding `author` (fix in this change) or `lead` (the code is right; a spec or plan must change;
@@ -131,7 +130,7 @@ remove the owner file.
    section starts with the three lines `Work-Item: B-NNN`, `Plan-Task: <plan path>#T<n>` and `Risk: <the plan's
    front-matter risk set, for example r1, r2, r3>` exactly; acceptance criteria table; Verification (local gate commands
    and results); Engineering impact; Version impact; the self-review checklist filled with facts (counted lines of
-   budget, the `test:` commit sha); a `## Review` section holding the content of `<lead>/reports/b<NNN>-review.md`
+   counted lines and estimate, the `test:` commit sha); a `## Review` section holding the content of `<lead>/reports/b<NNN>-review.md`
    and one line on who wrote the change (a subagent of the lead) ; no "Progress and handoff" placeholders left.
    For a documents amendment the second line is `Plan-Task: none (spec and plan)`.
 4. Open the pull request into `build/v1` with `mcp__github__create_pull_request` (title = the registry `prTitle`,
@@ -227,17 +226,17 @@ guess). Three consecutive failed attempts at the same failure means stop and rep
 The owner approved six measures on 2026-11-14 («طبق الاقتراحات فقط كتعديل على ملفات اسلوب العمل»). They change how work
 flows, never what is checked: test-first, the independent review, the adversarial verification of engineering content,
 the mutation step and local CI on the merged head stay exactly as sections 1 to 5 describe. Nothing here lets an agent
-skip a check, weaken a test or stretch a task past its file list or its budget. Items 4a, 5 and 6 apply to lanes started
+skip a check, weaken a test or stretch a task past its file list. Items 4a, 5 and 6 apply to lanes started
 with lane script version 2 (`<lead>/build-lane-v2.workflow.js`); a lane resumed from an older run keeps its
 older role texts, and a role text always wins over this section for that role.
 
 1. **Pre-flight audit of the plans (lead step, in force at the next start).** Before a wave of tasks is launched the
    lead runs `<lead>/plan-audit.workflow.js` over the plans of that wave (read-only: an auditor per plan checks
-   every remaining task's `files`, budget, `tests_first` and `depends_on` against the merged code; a second agent tries
+   every remaining task's `files`, `tests_first` and `depends_on` against the merged code; a second agent tries
    to refute each finding), and turns the confirmed findings into ONE documents amendment per plan. First the plans on
    the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0005, providers 0009),
    later plans when their wave is near (an audit of code that will still change goes stale). Writers keep their own
-   duty: check the file list and the budget before writing everything, and stop early when the plan cannot hold the task.
+   duty: check the file list before writing, and stop early when the task needs a file outside it.
 2. **Small edits of existing tests outside the file list (approved; NOT in force until the gate rule merges, work item
    B-507).** A pull request is judged by the gate of its base commit, so until B-507's gate change is on `build/v1` the
    rule of section 1 stands: a needed file outside `files` means `NEEDS_PLAN_AMENDMENT`. When the only out-of-list files
@@ -318,7 +317,7 @@ lanes started with lane script version 3 (`<lead>/build-lane-v3.workflow.js`).
    servers T17 and T19b.
 6. **Mechanical plan amendments are written by the lead (owner's permission of 2026-11-15: «نعم، اكتب التعديلات
    الآلية مباشرة»).** Mechanical means: a file added to a task's `files` with the evidence of a writer's trial (the
-   gate passed with exactly that file set), a `max_changed_lines` number set from a measured count (never above 400),
+   gate passed with exactly that file set), an optional `max_changed_lines` estimate refreshed from a measured count,
    a `tests_first` entry moved to the implementation commits because it cannot be red at the base (TF004), a
    `depends_on` id corrected after a split, stale prose corrected to what merged. The lead edits the plan in a
    worktree, opens a documents pull request (`Plan-Task: none (spec and plan)`, `Risk: r0`, the Review section says

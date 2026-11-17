@@ -165,7 +165,7 @@ PY
       if [ "$phead" != "$head" ]; then git -C "$WT" fetch -q origin "$br" && git -C "$WT" merge -q --ff-only "origin/$br" 2>/dev/null; fi
       if ! grep -q '^## Local CI' "$BODY"; then
         { printf '\n## Local CI\n\n'; cat "$rd/summary.md"
-          grep -q 'Not run in the container' "$rd/summary.md" || printf '\nNot run in the container: the dependency audit (`uv audit --locked`; api.osv.dev is outside AGENTS.md section 9 and denied by the network policy) and the windows job (no Windows here). Both are owner local-test items (LOCAL-TESTING.md).\n'; } >>"$BODY"
+          grep -q 'Not run in the container' "$rd/summary.md" || printf '\nNot run in the container: the dependency audit (`uv audit --locked`; api.osv.dev is outside AGENTS.md section 9 allowed services) and the windows job (no Windows here). Both are owner local-test items (LOCAL-TESTING.md).\n'; } >>"$BODY"
       fi
       echo "PASS HEAD=$phead BODY=$BODY RUN_DIR=$rd TITLE=$T"; exit 0 ;;
     *) echo "$out" | tail -40; echo "CI_FAIL run_dir=$rd"; exit 1 ;;
