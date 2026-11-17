@@ -683,16 +683,21 @@ tasks:
     # opens and binds the original, so copy_on_open takes no working copy; every launch is hidden. Estimate:
     # AdapterHostPort.open_original and the visible keyword about 16 (_hostport.py), the visible launch about 5
     # (csi/_session_ops.py), the opener keyword, the routing of csi_open_model inside the try and the optional path of
-    # OpenModelArgs about 22 (csi/_tools.py), 1 of CHANGELOG.md: about 44; budget 60. Before T19a, whose cycle test
+    # OpenModelArgs about 22 (csi/_tools.py), 1 of CHANGELOG.md: about 44 (measured 77 by the B-550 writer, an estimate only: CHANGELOG.md 1, _hostport.py 17, _session_ops.py 9,
+    # _tools.py 50); budget 80. Before T19a, whose cycle test
     # opens the original through it and which wires opener and visible in build_ports; after T19c (merged), the last
     # task that edited _hostport.py; plan 0002 T15 also edits csi/_tools.py, without an order (whichever lands second adapts).
+    # Amendment (B-554, documents only, 2026-11-17): test_csi_revisions.py joins files, because spec 4.5.9 and AC51 turn the
+    # csi_open_model refusal into a failure envelope and its test test_open_model_is_not_a_tool_of_the_workflow asserted the
+    # old raised ContractError; max_changed_lines 60 to 80 from the measured 77 (an estimate only, owner decision of 2026-11-17).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
       - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py"
-    max_changed_lines: 60
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py"  # test_open_model_is_not_a_tool_of_the_workflow now expects the INVALID_ARGUMENT failure envelope, test code (B-554)
+    max_changed_lines: 80
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy"
