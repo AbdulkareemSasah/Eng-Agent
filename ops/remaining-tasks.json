@@ -1,6 +1,6 @@
 {
  "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies.",
- "count": 177,
+ "count": 181,
  "tasks": [
   {
    "id": "B-437",
@@ -1727,7 +1727,9 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "B.T10",
-    "S.T19a"
+    "E.T23",
+    "S.T19a",
+    "W.T7b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3529,6 +3531,99 @@
    "branch_pushed": false,
    "lead_notes": [
     "From documents item B-543. Engineering calcs: adversarial verification. First-live-run path: steps 5 and 6 cannot run without it."
+   ]
+  },
+  {
+   "id": "B-556",
+   "task": "W.T7b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T7b",
+   "kind": "impl",
+   "title": "D-3 stops on a story drift above the limit, and D-2 takes the reason check_model_failed (rules and points)",
+   "branch": "fix/b556-harness-wt7b-d3-drift-stop",
+   "prTitle": "fix(eng-harness): d-3 stops on a story drift above the limit, and D-2 takes the reason check_model_failed (rules and points) (B-556)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544 (owner decision of 2026-11-16 on D-3). Estimate 30 is tight (about 26 to 28); the count is informational after B-553. W.T8 waits for it."
+   ]
+  },
+  {
+   "id": "B-557",
+   "task": "W.T16b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T16b",
+   "kind": "impl",
+   "title": "The change-set values carry their canonical number and the check references reach it (write arguments)",
+   "branch": "fix/b557-harness-wt16b-canonical-values",
+   "prTitle": "fix(eng-harness): the change-set values carry their canonical number and the check references reach it (write arguments) (B-557)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T16",
+    "W.T17"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544. Engineering calc change: adversarial verification. harness.change_set_check stays at version 1 (owner queue)."
+   ]
+  },
+  {
+   "id": "B-558",
+   "task": "W.T9c",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T9c",
+   "kind": "impl",
+   "title": "Step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off",
+   "branch": "feat/b558-harness-wt9c-d2-failed-check-exceptions",
+   "prTitle": "feat(eng-harness): step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off (B-558)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T9b",
+    "W.T7b"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544."
+   ]
+  },
+  {
+   "id": "B-559",
+   "task": "I.T9c",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T9c",
+   "kind": "impl",
+   "title": "Sign-off screen reads the edit cycle design verdicts (harness.host_design_verdicts/1)",
+   "branch": "feat/b559-harness-it9c-signoff-design-verdicts",
+   "prTitle": "feat(eng-harness): sign-off screen reads the edit cycle design verdicts (harness.host_design_verdicts/1) (B-559)",
+   "risk": "r3",
+   "pending_deps": [
+    "I.T9b"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544."
    ]
   }
  ]

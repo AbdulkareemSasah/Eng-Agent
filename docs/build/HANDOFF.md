@@ -23,7 +23,7 @@ local CI, merge). Nothing pushed: start the item fresh from its registry entry.
 
 | Item | What | State at the hand-over |
 |---|---|---|
-| B-544 | Documents: first-live-run gaps, third set, part 2 (values and results) | Review round 2 then integration. Must carry the owner decision of 2026-11-16: a story drift above the limit stops the edit cycle at D-3 and asks the engineer. Its new tasks (the drift-rule fix and others) get registry entries after it merges. |
+| B-544 | Documents: first-live-run gaps, third set, part 2 | **Merged as #408.** It carries the owner D-3 decision and added W.T7b (B-556), W.T16b (B-557), W.T9c (B-558) and plan 0006 I.T9c (B-559), now in the registry. |
 | B-547 | W.T16 item-id rule in harness.change_set_check (engineering calc) | Writing, Opus reviewer, adversarial verification |
 | B-551 | E.T23 Preview.models and ctx.promote take a model key | Pushed, head 2361039, no pull request; 23 counted lines, test-first pass. Stopped: the types step fails on one existing test outside the file list (`tests/unit/test_ctx_basis.py` line 120). Needs a small documents amendment adding that file to plan 0001 T23, then the one-line edit in its registry note, gate, review, pull request. |
 | B-552 then B-553 | Owner decision of 2026-11-17: the changed-line count is an estimate, not a limit (GC009 becomes a notice; the 400 cap goes; GC008, max_sessions, test-first and the risk floor stay) | B-552 documents then B-553 gate code (protected `.gate/gate.yml`; the body states the owner approval as B-524 #391 did) |
@@ -39,9 +39,9 @@ Until B-553 merges, the old gate still fails a pull request above its estimate (
 ## C. Order of the next work (first live run)
 
 1. Finish section B.
-2. B-550 (S.T23), then B-138 (S.T19a, port wiring: the central task; Opus reviewer).
-3. B-555 (W.T17, engineering) after B-547.
-4. W.T8 (B-202) after B-551, B-138 and B-544; then W.T9a (B-526), W.T9b (B-527).
+2. B-550 (S.T23), then B-138 (S.T19a, port wiring: the central task; Opus reviewer). In parallel: B-556 (W.T7b, the D-3 drift stop).
+3. B-555 (W.T17, engineering) after B-547, then B-557 (W.T16b, engineering).
+4. W.T8 (B-202) after B-551, B-138 and B-556; then W.T9a (B-526), W.T9b (B-527), B-558 (W.T9c) and B-559 (I.T9c).
 5. Interface: I.T14 (B-188), I.T14c (B-528), I.T14b (B-353), then I.T15, T16, T16b, T18a, T18b.
 6. W.T11, W.T12. Then the remaining tasks of the registry by `depends_on`; the frozen list (D-32) stays frozen until
    the first live run.
@@ -54,7 +54,7 @@ Until B-553 merges, the old gate still fails a pull request above its estimate (
    `packages/eng-harness/docs/local-testing.md` (two items 22 and two items 23).
 8. Owner queue (BUILD-STATUS section 6.6 and lead-findings): the design choices recorded for B-536, B-541, B-543,
    B-545; spec 0006 Q22 to Q24; Q16; engine Q40, Q41, Q43; the unused `windows_launcher()` (drop it or give it an
-   inspector argument, B-546 note).
+   inspector argument, B-546 note); from B-544: harness.change_set_check stays at version 1 although its output references change; with steel_and_concrete each kind's design summary sees the other kind's frames as not_designed, so the turn's design status is never PASS on a model with both kinds (a calc change would filter frames per kind); a summary with no drift row passes D-3, so if the live host returns no drift rows story drift goes unchecked (keep on the local-test list); the extra model-state read at step 13; the canonical value stored in the answer; the Q14 interim D-2 route; exception items taken from every cycle.
 
 ## D. How the new lead works (rules the owner set; all still in force)
 
