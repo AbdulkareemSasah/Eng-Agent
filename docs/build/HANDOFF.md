@@ -30,7 +30,7 @@ local CI, merge). Nothing pushed: start the item fresh from its registry entry.
 | B-554 | Plan 0002 T23 lists the collateral test of B-550 | **Merged as #409.** B-550 must merge origin/build/v1 before its local CI (its scope is judged against the plan in its base). |
 | Hub | `claude/pensive-volta-gcx0y9`: process documents and ADR-0035 for the same decision | **Done and reviewed** (commit 83264cc; renumbered from 0028 to 0035 in 49f43e0, because the build copy holds 0028 to 0034). The hub index still lacks rows for 0028 to 0034 (an owner choice whether to copy them in). |
 | B-550 | S.T23 open the original, visible launch | Pushed, head e65e608, no pull request; 77 counted lines (estimate 60, raised to 80 by B-554) and one collateral test, now in its file list. Merge origin/build/v1, apply [b550-collateral-test_csi_revisions.patch](b550-collateral-test_csi_revisions.patch), rerun the gate without mutation, review (Opus), pull request, local CI, merge. It no longer waits for B-553 (it fits 80). Body draft: [b550-pr-body.md](b550-pr-body.md). |
-| Mutation run 4 | Periodic full mutation of the modules changed since base 575b912 | Was running on the old machine; if no result is recorded in lead-findings, run it again (`tools/periodic-mutation.sh 575b912`, in the idle CPU class). Next base after it: the head it tested. |
+| Mutation run 4 | Periodic full mutation, base 575b912, head 4f1a7e6 | **Passed** (finished 09:04 UTC, every member pass). The next periodic run is due ten merges after 4f1a7e6, with base 4f1a7e6. |
 
 Until B-553 merges, the old gate still fails a pull request above its estimate (GC009). Lane script
 [build-lane-v35.workflow.js](build-lane-v35.workflow.js) has no budget stop; use it only after B-553 merges, and
