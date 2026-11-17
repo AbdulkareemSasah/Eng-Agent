@@ -32,6 +32,14 @@ registered through `workflows/__init__.py`, which `block.discover()` reads (§4.
 AC12 (`tests/rules/test_edit_cycle.py`, AC18) and the replay tests live in `tests/replay/edit_cycle_replay/` (AC27,
 AC28), a package name no other test folder uses. Open points are in §11 (Q12, Q13).
 
+**Amendment B-543 (documents only, first-live-run walk, part 1: the model in the edit cycle).** What opens the
+original at step 2 and where its file, instance and units come from (§4.5 step 2; spec 0002 §4.5.9, plan 0002 T23);
+`m` is the model key, which `Preview.models` and `ctx.promote` accept (§4.5; engine §4.3.2, §4.9, plan 0001 T23);
+`model.sections/1` is optional in the change-set check and the expected effects (§4.4.1, §4.4.2; plan T17); the v1
+exit for a model locked after analysis (§4.5, AC15); the visible launch (§4.2; spec 0002 §4.5.9, spec 0006 §4.2.2
+step 2); and the re-read before step 6 (§4.5.1, AC13). Each choice is stated as a decision where it is made; the host
+facts it rests on are §12 (7) and (8).
+
 ## 1. Problem
 
 The edit cycle is where the owner's time goes: 342 agent minutes and 500 engineer minutes in one reviewed task, against
@@ -153,7 +161,10 @@ defines its method; values are synthetic and say so.
   conflicting item is rejected. Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_hand_edit_between_cycles`.
 - AC13. (A5) Given a fake hand edit while the run waits at the change-set approval, then the first write raises
   `ApprovalVoid`, nothing is written under that approval, and the cycle returns to step 3 with the edit in the new
-  differences. Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait`.
+  differences. Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait`. Given a
+  fake hand edit after the step 3 read and before the step 6 request (while the run waits for the change set), then no
+  approval is requested on that read and the cycle returns to step 3 with the edit in the new differences (§4.5.1;
+  amendment B-543). Test: `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_change_set_wait`.
 - AC14. (A5) Given a fake hand edit while the run is stopped, when it resumes and the engineer chooses `accept` at the
   host-state check, then the next step 4 shows the edit. Test:
   `tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_while_stopped`.
@@ -161,7 +172,8 @@ defines its method; values are synthetic and say so.
   `csi_unlock_model` runs `under=` that approval in `work_on_copy` and `approve_each_write`, while in
   `autonomous_logged` the engine asks separately (§4.7). Test:
   `tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval` (needs spec 0002 plan T15, blocked
-  on ADR-0031; until then the test expects the interim `HOST_LOCKED` stop).
+  on ADR-0031; until then the test expects the v1 exit of §4.5: a cycle whose step 3 status shows `locked` asks for no
+  change set, calls no `csi_unlock_model`, writes nothing and opens the engineer turn; amendment B-543).
 - AC16. (A2) Given a fake timeout during analysis, and separately during design, then the step ends
   `TIMEOUT_UNKNOWN_OUTCOME`, the engine's `engine.in_flight` request opens, the outcome is not decided automatically
   (spec 0002 Q4, gap H-G7: unknown in v1, the engineer decides), and no further step on the host runs until it is
@@ -282,6 +294,12 @@ defines its method; values are synthetic and say so.
   then the host port's `model_files` names the new working file, `locate` finds it on the same bound instance, and the
   first `model_state` after it reads that file with no `MODEL_CHANGED_OUTSIDE`; given a failed open, then the host
   port still names the previous file. Test: `tests/workflow/adapters/test_csi_reopened.py::test_restore_moves_host_port`.
+- AC39. **[added: B-543]** Given a read set without `model.sections/1` (§4.4.1, §4.4.2), then `harness.change_set_check`
+  runs, a `select` with `area_kind` is `EMPTY_SELECTION` whose detail names the unread area kinds and every other rule
+  gives what it gives with the record; and `harness.expected_effects` runs and projects a `wall_section` as two `set`
+  effects on `model.sections/1`. Tests: `tests/golden/edit_cycle/test_change_set_check.py::test_sections_absent`
+  (cases `check-no-sections-*`), `tests/golden/edit_cycle/test_expected_effects.py::test_sections_absent` (cases
+  `effects-no-sections-*`).
 - AC32. Given the kinds of §4.2, then the report renders them through registered renderers with a source on every value
   cell, and adds the timings of §4.9. Test: `tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources`.
 
@@ -322,7 +340,10 @@ and T13) add their blocks to the same tuple. Decision points and rules are found
 - Input `EditCycleInput`: `model` (`pathlib.Path`, the absolute path of the model file; the command line gives the
   host port that file under its base name, which is the model key, spec 0006 §4.2.2 step 2; amendment B-536 replaces
   the `harness.file_input/1` reference, from which no component can find the file), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
-  spec 0002 §4.6.1 step 2). No engineering value is part of the input.
+  spec 0002 §4.6.1 step 2). The command line passes `visible_host` to the port builder as `visible` (spec 0006
+  §4.2.2 step 2) and the CSI host port launches every instance of the run with it (spec 0002 §4.5.9; amendment
+  B-543). Decision (B-543): the flag travels with the model files from the run's input, because the engine has no
+  launch and the port builder already takes the input's files there. No engineering value is part of the input.
 - Output `EditCycleOutput`: `accepted_revision` (the `model_saved` identity, revision, fingerprint, file hash),
   `cycles` (count), `promoted` (model handle), `summaries` (references, in this order, to the last
   `harness.analysis_summary/1` and to the last `harness.design_summary/1` of each kind of `design.run`, steel before
@@ -402,6 +423,11 @@ Input: `change_set` (reference to the answer field), `state` (the read set of st
 `harness.change_set_check/1`: `status` (`PASS`, `FAIL`), `resolved` (per item: `item_id`, `kind`, explicit targets
 sorted by code point, `values` as `{pointer, ref, unit}` where `ref` is the reference to the basis field or to the
 answer field, never a number), `issues` (`item_id`, `severity` `error`/`warning`, `code`, `detail`), `complete`.
+The read set's `sections` (`model.sections/1`) is optional (amendment B-543): the merged `csi_read_model_state` stores
+none while S12-G8 is open (§4.10), as `harness.model_diff` already allows. Without it, a `select` that names
+`area_kind` matches no area and is `EMPTY_SELECTION` with a detail saying that the area kinds were not read; every
+other rule is unchanged. Decision (B-543): no new issue code and no guessed kind, because an area whose kind is unknown
+must not enter or leave a selection silently; the engineer names the areas or drops `area_kind`.
 
 Rules: K1 resolve `select` against `model.frame_placements/1` or `model.area_placements/1` (story equal, section equal,
 area kind from `model.sections/1`); an empty result is `EMPTY_SELECTION`. K2 every name exists (`UNKNOWN_<CLASS>`) or is
@@ -455,6 +481,10 @@ lists only under combinations and grid systems, and v1 edits no grid. An item th
 the `item_id` of the item, `/` and the effect's position (from 1) among that item's effects in the sorted order, because
 effect item ids are unique in `harness.expected_effects/1`; K3 refuses an item id with `/`, so these ids cannot repeat
 another item's (amendment B-498).
+`state.sections` is optional here as in §4.4.1 (amendment B-543), and the one-revision rule applies to the state
+records given. Without it, `wall_section` is projected as on a section that `state` holds (the two `set` effects).
+Decision (B-543): without the record neither form can be checked, and spec 0003 §4.8 R2 gives each effect on an
+absent section `not_read`, so the read-back is `NEEDS_ENGINEER` and D-2 asks the engineer.
 
 #### 4.4.3 `harness.host_design_verdicts` v1
 
@@ -487,21 +517,22 @@ unclassified messages or drifts above the limit, `FAIL` on error messages). The 
 
 ### 4.5 Steps as ctx calls
 
-Notation: `m` is the model handle, `B` the basis view, `k` the cycle index; every calc's `basis` input is
+Notation: `m` is the model key `inp.model.name` (a string; the engine sends tool steps on the original's key to its
+working copy, engine §4.7), `B` the basis view, `k` the cycle index; every calc's `basis` input is
 `B.record_ref()`, the whole basis record (spec 0003 §4.4, engine §4.3.2; amendment B-511). Steps run in the child blocks of §4.1, so
 paths are stable (engine §4.3.1). Checks marked "engine" are enforced whatever the block does.
 
 | # | Calls | Checks the engine enforces |
 |---|---|---|
 | 1 | none (run start) | Invariant 8: build and tool-list fingerprint, before `run_started` (`RunRefused SERVER_CHECK_FAILED`); invariant 5: every §4.8 field present and confirmed |
-| 2 | `ctx.tool("csi_open_model", {"model": inp.model.name})` (the model key, amendment B-536) on a launched instance | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
+| 2 | `ctx.tool("csi_open_model", {"model": m})` (the model key, amendment B-536; no `path`): the CSI host port opens the original's file from the model files mapping in the run's own instance, launching one if the run has none, binds the key and records its units (spec 0002 §4.5.9 `open_original`; amendment B-543) | `copy_on_open`: working copy (`model_saved` role `working_copy`, `origin_sha256`) right after the open, in every mode; `model_bound`; units read (invariant 9); host lock (invariant 10) |
 | — | `async for c in ctx.attempts(B.count("attempts.cycles"))`: one `ctx.block(edit_cycle_once, ...)` per cycle | Bounded loop; exhaustion escalates |
 | 3 | `ctx.tool("csi_read_model_state", {"model": m})` (§4.10) | Check after write before the read (invariant 1) |
 | 4 | `ctx.calc("harness.model_diff", {"before_frames": R[k-1].frames, "after_frames": S[k].frames, ..., "basis": B.record_ref()})`, one `before_<field>` and `after_<field>` per read-set field (spec 0003 §4.7) | The `before_*` fields are `stale_ok`, the `after_*` fields current (spec 0003 §4.13) |
 | 5 | Turn `more_edits` or cycle 1: `async for a in ctx.attempts(B.count("attempts.change_set"))`: `ctx.ask(ChangeSetRequest, ...)`, then `ctx.calc("harness.change_set_check", ...)`; `FAIL` asks again. Turn `hand_edit`: empty set | Invariant 3 on every reference; engine AC61 schema validation |
 | 6 | `ctx.approve(title, Preview(items=<the item "revision" (step 7), one per change-set item, plus unlock and delete items>, diff_ref=<step 4>, models=[m]), kind=CHANGE_SET)`; skipped when the set is empty. Then, before any write, `ctx.calc("harness.expected_effects", ...)` with the accepted item ids (none when skipped) | Binding to the model state (engine §4.9); single use |
 | 7 | `ctx.tool("csi_save_model", {"model": m, "as_new_revision": True}, under=approval, item="revision")`; without `under=` when step 6 was skipped (empty set) | Binding re-check before it (`ApprovalVoid`, D-5); first link of the approval's write chain (Q3); `model_saved` role `revision` naming `W`, whose hash the snapshot `P[k]` shares; the snapshot's name and hash in the result's `saved_file` (§4.5.1); never over an existing file |
-| 8 | If the step 3 status shows `locked`: `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
+| 8 | If the step 3 status shows `locked` (after plan 0002 T15 only; v1 exit below): `ctx.tool("csi_unlock_model", ..., under=approval, item="unlock")`. Then per accepted item and target: `ctx.tool(<tool>, args, under=approval, item=<id>)`, arguments from `resolved` (references only) | Re-check before the first write and between writes (`ApprovalVoid`); invariant 2 (references for engineering parameters); always-ask list; `approve_each_write` previews |
 | 9 | `ctx.tool("csi_read_model_state", ...)` (S'), `ctx.calc("harness.readback_check", {"effects": <the step 6 expected effects>, "before_frames": S[k].frames, "after_frames": S'.frames, ..., "basis"})` (flat fields as in step 4); then D-2 (§4.6) | Invariant 1 inserts `check_model` before the read; read-back independence R0 (spec 0003 §4.8) |
 | 10 | `ctx.tool("csi_save_model", {"model": m})` | `model_saved` |
 | 11 | `ctx.tool("csi_run_analysis", {"model": m})` | Invariant 7 save first; long role and timeout (spec 0002 AC28); invariant 6 on a timeout: `engine.in_flight`, outcome unknown in v1 (spec 0002 Q4, H-G7); invariant 9 units after a timeout |
@@ -543,6 +574,25 @@ nothing; `R[0]` is the step 3 read of cycle 1 (the baseline, compared with itsel
 the step 3 read of cycle `k`. When the step 3 fingerprint equals that of `R[k-1]`, step 4 still runs (a cheap,
 journaled proof that nothing changed).
 
+Amendment B-543. **Step 2.** The open is a write step with action `open` and no `path`: the CSI tool port refuses a
+`csi_open_model` that names a `path` and gives every refusal as a failure envelope, never as a raised error (an error
+raised from the port would be an unknown-outcome write, engine §4.5.3). After it the engine binds the model
+(`first_use`), reads its units against those the host port recorded at the open (invariant 9) and takes the working
+copy (`copy_on_open`, engine §4.7), which the host port opens in the same instance; from then on the original is not
+read again (spec 0006 §4.2.2 step 2). Decision (B-543): the host port opens the original, as it already opens the
+working copy and a restore, because only it knows the file of a key and launches instances; the open writes no model
+content and, like every `csi_open_model`, is not reconciled, so a cut-off open goes to the engineer
+(`engine.in_flight`). In `approve_each_write` the open gets its own approval first, whose preview names the key and
+no model (spec 0002 §4.5.9, AC45), so the open works in every mode. **Models in previews and promotion.** `Preview(models=[m])` (step 6) and `ctx.promote(m, ...)`
+(step 16) take the key; `ToolResult.model` is `None` (engine §4.3.2). Decision (B-543): the engine binds an approval to
+the live state of each key and uses only the key of a model, so the key is enough and no model id or revision is
+invented in a stored preview. **v1 exit for a locked model.** Until plan 0002 T15 (ADR-0031) adds `csi_unlock_model`,
+a cycle whose step 3 status (`harness.csi_model_status/1`) shows `locked` true asks for no change set, writes nothing
+and goes to the engineer turn of that cycle as `stop_cycle` does (§4.6), the turn's refs including that status result;
+`locked` false or absent is not locked. Decision (B-543): the tool is not on the allowlist and a write to a locked
+model is refused only after the step 6 approval and the step 7 save, so the cycle stops before anything is asked; the
+engineer unlocks in ETABS, saves, and chooses `more_edits` or `hand_edit`. Whether ETABS reports the lock is §12 (7).
+
 #### 4.5.1 Revision files
 
 - `W`, the working file: step 2's working copy, the only file the host has open. Every write, the engine's
@@ -567,7 +617,12 @@ journaled proof that nothing changed).
 
 **Return to step 3 (D-5).** Steps 3 to 8 run inside `async for v in ctx.attempts(B.count("attempts.approval_void"))`.
 `ApprovalVoid` before the first write starts the next iteration (a new read, difference report and approval). A void
-after a write cannot be undone silently: it opens D-2 with the reason `model_changed_during_apply`.
+after a write cannot be undone silently: it opens D-2 with the reason `model_changed_during_apply`. Amendment B-543:
+the step 6 binding is the model's state when the request is made, not the step 3 read, so when the change set was
+asked (step 5), the cycle reads the state again (`csi_read_model_state`) and runs `harness.model_diff` from `S[k]` to
+it just before step 6; a difference that is not empty starts the next iteration like an `ApprovalVoid`. Decision
+(B-543): one more read per cycle that writes, because an edit made while the engineer composes the change set must
+appear in a difference report and in a new request, not as `unexpected` at step 9 (AC13).
 
 ### 4.6 Decision points and rules
 
@@ -615,7 +670,7 @@ and no result reference, so a replay could not name it.
 | Step 6 `CHANGE_SET` | page | page | resolved by the mode (engine §4.7) |
 | Step 7 revision save | `under=` step 6 (item `revision`) | `under=` step 6, no per-write preview (Q3) | direct |
 | Step 8 writes | `under=` step 6 | `under=` step 6, plus the engine's `p~pre.approve` preview per write | direct |
-| Unlock, combination delete | `under=` step 6, listed as items | same | the engine inserts its always-ask approval (Q5) |
+| Unlock (after plan 0002 T15 only, §4.5), combination delete | `under=` step 6, listed as items | same | the engine inserts its always-ask approval (Q5) |
 | Steps 11, 12 | none | engine preview per call (analysis and design are writes) | none |
 | Step 15 engineer turn | page | page | page |
 | Steps 16, 17 | page (always ask) | page | page |
@@ -794,7 +849,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC1, AC3, AC6, AC25 (unit part), AC26 (unit part), AC29, AC32, AC33, AC35, AC40 | Unit | `tests/unit/edit_cycle/`, `tests/unit/report/` |
 | AC2, AC18 | Unit (source rules; AC18 by the spec 0005 AC12 convention) | `tests/rules/` |
 | AC3 (kinds) | Contract | `tests/contract/` |
-| AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
+| AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37, AC39 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
 | AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38, AC41, AC42 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
@@ -851,4 +906,9 @@ first write (received by the step 9 route, plan T9c); (2) `csi_save_model` as a 
 revision and `csi_open_revision` on a server-launched instance; (3) the engineer editing by hand in the visible
 launched instance, saving, and pressing "I edited by hand"; (4) acceptance A1 to A7 on benchmark B-1, all of A4, with
 `cycle-timings.json` filled into the owner's sheet; (5) an ETABS kill and a process kill at analysis, apply and
-promotion (A6); (6) promotion when the original is open in the engineer's ETABS (file lock).
+promotion (A6); (6) promotion when the original is open in the engineer's ETABS (file lock); (7) amendment B-543:
+whether `csi_model_info` reports `locked` true after an analysis, whether the step 7 save as a new revision clears it,
+and that a cycle on a locked model takes the v1 exit of §4.5 (the engineer unlocks in ETABS by hand before choosing
+`more_edits` or `hand_edit`; the owner's guide and the workflow page say so, LOCAL-TESTING.md 5.2 item 11 and WS step
+8); (8) amendment B-543: `csi_launch` with `visible: true` shows the instance, the step 2 open of the original and the
+working copy happen in it, and the engineer can edit and save there.

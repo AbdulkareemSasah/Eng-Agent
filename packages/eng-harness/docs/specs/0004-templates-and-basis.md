@@ -318,7 +318,7 @@ is frozen for the run: a change means a new draft, a new confirmation, a new res
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
 | Template file | YAML, `eng-template/1` | canonical per suffix | at most 1 MiB, depth 8 | no | shipped folder or user folder |
-| Values file (`--basis`) | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` | no | engineer or a coding agent |
+| Values file (`--basis`) | YAML or JSON `{name, values}` (`name` corrected from `engineer` to the model of §4.4 by B-541) | canonical per suffix | by `FieldSpec` | no | engineer or a coding agent |
 | `FieldSpec` list | `tuple[FieldSpec, ...]` | canonical | see §4.5 | no | workflow module |
 | `DetectedValue` | `path, value, unit, ref` | canonical | by `FieldSpec` | `ref` | the caller (spec 0006, 0007) |
 | `BasisDraft` | model | | | no | `build_draft` |
@@ -399,4 +399,4 @@ that is not assumed.
 | Q6. Template and basis errors have no contract code | Owner | `INVALID_ARGUMENT` plus a `reason` key now (as engine Q7); a `HarnessCode` family only if the engine needs to branch on them |
 | Q7. `WorkflowDef` carries `required_basis` (paths) only | Owner (engine) | Add `basis_fields: tuple[FieldSpec, ...]` to `WorkflowDef` in spec 0007's plan and derive `required_basis`; this spec's check (AC21) then becomes trivial. Engine text written by amendment B-415 (engine §4.2, rule EC4, Q30; built by plan 0007 T6; draft until the owner approves) |
 | Q8. Whether v1 should ship any engineering values | Owner | No. Ship `blank` only; the owner supplies values with citations by pull request when wanted |
-| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `engineer` member is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |
+| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `name` member (`EngineerValues.name`, §4.4; called `engineer` here before B-541) is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |

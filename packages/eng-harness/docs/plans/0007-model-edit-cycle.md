@@ -287,6 +287,7 @@ tasks:
     # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap); T9b since the split (B-511).
     # Amendment (B-463, documents only): section 3 names eng-contract plan 0001 T19 (B-464) as a cross-plan dependency.
     # Amendment (B-536, documents only): EditCycleInput.model is the absolute pathlib.Path of the model file, and step 2 passes its base name as the model key (spec 4.2, 4.5; spec 0006 4.2.2 step 2); a type change, files and budget unchanged.
+    # Amendment (B-543, documents only): m is the model key in every step, Preview(models=[m]) included (plan 0001 T23); step 2 sends no path (plan 0002 T23 opens the original); step 5 calls harness.change_set_check without sections (T17); step 8 calls no csi_unlock_model in v1 (spec 4.5). The lock exit and the re-read before step 6 are T9b's. No line added (the unlock call is dropped): files and budget unchanged; waits for T17 and plan 0001 T23.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -313,7 +314,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_change_set_step.py::test_invalid_change_set_asked_again"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait"
     covers: [AC1, AC2, AC10, AC11, AC13, AC17, AC24]
-    depends_on: [T2, T3, T5, T6, T7, T7b, T16b]
+    depends_on: [T2, T3, T5, T6, T7, T7b, T16b, T17]  # T17 and external plan 0001 T23 by amendment B-543 (section 3); T7b and T16b by amendment B-544
   - id: T9a
     title: Workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn)
     # Amendment (B-511, documents only): pre-flight audit. The former T9 was planned at the 400-line cap (B-417: 395 to
@@ -345,6 +346,7 @@ tasks:
     title: Workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration
     # Amendment (B-417, documents only): registers the shipped workflow: workflows/__init__.py exports the blocks and block.discover() reads it lazily (spec 4.2), so blocks.lock.json gains the entries; about 15 lines, 380 to 395; tests/unit/test_block.py::test_main_writes_the_lock is isolated from the shipped blocks, about 3 lines, 395 to 400.
     # Amendment (B-511, documents only): split from the former T9 (see T9a); 230 is an estimate, to measure at write time.
+    # Amendment (B-543, documents only): the v1 exit for a model locked after analysis (spec 4.5, AC15: about 10 lines) and the re-read before step 6 with its return to step 3 (spec 4.5.1, AC13 second clause: about 15) in _cycle.py; test_engineer_changes.py::test_edit_during_change_set_wait added; promote takes the key (plan 0001 T23). 230 to 255 (an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.model_edit_cycle (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -361,7 +363,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"
       - "packages/eng-harness/tests/unit/test_block.py"  # isolates test_main_writes_the_lock from the shipped blocks (amendment B-417)
-    max_changed_lines: 230
+    max_changed_lines: 255
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_registered"
@@ -370,12 +372,13 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_cycle.py::test_unlock_under_change_set_approval"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_hand_edit_between_cycles"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_while_stopped"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_change_set_wait"  # AC13 second clause (amendment B-543)
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_keeps_hand_edit"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_restore_refuses_changed_snapshot"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_promote_and_conflict"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_and_draft"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_modes.py::test_approvals_per_mode"
-    covers: [AC1, AC9, AC12, AC14, AC15, AC20, AC21, AC22, AC23, AC34]
+    covers: [AC1, AC9, AC12, AC13, AC14, AC15, AC20, AC21, AC22, AC23, AC34]  # AC13: its second clause (amendment B-543); T8 its first
     depends_on: [T9a, T13]  # T13: the reopened hook that restore_previous needs (amendment B-503)
   - id: T10
     title: Report renderers and value-source audit
@@ -592,6 +595,33 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_item_id_not_a_page_token_is_refused"
     covers: [AC4]
     depends_on: [T14, T4b]
+  - id: T17
+    title: The change-set check and the expected effects take an absent model.sections/1
+    # Amendment (B-543, documents only): new (spec 4.4.1, 4.4.2). Both merged calcs require the reference sections
+    # (model.sections/1), which the merged csi_read_model_state never stores (spec 4.10, S12-G8), so step 5 and step 6
+    # can never run. sections becomes optional in both (about 8 lines in change_set_check.py, 8 in expected_effects.py),
+    # the lock moves their two entries (about 4), the two verification records follow (about 10), 1 of CHANGELOG.md:
+    # about 31; budget 50 (an estimate; T14, 40, is the analog). After T14 (change_set_check.py, calcs.lock.json),
+    # T4b (calcs.lock.json, whose kinds/edit_cycle.py change moves the hashes of the calcs that import it) and T16 (B-545), which edits the
+    # same four files as this task: change_set_check.py, calcs.lock.json, harness.change_set_check.md and test_change_set_check.py.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/expected_effects.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
+      - "packages/eng-harness/docs/verification/calcs/harness.expected_effects.md"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/check-no-sections-*.json"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/effects-no-sections-*.json"
+    max_changed_lines: 50
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_sections_absent"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_expected_effects.py::test_sections_absent"
+    covers: [AC39]
+    depends_on: [T14, T4b, T16]  # T16 (B-545) and T17 share change_set_check.py, calcs.lock.json, harness.change_set_check.md and test_change_set_check.py (B-543)
 ---
 
 # Implementation plan: eng-harness model edit cycle (spec 0007)
@@ -603,7 +633,8 @@ The spec is [0007](../specs/0007-model-edit-cycle.md); the owner-facing descript
 plans 0001 to 0006; golden data, journals and fixtures are test data.
 
 Build the data first and the R1 parts early: the kinds and the change-set model (T1a, T1b), then the four calcs (T2 to T4b),
-which carry the engineering checks and go to the owner for review as soon as they merge. The adapter additions (T5)
+which carry the engineering checks and go to the owner for review as soon as they merge; T17 (amendment B-543) lets
+the change-set check and the expected effects run without `model.sections/1`, after T4b and before T8. The adapter additions (T5)
 and the engine amendments (T6) are small, separate and reviewable on their own; T6 waits until the engine spec is
 amended in its own documents pull request (spec Q2, Q3, Q5 and spec 0004 Q7), as B-068 does for earlier amendments.
 The decision points and rules (T7) are R1 and reviewed separately from the block. The block is split in three (T8 steps
@@ -805,12 +836,25 @@ routing code: the inserted check's `ModelIntegrityError` escalates like any othe
 `test_readback_failure_routes` tests AC17 with a read-back `FAIL` that `check_model` does not see (the fake writes each
 wanted value and also changes an item the change set does not touch, so `harness.readback_check` reports it
 `unexpected`). Prose, files, tests and budget are otherwise unchanged.
+Amendment (B-543): `m` is the model key `inp.model.name` in every step, also in `Preview(models=[m])` (plan 0001
+T23); step 2 is `ctx.tool("csi_open_model", {"model": m})` with no `path` (the CSI host port opens the original, plan
+0002 T23; this task's tests run on the engine's fake ports); step 5 calls `harness.change_set_check` without
+`sections` (T17); step 8 calls no `csi_unlock_model` in v1, so the unlock item and call of spec §4.5 wait for plan 0002
+T15. The v1 exit for a locked model and the re-read before step 6 are T9b's (spec §4.5, §4.5.1).
 
 **T9a and T9b Workflow part 2** (spec §4.5 steps 11 to 17, §4.6, §4.7; split by amendment B-511). T9a:
 `run_and_summarize` (analysis, design, results, D-3, summaries; D-2 and D-3 are never open together, spec §4.6) and the
 engineer turn, tested through test workflows in `conftest.py`. T9b: the cycle loop, promotion and sign-off in
-`_finish.py`, the registration, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the interim `HOST_LOCKED`
-stop until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched with T15.
+`_finish.py`, the registration, and the full-workflow tests. `test_unlock_under_change_set_approval` expects the v1
+exit of spec §4.5 until plan 0002 T15 (ADR-0031) merges, then the approved unlock; the test states both and is switched
+with T15. Amendment (B-543): T9b builds that exit in `edit_cycle_once`: when the step 3 status result's `locked` is true
+the cycle skips steps 5 to 14 as `stop_cycle` does and the turn's refs include that status result; the test checks
+that no change set is asked, no write and no `csi_unlock_model` runs, and the turn opens. T9b also builds the re-read
+before step 6 (spec §4.5.1): in a cycle that asked for a change set, `csi_read_model_state` and `harness.model_diff`
+from `S[k]` just before step 6, and a non-empty difference starts the next approval-void iteration;
+`test_edit_during_change_set_wait` makes a fake hand edit while the change-set request is open and checks that no
+approval is requested on the old read and that the next step 4 shows the edit. `ctx.promote` takes the key (plan 0001
+T23).
 Amendment (B-417): T9b registers the shipped workflow (spec §4.2): `workflows/__init__.py` exports the blocks of
 `model_edit_cycle` (the workflow and its child blocks, `run_and_summarize` and those of `_finish.py` included) as one
 tuple, and `block.discover()` builds its `Registry` from it, importing `eng_harness.workflows` inside the function to
@@ -861,7 +905,8 @@ the test writes the dictionary, not the model.
 
 **T11 Acceptance support** (spec AC25, AC26). The prompt-count check over the workflow scenarios of T8, T9a and T9b (the
 A7 bound on the normal paths of spec §4.9, failure and escalation paths counted and reported) and the
-property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md`.
+property test over generated change sets; the needs-local-test items of spec §12 in `docs/local-testing.md` (items 7
+and 8 added by amendment B-543: the lock after analysis with the v1 exit, the visible launch).
 Amendment B-354 (spec AC35, Q11): `python -m eng_harness.report` with `audit-sources RUN_DIR` and
 `count-prompts RUN_DIR`, a read-only wrapper over the T10 and T10b functions so that the owner can run A3 and A7 on the
 journals of the local B-1 runs; no seventh `eng-harness` command. `docs/local-testing.md` names the command form
@@ -943,6 +988,17 @@ hand) and `test_item_id_not_a_page_token_is_refused`, which fails at the merge b
 the verification record and the lock follow. Version 1 stays (spec §4.4.1 decision). T16 waits for T4b (both edit
 `calcs.lock.json`).
 
+**T17 Sections absent** (amendment B-543; spec §4.4.1, §4.4.2, AC39). In `CheckInput` and `EffectsInput`, `sections`
+becomes `Sections | None = None` (still a reference when given, as `harness.model_diff` takes it). The check: without
+it the area-kind map is empty, so a `select` with `area_kind` resolves to nothing and its `EMPTY_SELECTION` detail
+says the area kinds were not read; `sections` leaves `_REFS` as a required name and is checked as a reference only when
+given. The effects: without it the section names are empty and `wall_section` gives the two `set` effects as on a held
+section; the one-revision rule runs over the state references given. Each calc keeps its version (no released
+behaviour changes for a call that passes the record, spec 0003 §4.2), its content hash moves in `calcs.lock.json`, and
+its verification record gains the case. The golden cases `check-no-sections-*` and `effects-no-sections-*` pin both
+paths; the merged cases, which pass the record, keep their expectations. T17 waits for T16, which edits the same four files as T17: `change_set_check.py`, `calcs.lock.json`,
+`harness.change_set_check.md` and `test_change_set_check.py`.
+
 ## 3. Dependencies
 
 - Runtime: none new. Development: none new (Hypothesis and pytest from plan 0001 T1).
@@ -957,9 +1013,9 @@ the verification record and the lock follow. Version 1 stays (spec §4.4.1 decis
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation); plan 0002 T21 waits for T5, not T5 for T21: T5's `test_csi_read_state_tool.py` builds `HARNESS_KINDS.extend(CSI_KINDS)`, which `extend` refuses once T21 registers `CSI_KINDS`, so T21 adapts that line (amendment B-503) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4); T15 of this plan (FB005, amendment B-511) |
-| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths |
+| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths; plan 0001 T23 (`Preview.models` takes the key) and T17 of this plan (amendment B-543) |
 | T9a | plan 0002 T13 (analysis and design tools); plan 0006 T10 (engineer-turn labels) |
-| T9b | plan 0001 T16b (promotion; B-499); plan 0002 T15 (for the final unlock test) |
+| T9b | plan 0001 T16b (promotion; B-499) and T23 (`ctx.promote` takes the key, through T8; amendment B-543); plan 0002 T15 (for the final unlock test; until then the v1 exit) |
 | T10, T10b | plan 0006 T11 to T13 (report model, sections, document) |
 | T11 | plan 0006 T14 is not needed: the tests drive the engine directly |
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
@@ -970,6 +1026,7 @@ the verification record and the lock follow. Version 1 stays (spec §4.4.1 decis
 | T10c | nothing outside this plan (amendment B-545) |
 | T16 | T4b of this plan (both edit `calcs.lock.json`; amendment B-545) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
+| T17 | T14 (`change_set_check.py`, `calcs.lock.json`), T4b (`calcs.lock.json`) and T16 (`change_set_check.py`, `calcs.lock.json`, `harness.change_set_check.md`, `test_change_set_check.py`); nothing outside this plan (amendment B-543). T8 waits for T17 |
 
 ## 4. Verification
 
