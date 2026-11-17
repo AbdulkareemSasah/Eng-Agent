@@ -53,7 +53,7 @@ def safe_relative_path(path: str) -> bool:
 
 
 class Task(_Model):
-    """One plan task: ``files`` are globs, ``max_changed_lines`` is an estimate in lines, ``max_sessions`` counts sessions."""
+    """Task globs, ``max_changed_lines`` (estimated lines) and ``max_sessions`` (session budget)."""
 
     id: TaskId
     title: Name

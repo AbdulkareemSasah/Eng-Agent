@@ -264,7 +264,7 @@ def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> Non
 
 
 def test_budget_counting(repo: Repo) -> None:
-    """AC11: additions plus deletions count, except tests, generated and spike files; GC009 reports the sum as a notice."""
+    """AC11: GC009 reports additions plus deletions, except tests, generated and spike files, as a notice."""
     plan = plan_text(files=("pkg/**", "uv.lock", "spikes/**"), max_changed_lines=10)
     base = make_gate_repo(repo, plan=plan, base_files={"pkg/src/keep.py": "a\nb\nc\n"})
     repo.commit(
