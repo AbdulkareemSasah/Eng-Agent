@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies.",
- "count": 167,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies.",
+ "count": 181,
  "tasks": [
   {
    "id": "B-437",
@@ -21,7 +21,8 @@
    ],
    "open_pr": 260,
    "branch_pushed": true,
-   "instructions": "Documents-only amendment. The B-146 writer (calcs plan 0003 T7, the first real calc) and the B-394 reviewer found the calc-module rules and the gate stop every calc task. Make exactly these edits in packages/eng-harness/docs/specs/0003-calcs.md and plans/0003-calcs.md:\n1. Spec 4.3 allowed imports of calc modules += `eng_contract.params` (name `eng_param`, needed for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs); calcs/__init__.py may import `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.\n2. Spec 4.3: the calc-module rules test covers every module under calcs/, subpackages included (calcs/footing/), and mirrors FB005 including the new form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`).\n3. tests/contract/test_calc_lock.py: under mutation testing (environment variable MUTANT_UNDER_TEST set) the lock-versus-registry comparison is skipped with an issue reference and an expiry (the B-369 pattern), because mutants change the hashed source by design.\n4. Plan T7 files += packages/eng-harness/tests/rules/test_calc_modules.py, packages/eng-harness/tests/contract/test_calc_lock.py, packages/eng-harness/src/eng_harness/calc.py (the re-export); T7 max_changed_lines 250 -> 270 (measured 249 before the re-export); T7 depends_on += the gate's T39 (B-439, form A4) in the prose of section 3; a YAML amendment comment on T7.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
+   "instructions": "Documents-only amendment. The B-146 writer (calcs plan 0003 T7, the first real calc) and the B-394 reviewer found the calc-module rules and the gate stop every calc task. Make exactly these edits in packages/eng-harness/docs/specs/0003-calcs.md and plans/0003-calcs.md:\n1. Spec 4.3 allowed imports of calc modules += `eng_contract.params` (name `eng_param`, needed for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs); calcs/__init__.py may import `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.\n2. Spec 4.3: the calc-module rules test covers every module under calcs/, subpackages included (calcs/footing/), and mirrors FB005 including the new form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`).\n3. tests/contract/test_calc_lock.py: under mutation testing (environment variable MUTANT_UNDER_TEST set) the lock-versus-registry comparison is skipped with an issue reference and an expiry (the B-369 pattern), because mutants change the hashed source by design.\n4. Plan T7 files += packages/eng-harness/tests/rules/test_calc_modules.py, packages/eng-harness/tests/contract/test_calc_lock.py, packages/eng-harness/src/eng_harness/calc.py (the re-export); T7 max_changed_lines 250 -> 270 (measured 249 before the re-export); T7 depends_on += the gate's T39 (B-439, form A4) in the prose of section 3; a YAML amendment comment on T7.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change.",
+   "merged_pr": 260
   },
   {
    "id": "B-438",
@@ -42,7 +43,8 @@
    ],
    "open_pr": 267,
    "branch_pushed": true,
-   "instructions": "Documents-only amendment of tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md and plans/0001-eng-dev-gate-0.1.md. Calcs, rules and code-pack checks carry an integer identity version (`@calc(..., version=1)`, `CheckMeta(version=...)`), which FB005 refuses as a numeric literal; a version is identity, not an engineering quantity, and cannot carry a threshold. Make exactly these edits:\n1. Spec 4.8: new form A4: an integer literal given directly as the `version=` keyword argument of a call to a callable named in the policy list `versioned.callables` of .gate/forbidden.yml (initially `calc` and `CheckMeta`). A new AC for it.\n2. Spec section 11: the Q5 row records that the owner's 'no further exceptions' is amended by draft decision B-438 (owner queue), with the reason above.\n3. Plan: new task T39 'FB005 form A4': files tools/eng-dev-gate/CHANGELOG.md, src/eng_dev_gate/checks/forbidden/rules_b.py, src/eng_dev_gate/checks/forbidden/engine.py (the policy model), .gate/forbidden.yml, the forbidden-check unit test file the plan already names for FB005; max_changed_lines 120, max_sessions 1, depends_on the last forbidden-check task, tests_first a test that `calc(version=1)` passes and `calc(limit=1)` and `other(version=1)` are refused. A YAML amendment comment and a paragraph.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
+   "instructions": "Documents-only amendment of tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md and plans/0001-eng-dev-gate-0.1.md. Calcs, rules and code-pack checks carry an integer identity version (`@calc(..., version=1)`, `CheckMeta(version=...)`), which FB005 refuses as a numeric literal; a version is identity, not an engineering quantity, and cannot carry a threshold. Make exactly these edits:\n1. Spec 4.8: new form A4: an integer literal given directly as the `version=` keyword argument of a call to a callable named in the policy list `versioned.callables` of .gate/forbidden.yml (initially `calc` and `CheckMeta`). A new AC for it.\n2. Spec section 11: the Q5 row records that the owner's 'no further exceptions' is amended by draft decision B-438 (owner queue), with the reason above.\n3. Plan: new task T39 'FB005 form A4': files tools/eng-dev-gate/CHANGELOG.md, src/eng_dev_gate/checks/forbidden/rules_b.py, src/eng_dev_gate/checks/forbidden/engine.py (the policy model), .gate/forbidden.yml, the forbidden-check unit test file the plan already names for FB005; max_changed_lines 120, max_sessions 1, depends_on the last forbidden-check task, tests_first a test that `calc(version=1)` passes and `calc(limit=1)` and `other(version=1)` are refused. A YAML amendment comment and a paragraph.\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change.",
+   "merged_pr": 267
   },
   {
    "id": "B-440",
@@ -63,7 +65,8 @@
    ],
    "open_pr": null,
    "branch_pushed": false,
-   "instructions": "Documents-only amendment of packages/eng-harness/docs/plans/0009-providers.md. The B-220 review found the gate's licenses step refuses two transitive dependencies of the provider runtime: cffi (MIT-0) and regex (Apache-2.0 AND CNRI-Python). Both licenses are permissive but not on the gate's allow list, and an exception needs an accepting ADR (.gate/gate.yml license_exceptions: distribution, license, adr). Make exactly these edits:\n1. T1 files += .gate/gate.yml (license_exceptions entries only) and packages/eng-harness/docs/adr/0005-transitive-licenses.md (a new ADR, status Proposed, accepting cffi MIT-0 and regex Apache-2.0 AND CNRI-Python as transitive dependencies of ADR-0001 and ADR-0003, owner queue). A YAML amendment comment on T1 and one sentence in its paragraph.\n2. T1's paragraph: an empty tests/unit/providers/__init__.py marker is allowed by gate AC10c without listing (it avoids mypy's duplicate module name test_config).\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change."
+   "instructions": "Documents-only amendment of packages/eng-harness/docs/plans/0009-providers.md. The B-220 review found the gate's licenses step refuses two transitive dependencies of the provider runtime: cffi (MIT-0) and regex (Apache-2.0 AND CNRI-Python). Both licenses are permissive but not on the gate's allow list, and an exception needs an accepting ADR (.gate/gate.yml license_exceptions: distribution, license, adr). Make exactly these edits:\n1. T1 files += .gate/gate.yml (license_exceptions entries only) and packages/eng-harness/docs/adr/0005-transitive-licenses.md (a new ADR, status Proposed, accepting cffi MIT-0 and regex Apache-2.0 AND CNRI-Python as transitive dependencies of ADR-0001 and ADR-0003, owner queue). A YAML amendment comment on T1 and one sentence in its paragraph.\n2. T1's paragraph: an empty tests/unit/providers/__init__.py marker is allowed by gate AC10c without listing (it avoids mypy's duplicate module name test_config).\nKeep this amendment to the listed edits only (lead decision D-28): the smallest text that does each item, no new rule, task, field or moved test beyond them. If a listed item conflicts with a document, say so in the body instead of widening the change.",
+   "merged_pr": 270
   },
   {
    "id": "B-111",
@@ -83,7 +86,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "the B-434 amendment adds _runner.py and journal/_events.py to T12 for exactly the two edits it names; reuse your earlier design (Ctx gets the host port, Ctx.finish() after the root block, inserted steps journaled as kind read, step_started carries the action)."
-   ]
+   ],
+   "merged_pr": 279
   },
   {
    "id": "B-112",
@@ -95,14 +99,13 @@
    "branch": "feat/b112-harness-et13-invariants-5-6-8",
    "prTitle": "feat(eng-harness): invariants 5, 6, 8, 9 and 10 (basis, honest outcomes, server checks, units, host leases) (B-112)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T12"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 299
   },
   {
    "id": "B-113",
@@ -114,14 +117,13 @@
    "branch": "feat/b113-harness-et14-ctx-decide-and-ctx",
    "prTitle": "feat(eng-harness): ctx.decide and ctx.decide_many over the DecisionPort, with engineer-tier requests (invariant 4) (B-113)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T13"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 326
   },
   {
    "id": "B-114",
@@ -133,15 +135,13 @@
    "branch": "feat/b114-harness-et15-approvals-binding-single-use",
    "prTitle": "feat(eng-harness): approvals (binding, single use, re-check before the write, items, pause and re-presentation) (B-114)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T12",
-    "E.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 341
   },
   {
    "id": "B-115",
@@ -153,14 +153,13 @@
    "branch": "feat/b115-harness-et16-permission-modes-always-ask",
    "prTitle": "feat(eng-harness): permission modes, always-ask list, working copies and file-copy promotion (B-115)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T15"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 357
   },
   {
    "id": "B-116",
@@ -172,14 +171,13 @@
    "branch": "feat/b116-harness-et17-runtime-guard-for-block",
    "prTitle": "feat(eng-harness): runtime guard for block and rule code, and the block-module rules test (B-116)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T16"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 375
   },
   {
    "id": "B-117",
@@ -196,7 +194,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 389
   },
   {
    "id": "B-118",
@@ -208,9 +207,7 @@
    "branch": "feat/b118-harness-et19-crash-matrix-replay-suite",
    "prTitle": "test(eng-harness): crash-matrix replay suite with a worker process (B-118)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T18"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -218,7 +215,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-509 (pull request 354): T19 is a test-only change: pull request title type `test`, one `test:` commit, test files only, no CHANGELOG line."
-   ]
+   ],
+   "merged_pr": 399
   },
   {
    "id": "B-350",
@@ -230,14 +228,13 @@
    "branch": "feat/b350-harness-et14b-ctx-ask-and-the",
    "prTitle": "feat(eng-harness): ctx.ask and the decision runtime record (run header and reader view) (B-350)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "E.T14"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 332
   },
   {
    "id": "B-129",
@@ -254,7 +251,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 276
   },
   {
    "id": "B-130",
@@ -266,14 +264,13 @@
    "branch": "feat/b130-harness-st11-csi-model-state-reader",
    "prTitle": "feat(eng-harness): cSI model-state reader, model kinds, fingerprint and units read (B-130)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T10"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 294
   },
   {
    "id": "B-131",
@@ -285,14 +282,13 @@
    "branch": "feat/b131-harness-st12-csi-edit-kinds-read",
    "prTitle": "feat(eng-harness): cSI edit kinds, read-back helpers and check_model (B-131)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T11"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 314
   },
   {
    "id": "B-132",
@@ -304,15 +300,13 @@
    "branch": "feat/b132-harness-st13-csi-analysis-design-and",
    "prTitle": "feat(eng-harness): cSI analysis, design and results through the long role (B-132)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T12",
-    "S.T12b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 334
   },
   {
    "id": "B-133",
@@ -324,14 +318,13 @@
    "branch": "feat/b133-harness-st14-reconciliation-by-reading-model",
    "prTitle": "feat(eng-harness): reconciliation by reading model state, preview and read_back (B-133)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T13"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 339
   },
   {
    "id": "B-135",
@@ -343,14 +336,13 @@
    "branch": "feat/b135-harness-st16-command-line-tool-adapter",
    "prTitle": "feat(eng-harness): command-line tool adapter (dxf-prep, etabs-model build) (B-135)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T14"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 345
   },
   {
    "id": "B-136",
@@ -384,7 +376,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 281
   },
   {
    "id": "B-138",
@@ -395,10 +388,9 @@
    "title": "Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes",
    "branch": "feat/b138-harness-st19-port-wiring-edit-cycle",
    "prTitle": "feat(eng-harness): port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
-   "risk": "r1, r3",
+   "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T19",
-    "S.T21"
+    "S.T23"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -407,7 +399,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-487: T19 was split by amendment B-475 into T19a (this item: CSI only, on the first-live-run path) and T19b (command-line tools: B-490); T17 left the dependencies; the plan waits for engine T13, T15, T16 and T19; it also edits tests/fakes/sasaah_csi/** like W.T5 (B-199), so run after W.T5",
-    "Plan audit 2 found seven blockers; amendment B-530 adds T19c before T19a."
+    "Plan audit 2 found seven blockers; amendment B-530 adds T19c before T19a.",
+    "2026-11-17: every dependency is merged except S.T23 (B-550). The plan front matter risk is r1, r2, r3 (B-537)."
    ]
   },
   {
@@ -425,7 +418,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 273
   },
   {
    "id": "B-181",
@@ -437,14 +431,13 @@
    "branch": "feat/b181-harness-it7-answer-models-and-checks",
    "prTitle": "feat(eng-harness): answer models and checks, approval and input ports, durable wait, stop-file run control (B-181)",
    "risk": "r3",
-   "pending_deps": [
-    "E.T15"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 350
   },
   {
    "id": "B-183",
@@ -456,14 +449,13 @@
    "branch": "feat/b183-harness-it9-approval-screens-r2",
    "prTitle": "feat(eng-harness): approval screens: change set, promotion and info (B-183)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 368
   },
   {
    "id": "B-184",
@@ -480,7 +472,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 388
   },
   {
    "id": "B-186",
@@ -500,7 +493,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "T2b (B-436) adds fragment(); use it for the value-cell links; the section functions take (ReportModel, JournalReader, ResultStore) per amendment B-435."
-   ]
+   ],
+   "merged_pr": 277
   },
   {
    "id": "B-187",
@@ -512,14 +506,13 @@
    "branch": "feat/b187-harness-it13-report-document-draft-and",
    "prTitle": "feat(eng-harness): report document: DRAFT and completeness marks, integrity line, policy meta, atomic UTF-8 write (B-187)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T12"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 295
   },
   {
    "id": "B-188",
@@ -531,10 +524,7 @@
    "branch": "feat/b188-harness-it14-commands-run-and-resume",
    "prTitle": "feat(eng-harness): commands run and resume: wiring, generated options, answers file, outcome mapping (B-188)",
    "risk": "r3",
-   "pending_deps": [
-    "E.T18",
-    "I.T10"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -590,7 +580,6 @@
    "prTitle": "feat(eng-harness): end-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule (B-191)",
    "risk": "r3",
    "pending_deps": [
-    "E.T18",
     "I.T15",
     "I.T16",
     "I.T16b"
@@ -612,7 +601,6 @@
    "prTitle": "feat(eng-harness): commands run and resume: signals, launch address on the terminal only, decision layer wiring (B-353)",
    "risk": "r3",
    "pending_deps": [
-    "E.T18",
     "I.T14c"
    ],
    "writer": "sonnet, high",
@@ -631,14 +619,13 @@
    "branch": "feat/b429-harness-it7b-stop-file-run-control-and-th",
    "prTitle": "feat(eng-harness): stop-file run control and the voided approval display (B-429)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 370
   },
   {
    "id": "B-430",
@@ -652,8 +639,7 @@
    "risk": "r3",
    "pending_deps": [
     "I.T14b",
-    "I.T16",
-    "E.T18"
+    "I.T16"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -693,8 +679,7 @@
    "pending_deps": [
     "I.T15",
     "I.T16",
-    "I.T16b",
-    "W.T6"
+    "I.T16b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -717,10 +702,7 @@
     "I.T15",
     "I.T16",
     "I.T16b",
-    "D.T10",
-    "P.T10a",
-    "W.T9",
-    "W.T6"
+    "W.T9"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -742,10 +724,7 @@
    "branch": "feat/b146-harness-ct7-calc-1-model-fingerprint",
    "prTitle": "feat(eng-harness): calc 1, model fingerprint, with the canonical-state helper (B-146)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "DOC.CALCRULES",
-    "G.T39"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -756,7 +735,8 @@
    "branch_pushed": true,
    "lead_notes": [
     "your work is on the pushed branch feat/b146-harness-ct7-calc-1-model-fingerprint (commits 3cb99b9 and c5a967c). Continue on it (merge origin/build/v1, never rebase): amendment B-437 allows eng_param, the eng_harness.calc re-export of read_lock and removed_ids, the recursive rules test and the lock-test skip under mutation testing; gate T39 (B-439) adds FB005 form A4 for version=. Remove the B-146 comment about the import, run the full gate including mutation, then open the pull request."
-   ]
+   ],
+   "merged_pr": 283
   },
   {
    "id": "B-147",
@@ -768,10 +748,7 @@
    "branch": "feat/b147-harness-ct8-calc-2-difference-report",
    "prTitle": "feat(eng-harness): calc 2, difference report, with the tolerance-comparison helper (B-147)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T7",
-    "E.T12"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -779,7 +756,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 305
   },
   {
    "id": "B-148",
@@ -791,9 +769,7 @@
    "branch": "feat/b148-harness-ct9-calc-3-read-back",
    "prTitle": "feat(eng-harness): calc 3, read-back check (B-148)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T8b"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -801,7 +777,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 338
   },
   {
    "id": "B-149",
@@ -813,9 +790,7 @@
    "branch": "feat/b149-harness-ct10-calc-4-design-results-r2",
    "prTitle": "feat(eng-harness): calc 4, design results summary (B-149)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T9"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -826,7 +801,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "Rebuilt on the -r2 branch (lead decision D-22, TF004); merged as pull request 353; pull request 343 superseded."
-   ]
+   ],
+   "merged_pr": 353
   },
   {
    "id": "B-150",
@@ -888,7 +864,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-512 (pull request 356): T7 to T9 do not wait for engine T17; only T10 does."
-   ]
+   ],
+   "merged_pr": 361
   },
   {
    "id": "B-172",
@@ -900,14 +877,13 @@
    "branch": "feat/b172-harness-dt8-tiers-2-and-3",
    "prTitle": "feat(eng-harness): tiers 2 and 3, shadow mode, timeouts, policy switches, local_only (B-172)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "D.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 367
   },
   {
    "id": "B-173",
@@ -919,14 +895,13 @@
    "branch": "feat/b173-harness-dt9-decide-many-batching-and",
    "prTitle": "feat(eng-harness): decide_many batching and one batched screen (B-173)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "D.T8"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 373
   },
   {
    "id": "B-174",
@@ -943,7 +918,8 @@
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 385
   },
   {
    "id": "B-220",
@@ -955,9 +931,7 @@
    "branch": "feat/b220-harness-pt1-providers-config-v2",
    "prTitle": "feat(eng-harness): dependencies, provider errors, configuration, network guard (B-220)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "DOC.PROVT1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -965,7 +939,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "PR #253's branch carries a secret-like test literal in commit aa6b855, which the secrets step scans and which no new commit can remove (no history rewrite, A16). Start the fresh branch named in this task from origin/build/v1 and bring over the content of origin/feat/b220-harness-pt1-dependencies-provider-errors-configuration (git checkout <branch> -- <your task's files>), with the test literal built at runtime so it matches no credential pattern; first commit the tests only, then the code. Add an empty tests/unit/providers/__init__.py (gate AC10c). Add the license exceptions and ADR 0005 that amendment B-440 puts in your files. Open a new pull request and say in its body that it replaces #253 (the lead closes #253)."
-   ]
+   ],
+   "merged_pr": 274
   },
   {
    "id": "B-221",
@@ -977,14 +952,13 @@
    "branch": "feat/b221-harness-pt2-credential-store-backend-allow",
    "prTitle": "feat(eng-harness): credential store, backend allow-list, key management entry point (B-221)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 292
   },
   {
    "id": "B-222",
@@ -996,14 +970,13 @@
    "branch": "feat/b222-harness-pt3-shared-http-client-error",
    "prTitle": "feat(eng-harness): shared HTTP client, error mapping, outgoing guard (B-222)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 304
   },
   {
    "id": "B-223",
@@ -1032,14 +1005,13 @@
    "branch": "feat/b224-harness-pt5-strict-output-type-and",
    "prTitle": "feat(eng-harness): strict output type and prompt for the language-model tier (B-224)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 296
   },
   {
    "id": "B-225",
@@ -1072,8 +1044,7 @@
    "risk": "r1, r3",
    "pending_deps": [
     "P.T4",
-    "P.T6",
-    "P.T10a"
+    "P.T6"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1091,14 +1062,13 @@
    "branch": "feat/b227-harness-pt8-evaluation-core-thresholds-metrics",
    "prTitle": "feat(eng-harness): evaluation core (thresholds, metrics, eligibility) (B-227)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 293
   },
   {
    "id": "B-228",
@@ -1110,14 +1080,13 @@
    "branch": "feat/b228-harness-pt9-evaluation-store-release-verification",
    "prTitle": "feat(eng-harness): evaluation store, release verification, evaluate command (B-228)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "P.T8"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 309
   },
   {
    "id": "B-229",
@@ -1129,9 +1098,7 @@
    "branch": "feat/b229-harness-pt10-runtime-assembly-shadow-mode",
    "prTitle": "feat(eng-harness): phase-1 runtime assembly, rules and engineer (B-229)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "D.T10"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1139,7 +1106,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-487: T10 was split by amendment B-475 into T10a (this item, budget 150) and T10b (B-491); the plan front matter names T1 only (merged); the cross-plan prose of plan 0009 section 3 names decisions T10 and engine T14b, which are listed here; check that prose again before launching"
-   ]
+   ],
+   "merged_pr": 387
   },
   {
    "id": "B-164",
@@ -1173,7 +1141,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 290
   },
   {
    "id": "B-281",
@@ -1339,7 +1308,6 @@
    "prTitle": "feat(eng-harness): engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets) (B-289)",
    "risk": "r1, r3",
    "pending_deps": [
-    "E.T18",
     "W.T8",
     "W.T9"
    ],
@@ -1365,7 +1333,6 @@
     "G.T4",
     "G.T6",
     "G.T9",
-    "W.T4",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -1433,8 +1400,7 @@
    "prTitle": "feat(eng-harness): report renderers, verdict-source audit and the local-testing list (B-293)",
    "risk": "r1, r3",
    "pending_deps": [
-    "G.T13",
-    "W.T10"
+    "G.T13"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1471,16 +1437,15 @@
    "branch": "feat/b439-gate-t39-fb005-version-keyword",
    "prTitle": "feat(eng-dev-gate): FB005 form A4, the version keyword of versioned callables (B-439)",
    "risk": "r3",
-   "pending_deps": [
-    "DOC.GATEA4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
     "enforcement"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 271
   },
   {
    "id": "B-326",
@@ -1547,7 +1512,8 @@
    "branch_pushed": true,
    "lead_notes": [
     "your earlier session left three commits on branch feat/b330-codes-zt1-shared-column-section-model (8a2d529 tests, 28c346b feat, c2a527e refactor), now pushed by the lead. Continue on it: merge origin/build/v1 (never rebase), run the full package gate including mutation, and open the pull request."
-   ]
+   ],
+   "merged_pr": 269
   },
   {
    "id": "B-331",
@@ -1559,9 +1525,7 @@
    "branch": "feat/b331-codes-zt2-check-max-axial-strength",
    "prTitle": "feat(structural-codes): check max_axial_strength (22.4.2.1) (B-331)",
    "risk": "r1",
-   "pending_deps": [
-    "Z.T1"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1569,7 +1533,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 288
   },
   {
    "id": "B-332",
@@ -1581,9 +1546,7 @@
    "branch": "feat/b332-codes-zt3-check-axial-flexure-uniaxial",
    "prTitle": "feat(structural-codes): check axial_flexure_uniaxial (22.4.1.1), strain compatibility with the capped ray capacity (B-332)",
    "risk": "r1",
-   "pending_deps": [
-    "Z.T1"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1591,7 +1554,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 298
   },
   {
    "id": "B-333",
@@ -1603,9 +1567,7 @@
    "branch": "feat/b333-codes-zt4-check-longitudinal-reinforcement-limits",
    "prTitle": "feat(structural-codes): check longitudinal_reinforcement_limits (10.6.1.1) (B-333)",
    "risk": "r1",
-   "pending_deps": [
-    "Z.T1"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1613,7 +1575,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 284
   },
   {
    "id": "B-334",
@@ -1645,9 +1608,7 @@
    "branch": "feat/b196-harness-wt2-calc-harness-change-set",
    "prTitle": "feat(eng-harness): calc harness.change_set_check (resolve, validate, conflicts, refused kinds) (B-196)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T8b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1655,7 +1616,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 344
   },
   {
    "id": "B-197",
@@ -1667,10 +1629,7 @@
    "branch": "feat/b197-harness-wt3-calc-harness-expected-effects",
    "prTitle": "feat(eng-harness): calc harness.expected_effects (projection of a resolved change set) (B-197)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T9",
-    "W.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1678,7 +1637,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 366
   },
   {
    "id": "B-198",
@@ -1690,9 +1650,7 @@
    "branch": "feat/b198-harness-wt4-calc-analysis-summary",
    "prTitle": "feat(eng-harness): calc harness.analysis_summary (B-198)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "S.T21"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1700,7 +1658,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 396
   },
   {
    "id": "B-199",
@@ -1712,17 +1671,13 @@
    "branch": "feat/b199-harness-wt5-csi-adapter-read-tool",
    "prTitle": "feat(eng-harness): cSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment) (B-199)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "S.T11",
-    "S.T12",
-    "S.T13",
-    "S.T14"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 362
   },
   {
    "id": "B-200",
@@ -1739,7 +1694,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 383
   },
   {
    "id": "B-201",
@@ -1756,7 +1712,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 402
   },
   {
    "id": "B-202",
@@ -1770,10 +1727,9 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "B.T10",
-    "D.T10",
+    "E.T23",
     "S.T19a",
-    "W.T6",
-    "W.T7"
+    "W.T7b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1792,8 +1748,6 @@
    "prTitle": "feat(eng-harness): workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop (B-203)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "I.T10",
-    "W.T4",
     "W.T8"
    ],
    "writer": "sonnet, medium",
@@ -1820,7 +1774,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 386
   },
   {
    "id": "B-205",
@@ -1833,7 +1788,6 @@
    "prTitle": "feat(eng-harness): acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list (B-205)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T10b",
     "W.T9b"
    ],
    "writer": "sonnet, medium",
@@ -1853,7 +1807,6 @@
    "prTitle": "test(eng-harness): replay test and crash matrix of the workflow (A6) (B-206)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T19",
     "S.T19a",
     "W.T9b"
    ],
@@ -1881,7 +1834,8 @@
    "branch_pushed": true,
    "lead_notes": [
     "spec 0010 Q20 is settled by B-442 (CheckMeta.version, integer, default 1) and core T15 (B-443) adds the field; pass it as CalcInfo.version."
-   ]
+   ],
+   "merged_pr": 268
   },
   {
    "id": "B-394",
@@ -1893,9 +1847,7 @@
    "branch": "feat/b394-harness-xt3-footing-subjects-calc",
    "prTitle": "feat(eng-harness): calc harness.footing_subjects and the footing calc package (B-394)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1906,7 +1858,8 @@
    "branch_pushed": true,
    "lead_notes": [
     "the calc lock test is now skipped under mutation testing (B-146, amendment B-437). Merge origin/build/v1 into your branch (never rebase), run the full package gate including mutation, fix the mutation score inside your files if it is low, and push."
-   ]
+   ],
+   "merged_pr": 256
   },
   {
    "id": "B-395",
@@ -2019,9 +1972,7 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "B.T10",
-    "I.T10",
     "S.T19a",
-    "W.T6",
     "X.T8",
     "Y.T3"
    ],
@@ -2086,7 +2037,6 @@
    "prTitle": "feat(eng-harness): report sections (schedule, calculation notes), acceptance audits and the local-testing list (B-403)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T10",
     "X.T9"
    ],
    "writer": "sonnet, medium",
@@ -2106,7 +2056,6 @@
    "prTitle": "feat(eng-harness): replay, crash matrix and hash-seed determinism of the footing workflow (B-404)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T19",
     "X.T11",
     "X.T12"
    ],
@@ -2893,7 +2842,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 316
   },
   {
    "id": "B-460",
@@ -2905,10 +2855,7 @@
    "branch": "feat/b460-harness-ct8b-calc-2-difference-report",
    "prTitle": "feat(eng-harness): calc 2, difference report, on the comparison core (B-460)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "CT.T19",
-    "C.T8c"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -2919,7 +2866,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "written and reviewed once (BLOCKED, round 2 queued): held by playbook 5d until B-464 and B-467 are on origin/build/v1 (basis field names), and until B-469 and B-470 (C.T8c, difference keys carry their list) have merged; then rename the basis paths to the B-467 names, merge origin/build/v1 and rewrite the calc lock"
-   ]
+   ],
+   "merged_pr": 333
   },
   {
    "id": "B-464",
@@ -2939,7 +2887,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "written (head 7966378), not pushed; waits for amendment B-468 (T19 files gain the harness calc lock, risk set r1, r2, r3); then regenerate calcs.lock.json with the lock writer, never by hand"
-   ]
+   ],
+   "merged_pr": 320
   },
   {
    "id": "B-466",
@@ -2951,9 +2900,7 @@
    "branch": "feat/b466-harness-st12b-csi-read-back-helpers",
    "prTitle": "feat(eng-harness): cSI read-back helpers and check_model (B-466)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T12"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2961,7 +2908,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "plan task T12b merged with amendment B-465 (#310, budget 380, depends on T12); held by playbook 5d until B-464 and B-467 are on origin/build/v1 (basis field names); owner questions on tolerance delivery and drained warnings are in BUILD-STATUS section 6"
-   ]
+   ],
+   "merged_pr": 327
   },
   {
    "id": "B-470",
@@ -2984,7 +2932,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "plan task pending amendment B-469 (calcs spec 4.7: difference keys carry their list, duplicate keys always ambiguous; new task T8c, queued); new calc version of the comparison core"
-   ]
+   ],
+   "merged_pr": 324
   },
   {
    "id": "B-472",
@@ -3004,7 +2953,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "plan task pending amendment B-471 (first-live-run blockers); blocks I.T18b (the port builder, B-433)"
-   ]
+   ],
+   "merged_pr": 319
   },
   {
    "id": "B-485",
@@ -3084,10 +3034,7 @@
    "branch": "feat/b489-harness-it13b-report-status-section-decision-runtime-r2",
    "prTitle": "feat(eng-harness): report status section shows the run's decision runtime (B-489)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T13",
-    "E.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -3095,7 +3042,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-487: new plan task from B-471 (budget 50, one session, T13 is merged); the plan front matter names T13 only; E.T14b is listed because the status rows read RunView.decision_runtime (engine AC69), which the plan prose ties to the engine decision runtime record: check before launching; first-live-run path, not yet in priority.txt"
-   ]
+   ],
+   "merged_pr": 374
   },
   {
    "id": "B-490",
@@ -3130,8 +3078,7 @@
    "prTitle": "feat(eng-harness): runtime assembly with built providers and verified releases, shadow-mode workflow (B-491)",
    "risk": "r1, r3",
    "pending_deps": [
-    "P.T7",
-    "P.T10a"
+    "P.T7"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3157,7 +3104,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 378
   },
   {
    "id": "B-519",
@@ -3174,7 +3122,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 381
   },
   {
    "id": "B-520",
@@ -3191,7 +3140,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 394
   },
   {
    "id": "B-521",
@@ -3208,7 +3158,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 397
   },
   {
    "id": "B-522",
@@ -3225,7 +3176,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 369
   },
   {
    "id": "B-523",
@@ -3242,7 +3194,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 376
   },
   {
    "id": "B-524",
@@ -3262,7 +3215,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "Protected path .gate/forbidden.yml: waits for the owner's approval (asked on 2026-11-15)."
-   ]
+   ],
+   "merged_pr": 391
   },
   {
    "id": "B-525",
@@ -3274,9 +3228,7 @@
    "branch": "feat/b525-harness-wt4b-calc-host-design-verdicts",
    "prTitle": "feat(eng-harness): calc harness.host_design_verdicts (B-525)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -3287,7 +3239,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "Waits for the owner's answer to spec 0007 Q19 (asked on 2026-11-15)."
-   ]
+   ],
+   "merged_pr": 400
   },
   {
    "id": "B-526",
@@ -3300,8 +3253,6 @@
    "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T4",
-    "W.T4b",
     "W.T8"
    ],
    "writer": "sonnet, medium",
@@ -3340,7 +3291,6 @@
    "prTitle": "feat(eng-harness): commands run and resume: the page ports' wait mode and the answers files (B-528)",
    "risk": "r3",
    "pending_deps": [
-    "I.T10",
     "I.T14"
    ],
    "writer": "sonnet, medium",
@@ -3359,14 +3309,323 @@
    "branch": "feat/b534-harness-wt10b-prompt-counter-and-cycle-timings",
    "prTitle": "feat(eng-harness): prompt counter and B-1 cycle timings (B-534)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T10"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 395
+  },
+  {
+   "id": "B-546",
+   "task": "S.T22",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T22",
+   "kind": "impl",
+   "title": "Platform launcher for doctor and build_ports, AdapterPorts lifetime, server sections from parsed tables, host program of a product",
+   "branch": "feat/b546-harness-st22-platform-launcher-ports-lifetime",
+   "prTitle": "feat(eng-harness): platform launcher for doctor and build_ports, AdapterPorts lifetime, server sections from parsed tables (B-546)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-541."
+   ],
+   "merged_pr": 406
+  },
+  {
+   "id": "B-547",
+   "task": "W.T16",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T16",
+   "kind": "impl",
+   "title": "Calc harness.change_set_check refuses an item id that is not a page token, or is revision or unlock (INVALID_ITEM_ID)",
+   "branch": "fix/b547-harness-wt16-item-id-page-token",
+   "prTitle": "fix(eng-harness): calc harness.change_set_check refuses an item id that is not a page token, or is revision or unlock (B-547)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-545 (walk-through C20, C29). Engineering calc: adversarial verification. Was in lane small-fixes-1 at the checkpoint of 2026-11-17: check GitHub for its branch and pull request. W.T17 waits for it."
+   ]
+  },
+  {
+   "id": "B-548",
+   "task": "W.T10c",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T10c",
+   "kind": "impl",
+   "title": "The B-1 timings read the benchmark request where the engine stores the change-set answer",
+   "branch": "fix/b548-harness-wt10c-benchmark-request-in-change-set-answer",
+   "prTitle": "fix(eng-harness): the B-1 timings read the benchmark request where the engine stores the change-set answer (B-548)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-545."
+   ],
+   "merged_pr": 405
+  },
+  {
+   "id": "B-549",
+   "task": "I.T10c",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T10c",
+   "kind": "impl",
+   "title": "The voided display matches the engine request kinds; the input screen tells how a waiting run takes a data answer",
+   "branch": "fix/b549-harness-it10c-voided-display-engine-kinds",
+   "prTitle": "fix(eng-harness): the voided display matches the engines request kinds; the input screen tells how a waiting run takes a data answer (B-549)",
+   "risk": "r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "sonnet, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-545."
+   ],
+   "merged_pr": 407
+  },
+  {
+   "id": "B-550",
+   "task": "S.T23",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T23",
+   "kind": "impl",
+   "title": "The CSI host port opens the original for the step 2 open and launches visible on request",
+   "branch": "feat/b550-harness-st23-open-original-visible-launch",
+   "prTitle": "feat(eng-harness): the CSI host port opens the original for the step 2 open and launches visible on request (B-550)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Written and pushed (head e65e608, no pull request): 77 counted lines and one collateral test outside its files (tests/workflow/adapters/test_csi_revisions.py). After B-554 (file list) and B-553 (no line limit) merge: apply the patch docs/build/b550-collateral-test_csi_revisions.patch, rerun the gate without mutation, review, open the pull request.",
+    "B-554 merged (#409): the file list and the estimate 80 are in the plan; B-550 no longer waits for B-553."
+   ]
+  },
+  {
+   "id": "B-551",
+   "task": "E.T23",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": "T23",
+   "kind": "impl",
+   "title": "Preview.models and ctx.promote take a model key",
+   "branch": "feat/b551-harness-et23-model-keys",
+   "prTitle": "feat(eng-harness): Preview.models and ctx.promote take a model key (B-551)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": true,
+   "lead_notes": [
+    "From documents item B-543. W.T8 waits for it.",
+    "2026-11-17: written and pushed (head 2361039, no pull request), 23 counted lines, test-first pass. Stopped NEEDS_PLAN_AMENDMENT: the types step fails on one existing test outside the file list, packages/eng-harness/tests/unit/test_ctx_basis.py line 120 (test_preview_and_approval). Fix: a documents amendment adding that test file to plan 0001 T23 files, then replace `assert preview.models[0].revision == 2` with `assert preview.models == (handle,)  # the handle, revision 2, as given` (the writer verified check: pass with that edit). Handoff note and pull request body were in the old lead folder (b551-writer.md, b551-body.md): the body needs its Collateral test edits and Verification sections; rewrite them from this note."
+   ]
+  },
+  {
+   "id": "B-552",
+   "task": "G.T40d",
+   "plan": "tools/eng-dev-gate/docs/plans/0001-eng-dev-gate-0.1.md",
+   "planTask": "T40",
+   "kind": "docs",
+   "title": "The changed-line count is an estimate, not a limit (owner decision 2026-11-17): gate spec, gate plan T40, process copies",
+   "branch": "docs/b552-gate-line-count-estimate",
+   "prTitle": "docs(eng-dev-gate): the changed-line count is an estimate, not a limit; plan T40 (B-552)",
+   "risk": "r3",
+   "pending_deps": [],
+   "writer": "opus, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": true,
+   "lead_notes": [
+    "Owner decision of 2026-11-17. Was in lane gate-noline at the checkpoint. The hub ADR on claude/pensive-volta-gcx0y9 is numbered 0028, which design/docs/adr already uses (0028 to 0034 exist there): the design copy needs the next free number (0035) and the hub file should be renumbered to match.",
+    "Written and pushed (head 48420c1, gate without mutation pass); the writer proposes accepting T40 as written (its files include the design/ copies, AGENTS template and renders, agents.yml template-version lines, PR template). Next: review, pull request, local CI, merge."
+   ]
+  },
+  {
+   "id": "B-553",
+   "task": "G.T40",
+   "plan": "tools/eng-dev-gate/docs/plans/0001-eng-dev-gate-0.1.md",
+   "planTask": "T40",
+   "kind": "impl",
+   "title": "GC009 reports the changed-line count as a notice; no cap on max_changed_lines",
+   "branch": "fix/b553-gate-gc009-notice",
+   "prTitle": "fix(eng-dev-gate): GC009 reports the changed-line count as a notice; no cap on max_changed_lines (B-553)",
+   "risk": "r3",
+   "pending_deps": [
+    "DOC.B552"
+   ],
+   "writer": "opus, high",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Changes the protected .gate/gate.yml: the pull request body states the owner approval of 2026-11-17 the way B-524 (#391) did.",
+    "Start from docs/build/b552-t40-documents-trial.patch and docs/build/line-limit-sweep.md sections B and C."
+   ]
+  },
+  {
+   "id": "B-554",
+   "task": "S.T23d",
+   "plan": "packages/eng-harness/docs/plans/0002-servers-and-adapters.md",
+   "planTask": "T23",
+   "kind": "docs",
+   "title": "Plan 0002 T23 lists the collateral test test_csi_revisions.py and the measured count 77",
+   "branch": "docs/b554-servers-t23-collateral-test",
+   "prTitle": "docs(eng-harness): servers plan T23 lists the collateral test of the csi_open_model envelope and its measured size (B-554)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Was in lane servers-t23-docs at the checkpoint."
+   ]
+  },
+  {
+   "id": "B-555",
+   "task": "W.T17",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T17",
+   "kind": "impl",
+   "title": "The change-set check and the expected effects take an absent model.sections/1",
+   "branch": "fix/b555-harness-wt17-sections-optional",
+   "prTitle": "fix(eng-harness): the change-set check and the expected effects take an absent model.sections/1 (B-555)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T16"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-543. Engineering calcs: adversarial verification. First-live-run path: steps 5 and 6 cannot run without it."
+   ]
+  },
+  {
+   "id": "B-556",
+   "task": "W.T7b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T7b",
+   "kind": "impl",
+   "title": "D-3 stops on a story drift above the limit, and D-2 takes the reason check_model_failed (rules and points)",
+   "branch": "fix/b556-harness-wt7b-d3-drift-stop",
+   "prTitle": "fix(eng-harness): d-3 stops on a story drift above the limit, and D-2 takes the reason check_model_failed (rules and points) (B-556)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544 (owner decision of 2026-11-16 on D-3). Estimate 30 is tight (about 26 to 28); the count is informational after B-553. W.T8 waits for it."
+   ]
+  },
+  {
+   "id": "B-557",
+   "task": "W.T16b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T16b",
+   "kind": "impl",
+   "title": "The change-set values carry their canonical number and the check references reach it (write arguments)",
+   "branch": "fix/b557-harness-wt16b-canonical-values",
+   "prTitle": "fix(eng-harness): the change-set values carry their canonical number and the check references reach it (write arguments) (B-557)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T16",
+    "W.T17"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [
+    "sources",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544. Engineering calc change: adversarial verification. harness.change_set_check stays at version 1 (owner queue)."
+   ]
+  },
+  {
+   "id": "B-558",
+   "task": "W.T9c",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T9c",
+   "kind": "impl",
+   "title": "Step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off",
+   "branch": "feat/b558-harness-wt9c-d2-failed-check-exceptions",
+   "prTitle": "feat(eng-harness): step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off (B-558)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "W.T9b",
+    "W.T7b"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544."
+   ]
+  },
+  {
+   "id": "B-559",
+   "task": "I.T9c",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T9c",
+   "kind": "impl",
+   "title": "Sign-off screen reads the edit cycle design verdicts (harness.host_design_verdicts/1)",
+   "branch": "feat/b559-harness-it9c-signoff-design-verdicts",
+   "prTitle": "feat(eng-harness): sign-off screen reads the edit cycle design verdicts (harness.host_design_verdicts/1) (B-559)",
+   "risk": "r3",
+   "pending_deps": [
+    "I.T9b"
+   ],
+   "writer": "sonnet, medium",
+   "reviewer": "opus, medium",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "From documents item B-544."
+   ]
   }
  ]
 }

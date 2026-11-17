@@ -259,6 +259,29 @@ tasks:
     # (T8 and T9a, T9b follow through T7).
     # Amendment (B-542, documents only): tests/contract/test_rule_lock.py, tests/rules/test_block_modules.py and .gate/ratchet.json join the files; trial: the mutation baseline passes with exactly these (see T7 prose).
     depends_on: [T1b, T15]
+  - id: T7b
+    title: D-3 stops on a story drift above the limit, and D-2 takes the reason check_model_failed (rules and points)
+    # Amendment (B-544, documents only): new fix task for merged T7 code (owner decision of 2026-11-16, spec Q20; spec
+    # Q14 interim reading; spec 4.6, AC18). edit_cycle_analysis_messages.clean also needs drift_status PASS (about 3
+    # lines and the rationale), ReadbackReason gains check_model_failed (1), both rules and the D-2 point move to version
+    # 2 (3; the rule lock hashes the module source, the point lock its state schema, docstrings included, so the D-3
+    # point and AnalysisState stay unchanged at version 1), the two locks follow (about 6),
+    # 1 of CHANGELOG.md: about 15; budget 30 (an estimate). T7 is not changed; T8 waits for this task.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/rules/edit_cycle.py"
+      - "packages/eng-harness/src/eng_harness/rules.lock.json"
+      - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_points.py"
+      - "packages/eng-harness/src/eng_harness/decisions.lock.json"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_boundary"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_clean_drift_at_and_above_the_limit"
+      - "packages/eng-harness/tests/rules/test_edit_cycle.py::test_pass_boundary"
+    covers: [AC18]
+    depends_on: [T7]
   - id: T8
     title: Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back)
     # Amendment (B-417, documents only): basis_fields and the blank template's ask_each_run use the unit-suffixed paths of spec 4.8; registration and blocks.lock.json move to T9 (this task is at the 400-line cap); T9b since the split (B-511).
@@ -279,6 +302,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_change_set_step.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
+    # Amendment (B-544, documents only): EditCycleOutput.summaries is the ordered tuple of spec 4.2; step 8 passes the resolved references unchanged, which T16b makes valid write arguments; waits for T7b and T16b; no line added, files and budget unchanged.
     max_changed_lines: 400
     max_sessions: 3
     tests_first:
@@ -290,27 +314,33 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_change_set_step.py::test_invalid_change_set_asked_again"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait"
     covers: [AC1, AC2, AC10, AC11, AC13, AC17, AC24]
-    depends_on: [T2, T3, T5, T6, T7, T17]  # T17 and external plan 0001 T23 by amendment B-543 (section 3)
+    depends_on: [T2, T3, T5, T6, T7, T7b, T16b, T17]  # T17 and external plan 0001 T23 by amendment B-543 (section 3); T7b and T16b by amendment B-544
   - id: T9a
     title: Workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn)
     # Amendment (B-511, documents only): pre-flight audit. The former T9 was planned at the 400-line cap (B-417: 395 to
     # 400) with no margin; split by its own structure, as B-499 split engine T16. T9a: run_and_summarize and the
     # engineer turn, tested through the test workflows of conftest.py; 200 is an estimate, to measure at write time.
+    # Amendment (B-544, documents only): first-live-run walk-through C21, C22, C23 and the owner's drift decision (spec
+    # 4.5 steps 13 and 14, 4.6, Q20, Q21; AC41, AC42): the step 13 model-state read and its frames, the combinations
+    # named in the drift read, one design summary per design kind, the D-3 drift_status and the turn's design status;
+    # about 30 lines: 200 to 235 (an estimate). The rule it relies on is T7b's (through T8).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py"
-    max_changed_lines: 200
+    max_changed_lines: 235
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py::test_engineer_turn_branches"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_turn.py::test_drift_at_d3"  # AC42 (amendment B-544)
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_step_13_and_14_inputs"  # AC41 (amendment B-544)
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_analysis_timeout_reconciles"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_design_timeout_reconciles"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_save_before_analysis_and_design"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_long_runs.py::test_stale_build_stops_before_any_write"
-    covers: [AC16, AC19]
+    covers: [AC16, AC19, AC41, AC42]
     depends_on: [T4, T4b, T8]
   - id: T9b
     title: Workflow part 2b - steps 16 and 17 (promotion, sign-off), the cycle loop and registration
@@ -486,6 +516,56 @@ tasks:
       - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py::test_item_id_with_a_slash_is_refused"
     covers: [AC4]
     depends_on: [T3]
+  - id: T16b
+    title: The change-set values carry their canonical number and the check's references reach it (write arguments)
+    # Amendment (B-544, documents only): new fix task for merged T1b and T2 code (first-live-run walk-through C17; spec
+    # 4.3.1, 4.4.1 K4, AC40). A resolved value's ref names the value record or a key without a unit suffix, so the CSI
+    # tool port refuses it as an engineering argument (INVALID_ARGUMENT or REF_UNIT_MISMATCH). About 20 lines in
+    # _change_set.py (value_<suffix> filled and checked by eng_contract.units), 4 in change_set_check.py (the two ref
+    # forms), 4 of the lock (the check and expected_effects import the model), 4 of the record, 1 of CHANGELOG.md: about
+    # 33; budget 50 (an estimate). After T16 and T17 (B-543), which edit change_set_check.py, calcs.lock.json, the record
+    # and the golden test as this task does (T17 also expected_effects.py, whose lock entry this task moves).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_change_set.py"
+      - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py"
+      - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
+      - "packages/eng-harness/tests/data/golden/edit_cycle/check-*.json"
+    max_changed_lines: 50
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py::test_value_refs_are_write_arguments"
+    covers: [AC40]
+    depends_on: [T16, T17]  # T17 (B-543) shares change_set_check.py, calcs.lock.json, harness.change_set_check.md and test_change_set_check.py
+  - id: T9c
+    title: Step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off
+    # Amendment (B-544, documents only): new (first-live-run walk-through C19, C25, C32; spec 4.5, 4.6, AC17, AC22, Q14
+    # interim reading). The check inserted before the step 9 read raises ModelIntegrityError, which escalates, so D-2
+    # never sees a READBACK_MISMATCH or READBACK_UNAVAILABLE; and the sign-off of a run with exceptions cannot be signed
+    # without the exc_<n> items. About 15 lines for the route in _cycle.py, 20 for the items (the verdict results
+    # collected per cycle in _cycle.py, numbered in _finish.py), 1 of CHANGELOG.md: about 36; the blocks of _cycle.py
+    # and _finish.py move to version 2 (block.py hashes the module source) with blocks.lock.json rewritten: one changed
+    # version line per block (2 counted lines) and two changed lock lines per entry (4 counted lines), about 36 to 42
+    # more for six or seven blocks; budget 85 (an estimate).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
+      - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_finish.py"
+      - "packages/eng-harness/src/eng_harness/blocks.lock.json"  # the version 2 entries of the changed blocks (spec 0001 4.2)
+      - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
+      - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"  # only where T8 or T9b pin a child block's version
+    max_changed_lines: 85
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py::test_check_failure_routes"
+      - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py::test_sign_off_exception_items"
+    covers: [AC17, AC22]
+    depends_on: [T9b, T7b]
   - id: T15
     title: FB005 admits the integer version of block, workflow, decision_point and rule (gate configuration)
     # Amendment (B-511, documents only): new. .gate/forbidden.yml line 16 lists only calc and CheckMeta under
@@ -568,6 +648,9 @@ The decision points and rules (T7) are R1 and reviewed separately from the block
 report and audit (T10), the prompt counter and timings (T10b) are pure functions over the journal. T11 and T12 add the acceptance
 support and the replay suite, mostly tests. T10c and T16 fix merged code found by the first-live-run walk-through
 (amendment B-545): the benchmark label's place in the stored answer, and the item ids the change-set screen can carry.
+T7b, T16b and T9c (amendment B-544) follow the same walk-through and the owner's drift decision of 2026-11-16: T7b
+(rule and points) after T7 and before T8, T16b (change-set values as write arguments) after T16 and T17 and before T8, and T9c
+(the step 9 route and the step 17 exception items) after T9b; T9a carries the step 13 and 14 changes.
 
 Reuse (spec §2): everything from plans 0001 to 0006; no code is copied from Sasaah or elsewhere (A12). Tests use the
 synthetic CSI fake of plan 0002 T4 (extended by T5 here with the `Analysis Messages` table, design replies, a lock
@@ -721,6 +804,23 @@ mutation step rewrites it in its copy of the package: the hash no longer matches
 does not judge the mutmut import (spec 0001 AC19). The skip raises the eng-harness skip count in `.gate/ratchet.json`
 from 4 to 5. No other test and no budget changes.
 
+**T7b Drift at D-3 and the failed-check reason at D-2** (amendment B-544; spec §4.6, AC18, Q20, Q14). In
+`rules/edit_cycle.py`, `edit_cycle_analysis_messages.clean` returns `continue` only when the state has no error, no
+unclassified message and `drift_status` `PASS` (the owner's decision of 2026-11-16), with a rationale that says so;
+`readback_result_pass` is unchanged. In `workflows/model_edit_cycle/_points.py`, `ReadbackReason` gains
+`check_model_failed`; `AnalysisState`, its fields and its docstring stay as they are, because the point lock hashes
+the state's JSON schema, which carries the class docstring, so the D-3 point keeps version 1 (how `drift_status` is
+read, spec §4.6, is stated in the rule's docstring and rationale, which change anyway). Both rules move to version 2,
+because `rules.lock.json` hashes the module source, and the point
+`edit_cycle_readback_result` moves to version 2, because its state schema changes (spec 0005 AC4, AC10); both locks are
+regenerated with `uv run python -m eng_harness.decisions --write-lock`. The first `test:` commit changes the last
+assertion of `test_clean_boundary` (a drift state gives `None`; the spec changed, not the test's aim), adds
+`check_model_failed` to `test_pass_boundary` (`None`), and adds `test_clean_drift_at_and_above_the_limit`, whose states
+are derived by hand in its docstring from spec §4.4.4 and §4.6: a summary whose highest drift ratio equals the limit has
+`exceeding` empty, so `drift_status` is `PASS` and the rule continues; a ratio just above it is in `exceeding`, so
+`NEEDS_ENGINEER` and `None` (synthetic values, no limit is hard-coded in the rule). All three fail at the merge base.
+The version assertion of `test_discovery_finds_the_points_and_rules` follows in the implementation commit.
+
 **T8 Workflow part 1** (spec §4.2, §4.5 steps 1 to 10, §4.7, §4.8). Input and output models, `basis_fields`, the
 child blocks `read_state`, `obtain_change_set` and `apply_change_set` (with D-2 and the approval-void loop), and the
 blank template's `ask_each_run` list (paths only, no value, spec 0004 §4.8). Amendment (B-417): plan 0004 T9 has pinned
@@ -732,6 +832,12 @@ is T9b's (this task is at its 400-line cap): `block.discover()` stays empty here
 workflows defined in `tests/workflow/edit_cycle/conftest.py`.
 Amendment (B-533): the report support of T10b identifies a cycle by the `block` step whose `child.name` is `edit_cycle_once`;
 T8 keeps that block name (and its `block` step kind) for the cycle child block.
+Amendment (B-544): `EditCycleOutput.summaries` is the ordered tuple of spec §4.2 (the analysis summary, then one design
+summary per kind of `design.run`), which T9a and T9b fill; step 8 passes each resolved `ref` unchanged as the tool's
+engineering argument, valid once T16b has merged; the D-2 reason `check_model_failed` is T7b's and its route T9c's, and
+the D-3 state (`AnalysisState`, which T9a fills) follows spec §4.6 as amended by B-544: the owner's decision of
+2026-11-16 that a story drift above the limit stops the cycle at D-3, `drift_status` read from the analysis summary's
+`exceeding` (T7b's rule).
 Amendment (B-503): plan 0001 T22 stops on a `check_model` that is not clean, which the check inserted before the S'
 read of step 9 can meet; how the block routes that stop is spec Q14 (open). Until Q14 is answered this task adds no
 routing code: the inserted check's `ModelIntegrityError` escalates like any other `StepError`, and
@@ -770,6 +876,15 @@ The merged test `tests/unit/test_block.py::test_main_writes_the_lock` runs `main
 `discover()`, and expects `"[]\n"`; once `discover()` returns the shipped blocks it would fail, so the task lists that file
 and monkeypatches `block.discover` there to return an empty `Registry`, keeping the expectation (what the shipped blocks
 are is checked by `test_block_lock.py` and `test_workflow_registered`).
+Amendment (B-544; spec §4.5 steps 13 and 14, §4.6, AC41, AC42): T9a's step 13 parallel also calls
+`csi_read_model_state` (`F`) and passes the drift read `cases` empty and `combos` every combination of `R[k]`'s
+`harness.csi_name_lists/1`; step 14 runs `harness.host_design_verdicts` and `harness.design_summary` once per kind of
+`design.run`, steel before concrete, with `F.frames` and that kind's previous summary; the D-3 state's `drift_status` is
+`PASS` when the analysis summary's `exceeding` is empty, else `NEEDS_ENGINEER` (spec §4.6, owner decision of 2026-11-16); the
+turn's design status is the worse of the summaries' statuses in the order of spec 0003 §4.9 S5. `test_step_13_and_14_inputs`
+runs a cycle with `design.run` `steel_and_concrete` and checks the calls, the two summaries and the absence of
+`REF_STALE`; `test_drift_at_d3` seeds the fake's drift rows at the limit and just above it (synthetic values)
+and checks D-3. The workflow tests of the normal paths seed drift rows not above the limit (spec §4.9).
 
 **T10 and T10b Report and B-1 support** (spec §4.9; split by amendment B-533). T10: renderers for the kinds of T1a and
 value cells with sources (spec 0006 AC52) and `audit_value_sources`. T10b: `count_prompts`, `edit_cycle_timings`, the
@@ -835,6 +950,38 @@ Open, not built (spec §11 Q18): two terms of one `load_combination_set` item wi
 `case.case_type`, `case.step`) are not refused either; K3 speaks of two items, so the spec does not require it and no
 test pins either behaviour.
 
+**T16b Change-set values as write arguments** (amendment B-544; spec §4.3.1, §4.4.1 K4, AC40). In `_change_set.py`
+each input value model holds `value_<suffix>` (`value_mm`, `value_kN_m`, `value_kPa`, `value_ratio`): a `before`
+validator fills it from `value` and `unit` by `eng_contract.units` when it is absent and refuses a given one that
+differs from that conversion, so the stored answer validates again on replay. The field and the validator are declared
+only on the four change-set models `LengthInput`, `LineLoadInput`, `AreaLoadInput` and `RatioInput`, not on
+`_InputValue`; the column workflow's `_Area` (frozen, `workflows/column_design/_requests.py`) and its round-trip test stay
+as they are. In `change_set_check.py` a resolved value's `ref` gains `/value`
+(basis) or `/value_<suffix>` (input). No bound, unit rule or issue changes, and the calc keeps version 1 (spec §4.4.1).
+The lock moves the entries of the check and of `harness.expected_effects` (both import the model); the record gains
+the reference form. `test_value_refs_are_write_arguments` stores an answer as the engine does, runs the check, and
+validates each resolved ref with `eng_contract` `validate_input(..., InputPolicy(require_refs=True))` against
+`DefineWallSectionArgs`, `SetFrameLoadDistributedArgs` and `AddLoadPatternArgs`: 0.2 m gives 200 mm (derived by hand
+from the contract's unit table); it fails at the merge base with `INVALID_ARGUMENT`. The golden outputs of the check
+change their `ref` strings only, those of T17's `check-no-sections-*` cases included. T16b waits for T16 and T17, which
+edit the same four files.
+
+**T9c Failed check at step 9 and exception items at step 17** (amendment B-544; spec §4.5, §4.6, AC17, AC22, Q14). The
+step 9 block catches `ModelIntegrityError` from the S' read and opens D-2 with the state of spec §4.6 (reason
+`check_model_failed`, `NEEDS_ENGINEER`, flags false, the step 6 expected effects as refs); `test_check_failure_routes`
+has the fake change a written value before the inserted check, so `check_model` reports `READBACK_MISMATCH`, and checks
+that D-2 opens, analysis does not run and `restore_previous` works. Step 17 adds after the outputs one item `exc_<n>`
+per exception of every cycle's `harness.host_design_verdicts/1` results in call order (spec §4.5); the cycle loop
+keeps those references. `test_sign_off_exception_items` runs two cycles whose verdicts hold `FAIL` and `NEEDS_ENGINEER`
+rows, checks the items and their order against the sign-off screen of plan 0006 T9c (each exception row has a reason
+field), and signs with a reason per exception; it fails at the merge base, where the request has no `exc_` item.
+The verdict references stay in `_cycle.py` and `_finish.py`, never in `__init__.py`, so `model_edit_cycle` keeps
+version 1 (AC1). `block.py` hashes the source of each block's module (spec 0001 §4.2), so every block of `_cycle.py`
+(`edit_cycle_once`, `read_state`, `obtain_change_set`, `apply_change_set`, `run_and_summarize`) and of `_finish.py`
+moves to version 2, and `blocks.lock.json` is rewritten with `python -m eng_harness.block --write-lock`; without that,
+`tests/contract/test_block_lock.py::test_lock_matches_registry` reports `VERSION_BUMP_REQUIRED`. `test_definition.py`
+changes only where T8 or T9b pinned a child block's version.
+
 **T15 FB005 and the block version** (amendment B-511; spec AC2, gate spec §4.8 A4). `.gate/forbidden.yml` line 16
 becomes `callables: [calc, CheckMeta, block, workflow, decision_point, rule]`; nothing else of FB005 changes. The first
 `test:` commit extends `test_version_keyword_of_versioned_callable` with `@block(..., version=1)`,
@@ -889,6 +1036,8 @@ paths; the merged cases, which pass the record, keep their expectations. T17 wai
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 | T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
+| T7b, T16b | nothing outside this plan (amendment B-544); T7b after T7; T16b after T16 and T17 (`change_set_check.py`, `calcs.lock.json`, `harness.change_set_check.md`, `test_change_set_check.py`); T8 waits for both |
+| T9c | plan 0006 T9c (the sign-off screen reads `harness.host_design_verdicts/1`; amendment B-544) |
 | T10c | nothing outside this plan (amendment B-545) |
 | T16 | T4b of this plan (both edit `calcs.lock.json`; amendment B-545) |
 | T15 | gate plan T39 (FB005 form A4, merged); the owner's approval of the protected change (amendment B-511) |
