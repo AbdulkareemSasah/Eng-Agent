@@ -23,7 +23,7 @@ __all__ = ["analysis_messages_clean", "readback_result_pass"]
     id="edit_cycle_readback_result.pass",
     version=2,
     point="edit_cycle_readback_result",
-    rationale="The read-back passed, with no model change during apply or failed pre-read check, so the cycle continues.",
+    rationale="The read-back passed without a model change or failed pre-read check, so the cycle continues.",
 )
 def readback_result_pass(state: ReadbackState, basis: RuleBasis) -> Pick[ReadbackAction] | None:
     """Spec 0007 4.6: status `PASS` and reason `readback` give `continue`; `check_model_failed` does not."""
@@ -36,7 +36,7 @@ def readback_result_pass(state: ReadbackState, basis: RuleBasis) -> Pick[Readbac
     id="edit_cycle_analysis_messages.clean",
     version=2,
     point="edit_cycle_analysis_messages",
-    rationale="The analysis has no error, no unclassified message and no drift above the basis limit, so the cycle continues.",
+    rationale="No error, no unclassified message and no drift above the basis limit: the cycle continues.",
 )
 def analysis_messages_clean(state: AnalysisState, basis: RuleBasis) -> Pick[AnalysisAction] | None:
     """Spec 0007 4.6: no error, no unclassified message and drift `PASS` give `continue` (Q20).

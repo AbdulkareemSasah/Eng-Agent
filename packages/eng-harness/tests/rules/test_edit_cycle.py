@@ -15,7 +15,7 @@ from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
 
 from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
-from eng_harness.calcs.edit_cycle.analysis_summary import SummaryInput, analysis_summary
+from eng_harness.calcs.edit_cycle.analysis_summary import SummaryBody, SummaryInput, analysis_summary
 from eng_harness.ctx import BasisView
 from eng_harness.decisions import _points, _rules
 from eng_harness.decisions._points import DecisionPoint
@@ -92,6 +92,10 @@ def test_clean_boundary() -> None:
             assert analysis_messages_clean.fn(drift, _BASIS) is None
 
 
+def _summary(inp: SummaryInput, meta: InputMeta) -> SummaryBody:
+    return SummaryBody.model_validate(analysis_summary(inp, meta, TraceBuilder()).model_dump())
+
+
 def test_clean_drift_at_and_above_the_limit() -> None:
     """Spec 0007 4.4.4, 4.6, AC18: exact equality passes; the next stored float exceeds.
 
@@ -125,7 +129,7 @@ def test_clean_drift_at_and_above_the_limit() -> None:
             for name, result_id in case["refs"].items()
         }
     )
-    at = analysis_summary(inp, meta, TraceBuilder())
+    at = _summary(inp, meta)
     assert at.exceeding == []
     assert at.governing_drift["X"].ratio == at.limit_ratio
     state = AnalysisState(
@@ -134,15 +138,11 @@ def test_clean_drift_at_and_above_the_limit() -> None:
     assert analysis_messages_clean.fn(state, _BASIS) == Pick(AnalysisAction.CONTINUE)
     rows = list(inp.drifts.rows)
     rows[1] = rows[1].model_copy(update={"drift_ratio": nextafter(at.limit_ratio, inf)})
-    above = analysis_summary(
-        inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": rows})}), meta, TraceBuilder()
-    )
+    above = _summary(inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": rows})}), meta)
     assert [(row.story, row.ratio) for row in above.exceeding] == [("S2", nextafter(at.limit_ratio, inf))]
     drift_status = VerdictStatus.NEEDS_ENGINEER if above.exceeding else VerdictStatus.PASS
     assert analysis_messages_clean.fn(state.model_copy(update={"drift_status": drift_status}), _BASIS) is None
-    absent = analysis_summary(
-        inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": []})}), meta, TraceBuilder()
-    )
+    absent = _summary(inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": []})}), meta)
     assert absent.exceeding == []
     assert analysis_messages_clean.fn(state, _BASIS) == Pick(AnalysisAction.CONTINUE)
 
