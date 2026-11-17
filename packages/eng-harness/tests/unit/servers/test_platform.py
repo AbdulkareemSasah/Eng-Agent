@@ -38,7 +38,7 @@ def test_windows_pair_over_the_given_inspector(monkeypatch: pytest.MonkeyPatch) 
             JOB_SIGNATURES={"b": 2}, WindowsLauncher=lambda kernel, inspector: ("launcher", kernel, inspector)
         ),
     }
-    monkeypatch.setattr(_platform, "_windows", lambda: True)
+    monkeypatch.setattr(_platform, "os", SimpleNamespace(name="nt"))
     monkeypatch.setattr(importlib, "import_module", lambda name: modules[name])
     inspector = cast(Any, platform_inspector())
     assert inspector == ("inspector", ("kernel32", {"a": 1}))

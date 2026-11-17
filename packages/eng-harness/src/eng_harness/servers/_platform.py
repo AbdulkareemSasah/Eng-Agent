@@ -8,13 +8,9 @@ from eng_harness.servers._launcher import PosixLauncher, ProcessLauncher
 from eng_harness.servers._procinfo import PosixProcessInspector, ProcessInspector
 
 
-def _windows() -> bool:
-    return os.name == "nt"
-
-
 def platform_inspector() -> ProcessInspector:
     """The POSIX inspector, or the Windows one."""
-    if not _windows():
+    if os.name != "nt":
         return PosixProcessInspector()
     pi = importlib.import_module("eng_harness.servers._procinfo")
     return cast(ProcessInspector, pi.WindowsProcessInspector(pi.CtypesKernel32(pi.PROCESS_SIGNATURES)))
@@ -22,7 +18,7 @@ def platform_inspector() -> ProcessInspector:
 
 def platform_launcher(inspector: ProcessInspector) -> ProcessLauncher:
     """The POSIX launcher, or the Job Object launcher, over `inspector`."""
-    if not _windows():
+    if os.name != "nt":
         if not isinstance(inspector, PosixProcessInspector):
             raise TypeError(f"POSIX launcher needs a PosixProcessInspector, not {type(inspector).__name__}")
         return PosixLauncher(inspector)
