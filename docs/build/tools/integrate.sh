@@ -18,7 +18,12 @@ OWNER=$LK/integrate.owner.b$N
 REL=$LK/integrate.release.b$N
 WAIT=520   # seconds one call may block (the tool timeout is 600)
 
-have_lock() { [ -f "$OWNER" ] && pgrep -f "integrate.owner.b$N;" >/dev/null 2>&1; }
+# Batch mode (owner decision of 2026-11-16, work item B-539): when the file $L/BATCH_MODE exists, local CI itself
+# queues the runs, tests on the newest base and tests waiting pull requests as one batch, so the lead's integration
+# lock is not taken: several integrators prepare their pull requests and wait at local CI at the same time.
+batch_mode() { [ -f "$L/BATCH_MODE" ]; }
+
+have_lock() { batch_mode && return 0; [ -f "$OWNER" ] && pgrep -f "integrate.owner.b$N;" >/dev/null 2>&1; }
 
 take_lock() {
   if have_lock; then return 0; fi
