@@ -2,8 +2,9 @@
 
 Expected picks are derived by hand from the rule lines of the table in spec 0007 section 4.6:
 `edit_cycle_readback_result.pass` is "status `PASS` and reason `readback` -> `continue`" and
-`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified`, drift `PASS` -> `continue`". Neither rule
-reads the basis (spec 0007 4.6: no rule holds a number), so the restricted basis view is built with no path.
+`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified`, drift `PASS` -> `continue`".
+Neither rule reads the basis (spec 0007 4.6: no rule holds a number),
+so the restricted basis view is built with no path.
 A state outside the rule gives `None` (spec 0007 AC18), so the next rule or the engineer decides.
 """
 
