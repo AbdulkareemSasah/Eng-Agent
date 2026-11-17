@@ -32,7 +32,7 @@ def gate_yml(*, bootstrap: bool = True) -> str:
         + "spec_globs: ['**/docs/specs/*.md', '**/docs/clauses/**/*.md']\nplan_globs: ['**/docs/plans/*.md']\n"
         "test_globs: ['**/tests/**', '**/test_*.py']\ngenerated_globs: ['uv.lock', '**/AGENTS.md']\n"
         "spike_globs: ['spikes/**']\n"
-        "limits:\n  diff_lines: 200\n  max_task_lines: 400\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
+        "limits:\n  diff_lines: 200\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
         "  mutation_run_seconds: 7200\n"
     )
 

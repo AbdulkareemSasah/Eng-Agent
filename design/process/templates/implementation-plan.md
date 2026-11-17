@@ -9,7 +9,7 @@ tasks:
   - id: T1
     title: {{short title}}
     files: ["src/<package>/tools/<module>.py", "tests/fake_host/test_<module>.py"]
-    max_changed_lines: 300
+    max_changed_lines: 300   # estimate only; exceeding it is never a failure
     max_sessions: 2
     tests_first: ["tests/fake_host/test_<module>.py::test_<criterion>"]
     covers: [AC1, AC2]

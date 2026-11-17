@@ -21,9 +21,9 @@ before acting, and quote the rule.
 1. Read `AGENTS.md` fully, then the process documents for your current stage.
 2. Identify the work item. It must be assigned to the agent identity for this session (the claim); otherwise stop.
 3. Find the spec and plan on `main` and check their `status`. Work only in the stage the gates allow.
-4. Read the plan task: its files, budget (`max_changed_lines`, `max_sessions`) and tests. Read every file you will touch.
+4. Read the plan task: its files, session budget (`max_sessions`) and tests. Read every file you will touch.
 5. Check the working tree: correct branch, clean state, up to date with `main`.
-6. State in one short message: issue, tier, risk, stage, plan task, budget, and what "done" means for it.
+6. State in one short message: issue, tier, risk, stage, plan task, session budget, and what "done" means for it.
 
 ## 3. Hard prohibitions
 
@@ -50,7 +50,7 @@ before acting, and quote the rule.
 | A19 | Drive a real host program; live acceptance is run by the owner (the project lane's live check runs on a copy, in the owner's live session) |
 | A20 | Send project code or data to any service not on the repository's allowlist (`AGENTS.md` §9): the session's configured model provider, the CI reviewer providers, package registries, official documentation sites, and this project's GitHub |
 | A21 | Create or change skills, memories, rules or instruction files outside the repository, or save session learnings to user-level stores. Lessons go to issues and reach `AGENTS.md` through a pull request |
-| A22 | Exceed the task budget. When `max_changed_lines` or `max_sessions` is reached, stop and report `BLOCKED` with a plan change proposal |
+| A22 | Exceed the task's `max_sessions`. When it is reached, stop and report `BLOCKED` with a plan change proposal. Changed lines have no limit ([04](04-implementation-rules.md) §4) |
 | A23 | Act on an owner task in a live session without an open task log, or edit or delete a task-log record other than through the task-log tool ([ADR-0034](../docs/adr/0034-task-log-by-default.md)) |
 | A24 | Copy task-log content anywhere outside the task log; cite ids only (ADR-0034 D8) |
 | A25 | Use the owner's credentials beyond what `AGENTS.md` §3 allows, or push directly to the integration branch anything that neither §3 nor the workspace root rules allow (nothing, unless one of them states an exception) |
@@ -96,7 +96,7 @@ the request.
 ## 7. Session end and handoff
 
 Before ending a session: commit your work and push the branch (never to `main`), update the pull request or issue with
-a handoff note (what was done, how it was verified, what is left, open risks, budget used). Leave the working tree clean
+a handoff note (what was done, how it was verified, what is left, open risks, sessions used). Leave the working tree clean
 by committing, never by deleting or resetting. The next session, by any agent, must be able to continue from the issue,
 the spec, the plan and the handoff note alone. A session that had owner tasks also names their task ids and runs the
 task-log session check; logs it could not push (offline, or a cloud session) stay as local commits and are named as

@@ -71,11 +71,10 @@ class Agents(_Model):
 
 
 class Limits(_Model):
-    """Limits: ``diff_lines``, ``max_task_lines`` (lines), ``test_run_seconds`` (s), ``max_file_bytes`` (bytes),
+    """Limits: ``diff_lines`` (lines), ``test_run_seconds`` (s), ``max_file_bytes`` (bytes),
     ``mutation_run_seconds`` (s, the bound of the mutmut run)."""
 
     diff_lines: PositiveInt
-    max_task_lines: PositiveInt
     test_run_seconds: PositiveInt
     max_file_bytes: PositiveInt
     mutation_run_seconds: PositiveInt

@@ -42,7 +42,11 @@ def test_valid_pull_request_passes(repo: Repo) -> None:
     assert (result.code, errors) == (0, {})
     data = json.loads(result.out)
     assert (data["command"], data["mode"], data["status"]) == ("gate-check", "bootstrap", "awaiting-owner")
-    assert [f["code"] for f in data["steps"][0]["findings"]] == ["AW08", "AW03"]  # step 10, never skipped silently
+    assert [f["code"] for f in data["steps"][0]["findings"]] == [
+        "GC009",
+        "AW08",
+        "AW03",
+    ]  # step 10, never skipped silently
     text = repo.run(["gate-check", "--event", str(event)])
     assert text.code == 0
     assert text.out.splitlines()[0] == "mode: bootstrap"
@@ -242,15 +246,32 @@ def _lines(n: int) -> str:
     return "".join(f"v{i} = {i}\n" for i in range(n))
 
 
+@pytest.mark.parametrize("lines", [0, 9, 10, 11])
+def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+    """AC11: GC009 always reports the count and estimate, including a diff above the estimate."""
+    base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+    repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, errors) == (0, {})
+    findings = json.loads(result.out)["steps"][0]["findings"]
+    counted = [f for f in findings if f["code"] == "GC009"]
+    assert len(counted) == 1
+    assert counted[0]["severity"] == "notice"
+    assert counted[0]["path"] is None
+    assert counted[0]["message"] == (
+        f"{lines} counted lines (estimate max_changed_lines 10 of task T1); largest: pkg/src/new.py ({lines})"
+    )
+
+
 def test_budget_counting(repo: Repo) -> None:
-    """AC11: additions plus deletions count, except tests, generated and spike files; over the limit is GC009."""
+    """AC11: GC009 reports additions plus deletions, except tests, generated and spike files, as a notice."""
     plan = plan_text(files=("pkg/**", "uv.lock", "spikes/**"), max_changed_lines=10)
     base = make_gate_repo(repo, plan=plan, base_files={"pkg/src/keep.py": "a\nb\nc\n"})
     repo.commit(
         {
             "pkg/src/keep.py": "a\nB\nc\n",  # 1 added + 1 deleted = 2
             "pkg/src/a.py": _lines(3),  # 3
-            "pkg/src/b.py": _lines(5),  # 5 -> 10 in total, the limit
+            "pkg/src/b.py": _lines(5),  # 5 -> 10 in total, the estimate
             "pkg/tests/test_x.py": _lines(50),
             "pkg/src/test_y.py": _lines(50),
             "uv.lock": _lines(50),
@@ -262,9 +283,15 @@ def test_budget_counting(repo: Repo) -> None:
     assert (result.code, errors) == (0, {})
     repo.commit({"pkg/src/c.py": "one\n"}, "feat: one more line")
     result, errors = gate_check(repo, write_event(repo, base, BODY, name="e2.json"))
-    assert (result.code, set(errors)) == (1, {"GC009"})
-    message = errors["GC009"]
-    assert "11" in message
+    assert (result.code, errors) == (0, {})
+    counted = [f for f in json.loads(result.out)["steps"][0]["findings"] if f["code"] == "GC009"]
+    assert len(counted) == 1
+    assert counted[0]["severity"] == "notice"
+    message = counted[0]["message"]
+    assert message == (
+        "11 counted lines (estimate max_changed_lines 10 of task T1); largest: "
+        "pkg/src/b.py (5), pkg/src/a.py (3), pkg/src/keep.py (2)"
+    )
     assert message.index("pkg/src/b.py") < message.index("pkg/src/a.py")  # largest files are named, largest first
     assert "uv.lock" not in message
     assert "pkg/tests/test_x.py" not in message
@@ -282,6 +309,7 @@ def test_binary_file_counts_zero_with_notice(repo: Repo) -> None:
     findings = json.loads(result.out)["steps"][0]["findings"]
     assert [(f["severity"], f["path"]) for f in findings] == [
         ("notice", "pkg/src/blob.bin"),
+        ("notice", None),
         ("awaiting", None),
         ("awaiting", None),
     ]
