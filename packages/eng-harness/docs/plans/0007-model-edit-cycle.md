@@ -546,15 +546,19 @@ tasks:
     # interim reading). The check inserted before the step 9 read raises ModelIntegrityError, which escalates, so D-2
     # never sees a READBACK_MISMATCH or READBACK_UNAVAILABLE; and the sign-off of a run with exceptions cannot be signed
     # without the exc_<n> items. About 15 lines for the route in _cycle.py, 20 for the items (the verdict results
-    # collected per cycle in _cycle.py, numbered in _finish.py), 1 of CHANGELOG.md: about 36; budget 50 (an estimate).
+    # collected per cycle in _cycle.py, numbered in _finish.py), 1 of CHANGELOG.md: about 36; the blocks of _cycle.py
+    # and _finish.py move to version 2 (block.py hashes the module source) with blocks.lock.json rewritten: one version
+    # line per block and two lock lines per entry, about 20 more; budget 65 (an estimate).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_finish.py"
+      - "packages/eng-harness/src/eng_harness/blocks.lock.json"  # the version 2 entries of the changed blocks (spec 0001 4.2)
       - "packages/eng-harness/tests/workflow/edit_cycle/conftest.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
-    max_changed_lines: 50
+      - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"  # only where T8 or T9b pin a child block's version
+    max_changed_lines: 65
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py::test_check_failure_routes"
@@ -970,6 +974,12 @@ per exception of every cycle's `harness.host_design_verdicts/1` results in call 
 keeps those references. `test_sign_off_exception_items` runs two cycles whose verdicts hold `FAIL` and `NEEDS_ENGINEER`
 rows, checks the items and their order against the sign-off screen of plan 0006 T9c (each exception row has a reason
 field), and signs with a reason per exception; it fails at the merge base, where the request has no `exc_` item.
+The verdict references stay in `_cycle.py` and `_finish.py`, never in `__init__.py`, so `model_edit_cycle` keeps
+version 1 (AC1). `block.py` hashes the source of each block's module (spec 0001 §4.2), so every block of `_cycle.py`
+(`edit_cycle_once`, `read_state`, `obtain_change_set`, `apply_change_set`, `run_and_summarize`) and of `_finish.py`
+moves to version 2, and `blocks.lock.json` is rewritten with `python -m eng_harness.block --write-lock`; without that,
+`tests/contract/test_block_lock.py::test_lock_matches_registry` reports `VERSION_BUMP_REQUIRED`. `test_definition.py`
+changes only where T8 or T9b pinned a child block's version.
 
 **T15 FB005 and the block version** (amendment B-511; spec AC2, gate spec §4.8 A4). `.gate/forbidden.yml` line 16
 becomes `callables: [calc, CheckMeta, block, workflow, decision_point, rule]`; nothing else of FB005 changes. The first
