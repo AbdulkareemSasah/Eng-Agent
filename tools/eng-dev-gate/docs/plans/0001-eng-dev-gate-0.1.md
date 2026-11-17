@@ -4,7 +4,9 @@ issue: "B-004"
 spec: tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md
 status: draft            # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: r3                 # binding for every pull request of this plan; never below the path risk floor
+risk: [r2, r3]           # binding for every pull request of this plan; never below the path risk floor
+# Amendment (B-561): T40 requires packages/eng-contract/AGENTS.md and .gate/agents.yml
+# under that package; their existing contract path floor adds r2 to the gate's r3.
 tasks:
   - id: T1
     title: Package skeleton, dependency ADR, CLI shell
