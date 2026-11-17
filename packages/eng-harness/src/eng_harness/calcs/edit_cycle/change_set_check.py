@@ -1,8 +1,9 @@
 """Calc `harness.change_set_check` v1: the change set against the model and the basis (spec 0007 4.4.1, K1 to K7).
 
 Purpose: resolve each item's selection to sorted explicit names (K1), check every name (K2), refuse two items on one
-target and property and an item id with `/` (K3), check each value's source, unit and bounds (K4), name the gap of a
-refused kind (K5), warn where the engineer changed a property an item also sets (K6), and fail on any error (K7).
+target and property and an item id that is not a page token (K3), check each value's source, unit and bounds (K4), name
+the gap of a refused kind (K5), warn where the engineer changed a property an item also sets (K6), and fail on any
+error (K7).
 Inputs: `change_set` (the answer field), the step 3 read set as flat fields (`frames`, `areas`, `sections`,
 `restraints`), `names` (`harness.csi_name_lists/1`), `diff` (the step 4 `harness.model_diff/1`) and `basis`.
 Units: a value is compared exactly in the canonical unit of its quantity kind (the unit of its bounds), converted by
@@ -44,6 +45,10 @@ ANSWER_FIELD = "fields/change_set/value"
 _FRAMES, _AREAS = "model.frame_placements/1", "model.area_placements/1"
 _SECTIONS, _LOADS, _JOINTS = "model.sections/1", "model.load_set/1", "model.joint_restraints/1"
 _GRAVITY = "gravity"
+_ID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"
+_RESERVED_IDS = ("revision", "unlock")
+"""K3 (spec 0007 4.4.1): an item id is a page token of spec 0006 AC49 (`[A-Za-z0-9_.-]`, at most 64) less the 7 of the
+field prefix `reject_` and `reason_` (1 to 57 characters), and not an id step 6 adds to the preview itself."""
 _REFS = ("change_set", "frames", "areas", "sections", "restraints", "names", "diff", "basis")
 _VALUES = (
     ("wall_section", "thickness", "length", "/thickness_mm"),
@@ -57,6 +62,10 @@ Claim = tuple[str, tuple[str, ...], str, str]
 """Section, reported key (spec 0003 4.7 D2, list name first), property pointer and the value the item sets."""
 Bounds = dict[str, tuple[Fraction, Fraction, str]]
 """Per quantity kind: exact lower and upper bound and their (canonical) unit."""
+
+
+def _is_page_token(text: str) -> bool:
+    return 0 < len(text) <= 57 and all(char in _ID_CHARS for char in text)  # K3: 64 less the 7 of the prefix
 
 
 def _ref(kind: str) -> Any:
@@ -290,6 +299,13 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
     for index, item in enumerate(items):
         if "/" in item.id:  # K3: effect ids join the item id with `/` (spec 0007 4.4.2)
             check.issue(item.id, "INVALID_ITEM_ID", f"item id {item.id} contains / (spec 0007 4.4.1 K3)")
+        elif not _is_page_token(item.id) or item.id in _RESERVED_IDS:  # K3: the change-set screen's field names
+            check.issue(
+                item.id,
+                "INVALID_ITEM_ID",
+                f"item id {item.id} is not 1 to 57 ASCII letters, digits, _, . or -, or is revision or unlock"
+                " (spec 0007 4.4.1 K3)",
+            )
         if (gap := refused_gap(item)) is not None:  # K5
             check.issue(item.id, "NOT_IMPLEMENTED", f"{item.kind} is refused in v1 (spec 0007 4.3.2)", gap=gap)
             continue

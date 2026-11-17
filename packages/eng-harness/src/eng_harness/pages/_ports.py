@@ -27,7 +27,9 @@ from eng_harness.report._lineage import ReleaseMarks  # not `eng_harness.report`
 
 type ScreenBuilder = Callable[[PageHub, Request], Screen]  # T9, T9b and T10 register theirs by `request.kind`
 type FormCheck = Callable[[PageHub, Request, Mapping[str, str]], None]  # raises `AnswerError`; by `request.kind`
-_VOIDABLE = frozenset({"CHANGE_SET", "PROMOTION"})  # the approvals that bind a model (spec 0006 4.4.5)
+_VOIDABLE = frozenset(
+    {"change_set", "promotion", "CHANGE_SET", "PROMOTION"}
+)  # the approvals that bind a model (spec 0006 4.4.5); the engine journals the lower-case values, B-545 accepts both
 _NO_REPORT = h.document(trusted("Report"), [el(Tag.P, trusted("The report is not available yet."))], STYLESHEET)
 
 

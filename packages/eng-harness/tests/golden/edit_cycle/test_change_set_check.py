@@ -20,6 +20,7 @@ STEMS = [
     "check-duplicate-target",
     "check-item-id-refused-kind",
     "check-item-id-slash",
+    "check-item-id-token",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -124,9 +125,53 @@ def test_item_id_with_a_slash_is_refused(item_id: str) -> None:
     assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
 
 
-def test_item_id_without_a_slash_is_not_refused() -> None:
-    item = {"id": "a-b.c_1\\d", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+ID_DETAIL = "item id {} is not 1 to 57 ASCII letters, digits, _, . or -, or is revision or unlock (spec 0007 4.4.1 K3)"
+
+
+@pytest.mark.parametrize(
+    "item_id",
+    ["beam 1", "b\u00e9", "\u0663", "a" * 58, "a" * 64, "ab\n", "a,b", "a\\b", "revision", "unlock"],
+)
+def test_item_id_not_a_page_token_is_refused(item_id: str) -> None:
+    """K3 and AC4: an id that is not 1 to 57 ASCII token characters, or is revision or unlock, is INVALID_ITEM_ID."""
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(_case(), items=[item])
+    assert body["issues"] == [
+        {
+            "item_id": item_id,
+            "severity": "error",
+            "code": "INVALID_ITEM_ID",
+            "detail": ID_DETAIL.format(item_id),
+            "gap": None,
+        }
+    ]
+    assert body["status"] == "FAIL"
+    assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
+
+
+def test_item_id_that_is_a_page_token_is_not_refused() -> None:
+    item = {"id": "a-b.c_1d", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
     assert run_check(_case(), items=[item])["issues"] == []
+
+
+@pytest.mark.parametrize("item_id", ["a", "a" * 57, "a.b_c-1", "A9", "revision1", "Revision", "unlock-2"])
+def test_item_id_page_token_boundaries_are_accepted(item_id: str) -> None:
+    """The accepted side: 1 and 57 characters, every allowed character, near-misses of the reserved ids."""
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    assert run_check(_case(), items=[item])["issues"] == []
+
+
+def test_item_id_with_a_slash_and_not_a_token_gives_the_slash_issue_only() -> None:
+    item = {"id": "a/ b", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    issues = run_check(_case(), items=[item])["issues"]
+    assert [(i["code"], i["detail"]) for i in issues] == [
+        ("INVALID_ITEM_ID", "item id a/ b contains / (spec 0007 4.4.1 K3)")
+    ]
+
+
+def test_item_id_token_rule_comes_before_the_other_issues_of_its_item() -> None:
+    items = [{"id": "x y", "kind": "frame_section", "frames": ["B1"], "section": "NOPE"}]
+    assert _issues(run_check(_case(), items=items)) == [("x y", "INVALID_ITEM_ID"), ("x y", "UNKNOWN_SECTION")]
 
 
 def test_item_id_rule_changes_no_other_rule() -> None:
