@@ -117,3 +117,13 @@ def test_void_without_a_marked_kind_goes_to_the_index() -> None:
     assert "<b>changed" not in body
     assert "other failure" not in body
     assert "apr_c" in body  # the open request stays listed
+
+
+def test_void_marks_the_engine_kinds() -> None:
+    """The engine journals the lower-case enum values (`ApprovalKind`); the upper-case spelling is accepted too."""
+    for kind in ("change_set", "promotion", "CHANGE_SET", "PROMOTION"):
+        request = approval_request("apr_k", kind=kind)
+        port = _hub(request)
+        port.hub.emit(_resolved(request))
+        port.hub.emit(_void())
+        assert "voided" in _text(port, "apr_k").lower(), kind
