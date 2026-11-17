@@ -22,7 +22,7 @@ from eng_contract.store import ResultStore
 from pydantic import JsonValue
 
 from eng_harness import errors
-from eng_harness.ctx import Approval, ApprovalKind, Preview
+from eng_harness.ctx import Approval, ApprovalKind, ModelHandle, Preview
 from eng_harness.engine._invariants import Guard, _Ctx, _Phase
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
@@ -39,6 +39,11 @@ class AwaitingApproval(errors.Pause):
 def request_id(run_id: str, path: str) -> str:
     """`apr_` and the first 32 hex digits of sha256 of `<run_id>\\n<path>`: stable across replay (spec 4.9)."""
     return "apr_" + hashlib.sha256(f"{run_id}\n{path}".encode()).hexdigest()[:32]
+
+
+def model_key(model: ModelHandle | str) -> str:
+    """The key of a model named by its handle or by the key itself (spec 4.3.2, AC72)."""
+    return model if isinstance(model, str) else model.model_key
 
 
 @dataclass
@@ -92,7 +97,7 @@ class Approvals:
     async def _request(self, rid: str, title: str, preview: Preview, kind: ApprovalKind, args: _Obj) -> ApprovalRequest:
         sha, held = payload_sha256(args), self._asked.get(rid)
         if held is None:
-            bound = {m.model_key: await self._bind(m.model_key) for m in preview.models}
+            bound = {k: await self._bind(k) for k in map(model_key, preview.models)}
             stored = self._store.put("harness.approval_preview/1", args, self._producer())
             body: _Obj = {
                 "request_id": rid, "kind": kind.value, "title": title, "preview_ref": stored.result_id,
