@@ -1,0 +1,3 @@
+mode: bootstrap
+test-first: skipped
+  test-first: skipped (exempt: type docs)

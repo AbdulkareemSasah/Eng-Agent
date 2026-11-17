@@ -1,0 +1,10 @@
+periodic mutation: base 4f1a7e6 head d9c19fb started 11:09:17
+mode: bootstrap
+check: pass
+  mutation:eng-contract: pass
+  mutation:eng-harness: pass
+  mutation:structural-codes-aci318-14: pass
+  mutation:structural-codes-core: pass
+  mutation:structural-codes-sbc304-2018: pass
+  mutation:eng-dev-gate: pass
+finished 11:24:15 exit=0
