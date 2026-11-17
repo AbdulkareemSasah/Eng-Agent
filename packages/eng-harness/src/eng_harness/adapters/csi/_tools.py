@@ -14,12 +14,13 @@ fingerprint change is not an outside edit; a failed call records nothing (an unk
 Adapter-local tools (plan 0007 T5; spec 0007 4.10) are defined here, not in the allowlist file, whose names the build
 check compares with the server's tool list: the reads of `_read_state_tool.py`, `csi_open_revision` and `csi_save_model`
 with `as_new_revision` (`_revisions.py`). Each composes allowlisted host tools; `csi_open_model` is allowlisted for
-`csi_open_revision` alone, so the port refuses it by name. With `Revisions` wired, the open file is read before every
-write but an open: a snapshot is never written. A save or restore a timeout cut off is not reconciled: the engineer
-decides. The summary of a snapshot save and of a restore carries `saved_file` (`name`, `sha256`).
+`csi_open_revision` and, with no path, the step 2 open of the original (`opener`). With `Revisions` wired, the open
+file is read before every write but an open: a snapshot is never written. A save or restore a timeout cut off is
+not reconciled: the engineer decides. The summary of a snapshot save and of a restore carries `saved_file` (`name`,
+`sha256`).
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any, Literal
 
@@ -93,10 +94,10 @@ class _ObjectResultsArgs(_ResultsArgs):
 
 
 class OpenModelArgs(ParamModel):
-    """`csi_open_model`, reached only by `csi_open_revision` (the port refuses it by name): the file to open."""
+    """`csi_open_model`: with no `path` the original of `model` (step 2); a `path` only `csi_open_revision` sends."""
 
     model: str
-    path: str
+    path: str | None = None
 
 
 def _local(name: str, args_model: str, *, write: bool) -> ToolDescriptor:
@@ -187,15 +188,17 @@ class CsiToolPort(AdapterToolPort):
     port made without them records into a book nobody reads. `revisions` holds the run's snapshots: without it
     `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked. `reopened`
     is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file after a
-    successful `csi_open_revision` only.
+    successful `csi_open_revision` only. `opener` is the host port's `open_original`: `csi_open_model` with no path
+    calls it (spec 4.5.9); without it that open is refused with `INTERNAL`.
     """
 
     def __init__(
         self, *, binder: ModelBinder, written: WrittenItems | None = None, wrote: Callable[[str], None] | None = None,
-        revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None, **wiring: Any,
+        revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None,
+        opener: Callable[[str], Awaitable[Path]] | None = None, **wiring: Any,
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
-        self._reopened = reopened or (lambda key, path: None)
+        self._reopened, self._opener = reopened or (lambda key, path: None), opener
         builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
@@ -217,14 +220,12 @@ class CsiToolPort(AdapterToolPort):
         """As `AdapterToolPort.call`; a successful edit is committed to the book and marked on the host port.
 
         Raises:
-            ContractError: `INVALID_ARGUMENT` for a tool outside the allowlist and for `csi_open_model`.
+            ContractError: `INVALID_ARGUMENT` for a tool outside the allowlist.
         """
         descriptor = self._find(tool)
-        if tool == "csi_open_model":
-            raise ContractError(
-                ErrorCode.INVALID_ARGUMENT, "csi_open_model is reached through csi_open_revision", field="tool"
-            )
         try:
+            if tool == "csi_open_model":
+                return await self._open_original(descriptor, args, model)
             if tool in READ_TOOLS:
                 return await self._read_parts(descriptor, args, model)
             if tool == "csi_open_revision":
@@ -293,6 +294,27 @@ class CsiToolPort(AdapterToolPort):
         if not isinstance(reply, SuccessEnvelope):
             return reply
         return _with_saved_file(reply, revisions.snapshot(working, target))
+
+    async def _open_original(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None
+    ) -> Envelope:
+        """`csi_open_model` with no path: the host port opens the original, nothing is ledgered (spec 4.5.9)."""
+        server = self._config.servers[self._server]
+        self._health.check(server.host_key)
+        started, began = self._clock.now(), self._clock.now_ms()
+        validated = validate_call(OpenModelArgs, args, source=self._store, current_revision=self._binder.revision)
+        if validated.model.path is not None:
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, "csi_open_model opens the original: no path", field="path")
+        if self._opener is None:
+            raise ContractError(ErrorCode.INTERNAL, "no opener wiring", incident_id=self._ids.new_ulid())
+        key = validated.model.model
+        opened = await self._opener(key)
+        binding = await self._binder.binding(server.host_key, key, descriptor)
+        return make_envelope(
+            self._store, tool=f"{self._allowlist.adapter}/csi_open_model", kind="harness.run_output/1",
+            payload={"value": {"model": key, "file": opened.name}}, summary={}, reply={}, check=self._check,
+            host=binding.host, inputs=validated.inputs, started_at=started, duration_ms=self._clock.now_ms() - began,
+        )  # fmt: skip
 
     async def _open_revision(self, args: Mapping[str, JsonValue], op_id: str, model: str | None) -> Envelope:
         """`csi_open_revision`: a copy of an unchanged snapshot becomes the working file, opened without saving."""
