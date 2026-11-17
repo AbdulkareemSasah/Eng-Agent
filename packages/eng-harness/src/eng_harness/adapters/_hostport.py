@@ -327,7 +327,8 @@ class AdapterHostPort:
                 r["visible"],
             )
             self._instances[opened.instance_id] = opened
-            self._sessions.bind_instance(self._host_key, pid=opened.pid, product=self._product)
+            if self._session.alive(opened):
+                self._sessions.bind_instance(self._host_key, pid=opened.pid, product=self._product)
         for key, b in saved["bindings"].items():
             self._bound[key], self._models[key] = b["instance_id"], b["model_id"]
             self._files.setdefault(key, Path(b["file"]))
