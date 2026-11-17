@@ -50,7 +50,8 @@ class Script:
     def answer(self, label: str | None) -> str:
         """The stored change-set answer, carrying the optional `benchmark_request` label."""
         who = {"unit": None, "entered_by": "x", "entered_at": "2026-01-01T00:00:00.000Z"}
-        fields: dict[str, Any] = {} if label is None else {"benchmark_request": {"value": label, **who}}
+        value = {"items": [], **({} if label is None else {"benchmark_request": label})}
+        fields: dict[str, Any] = {"change_set": {"value": value, **who}}
         body: dict[str, Any] = {"step": "1", "fields": fields}
         return self.store.put("basis.engineer_input/1", body, PRODUCER).result_id
 

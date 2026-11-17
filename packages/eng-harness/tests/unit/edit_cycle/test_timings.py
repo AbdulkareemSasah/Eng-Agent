@@ -11,13 +11,14 @@ import pytest
 from eng_contract.ids import FixedClock, IdSource
 from eng_contract.store import ResultStore
 from fixtures.report_run import HEADER, SHA, build_report_run
+from pydantic import JsonValue
 
 from eng_harness import __version__
 from eng_harness._text import format_duration_ms
 from eng_harness.journal import EventType, JournalReader
 from eng_harness.report import ReleaseMarks, build_report
 
-from .journal_script import Script
+from .journal_script import PRODUCER, Script
 
 TURN = "edit_cycle_engineer_turn"
 _KINDS = EventType
@@ -134,6 +135,24 @@ def test_benchmark_skips_a_missing_answer(run_dir: Path, store: ResultStore, ids
     s.writer.close()
     found = edit_cycle_timings(JournalReader(run_dir), store).benchmarks
     assert [b.label for b in found] == ["R1"]
+
+
+def test_benchmark_label_in_the_change_set_answer(run_dir: Path, store: ResultStore, ids: IdSource) -> None:
+    """AC29: the label is read where the engine stores the answer (field `change_set`, member `benchmark_request`)."""
+    from eng_harness.report._edit_cycle import edit_cycle_timings
+
+    s = _script(run_dir, store, ids)
+    s.begin("1/0/0", 10)
+    s.at(13, _KINDS.INPUT_REQUESTED, {"request_id": "cs1", "kind": "block", "title": "t", "fields_schema_sha256": SHA})
+    who: dict[str, JsonValue] = {"unit": None, "entered_by": "x", "entered_at": "2026-01-01T00:00:00.000Z"}
+    held: dict[str, JsonValue] = {"change_set": {"value": {"items": [], "benchmark_request": "R7"}, **who}}
+    answer = store.put("basis.engineer_input/1", {"step": "1/0/0/1", "fields": held}, PRODUCER).result_id
+    s.at(14, _KINDS.INPUT_PROVIDED, {"request_id": "cs1", "answer_ref": answer, "by": "engineer:x"})
+    s.decision("dec1", TURN, "accept", 20, 10)
+    s.end("1/0/0", 10, 40)
+    s.writer.close()
+    found = edit_cycle_timings(JournalReader(run_dir), store).benchmarks
+    assert [(b.label, b.elapsed_ms, b.cycles) for b in found] == [("R7", 17_000, 1)]
 
 
 def test_report_adds_the_cycle_timings(run_dir: Path, store: ResultStore, ids: IdSource, clock: FixedClock) -> None:

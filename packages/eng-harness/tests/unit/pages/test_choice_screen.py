@@ -151,12 +151,24 @@ def test_data_request_is_read_only(tmp_path: Path) -> None:
         assert "<form" not in body
         assert "<button" not in body
         assert "<input" not in body
-        assert "provide the answers with" in body
-        assert "resume --answers FILE" in body
+        assert "read-only here" in body
         for cell in ("depth", "number", "mm", "minimum=100", "maximum=900.5", "name", "string", "maxLength=20"):
             assert cell in body
         refused = w.client.post("/answer/inp_data", {"shown_sha256": request.fields_schema_sha256, "by": "ada"})
         assert refused.status >= HTTPStatus.BAD_REQUEST  # no form, no token: nothing answers
+        assert future.result(5) is None
+
+
+def test_data_request_names_stop_and_resume(tmp_path: Path) -> None:
+    """A waiting run takes a data answer only through stop and `resume RUN_ID --answers FILE` (spec 0006 4.4.5)."""
+    schema = data_schema({"type": "object", "properties": {"depth": {"type": "number"}}})
+    request = build_request(IDS, "inp_note", "block", "Values", schema, ())
+    with rig(tmp_path) as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        body = shown(w, request)
+        assert "stop the run (`stop RUN_ID` from another terminal, or Ctrl+C once in its terminal)" in body
+        assert "then run `resume RUN_ID --answers FILE`" in body
+        assert "`status` lists the run ids." in body
         assert future.result(5) is None
 
 

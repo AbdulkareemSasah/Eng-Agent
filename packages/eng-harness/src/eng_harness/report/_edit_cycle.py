@@ -232,8 +232,9 @@ def _benchmarks(
             fields = store.payload(parse_ref(ref)[0]).get("fields")
         except ContractError:
             continue
-        body = fields.get("benchmark_request") if isinstance(fields, dict) else None
-        label = body.get("value") if isinstance(body, dict) else None
+        entry = fields.get("change_set") if isinstance(fields, dict) else None
+        answer = entry.get("value") if isinstance(entry, dict) else None
+        label = answer.get("benchmark_request") if isinstance(answer, dict) else None
         if isinstance(label, str):
             started.setdefault(label, r)
     accepts = [
