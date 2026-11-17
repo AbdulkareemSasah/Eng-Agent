@@ -1,11 +1,11 @@
-# Build handoff checkpoint of 2026-11-17 (build/v1 at d5ea640): hand-over to a lead on another machine
+# Build handoff checkpoint of 2026-11-17 (build/v1 at d5ea640, updated to 8b2722f and later): hand-over to a lead on another machine
 
 Written by the lead of the cloud session when the owner asked for a hand-over to another agent on another machine
 (2026-11-17, about 09:30 UTC). This section is the newest; the sections below it stay for their history.
 
 ## A. State
 
-- **Plan tasks merged: 228 of 349** (the total is the `- id:` entries in the front matter of every plan under
+- **Plan tasks merged: 229 of 349** (228 at the first write of this section; B-547 #410 merged after it) (the total is the `- id:` entries in the front matter of every plan under
   `packages/**/docs/plans/` and `tools/*/docs/plans/`, recounted at d5ea640; it grew from 340 by the tasks the
   first-live-run walk-through added). Merged since the checkpoint of 2026-11-16: B-200 #383, B-174 #385, B-204 #386,
   B-229 #387, B-184 #388, B-524 #391, B-519 #381, B-532 #392, B-520 #394, B-534 #395, B-198 #396, B-521 #397,
@@ -24,7 +24,7 @@ local CI, merge). Nothing pushed: start the item fresh from its registry entry.
 | Item | What | State at the hand-over |
 |---|---|---|
 | B-544 | Documents: first-live-run gaps, third set, part 2 | **Merged as #408.** It carries the owner D-3 decision and added W.T7b (B-556), W.T16b (B-557), W.T9c (B-558) and plan 0006 I.T9c (B-559), now in the registry. |
-| B-547 | W.T16 item-id rule in harness.change_set_check (engineering calc) | Writing, Opus reviewer, adversarial verification |
+| B-547 | W.T16 item-id rule in harness.change_set_check (engineering calc) | **Merged as #410.** B-555 (W.T17) can start. Notes: the counted lines sit at the estimate 30; the mutation step ran only in local CI without mutation, so the next periodic run covers it; if a delete item of the change-set preview ever gets a fixed id, the reserved ids must grow (spec 0007 4.5 step 6). |
 | B-551 | E.T23 Preview.models and ctx.promote take a model key | Pushed, head 2361039, no pull request; 23 counted lines, test-first pass. Stopped: the types step fails on one existing test outside the file list (`tests/unit/test_ctx_basis.py` line 120). Needs a small documents amendment adding that file to plan 0001 T23, then the one-line edit in its registry note, gate, review, pull request. |
 | B-552 then B-553 | Owner decision of 2026-11-17: the changed-line count is an estimate, not a limit | **B-552 is written and pushed** (branch docs/b552-gate-line-count-estimate, head 48420c1, gate without mutation pass, no pull request): gate spec (GC009 a notice, no size cap, links ADR-0035) and gate plan T40 (estimate 260; its files include the design/ copies, the AGENTS template with its five rendered AGENTS.md files, the template-version lines in the .gate/agents.yml files and .github/pull_request_template.md, because the gate refuses those next to a spec or plan, GC010). Next: review it (Opus), open its pull request, local CI, merge. Then **B-553** (T40): start from [b552-t40-documents-trial.patch](b552-t40-documents-trial.patch) (the documents part, 117 counted lines, agents drift pass) plus the code and test changes listed in [line-limit-sweep.md](line-limit-sweep.md) sections B and C; the base gate still judges it, so it must stay inside 260 or the plan estimate is raised first. Writer note: [b552-writer.md](b552-writer.md); body: [b552-pr-body.md](b552-pr-body.md). |
 | B-554 | Plan 0002 T23 lists the collateral test of B-550 | **Merged as #409.** B-550 must merge origin/build/v1 before its local CI (its scope is judged against the plan in its base). |

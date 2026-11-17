@@ -3359,7 +3359,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "From documents item B-545 (walk-through C20, C29). Engineering calc: adversarial verification. Was in lane small-fixes-1 at the checkpoint of 2026-11-17: check GitHub for its branch and pull request. W.T17 waits for it."
-   ]
+   ],
+   "merged_pr": 410
   },
   {
    "id": "B-548",
@@ -3519,9 +3520,7 @@
    "branch": "fix/b555-harness-wt17-sections-optional",
    "prTitle": "fix(eng-harness): the change-set check and the expected effects take an absent model.sections/1 (B-555)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T16"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -3567,7 +3566,6 @@
    "prTitle": "fix(eng-harness): the change-set values carry their canonical number and the check references reach it (write arguments) (B-557)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T16",
     "W.T17"
    ],
    "writer": "sonnet, medium",
