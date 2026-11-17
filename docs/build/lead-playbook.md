@@ -357,3 +357,24 @@ lanes started with lane script version 3 (`<lead>/build-lane-v3.workflow.js`).
    first `test:` commit: `uv run -q eng-gate test-first --base $(git merge-base origin/build/v1 HEAD) --head HEAD
    --title "<pull request title>"`, and the result goes into the handoff note. If it reports TF004 before anything is
    pushed, rewrite the local commits (nothing is published yet); after a push, stop and report it to the lead.
+12. **Batch merge (owner decision of 2026-11-16, work item B-539).** Local CI may test up to three waiting pull
+   requests as one batch: every job except the gate job runs for each pull request as before; the gate job runs once
+   on the tree that the batch's squash merges produce together; on a PASS every member merges; on a FAIL each member
+   is tested alone. After the merges local CI compares the tree of `build/v1` with the tested tree. When the file
+   `<lead>/BATCH_MODE` exists, `integrate.sh` does not take the integration lock (local CI queues the runs
+   itself and always tests on the newest base); the integrator's sequence is unchanged. A merge call that fails because
+   the base branch moved is repeated after twenty seconds, up to five times. The lead writes or removes the mode file;
+   an agent never does.
+13. **Scripts that agents run are replaced, never rewritten in place (lead rule of 2026-11-16).** bash reads a script
+   while it runs it: rewriting `<lead>/tools/*.sh` in place made three running integrations fail. The lead
+   writes the new version to a new file and renames it over the old one (`mv`), so that a running process keeps the
+   file it started with. An agent that sees a syntax error from a lead script stops, runs `finish` and reports, as the
+   three integrators did.
+14. **The live local CI run has CPU priority (lead rule of 2026-11-16).** A helper of the lead raises the priority of
+   the live local CI run, because a few merged tests assert wall-clock bounds and failed once under load. Agents do not
+   change process priorities; a dry run or any other extra heavy job that an agent is asked to start runs in the idle
+   class (`chrt -i 0 nice -n 19 ...`).
+15. **Pause file (lead rule of 2026-11-17, after the pause of 2026-11-16 was not kept).** When the owner orders a pause
+   the lead creates `<lead>/locks/pause.lane`. Every writer, reviewer, verifier and gate runner of lane script
+   version 3.4 checks it first and returns BLOCKED with "PAUSED by the lead" at once, so that no lane starts new work;
+   integrators already running finish their sequence. The lead removes the file when the owner says to continue.
