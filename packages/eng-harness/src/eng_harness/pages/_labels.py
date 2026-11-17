@@ -57,7 +57,8 @@ OPTIONS: Final[Mapping[str, Trusted]] = {
     "abandon": trusted("Abandon the run"),
 }  # the engineer turn (spec 0007) and the engine's own requests (engine 4.5): option id to its label
 INPUT_NOTE: Final[Trusted] = trusted(
-    "These fields are read-only here: provide the answers with `resume --answers FILE`."
+    "These fields are read-only here. To answer them, stop the run (`stop RUN_ID` from another terminal, "
+    "or Ctrl+C once in its terminal), then run `resume RUN_ID --answers FILE`; `status` lists the run ids."
 )
 INPUT_FIELDS: Final[tuple[Trusted, ...]] = tuple(trusted(w) for w in ("Field", "Type", "Unit", "Bounds"))
 NAME_PROPOSED: Final[Trusted] = trusted("Engineer named in the settings")

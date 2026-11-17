@@ -37,10 +37,11 @@ class OpenedInstance:
 class CsiSession:
     def __init__(
         self, sessions: ServerManager, guard: ProcessGuard, inspector: ProcessInspector, locks: HostLocks,
-        ids: IdSource, *, server: str, product: str, program: str, exe_name: str,
+        ids: IdSource, *, server: str, product: str, program: str, exe_name: str, visible: bool = False,
     ) -> None:  # fmt: skip
         self._sessions, self._guard, self._inspector, self._locks, self._ids = sessions, guard, inspector, locks, ids
         self._server, self._product, self._program, self._exe = server, product, program, exe_name
+        self._visible = visible  # every launch of the run is shown or hidden alike (spec 4.5.9)
 
     def owns(self, instance: OpenedInstance) -> bool:
         return self._sessions.role_session(self._server, _ROLE) == instance.session
@@ -86,17 +87,17 @@ class CsiSession:
 
     async def _launch(self, path: Path, observed_at: Timestamp) -> OpenedInstance:
         before = self._guard.snapshot()
-        launched: dict[str, Any] = {"product": self._product, "visible": False}
+        launched: dict[str, Any] = {"product": self._product, "visible": self._visible}
         pid = (await self._call("csi_launch", launched, CallEffect.WRITE)).get("pid")
         if not isinstance(pid, int):
             self._bad("csi_launch")
         found = self._guard.identify_launch(before, named_pid=pid)
-        self._guard.record_launch(self._sessions, found, visible=False, server=self._server, role=_ROLE)
+        self._guard.record_launch(self._sessions, found, visible=self._visible, server=self._server, role=_ROLE)
         self._locks.acquire(self._program, found)  # before any other call on the instance (spec 4.4.1)
         await self._open(path, found.pid)
         return OpenedInstance(
             self._ids.new_ulid(), found.pid, found.started_at, observed_at, found.exe_name,
-            self._sessions.role_session(self._server, _ROLE), False,
+            self._sessions.role_session(self._server, _ROLE), self._visible,
         )  # fmt: skip
 
     async def _open(self, path: Path, pid: int) -> None:

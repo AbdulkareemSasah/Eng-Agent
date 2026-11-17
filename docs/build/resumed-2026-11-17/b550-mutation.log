@@ -1,0 +1,3 @@
+mode: bootstrap
+check: pass
+  mutation: pass

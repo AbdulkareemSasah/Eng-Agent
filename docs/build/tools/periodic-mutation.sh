@@ -27,7 +27,7 @@ cd "$WT" || exit 2
 uv sync -q --all-packages --locked && uv sync -q --project .gate-base --package eng-dev-gate --locked || { echo "SETUP_FAIL"; exit 2; }
 echo "periodic mutation: base ${base:0:7} head ${head:0:7} started $(date -u +%H:%M:%S)" | tee "$log"
 GITHUB_ACTIONS=true CI=true GITHUB_EVENT_NAME=pull_request GITHUB_EVENT_PATH=$ev GITHUB_REPOSITORY=AbdulkareemSasah/Eng-Agent \
-  nice -n 10 uv run -q --project .gate-base --package eng-dev-gate eng-gate --root . --gate-root .gate-base check --all --only mutation >>"$log" 2>&1
+  chrt -i 0 nice -n 19 uv run -q --project .gate-base --package eng-dev-gate eng-gate --root . --gate-root .gate-base check --all --only mutation >>"$log" 2>&1
 rc=$?
 echo "finished $(date -u +%H:%M:%S) exit=$rc" | tee -a "$log"
 tail -20 "$log"
