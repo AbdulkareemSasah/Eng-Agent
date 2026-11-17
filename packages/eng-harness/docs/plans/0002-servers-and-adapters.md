@@ -524,6 +524,12 @@ tasks:
     # (spec 4.1, about 25), the route argument of csi_allowlist (csi/__init__.py, about 2) and record_pre_image in
     # _toolport.py (about 3). Estimate 313 - 13 + 35 + 6 + 25 + 2 + 3 = about 371; budget 380 (the cap). If the writer
     # measures more, it stops with NEEDS_PLAN_AMENDMENT; the binder is the next split candidate.
+    # Amendment (B-543, documents only): build_ports takes the keyword visible and gives it to AdapterHostPort, and
+    # passes host.open_original to CsiToolPort as opener (spec 4.1 item 6, 4.5.9; built by T23, which T19a now waits
+    # for); about 4 lines in adapters/__init__.py; and preview answers a tool with action open on a key with no bound
+    # model with models empty instead of the model_open refusal (spec 4.5.9, AC45), about 4 lines in _toolport.py:
+    # estimate 371 to 379, budget 380 unchanged. test_cycle_steps opens the original through the step 2 tool step
+    # (spec 0007 4.5).
     # Amendment (B-541, documents only): first-live-run gaps, third set. T19a waits for the new T22, which defines
     # AdapterPorts (with its servers field and async context), the platform launcher and inspector, servers_config and
     # ServersConfig.host_program (spec 4.1, AC48 to AC50). build_ports types config as ServersConfig, returns
@@ -562,8 +568,9 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image"  # AC45 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_preview_sends_no_write"  # AC45 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_binder_from_host_port"  # the production binder (B-530)
+      - "packages/eng-harness/tests/workflow/test_build_ports.py::test_open_preview_without_binding"  # AC45 (B-543)
     covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
-    depends_on: [T14, T18, T19c, T20, T21, T22]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3); T22 by B-541
+    depends_on: [T14, T18, T19c, T20, T21, T22, T23]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3); T22 by B-541, T23 by amendment B-543
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
     # Amendment (B-475, documents only): new, split from T19. Off the first-live-run path: it returns with the DXF start,
@@ -669,6 +676,30 @@ tasks:
       - "packages/eng-harness/tests/unit/servers/test_config.py::test_host_program_of_product"
     covers: [AC48, AC49, AC50]
     depends_on: [T18, T20]  # both merged (doctor.py, servers/_config.py); T19a and plan 0006 T16 wait for T22 (section 3)
+  - id: T23
+    title: The CSI host port opens the original for the step 2 open and launches visible on request
+    # Amendment (B-543, documents only): new (spec 4.5.9 "Opening the original", AC51; spec 0007 4.5 step 2). The merged
+    # CsiToolPort refuses csi_open_model by name, outside its try (an unknown-outcome write for the engine), and nothing
+    # opens and binds the original, so copy_on_open takes no working copy; every launch is hidden. Estimate:
+    # AdapterHostPort.open_original and the visible keyword about 16 (_hostport.py), the visible launch about 5
+    # (csi/_session_ops.py), the opener keyword, the routing of csi_open_model inside the try and the optional path of
+    # OpenModelArgs about 22 (csi/_tools.py), 1 of CHANGELOG.md: about 44; budget 60. Before T19a, whose cycle test
+    # opens the original through it and which wires opener and visible in build_ports; after T19c (merged), the last
+    # task that edited _hostport.py; plan 0002 T15 also edits csi/_tools.py, without an order (whichever lands second adapts).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py"
+    max_changed_lines: 60
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_open_refusals_are_envelopes"
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_visible_launch"
+    covers: [AC51]
+    depends_on: [T19c]  # external: plan 0007 T5 and T13 (merged; csi/_tools.py and _hostport.py)
 ---
 
 # Implementation plan: eng-harness servers and adapters
@@ -682,7 +713,8 @@ and allowlist (T6, T6b), the first safety gate of a run; the host-instance lock 
 T8b, T9); then the CSI adapter in the order of the cycle: identity and session operations (T10), reply mapping and model state (T11, T11b), edits
 (T12) and read-back (T12b), analysis and design (T13), reconciliation (T14); the blocked ADR-0031 switch (T15); the
 command-line tools (T16); record mode (T17); the doctor (T18); the remaining `HostPort` methods of the CSI host port
-(T19c, amendment B-530); and an end-to-end task (T19a) that wires the CSI ports
+(T19c, amendment B-530); the step 2 open of the original and the visible launch (T23, amendment B-543); and an
+end-to-end task (T19a) that wires the CSI ports
 into the engine and runs the crash matrix, together with the two engine stops that the early tasks leave out (a failed
 build check, the units trap; B-413), and T19b, which adds the command-line tools to that wiring (amendment B-475: T19
 split so that the first live run, the edit cycle on ETABS, waits for neither the command-line adapter nor record mode).
@@ -690,7 +722,7 @@ T20 (B-085) adds the framework items that the IDEA adapter (spec 0014, item A1) 
 T21 (B-503) moves the CSI kind models to a kinds module and registers them, before T19a and edit-cycle plan 0007 T4.
 T22 (B-541) gives the doctor and `build_ports` one platform launcher and inspector, defines `AdapterPorts` with the
 `ServerManager`'s lifetime, converts parsed server sections and names a server's host program, before T19a and plan
-0006 T16.
+0006 T16. T23 (B-543) is the step 2 open of the original and the visible launch (the entry above).
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line and
@@ -700,11 +732,12 @@ CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools 
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
 T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503), `_hostport.py` (T10, T11b,
-T12b, plan 0007 T13, T19c, T19a; B-503, B-530), `_identity.py` and `test_csi_session_ops.py` (T10, T19c; B-530),
+T12b, plan 0007 T13, T19c, T23, T19a; B-503, B-530, B-543), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
+B-530), `csi/_session_ops.py` (T10, T23; B-543),
 `csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them), `adapters/__init__.py` (T22, T19a, T19b; B-541) and
 `test_build_ports.py` (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
-adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15; plan 0007 T5 and T13, B-503: T15 and
-those two are not ordered, so whichever lands second adapts),
+adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15, T23; plan 0007 T5 and T13, B-503: T15 and
+those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
 T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
@@ -891,8 +924,9 @@ answer of 2026-11-14, amendment B-495), the message naming H-G8 and the entries:
 `tests/unit/cli/test_exit_codes.py::test_error_codes` (70 at the base). A `harness.toml` for a run
 before T19b therefore holds no `[cli_tools.*]` section. T19a does not wait for plan 0008.
 
-Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks` and
-`allowlists`, with the defaults and rules of spec §4.1 (in production the command line fills `files`, plan 0006 T14c,
+Keyword seams of `build_ports` (amendment B-530; spec §4.1): `inspector`, `launcher`, `lock_dir`, `files`, `checks`,
+`allowlists` and `visible` (amendment B-543, given to the host port; `build_ports` also passes `host.open_original` as
+the tool port's `opener`, T23), with the defaults and rules of spec §4.1 (in production the command line fills `files`, plan 0006 T14c,
 amendment B-536); the workflow and replay tests pass `files`, a test inspector and
 launcher over the CSI fake, and `test_allowlist_loaded_for_route` passes, through `allowlists`, a loader of its
 synthetic routed allowlist (a `load_allowlist` call with the route it is given). `allowlists` maps an adapter name to a
@@ -1016,6 +1050,22 @@ each of the six kinds in `HARNESS_KINDS` is the model of `eng_harness.kinds.csi`
 answers; it fails at the base, where `eng_harness.kinds.csi` does not exist. No calc imports the module yet, so no
 calc hash changes here; once plan 0007 T4's calcs import it, it enters their `modules` (spec 0003 §4.5).
 
+**T23 Opening the original, visible launch** (amendment B-543; spec §4.5.9 "Opening the original", AC51; spec 0007
+§4.5 step 2). `AdapterHostPort.open_original(model_key)` does what `restore` does without the hash check: the file of
+the key, `CsiSession.open_file` on the reusable owned instance (or a launch), `_keep`, the units read and `_persist`.
+`AdapterHostPort` and `CsiSession` take `visible: bool = False`; `_launch` sends it to `csi_launch`, to
+`record_launch` and to the `OpenedInstance`. `CsiToolPort` takes `opener` (like `reopened`); in `call`, the
+`csi_open_model` branch moves inside the `try`: with a `path` it answers `INVALID_ARGUMENT` as today, without one it
+validates the arguments (`OpenModelArgs.path` becomes optional), calls `opener(key)` (`INTERNAL` when the port has
+none), takes the binding of the key and answers a success envelope of kind `harness.run_output/1` with the key and the
+file's base name; it writes no ledger entry (the open is not reconciled, `_UNRECONCILED`). `csi_open_revision` keeps
+sending its `path` through `super().call`. `test_open_original_then_working_copy` runs, against the CSI fake server
+process, the open through a tool port whose opener is the host port's `open_original` and whose binder is a test
+binder (as `tests/workflow/adapters/test_csi_reopened.py` builds one; the production binder `AdapterHostPort.binding`
+is T19a's, B-530, which comes after T23), then `locate`, `read_units` and `working_copy` (one
+launch, the copy in the same instance); `test_open_refusals_are_envelopes` checks the three refusals of AC51 return
+failure envelopes; `test_visible_launch` checks the fake's recorded `visible` flag, the run state's and the default.
+
 ## 3. Dependencies
 
 - Runtime: `mcp` 2.x (package ADR in T1, owner queue); `eng-contract`, `pydantic` as in the engine plan. No other.
@@ -1025,12 +1075,13 @@ calc hash changes here; once plan 0007 T4's calcs import it, it enters their `mo
   replay tests that run the real engine: T19a waits for engine 0001 T13, T15, T16, T16b and T19 (T13 brings in T9 to
   T12; B-413; T16b is the promotion half of the former T16, B-499). No earlier task of this plan runs the real engine. T19a waits for no task of plan
   [0008-safe-adapter](0008-safe-adapter.md): the SAFE engine stop of spec 0008 AC4 is 0008 T3's, after T19a (B-475).
-  T19a also waits for T19c (amendment B-530) and T21, and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
+  T19a also waits for T19c (amendment B-530), T21, T22 (amendment B-541) and T23 (amendment B-543: T23 edits `_hostport.py` and
+  `csi/_tools.py` first, and T19a wires its opener and `visible`), and for edit-cycle plan [0007](0007-model-edit-cycle.md) T5
   (`Revisions`, the revision
   tools) and T13 (the `reopened` hook), whose wiring it adds (amendment B-503); neither of those waits for T19a.
   Plan 0007 T4 waits for T21 (its calcs import `eng_harness.kinds.csi`). T21 waits for plan 0007 T5, whose
   `test_csi_read_state_tool.py` it adapts to `HARNESS_KINDS` holding `CSI_KINDS`. T19b waits for T16 and T19a. T19a and
-  plan [0006](0006-cli-progress-pages-report.md) T16 (the doctor's new arguments) wait for T22 (amendment B-541).
+  plan [0006](0006-cli-progress-pages-report.md) T16 (the doctor's new arguments) wait for T22 (amendment B-541). T22 and T23 share only `CHANGELOG.md` and are not ordered.
   Every later task whose tests run the real engine over `build_ports` (T19b, plan 0008 T1 and T3, plan 0012 T1) enters
   the returned `AdapterPorts` around `Engine.start` and `Engine.resume` in its tests, as T19a does (spec AC48). `eng-contract`
   0.1.0 merged. T15 waits for ADR-0031 and an `eng-contract` minor release.
