@@ -36,7 +36,8 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
     worker = multiprocessing.get_context("spawn").Process(target=run_crash_worker, args=(str(tmp_path), cut))
     worker.start()
     try:
-        deadline = time.monotonic() + 30
+        # This is a hang guard for the whole pre-cut sequence, including process startup and disk syncs.
+        deadline = time.monotonic() + 120
         while not (tmp_path / "cut.json").exists() and worker.is_alive() and time.monotonic() < deadline:
             time.sleep(0.02)
         assert (tmp_path / "cut.json").exists(), (tmp_path / "worker.log").read_text()
@@ -63,7 +64,7 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
 
     async def body() -> None:
         async with r.ports() as ports:
-            inputs = AppliedInput()
+            inputs = AppliedInput(cut)
             result = await r.engine(ports, inputs=inputs).resume(r.run_id)
             assert result.status is RunStatus.COMPLETED, result
             assert len(logical_calls()) == before == 1

@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from eng_contract.envelope import Provenance
+from eng_contract.envelope import Provenance, SuccessEnvelope
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from pydantic import BaseModel, JsonValue
@@ -206,9 +206,14 @@ def rig(root: Path, *, tolerance: Any = 0.25) -> Rig:
 class AppliedInput(FakeInputPort):
     """Explicit synthetic engineer confirmation; never a production decision or adapter proof of end."""
 
+    def __init__(self, cut: str) -> None:
+        super().__init__()
+        self.cut = cut
+
     async def present(self, request: InputRequest) -> None:
         await super().present(request)
         assert request.kind == "engine.in_flight", request
+        assert request.title == f"A write was cut off ({self.cut})", request
         self.script(
             request.request_id,
             InputAnswer(
@@ -229,12 +234,16 @@ async def crash_worker(root: Path, cut: str) -> None:
         async def stopped(tool: str, *args: Any, **kwargs: Any) -> Any:
             result = await call(tool, *args, **kwargs)
             if tool == cut:
-                (root / "cut.json").write_text(json.dumps({"run_id": r.run_id, "basis_ref": r.basis_ref}))
+                assert isinstance(result, SuccessEnvelope), result
+                marker = root / "cut.tmp"
+                marker.write_text(json.dumps({"run_id": r.run_id, "basis_ref": r.basis_ref}))
+                marker.replace(root / "cut.json")
                 await asyncio.Event().wait()
             return result
 
         ports.tool_port.call = stopped
-        await r.engine(ports).start(r.request())
+        outcome = await r.engine(ports).start(r.request())
+        raise AssertionError(f"the worker ended before the cut at {cut}: {outcome}")
 
 
 def run_crash_worker(root: str, cut: str) -> None:
