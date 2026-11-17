@@ -336,7 +336,7 @@ def test_checks_and_output(tmp_path: Path) -> None:
         doctor,
         home,
         programs=_Dirs({str(install)}),
-        roles=doctor.LiveRoles(),
+        roles=doctor.LiveRoles(_Procs({})),
         allowlist_for=lambda _adapter: allowlist,
         inspector=_Procs({}),
     )
@@ -422,3 +422,56 @@ def test_extra_checks_and_unreleased_tools(tmp_path: Path) -> None:
     assert by_name["page binding"].status == "warn"
     assert blown_report.checks[-2].name == "locale"
     assert blown_report.checks[-1].name == "page binding"
+
+
+def test_live_roles_use_platform_launcher(tmp_path: Path, monkeypatch: Any) -> None:
+    """AC49: the roles start through `platform_launcher` over the inspector the doctor reports with."""
+    import eng_harness.doctor as doctor
+
+    seen: list[object] = []
+    inspector = _Procs({})
+    sentinel = object()
+
+    class _Manager:
+        def __init__(self, config: object, run_dir: Path, *, launcher: object = None) -> None:
+            seen.append(launcher)
+            self.servers = config
+
+        async def __aenter__(self) -> _Manager:
+            return self
+
+        async def __aexit__(self, *exc: object) -> None:
+            return None
+
+    def launcher_of(given: object) -> object:
+        seen.append(given)
+        return sentinel
+
+    monkeypatch.setattr(doctor, "platform_launcher", launcher_of)
+    monkeypatch.setattr(doctor, "ServerManager", _Manager)
+    assert doctor.LiveRoles(inspector).inspect(ServersConfig(), tmp_path) == {}
+    assert seen == [inspector, sentinel]
+
+
+def test_no_config_file_and_environment(tmp_path: Path) -> None:
+    """AC49: `run(None, ...)` checks no server section; `env` replaces the environment of the dependencies."""
+    from io import StringIO
+
+    import eng_harness.doctor as doctor
+
+    home = tmp_path / "home"
+    blocked = tmp_path / "file"
+    blocked.write_text("not a folder", encoding="utf-8")
+    deps = _deps(doctor, home, env={"ENG_WORKSPACE": str(home / "ws"), "XDG_STATE_HOME": str(blocked)})
+    own = StringIO()
+    assert doctor.run(None, json_output=False, show_paths=False, out=own, deps=deps) == 1
+    assert "lock directory | " in own.getvalue()
+    assert "not writable" in own.getvalue()
+    given = StringIO()
+    env = {"ENG_WORKSPACE": str(home / "ws"), "XDG_STATE_HOME": str(tmp_path / "state")}
+    assert doctor.run(None, json_output=False, show_paths=False, out=given, deps=deps, env=env) == 0
+    rows = [line.split(" | ") for line in given.getvalue().splitlines()]
+    names = [row[1] for row in rows]
+    assert not any(name.startswith(("server executable", "tool-list fingerprint")) for name in names)
+    assert ["ok", "lock directory", "writable; no stale lock"] in rows
+    assert ["ok", "installed host programs", "none declared"] in rows
