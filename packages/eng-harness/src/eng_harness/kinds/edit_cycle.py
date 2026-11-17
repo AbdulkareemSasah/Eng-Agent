@@ -1,7 +1,8 @@
-"""Payload models of the edit-cycle kinds (spec 0007 section 4.2, 4.4.1, 4.4.4, 4.10).
+"""Payload models of the edit-cycle kinds (spec 0007 section 4.2, 4.4.1, 4.4.3, 4.4.4, 4.10).
 
-Purpose: the stored form of `harness.change_set_check/1`, `harness.analysis_summary/1` and `harness.csi_name_lists/1`,
-with the rules a reader may rely on (status follows issues and counts, lists sorted, values only by reference).
+Purpose: the stored form of `harness.change_set_check/1`, `harness.host_design_verdicts/1`,
+`harness.analysis_summary/1` and `harness.csi_name_lists/1`, with the rules a reader may rely on (status follows issues
+and counts, lists sorted, values only by reference, the verdict set's rules for the host design verdicts).
 Units: drift ratios are dimensionless; resolved values name their unit.
 Errors: `pydantic.ValidationError` for every violated rule.
 """
@@ -9,7 +10,10 @@ Errors: `pydantic.ValidationError` for every violated rule.
 from collections.abc import Iterable
 from typing import Annotated, Any, Literal, Self
 
+from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.refs import RefString
+from eng_contract.trace import Trace
+from eng_contract.verdicts import Verdict, VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
 
 from eng_harness.kinds.calcs import CalcPayload
@@ -21,6 +25,7 @@ __all__ = [
     "AnalysisSummary",
     "ChangeSetCheck",
     "CsiNameLists",
+    "HostDesignVerdicts",
     "Label",
 ]
 
@@ -154,6 +159,24 @@ class AnalysisSummary(CalcPayload):
         return self
 
 
+class HostDesignVerdicts(CalcPayload):
+    """`harness.host_design_verdicts/1` (spec 0007 4.4.3): the members of `verdicts.set/1` and the calc port's three.
+
+    The rules of the verdict set (trace references, counts) are those of `VerdictSet`, which this model validates.
+    """
+
+    verdicts: list[Verdict]
+    traces: list[Trace]
+    counts: dict[VerdictStatus, int]
+
+    @model_validator(mode="after")
+    def _verdict_set_rules(self) -> Self:
+        VerdictSet.model_validate(
+            {"verdicts": self.verdicts, "traces": self.traces, "counts": self.counts, "draft": self.draft}
+        )
+        return self
+
+
 class CsiNameLists(_P):
     """`harness.csi_name_lists/1` (spec 0007 4.10): the names of the model, each list sorted and unique."""
 
@@ -173,6 +196,7 @@ class CsiNameLists(_P):
 EDIT_CYCLE_KINDS: dict[str, type[BaseModel]] = {
     "harness.change_set_check/1": ChangeSetCheck,
     "harness.analysis_summary/1": AnalysisSummary,
+    "harness.host_design_verdicts/1": HostDesignVerdicts,
     "harness.csi_name_lists/1": CsiNameLists,
 }
 """The edit-cycle kinds by registered name."""

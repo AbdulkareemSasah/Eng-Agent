@@ -6,6 +6,7 @@ returns its recorded result, or raises its recorded failure again, with no port 
 `ContractError` if unknown.
 """
 
+import inspect
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
@@ -39,7 +40,7 @@ from eng_harness.ctx import (
     ReadResult,
     ToolResult,
 )  # fmt: skip
-from eng_harness.engine import _approvals, _decide, _modes, _promote, _steps
+from eng_harness.engine import _approvals, _decide, _modes, _promote, _resources, _steps
 from eng_harness.engine._codec import decode, decode_summary
 from eng_harness.engine._guard import block_code, engine_work, enter_block_code
 from eng_harness.engine._invariants import SiblingBoard
@@ -113,12 +114,12 @@ class Ctx:
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
         pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort, mode: str,
-        always_ask: Sequence[str], run_dir: Path, copy_on_open: bool = False,
+        always_ask: Sequence[str], run_dir: Path, limits: _resources.Limits, copy_on_open: bool = False,
     ) -> None:  # fmt: skip
         """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
-        pending hosts, host leases, decisions, approvals, permission mode and always-ask tools."""
+        pending hosts, host leases, decisions, approvals, permission mode, always-ask tools and limits."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending, self._leases, self._decider, self._host = pending, leases, decider, host
+        self._pending, self._leases, self._decider, self._host, self._limits = pending, leases, decider, host, limits
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
         self._modes = _modes.Modes(
             mode,
@@ -260,7 +261,8 @@ class Ctx:
             }  # fmt: skip
             began = self._begin(path, attempt, "tool", name, args, model_key=key, **fields)
             try:
-                envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
+                async with self._limits.host(info.host_key):  # one call at a time on a host (4.10)
+                    envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
             except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
                 if info.effect != "write":
                     await self._leases.started(info.host_key)  # the raised read may have started an instance (4.6 #10)
@@ -297,7 +299,10 @@ class Ctx:
             attempt += 1
 
     def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
-        return self.index.lookup(path, kind, name, payload_sha256(args), child)
+        recorded = self.index.lookup(path, kind, name, payload_sha256(args), child)
+        if recorded is None:  # a live step is next: the engineer may have asked for a stop (4.8, `RunControlPort`)
+            self._limits.check_stop(path)
+        return recorded
 
     @engine_work
     async def read(self, ref: Ref | ToolResult | CalcResult, pointer: str = "") -> ReadResult:
@@ -404,7 +409,8 @@ class Ctx:
         self._guard.refs(_decide.held(items), {})  # invariant 3: the default rule for every reference
         began = self._clock.now_ms()
         try:
-            settled = await self._decider.settle(path, items, many=kind == "decide_many")
+            async with self._limits.decisions:  # at most `max_concurrent_decisions` requests at once (4.10)
+                settled = await self._decider.settle(path, items, many=kind == "decide_many")
             value: list[JsonValue] = [
                 {"choice": a.choice, "decided_by": a.decided_by, "confidence": a.confidence} for _, a, _ in settled
             ]
@@ -544,10 +550,20 @@ class Ctx:
             for model in models:
                 await self._guard.check(self, path, "post", model)
 
-        return await _steps.parallel(
-            steps, before=before, after=after, enter=enter,
-            leave=self._guard.dirty_models,
-        )  # fmt: skip
+        async def gated(step: Awaitable[T]) -> T:
+            async with gate:  # children start in argument order, at most `max_parallel_children` at once (4.10)
+                return await step
+
+        gate = self._limits.children()
+        try:
+            return await _steps.parallel(
+                [gated(step) for step in steps], before=before, after=after, enter=enter,
+                leave=self._guard.dirty_models,
+            )  # fmt: skip
+        finally:
+            for step in steps:  # a step that never started (a refused `parallel`) is closed, not left to warn
+                if inspect.iscoroutine(step):
+                    step.close()
 
     @engine_work
     async def finish(self) -> None:

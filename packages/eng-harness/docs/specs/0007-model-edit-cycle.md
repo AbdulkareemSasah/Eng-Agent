@@ -33,9 +33,9 @@ AC12 (`tests/rules/test_edit_cycle.py`, AC18) and the replay tests live in `test
 AC28), a package name no other test folder uses. Open points are in §11 (Q12, Q13).
 
 **Amendment B-543 (documents only, first-live-run walk, part 1: the model in the edit cycle).** What opens the
-original at step 2 and where its file, instance and units come from (§4.5 step 2; spec 0002 §4.5.9, plan 0002 T22);
+original at step 2 and where its file, instance and units come from (§4.5 step 2; spec 0002 §4.5.9, plan 0002 T23);
 `m` is the model key, which `Preview.models` and `ctx.promote` accept (§4.5; engine §4.3.2, §4.9, plan 0001 T23);
-`model.sections/1` is optional in the change-set check and the expected effects (§4.4.1, §4.4.2; plan T16); the v1
+`model.sections/1` is optional in the change-set check and the expected effects (§4.4.1, §4.4.2; plan T17); the v1
 exit for a model locked after analysis (§4.5, AC15); the visible launch (§4.2; spec 0002 §4.5.9, spec 0006 §4.2.2
 step 2); and the re-read before step 6 (§4.5.1, AC13). Each choice is stated as a decision where it is made; the host
 facts it rests on are §12 (7) and (8).
@@ -105,7 +105,7 @@ defines its method; values are synthetic and say so.
   `tests/contract/test_edit_cycle_kinds.py::test_fixtures`.
 - AC4. Given a change set and a model state, when `harness.change_set_check` runs, then selections resolve to sorted
   explicit names, and an unknown frame, area, joint, section, material or pattern, two items on the same target and
-  property, an item id with `/`, or an empty selection is an `error` issue and the status is `FAIL`. Test:
+  property, an item id that K3 refuses (`/`, not a page token, `revision` or `unlock`; amendment B-545), or an empty selection is an `error` issue and the status is `FAIL`. Test:
   `tests/golden/edit_cycle/test_change_set_check.py::test_golden_cases` (cases `check-resolve-*`, `check-unknown-*`,
   `check-duplicate-*`, `check-item-id-*`).
 - AC5. Given a value outside the basis bounds of its quantity kind (§4.8 `bounds.*`), including a thickness entered
@@ -244,7 +244,9 @@ defines its method; values are synthetic and say so.
 - AC28. Given a recorded journal of the workflow, then it replays without divergence (process/05 §2). Test:
   `tests/replay/edit_cycle_replay/test_replay.py::test_recorded_journal_replays`.
 - AC29. (B-1) Given a fixture journal, when `edit_cycle_timings` runs, then it gives the measures of §4.9 and their sums
-  equal the sums over the fixture events. Test: `tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings`.
+  equal the sums over the fixture events, the `benchmark_request` label read from a change-set answer stored in the
+  engine's shape (§4.9; amendment B-545). Tests: `tests/unit/edit_cycle/test_timings.py::test_cycle_and_turn_timings`,
+  `tests/unit/edit_cycle/test_timings.py::test_benchmark_label_in_the_change_set_answer`.
 - AC30. Given synthetic host design results and analysis messages, then `harness.host_design_verdicts` and
   `harness.analysis_summary` give the golden outputs of §4.4.3 and §4.4.4, and `harness.design_summary` given a
   `harness.host_design_verdicts/1` reference gives the body it gives for the same verdicts in a `verdicts.set/1`
@@ -332,7 +334,7 @@ engineer inputs with `entered_by` and `entered_at`, and the change-set approval 
 
 `ChangeSetDraft` (frozen, `extra="forbid"`): `items` (1 to `ChangeSetSettings.max_items`, a software setting),
 `note` (`Label`, optional), `benchmark_request` (`Label`, optional: the B-1 request id, §4.9). Each item has a unique
-`id` (`Label`) and a `kind` (discriminator):
+`id` (`Label`; the check refuses an id that is not a page token, §4.4.1 K3) and a `kind` (discriminator):
 
 | `kind` | Fields | Tool (spec 0002 §4.6.2) |
 |---|---|---|
@@ -390,7 +392,15 @@ must not enter or leave a selection silently; the engineer names the areas or dr
 Rules: K1 resolve `select` against `model.frame_placements/1` or `model.area_placements/1` (story equal, section equal,
 area kind from `model.sections/1`); an empty result is `EMPTY_SELECTION`. K2 every name exists (`UNKNOWN_<CLASS>`) or is
 added earlier in the set. K3 two items setting the same target and property is `DUPLICATE_TARGET`; an item id that
-contains `/` is `INVALID_ITEM_ID` (§4.4.2 effect ids). K4 each value: a `basis` path present and confirmed (else
+is not 1 to 57 ASCII letters, digits, `_`, `.` or `-`, or that is `revision` or `unlock`, is `INVALID_ITEM_ID`
+(amendment B-545): `/` is refused because effect ids join the item id with `/` (§4.4.2), the token rule because the
+change-set screen names an item's reject and reason fields `reject_<id>` and `reason_<id>`, a page token of at most 64
+characters (spec 0006 AC49; the prefixes of plan 0006 T9), so 64 less the 7 of the prefix, and `revision` and `unlock` because step 6 adds preview
+items of those ids and a preview refuses a repeated id. Decision (B-545): the rule lives in the check, not in
+`ChangeSetDraft` or the page, because the check already refuses ids with a named, stored issue, while the engine only
+logs a model refusal of a file answer and keeps the request open, and a field name cannot carry any other id without a
+second encoding on the page. Decision (B-545): the calc stays version 1, as for the slash rule (amendment B-513),
+because it is a draft that no run has journaled. K4 each value: a `basis` path present and confirmed (else
 `SOURCE_MISSING`), unit of the field's dimension (`UNIT_MISMATCH`), value within the bounds of its value kind by exact
 comparison of canonical values (`OUT_OF_BOUNDS`): `bounds.thickness_min_mm` and `bounds.thickness_max_mm` for a length,
 `bounds.line_load_min_kN_m` and `bounds.line_load_max_kN_m` for a line load, `bounds.area_load_min_kPa` and
@@ -637,7 +647,10 @@ Every journal event carries its time from the contract `Clock` (engine §4.4). T
 the journal sufficient for B-1:
 
 - each cycle is the scope `<loop path>/<k>`, so every event's cycle follows from its step path;
-- the change set carries the optional `benchmark_request` label, recorded through the answer;
+- the change set carries the optional `benchmark_request` label, recorded through the answer: the stored
+  `basis.engineer_input/1` holds one entry per field of `ChangeSetRequest`, so the label is at
+  `fields.change_set.value.benchmark_request` (§4.3.1; amendment B-545: the merged timings read a top-level
+  `fields.benchmark_request`, which a real answer never holds);
 - `edit_cycle_timings(reader, store=None) -> CycleTimings` (pure, over `JournalReader`; amendment B-533: the optional
   `ResultStore` is where the `benchmark_request` label is read, because the label is only in the stored change-set
   answer, so without a store `benchmarks` is empty) gives per step its kind, name and duration;
