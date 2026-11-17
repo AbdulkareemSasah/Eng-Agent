@@ -16,9 +16,8 @@ generated_globs: ["uv.lock", "**/AGENTS.md", "**/docs/schema/**"]  # B-360: JSON
 spike_globs: ["spikes/**"]
 agents:
   unmanaged_ok: ["design/**"]
-limits:  # max_task_lines: process/04 section 4. The others are gate settings proposed here (owner queue).
+limits:  # Gate settings proposed here (owner queue).
   diff_lines: 200
-  max_task_lines: 400
   test_run_seconds: 600
   max_file_bytes: 1048576
   mutation_run_seconds: 7200

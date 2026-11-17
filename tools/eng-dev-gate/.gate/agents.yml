@@ -2,9 +2,9 @@ template: ../../design/process/templates/AGENTS.template.md
 output: AGENTS.md
 values:  # key = the exact text between the double braces in the template
   "package-name": "eng-dev-gate"
-  "template-version": "sha256:3681a65820bf"
+  "template-version": "sha256:7a1a12af2a76"
   "hub-path": "../../design"
-  "one-paragraph purpose": "The gate of the Eng-Agent platform: the `eng-gate` command that enforces the process rules (plan and spec gates, file scope and diff budget, risk floor, test-first, forbidden patterns, import layers, secrets, licenses, coverage ratchet, AGENTS.md drift) on a workstation and in CI with stable exit codes and diagnostic codes. Spec and plan: `docs/specs/0001-eng-dev-gate-0.1.md`, `docs/plans/0001-eng-dev-gate-0.1.md`."
+  "one-paragraph purpose": "The gate of the Eng-Agent platform: the `eng-gate` command that enforces the process rules (plan and spec gates, file scope, risk floor, test-first, forbidden patterns, import layers, secrets, licenses, coverage ratchet, AGENTS.md drift) on a workstation and in CI with stable exit codes and diagnostic codes. Spec and plan: `docs/specs/0001-eng-dev-gate-0.1.md`, `docs/plans/0001-eng-dev-gate-0.1.md`."
   "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "tool (development tool, not a layer of the product; spec section 4.1)"
   "packages": "none: it imports no other workspace package"
   "for servers: other servers, structural-codes, eng-harness": "every other workspace package (no package imports the gate)"

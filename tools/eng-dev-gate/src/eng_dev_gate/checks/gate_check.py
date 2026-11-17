@@ -1,4 +1,4 @@
-"""``gate-check`` (spec 4.5): body parsing, plan and task, file scope and diff budget.
+"""``gate-check`` (spec 4.5): body parsing, plan and task, file scope and the counted-lines notice.
 
 Part 2 is in ``gate_check_docs`` and ``codeowners``. The pull-request title and body are data, never executed.
 """
@@ -222,30 +222,30 @@ def _scope(
     return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
 
 
-def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
-    """GC009 when added plus deleted lines exceed the task limit; tests, generated and spike files are not counted."""
+def _counted(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
+    """GC009 reports the counted lines; tests, generated and spike files are not counted."""
     counted = counted_lines(entries, config)
     findings = [
         Finding(
             code="GC009",
             severity=Severity.NOTICE,
             path=e.path,
-            message="notice, not a budget failure: binary file counts zero",
+            message="binary file counts zero",
         )
         for e in counted
         if e.binary
     ]
     total = sum(e.added + e.deleted for e in counted)
-    if total > task.max_changed_lines:
-        largest = sorted(counted, key=lambda e: e.added + e.deleted, reverse=True)[:LARGEST_FILES_SHOWN]
-        names = ", ".join(f"{e.path} ({e.added + e.deleted})" for e in largest)
-        findings.append(
-            _error(
-                "GC009",
-                f"{total} changed lines exceed max_changed_lines {task.max_changed_lines} of task {task.id} "
-                f"(BLOCKED: propose a plan change); largest: {names}",
-            )
+    largest = sorted(counted, key=lambda e: e.added + e.deleted, reverse=True)[:LARGEST_FILES_SHOWN]
+    names = ", ".join(f"{e.path} ({e.added + e.deleted})" for e in largest)
+    findings.append(
+        Finding(
+            code="GC009",
+            severity=Severity.NOTICE,
+            message=f"{total} counted lines (estimate max_changed_lines {task.max_changed_lines} of task {task.id}); "
+            f"largest: {names}",
         )
+    )
     return findings
 
 
@@ -253,7 +253,7 @@ def _judge(
     pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str], base: str,
     changes: list[Change], approvals: Approvals | None, risks: set[str],
 ) -> list[Finding]:  # fmt: skip
-    """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and budget (steps 3 to 8)."""
+    """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and counted lines (steps 3 to 8)."""
     fields = parse_body(pr.body)
     findings = _work_item(fields, config)
     target = _plan_task(fields, config)
@@ -269,7 +269,7 @@ def _judge(
         paths = [p for c in changes for p in c.paths]
         return [*findings, *none_findings(target, paths, entries, config)]
     plan_path, task_id = target
-    plan = _read(git, gate_ref, plan_path, lambda text: parse_plan(text, config.limits.max_task_lines))
+    plan = _read(git, gate_ref, plan_path, parse_plan)
     if isinstance(plan, Finding):
         return [*findings, plan]
     risks.update(plan.risk)
@@ -288,7 +288,7 @@ def _judge(
     return [
         *findings,
         *_scope(changes, task, plan_path, member_dirs, git, base, pr.head_sha),
-        *_budget(entries, task, config),
+        *_counted(entries, task, config),
     ]
 
 

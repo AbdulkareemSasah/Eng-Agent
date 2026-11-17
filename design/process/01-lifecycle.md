@@ -16,7 +16,7 @@ flowchart LR
 | S1 Discovery | Problem statement, acceptance criteria, reuse research | The problem is measurable; reuse options were checked |
 | S2 Spec | Spec file of the right type ([03](03-specs-and-design-review.md)); an ADR if architecture changes | Spec review checklist passes |
 | **G1** | The spec merged to `main` through its own pull request, front matter `status: approved` | Approvals per §5, verified by the `gate-check` CI job |
-| S3 Plan | Plan file `docs/plans/<issue>-<slug>.md` ([templates/implementation-plan.md](templates/implementation-plan.md)) | Every acceptance criterion maps to a test; every task lists its files and budget |
+| S3 Plan | Plan file `docs/plans/<issue>-<slug>.md` ([templates/implementation-plan.md](templates/implementation-plan.md)) | Every acceptance criterion maps to a test; every task lists its files, size estimate and session budget |
 | **G2** | The plan merged to `main` through its own pull request, `status: approved` | Approvals per §5, verified by `gate-check` |
 | S4 Implement | Per task: a `test:` commit with failing tests, then code, then refactor | Task tests green |
 | S5 Pre-checks | Local gate (`uv run eng-gate check`) and optional author-side review tools | Local gate green |
@@ -57,12 +57,13 @@ automatically on green CI ([12](12-operations.md) §6). Runtime dependency addit
 Gates are files and pull-request approvals on `main`, never labels or comments, so CI can verify them:
 
 - Specs and plans carry YAML front matter: `id`, `issue`, `status` (`draft` or `approved`), `size`, `risk`, and for
-  plans the task list with `files` (globs), `max_changed_lines` and `max_sessions` per task.
+  plans the task list with `files` (globs), `max_changed_lines` (an estimate, [04](04-implementation-rules.md) §4) and
+  `max_sessions` per task.
 - A spec or plan becomes approved only by merging the pull request that sets `status: approved`, with the approvals
   required in §5. A pull request that changes a spec or a plan changes nothing else.
 - An implementation pull request names `Plan-Task: docs/plans/<file>#T<n>` in its description. The `gate-check` job
-  verifies that the plan and its spec are approved on `main`, the task exists, every changed file matches the task's
-  globs, and the diff stays within `max_changed_lines`.
+  verifies that the plan and its spec are approved on `main`, the task exists, and every changed file matches the
+  task's globs. Diff size is reported, never failed ([04](04-implementation-rules.md) §4).
 - Labels (`status/`, `size/`, `risk/`) are informational and for search; no gate depends on them.
 - Bootstrap mode ([ADR-0028](../docs/adr/0028-build-v1-in-this-repository.md)): gates are verified on `build/v1`
   instead of `main`; a spec or plan with `status: draft` that a subagent other than its author reviewed stands in for
@@ -98,8 +99,8 @@ A pull request whose recorded risk is below the floor fails `risk-floor`.
 
 - One work item per agent session; the claiming identity is the issue's assignee.
 - At most three open pull requests per repository from agents.
-- Each plan task has a budget (`max_changed_lines`, `max_sessions`). Exceeding it means `BLOCKED` and a plan update,
-  never "keep going".
+- Each plan task has a session budget (`max_sessions`). Exceeding it means `BLOCKED` and a plan update, never "keep
+  going". Changed lines have no limit ([04](04-implementation-rules.md) §4).
 - A work item blocked for more than five working days is re-triaged.
 
 ## 8. Change types and their first move

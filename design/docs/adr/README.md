@@ -27,7 +27,7 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0018](0018-permission-modes.md) | Three permission modes, user-selectable, default work on a copy | Proposed |
 | [0019](0019-host-version-support-policy.md) | Host version support: tested versions only, design for multi-version | Proposed |
 | [0020](0020-dxf-reading-as-mcp-server.md) | DXF reading as its own MCP server | Superseded by ADR-0024 |
-| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026 and ADR-0028 |
+| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026, ADR-0028 and ADR-0035 |
 | [0022](0022-repository-names.md) | Repository and package names | Proposed; amended by ADR-0024 |
 | [0023](0023-license-apache-2.md) | License: Apache-2.0 | Proposed |
 | [0024](0024-harness-on-existing-sasaah-servers.md) | The harness runs on the existing Sasaah MCP servers and tools; no new host servers are built | Accepted |
@@ -41,3 +41,4 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0032](0032-harness-side-model-identity.md) | A harness-side model identity in the workspace when the host cannot stamp one (amends 04 §3.3, 06 §6) | Proposed |
 | [0033](0033-desktop-products-in-sasaah.md) | The desktop products stay in Sasaah during v1; nothing is built under `products/` | Proposed |
 | [0034](0034-task-log-by-default.md) | Every owner task has a task log in the root folder `tasklog/`, pushed directly as log-only commits; recorded owner exceptions to A11, hub rule 6 and "never the owner's credentials" | Proposed |
+| [0035](0035-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted |

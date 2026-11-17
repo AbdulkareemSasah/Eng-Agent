@@ -74,7 +74,7 @@ Process enforcement is code, and it lives in one repository so no repository can
 | Job | Runs on | Content |
 |---|---|---|
 | `gate` | Linux | `uv run eng-gate check` |
-| `gate-check` | Linux | Spec and plan approved on `main`; plan task exists; changed files match the task; diff within budget; spec or plan pull requests change nothing else; approvals per [01](01-lifecycle.md) §5 |
+| `gate-check` | Linux | Spec and plan approved on `main`; plan task exists; changed files match the task; diff size reported as a notice, never failed; spec or plan pull requests change nothing else; approvals per [01](01-lifecycle.md) §5 |
 | `risk-floor` | Linux | Recorded risk is at least the path-derived floor |
 | `test-first` | Linux | [05](05-testing-and-verification.md) §9 |
 | `ci-review` | Linux | CI reviewers ([06](06-review-and-merge.md) §1), posting under the reviewer identity; re-runs on new commits |

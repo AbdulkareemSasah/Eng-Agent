@@ -27,7 +27,7 @@ BODY = (
     "spec_globs: ['**/docs/specs/*.md']\nplan_globs: ['**/docs/plans/*.md']\n"
     "test_globs: ['**/tests/**']\ngenerated_globs: ['uv.lock']\nspike_globs: ['spikes/**']\n"
     "agents:\n  unmanaged_ok: ['design/**']\n"
-    "limits:\n  diff_lines: 200\n  max_task_lines: 400\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
+    "limits:\n  diff_lines: 200\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
     "  mutation_run_seconds: 7200\n"
 )
 

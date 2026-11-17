@@ -29,7 +29,7 @@ def _error(code: str, message: str, path: str | None = None) -> Finding:
 
 
 def counted_lines(entries: Sequence[NumstatEntry], config: GateConfig) -> list[NumstatEntry]:
-    """The entries that count against a budget: not tests, generated files or spike files (spec 4.5 step 7)."""
+    """The entries that are counted: not tests, generated files or spike files (spec 4.5 step 7)."""
     exempt = [*config.test_globs, *config.generated_globs, *config.spike_globs]
     return [e for e in entries if not matches_any(e.path, exempt)]
 
@@ -127,7 +127,7 @@ def _check_document(
 ) -> list[Finding]:
     """GC005, GC004, GC016 and GC014 or GC015 for one changed spec or plan, read at the head commit."""
     plan = matches_any(path, config.plan_globs)
-    parse: Callable[[str], Spec] = (lambda t: parse_plan(t, config.limits.max_task_lines)) if plan else parse_spec
+    parse: Callable[[str], Spec] = parse_plan if plan else parse_spec
     try:
         doc = parse(git.show(head, path))
     except FrontMatterError as problem:
