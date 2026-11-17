@@ -685,6 +685,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_modes.py"
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/workflow/test_model_keys.py"
+      # Amendment (B-560): test-only collateral; compare the supplied handle instead of accessing .revision on the union.
+      - "packages/eng-harness/tests/unit/test_ctx_basis.py"
     max_changed_lines: 30
     max_sessions: 1
     tests_first:
@@ -1061,7 +1063,10 @@ key (`ModeApprovals.stored`). `ToolResult.model` stays `None`. `test_preview_and
 rig in `work_on_copy` once the working copy is taken, a write under a `CHANGE_SET` approval whose preview names the
 original's key, then a `PROMOTION` approval and promotion given the key: the binding is the working copy's state, the
 stored preview holds the key, and the promotion returns the promoted handle as with a handle of the same key. It fails
-at the base, where `Preview` refuses a `str` model.
+at the base, where `Preview` refuses a `str` model. Amendment B-560 adds the existing
+`test_ctx_basis.py::test_preview_and_approval` assertion to T23: compare `preview.models` with `(handle,)`, preserving
+the supplied revision-2 handle check while accepting the widened type. This collateral edit is in the implementation
+commit; the test already passes at the base. The budget, acceptance criteria and `tests_first` stay unchanged.
 
 ## 3. Dependencies
 
