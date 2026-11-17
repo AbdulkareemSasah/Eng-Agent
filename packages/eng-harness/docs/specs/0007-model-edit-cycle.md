@@ -215,7 +215,7 @@ defines its method; values are synthetic and say so.
   is the worse of the two (§4.5). Test: `tests/workflow/edit_cycle/test_long_runs.py::test_step_13_and_14_inputs`.
 - AC42. **[added: B-544]** Given the fake returning no analysis message and story drifts whose highest ratio equals
   `limits.drift_ratio`, then the D-3 `drift_status` is `PASS` and the rule continues; given one row just above the
-  limit, or no drift row, then it is `NEEDS_ENGINEER` and D-3 reaches the engineer (§4.6, Q20). Test:
+  limit, then it is `NEEDS_ENGINEER` and D-3 reaches the engineer (§4.6, Q20). Test:
   `tests/workflow/edit_cycle/test_turn.py::test_drift_at_d3`.
 - AC20. Given more cycles than `attempts.cycles`, then the run escalates with `attempts_exhausted`. Test:
   `tests/workflow/edit_cycle/test_cycle.py::test_cycle_limit`.
@@ -556,7 +556,7 @@ step 9 or step 3 read is stale at step 14 (`REF_STALE`, invariant 3), spec 0003 
 `stale_ok`, and leaving it out would drop the summary's frames without design results. **Drift names.** Decision:
 `combos` is every combination name of `R[k]`'s `harness.csi_name_lists/1` and `cases` is empty, because no basis field
 or name list names drift cases, and a limit checked over all combinations never passes a drift that a subset of them
-would fail; a model without combinations gives no drift row, which D-3 does not pass (§4.6). Which combinations the
+would fail; a model without combinations gives no drift row. Which combinations the
 limit applies to is Q21; what the host returns for combinations with no case is §12 (1). **Two design kinds.**
 Decision: one design summary per kind of `design.run`, because spec 0003 §4.9 takes one verdicts reference and a
 merge would be a new calc; with `steel_and_concrete` each summary lists the other kind's frames among its frames
@@ -646,15 +646,14 @@ same cycle with the summaries available so far; `restore_previous` runs `ctx.too
 "revision": P[k]})` (§4.5.1, §4.10, Q4) and starts the next approval-void iteration (a new step 3 read, a step 4
 difference report against `R[k-1]` that still shows the engineer's changes, and a new approval).
 
-Amendment B-544. **Drift at D-3 (owner decision of 2026-11-16, Q20).** `clean` holds only when the analysis summary
-reports no error, no unclassified message and no story whose drift ratio exceeds the limit. The D-3 state's
-`drift_status` is `PASS` when the summary's `exceeding` is empty and its `governing_drift` is not, else
-`NEEDS_ENGINEER`; the limit and "exceeds" are those of §4.4.4. So a story drift above the limit stops the cycle at D-3
-and asks the engineer. Decision (B-544): a summary with no drift row (`governing_drift` empty) gives `NEEDS_ENGINEER`
-too, because then no story was checked against the limit, while the merged calc reports `PASS` for it; the calc is
-unchanged. Both rules of `rules/edit_cycle.py` move to version 2, because the rule lock hashes the module source (spec
-0005 AC10); the D-2 point moves to version 2 for its new reason (spec 0005 AC4); the D-3 state model, docstring
-included, is unchanged, so the D-3 point stays at version 1. **A failed check before the step 9
+Amendment B-544. **Drift at D-3 (owner decision of 2026-11-16, Q20).** A story drift above the limit stops the edit
+cycle at D-3 and asks the engineer: `clean` holds only when the analysis summary reports no error, no unclassified
+message and no story whose drift ratio exceeds the limit. The D-3 state carries the member of
+`harness.analysis_summary/1` that says so, `exceeding`, as `drift_status`: `PASS` when `exceeding` is empty, else
+`NEEDS_ENGINEER`, as §4.4.4 sets the summary's status; the limit and the meaning of "exceeds" are those of §4.4.4. Both rules of
+`rules/edit_cycle.py` move to version 2, because the rule lock hashes the module source (spec 0005 AC10); the D-2
+point moves to version 2 for its new reason (spec 0005 AC4); the D-3 state model, docstring included, is unchanged, so
+the D-3 point stays at version 1. **A failed check before the step 9
 read (Q14, interim reading).** The step 9 block catches the `ModelIntegrityError` of the check that invariant 1
 inserts before the S' read and opens D-2 with the reason `check_model_failed`, status `NEEDS_ENGINEER`, every finding
 flag false and the step 6 expected effects as refs; the read-back check does not run, and `restore_previous` and
@@ -886,7 +885,7 @@ start at version 1 with lock entries.
 | Q18 | **[added: B-513]** K3 (§4.4.1) refuses two items on one target and property and an item id with `/`, but says nothing of two terms of one `load_combination_set` item that have the same D2 item key (`case.case`, `case.case_type`, `case.step`); the merged check passes such an item without an issue | Owner | Decide whether K3 extends to the terms of one item and with which issue code (a golden case and a version rule of spec 0003 §4.2 follow). Until answered nothing refuses it and no test pins either behaviour; plan T14 builds only the item id rule |
 | Q19 | **[added: B-511]** `harness.host_design_verdicts` (§4.4.3) cannot output `verdicts.set/1`: the calc registry refuses an output kind outside the `harness.` family (spec 0003 AC1, AC47; contract §4.10.1 refuses a calc kind in a neutral family), and the calc port stores the body with `calc`, `draft` and `trace`, which the extra-forbidding `verdicts.set/1` model refuses; the merged design summary (spec 0003 §4.9) takes only a `verdicts.set/1` reference | Owner | Answered by the owner on 2026-11-16 (amendment B-538): option (a). The output kind is `harness.host_design_verdicts/1` in `kinds/edit_cycle.py`, holding the members of the verdict set plus the calc port's `calc`, `draft` and `trace` (§4.4.3); spec 0003 §4.9 `SummaryInput.verdicts` also accepts it (the draft design summary's content hash changes and its verification record follows, spec 0003 §4.5); the `check_id` and `code` values of §4.4.3 are as recommended (`host.<kind>_design_ratio`, `host_<kind>_design`); contract §4.10.1 and spec 0003 AC1 and AC47 do not change. Built by plan T4b |
 | Q20 | **[added: B-544]** §4.6 put a drift status into the D-3 state while §4.4.4 defines one combined status, and `edit_cycle_analysis_messages.clean` ignored drift, so a story drift above the limit passed D-3 without the engineer (raised by the reviewers of plan T4 and T7) | Owner | Answered by the owner on 2026-11-16: a story drift above the limit stops the cycle at D-3 and asks the engineer. `clean` holds only when the analysis summary reports no error, no unclassified message and no story whose drift ratio exceeds the limit; the D-3 state carries it as `drift_status`, read from the summary's `exceeding` (§4.6); built by plan T7b (rule) and T9a (state) |
-| Q21 | **[added: B-544]** Which load cases and combinations the story-drift read of step 13 names: no basis field or name list names them | Owner | Interim reading (lead decision B-544): every combination of the cycle's name lists and no case (§4.5), and a summary with no drift row does not pass D-3 (§4.6); naming the drift combinations would need a basis field that holds names, which §4.8 does not have |
+| Q21 | **[added: B-544]** Which load cases and combinations the story-drift read of step 13 names: no basis field or name list names them | Owner | Interim reading (lead decision B-544): every combination of the cycle's name lists and no case (§4.5); a summary with no drift row has `exceeding` empty, so its `drift_status` is `PASS` (§4.4.4, §4.6), and what the host returns for combinations with no case is §12 (1); naming the drift combinations would need a basis field that holds names, which §4.8 does not have |
 | C1 | 18 step 11 "or followed through the status tool": S-12 §5 shows synchronous runs | Owner | As spec 0002 C1: long role with its own timeout |
 | C2 | 18 step 15 calls the engineer turn "approve"; spec 0006 Q14 makes it a choice | Owner | Choice request (§4.7) |
 | C3 | 18 §2 seismic parameters "through a dedicated tool": none exists | Owner | Refused (CG-1, OQ-G8) |

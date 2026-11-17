@@ -523,7 +523,8 @@ tasks:
     # tool port refuses it as an engineering argument (INVALID_ARGUMENT or REF_UNIT_MISMATCH). About 20 lines in
     # _change_set.py (value_<suffix> filled and checked by eng_contract.units), 4 in change_set_check.py (the two ref
     # forms), 4 of the lock (the check and expected_effects import the model), 4 of the record, 1 of CHANGELOG.md: about
-    # 33; budget 50 (an estimate). After T16 (change_set_check.py, calcs.lock.json, the record, the golden test).
+    # 33; budget 50 (an estimate). After T16 and T17 (B-543), which edit change_set_check.py, calcs.lock.json, the record
+    # and the golden test as this task does (T17 also expected_effects.py, whose lock entry this task moves).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_change_set.py"
@@ -538,7 +539,7 @@ tasks:
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py::test_value_refs_are_write_arguments"
     covers: [AC40]
-    depends_on: [T16]
+    depends_on: [T16, T17]  # T17 (B-543) shares change_set_check.py, calcs.lock.json, harness.change_set_check.md and test_change_set_check.py
   - id: T9c
     title: Step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off
     # Amendment (B-544, documents only): new (first-live-run walk-through C19, C25, C32; spec 4.5, 4.6, AC17, AC22, Q14
@@ -643,7 +644,7 @@ report and audit (T10), the prompt counter and timings (T10b) are pure functions
 support and the replay suite, mostly tests. T10c and T16 fix merged code found by the first-live-run walk-through
 (amendment B-545): the benchmark label's place in the stored answer, and the item ids the change-set screen can carry.
 T7b, T16b and T9c (amendment B-544) follow the same walk-through and the owner's drift decision of 2026-11-16: T7b
-(rule and points) after T7 and before T8, T16b (change-set values as write arguments) after T16 and before T8, and T9c
+(rule and points) after T7 and before T8, T16b (change-set values as write arguments) after T16 and T17 and before T8, and T9c
 (the step 9 route and the step 17 exception items) after T9b; T9a carries the step 13 and 14 changes.
 
 Reuse (spec §2): everything from plans 0001 to 0006; no code is copied from Sasaah or elsewhere (A12). Tests use the
@@ -829,7 +830,9 @@ T8 keeps that block name (and its `block` step kind) for the cycle child block.
 Amendment (B-544): `EditCycleOutput.summaries` is the ordered tuple of spec §4.2 (the analysis summary, then one design
 summary per kind of `design.run`), which T9a and T9b fill; step 8 passes each resolved `ref` unchanged as the tool's
 engineering argument, valid once T16b has merged; the D-2 reason `check_model_failed` is T7b's and its route T9c's, and
-the D-3 state that T9a builds follows spec §4.6 as amended by B-544 (`drift_status`).
+the D-3 state (`AnalysisState`, which T9a fills) follows spec §4.6 as amended by B-544: the owner's decision of
+2026-11-16 that a story drift above the limit stops the cycle at D-3, `drift_status` read from the analysis summary's
+`exceeding` (T7b's rule).
 Amendment (B-503): plan 0001 T22 stops on a `check_model` that is not clean, which the check inserted before the S'
 read of step 9 can meet; how the block routes that stop is spec Q14 (open). Until Q14 is answered this task adds no
 routing code: the inserted check's `ModelIntegrityError` escalates like any other `StepError`, and
@@ -872,10 +875,10 @@ Amendment (B-544; spec §4.5 steps 13 and 14, §4.6, AC41, AC42): T9a's step 13 
 `csi_read_model_state` (`F`) and passes the drift read `cases` empty and `combos` every combination of `R[k]`'s
 `harness.csi_name_lists/1`; step 14 runs `harness.host_design_verdicts` and `harness.design_summary` once per kind of
 `design.run`, steel before concrete, with `F.frames` and that kind's previous summary; the D-3 state's `drift_status` is
-`PASS` when the analysis summary's `exceeding` is empty and its `governing_drift` is not, else `NEEDS_ENGINEER`; the
+`PASS` when the analysis summary's `exceeding` is empty, else `NEEDS_ENGINEER` (spec §4.6, owner decision of 2026-11-16); the
 turn's design status is the worse of the summaries' statuses in the order of spec 0003 §4.9 S5. `test_step_13_and_14_inputs`
 runs a cycle with `design.run` `steel_and_concrete` and checks the calls, the two summaries and the absence of
-`REF_STALE`; `test_drift_at_d3` seeds the fake's drift rows at the limit, just above it and empty (synthetic values)
+`REF_STALE`; `test_drift_at_d3` seeds the fake's drift rows at the limit and just above it (synthetic values)
 and checks D-3. The workflow tests of the normal paths seed drift rows not above the limit (spec §4.9).
 
 **T10 and T10b Report and B-1 support** (spec §4.9; split by amendment B-533). T10: renderers for the kinds of T1a and
@@ -955,7 +958,8 @@ the reference form. `test_value_refs_are_write_arguments` stores an answer as th
 validates each resolved ref with `eng_contract` `validate_input(..., InputPolicy(require_refs=True))` against
 `DefineWallSectionArgs`, `SetFrameLoadDistributedArgs` and `AddLoadPatternArgs`: 0.2 m gives 200 mm (derived by hand
 from the contract's unit table); it fails at the merge base with `INVALID_ARGUMENT`. The golden outputs of the check
-change their `ref` strings only.
+change their `ref` strings only, those of T17's `check-no-sections-*` cases included. T16b waits for T16 and T17, which
+edit the same four files.
 
 **T9c Failed check at step 9 and exception items at step 17** (amendment B-544; spec §4.5, §4.6, AC17, AC22, Q14). The
 step 9 block catches `ModelIntegrityError` from the S' read and opens D-2 with the state of spec §4.6 (reason
@@ -1021,7 +1025,7 @@ paths; the merged cases, which pass the record, keep their expectations. T17 wai
 | T12 | plan 0001 T19 (crash-matrix worker); plan 0002 T19a (amendment B-475) |
 | T13 | nothing outside this plan beyond T5's needs (amendment B-503); plan 0002 T19c and T19a wait for T13 (all three edit `adapters/_hostport.py`; T19c by amendment B-530), and T13 and plan 0002 T15 both edit `csi/_tools.py` without an order (whichever lands second adapts) |
 | T14 | T3 (both edit `calcs.lock.json`; T2 is merged; amendment B-513) |
-| T7b, T16b | nothing outside this plan (amendment B-544); T8 waits for both |
+| T7b, T16b | nothing outside this plan (amendment B-544); T7b after T7; T16b after T16 and T17 (`change_set_check.py`, `calcs.lock.json`, `harness.change_set_check.md`, `test_change_set_check.py`); T8 waits for both |
 | T9c | plan 0006 T9c (the sign-off screen reads `harness.host_design_verdicts/1`; amendment B-544) |
 | T10c | nothing outside this plan (amendment B-545) |
 | T16 | T4b of this plan (both edit `calcs.lock.json`; amendment B-545) |
