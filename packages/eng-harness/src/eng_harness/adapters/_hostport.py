@@ -28,7 +28,7 @@ class AdapterHostPort:
         self, *, identity: IdentityStore, sessions: ServerManager, guard: ProcessGuard, inspector: ProcessInspector,
         locks: HostLocks, clock: Clock, ids: IdSource, run_dir: Path, product: str, program: str, exe_name: str,
         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
-        readback: ReadBack | None = None,
+        readback: ReadBack | None = None, visible: bool = False,
     ) -> None:  # fmt: skip
         self._identity, self._clock, self._ids, self._sessions, self._locks = identity, clock, ids, sessions, locks
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
@@ -43,8 +43,9 @@ class AdapterHostPort:
         self._written: set[str] = set()
         self._warnings: list[tuple[str, WarningCode]] = []
         self._session = CsiSession(
-            sessions, guard, inspector, locks, ids, server=server, product=product, program=program, exe_name=exe_name
-        )
+            sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
+            exe_name=exe_name, visible=visible,
+        )  # fmt: skip
         self._reader = CsiStateReader(product=product, call=self._session._call)  # B-451: no public read on CsiSession
         self._load(files)
 
@@ -64,6 +65,16 @@ class AdapterHostPort:
 
     async def release(self, lease: HostLease) -> None:
         self._locks.release_all()
+
+    async def open_original(self, model_key: str) -> Path:
+        """Open the file of `model_key` in the run's instance (launching one) and bind it (spec 4.5.9, step 2 open)."""
+        source = self._file(model_key)
+        model_id = self._identity.resolve(source).model_id
+        opened = await self._session.open_file(source, self._reusable(), self._clock.now())
+        self._keep(model_key, source, model_id, opened)
+        self._units[model_key] = await self._session.units(opened)
+        self._persist()
+        return source
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         source = self._file(model_key)
