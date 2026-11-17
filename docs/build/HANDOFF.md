@@ -1,3 +1,92 @@
+# Build handoff checkpoint of 2026-11-17 (build/v1 at d5ea640, updated to 8b2722f and later): hand-over to a lead on another machine
+
+Written by the lead of the cloud session when the owner asked for a hand-over to another agent on another machine
+(2026-11-17, about 09:30 UTC). This section is the newest; the sections below it stay for their history.
+
+## A. State
+
+- **Plan tasks merged: 229 of 349** (228 at the first write of this section; B-547 #410 merged after it) (the total is the `- id:` entries in the front matter of every plan under
+  `packages/**/docs/plans/` and `tools/*/docs/plans/`, recounted at d5ea640; it grew from 340 by the tasks the
+  first-live-run walk-through added). Merged since the checkpoint of 2026-11-16: B-200 #383, B-174 #385, B-204 #386,
+  B-229 #387, B-184 #388, B-524 #391, B-519 #381, B-532 #392, B-520 #394, B-534 #395, B-198 #396, B-521 #397,
+  B-117 #389, B-118 #399, B-525 #400, B-201 #402, B-548 #405, B-546 #406, B-549 #407; documents B-537, B-538, B-536,
+  B-542, B-545, B-541, B-543; lead tooling B-539 (local CI batch mode, three direct commits by the owner's word).
+- **Registry:** `ops/remaining-tasks.json` has 177 entries; every merged entry now carries `merged_pr`; B-546 to B-555
+  were added; B-138 (S.T19a) has risk `r1, r2, r3` and waits only for S.T23 (B-550).
+- **Priority:** the first live run (D-32). The path is in [priority.txt](priority.txt) and in section C.
+
+## B. In flight at the hand-over (started in the old session; they may still finish there)
+
+Check each on GitHub first (`git ls-remote --heads origin`, open pull requests into `build/v1`, `git log origin/build/v1`).
+A merged one is done. A pushed branch with no pull request continues from its branch (review, gate, pull request,
+local CI, merge). Nothing pushed: start the item fresh from its registry entry.
+
+| Item | What | State at the hand-over |
+|---|---|---|
+| B-544 | Documents: first-live-run gaps, third set, part 2 | **Merged as #408.** It carries the owner D-3 decision and added W.T7b (B-556), W.T16b (B-557), W.T9c (B-558) and plan 0006 I.T9c (B-559), now in the registry. |
+| B-547 | W.T16 item-id rule in harness.change_set_check (engineering calc) | **Merged as #410.** B-555 (W.T17) can start. Notes: the counted lines sit at the estimate 30; the mutation step ran only in local CI without mutation, so the next periodic run covers it; if a delete item of the change-set preview ever gets a fixed id, the reserved ids must grow (spec 0007 4.5 step 6). |
+| B-551 | E.T23 Preview.models and ctx.promote take a model key | Pushed, head 2361039, no pull request; 23 counted lines, test-first pass. Stopped: the types step fails on one existing test outside the file list (`tests/unit/test_ctx_basis.py` line 120). Needs a small documents amendment adding that file to plan 0001 T23, then the one-line edit in its registry note, gate, review, pull request. |
+| B-552 then B-553 | Owner decision of 2026-11-17: the changed-line count is an estimate, not a limit | **B-552 is written and pushed** (branch docs/b552-gate-line-count-estimate, head 48420c1, gate without mutation pass, no pull request): gate spec (GC009 a notice, no size cap, links ADR-0035) and gate plan T40 (estimate 260; its files include the design/ copies, the AGENTS template with its five rendered AGENTS.md files, the template-version lines in the .gate/agents.yml files and .github/pull_request_template.md, because the gate refuses those next to a spec or plan, GC010). Next: review it (Opus), open its pull request, local CI, merge. Then **B-553** (T40): start from [b552-t40-documents-trial.patch](b552-t40-documents-trial.patch) (the documents part, 117 counted lines, agents drift pass) plus the code and test changes listed in [line-limit-sweep.md](line-limit-sweep.md) sections B and C; the base gate still judges it, so it must stay inside 260 or the plan estimate is raised first. Writer note: [b552-writer.md](b552-writer.md); body: [b552-pr-body.md](b552-pr-body.md). |
+| B-554 | Plan 0002 T23 lists the collateral test of B-550 | **Merged as #409.** B-550 must merge origin/build/v1 before its local CI (its scope is judged against the plan in its base). |
+| Hub | `claude/pensive-volta-gcx0y9`: process documents and ADR-0035 for the same decision | **Done and reviewed** (commit 83264cc; renumbered from 0028 to 0035 in 49f43e0, because the build copy holds 0028 to 0034). The hub index still lacks rows for 0028 to 0034 (an owner choice whether to copy them in). |
+| B-550 | S.T23 open the original, visible launch | Pushed, head e65e608, no pull request; 77 counted lines (estimate 60, raised to 80 by B-554) and one collateral test, now in its file list. Merge origin/build/v1, apply [b550-collateral-test_csi_revisions.patch](b550-collateral-test_csi_revisions.patch), rerun the gate without mutation, review (Opus), pull request, local CI, merge. It no longer waits for B-553 (it fits 80). Body draft: [b550-pr-body.md](b550-pr-body.md). |
+| Mutation run 4 | Periodic full mutation, base 575b912, head 4f1a7e6 | **Passed** (finished 09:04 UTC, every member pass). The next periodic run is due ten merges after 4f1a7e6, with base 4f1a7e6. |
+
+Until B-553 merges, the old gate still fails a pull request above its estimate (GC009). Lane script
+[build-lane-v35.workflow.js](build-lane-v35.workflow.js) has no budget stop; use it only after B-553 merges, and
+[build-lane-v34.workflow.js](build-lane-v34.workflow.js) before that.
+
+## C. Order of the next work (first live run)
+
+1. Finish section B.
+2. B-550 (S.T23), then B-138 (S.T19a, port wiring: the central task; Opus reviewer). In parallel: B-556 (W.T7b, the D-3 drift stop).
+3. B-555 (W.T17, engineering) after B-547, then B-557 (W.T16b, engineering).
+4. W.T8 (B-202) after B-551, B-138 and B-556; then W.T9a (B-526), W.T9b (B-527), B-558 (W.T9c) and B-559 (I.T9c).
+5. Interface: I.T14 (B-188), I.T14c (B-528), I.T14b (B-353), then I.T15, T16, T16b, T18a, T18b.
+6. W.T11, W.T12. Then the remaining tasks of the registry by `depends_on`; the frozen list (D-32) stays frozen until
+   the first live run.
+7. Owner guide `LOCAL-TESTING.md` corrections found by the walk-through (`walkthrough-confirmed.md`, C4, C6, C7/C30,
+   C15, C26 and the rest listed in lead-findings): `--template blank@0.1.0`; lower-case hash; `[engine] engineer` is
+   needed for `--answers`; the tool fingerprint was never compared with a live tools/list; the model is locked after an
+   analysis; `name` instead of `engineer` in the basis file; the model path in input.json is absolute; stop then
+   resume for a later change set; the run id is printed on stderr; an item id is a token of 1 to 57 characters; doctor
+   works without harness.toml; file encoding (utf-8-sig); also fix the numbering of
+   `packages/eng-harness/docs/local-testing.md` (two items 22 and two items 23).
+8. Owner queue (BUILD-STATUS section 6.6 and lead-findings): the design choices recorded for B-536, B-541, B-543,
+   B-545; spec 0006 Q22 to Q24; Q16; engine Q40, Q41, Q43; the unused `windows_launcher()` (drop it or give it an
+   inspector argument, B-546 note); from B-544: harness.change_set_check stays at version 1 although its output references change; with steel_and_concrete each kind's design summary sees the other kind's frames as not_designed, so the turn's design status is never PASS on a model with both kinds (a calc change would filter frames per kind); a summary with no drift row passes D-3, so if the live host returns no drift rows story drift goes unchecked (keep on the local-test list); the extra model-state read at step 13; the canonical value stored in the answer; the Q14 interim D-2 route; exception items taken from every cycle.
+
+## D. How the new lead works (rules the owner set; all still in force)
+
+- Talk to the owner in Arabic; code, commits and documents in English. The lead writes no code: every change is
+  written, reviewed, gated and integrated by subagents. **Delegate to smaller, cheaper models** for writing and routine
+  review; keep the strongest model for the lead's own judgement and for reviewing sensitive work (first-live-run
+  wiring, engineering calcs and checks, gate changes). Credits are limited: run few lanes at once (about four), one
+  audit at a time, no dry runs.
+- Permissions: push task branches; open pull requests into `build/v1`; squash-merge after an independent review and a
+  local CI PASS on the current head. Push directly to `build/v1` only the state files (BUILD-STATUS.md, HANDOFF.md,
+  LOCAL-TESTING.md, `docs/build/`, `ops/remaining-tasks.json`). Never push to `main`. Commit trailer: only
+  `Assisted-by: anthropic/claude` (no model names, no other trailer).
+- Local CI per pull request without mutation; a full mutation run every ten merges (periodic-mutation.sh). Batch
+  mode: create `<lead>/BATCH_MODE` to let `ops/localci.py` test up to three waiting pull requests as one batch.
+- Stop rule: when the owner says stop or needs his allowance, create `<lead>/locks/pause.lane` (lane script v3.4 and
+  later: agents that start see it and return at once), let running integrators finish, save state, resume only on his
+  word.
+- Lessons in [lead-playbook.md](lead-playbook.md) section 8 (items 9 to 15): no second gate run under the integration
+  lock; hold markers; the writer runs the test-first check before the first push; replace scripts by `mv`, never edit
+  them in place while lanes run them; live local CI has CPU priority (`tools/ci-priority.sh`).
+
+## E. Rebuild the machine layout
+
+As section 7 item 2 of the checkpoint of 2026-11-14 below says: the paths in `docs/build/` are placeholders
+(`<lead>`, `<build-v1>`, `<worktrees>`, `<hub>`, `<lane-scripts>`, `<session-transcript>`). Clone the repository,
+make a reference checkout of `build/v1`, copy `lead-playbook.md` to `<lead>/PLAYBOOK.md`, `priority.txt` to
+`<lead>/PRIORITY.txt`, `lead-findings.md` to `<lead>/reports/lead-findings.md`, `resume/` to `<lead>/resume/`,
+`tools/` to `<lead>/tools/`, the lane scripts to `<lane-scripts>/`; replace the placeholders with real paths
+(`sed -i 's#<lead>#/real/path#g'`); create `<lead>/locks`, `<lead>/pr`, `<lead>/logs`, `<lead>/integ`; run
+`uv sync --all-packages --locked` once per worktree. Local CI needs Linux. The workflow run ids in RESUME.md belong to
+the old session and cannot be resumed elsewhere: restart from the state on GitHub.
+
 # Build handoff checkpoint of 2026-11-16 (build/v1 at 4c4be4d, work item B-506)
 
 **State.** 209 of 340 plan tasks merged. The 340 is the number of `- id:` entries in the front matter of the plan files
