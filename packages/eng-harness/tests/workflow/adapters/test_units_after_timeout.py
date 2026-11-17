@@ -20,8 +20,16 @@ def test_units_trap(tmp_path: Path) -> None:
     r.control.write_text(json.dumps(data))
     steps = [
         ("csi_open_model", {"model": "m"}),
-        ("csi_define_wall_section", {"model": "m", "name": "W1", "material": "C30", "thickness_mm": 250.0,
-                                     "shell_type": "ShellThin"}),
+        (
+            "csi_define_wall_section",
+            {
+                "model": "m",
+                "name": "W1",
+                "material": "C30",
+                "thickness_mm": r.value("thickness_mm", 250.0),
+                "shell_type": "ShellThin",
+            },
+        ),
         ("csi_read_model_state", {"model": "m"}),
     ]
 
@@ -29,6 +37,7 @@ def test_units_trap(tmp_path: Path) -> None:
         async with r.ports() as p:
             result = await r.engine(p, steps).start(r.request(mode=PermissionMode.AUTONOMOUS_LOGGED))
             assert result.status is RunStatus.NEEDS_ENGINEER, result
+            assert result.escalation is not None
             assert result.escalation.reason == "units_mismatch"
             assert "kN_mm_C" in result.escalation.detail
             assert not any(isinstance(e.payload, ev.StepReconciled) for e in r.events())

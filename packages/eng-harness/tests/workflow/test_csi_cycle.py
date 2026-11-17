@@ -1,5 +1,6 @@
 """The CSI cycle through Engine and production ports (plan 0002 T19a, AC36)."""
 
+import json
 from pathlib import Path
 
 import anyio
@@ -28,8 +29,10 @@ def test_cycle_steps(tmp_path: Path) -> None:
             assert EventType.MODEL_BOUND in [e.type for e in journal]
             assert EventType.MODEL_SAVED in [e.type for e in journal]
             assert [c["path"] for c in r.calls("csi_open_model")][:2] == [
-                str(r.original.resolve()), str(ports.host_port.model_files("m@copy")[0])]
-            calls = __import__("json").loads(r.control.read_text())["calls"]
+                str(r.original.resolve()),
+                str(ports.host_port.model_files("m@copy")[0]),
+            ]
+            calls = json.loads(r.control.read_text())["calls"]
             names = [c["tool"] for c in calls]
             assert names.index("csi_save_model") < names.index("csi_run_analysis") < names.index("csi_design_run")
             assert r.calls("csi_run_analysis")[0]["role"] == "long"
