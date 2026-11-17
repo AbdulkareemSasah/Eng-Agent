@@ -3438,9 +3438,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false,
+   "branch_pushed": true,
    "lead_notes": [
-    "From documents item B-543. Was in lane engine-t23 at the checkpoint of 2026-11-17: check GitHub for its branch and pull request. W.T8 waits for it."
+    "From documents item B-543. W.T8 waits for it.",
+    "2026-11-17: written and pushed (head 2361039, no pull request), 23 counted lines, test-first pass. Stopped NEEDS_PLAN_AMENDMENT: the types step fails on one existing test outside the file list, packages/eng-harness/tests/unit/test_ctx_basis.py line 120 (test_preview_and_approval). Fix: a documents amendment adding that test file to plan 0001 T23 files, then replace `assert preview.models[0].revision == 2` with `assert preview.models == (handle,)  # the handle, revision 2, as given` (the writer verified check: pass with that edit). Handoff note and pull request body were in the old lead folder (b551-writer.md, b551-body.md): the body needs its Collateral test edits and Verification sections; rewrite them from this note."
    ]
   },
   {
