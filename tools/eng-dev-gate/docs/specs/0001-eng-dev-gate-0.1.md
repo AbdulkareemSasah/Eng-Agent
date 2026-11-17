@@ -3,7 +3,9 @@ id: spec-0001-eng-dev-gate-0-1
 issue: "B-004"
 status: draft        # draft | approved (approved only by merging this file's own pull request)
 size: large
-risk: r3
+risk: [r2, r3]
+# Amendment (B-561): T40 requires packages/eng-contract/AGENTS.md and .gate/agents.yml
+# under that package; their existing contract path floor adds r2 to the gate's r3.
 ---
 
 # Spec 0001: eng-dev-gate 0.1, the shared process gate
