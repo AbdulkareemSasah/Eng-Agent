@@ -90,6 +90,28 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
                 assert not reconciled.payload.result.complete
                 assert not reconciled.payload.result.summary
             assert [request.kind for request in inputs.presented] == expected_requests
+            if cut == "csi_open_model":
+                bound = [e.seq for e in journal if isinstance(e.payload, ev.ModelBound) and e.payload.model_key == "m"]
+                units = [
+                    e.seq
+                    for e in journal
+                    if e.path == f"{started.path}~post.units.m" and isinstance(e.payload, ev.StepCompleted)
+                ]
+                copied = [
+                    e.seq
+                    for e in journal
+                    if e.path == f"{started.path}~post.working_copy.m" and isinstance(e.payload, ev.ModelSaved)
+                ]
+                assert len(bound) == 1
+                assert len(units) == 1
+                assert len(copied) == 1
+                assert bound[0] < units[0] < copied[0]
+            checked = [
+                e.payload.model_key
+                for e in journal
+                if isinstance(e.payload, ev.StepStarted) and e.payload.name == "check_model"
+            ]
+            assert set(checked) == {"m@copy"}
             assert r.original.read_bytes() == b"synthetic model"
 
     anyio.run(body)

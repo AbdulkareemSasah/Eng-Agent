@@ -28,6 +28,12 @@ def test_cycle_steps(tmp_path: Path) -> None:
             assert EventType.HOST_STARTED in [e.type for e in journal]
             assert EventType.MODEL_BOUND in [e.type for e in journal]
             assert EventType.MODEL_SAVED in [e.type for e in journal]
+            checked = [
+                e.payload.model_key
+                for e in journal
+                if isinstance(e.payload, ev.StepStarted) and e.payload.name == "check_model"
+            ]
+            assert set(checked) == {"m@copy"}
             assert [c["path"] for c in r.calls("csi_open_model")][:2] == [
                 str(r.original.resolve()),
                 str(ports.host_port.model_files("m@copy")[0]),
