@@ -288,9 +288,11 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   before it (§4.5.7); the revision tools use the run's snapshot record (`run_dir/copies`,
   `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
   AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9),
-  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
-  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530) (plan
-  task T19a).
+  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`),
+  except for a tool with action `open` on a key with no bound model, whose preview has `models` empty (amendment
+  B-543). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
+  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530),
+  `::test_open_preview_without_binding` (amendment B-543) (plan task T19a).
 - AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
   models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
   `eng_harness.adapters.csi._replies` answers those same models. Test:
@@ -322,6 +324,16 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   case, or raises `ConfigError` naming `host_programs.<name>` when there is none. Tests:
   `tests/unit/servers/test_config.py::test_servers_config_from_tables`,
   `::test_byte_order_mark_accepted`, `::test_host_program_of_product` (plan task T22).
+- AC51. **[added: B-543]** Given a CSI tool port whose opener is its host port's `open_original` (the binder a test
+  binder until T19a wires the host port's own, B-530) and a model key in the host
+  port's files, when `csi_open_model` is called with that key and no `path`, then the host port opens that file in the
+  run's own instance (launching and locking one when the run has none), `locate` of the key finds it, `read_units`
+  matches the units recorded at the open, the answer is a success envelope, and `working_copy` then opens the copy in
+  the same instance; a `csi_open_model` that names a `path`, a key with no file and a port without `open_original`
+  answer failure envelopes (`INVALID_ARGUMENT`, `NOT_FOUND`, `INTERNAL`) and raise nothing; and a host port made with
+  `visible` true sends `csi_launch` with `visible: true` and records the launch as visible, while the default sends
+  `visible: false`. Tests: `tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy`,
+  `::test_open_refusals_are_envelopes`, `::test_visible_launch` (plan task T23).
 
 ## 4. Design
 
@@ -332,7 +344,7 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 | Module | Public names | Who may import |
 |---|---|---|
 | `eng_harness.servers` | `ServersConfig`, `ServerConfig`, `RoleConfig`, `CliToolConfig`, `ConfigError`, `load_servers_config`, `servers_config` **[added: B-541]**, `ServerManager`, `ServerCheck` (re-export of the port type), `RecordMode`, `platform_inspector`, `platform_launcher` **[added: B-541]** | engine wiring (0006), doctor, tests |
-| `eng_harness.adapters` | `build_ports(config: ServersConfig, workspace, store, run_dir, clock, ids, *, inspector=None, launcher=None, lock_dir=None, files=None, checks=None, allowlists=None) -> AdapterPorts` (`tool_port`, `host_port`, `servers`; an async context manager, **[added: B-541]**), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
+| `eng_harness.adapters` | `build_ports(config: ServersConfig, workspace, store, run_dir, clock, ids, *, inspector=None, launcher=None, lock_dir=None, files=None, checks=None, allowlists=None, visible=False) -> AdapterPorts` (`tool_port`, `host_port`, `servers`; an async context manager, **[added: B-541]**), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
 | `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=(), env=None) -> int` (`config_path` may be `None`, and `env`, **[added: B-541]**), `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
 | `eng_harness.kinds.csi` **[added: B-503]** | `CSI_KINDS` and the payload models of the harness kinds of A1 (`CsiModelStatus`, `CsiAnalysisRun`, `CaseStatus`, `CsiAnalysisStatus`, `CsiDesignRun`, `CsiRows`); imports `pydantic` only; registered in `HARNESS_KINDS` (`_kinds.py`), the registry of the run's store | adapters, calcs (spec 0003 §4.3), tests |
 
@@ -358,6 +370,9 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
    of AC41. Decision: a loader, not a loaded allowlist, because `load_allowlist` refuses a routed allowlist loaded
    without a route and its route filter is private. For CSI the result only validates the section's route (the CSI
    allowlist declares none, so a route is refused): `CsiToolPort` builds its own `tool_allowlist()`.
+6. `visible` (`bool`) **[added: B-543]** defaults to false and is given to the CSI host port, which launches every
+   instance of the run with it (§4.5.9); the command line passes the run input's `visible_host` (spec 0006 §4.2.2
+   step 2, spec 0007 §4.2). `build_ports` also passes the host port's `open_original` to `CsiToolPort` as `opener`.
 
 **[added: B-541]** Three rules of the result and the input:
 
@@ -803,11 +818,14 @@ engineer's explicit retry decision, journaled by the engine (engine §4.5.3), an
 | `model_state(model_key, instance_id)` | §4.6.4; `loaded: false` when the instance is not running or holds another file |
 | `check_model`, `save` | §4.5.8 |
 | `read_units` | §4.5.4 |
-| `working_copy(model_key, folder)` | copy the model file into `folder` (hash before and after the copy must match), launch a hidden instance on the `main` role if the host has none for this run, lock it, `csi_open_model(copy, confirm=true)`, record expected units, identity `derived_from` the original (ADR-0032); returns `<model_key>@copy` |
-| `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new hidden instance (reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
+| `open_original(model_key)` **[added: B-543]** (not an engine `HostPort` method; the CSI tool port's opener) | the file of `model_key` from the files mapping (else `NOT_FOUND`); `csi_open_model(file, confirm=true)` on the run's own instance if its launching role holds launch ownership, else launch one (visible as configured) on the `main` role, lock it and open the file there; bind the key to that instance, record its expected units and persist the run state; returns the `HostInstance` |
+| `working_copy(model_key, folder)` | copy the model file into `folder` (hash before and after the copy must match), launch an instance (visible as configured) on the `main` role if the host has none for this run, lock it, `csi_open_model(copy, confirm=true)`, record expected units, identity `derived_from` the original (ADR-0032); returns `<model_key>@copy` |
+| `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new instance (visible as configured; reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
 | `model_files` | the model file only (`.EDB`); companion files are the host's |
 | `started_instances`, `close_started` | §4.4.2 |
-| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent; except that a tool with action `open` whose key has no binding with `host`, the step 2
+`csi_open_model` (amendment B-543), gets the same one item with `models` empty and no pre-image, and no binding is
+read), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
 
 Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time, the time
 it was observed and the exe name, amendment B-530), bindings (model key to instance id, model id and file), expected
@@ -829,6 +847,25 @@ Model binder **[added: B-530]**: the host port is the CSI tool port's `ModelBind
 read since the model was bound, of one `csi_model_info` read on the bound instance (`""` when its reply has none, as
 the model-status mapping does); this reuses the reply the reader already maps and changes no outside-edit baseline.
 
+Opening the original **[added: B-543]** (spec 0007 §4.5 step 2, AC51). The CSI tool port answers `csi_open_model`
+with a model key and no `path` by calling its `opener` (a keyword like `reopened`; `build_ports` passes the host
+port's `open_original`) and then the binder, and returns a success envelope (`harness.run_output/1`, payload the key and
+the file's base name, provenance from the binding's `host`). It refuses a `csi_open_model` that names a `path` (only
+`csi_open_revision` sends one, inside the port), and it gives that refusal, a key with no file, a port without opener
+and every `ContractError` or `ToolFailed` of the open as a failure envelope, never a raised error, because the engine
+treats an error raised from a write as an unknown outcome; any other exception stays that unknown outcome and goes to
+the engineer (`engine.in_flight`), as for every write. Nothing
+is ledgered for it: the open writes no model content and is not reconciled (row above). Decision (B-543): the host
+port opens the original, as it opens the working copy and a restore, because only it maps a key to a file and launches
+and locks instances; a block cannot name a path. In `approve_each_write` the engine asks for an approval before the
+open (engine §4.7), when no model is bound yet: its preview (row above) names the tool and the key and carries no
+model. Decision (B-543): the open's preview reads no binding and binds no model, because the open writes no model
+content and the approval then has nothing to re-check; refusing it as `model_open` would stop every run in that mode
+at step 2. Visible launch: `AdapterHostPort` and its `CsiSession` take
+`visible` (default false; `build_ports` passes its `visible` keyword, §4.1) and every `csi_launch` of the run sends it,
+records it and keeps it in the run state, so a visible instance is reported, never terminated, at `close_started`
+(§4.4.2).
+
 ### 4.6 CSI adapter for the edit cycle on ETABS
 
 Product-specific parts (tool availability, design kinds, result tools that exist only for ETABS such as story
@@ -840,7 +877,7 @@ product module and allowlist entries, not a new adapter.
 | Step | Tools (role) | Mapping |
 |---|---|---|
 | 1 Server builds | `csi_status` (main), `tools/list` | §4.3.4 |
-| 2 Open a working copy | `csi_launch` (main; `product`, `version` from the basis or the configured product, `visible: false` unless the workflow needs an engineer turn in that instance), `csi_open_model` (`confirm`), `csi_save_model` with a new `path` | `HostPort.working_copy`; never on an instance the run did not launch (S-12 §1 step 2) |
+| 2 Open a working copy | `csi_launch` (main; `product`, `version` from the basis or the configured product, `visible: false` unless the workflow needs an engineer turn in that instance: the run input's `visible_host` through `build_ports`, amendment B-543), `csi_open_model` (`confirm`), `csi_save_model` with a new `path` | `open_original` (the step 2 tool step), then `HostPort.working_copy`; never on an instance the run did not launch (S-12 §1 step 2) |
 | 3 Read the model state | `csi_model_info`, `csi_list_stories`, `csi_list_grids`, `csi_list_points`, `csi_list_frames`, `csi_list_areas`, `csi_list_frame_sections`, `csi_list_area_sections`, `csi_list_materials`, `csi_list_load_patterns`, `csi_list_load_combos`, `csi_db_table_read` (tables of §4.6.4) | §4.6.4 |
 | 7, 10 Save | `csi_save_model` | `HostPort.save` |
 | 8 Apply the edits | §4.6.2 | one call per object (no batch tool, OQ-G7) |
@@ -1080,7 +1117,7 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37, AC49 (Windows; AC49 in `tests/windows/test_platform_windows.py`, B-541) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47, AC51 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
 | AC36 (crash matrix) | Replay | `tests/replay/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 

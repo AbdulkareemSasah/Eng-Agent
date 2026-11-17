@@ -465,8 +465,10 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
     # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's Path and Path | None fields, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
+    # Amendment (B-543, documents only): the port builder also receives visible, the input's top-level visible_host bool or false (spec 4.2.2 step 2, AC67; spec 0007 4.2, spec 0002 4.1 item 6), at run and at resume from the stored input, passed by keyword as files is (build_ports takes both keyword-only); about 6 lines beside the model-files walk and 1 in the field's type: 129 + 7 = 136, budget 140; test_model_files_reach_the_port_builder also checks visible.
     # Amendment B-541: the moved ConfigError clause, about 3 lines deleted at T14's place and 3 added at the end of step 2 (an estimate): 129 + 6 = 135; budget 136.
-    max_changed_lines: 136
+    # Both amendments sit in this task: 129 + 6 (B-541) + 7 (B-543) = 142; budget 143.
+    max_changed_lines: 143
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
@@ -692,6 +694,7 @@ tasks:
     title: "Bind the port builder default and draw the run id at step 1 for run"
     # Amendment (B-471, documents only): new, split from T18 (spec Q20 answer A, owner instruction of 2026-11-12); waits for engine plan T20 (work item B-472) and plan 0002 T19a (B-475).
     # Amendment (B-536, documents only): the default passes the files argument of T14c on to build_ports (spec 4.2.2 step 2); files and budget unchanged.
+    # Amendment (B-543, documents only): the default also passes the visible argument of T14c on to build_ports (spec 4.2.2 step 2, spec 0002 4.1 item 6); files and budget unchanged.
     # Amendment (B-541, documents only): run prints the line "run id: <run_id>" on standard error once the id is drawn at step 1, and the default converts the server sections with spec 0002 servers_config (AC66); budget 40 -> 45.
     files:
       - "packages/eng-harness/CHANGELOG.md"
@@ -959,7 +962,7 @@ registry, the approvals file, the calc settings and the `basis_fields` map (spec
 are the default factory's business (T18a). Step 4's preflight is
 that port's `preflight`, so no separate preflight field exists. (c) The port builder field `port_builder` (default
 `None`) is called as `port_builder(config, workspace, store, run_folder, clock, ids)` (T14c adds `files` and moves
-the call to the end of step 2, amendment B-536), where `run_folder` is a
+the call to the end of step 2, amendment B-536, and adds `visible`, amendment B-543), where `run_folder` is a
 callable that reads the run-id cell and raises while it is empty (spec §4.4.8); `build_ports` (spec 0002) builds
 only the tool and host ports, and T18b binds the default (spec Q20 answer A, amendment B-471). (d) `_wiring.py` builds the
 `ExpectedTimes` index once before the engine starts (`ExpectedTimes.build(workspace, workflow, settings)`, merged T4,
@@ -1005,7 +1008,8 @@ the bare one when one data request is pending) the same way. (3) The answer's `b
 (`run`, step 2) and with nothing journaled (spec §4.2.1, AC46, AC64), a case of `test_form_request_answers_file`.
 Workflow tests use a fake engine from `CliDeps` except the wait test; T17c re-checks AC46 and AC64 with the real
 engine. (4) Amendment B-536 (spec §4.2.2 step 2, AC67, AC68): the port builder is called at the end of step 2 as
-`port_builder(config, workspace, store, run_folder, clock, ids, files)`, `files` mapping the base name of each
+`port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` (`files` and `visible` by keyword;
+`visible` is the input's top-level `visible_host` bool or false, amendment B-543, spec 0007 §4.2), `files` mapping the base name of each
 top-level `pathlib.Path` field of the workflow's input model to its value (absolute and existing; a relative path, a
 missing file or a repeated base name is exit 2 with no run folder); `resume` builds the same mapping from the run's
 input read through `input_ref` of the run header before `Engine.resume`, without the existence check (a case of
@@ -1191,8 +1195,9 @@ run header (spec 0002 §4.5.8, closed gap H-G9; amendment B-503), so T18a and T1
 Q20 answer A). `cli/_wiring.py` draws the run id for `run` at step 1 (`run_` + ULID from the ids source), fills the
 run-id cell at once, as for `resume`, and passes the id in `RunRequest.run_id` (engine plan T20, work item B-472,
 engine AC70); the `port_builder` default is `build_ports` (plan 0002 T19a; amendment B-475), so the default calls `build_ports(config,
-workspace, store, run_folder(), clock, ids, files=files)` (the `files` of T14c, amendment B-536). `test_port_builder_bound_and_run_id_drawn` checks that the default is
-`build_ports`, that for `run` the cell holds the id before any port is built and the engine receives the same id, and
+workspace, store, run_folder(), clock, ids, files=files, visible=visible)` (the `files` of T14c, amendment B-536, and its
+`visible`, amendment B-543). `test_port_builder_bound_and_run_id_drawn` checks that the default is
+`build_ports`, that the default hands `files` and `visible` to `build_ports` unchanged (a case with `visible` true), that for `run` the cell holds the id before any port is built and the engine receives the same id, and
 that `run` and `resume` are then available with `CliDeps()`; it fails at the merge base because the default is `None`.
 It covers AC66. Amendment B-541: once the id is drawn, `run` prints the line `run id: <run_id>` on standard error,
 and the default converts the configuration's server sections with plan 0002 T22's `servers_config` before it calls
@@ -1275,7 +1280,7 @@ T17, with the real engine; the page's voided display that AC34 needs is built in
 | Workspace, `eng_contract.store.Workspace` (step 1, amendment B-412 seventh review) | none (built in `cli/_wiring.py`, T14, over the environment `main` hands on, in which `--workspace` is `ENG_WORKSPACE`, T14b; amendment B-541) | not applicable | merged (`eng_contract.store`) |
 | `ResultStore` of the workspace (steps 1, 5 and 6) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`eng_contract.store`) |
 | `EngineSettings` from the `[engine]` limits of the configuration, engine §4.10 defaults otherwise (step 5, spec §4.2.4) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`engine/_runner.py`) |
-| Port builder `build_ports`: tool and host ports only (end of step 2 since amendment B-536), called as `port_builder(config, workspace, store, run_folder, clock, ids, files)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) and `files` the model files of the input (T14c, amendment B-536) | T14 (`port_builder`; T14c adds `files`; T14 enters the returned ports around the engine call, amendment B-541) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`; it converts the server sections with `servers_config`, amendment B-541) | plan 0002 T19a (amendment B-475) over plan 0002 T22 (`AdapterPorts`, `servers_config`; amendment B-541); engine plan T20 (caller-chosen run id, work item B-472) |
+| Port builder `build_ports`: tool and host ports only (end of step 2 since amendment B-536), called as `port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` with `run_folder` a callable over the run-id cell (amendment B-412 eighth review) and `files` the model files of the input (T14c, amendment B-536) and `visible` the input's `visible_host` (T14c, amendment B-543) | T14 (`port_builder`; T14c adds `files` and `visible`; T14 enters the returned ports around the engine call, amendment B-541) | T18b (spec Q20 answer A, amendment B-471: T18b also draws the run id in `cli/_wiring.py`; it converts the server sections with `servers_config`, amendment B-541) | plan 0002 T19a (amendment B-475) over plan 0002 T22 (`AdapterPorts`, `servers_config`; amendment B-541); engine plan T20 (caller-chosen run id, work item B-472) |
 | Calc port `HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)` (steps 4 and 5), called as `calc_port_factory(config, workspace, store, run_class, clock, ids)` (amendment B-412 eighth review) | T14 (`calc_port_factory`) | T18a (the default supplies the calc registry, the approvals file through the merged `load_approvals`, the calc settings and the `basis_fields` map, B-498) | plan 0003 T5; `load_approvals` merged (`_calc/_approvals.py`) |
 | Run class: `--run-class` for `run`, the run header's `run_class` for `resume` (steps 4 and 5) | none (`cli/_wiring.py`, T14) | not applicable | merged (`cli/_parser.py`, T3; `JournalReader`, engine T4) |
 | Engine `BasisPort`, `StoreBasisPort` over the `ResultStore` (step 5) | none (built in `cli/_wiring.py`, T14) | not applicable | merged (`basis/_port.py`, plan 0004 T8) |
