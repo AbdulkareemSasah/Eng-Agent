@@ -160,6 +160,19 @@ def test_data_request_is_read_only(tmp_path: Path) -> None:
         assert future.result(5) is None
 
 
+def test_data_request_names_stop_and_resume(tmp_path: Path) -> None:
+    """A waiting run takes a data answer only through stop and `resume RUN_ID --answers FILE` (spec 0006 4.4.5)."""
+    schema = data_schema({"type": "object", "properties": {"depth": {"type": "number"}}})
+    request = build_request(IDS, "inp_note", "block", "Values", schema, ())
+    with rig(tmp_path) as w:
+        future = in_thread(w.engine.ask(w.inputs, request))
+        body = shown(w, request)
+        assert "stop the run (`stop RUN_ID` from another terminal, or Ctrl+C once in its terminal)" in body
+        assert "then run `resume RUN_ID --answers FILE`" in body
+        assert "`status` lists the run ids." in body
+        assert future.result(5) is None
+
+
 def test_each_question_shows_its_own_evidence(tmp_path: Path) -> None:
     questions = [Question(name=f"q{n}", prompt=f"Prompt {n}", options=("a", "b")) for n in (0, 1)]
     evidence = [
