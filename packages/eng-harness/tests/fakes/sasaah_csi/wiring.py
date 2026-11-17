@@ -4,12 +4,13 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from eng_contract.envelope import Provenance, SuccessEnvelope
 from eng_contract.ids import FixedClock, SeededIdSource
@@ -212,14 +213,28 @@ class AppliedInput(FakeInputPort):
 
     async def present(self, request: InputRequest) -> None:
         await super().present(request)
-        assert request.kind == "engine.in_flight", request
-        assert request.title == f"A write was cut off ({self.cut})", request
+        fields = cast(dict[str, Any], request.fields_schema["properties"])
+        why = fields["why"]["default"]
+        if request.kind == "engine.host_state":
+            assert self.cut == "csi_save_model", request
+            assert request.title == "A model changed while the run was stopped (m@copy)", request
+            assert re.fullmatch(r"m@copy is at revision 1 \([0-9a-f]{64}\), the journal has 0", why), request
+            assert "accept" in fields["state"]["enum"], request
+            choices = {"state": "accept"}
+        else:
+            assert request.kind == "engine.in_flight", request
+            assert request.title == f"A write was cut off ({self.cut})", request
+            expected = "the adapter has no reconciler for this tool"
+            if self.cut in {"csi_run_analysis", "csi_design_run"}:
+                expected = "the adapter could not decide: unknown"
+            assert why == expected, request
+            choices = {"outcome": "applied"}
         self.script(
             request.request_id,
             InputAnswer(
                 request_id=request.request_id,
                 shown_sha256=request.fields_schema_sha256,
-                choices={"outcome": "applied"},
+                choices=choices,
                 by="engineer:test",
             ),
         )

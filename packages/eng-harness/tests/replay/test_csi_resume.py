@@ -68,13 +68,26 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
             result = await r.engine(ports, inputs=inputs).resume(r.run_id)
             assert result.status is RunStatus.COMPLETED, result
             assert len(logical_calls()) == before == 1
-            reconciled = [e.payload for e in r.events() if isinstance(e.payload, ev.StepReconciled)]
-            assert any(p.outcome == "applied" and p.op_id == op_id for p in reconciled)
-            attempts = [e for e in r.events() if e.path == started.path and isinstance(e.payload, ev.StepStarted)]
+            journal = r.events()
+            (reconciled,) = [e for e in journal if isinstance(e.payload, ev.StepReconciled)]
+            assert isinstance(reconciled.payload, ev.StepReconciled)
+            assert (reconciled.payload.outcome, reconciled.payload.op_id) == ("applied", op_id)
+            attempts = [e for e in journal if e.path == started.path and isinstance(e.payload, ev.StepStarted)]
             assert len(attempts) == 1
             setter = cut in {"csi_assign_frame_section", "csi_assign_area_section"}
-            assert (reconciled[0].decided_by == "adapter") is setter
-            assert bool(inputs.presented) is not setter
+            assert reconciled.payload.decided_by == ("adapter" if setter else "engineer:test")
+            assert bool(reconciled.payload.evidence) is setter
+            expected_requests = [] if setter else ["engine.in_flight"]
+            if cut == "csi_save_model":
+                expected_requests.append("engine.host_state")
+                (baseline,) = [
+                    e for e in journal if isinstance(e.payload, ev.ModelSaved) and e.payload.role == "baseline"
+                ]
+                assert isinstance(baseline.payload, ev.ModelSaved)
+                assert baseline.payload.model_key == "m@copy" and baseline.seq > reconciled.seq
+                assert reconciled.payload.result is not None and not reconciled.payload.result.complete
+                assert not reconciled.payload.result.summary
+            assert [request.kind for request in inputs.presented] == expected_requests
             assert r.original.read_bytes() == b"synthetic model"
 
     anyio.run(body)
