@@ -151,8 +151,7 @@ def test_data_request_is_read_only(tmp_path: Path) -> None:
         assert "<form" not in body
         assert "<button" not in body
         assert "<input" not in body
-        assert "provide the answers with" in body
-        assert "resume --answers FILE" in body
+        assert "read-only here" in body
         for cell in ("depth", "number", "mm", "minimum=100", "maximum=900.5", "name", "string", "maxLength=20"):
             assert cell in body
         refused = w.client.post("/answer/inp_data", {"shown_sha256": request.fields_schema_sha256, "by": "ada"})
