@@ -1,30 +1,44 @@
-# Integration and continuation checkpoint of 2026-11-17 (build/v1 at d9c19fb)
+# Integration and continuation checkpoint of 2026-11-17 (build/v1 at 1ec7566)
 
-The owner said to continue after the usage quota pause. This checkpoint records state only; it does not rewrite product source. Reference checkout is detached at `d9c19fbddf59078bcd44ed4f7eee5f0806e70697`. GitHub API access is working (HTTP 200). No local CI job is running.
+The owner authorized continuation after the quota pause. This checkpoint records integrated state and active guidance; it does not change product source. The reference checkout is detached at `1ec7566c016aacf75c15aacb260435df44f23c67`. No CI job is currently running.
+
+This top checkpoint is authoritative. Older handoffs and machine snapshots below are retained for history and are superseded where their state differs.
 
 ## A. Integrated state
 
-- **Plan progress:** 230 of 354 current plan tasks merged. Registry has 183 entries. B-550/#411, B-552/#412 and B-560/#413 are merged after current-head local CI PASS. PRs #412/#413 passed together on verified tree `b7648fbd2140d36cd87a00c1246bbabf36b3007b`; details and machine-path-free evidence are in [integration-2026-11-17/](integration-2026-11-17/).
-- B-550 merge `3cb4563f2593d0f64db910ddc0d3c8c3317a8417`; B-552 merge `da0ab9bf808d9dae77f52f15a179c6511f90159e`; B-560 merge `d9c19fbddf59078bcd44ed4f7eee5f0806e70697`.
-- Existing task-log items remain: B-537 PR #384 appears open through the API although its content is integrated at `45dc8ab9`; do not redo or close it. B-334 PR #331 remains frozen. B-164 PR #323 needs the documented future TF004 rebuild.
+- **Plan progress:** 232 of 354 current plan tasks merged. The registry has 183 entries. B-551/#415, B-553/#416 and B-561/#414 are merged. B-550/#411, B-552/#412 and B-560/#413 were already checkpointed. Merge records and CI evidence for the current three are in [integration-2026-11-17/](integration-2026-11-17/).
+- B-551 squash: `9c26ab3435c9dd3867313bdef2eb60e63633c218`; B-553 squash: `1ec7566c016aacf75c15aacb260435df44f23c67`; B-561 squash: `c803dad7f65f1f9a4f3b770dcb12bb080504e02c`.
+- B-553's risk is `r2, r3` after B-561; its DOC.B561 dependency is cleared. B-551 has no pending dependencies. The registry IDs and merged PR fields reflect these integrations.
+- Earlier continuation already integrated B-544/#408 (registry tasks W.T7b/W.T16b/W.T9c/I.T9c), B-547/#410, and B-554/#409; B-551, B-552, B-553 and B-561 are now integrated as listed above. Existing task-log items remain: B-537 PR #384 appears open through the API although its content is integrated at `45dc8ab9`; do not redo or close it. B-334 PR #331 remains frozen. B-164 PR #323 needs the documented future TF004 rebuild.
 
-## B. Active task branches
+## B. Current first-live-run order
 
-1. **B-551 (E.T23)** — pushed head `b55b965b0d979b57d1751c07a4403bc74493047d`, branch `feat/b551-harness-et23-model-keys`. The assertion compares the complete tuple to the supplied handle. Focused tests: 14 passed; package gate PASS; formal test-first PASS; independent review APPROVE. Per-change mutation is running; result is pending (live process observed). Log: `<lead>/logs/b551-mutation.log`. No PR or local CI yet. B-551 has no remaining dependency.
-2. **B-553 (G.T40)** — pushed head `5d2b2549a4b9f5fd2303fde31f17366e572e0d40`, branch `fix/b553-gate-gc009-notice`. Six regression cases failed first on the base; formal test-first PASS; full package gate PASS; independent review APPROVE. Scope is 182 counted lines of 260 across 46 files. The current base plan still declares risk `r3`. After B-561 merges, the amended plan risk set will be `r2, r3`; DOC.B561 remains pending until that merge. Per-change mutation, PR, local CI and integration remain incomplete. The standard gate package has no configured R1/R2 mutation selectors, so no mutation score is available or claimed.
-3. **B-561 (DOC.B561)** — pushed head `77ce9dd07475471d54809e1a1244ca7d063a44b5`, branch `docs/b561-gate-plan-risk-r2`. It amends only the gate spec and plan risk sets from r3 to r2,r3. Independent review APPROVE, package gate PASS, and documents-only test-first exemption recorded. No PR or local CI yet. Merge it before proceeding with B-553.
-4. **Periodic mutation run 5:** completed PASS, exit 0, base `4f1a7e67`, head `d9c19fbddf59078bcd44ed4f7eee5f0806e70697`, six members passed. Recorded interval 11:09:17–11:24:15 UTC (898 seconds). Proof: [periodic-mutation-d9c19fb.log](integration-2026-11-17/periodic-mutation-d9c19fb.log). Next periodic base is `d9c19fbd` after ten new PR merges.
+1. **B-138 (S.T19a)** and **B-556 (W.T7b)** are active; their writers are using `.worktrees/b138` and `.worktrees/b556`.
+2. Then B-555 (W.T17), B-557 (W.T16b), and the B-164 rebuild in the established order before B-202 (W.T8). B-164 remains held for its documented TF004 rebuild after its prerequisites.
+3. B-202 waits for B.T10 (B-164), S.T19a (B-138), and W.T7b (B-556); E.T23 (B-551) is merged and cleared. Continue with the existing owner order after those dependencies.
+4. Refresh remote PR state before integration work. There is no local CI run in progress.
 
-## C. Next order
+## C. Mutation and CI state
 
-1. Refresh branch and PR state through the working API before opening or updating PRs.
-2. Wait for the running B-551 per-change mutation check to finish and record its result from `<lead>/logs/b551-mutation.log`; then complete its PR, current-head local CI and integration sequence.
-3. Open B-561 PR and complete current-head local CI and merge. Then update B-553 to the merged base, verify its amended risk metadata, and complete the remaining mutation/PR/CI/integration steps. Do not claim unrun mutation checks.
-4. After B-551 and B-553 complete, continue the first-live-run sequence with B-138 (S.T19a) and B-556 (W.T7b) in the established order. B-164 remains held for the later TF004 rebuild.
+- Periodic mutation run 5 passed (exit 0), six members; interval 11:09:17–11:24:15 UTC (898 seconds), base `4f1a7e67`, head `d9c19fb`. Its proof is [periodic-mutation-d9c19fb.log](integration-2026-11-17/periodic-mutation-d9c19fb.log). Three PR merges (#414–#416) followed that run, so the next periodic run is due after seven additional PR merges, using `d9c19fbd` as its base.
+- B-551 per-change mutation passed the configured 80% floor on authored head `b55b965b`; successful output did not emit an exact score, so none is claimed.
+- B-553's mutation selector passed, but the package has no eligible configured R1/R2 modules; no numerical score is claimed.
+- B-551 and B-553 passed batched local CI on exact PR heads `db65b2a60e7184d68d5c782a252eb83ed06dbf4e` and `580fa8881eda103033da6e6c09826d1b93690db3`. The full gate ran on batch tree `9db7ea3f93ded33999befc85e126bf9c419fdbdf`, 895 seconds, with both CI summaries matching that tree. B-561 local CI passed on exact head `6fda1a2beea771e1223d9acd6c2355247c414f06`; its full gate took 1249 seconds.
+- The B-561 automatic base merge commit `6fda1a2beea771e1223d9acd6c2355247c414f06` lacked an `Assisted-by` trailer. It was published before detection and was preserved; the final squash commit has the required sole trailer.
+- Windows was not run on this Linux machine. `uv audit --locked` was not run because `api.osv.dev` is outside AGENTS.md §9 allowed services. Both remain owner local-test items. No claim is made that either check passed.
+- First live host behavior remains unverified pending owner-side testing.
 
-## D. Environment and evidence
+## D. Active changed-line guidance
 
-The owner published the updated environment; API response is HTTP 200. No PR local-CI job is running. B-551 per-change mutation is running with result pending. Periodic mutation run 5 is finished. The first live host behavior remains unverified pending owner-side testing. This checkpoint does not claim application behavior or a rewritten product source. Reports and compact proof outputs for B-551/B-553/B-561 and the periodic run are archived in [integration-2026-11-17/](integration-2026-11-17/); machine-specific paths are replaced with placeholders.
+B-553 is merged: GC009 reports counted lines as a notice. Changed-line counts are informative only. They never stop work, trigger a split, or require a plan amendment; scope, test-first, risk floor, and `max_sessions` remain binding. D-12 is marked superseded in BUILD-STATUS.md. Active playbook and workflow copies are updated; historical checkpoints and v34 are preserved as history.
+
+## E. Machine layout and continuation
+
+- Reference checkout: `/workspace/Eng-Agent`, detached at the current `build/v1` head above. Worktrees: `/workspace/Eng-Agent/.worktrees`; lead scratch: `/workspace/Eng-Agent/.lead`; active writers are in `.worktrees/b138` and `.worktrees/b556`. Scratch copies and task worktrees are ignored through `.git/info/exclude`.
+- Continue using the configured environment paths: `UV_CACHE_DIR=/workspace/Eng-Agent/.lead/uv-cache` and `UV_PYTHON_INSTALL_DIR=/workspace/Eng-Agent/.lead/python`; setup used `uv sync --all-packages --locked` with uv 0.13.6 and CPython 3.14.10. Setup evidence and prior machine measurements are in [machine-layout.md](resumed-2026-11-17/machine-layout.md).
+- The live lead playbook and workflow helpers are in `.lead/PLAYBOOK.md`, `.lead/lane-scripts/`, and `.lead/tools/`; tracked reference copies are under `docs/build/`. Reconstruct/refresh those ignored runtime copies from the tracked files when a new machine or environment replaces the workspace.
+- The existing handover record above was made 2026-11-17; its B-544/#408, B-547/#410 and B-554/#409 completions remain valid. Its older pre-integration state for B-551/B-552/B-553 is superseded by this checkpoint.
+
 
 ---
 
