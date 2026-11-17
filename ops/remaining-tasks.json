@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged.",
- "count": 183,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries.",
+ "count": 184,
  "tasks": [
   {
    "id": "B-437",
@@ -389,7 +389,9 @@
    "branch": "feat/b138-harness-st19-port-wiring-edit-cycle",
    "prTitle": "feat(eng-harness): port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
    "risk": "r1, r2, r3",
-   "pending_deps": [],
+   "pending_deps": [
+    "DOC.B562"
+   ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -400,7 +402,8 @@
     "Plan audit 2 found seven blockers; amendment B-530 adds T19c before T19a.",
     "2026-11-17: every dependency is merged except S.T23 (B-550). The plan front matter risk is r1, r2, r3 (B-537).",
     "Current checkpoint 2026-11-17: S.T23 prerequisite B-550 merged as PR #411; dependency satisfied.",
-    "Integrated prerequisite B-550 as PR #411; S.T23 dependency is satisfied."
+    "Integrated prerequisite B-550 as PR #411; S.T23 dependency is satisfied.",
+    "2026-11-17: the real six-write crash matrix found an EC1 original/copy handoff collision and post-open bookkeeping gaps. Owner approved an explicit conservative original-open content capability. Continue the existing branch; preserve local test-first eeae76fe and continuation 668c3830, and wait for B-562 spec/plan scope amendment before additional engine/port/journal implementation. Existing adapter work remains unmerged and under review."
    ]
   },
   {
@@ -3570,10 +3573,11 @@
    "verifier_lenses": [
     "sources"
    ],
-   "open_pr": null,
-   "branch_pushed": false,
+   "open_pr": 417,
+   "branch_pushed": true,
    "lead_notes": [
-    "From documents item B-544 (owner decision of 2026-11-16 on D-3). Estimate 30 is tight (about 26 to 28); the count is informational after B-553. W.T8 waits for it."
+    "From documents item B-544 (owner decision of 2026-11-16 on D-3). Estimate 30 is tight (about 26 to 28); the count is informational after B-553. W.T8 waits for it.",
+    "2026-11-17: PR #417 open at f35b53830a05380e35075ee4ed849a66bcd502ae after a state-only base merge; entire eng-harness tree matches tested 9ff084d5. Package gate, 144 focused tests, formal test-first and independent reviews passed. Mutation gate passed with MU003/no mutants/no numerical score; local CI and integration remain pending, planned with B-562 documents."
    ]
   },
   {
@@ -3691,6 +3695,26 @@
     "Integrated 2026-11-17 as PR #414, squash c803dad7f65f1f9a4f3b770dcb12bb080504e02c after local CI PASS. The automatic base merge commit 6fda1a2beea771e1223d9acd6c2355247c414f06 lacked an Assisted-by trailer; it was already published and was preserved. Final squash has the required sole trailer."
    ],
    "merged_pr": 414
+  },
+  {
+   "id": "B-562",
+   "task": "DOC.B562",
+   "plan": null,
+   "planTask": null,
+   "kind": "docs",
+   "title": "Explicit conservative original-open content capability and the S.T19a completion scope",
+   "branch": "docs/b562-original-open-content-capability",
+   "prTitle": "docs(eng-harness): define the conservative original-open capability and completion scope (B-562)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "delegated writer",
+   "reviewer": "independent lead review",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "Owner decision of 2026-11-17: add an explicit conservative tool capability identifying an original open that does not change model content; default remains conservative for other tools and legacy journals. Required to finish S.T19a without treating the superseded original as a mutated active model. Preserve write-effect permissions, leases, units, unknown-outcome reconciliation, actual-data checks and restore safety. A reviewed spec/plan amendment must merge before B-138 edits its additional engine/port/journal files. No engineering number or new dependency is authorized."
+   ]
   }
  ]
 }
