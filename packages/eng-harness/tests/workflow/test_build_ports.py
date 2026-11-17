@@ -98,6 +98,44 @@ def test_binder_from_host_port(tmp_path: Path) -> None:
     anyio.run(body)
 
 
+@pytest.mark.parametrize("identity", ["live", "dead", "reused"])
+def test_preflight_attaches_only_to_live_cached_identity(tmp_path: Path, identity: str) -> None:
+    r = rig(tmp_path)
+
+    async def body() -> None:
+        async with r.ports() as p:
+            await opened(r, p)
+            instance = await p.host_port.locate("m")
+            assert instance is not None
+            expected = await p.host_port.read_units("m", instance.instance_id)
+            await p.host_port.release(await p.host_port.acquire("csi"))
+
+        data = json.loads(r.control.read_text())
+        assert data["launched"] == [instance.pid]
+        if identity == "dead":
+            data["launched"] = []
+        elif identity == "reused":
+            # The fake inspector derives start order from this list. The same PID now has a different start time.
+            data["launched"] = [instance.pid + 1, instance.pid]
+        r.control.write_text(json.dumps(data))
+        before = len(r.calls("csi_attach"))
+        async with r.ports() as resumed:
+            checks = await resumed.host_port.preflight({"csi": csi_allowlist().sasaah_commit})
+            assert len(checks) == 1
+            assert checks[0].ok, checks
+            attached = r.calls("csi_attach")[before:]
+            assert [call["pid"] for call in attached] == ([instance.pid] if identity == "live" else [])
+            assert resumed.host_port.model_files("m") == (r.original.resolve(),)
+            assert await resumed.host_port.started_instances("csi") == [instance]
+            found = await resumed.host_port.locate("m")
+            assert found == (instance if identity == "live" else None)
+            units = await resumed.host_port.read_units("m", instance.instance_id)
+            assert units.loaded is (identity == "live")
+            assert units.expected == expected.expected
+
+    anyio.run(body)
+
+
 def test_csi_wiring_shares_book_and_pre_image(tmp_path: Path) -> None:
     r = rig(tmp_path)
 
