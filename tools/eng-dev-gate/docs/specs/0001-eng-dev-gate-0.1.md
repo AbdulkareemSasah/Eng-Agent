@@ -15,7 +15,8 @@ Governing documents: [process/11](../../../../design/process/11-repository-stand
 [process/01](../../../../design/process/01-lifecycle.md) §4 to §6 and §9,
 [process/06](../../../../design/process/06-review-and-merge.md),
 [ADR-0021](../../../../design/docs/adr/0021-agent-agnostic-ci-enforced-process.md),
-[ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md). The plan is
+[ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md),
+[ADR-0035](../../../../design/docs/adr/0035-no-changed-line-limit.md) (no changed-line limit). The plan is
 [0001-eng-dev-gate-0.1](../plans/0001-eng-dev-gate-0.1.md). Where a rule here goes beyond the process documents, §11
 lists it as a question for the owner. In bootstrap mode this spec counts as reviewed once a subagent that did not write
 it has reviewed it and it is on `build/v1` (ADR-0028 §4); the owner still approves it later.
@@ -84,7 +85,8 @@ gate-check (§4.5)
   directory matches a task glob, then no GC008 for it; a non-empty one, a renamed or deleted one, or one without such a neighbour, is GC008
   (amendment B-363).
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
-  spike files are summed; above `max_changed_lines` gives GC009 and names the largest files.
+  spike files are summed; GC009 is a notice with the sum, the task's `max_changed_lines` (an estimate) and the largest
+  files, never a failure (ADR-0035; amendment B-552).
 - AC12. Given a pull request that changes a spec or a plan, when it also changes any other file, then GC010; its
   `Plan-Task:` line must be `none (spec and plan)`.
 - AC12a. Given the committed root `.gate/gate.yml`, then its `spec_globs` match `docs/workflows/*.md` under any
@@ -95,9 +97,9 @@ gate-check (§4.5)
   documents-only pull request of a clause spec is a spec and plan pull request (amendment B-343).
 - AC12c. Given the committed root `.gate/gate.yml`, then its `generated_globs` also match the JSON Schema snapshots
   `docs/schema/**` of a package (written by the package's schema exporter and checked fresh by its snapshot test), so
-  they do not count toward a task's diff budget (§4.5 step 7); they stay in the task's file scope (amendment B-359).
-- AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, whose
-  task exceeds the size cap, or that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
+  they are not counted lines (§4.5 step 7); they stay in the task's file scope (amendment B-359).
+- AC13. Given a plan whose front matter is invalid, whose task ids repeat, whose `depends_on` is cyclic or unknown, or
+  that leaves an acceptance criterion of its spec uncovered, then GC005 or GC016.
 - AC13a. Given a plan whose `spec:` names a directory (a path ending in `/`) of clause specs, then every `*.md` file
   directly in it is loaded from the same commit as the plan (the gate branch in §4.5 step 4; the head commit for a spec-and-plan pull request, step 8) and must have valid spec front matter (GC005; no such file: GC004);
   `covers` ids may carry a prefix (`BP-AC1`); and GC016 lists every criterion that is not covered, among the criteria of
@@ -371,17 +373,18 @@ Checks, in order (all run; findings accumulate):
    under a member's `tests/` directory, added or modified (not renamed) and 0 bytes at head, is in scope when another changed file in the same directory matches a task glob:
    it is a test package marker that type checking of shared test helpers needs, and it holds no code (AC10c; amendment
    B-363). Else GC008.
-7. **Budget.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every changed
-   file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
-   `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. Above `max_changed_lines`
-   is GC009 ("BLOCKED, propose a plan change", rule A22). `max_sessions` cannot be observed and is left to review.
+7. **Counted lines.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every
+   changed file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
+   `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. The sum, the task's
+   `max_changed_lines` and the largest files are the notice GC009, never a failure: `max_changed_lines` is an estimate,
+   and exceeding it needs no plan change (ADR-0035; amendment B-552). `max_sessions` cannot be observed and is left to
+   review.
 8. **Spec and plan pull requests.** If any changed file matches `spec_globs` or `plan_globs`, every changed file must
    (GC010); each changed spec or plan must have valid front matter (GC005); a changed plan must cover every
-   acceptance criterion (`AC<n>.` lines) of its spec in some task's `covers` (GC016), and every task must stay within
-   the size cap `limits.max_task_lines` (initially 400, "about 400" in process/04 §4) (GC005). A pull request that
-   adds or changes `status: approved` fails in bootstrap mode (GC014); with bootstrap off, the approvals of
-   process/01 §5 (strictest over the risk set) must exist on the pull request that merged the approving commit,
-   from the logins in `identities`, through `ApprovalSource` (GC015). Workflow specs (`<package>/docs/workflows/<name>.md`,
+   acceptance criterion (`AC<n>.` lines) of its spec in some task's `covers` (GC016); no cap applies to
+   `max_changed_lines` (ADR-0035). A pull request that adds or changes `status: approved` fails in bootstrap mode
+   (GC014); with bootstrap off, the approvals of process/01 §5 (strictest over the risk set) must exist on the pull
+   request that merged the approving commit, from the logins in `identities`, through `ApprovalSource` (GC015). Workflow specs (`<package>/docs/workflows/<name>.md`,
    process/03) carry spec front matter and are specs: the committed `spec_globs` include `**/docs/workflows/*.md`
    (AC12a; amendment B-340). Clause specs (`<package>/docs/clauses/<pack>/*.md`, process/03 and structural-codes
    spec 0001) are specs too: the committed `spec_globs` include `**/docs/clauses/*/*.md` (AC12b). For a plan whose
@@ -836,7 +839,7 @@ JSON result: `{"command", "mode", "status", "steps": [{"name", "status", "findin
 
 Root `.gate/` files: `gate.yml` (new in this package; mode `bootstrap.{enabled,gate_branch}`, `main_branch`, `identities`,
 `spec_globs`, `plan_globs`, `test_globs`, `generated_globs`, `spike_globs`, `agents.unmanaged_ok`, `limits.{diff_lines,
-max_task_lines, test_run_seconds, mutation_run_seconds, max_file_bytes}`, `license_exceptions`, `secrets.allow`), `forbidden.yml`
+test_run_seconds, mutation_run_seconds, max_file_bytes}`, `license_exceptions`, `secrets.allow`), `forbidden.yml`
 (`escape_hatch`, `host_sdk`, `io_modules`, `cited`, `versioned`, `rationale`), `risk-map.yml`, `ratchet.json`, `agents.yml`.
 
 Spec and plan front matter (YAML between `---` lines at the start of the file): spec `id`, `issue`, `status`, `size`,
@@ -854,7 +857,7 @@ Diagnostic codes (the contract of this tool; the package `CHANGELOG.md` lists ch
 
 | Prefix | Meaning | Codes |
 |---|---|---|
-| GC | gate-check | 001 no Plan-Task · 002 malformed or duplicate · 003 work item · 004 plan or spec not on the gate branch · 005 front matter invalid · 006 status not acceptable · 007 task unknown · 008 file outside task · 009 budget · 010 spec or plan pull request mixed · 011 `none` reason · 012 lane · 013 base branch · 014 `approved` set in bootstrap · 015 approval missing · 016 criterion uncovered |
+| GC | gate-check | 001 no Plan-Task · 002 malformed or duplicate · 003 work item · 004 plan or spec not on the gate branch · 005 front matter invalid · 006 status not acceptable · 007 task unknown · 008 file outside task · 009 notice: counted lines · 010 spec or plan pull request mixed · 011 `none` reason · 012 lane · 013 base branch · 014 `approved` set in bootstrap · 015 approval missing · 016 criterion uncovered |
 | AW | awaiting owner (notice) | 01 to 09, §4.4 |
 | RF | risk-floor | 001 below floor · 002 body mismatch · 003 map invalid · 004 no recorded risk |
 | TF | test-first | 001 title · 002 no test commit · 003 test commit not tests only · 004 passes at base · 005 fails at head · 006 refactor changed tests · 007 test pull request changed code · 008 `tests_first` file missing · 009 pytest could not run · 010 no new test · 011 import probe |

@@ -670,6 +670,38 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_forbidden_fb005.py::test_version_keyword_of_versioned_callable"
     covers: [AC33a]
     depends_on: [T11]
+  - id: T40
+    title: "gate-check: the changed-line count is a notice (GC009), no plan-parsing cap; AGENTS.md and hub copies"
+    # Amendment (B-552, documents only): owner decision of 2026-11-17, ADR-0035 (hub ADR-0028): max_changed_lines is an
+    # estimate. GC009 becomes a notice; limits.max_task_lines is removed. The template, AGENTS.md and design/ files are
+    # here because gate-check refuses them beside a spec or plan (GC010) and the template needs its renders (AG003).
+    files:
+      - "tools/eng-dev-gate/CHANGELOG.md"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check_docs.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/risk_floor.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/test_first.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/frontmatter.py"
+      - "tools/eng-dev-gate/src/eng_dev_gate/config/gate_config.py"
+      - ".gate/gate.yml"
+      - ".gate/agents.yml"
+      - "*/*/.gate/agents.yml"
+      - "AGENTS.md"
+      - "*/*/AGENTS.md"
+      - ".github/pull_request_template.md"
+      - "design/00-OVERVIEW-AR.md"
+      - "design/docs/adr/README.md"
+      - "design/docs/adr/0021-agent-agnostic-ci-enforced-process.md"
+      - "design/docs/adr/0035-no-changed-line-limit.md"
+      - "design/process/**"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 260
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_counted_lines_above_estimate_is_a_notice"
+      - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_task_estimate_above_400_parses"
+    covers: [AC11, AC13]
+    depends_on: [T4, T13, T14, T15, T16, T38]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
@@ -714,7 +746,7 @@ GitHub are fake ports except in the one integration test per tool step.
 
 ## 2. Tasks
 
-Each task is one pull request of at most about 400 changed lines of non-test, non-generated code, starts with a `test:`
+Each task is one pull request (its `max_changed_lines` is an estimate, never a limit: ADR-0035), starts with a `test:`
 commit holding the failing tests, and names `Plan-Task: tools/eng-dev-gate/docs/plans/0001-eng-dev-gate-0.1.md#T<n>`.
 The workspace `uv.lock` is regenerated with `uv lock` in tasks that change dependencies (T1, T20).
 
@@ -756,6 +788,17 @@ Amendment (B-438): T39 adds FB005 form A4 (spec §4.8): an integer literal given
 callable in `versioned.callables` (initially `calc` and `CheckMeta`), with that list in the policy model of
 `engine.py` and in `.gate/forbidden.yml`; its first test shows `calc(version=1)` passes while `calc(limit=1)` and
 `other(version=1)` are refused.
+
+Amendment (B-552): T40 follows the owner's decision of 2026-11-17
+([ADR-0035](../../../../design/docs/adr/0035-no-changed-line-limit.md), the build copy of hub ADR-0028): GC009 becomes
+a notice with the counted lines, the task's `max_changed_lines` and the largest files; `parse_plan` loses its cap and
+`limits.max_task_lines` leaves `Limits` and the root `.gate/gate.yml` (a protected path: the pull request states the
+owner's approval, as B-524 did), with every call site and test fixture that passes it. `test_budget_counting` and the
+cap case of `test_plan_front_matter_rules` change with AC11 and AC13. The same pull request brings `design/` to the hub
+text of that decision, the AGENTS template included, re-renders every `AGENTS.md` with `eng-gate agents render --all`
+(each `.gate/agents.yml` takes the new `template-version`; the gate's own purpose line drops "diff budget"), and drops
+the `max_changed_lines` box of `.github/pull_request_template.md`. T40 is judged by the gate of its base, where GC009
+still fails above 260.
 
 **T12** adds the `imports` check with the layer, public module, declared dependency, Sasaah, third-party and cycle rules.
 
