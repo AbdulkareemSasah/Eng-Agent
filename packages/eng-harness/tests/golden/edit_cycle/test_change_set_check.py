@@ -20,6 +20,7 @@ STEMS = [
     "check-duplicate-target",
     "check-item-id-refused-kind",
     "check-item-id-slash",
+    "check-item-id-token",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -117,6 +118,30 @@ def test_item_id_with_a_slash_is_refused(item_id: str) -> None:
             "severity": "error",
             "code": "INVALID_ITEM_ID",
             "detail": f"item id {item_id} contains / (spec 0007 4.4.1 K3)",
+            "gap": None,
+        }
+    ]
+    assert body["status"] == "FAIL"
+    assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
+
+
+ID_DETAIL = "item id {} is not 1 to 57 ASCII letters, digits, _, . or -, or is revision or unlock (spec 0007 4.4.1 K3)"
+
+
+@pytest.mark.parametrize(
+    "item_id",
+    ["beam 1", "b\u00e9", "\u0663", "a" * 58, "a" * 64, "ab\n", "a,b", "a\\b", "revision", "unlock"],
+)
+def test_item_id_not_a_page_token_is_refused(item_id: str) -> None:
+    """K3 and AC4: an id that is not 1 to 57 ASCII token characters, or is revision or unlock, is INVALID_ITEM_ID."""
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(_case(), items=[item])
+    assert body["issues"] == [
+        {
+            "item_id": item_id,
+            "severity": "error",
+            "code": "INVALID_ITEM_ID",
+            "detail": ID_DETAIL.format(item_id),
             "gap": None,
         }
     ]
