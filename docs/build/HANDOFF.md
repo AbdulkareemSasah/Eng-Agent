@@ -1,7 +1,46 @@
+# Resume update of 2026-11-17 (build/v1 at 2a2171ea)
+
+This is the newest machine-side checkpoint. No new merges are recorded since the prior checkpoint; the older handoff below remains for its history. The latest measured counts supplied for this resume are 229 merged plan tasks of 353 current plan tasks, and 182 registry entries after adding B-560. The prior handoff retained a total of 349 after B-544 had added four tasks (W.T7b, W.T16b, W.T9c and I.T9c); recounting current plan front matter gives 353. The registry before B-560 had 181 entries; B-554 is pull request #409 and is now recorded as merged.
+
+## A. Current work and reviews
+
+- **B-550 (S.T23):** task branch `feat/b550-harness-st23-open-original-visible-launch`, resumed from published head `e65e608` with the build/v1 merge and collateral test; final head `79302d00953686dea66e21d671cc17a0fc242553` has the same tested tree as `d032e673`. Focused tests (25), package gate, test-first and mutation checks passed; mutation found zero eligible R1/R2 modules (no score, no MU003). Independent review APPROVE. Task-branch push was confirmed fast-forward, `e65e6080..79302d00953686dea66e21d671cc17a0fc242553`. This resumed session created no PR and ran no local CI; current PR-list status is unverified. Review: [b550-review.md](resumed-2026-11-17/b550-review.md).
+- **B-551 (E.T23):** published branch remains at `2361039`; blocked on B-560, then needs the documented one-line collateral test adjustment and a rerun of its gate. Independent implementation review remains outstanding; this resumed session created no PR, and current PR-list status is unverified.
+- **B-552 (G.T40 documents):** local continuation head `8cb72712` (author metadata corrected before publication; tree matches `0200eebd`); independent review APPROVE and `uv run eng-gate check --package eng-dev-gate --skip mutation` passed on that tree. The early task-branch push to origin is confirmed; this resumed session created no PR and ran no local CI; current PR-list status is unverified. B-553 stays dependent on DOC.B552. Review: [b552-review.md](resumed-2026-11-17/b552-review.md).
+- **B-554:** merged as #409; registry corrected to `merged_pr: 409` and `branch_pushed: true`.
+- **B-560:** local documents branch `docs/b560-engine-t23-collateral-test`, head `c4d0e566`; adds `packages/eng-harness/tests/unit/test_ctx_basis.py` to plan 0001 T23's file list and records why. Independent review APPROVE and `uv run eng-gate check --package eng-harness --skip mutation` passed on `c4d0e566`. The early task-branch push to origin is confirmed; this session created no PR and ran no local CI; current PR-list status is unverified. B-551 now depends on DOC.B560. Review and writer note: [b560-review.md](resumed-2026-11-17/b560-review.md), [b560-writer.md](resumed-2026-11-17/b560-writer.md).
+
+B-550, B-552 and B-560 task-branch pushes are confirmed. This resumed session created no PR and ran no local CI for them; current PR-list status is unverified. B-164 (B.T10) remains queued; it is still a prerequisite for W.T8 (B-202), and its prior PR #323 failed local CI on TF004. Keep it in the prescribed order and do not start it yet.
+
+## B. Resume blockers and external state
+
+Git fetch and remote branch listing succeeded: 429 remote branches were listed and `origin/build/v1` is at `2a2171ea`. The GitHub API endpoint `api.github.com` returned HTTP CONNECT 403, and no GitHub MCP tool was available, so open pull requests and remote local-CI/merge state could not be refreshed. A `GH_TOKEN` variable exists, but its value was not read or printed and no authentication conclusion was drawn. The owner said «سأطبّق تعديل الشبكة» (“I will apply the network change”); application is not yet confirmed. PR listing, pull-request creation, local CI via the pull-request runner, and merges remain outstanding. Restore API access and check the current PR list before creating or updating pull requests. Afterward, run local CI on each current PR head and merge only on PASS.
+
+The latest seven PR merges are after periodic mutation base `4f1a7e6`; the next periodic mutation run is due after three more PR merges, using base `4f1a7e6`. Do not claim any additional mutation result.
+
+## C. Next order
+
+1. Confirm API access after the owner applies the network change; refresh `origin/build/v1`, remote task branches and open PRs before acting.
+2. B-550 local checks passed and its task-branch push is confirmed at `79302d00953686dea66e21d671cc17a0fc242553`; mutation found zero eligible R1/R2 modules (no score/no MU003). B-560 package gate passed and its task-branch push is confirmed. Recheck local branches and reviews, then create or merge pull requests only after the lead checks current remote state and CI requirements.
+3. Merge B-560 before resuming B-551. Then apply the recorded assertion adjustment to B-551, run its package gate and obtain independent implementation review.
+4. Resume B-552's approved continuation, then B-553 after B-552 merges. Complete B-550's PR and local CI before starting B-138 (S.T19a).
+5. Keep B-556 on its planned parallel first-live-run path. B-202 (W.T8) waits for B.T10 (B-164), E.T23 (B-551), S.T19a (B-138) and W.T7b (B-556). Keep B-164 queued until its documented order/dependency allows it; do not jump ahead.
+6. Continue the first-live-run order in the previous checkpoint and registry. The first live host behavior remains unverified until owner-side testing.
+
+## D. Machine layout and setup
+
+The reference checkout is `/workspace/Eng-Agent` on `build/v1`, HEAD `2a2171ea`; worktrees are under `/workspace/Eng-Agent/.worktrees`; lead scratch is `/workspace/Eng-Agent/.lead`. Playbook, priority list, findings, resume material, tools and workflow scripts are copied under `.lead/`; `.lead/` and `.worktrees/` are excluded through `.git/info/exclude`. Linux x86_64, 5 available processors, 34,906,004 kB total memory. `uv sync --all-packages --locked` succeeded with CPython 3.14.10 and uv 0.13.6; see [machine-layout.md](resumed-2026-11-17/machine-layout.md) for setup results and the two non-blocking uv-build version warnings. No tests or gates were run for machine setup.
+
+## E. Durable resumed notes
+
+Review records, writer handoffs, pull request bodies and compact gate/push logs are copied to [resumed-2026-11-17/](resumed-2026-11-17/). Machine-specific paths in those copies use `<lead>`, `<worktrees>` and `<build-v1>` placeholders. Full gate logs remain in the lead scratch folder and may be checked by their owners when the running commands finish.
+
+---
+
 # Build handoff checkpoint of 2026-11-17 (build/v1 at d5ea640, updated to 8b2722f and later): hand-over to a lead on another machine
 
 Written by the lead of the cloud session when the owner asked for a hand-over to another agent on another machine
-(2026-11-17, about 09:30 UTC). This section is the newest; the sections below it stay for their history.
+(2026-11-17, about 09:30 UTC). This was the newest checkpoint at that hand-over; the resume update above supersedes its current-state details, and the sections below stay for their history.
 
 ## A. State
 
