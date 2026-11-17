@@ -591,11 +591,12 @@ class Ctx:
         raise errors.Escalation(reason, evidence=[ref.ref for ref in evidence])
 
     @engine_work
-    async def promote(self, model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle:
+    async def promote(self, model: ModelHandle | str, how: Promotion, approval: Approval) -> ModelHandle:
         """Make the accepted revision of the working copy of `model` the model of record, as one step (spec 4.7, AC52).
 
         The original is backed up in the run folder and its files are replaced by the copy's; `approval` answers a
-        `PROMOTION` approval bound to `model`. The step is a write with an `op_id` that is never sent to the `ToolPort`.
+        `PROMOTION` approval bound to `model` (a handle or its key). The step is a write with an `op_id` that is never
+        sent to the `ToolPort`.
 
         Raises:
             NotImplementedGap: `Promotion.REPLAY_WRITES` (gap E-G1). BlockRuleViolation, ApprovalVoid: no working copy,
@@ -607,8 +608,8 @@ class Ctx:
             )
         return await _steps.step(lambda path: self._promoted(path, model, approval))
 
-    async def _promoted(self, path: str, model: ModelHandle, approval: Approval) -> ModelHandle:
-        key = model.model_key
+    async def _promoted(self, path: str, model: ModelHandle | str, approval: Approval) -> ModelHandle:
+        key = _approvals.model_key(model)
         copy = self._modes.copies.get(key, key)
         args: _Obj = {"model": key, "copy": copy, "approval": approval.request_id}
         recorded = self._look(path, "promote", Promotion.FILE_COPY.value, args)

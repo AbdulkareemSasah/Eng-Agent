@@ -144,7 +144,7 @@ class Preview(_Frozen):
 
     items: tuple[PreviewItem, ...]
     diff_ref: Ref | None
-    models: tuple[ModelHandle, ...]
+    models: tuple[ModelHandle | str, ...]  # a model by its handle or by its key (spec 4.3.2, AC72)
 
     @model_validator(mode="after")
     def _unique_ids(self) -> Self:

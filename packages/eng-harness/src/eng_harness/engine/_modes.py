@@ -180,7 +180,7 @@ class Modes:
                 return args, approval if prior.under == approval.request_id else under
             if under is not None:  # the approval it was given keeps its re-check and items (spec 4.7, EC3)
                 return args, under
-            bound = {m.model_key for m in preview.models}
+            bound = set(map(_approvals.model_key, preview.models))
             named = {v for v in (key, args.get(param) if param else None) if isinstance(v, str)}
             return args, approval if info is not None and info.effect == "write" and bound & named else under
 
