@@ -1,0 +1,6 @@
+gate/test-first tested head=d032e673f8bf630e52be24acb5e3af20c36abcc4
+final head=79302d00953686dea66e21d671cc17a0fc242553
+original tested tree=fa00da11223194644f8bc52b76cb01f6d4847c18
+final tree=fa00da11223194644f8bc52b76cb01f6d4847c18
+git diff --exit-code d032e673f8bf630e52be24acb5e3af20c36abcc4 HEAD: exit 0
+Published e65e6080 remains an ancestor. Only unpublished continuation attribution changed.
