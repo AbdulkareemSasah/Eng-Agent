@@ -84,8 +84,10 @@ def test_crash_matrix(tmp_path: Path, cut: str) -> None:
                     e for e in journal if isinstance(e.payload, ev.ModelSaved) and e.payload.role == "baseline"
                 ]
                 assert isinstance(baseline.payload, ev.ModelSaved)
-                assert baseline.payload.model_key == "m@copy" and baseline.seq > reconciled.seq
-                assert reconciled.payload.result is not None and not reconciled.payload.result.complete
+                assert baseline.payload.model_key == "m@copy"
+                assert baseline.seq > reconciled.seq
+                assert reconciled.payload.result is not None
+                assert not reconciled.payload.result.complete
                 assert not reconciled.payload.result.summary
             assert [request.kind for request in inputs.presented] == expected_requests
             assert r.original.read_bytes() == b"synthetic model"
