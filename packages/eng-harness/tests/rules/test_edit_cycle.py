@@ -2,7 +2,7 @@
 
 Expected picks are derived by hand from the rule lines of the table in spec 0007 section 4.6:
 `edit_cycle_readback_result.pass` is "status `PASS` and reason `readback` -> `continue`" and
-`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified` -> `continue`". Neither rule
+`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified`, drift `PASS` -> `continue`". Neither rule
 reads the basis (spec 0007 4.6: no rule holds a number), so the restricted basis view is built with no path.
 A state outside the rule gives `None` (spec 0007 AC18), so the next rule or the engineer decides.
 """
@@ -166,7 +166,12 @@ def test_discovery_finds_the_points_and_rules() -> None:
         "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
         "edit_cycle_readback_result": ["continue", "restore_previous", "stop_cycle"],
     }
-    assert all(r.thresholds == () and r.version == 1 for r in rules.rules)
+    assert all(r.thresholds == () and r.version == 2 for r in rules.rules)
+    assert {p.name: p.version for p in points.points} == {
+        "edit_cycle_analysis_messages": 1,
+        "edit_cycle_engineer_turn": 1,
+        "edit_cycle_readback_result": 2,
+    }
 
 
 def test_policies_follow_the_table() -> None:
