@@ -34,7 +34,7 @@ match the implementation's output (tests that assert whatever the code returns).
 
 ## 4. Pull request size
 
-- No limit on changed lines ([ADR-0028](../docs/adr/0028-no-changed-line-limit.md)). A plan task's
+- No limit on changed lines ([ADR-0035](../docs/adr/0035-no-changed-line-limit.md)). A plan task's
   `max_changed_lines` is an estimate: exceeding it is never a failure, never a reason to stop and never needs a plan
   amendment. `gate-check` reports the counted lines, the estimate and the largest files as a notice.
 - Reviewers judge whether a pull request is reviewable and may ask for a split as a finding; size alone never blocks.

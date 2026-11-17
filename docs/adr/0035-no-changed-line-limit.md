@@ -1,4 +1,4 @@
-# ADR-0028: No changed-line limit per task
+# ADR-0035: No changed-line limit per task
 
 Status: Accepted (decided by the owner, 2026-11-17) · Date: 2026-11-17
 
