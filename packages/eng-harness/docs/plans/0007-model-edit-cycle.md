@@ -547,8 +547,9 @@ tasks:
     # never sees a READBACK_MISMATCH or READBACK_UNAVAILABLE; and the sign-off of a run with exceptions cannot be signed
     # without the exc_<n> items. About 15 lines for the route in _cycle.py, 20 for the items (the verdict results
     # collected per cycle in _cycle.py, numbered in _finish.py), 1 of CHANGELOG.md: about 36; the blocks of _cycle.py
-    # and _finish.py move to version 2 (block.py hashes the module source) with blocks.lock.json rewritten: one version
-    # line per block and two lock lines per entry, about 20 more; budget 65 (an estimate).
+    # and _finish.py move to version 2 (block.py hashes the module source) with blocks.lock.json rewritten: one changed
+    # version line per block (2 counted lines) and two changed lock lines per entry (4 counted lines), about 36 to 42
+    # more for six or seven blocks; budget 85 (an estimate).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_cycle.py"
@@ -558,7 +559,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_promotion.py"
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py"  # only where T8 or T9b pin a child block's version
-    max_changed_lines: 65
+    max_changed_lines: 85
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py::test_check_failure_routes"
