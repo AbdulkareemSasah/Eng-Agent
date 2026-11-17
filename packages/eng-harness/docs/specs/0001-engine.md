@@ -794,7 +794,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | Event | Payload | Durability |
 |---|---|---|
 | `run_started` | Run header: `run_id`, `workflow`, `block {name, version, code_sha256}`, `input_ref`, `input_sha256`, `basis_ref`, `mode`, `run_class` (`trial`, `production`), `engine_version`, `contract_version`, `settings_sha256`, `servers` (ServerCheck list), `always_ask`, `unreleased_tools` (tool name to record, from `ToolPort.unreleased_tools()`; empty when none), `decision_runtime` (the JSON object from `DecisionPort.runtime_summary()`, recorded as given and opaque to the engine: spec 0009's `DecisionRuntime.summary`, providers and released points without endpoints or keys; empty when none) | FULL |
-| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `action` (the tool's `ToolInfo.action`; optional, so earlier journals read unchanged; it records what a replay rule needs to detect a removed inserted save step, AC47, but no §4.5.2 rule reads it yet, Q35; draft decision B-434, owner queue), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
+| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `action` (the tool's `ToolInfo.action`; optional, so earlier journals read unchanged; it records what a replay rule needs to detect a removed inserted save step, AC47, but no §4.5.2 rule reads it yet, Q35; draft decision B-434, owner queue), `opens_model_without_writing` (optional strict boolean, B-562, below), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
 | `step_completed` | `result` (`ref`, `summary`, `warnings`, `complete`) or the block output ref, `duration_ms`, `calc {id, version, content_sha256, status}` (calc steps) | NORMAL |
 | `step_failed` | `error` (contract `ErrorDetail`, or `{harness_code, message}`), `retryable`, `duration_ms` | NORMAL |
 | `step_reconciled` | `op_id`, `outcome` (`applied`, `not_applied`), `result`, `decided_by` (`adapter`, `engineer:<name>`), `evidence` (refs) | FULL |
@@ -814,6 +814,13 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `run_completed` | `output_ref`, `output_sha256`, `draft` | FULL |
 | `run_failed` | `reason` (`abandoned`), `by` | FULL |
 | `signed_off` | `outputs` (refs), `approval_request_id`, `by` | FULL |
+
+**Open capability (B-562).** Before sending a tool call with effect `write` and action `open`, the engine records
+`opens_model_without_writing: true` on that attempt's `step_started` if the adapter explicitly returns true for the
+call arguments (§4.8). Validation accepts true only for a `tool` step with that effect and action. An absent field,
+`null`, or false retains the ordinary write behavior. Canonical serialization omits the field when its value is
+`None`, preserving earlier payloads and their hashes. Replay uses the recorded field for that attempt's content
+classification, without asking the adapter for a new description of the recorded call.
 
 `run_escalated` is not terminal: the journal is unchanged and a resume replays (S-10). Terminal events are
 `run_completed` and `run_failed`; after them the run only accepts `signed_off`. A block that raises an uncaught
@@ -891,7 +898,8 @@ root block.
    rerun marking of reads in flight. A write in flight on a lost or reopened model is not reconciled (the host's memory
    since the last save is gone, so a reconciler could report `not_applied` for an edit that is only gone from memory);
    step 8 resolves it.
-8. Host-state check (§4.5.4) for every model the run wrote; a lost model is a mismatch.
+8. Host-state check (§4.5.4) for every model the run wrote to, subject to the recorded open capability and the
+   rules for lost or reopened models in that section.
    8a. (Amendment B-415.) For each tool save reconciled `applied` (or journaled without its `model_saved`) whose
    model passed the check, append its `model_saved` from the check's read (§4.6 "Tool saves", EC2), reading
    `HostPort.model_files(model_key)` for its `file_name` (review fix B-415: the check's `HostModelState` holds no file
@@ -931,22 +939,40 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 | Step | Rule |
 |---|---|
-| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty (invariant 1), and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
+| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty as invariant 1 specifies, and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
 | Read, calc, decision (tiers other than the engineer) | `step_rerun`, then the step runs again with the same attempt (no side effect) |
 | Approval, ask, engineer-tier decision | Presented again with the same request id (AC36). An approval or ask step in flight gets `step_rerun` with reason `read_in_flight` and runs again as the same attempt, which presents it again (amendment B-499) |
 | Block, parallel, attempts | Scopes, not steps: their children are handled one by one |
 
 #### 4.5.4 Host-state check before live execution
 
-For every model the run wrote to, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
+For every model with a write to check, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
 last `model_saved`, or, when a write on it completed or was reconciled `applied` after that save (§4.5.1 step 7), with
 the model identity and revision of the latest such result's `provenance.host` (the contract's `HostInfo` has no
 fingerprint, so against a result the fingerprint is not compared; draft decision B-427, owner queue). A model with `HostModelState.loaded` false (a lost model,
 §4.5.1 step 6) is a mismatch with reason `model_not_loaded`. A reopened model is compared with its last `model_saved`
 only, never with a reconciled result, and any write on it after that save (completed, reconciled or in flight) is a
-mismatch with reason `model_reopened`: the reopened file cannot hold it. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
-request (`engine.host_state`) offering three choices (11 §5):
+mismatch with reason `model_reopened`: the reopened file cannot hold it.
+
+**Content comparison (B-562).** Exclude an open explicitly recorded as `opens_model_without_writing: true` from
+the latest write result used for comparison and the latest tool save candidate in step 8a. A completed or applied
+open with this guarantee leaves the comparison for actual writes on the same key intact, including whether a
+reopened file lacks those writes.
+
+Skip the original's host-state check only after journal evidence establishes the EC1 handoff. The original's
+latest write must be an explicitly marked open that completed or was confirmed `applied`, with no other
+model-content write or unresolved write to check on that key. Its `p~post.working_copy.<model_key>` must have a
+completed, current attempt started after the open's outcome and naming that original and a distinct copy key.
+The same path must have a matching `model_saved` for the copy with role `working_copy` between that attempt's
+start and completion. A later save of the copy leaves this historical evidence valid. The original open and the
+copy evidence must survive any restore cut.
+A later original binding takes precedence over the handoff. The copy's writes remain subject to the normal
+check. If a lost or reopened binding prevents reconciliation of a pending open, the bound key still requires
+host-state recovery. Leases, in-flight reconciliation and restore restrictions use the recorded write effect.
+
+On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input request
+(`engine.host_state`) offering three choices (11 §5):
 
 - `accept`: the differences are engineer changes. The engine saves the model (`model_saved`, role `baseline`) and
   continues; the workflow shows and records the differences itself (18 step 4). Not offered for a lost model (there is
@@ -981,7 +1007,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 
 | # | Where and how | Raises | Tests |
 |---|---|---|---|
-| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag. Clean means a success envelope whose summary validates as the `CheckModelSummary` of `issues.model_check/1` with `clean` true; any other summary (an `error` issue such as `READBACK_MISMATCH` or `READBACK_UNAVAILABLE`, or a summary of another shape) fails the check as a failure envelope does: the step fails, `check_enforced` is `fail` and the flag stays set (amendment B-503) | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
+| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty, except for an open with `opens_model_without_writing: true` on that attempt (§4.4.2). Such an open leaves the existing dirty flag as it was, both live and in replay. Before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag. Clean means a success envelope whose summary validates as the `CheckModelSummary` of `issues.model_check/1` with `clean` true; any other summary (an `error` issue such as `READBACK_MISMATCH` or `READBACK_UNAVAILABLE`, or a summary of another shape) fails the check as a failure envelope does: the step fails, `check_enforced` is `fail` and the flag stays set (amendment B-503) | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
 | 2 References for engineering quantities (P2) | `_invariants`, before the port call: every argument at a path in `ToolInfo.engineering_params` or `CalcInfo.engineering_params` must be a `Ref` or a result; a number, a quantity object or a `Quantity` is refused | `ContractError` `INVALID_ARGUMENT` with `field` (contract §5 step 2) | AC38 |
 | 3 No stale inputs | `_invariants`: every reference to `calc`, `decide`, `approve` is resolved with `eng_contract.refs.resolve_ref` and a `current_revision` that knows every model attached in the run (contract Q4). For `calc`, each argument's `RefRule` is `CalcInfo.ref_rules[path]` (the argument's field path); a path not listed gets the default `RefRule` (no kinds, no unit, `stale_ok` false), so `stale_ok` exists only where the calc declares it (spec 0003 §4.13). `decide` and `approve` use the default `RefRule` | `ContractError` `REF_STALE` (and the contract's other `REF_*` codes) | AC39 |
 | 4 Decisions cannot produce numbers (P10) | `_decide`: options must be a `StrEnum` subclass or a sequence of `Ref`; the answer must be a member value or an index into the sequence; the block receives the member or the `Ref` | `BlockRuleViolation` (options), `DecisionInvalid` (answer) | AC40 |
@@ -1058,6 +1084,12 @@ again.
   `csi_open_revision`) takes no working copy and does not change the `origin_sha256` that promotion compares (§4.7
   "Promotion"); its new working file is recorded by "Tool saves" (§4.6). Without `copy_on_open`, the working copy is
   taken as each mode states (EC1).
+  **Recovery (B-562).** An open confirmed `applied` during the call follows the same post-open binding, units and
+  copy rules as a successful call. On replay the engine uses the recorded host, action and model key to complete
+  any missing post-open binding and units check before a still-live first copy. An already completed copy is
+  replayed from the journal without rebinding the original or taking the copy again. The open capability (§4.8)
+  affects model-content checks only. The write effect still governs approvals, leases, units checks, parallel
+  sibling conflicts, reconciliation and retries.
 - **`approve_each_write`.** Before each write, the inserted step `p~pre.approve` presents `ToolPort.preview(tool,
   args)` as a `CHANGE_SET` approval; a rejection raises `ApprovalRejected` (a `StepError`) and the write is not called.
   An answer that rejects any item of an inserted approval is a rejection: the write is one step (amendment B-499).
@@ -1115,7 +1147,12 @@ Port data types (frozen models): `ToolInfo` (`name`, `effect` read or write, `ac
 `engineering_params` (field paths), `overwrites_original(args) -> bool` is a method on the adapter's `ToolInfo`
 subclass, and so is `saves_new_file(args) -> bool` (amendment B-415: true when a call with `args` writes the saved
 model to a new file that did not exist before the call and leaves every existing file's content as it was, apart
-from the open working file saved in place; the base `ToolInfo` returns false; §4.6 "Tool saves", §4.7)); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unknown`; `result: Envelope | None`;
+from the open working file saved in place; the base `ToolInfo` returns false; §4.6 "Tool saves", §4.7), and
+`opens_model_without_writing(args) -> bool` (B-562). The base returns false. An adapter may explicitly return true
+for a write-classified `open` only when that call leaves model content unchanged in memory and creates or writes no
+model file. The two file classifiers alone cannot establish this guarantee. See spec 0002 §4.5.9 for the CSI
+original open, §4.4.2 for the recorded capability, and §4.5.4 and invariant 1 for its use); `Reconciliation`
+(`outcome` `applied`, `not_applied`, `partial`, `unknown`; `result: Envelope | None`;
 `missing: list[str]`; `evidence: list[Ref]`); `ServerCheck` (`server`, `build`, `min_build`, `fingerprint`,
 `expected_fingerprint`, `ok`, `reason`); `HostModelState` (`loaded`, `model_id`, `revision`, `fingerprint`,
 `file_sha256`; the last four `None` when `loaded` is false);
@@ -1341,8 +1378,9 @@ at least 80% on the R1 modules listed in the plan.
 
 ## 10. Version impact
 
-New package; `eng-harness` 0.1.0 when phase 1 is complete. The journal `schema_version` is 1; a change to it or to an
-event payload is a new schema version that the reader must still read (its changelog entry states the impact). The
+New package; `eng-harness` 0.1.0 when phase 1 is complete. The journal `schema_version` is 1. Except for the
+version-1 additions below, a change to the schema or to an event payload requires a new schema version and the
+reader must still read earlier versions (its changelog entry states the impact). The
 B-068 fields (`run_class`, `unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`,
 `model_bound.file_names`, `model_saved.origin_file_names`, the kind `engine.decision`) are part of version 1, because
 no journal exists yet; `item_reasons`, `unreleased_tools`, `file_names` and `origin_file_names` default to empty,
@@ -1353,6 +1391,9 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 `ToolInfo.saves_new_file` (default false) change no journal payload: a tool save is journaled with the existing
 `model_saved` payload and its existing role `revision`, so the journal schema stays version 1.
 The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload, nor does the B-495 rerun limit.
+The owner approved the conservative opt-in capability on 2026-11-17 (B-562). Its optional `step_started` field is
+an additive change within journal version 1. The reader preserves the canonical form and conservative write
+treatment of earlier payloads (§4.4.2). The base port method defaults to false for existing adapters.
 
 ## 11. Open questions, gaps and additions
 
