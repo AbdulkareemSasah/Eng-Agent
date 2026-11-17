@@ -84,8 +84,8 @@ class DoctorDeps:
 
 
 class LiveRoles:
-    def __init__(self, inspector: ProcessInspector) -> None:
-        self._inspector = inspector
+    def __init__(self, inspector: ProcessInspector | None = None) -> None:
+        self._inspector = inspector or platform_inspector()
 
     def inspect(self, config: ServersConfig, run_dir: Path) -> Mapping[tuple[str, str], RoleFacts]:
         return anyio.run(_gather, config, run_dir, platform_launcher(self._inspector))

@@ -16,5 +16,7 @@ if sys.platform == "win32":
     def test_platform_pair_windows() -> None:
         inspector = platform_inspector()
         assert isinstance(inspector, WindowsProcessInspector)
-        assert isinstance(platform_launcher(inspector), WindowsLauncher)
+        launcher = platform_launcher(inspector)
+        assert isinstance(launcher, WindowsLauncher)
+        assert launcher._inspector is inspector
         assert inspector.identity(__import__("os").getpid()) is not None

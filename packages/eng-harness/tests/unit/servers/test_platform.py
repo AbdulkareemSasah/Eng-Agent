@@ -18,11 +18,12 @@ def test_platform_pair() -> None:
     launcher = platform_launcher(inspector)
     assert isinstance(launcher, PosixLauncher)
     assert launcher._inspector is inspector
-    assert isinstance(platform_launcher(cast(Any, _Other())), PosixLauncher)
+    with pytest.raises(TypeError):
+        platform_launcher(cast(Any, _Other()))
 
 
 class _Other:
-    """An inspector that is not the POSIX one: the launcher keeps its own default."""
+    """An inspector that is not the POSIX one: the launcher refuses it."""
 
 
 def test_windows_pair_over_the_given_inspector(monkeypatch: pytest.MonkeyPatch) -> None:

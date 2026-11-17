@@ -230,22 +230,15 @@ def test_audit_log_flag(tmp_path: Path) -> None:
             load_servers_config(_write(tmp_path, _minimal(extra=f"audit_log = {value}")))
 
 
-def test_servers_config_from_tables() -> None:
+def test_servers_config_from_tables(tmp_path: Path) -> None:
     """AC50: the validation of `load_servers_config` over tables already parsed, with the dotted key of a fault."""
     data = tomllib.loads(FULL)
-    assert servers_config(data) == load_servers_config_text(FULL)
+    assert servers_config(data) == load_servers_config(_write(tmp_path, FULL))
     assert servers_config({"engine": {}}) == ServersConfig()
     broken = tomllib.loads(_minimal(extra="audit_log = 1"))
     with pytest.raises(ConfigError) as caught:
         servers_config(broken)
     assert caught.value.key == "servers.csi.audit_log"
-
-
-def load_servers_config_text(text: str) -> ServersConfig:
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as folder:
-        return load_servers_config(_write(Path(folder), text))
 
 
 def test_byte_order_mark_accepted(tmp_path: Path) -> None:

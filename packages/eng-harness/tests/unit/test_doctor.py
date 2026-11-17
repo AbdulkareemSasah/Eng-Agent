@@ -336,7 +336,7 @@ def test_checks_and_output(tmp_path: Path) -> None:
         doctor,
         home,
         programs=_Dirs({str(install)}),
-        roles=doctor.LiveRoles(_Procs({})),
+        roles=doctor.LiveRoles(),
         allowlist_for=lambda _adapter: allowlist,
         inspector=_Procs({}),
     )
