@@ -1,22 +1,24 @@
-# Integration and continuation checkpoint of 2026-11-17 (build/v1 at 1ec7566)
+# Integration and continuation checkpoint of 2026-11-17 (last source integration 1ec7566)
 
-The owner authorized continuation after the quota pause. This checkpoint records integrated state and active guidance; it does not change product source. The reference checkout is detached at `1ec7566c016aacf75c15aacb260435df44f23c67`. No CI job is currently running.
+The owner authorized continuation after the quota pause. This checkpoint records integrated state and active guidance; it does not change product source. This continuation was prepared from state checkpoint `cf56035b`; the last source integration is `1ec7566c016aacf75c15aacb260435df44f23c67`. The reference checkout is detached at the latest integration/state head. No local CI job is currently running.
 
 This top checkpoint is authoritative. Older handoffs and machine snapshots below are retained for history and are superseded where their state differs.
 
 ## A. Integrated state
 
-- **Plan progress:** 232 of 354 current plan tasks merged. The registry has 183 entries. B-551/#415, B-553/#416 and B-561/#414 are merged. B-550/#411, B-552/#412 and B-560/#413 were already checkpointed. Merge records and CI evidence for the current three are in [integration-2026-11-17/](integration-2026-11-17/).
+- **Plan progress:** 232 of 354 current plan tasks merged. The registry has 184 entries. B-551/#415, B-553/#416 and B-561/#414 are merged. B-550/#411, B-552/#412 and B-560/#413 were already checkpointed. Merge records and CI evidence for the current three are in [integration-2026-11-17/](integration-2026-11-17/).
 - B-551 squash: `9c26ab3435c9dd3867313bdef2eb60e63633c218`; B-553 squash: `1ec7566c016aacf75c15aacb260435df44f23c67`; B-561 squash: `c803dad7f65f1f9a4f3b770dcb12bb080504e02c`.
 - B-553's risk is `r2, r3` after B-561; its DOC.B561 dependency is cleared. B-551 has no pending dependencies. The registry IDs and merged PR fields reflect these integrations.
 - Earlier continuation already integrated B-544/#408 (registry tasks W.T7b/W.T16b/W.T9c/I.T9c), B-547/#410, and B-554/#409; B-551, B-552, B-553 and B-561 are now integrated as listed above. Existing task-log items remain: B-537 PR #384 appears open through the API although its content is integrated at `45dc8ab9`; do not redo or close it. B-334 PR #331 remains frozen. B-164 PR #323 needs the documented future TF004 rebuild.
 
 ## B. Current first-live-run order
 
-1. **B-138 (S.T19a)** and **B-556 (W.T7b)** are active; their writers are using `.worktrees/b138` and `.worktrees/b556`.
-2. Then B-555 (W.T17), B-557 (W.T16b), and the B-164 rebuild in the established order before B-202 (W.T8). B-164 remains held for its documented TF004 rebuild after its prerequisites.
-3. B-202 waits for B.T10 (B-164), S.T19a (B-138), and W.T7b (B-556); E.T23 (B-551) is merged and cleared. Continue with the existing owner order after those dependencies.
-4. Refresh remote PR state before integration work. There is no local CI run in progress.
+1. **B-138 (S.T19a)** continues from unpublished local head `668c3830` in `.worktrees/b138`, preserving first-red commit `eeae76fe`. Session 2 of 3. The expanded six-write crash matrix found a false original-model host-state stop after the documented same-instance working-copy handoff, and post-open bookkeeping gaps. Additional engine/port/journal edits are held until **B-562 (DOC.B562)** merges. The owner approved an explicit conservative capability for an original open that changes no model content on 2026-11-17; default and legacy behavior stay conservative. B-562 is being written on `docs/b562-original-open-content-capability`.
+2. **B-556 (W.T7b)** is ready as [PR #417](https://github.com/AbdulkareemSasah/Eng-Agent/pull/417), current head `f35b53830a05380e35075ee4ed849a66bcd502ae`, pure state-base merge from tested `9ff084d5`. Package gate, 144 focused tests and formal test-first passed; independent lead review approved and sources verification approved with one low documentation concern. Its mutation gate passed with MU003 because the selected decorated rules generated no mutants; no score or mutation coverage is claimed. PR-local CI has not started. Batch it with B-562 when ready.
+3. Then B-555 (W.T17), B-557 (W.T16b), and the B-164 rebuild in the established order before B-202 (W.T8). B-164 remains held for its documented TF004 rebuild after its prerequisites.
+4. B-202 waits for B.T10 (B-164), S.T19a (B-138), and W.T7b (B-556); E.T23 (B-551) is merged and cleared. Continue with the existing owner order after those dependencies.
+5. B-555's read-only pre-flight audit is READY with no scope, test-first, dependency or spec blocker; preserve optional-reference completeness and single-revision checks for supplied sections. The original-open blocker and audit evidence are archived below.
+6. GitHub API access succeeded on this continuation. Fetch found 433 remote branches and the same three older open PRs #384, #331 and #323; B-556/#417 was then opened. Refresh remote state before integration; no local CI run is in progress.
 
 ## C. Mutation and CI state
 
@@ -27,6 +29,10 @@ This top checkpoint is authoritative. Older handoffs and machine snapshots below
 - The B-561 automatic base merge commit `6fda1a2beea771e1223d9acd6c2355247c414f06` lacked an `Assisted-by` trailer. It was published before detection and was preserved; the final squash commit has the required sole trailer.
 - Windows was not run on this Linux machine. `uv audit --locked` was not run because `api.osv.dev` is outside AGENTS.md §9 allowed services. Both remain owner local-test items. No claim is made that either check passed.
 - First live host behavior remains unverified pending owner-side testing.
+
+B-138 save-cut evidence: after explicit engineer `applied`, the existing AC34 `engine.host_state` choice `accept` can authorize and journal a new baseline. This was a targeted diagnostic using the actual ports and an in-memory filter of the already-proven original handoff; it is not a pass of the committed matrix. Full matrix, formal test-first and the package gate remain pending the reviewed scope and final implementation. No recovered `saved_file` or provenance is invented. The absent recovered snapshot summary remains a limitation for later snapshot-based restore and needs to remain explicit. No general host-state mismatch or abandonment request is automatically accepted.
+
+Continuation evidence: [B-556 mutation](integration-2026-11-17/b556-mutation.md), [B-556 integration preparation](integration-2026-11-17/b556-integration-prep.md), [B-138 blocker refutation](integration-2026-11-17/b138-resume-blocker-refutation.md), [B-555 pre-flight](integration-2026-11-17/b555-preflight.md).
 
 ## D. Active changed-line guidance
 
