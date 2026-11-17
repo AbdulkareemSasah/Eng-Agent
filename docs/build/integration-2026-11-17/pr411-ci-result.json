@@ -1,0 +1,56 @@
+{
+  "base": "f538973ef3ade1dcdf7efb36c82bbeaeae99d08b",
+  "failing": [],
+  "finished_at": "2026-11-17T10:53:39Z",
+  "head": "6eda5f54fecda0721a3115e2989d6e8b3b640399",
+  "jobs": {
+    "agents-drift": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "build": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "ci-review": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "gate": {
+      "exit": 0,
+      "seconds": 645,
+      "tail": ""
+    },
+    "gate-check": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "risk-floor": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "security": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "setup": {
+      "exit": 0,
+      "seconds": 3,
+      "tail": ""
+    },
+    "test-first": {
+      "exit": 0,
+      "seconds": 14,
+      "tail": ""
+    }
+  },
+  "mode": "pull_request",
+  "started_at": "2026-11-17T10:42:32Z",
+  "verdict": "PASS"
+}
