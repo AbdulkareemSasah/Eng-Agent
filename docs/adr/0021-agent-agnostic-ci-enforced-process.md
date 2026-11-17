@@ -1,6 +1,6 @@
 # ADR-0021: A development process that is tool-agnostic and enforced by machines
 
-Status: Proposed; amended by ADR-0026 (project lane) · Date: 2026-10-24
+Status: Proposed; amended by ADR-0026 (project lane) and ADR-0028 (no changed-line limit) · Date: 2026-10-24
 
 ## Context
 

@@ -20,7 +20,8 @@ Rules for spec and plan pull requests ([01](01-lifecycle.md) §4):
   together with code or tests.
 - Tool specs of one toolset may be grouped into one spec pull request and approved together, so the owner reviews a
   coherent set once instead of each tool separately.
-- Front matter is mandatory (`id`, `issue`, `status`, `size`, `risk`; plans add the task list with files and budgets).
+- Front matter is mandatory (`id`, `issue`, `status`, `size`, `risk`; plans add the task list with files, size
+  estimates and session budgets).
 
 ## 2. What every spec contains
 

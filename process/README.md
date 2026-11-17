@@ -19,7 +19,7 @@ documents means a package directory of the `eng-platform` workspace; repository-
 3. **Never invent an engineering number.** Every constant has a cited source; every value has a provenance.
 4. **Never improvise a missing capability.** Build it as a permanent tool: in a live project through the project lane
    ([01](01-lifecycle.md) §9), otherwise through a gap report ([02](02-work-items.md) §5).
-5. **Stay inside the plan task**: its files, its size budget, its session budget.
+5. **Stay inside the plan task**: its files and its session budget.
 6. **Nobody approves their own work.** Reviews that count are run by CI or given by the owner.
 7. **CI is the definition of done.** Nothing bypasses CI; nobody bypasses branch protection.
 8. **uv only for Python.** No pip, poetry, conda or manual virtual environments.

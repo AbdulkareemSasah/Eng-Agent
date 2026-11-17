@@ -34,7 +34,11 @@ match the implementation's output (tests that assert whatever the code returns).
 
 ## 4. Pull request size
 
-- At most about 400 changed lines of non-test, non-generated code per pull request. Larger work is split by the plan.
+- No limit on changed lines ([ADR-0028](../docs/adr/0028-no-changed-line-limit.md)). A plan task's
+  `max_changed_lines` is an estimate: exceeding it is never a failure, never a reason to stop and never needs a plan
+  amendment. `gate-check` reports the counted lines, the estimate and the largest files as a notice.
+- Reviewers judge whether a pull request is reviewable and may ask for a split as a finding; size alone never blocks.
+- A file outside the task's `files` globs still needs a plan amendment ([01](01-lifecycle.md) §4).
 - One issue per pull request. No unrelated changes ("while I was here" edits are separate pull requests).
 
 ## 5. Python standards

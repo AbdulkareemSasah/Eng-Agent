@@ -27,10 +27,11 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0018](0018-permission-modes.md) | Three permission modes, user-selectable, default work on a copy | Proposed |
 | [0019](0019-host-version-support-policy.md) | Host version support: tested versions only, design for multi-version | Proposed |
 | [0020](0020-dxf-reading-as-mcp-server.md) | DXF reading as its own MCP server | Superseded by ADR-0024 |
-| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026 |
+| [0021](0021-agent-agnostic-ci-enforced-process.md) | A development process that is tool-agnostic and enforced by machines: verifiable gates, separate identities, CI-run reviews, one shared gate | Proposed; amended by ADR-0026 and ADR-0028 |
 | [0022](0022-repository-names.md) | Repository and package names | Proposed; amended by ADR-0024 |
 | [0023](0023-license-apache-2.md) | License: Apache-2.0 | Proposed |
 | [0024](0024-harness-on-existing-sasaah-servers.md) | The harness runs on the existing Sasaah MCP servers and tools; no new host servers are built | Accepted |
 | [0025](0025-first-workflow-edit-cycle.md) | The first workflow is the model edit cycle | Accepted |
 | [0026](0026-project-lane-for-tools.md) | A project lane builds tools during live projects; the release lane runs before reuse | Accepted |
 | [0027](0027-phase-1-interface.md) | Phase 1 interface: command line, HTML approval page and run report | Accepted |
+| [0028](0028-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted |

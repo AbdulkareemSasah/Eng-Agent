@@ -12,6 +12,7 @@ Risk: {{r0 | r1 | r2 | r3}} (from the plan)
 ## Verification
 CI run: {{link}} (the gate, `gate-check`, `risk-floor`, `test-first`, CI reviewers)
 Live acceptance needed before the next release: {{yes, which scripts and host versions / no}}
+Changed lines: {{counted}} (plan estimate `max_changed_lines`: {{n}}; informational)
 
 ## Engineering impact (R1)
 Golden diff report: {{link or "no output change"}} · Verification record: {{link}}
@@ -20,7 +21,7 @@ Golden diff report: {{link or "no output change"}} · Verification record: {{lin
 {{patch / minor / major}} · Changelog entry: {{added / not needed}}
 
 ## Self-review checklist
-- [ ] Only this plan task's change; files within the task's list; within `max_changed_lines`
+- [ ] Only this plan task's change; files within the task's list
 - [ ] First commit is `test:` with tests that fail without the change
 - [ ] Principles P1 to P12 respected; no escape hatches; nothing from the forbidden list
 - [ ] Units, suffixes, bounds and error codes per the contract; neutral kinds for anything crossing packages
