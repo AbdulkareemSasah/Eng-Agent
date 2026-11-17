@@ -242,6 +242,23 @@ def _lines(n: int) -> str:
     return "".join(f"v{i} = {i}\n" for i in range(n))
 
 
+@pytest.mark.parametrize("lines", [0, 9, 10, 11])
+def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+    """AC11: GC009 always reports the count and estimate, including an overestimate diff."""
+    base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+    repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, errors) == (0, {})
+    findings = json.loads(result.out)["steps"][0]["findings"]
+    counted = [f for f in findings if f["code"] == "GC009"]
+    assert len(counted) == 1
+    assert counted[0]["severity"] == "notice"
+    assert counted[0]["path"] is None
+    assert counted[0]["message"] == (
+        f"{lines} counted lines (estimate max_changed_lines 10 of task T1); largest: pkg/src/new.py ({lines})"
+    )
+
+
 def test_budget_counting(repo: Repo) -> None:
     """AC11: additions plus deletions count, except tests, generated and spike files; over the limit is GC009."""
     plan = plan_text(files=("pkg/**", "uv.lock", "spikes/**"), max_changed_lines=10)

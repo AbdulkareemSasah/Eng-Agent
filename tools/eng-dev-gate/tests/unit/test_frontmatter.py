@@ -128,6 +128,12 @@ def test_plan_front_matter_rules() -> None:
     assert len(parse_plan(ok, CAP).tasks) == 3
 
 
+@pytest.mark.parametrize("estimate", [401, 10000])
+def test_task_estimate_above_400_parses(estimate: int) -> None:
+    """AC13: positive line estimates have no upper cap."""
+    assert parse_plan(plan_text(max_changed_lines=estimate), CAP).tasks[0].max_changed_lines == estimate
+
+
 def test_spec_front_matter_rules() -> None:
     """A spec needs id, issue, status, size and risk with valid values."""
     for broken in (
