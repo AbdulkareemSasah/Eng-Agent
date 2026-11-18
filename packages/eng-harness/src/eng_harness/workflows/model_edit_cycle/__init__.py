@@ -7,13 +7,12 @@ Units: the quantity fields carry the canonical unit of their name's suffix (cont
 Errors: `RegistryError` at import for an invalid declaration; the step errors of the ctx calls reach the engine.
 """
 
-from pathlib import Path
 from typing import Any
 
 from eng_contract.refs import Ref
 from pydantic import BaseModel, ConfigDict
 
-from eng_harness.block import FieldSpec, workflow
+from eng_harness.block import FieldSpec, ModelFile, workflow
 from eng_harness.ctx import ModelHandle
 from eng_harness.errors import NotImplementedGap
 from eng_harness.workflows.model_edit_cycle._change_set import (
@@ -99,7 +98,7 @@ class EditCycleInput(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    model: Path
+    model: ModelFile
     visible_host: bool = True
 
 

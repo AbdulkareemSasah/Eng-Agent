@@ -2,8 +2,6 @@
 
 Imports, no `.value` read, no arithmetic, no `while`, no bare `except` (the scan of `test_block_modules.py`), no I/O
 call, and no numeric literal except an integer index, a `len` comparison and the integer `version=` of a declaration.
-One import is a known conflict: `EditCycleInput.model` is a `pathlib.Path` by spec 0007 4.2 (amendment B-536), and
-spec 0001 4.1.2 and the gate's FB004 list `pathlib` among the modules block code never imports.
 """
 
 import ast
@@ -15,7 +13,6 @@ from types import ModuleType
 import eng_harness.workflows.model_edit_cycle as package
 
 FOLDER = Path(package.__file__).resolve().parent
-PATH_IMPORT = "from pathlib import Path"  # the one known exception, see the module docstring
 IO_CALLS = {"open", "input", "print"}
 
 
@@ -57,8 +54,7 @@ def test_modules_follow_block_rules() -> None:
     assert {"__init__.py", "_cycle.py", "_change_set.py", "_points.py"} <= names
     for path in sorted(FOLDER.glob("*.py")):
         source = path.read_text(encoding="utf-8")
-        lines = source.splitlines()
-        found = [p for p in scan(source) if lines[int(p.partition(":")[0]) - 1].strip() != PATH_IMPORT]
+        found = scan(source)
         assert found == [], (path.name, found)
         tree = ast.parse(source)
         assert _literals(tree) == [], path.name

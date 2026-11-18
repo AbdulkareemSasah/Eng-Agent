@@ -3,7 +3,7 @@
 The expected paths, kinds and units are copied from the table of spec 0007 4.8, not from the code under test.
 """
 
-from pathlib import Path
+from pathlib import Path, PurePath
 
 import eng_harness.templates as templates_pkg
 from eng_harness.adapters.csi import csi_allowlist
@@ -54,7 +54,10 @@ def test_workflow_definition() -> None:
     assert model_edit_cycle.always_ask == ("csi_unlock_model",)
     assert model_edit_cycle.copy_on_open is True
     assert model_edit_cycle.input_model is EditCycleInput
-    assert EditCycleInput.model_fields["model"].annotation is Path
+    assert EditCycleInput.model_fields["model"].annotation is PurePath
+    assert EditCycleInput.model_validate_json('{"model": "/no/such/folder/model.EDB"}', strict=True).model.name == (
+        "model.EDB"
+    )
     assert EditCycleInput.model_fields["visible_host"].default is True
 
     shipped = Path(templates_pkg.__file__).resolve().parent / "shipped"

@@ -96,17 +96,6 @@ STOP = object()
 """What a responder returns to end `Stand.play` at the request it was shown; the outcome is then the paused one."""
 
 
-class _Loaded:
-    """A basis port that answers from memory: the store read of `StoreBasisPort` is I/O that the runtime guard refuses
-    when the first `ctx.basis` access comes from block code (finding of B-202, reported to the lead)."""
-
-    def __init__(self, store: ResultStore, basis_ref: str) -> None:
-        self._loaded = StoreBasisPort(store).load(basis_ref)
-
-    def load(self, basis_ref: str) -> Any:
-        return self._loaded
-
-
 @dataclass
 class Stand:
     """One test's workspace, store, fake server control file, ports and engineer."""
@@ -195,7 +184,7 @@ class Stand:
             discover(), settings, labels, clock=self.clock, monotonic=time.monotonic, rule_guard=rule_guard
         )
         bound = EnginePorts(
-            tool=ports.tool_port, host=ports.host_port, calc=calc, basis=_Loaded(self.store, self.basis_ref),
+            tool=ports.tool_port, host=ports.host_port, calc=calc, basis=StoreBasisPort(self.store),
             approvals=self.approvals, inputs=self.inputs, decision=cascade,
         )  # fmt: skip
         return Engine(self.workspace, Registry([flow]), bound, self.store, EngineSettings(), self.clock, self.ids)
