@@ -1,0 +1,53 @@
+"""The edit-cycle workflow modules obey the rules of block code (plan 0007 T8; spec 0007 AC2; spec 0001 4.1.2).
+
+Imports, no `.value` read, no arithmetic, no `while`, no bare `except` (the scan of `test_block_modules.py`), no I/O
+call, and no numeric literal except an integer index, a `len` comparison and the integer `version=` of a declaration.
+One import is a known conflict: `EditCycleInput.model` is a `pathlib.Path` by spec 0007 4.2 (amendment B-536), and
+spec 0001 4.1.2 and the gate's FB004 list `pathlib` among the modules block code never imports.
+"""
+
+import ast
+from pathlib import Path
+
+from rules.test_block_modules import check_source
+
+import eng_harness.workflows.model_edit_cycle as package
+
+FOLDER = Path(package.__file__).resolve().parent
+PATH_IMPORT = "from pathlib import Path"  # the one known exception, see the module docstring
+IO_CALLS = {"open", "input", "print"}
+
+
+def _literals(tree: ast.AST) -> list[int]:
+    """Lines of numeric literals that are neither an index, a `len` comparison nor a `version=` keyword."""
+    allowed: set[int] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Subscript):
+            allowed |= {id(n) for n in ast.walk(node.slice)}
+        if isinstance(node, ast.Compare) and any(
+            isinstance(side, ast.Call) and ast.unparse(side.func) == "len" for side in (node.left, *node.comparators)
+        ):
+            allowed |= {id(n) for n in ast.walk(node)}
+        if isinstance(node, ast.keyword) and node.arg == "version":
+            allowed.add(id(node.value))
+        if isinstance(node, ast.AnnAssign):
+            allowed |= {id(n) for n in ast.walk(node.annotation)}
+    return [
+        n.lineno
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Constant) and type(n.value) in (int, float) and id(n) not in allowed
+    ]
+
+
+def test_modules_follow_block_rules() -> None:
+    names = {p.name for p in FOLDER.glob("*.py")}
+    assert {"__init__.py", "_cycle.py", "_change_set.py", "_points.py"} <= names
+    for path in sorted(FOLDER.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        lines = source.splitlines()
+        found = [p for p in check_source(source) if lines[int(p.partition(":")[0]) - 1].strip() != PATH_IMPORT]
+        assert found == [], (path.name, found)
+        tree = ast.parse(source)
+        assert _literals(tree) == [], path.name
+        calls = {ast.unparse(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
+        assert calls & IO_CALLS == set(), path.name
