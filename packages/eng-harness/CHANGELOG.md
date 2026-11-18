@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calcs `harness.change_set_check` and `harness.expected_effects` take an absent `model.sections/1` (the field `sections` is optional; a supplied record keeps its reference, completeness and single-revision checks): without it a `select` that names `area_kind` is `EMPTY_SELECTION` with the detail that the area kinds were not read, every other rule is unchanged, and a `wall_section` is projected as the two `set` effects of a held section; the two content hashes in `calcs.lock.json` move (plan 0007 T17, B-555; spec 0007 4.4.1, 4.4.2, AC39).
 - D-3 continues only when drift status is `PASS` as well as no error or unclassified message; D-2 accepts the reason `check_model_failed` without an automatic continue. Both edit-cycle rules and the D-2 point move to version 2; D-3 stays at version 1 (plan 0007 T7b, B-556; spec 0007 4.6, AC18, Q20, Q14 interim reading).
 
 - Model keys in previews and promotion: `Preview.models` takes `ModelHandle | str` and `ctx.promote` takes `ModelHandle | str`, a `str` being a model key; one helper (`_approvals.model_key`) answers the key of either for the approval's binding, the models of an inserted preview and the promotion, so block code needs no model id or revision (plan 0001 T23, B-551; spec 0001 4.3.2, 4.9, AC72).

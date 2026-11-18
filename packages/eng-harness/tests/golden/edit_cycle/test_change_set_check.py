@@ -252,6 +252,20 @@ def test_incomplete_record_makes_the_check_incomplete(name: str) -> None:
     assert (body["complete"], body["status"]) == (False, "PASS")
 
 
+def test_absent_sections_leave_the_check_complete_and_incomplete_sections_do_not() -> None:
+    case = load_cases("check")["check-no-sections-other-rules"]
+    assert run_check(case)["complete"] is True
+    assert run_check(case, meta=input_meta(case.refs, frozenset({"diff"})))["complete"] is False
+    full = _case()
+    assert run_check(full, meta=input_meta(full.refs, frozenset({"sections"})))["complete"] is False
+
+
+def test_unread_area_kinds_are_named_only_for_a_selection_with_an_area_kind() -> None:
+    case = load_cases("check")["check-no-sections-area-kind"]
+    body = run_check(case, items=[{"id": "a1", "kind": "area_section", "select": {"story": "L3"}, "section": "S150"}])
+    assert [issue["detail"] for issue in body["issues"]] == ["the selection of item a1 matches no area"]
+
+
 def test_incomplete_difference_report_makes_the_check_incomplete() -> None:
     case = _case()
     body = run_check(case, diff=case.input["diff"] | {"complete": False, "identical": False})

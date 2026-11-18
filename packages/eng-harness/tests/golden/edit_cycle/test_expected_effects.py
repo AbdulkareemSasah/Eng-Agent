@@ -264,6 +264,26 @@ def test_state_records_must_be_one_model_revision(kwargs: dict[str, Any]) -> Non
     _refused(case, "sections", message, meta=meta_for(case.refs, **kwargs))
 
 
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"models": {"loads": OTHER}},
+        {"models": {"restraints": None}},
+        {"revisions": {"restraints": 4}},
+    ],
+)
+def test_state_records_without_sections_must_be_one_model_revision(kwargs: dict[str, Any]) -> None:
+    case = _case("effects-no-sections-wall")
+    message = "the state records must be reads of one host model revision"
+    _refused(case, "loads", message, meta=meta_for(case.refs, **kwargs))
+
+
+def test_sections_supplied_give_a_new_wall_section_as_an_add() -> None:
+    """The record present: a wall section it lacks is an `add` of the row, as before."""
+    case = _case("effects-wall-sections")
+    assert [(e["item_id"], e["op"]) for e in run_effects(case)["effects"]][2:] == [("b2", "add")]
+
+
 @pytest.mark.parametrize("change", [None, {"confirmed": False}, {"value": "thick"}])
 def test_basis_value_must_be_present_confirmed_and_a_number(change: dict[str, Any] | None) -> None:
     case = _case()
