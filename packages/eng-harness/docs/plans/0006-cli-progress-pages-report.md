@@ -492,6 +492,7 @@ tasks:
     # change, no line added. Whichever of this task and plan 0007 T8 merges first adds ModelFile to block.py with
     # test_model_file_is_pure (about 5 lines: budget 143 -> 148, an estimate); the other relies on it. The test is not in
     # this task's tests_first, so the order stays free; this task's own first commit holds it when it adds the alias.
+    # Amendment (B-574, documents only): T14c merged before B-569 with the Path walk (B-528, #429); plan 0007 T8 makes the PurePath switch.
     max_changed_lines: 148
     max_sessions: 1
     tests_first:
