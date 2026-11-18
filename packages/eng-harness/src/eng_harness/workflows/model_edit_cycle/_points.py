@@ -54,6 +54,7 @@ class ReadbackReason(StrEnum):
 
     READBACK = "readback"
     MODEL_CHANGED_DURING_APPLY = "model_changed_during_apply"
+    CHECK_MODEL_FAILED = "check_model_failed"
 
 
 class ReadbackState(BaseModel):
@@ -110,7 +111,7 @@ class TurnState(BaseModel):
 
 @decision_point(
     name="edit_cycle_readback_result",
-    version=1,
+    version=2,
     title="Read-back result of the applied change set",
     options=ReadbackAction,
     state=ReadbackState,
