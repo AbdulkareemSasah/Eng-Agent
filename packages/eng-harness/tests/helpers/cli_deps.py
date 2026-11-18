@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 from workflows.rig import Host
 
 from eng_harness import __version__
-from eng_harness.block import Registry, workflow
+from eng_harness.block import ModelFile, Registry, workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.cli import CliDeps, main
 from eng_harness.cli._config import HarnessConfig
@@ -94,12 +94,13 @@ FILE_FLOW = "file_flow"
 
 
 class FileInput(BaseModel):
-    """The input of the workflow with model files: two `Path` fields and the `visible_host` flag (spec 0006 AC67)."""
+    """Model files, an ordinary path and the visibility flag (spec 0006 AC67)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    model_file: Path
-    other_file: Path | None = None
+    model_file: ModelFile
+    other_file: ModelFile | None = None
+    ordinary_path: Path = Path("notes.txt")
     visible_host: bool = False
 
 
