@@ -2,10 +2,10 @@
 
 - Calc id: `harness.footing_subjects`
 - Version: 1
-- Content hash: `a95883b3249a9660a7cfe1e9b01ccec6c23cb218271df9a5b1d9eab274cb2e5b` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `6023c85a3e67111231ffb12370ae81c5eefed11befba474e74f1a8dc6121d4ff` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
-- Method source: eng-harness spec 0010 section 4.4.1 (rules S1 to S6), acceptance criterion AC6; basis field `compare.angle` read as spec 0003 section 4.4 states (confirmed, unit deg, value >= 0)
-- Constants: five `Cited` angles (0, 90, 180, 270, 360 deg), source "Geometry"; no engineering number. The angle tolerance is the basis field `compare.angle`, never a literal.
+- Method source: eng-harness spec 0010 section 4.4.1 (rules S1 to S6), acceptance criterion AC6; basis field `compare.angle_deg` read as spec 0003 section 4.4 states (confirmed, unit deg, value >= 0)
+- Constants: five `Cited` angles (0, 90, 180, 270, 360 deg), source "Geometry"; no engineering number. The angle tolerance is the basis field `compare.angle_deg`, never a literal.
 
 ## Golden cases
 
@@ -31,7 +31,7 @@ Pending: a subagent that did not write the calc (bootstrap mode), then the owner
 ## Findings and open points for the owner
 
 1. S1 does not say what a "column" with both ends at one height is. This calc gives it no lower end, so it is not counted at any joint (the joint is excluded NO_COLUMN_AT_JOINT if nothing else stands there). Recommend: accept.
-2. S5 does not say what happens when `compare.angle` is large enough for a rotation to be within it of both a along-axis and an across-axis target (any tolerance of 45 deg or more). This calc then excludes the column as COLUMN_ROTATED instead of choosing an orientation. Recommend: accept.
+2. S5 does not say what happens when `compare.angle_deg` is large enough for a rotation to be within it of both a along-axis and an across-axis target (any tolerance of 45 deg or more). This calc then excludes the column as COLUMN_ROTATED instead of choosing an orientation. Recommend: accept.
 3. S3 and S4: a column's section name that is not in the sections is an input error (`INVALID_ARGUMENT`, field `sections`), looked up only for a column that stands alone at a support joint.
 4. Which of `b_mm` and `h_mm` lies along local axis 2 at zero rotation is the CSI convention: local test L2 (`docs/local-testing.md`).
 5. Excluded rows and subjects are sorted by joint name as text, so "J10" precedes "J5". The spec fixes ordering only for subjects (kind validator); the ordering of excluded rows is this calc's choice.

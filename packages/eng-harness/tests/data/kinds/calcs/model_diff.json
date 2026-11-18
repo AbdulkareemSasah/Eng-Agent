@@ -69,7 +69,7 @@
   "not_compared": [],
   "tolerances": {
     "length": {
-      "ref": "res_00000000000000000000000009#/fields/compare.length",
+      "ref": "res_00000000000000000000000009#/fields/compare.length_mm",
       "unit": "mm",
       "value": 1.0
     }
