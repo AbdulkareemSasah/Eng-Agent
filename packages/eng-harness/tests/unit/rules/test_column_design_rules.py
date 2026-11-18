@@ -15,6 +15,12 @@ from pathlib import Path
 import pytest
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
+
+from eng_harness.ctx import BasisView
+from eng_harness.decisions import _points, _rules
+from eng_harness.decisions._points import PointRegistry
+from eng_harness.decisions._rules import RuleRegistry
+from eng_harness.decisions.types import Pick, RuleBasis
 from eng_harness.rules.column_design import map_result_clean, member_fail_matched, member_no_proposal, readback_pass
 from eng_harness.workflows.column_design._points import (
     COLUMN_POLICY,
@@ -32,12 +38,6 @@ from eng_harness.workflows.column_design._points import (
     TurnAction,
     TurnState,
 )
-
-from eng_harness.ctx import BasisView
-from eng_harness.decisions import _points, _rules
-from eng_harness.decisions._points import PointRegistry
-from eng_harness.decisions._rules import RuleRegistry
-from eng_harness.decisions.types import Pick, RuleBasis
 
 _RESULT = "res_01ARZ3NDEKTSV4RRFFQ69G5FAV"
 _BASIS = RuleBasis(BasisView(_RESULT, DesignBasis(template=None, fields={}), ()), ())
