@@ -97,6 +97,7 @@ async def _rig(tmp_path: Path, config: Any, control: Path, store: ResultStore, r
         key = await host.working_copy("m", folder)
         held = await host.locate(key)
         assert held is not None
+        assert held.pid is not None
         port = CsiToolPort(
             binder=Binder(held.pid), reopened=reopened, revisions=Revisions(folder, run_dir / "adapter" / "revs.json"),
             config=config, server="csi", caller=manager, store=store, ledger=WriteLedger(run_dir), clock=clock,

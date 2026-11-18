@@ -73,6 +73,21 @@ class BuildPin(_Model):
     sasaah_commit: str = Field(pattern=r"^[0-9a-f]{40}$")
     exe_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     server_info_version: str | None = None
+    addin_sha256: tuple[Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")], ...] = ()
+    addin_paths: tuple[str, ...] = ()
+
+    @field_validator("addin_paths")
+    @classmethod
+    def _addin_paths_absolute(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        for path in value:
+            _absolute(path)
+        return value
+
+    @model_validator(mode="after")
+    def _addins(self) -> Self:
+        if len(self.addin_sha256) != len(self.addin_paths):
+            raise ValueError("addin_paths and addin_sha256 must have equal lengths")
+        return self
 
 
 class RoleConfig(_Model):
@@ -95,11 +110,19 @@ class ServerConfig(_Model):
     shutdown_grace_s: Seconds = 10  # software setting, s
     build: BuildPin
     host_key: str
+    pipe_name: str | None = None
     product: str  # the host product this server serves (spec 0008 4.1); required, one server section per product
     mcp_mode: str = "legacy"  # spec section 11 Q3
     audit_log: bool = Field(default=True, strict=True)  # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError
     route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), not this loader
     roles: Mapping[str, RoleConfig] = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _revit_product(cls, data: object) -> object:
+        if isinstance(data, dict) and data.get("adapter") == "sasaah-revit-mcp" and "product" not in data:
+            return {**data, "product": "Revit"}
+        return data
 
     @field_validator("command")
     @classmethod
@@ -109,7 +132,7 @@ class ServerConfig(_Model):
     @field_validator("product")
     @classmethod
     def _product_known(cls, value: str) -> str:
-        if value not in KNOWN_PRODUCTS:
+        if value not in (*KNOWN_PRODUCTS, "Revit"):
             raise ValueError(f"unknown product {value!r}; one of {', '.join(KNOWN_PRODUCTS)}")
         return value
 
@@ -146,8 +169,42 @@ class ServerConfig(_Model):
 
     @model_validator(mode="after")
     def _csi_disables_scripts(self) -> Self:
-        if self.adapter == _CSI_ADAPTER and "--disable-script" not in self.args:
-            raise ValueError("args must contain --disable-script")
+        if self.adapter == _CSI_ADAPTER:
+            if "--disable-script" not in self.args:
+                raise ValueError("args must contain --disable-script")
+            if self.product not in KNOWN_PRODUCTS:
+                raise ValueError(f"product: unknown CSI product {self.product!r}; one of {', '.join(KNOWN_PRODUCTS)}")
+        if self.adapter == "sasaah-revit-mcp":
+            if self.product != "Revit":
+                raise ValueError(f"product must be 'Revit', not {self.product!r}")
+            if not self.pipe_name or not self.pipe_name.strip():
+                raise ValueError("pipe_name is required for Revit")
+            if not self.build.addin_paths:
+                raise ValueError("build.addin_paths and build.addin_sha256 are required for Revit")
+            if set(self.roles) != {"read", "write"}:
+                raise ValueError("roles: Revit requires read and write roles")
+            if set(self.roles["read"].classes) != {"session", "call"} or self.roles["write"].classes != ("attended",):
+                raise ValueError("roles: invalid Revit role classes")
+            classes = [item for role in self.roles.values() for item in role.classes]
+            if len(classes) != len(set(classes)):
+                raise ValueError("roles: a timeout class cannot be served twice")
+            if self.toolsets:
+                raise ValueError("toolsets is forbidden for Revit (the allowlist is the filter)")
+            forbidden = {
+                "--enable-send-code",
+                "--enable-adaptive-bake",
+                "--cache-send-code-bodies",
+                "--toolsets",
+                "--pipe-name",
+                "--bridge-timeout-ms",
+                "--disable-send-code",
+                "--disable-adaptive-bake",
+                "--no-cache-send-code-bodies",
+            }
+            if any(arg.split("=", 1)[0] in forbidden for arg in self.args):
+                raise ValueError("args contain an adapter-only or forbidden Revit option")
+            if any(key.upper().startswith("SASAAH_MCP_") for key in self.env):
+                raise ValueError("env: SASAAH_MCP_ variables are adapter-only")
         return self
 
 

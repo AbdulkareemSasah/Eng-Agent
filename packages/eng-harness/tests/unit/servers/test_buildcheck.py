@@ -193,11 +193,23 @@ def test_fingerprint_per_product() -> None:
     assert "SAFE" in wrong.reason
 
 
-def test_addin_hashes() -> None:
-    pin = BuildPin(sasaah_commit=COMMIT, exe_sha256=EXE, addin_paths=("/a.dll",), addin_sha256=("d" * 64,))
-    seen = replace(_observed(), addin_sha256=("d" * 64,))
-    assert check_build("csi", pin, EXPECTED, seen, product="ETABS").ok
-    for hashes in ((), ("e" * 64,), ("d" * 64, "e" * 64)):
-        result = check_build("csi", pin, EXPECTED, replace(seen, addin_sha256=hashes), product="ETABS")
-        assert not result.ok
-        assert result.reason is not None and "add-in" in result.reason
+def test_addin_hashes(tmp_path: Any) -> None:
+    addin1 = tmp_path / "addin1.dll"
+    addin2 = tmp_path / "addin2.dll"
+    addin1.write_bytes(b"addin-one")
+    addin2.write_bytes(b"addin-two")
+    d1 = hashlib.sha256(b"addin-one").hexdigest()
+    d2 = hashlib.sha256(b"addin-two").hexdigest()
+    pin = BuildPin(sasaah_commit=COMMIT, exe_sha256=EXE, addin_paths=(str(addin1), str(addin2)), addin_sha256=(d1, d2))
+    assert check_build("csi", pin, EXPECTED, _observed(), product="ETABS").ok
+    addin2.write_bytes(b"changed")
+    result = check_build("csi", pin, EXPECTED, _observed(), product="ETABS")
+    assert not result.ok
+    assert result.reason is not None
+    assert "add-in" in result.reason
+    addin2.write_bytes(b"addin-two")
+    addin1.unlink()
+    missing = check_build("csi", pin, EXPECTED, _observed(), product="ETABS")
+    assert not missing.ok
+    assert missing.reason is not None
+    assert "add-in" in missing.reason

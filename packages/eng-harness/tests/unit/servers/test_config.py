@@ -332,10 +332,9 @@ def _revit() -> str:
 adapter = "sasaah-revit-mcp"
 command = "/opt/revit/server"
 pipe_name = "bridge"
-product = "Revit"
 client_grace_s = 5
 host_key = "revit"
-build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}", addin_sha256 = ["{SHA}"], addin_paths = ["/opt/revit/addin.dll"] }}
+build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}", addin_sha256 = ["{SHA}"], addin_paths = ["/a.dll"] }}
 [servers.revit.roles.read]
 classes = ["session", "call"]
 call_timeout_s = 10
@@ -347,30 +346,54 @@ call_timeout_s = 90
 
 def test_revit_server_section(tmp_path: Path) -> None:
     server = load_servers_config(_write(tmp_path, _revit())).servers["revit"]
+    assert server.product == "Revit"
     assert server.pipe_name == "bridge"
-    assert server.build.addin_paths == ("/opt/revit/addin.dll",)
+    assert server.build.addin_paths == ("/a.dll",)
     assert server.build.addin_sha256 == (SHA,)
+    assert server.roles["read"].classes == ("session", "call")
     assert server.roles["write"].classes == ("attended",)
-    for before, after in (
-        ('pipe_name = "bridge"', ""),
-        ('addin_paths = ["/opt/revit/addin.dll"]', 'addin_paths = ["relative"]'),
-        ('addin_sha256 = ["' + SHA + '"]', 'addin_sha256 = []'),
-        ('classes = ["attended"]', 'classes = ["call"]'),
-        ('call_timeout_s = 90', ""),
+    for before, after, match in (
+        ('pipe_name = "bridge"', "", "pipe_name"),
+        ('pipe_name = "bridge"', 'pipe_name = "  "', "pipe_name"),
+        ('addin_paths = ["/a.dll"]', 'addin_paths = ["relative"]', "addin_paths"),
+        ('addin_sha256 = ["' + SHA + '"]', "addin_sha256 = []", "addin_paths"),
+        (
+            f'addin_sha256 = ["{SHA}"], addin_paths = ["/a.dll"]',
+            "addin_sha256 = [], addin_paths = []",
+            "addin_paths",
+        ),
+        ('classes = ["attended"]', 'classes = ["call"]', "roles"),
+        ('classes = ["session", "call"]', 'classes = ["session", "call", "call"]', "roles"),
+        ("call_timeout_s = 90", "", "call_timeout_s"),
+        ("call_timeout_s = 10", "", "call_timeout_s"),
+        ("client_grace_s = 5", "", "client_grace_s"),
+        ('host_key = "revit"', 'host_key = "revit"\nproduct = "ETABS"', "product"),
+        ('[servers.revit.roles.write]\nclasses = ["attended"]\ncall_timeout_s = 90', "", "roles"),
     ):
-        with pytest.raises(ConfigError):
+        with pytest.raises(ConfigError, match=match):
             load_servers_config(_write(tmp_path, _revit().replace(before, after)))
+    with pytest.raises(ConfigError, match="product"):
+        load_servers_config(_write(tmp_path, _minimal(extra='product = "Revit"').replace('product = "ETABS"\n', "")))
 
 
 def test_revit_forbidden_options(tmp_path: Path) -> None:
     load_servers_config(_write(tmp_path, _revit()))
-    for extra in (
-        'args = ["--enable-send-code"]',
-        'args = ["--enable-adaptive-bake"]',
-        'args = ["--cache-send-code-bodies"]',
-        'args = ["--toolsets=all"]',
-        'args = ["--read-only"]',
-        'env = { SASAAH_MCP_TEST = "1" }',
+    for extra, match in (
+        ('args = ["--enable-send-code"]', "args"),
+        ('args = ["--enable-adaptive-bake"]', "args"),
+        ('args = ["--cache-send-code-bodies"]', "args"),
+        ('args = ["--toolsets=all"]', "args"),
+        ('args = ["--toolsets", "all"]', "args"),
+        ('args = ["--pipe-name", "p"]', "args"),
+        ('args = ["--bridge-timeout-ms", "1000"]', "args"),
+        ('args = ["--disable-send-code"]', "args"),
+        ('args = ["--disable-adaptive-bake"]', "args"),
+        ('args = ["--no-cache-send-code-bodies"]', "args"),
+        ('args = ["--read-only"]', "args"),
+        ('toolsets = ["destructive"]', "toolsets"),
+        ('env = { SASAAH_MCP_TEST = "1" }', "SASAAH_MCP_"),
+        ('env = { sasaah_mcp_test = "1" }', "SASAAH_MCP_"),
     ):
-        with pytest.raises(ConfigError):
-            load_servers_config(_write(tmp_path, _revit().replace('host_key = "revit"', 'host_key = "revit"\n' + extra)))
+        text = _revit().replace('host_key = "revit"', 'host_key = "revit"\n' + extra)
+        with pytest.raises(ConfigError, match=match):
+            load_servers_config(_write(tmp_path, text))

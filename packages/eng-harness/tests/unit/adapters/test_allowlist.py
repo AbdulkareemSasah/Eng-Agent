@@ -7,9 +7,11 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from eng_harness.adapters import Allowlist, AllowlistError, ToolDescriptor, load_allowlist
 from eng_harness.adapters.csi import csi_allowlist
+from eng_harness.ports import HostInstance, ToolInfo
 
 COMMIT = "a" * 40
 SHA = "b" * 64
@@ -422,12 +424,41 @@ def test_attended_class_and_deny_names() -> None:
     tool = _load(_tool(timeout_class="attended", confirm="host_dialog")).tools[0]
     assert (tool.timeout_class, tool.confirm) == ("attended", "host_dialog")
     names = (
-        "send_code_to_revit", "compile_and_run", "dev_hot_run", "dev_hot_unload", "dev_hot_sessions",
-        "run_baked_tool", "list_baked_tools", "list_bake_suggestions", "accept_bake_suggestion",
-        "dismiss_bake_suggestion", "batch_execute", "run_synapse_command", "shutdown_bridge", "authenticate",
-        "prepare_destructive", "switch_target", "get_change_records", "record_change",
+        "send_code_to_revit",
+        "compile_and_run",
+        "dev_hot_run",
+        "dev_hot_unload",
+        "dev_hot_sessions",
+        "run_baked_tool",
+        "list_baked_tools",
+        "list_bake_suggestions",
+        "accept_bake_suggestion",
+        "dismiss_bake_suggestion",
+        "batch_execute",
+        "run_synapse_command",
+        "shutdown_bridge",
+        "authenticate",
+        "prepare_destructive",
+        "switch_target",
+        "get_change_records",
+        "record_change",
     )
     for name in names:
         for prefix in ("", "revit_"):
             with pytest.raises(AllowlistError, match=prefix + name):
                 _load(_tool(name=prefix + name))
+
+
+def test_ports_revit_extensions() -> None:
+    """`ToolInfo.attended` defaults to False and `HostInstance.pid` is optional (plan 0011 T1)."""
+    plain = ToolInfo(name="revit_list_levels", effect="read", action="plain", host_key="revit")
+    attended = ToolInfo(
+        name="revit_change_element_type", effect="write", action="plain", host_key="revit", attended=True
+    )
+    assert plain.attended is False
+    assert attended.attended is True
+    ts = "2026-01-01T00:00:00.000Z"
+    assert HostInstance(instance_id="pipe", process_started_at=ts, program="revit").pid is None
+    assert HostInstance(instance_id="pipe", pid=1, process_started_at=ts, program="revit").pid == 1
+    with pytest.raises(ValidationError):
+        HostInstance(instance_id="pipe", pid=0, process_started_at=ts, program="revit")
