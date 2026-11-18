@@ -329,3 +329,26 @@ def test_unit_header_missing_on_unserved_tool() -> None:
     assert loaded.tool_names == frozenset({"csi_list_frames"})
     with pytest.raises(KeyError, match="host_set_loads"):
         loaded.descriptor("host_set_loads")
+
+
+HEADER_PRODUCTS = (
+    f'adapter = "test-adapter"\nsasaah_commit = "{COMMIT}"\nalso_tested_commits = []\n'
+    f'fingerprint = {{ ETABS = "{SHA}", SAFE = "{"c" * 64}" }}\nfingerprint_source = "s12-inventory"\n'
+)
+
+
+def test_tool_not_served_for_product() -> None:
+    """AC3: loaded for a product, only the entries that list it are served; the others are not on the allowlist."""
+    both = _tool(name="csi_list_frames", products=["ETABS", "SAFE"])
+    etabs_only = _tool(name="csi_results_story_drifts", products=["ETABS"])
+    text = _text(both, etabs_only, header=HEADER_PRODUCTS)
+    safe = load_allowlist(text, "test.toml", product="SAFE")
+    assert [tool.name for tool in safe.tools] == ["csi_list_frames"]
+    assert safe.tool_names == frozenset({"csi_list_frames"})
+    with pytest.raises(KeyError, match="csi_results_story_drifts"):
+        safe.descriptor("csi_results_story_drifts")
+    etabs = load_allowlist(text, "test.toml", product="ETABS")
+    assert etabs.tool_names == frozenset({"csi_list_frames", "csi_results_story_drifts"})
+    assert (etabs.tool_fingerprint, safe.tool_fingerprint) == (SHA, "c" * 64)
+    assert etabs.build_expectation().product == "ETABS"
+    assert safe.build_expectation().product == "SAFE"
