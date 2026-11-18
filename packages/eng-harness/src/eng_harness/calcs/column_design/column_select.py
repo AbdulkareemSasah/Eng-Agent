@@ -6,13 +6,15 @@ it is excluded `NOT_VERTICAL`; each column carries its section shape, material, 
 `kind` is not used (the CSI reader gives `other`, spec 0013 C3). Unknown names are error issues.
 Units: lengths in mm. The tolerance test is exact (`Fraction` of the stored values); `length_mm` is for display.
 Errors: `ContractError` `INVALID_ARGUMENT` for a basis field that is missing, unconfirmed, not a number or negative
-(`field` names it), and for a column whose section is not in the sections or that has no story.
+(`field` names it), for a column whose section is not in the sections or that has no story, and for an unrepresentable
+column length (`field="frames"`).
 """
 
 import math
 from fractions import Fraction
 from typing import Annotated, Literal, Self
 
+from eng_contract.cited import Cited
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.kinds.model import Circular, Frame, FramePlacements, FrameSection, Rectangular, Sections
@@ -28,6 +30,7 @@ __all__ = ["BASIS_FIELDS", "ColumnScope", "SelectBody", "SelectInput", "column_s
 _LENGTH = "compare.length_mm"
 BASIS_FIELDS = (_LENGTH,)
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
+_RADIX = Cited(value=2, unit="1", source="IEEE 754 binary64 radix for even-power-of-two scaling before sqrt")
 _Names = Annotated[list[Label], Field(min_length=NONEMPTY)]
 _Issue = Literal["UNKNOWN_FRAME", "UNKNOWN_STORY", "UNKNOWN_SECTION"]
 
@@ -131,9 +134,17 @@ def plan_distance_sq(frame: Frame) -> Fraction:
 
 
 def length_mm(frame: Frame) -> float:
-    """L3: the distance between the ends, from the exact squared distance, as a display float (0003 P2)."""
+    """L3: distance between ends from exact squared distance, scaled by 2^(2k) for display float (0003 P2)."""
     dz = Fraction(frame.j.z_mm) - Fraction(frame.i.z_mm)
-    return math.sqrt(plan_distance_sq(frame) + dz * dz)
+    d_sq = plan_distance_sq(frame) + dz * dz
+    radix = int(_RADIX.value)
+    half_shift = (d_sq.numerator.bit_length() - d_sq.denominator.bit_length()) // radix
+    scaled = d_sq * (Fraction(radix) ** (-(radix * half_shift)))
+    try:
+        return math.ldexp(math.sqrt(float(scaled)), half_shift)
+    except OverflowError as exc:
+        message = f"length of column {frame.id} exceeds representable float range"
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, message, field="frames") from exc
 
 
 def _shape(section: FrameSection) -> Literal["rectangular", "circular", "other"]:
