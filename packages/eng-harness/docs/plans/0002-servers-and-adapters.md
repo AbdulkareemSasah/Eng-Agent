@@ -568,7 +568,7 @@ tasks:
       - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
       - "packages/eng-harness/tests/unit/test_journal_events.py"
     max_changed_lines: 380
-    max_sessions: 3
+    max_sessions: 4  # amendment B-563: one additional writer session (was 3)
     tests_first:
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py::test_cycle_steps"
       - "packages/eng-harness/tests/replay/test_csi_resume.py::test_crash_matrix"
@@ -1026,6 +1026,10 @@ is handed off to the copy without a spurious original content check or a repeate
 existing engineer decision for unreconciled or unknown outcomes, and the existing host-state baseline choice for
 an applied save without read-back evidence when required (AC36). Add these regressions in the implementation
 commits. Keep the `tests_first` list and its existing first commit.
+
+**Session budget (B-563).** The first implementation, the environment handoff and resume, and the isolated
+stale CSI process identity fix used all three B-138 writer sessions before the owner paused the build. One
+additional writer session may complete the work already scoped by B-562 after the owner resumes the build.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
 routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`
