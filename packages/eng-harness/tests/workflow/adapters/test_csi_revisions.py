@@ -437,3 +437,25 @@ def test_record_is_written_through_a_temporary_file_in_new_folders(
     revisions.snapshot(work, revisions.target(work))
     assert swaps == [("revisions.json.tmp", "revisions.json")]
     assert sorted(p.name for p in record.parent.iterdir()) == ["revisions.json"]
+
+
+def test_only_the_pathless_original_open_changes_no_model_content(
+    make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+) -> None:
+    """AC52 (B-562): the descriptor guarantees unchanged content only for `csi_open_model` without `path`."""
+    _seeded(control)
+
+    async def body(port: Any, recorder: Any, pid: int, manager: ServerManager) -> None:
+        opening = await port.describe("csi_open_model")
+        assert (opening.effect, opening.action) == ("write", "open")  # the write effect and open action stay
+        assert opening.opens_model_without_writing({"model": "m"}) is True
+        assert opening.opens_model_without_writing({"model": "m", "path": "x.EDB"}) is False
+        assert opening.opens_model_without_writing({"model": "m", "path": None}) is False
+        revision = await port.describe("csi_open_revision")
+        assert revision.opens_model_without_writing({"model": "m", "revision": "x"}) is False
+        assert revision.opens_model_without_writing({"model": "m"}) is False
+        for tool in ("csi_save_model", "csi_assign_frame_section", "csi_read_model_state"):
+            assert (await port.describe(tool)).opens_model_without_writing({"model": "m"}) is False, tool
+        assert recorder.sent == []
+
+    run_port(make_config(), run_dir, store, body, revisions=_revisions(run_dir))
