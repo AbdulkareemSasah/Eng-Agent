@@ -1,6 +1,10 @@
 """Production CSI wiring contracts (plan 0002 T19a; AC41, AC43 to AC45)."""
 
+import hashlib
 import json
+import shutil
+import stat
+import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -10,18 +14,47 @@ import pytest
 from eng_contract.envelope import SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode, Precondition, WarningCode
 from eng_contract.refs import RefRule, resolve_ref
-from fakes.sasaah_csi.wiring import config, rig
+from fakes.sasaah_csi.wiring import Rig, config, rig
 
 from eng_harness.adapters import AllowlistError, load_allowlist
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.csi import csi_allowlist
-from eng_harness.errors import NotImplementedGap
-from eng_harness.servers import CallEffect
+from eng_harness.servers import CallEffect, ServersConfig
+
+CLI_FAKES = Path(__file__).resolve().parents[1] / "fakes" / "sasaah_cli"
+CLI_OP = "op_0123456789abcdef0123456789abcdef"
 
 
 async def opened(r: Any, p: Any) -> None:
     result = await p.tool_port.call("csi_open_model", {"model": "m"}, op_id="open", model="m")
     assert isinstance(result, SuccessEnvelope), result
+
+
+def with_cli_tools(r: Rig, root: Path, **release: Any) -> ServersConfig:
+    """The CSI configuration of `r` plus three `[cli_tools.*]` entries over the Python stand-ins of the scripts."""
+    tools = root / "cli-tools"
+    shutil.copytree(CLI_FAKES, tools)
+    shell = root / "pwsh"  # takes the PowerShell switches and runs the script in Python
+    shell.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{tools / "pwsh.py"}" "$@"\n')
+    shell.chmod(shell.stat().st_mode | stat.S_IXUSR)
+    artifact = root / "prep.exe"
+    artifact.write_bytes(b"cached-cli-v1")
+    pin = {"path": str(artifact), "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()}
+
+    def entry(script: str, output: str) -> dict[str, Any]:
+        return {
+            "shell": str(shell), "script": str(tools / script), "outputs": [output], "timeout_s": 20,
+            "build_artifacts": [pin],
+        }  # fmt: skip
+
+    entries = {
+        "dxf-prep/prepare": entry("run_prepare.py", "prepared.json"),
+        "dxf-prep/inspect": entry("run_inspect.py", "inspection.json"),
+        "etabs-model/build": entry("run_build.py", "model.json") | release,
+    }
+    return config(r.control).model_copy(
+        update={"cli_tools": ServersConfig.model_validate({"cli_tools": entries}).cli_tools}
+    )
 
 
 def test_allowlist_loaded_for_route(tmp_path: Path) -> None:
@@ -46,15 +79,30 @@ def test_allowlist_loaded_for_route(tmp_path: Path) -> None:
         csi_allowlist("left")
 
 
-def test_cli_tools_not_wired_gap(tmp_path: Path) -> None:
+def test_cli_tool_routed_through_build_ports(tmp_path: Path) -> None:
+    """AC43: a `[cli_tools.*]` entry is served by the command-line adapter, a CSI tool still by the CSI one."""
     r = rig(tmp_path)
-    cfg = config(r.control).model_copy(update={"cli_tools": {"prepare": object(), "build": object()}})
-    with pytest.raises(NotImplementedGap) as error:
-        r.ports(config=cfg)
-    assert error.value.code.value == "NOT_IMPLEMENTED"
-    assert all(word in str(error.value) for word in ("H-G8", "prepare", "build"))
-    assert not r.run_dir.exists()
-    assert r.calls("csi_launch") == []
+    cfg = with_cli_tools(r, tmp_path)
+    dxf = tmp_path / "plan.dxf"
+    dxf.write_bytes(b"0\nSECTION\n")
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            prepare = await p.tool_port.describe("dxf-prep/prepare")
+            assert (prepare.effect, prepare.action, prepare.host_key) == ("read", "plain", "dxf-prep")
+            assert prepare.engineering_params == ("SnapTol_mm", "BeamSpacing_mm", "ColumnGrow_mm")
+            build = await p.tool_port.describe("etabs-model/build")
+            assert (build.effect, build.host_key) == ("write", "etabs-model")
+            assert (await p.tool_port.describe("csi_open_model")).host_key == "csi"
+            args = {"dxf": str(dxf), "SnapTol_mm": r.value("SnapTol_mm", 5.0)}
+            done = await p.tool_port.call("dxf-prep/prepare", args, op_id=CLI_OP, model=None)
+            assert isinstance(done, SuccessEnvelope), done
+            assert done.kind == "harness.cli_run/1"
+            echoed = json.loads((r.run_dir / "tools" / CLI_OP / "prepared.json").read_text())["args"]
+            assert echoed == {"OutDir": str(r.run_dir / "tools" / CLI_OP), "Dxf": str(dxf), "SnapTol": "0.005"}
+            await opened(r, p)  # the CSI tools are served as before
+
+    anyio.run(body)
 
 
 def test_binder_from_host_port(tmp_path: Path) -> None:
