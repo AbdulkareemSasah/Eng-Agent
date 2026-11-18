@@ -21,6 +21,8 @@ STEMS = [
     "check-item-id-refused-kind",
     "check-item-id-slash",
     "check-item-id-token",
+    "check-no-sections-area-kind",
+    "check-no-sections-other-rules",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -44,6 +46,15 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_check(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_sections_absent() -> None:
+    """AC39: no `model.sections/1`; a selection with `area_kind` is EMPTY_SELECTION, the rest as before."""
+    cases = {stem: case for stem, case in load_cases("check").items() if stem.startswith("check-no-sections-")}
+    assert sorted(cases) == ["check-no-sections-area-kind", "check-no-sections-other-rules"]
+    for stem, case in cases.items():
+        assert ("sections" in case.input, "sections" in case.refs) == (False, False), stem
+        assert run_check(case) == case.expected, stem
 
 
 def test_golden_bodies_are_valid_payloads() -> None:
@@ -239,6 +250,20 @@ def test_incomplete_record_makes_the_check_incomplete(name: str) -> None:
     case = _case()
     body = run_check(case, meta=input_meta(case.refs, frozenset({name})))
     assert (body["complete"], body["status"]) == (False, "PASS")
+
+
+def test_absent_sections_leave_the_check_complete_and_incomplete_sections_do_not() -> None:
+    case = load_cases("check")["check-no-sections-other-rules"]
+    assert run_check(case)["complete"] is True
+    assert run_check(case, meta=input_meta(case.refs, frozenset({"diff"})))["complete"] is False
+    full = _case()
+    assert run_check(full, meta=input_meta(full.refs, frozenset({"sections"})))["complete"] is False
+
+
+def test_unread_area_kinds_are_named_only_for_a_selection_with_an_area_kind() -> None:
+    case = load_cases("check")["check-no-sections-area-kind"]
+    body = run_check(case, items=[{"id": "a1", "kind": "area_section", "select": {"story": "L3"}, "section": "S150"}])
+    assert [issue["detail"] for issue in body["issues"]] == ["the selection of item a1 matches no area"]
 
 
 def test_incomplete_difference_report_makes_the_check_incomplete() -> None:
