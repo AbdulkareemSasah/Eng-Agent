@@ -2,15 +2,18 @@
 
 import json
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from helpers.cli_deps import (
+    FILE_FLOW,
     REGISTRY,
     WORKFLOW,
+    FakeInput,
+    FakeOutput,
     Placeholder,
     Rig,
     Script,
@@ -21,10 +24,12 @@ from helpers.cli_deps import (
     completes,
 )
 
+from eng_harness.block import Registry, workflow
 from eng_harness.cli import CliDeps, ExitCode
 from eng_harness.cli._wiring import RunPortSet, default_engine_factory
+from eng_harness.ctx import Preview, PreviewItem
 from eng_harness.engine import Engine, EngineSettings, PermissionMode, RunOutcome, RunStatus
-from eng_harness.errors import HarnessCode, JournalIntegrityError, RunLocked, RunRefused
+from eng_harness.errors import HarnessCode, JournalIntegrityError, NotImplementedGap, RunLocked, RunRefused
 from eng_harness.journal import EventType, JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, HostPort, InputPort, RunClass, ToolPort
@@ -215,3 +220,91 @@ def test_report_that_cannot_be_built_is_a_warning(tmp_path: Path) -> None:
     assert json.loads(rig.out.getvalue())["report"] is None
     assert "eng-harness: the report was not written: " in rig.err.getvalue()
     assert not (rig.runs / rig.run_ids()[0] / "report").exists()
+
+
+REAL_FLOW = "real_flow"
+
+
+@workflow(name=REAL_FLOW, version=1, description="A workflow with one approval, for the real engine.")
+async def real_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+    """One approval of one item, then done."""
+    preview = Preview(items=(PreviewItem(id="i1", label="One change", refs=()),), diff_ref=None, models=())
+    await ctx.approve("Apply the change", preview)
+    return FakeOutput()
+
+
+def test_page_ports_wait_unless_no_wait_real_engine(tmp_path: Path) -> None:
+    """The merged engine asks `answer(wait=False)`; the process wait mode is the command's (spec 4.4.5 step 2)."""
+    rig = Rig(tmp_path / "waits", real_engine=True)
+    rig.open_with = approving_opener(rig, current=lambda: rig.shown[-1] if rig.shown else None)
+    registry = Registry([real_flow])
+    argv = ["run", REAL_FLOW, "--no-report", "--progress", "off", "--json"]
+    assert rig.main(*argv, workflow_registry=registry) == ExitCode.OK  # answered on the page: the run waited for it
+    [run_id] = rig.run_ids()
+    events = _events(rig, run_id)
+    assert events[-1].type is EventType.RUN_COMPLETED
+    assert [e.payload.by for e in events if isinstance(e.payload, ev.ApprovalResolved)] == ["engineer:ada"]
+    assert len(rig.opened) == 1
+
+    other = Rig(tmp_path / "no_wait", real_engine=True)
+    assert other.main(*argv, "--no-wait", workflow_registry=registry) == ExitCode.AWAITING_ENGINEER  # at once
+    [paused_id] = other.run_ids()
+    assert other.opened == []  # no page was served
+    assert _events(other, paused_id)[-1].payload == ev.RunPaused(
+        reason="awaiting_approval", request_ids=[json.loads(other.out.getvalue())["pending"][0]["request_id"]]
+    )
+
+
+def test_model_files_reach_the_port_builder(tmp_path: Path) -> None:
+    rig = Rig(tmp_path / "ok", script=approves(wait=False))
+    model = tmp_path / "models" / "plan.edb"
+    model.parent.mkdir()
+    model.write_bytes(b"x")
+    given = rig.input_file(json.dumps({"model_file": str(model), "visible_host": True}))
+    argv = ["--no-wait", "--no-report", "--progress", "off"]
+    assert rig.main("run", FILE_FLOW, "--input", given, *argv) == ExitCode.AWAITING_ENGINEER
+    assert rig.models == [({"plan.edb": model}, True)]  # the base name maps to the field's value; `visible_host` too
+    [run_id] = rig.run_ids()
+    model.unlink()  # a moved original is passed on unchecked at resume (spec 4.2.2 step 2)
+    assert rig.main("resume", run_id, *argv) == ExitCode.AWAITING_ENGINEER
+    assert rig.models[1] == ({"plan.edb": model}, True)  # from the run's stored input
+    plain = Rig(tmp_path / "plain")
+    assert plain.main("run", WORKFLOW, *argv) == ExitCode.OK
+    assert plain.models == [({}, False)]  # no model file and no `visible_host` field
+
+    other = tmp_path / "other" / "plan.edb"
+    other.parent.mkdir()
+    other.write_bytes(b"y")
+    absent = tmp_path / "absent.edb"
+    for name, values, text in [
+        ("relative", {"model_file": "plan.edb"}, "plan.edb is not an absolute path"),
+        ("missing", {"model_file": str(absent)}, f"{absent} is not an existing file"),
+        ("repeated", {"model_file": str(model.parent / "plan.edb"), "other_file": str(other)}, "same base name"),
+    ]:
+        model.write_bytes(b"x")
+        refused = Rig(tmp_path / name)
+        assert refused.main("run", FILE_FLOW, "--input", refused.input_file(json.dumps(values))) == ExitCode.USAGE, name
+        assert text in refused.err.getvalue(), (name, refused.err.getvalue())
+        assert (refused.run_ids(), refused.built, refused.engines) == ([], [], []), name
+
+
+def test_port_builder_gap_exits_2(tmp_path: Path) -> None:
+    message = "H-G8: CLI tools are not wired: sasaah-cli"
+
+    def gap(_: Path) -> None:
+        raise NotImplementedGap(message)
+
+    rig = Rig(tmp_path, on_build=gap)
+    assert rig.main("run", WORKFLOW, "--no-report") == ExitCode.USAGE  # returned by the command itself
+    assert f"eng-harness: {message}\n" in rig.err.getvalue()
+    assert (rig.run_ids(), rig.engines, rig.log, rig.out.getvalue()) == ([], [], [], "")
+
+    paused = Rig(tmp_path / "resume", script=approves(wait=False))
+    assert paused.main("run", WORKFLOW, "--no-wait", "--no-report") == ExitCode.AWAITING_ENGINEER
+    [run_id] = paused.run_ids()
+    before = _events(paused, run_id)
+    paused.on_build = gap
+    paused.err.truncate(0)
+    assert paused.main("resume", run_id, "--no-report") == ExitCode.USAGE
+    assert f"eng-harness: {message}\n" in paused.err.getvalue()
+    assert _events(paused, run_id) == before  # nothing was journaled

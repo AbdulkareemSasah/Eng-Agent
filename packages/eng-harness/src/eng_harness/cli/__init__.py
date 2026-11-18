@@ -64,7 +64,17 @@ class RunCalcPort(CalcPort, Protocol):
         ...
 
 
-type PortBuilder = Callable[[HarnessConfig, Workspace, ResultStore, Callable[[], Path], Clock, IdSource], RunPorts]
+class PortBuilder(Protocol):
+    """Builds the tool and host ports of a run, given the input's model files and `visible_host` (spec 4.2.2 step 2)."""
+
+    def __call__(
+        self, config: HarnessConfig, workspace: Workspace, store: ResultStore, run_folder: Callable[[], Path],
+        clock: Clock, ids: IdSource, *, files: Mapping[str, Path], visible: bool,
+    ) -> RunPorts:  # fmt: skip
+        """The ports, not yet entered."""
+        ...
+
+
 type CalcPortFactory = Callable[[HarnessConfig, Workspace, ResultStore, RunClass, Clock, IdSource], RunCalcPort]
 
 
