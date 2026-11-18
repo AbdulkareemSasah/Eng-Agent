@@ -704,6 +704,32 @@ tasks:
       - "tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_task_estimate_above_400_parses"
     covers: [AC11, AC13]
     depends_on: [T4, T13, T14, T15, T16, T38]
+  - id: T41
+    title: "gate-check: a test file or CHANGELOG.md outside the task files is a GC008 notice (collateral edit); AGENTS.md and hub copies"
+    # Amendment (B-565, documents only): owner decision of 2026-11-18, ADR-0036 (hub ADR-0036): a test file or the package
+    # CHANGELOG.md outside the task's files is a collateral edit and gives a GC008 notice; a non-test source file outside
+    # them stays a GC008 error; max_sessions is an estimate. The template, AGENTS.md and design/ files are here because
+    # gate-check refuses them beside a spec or plan (GC010) and the template needs its renders (AG003).
+    files:
+      - "tools/eng-dev-gate/CHANGELOG.md"
+      - "tools/eng-dev-gate/src/eng_dev_gate/checks/gate_check.py"
+      - ".gate/agents.yml"
+      - "*/*/.gate/agents.yml"
+      - "AGENTS.md"
+      - "*/*/AGENTS.md"
+      - "design/00-OVERVIEW-AR.md"
+      - "design/docs/adr/README.md"
+      - "design/docs/adr/0035-no-changed-line-limit.md"
+      - "design/docs/adr/0036-*.md"
+      - "design/process/**"
+      - "tools/eng-dev-gate/tests/**"
+    max_changed_lines: 120
+    max_sessions: 1
+    tests_first:
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_collateral_test_and_changelog_edits_are_notices"
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_non_test_source_outside_globs_is_still_gc008_error"
+    covers: [AC10, AC10d]
+    depends_on: [T14, T40]
 ---
 
 # Implementation plan: eng-dev-gate 0.1
@@ -801,6 +827,16 @@ text of that decision, the AGENTS template included, re-renders every `AGENTS.md
 (each `.gate/agents.yml` takes the new `template-version`; the gate's own purpose line drops "diff budget"), and drops
 the `max_changed_lines` box of `.github/pull_request_template.md`. T40 is judged by the gate of its base, where GC009
 still fails above 260.
+
+Amendment (B-565): T41 follows the owner's decision of 2026-11-18
+([ADR-0036](../../../../design/docs/adr/0036-collateral-test-edits-and-session-estimate.md)): in the scope check of
+`gate_check.py`, a changed path outside the task's globs that is a test file (`test_globs`) or the `CHANGELOG.md` of a
+workspace member or of the plan's package folder is reported as GC008 with severity notice and a message that names it
+a collateral edit; any other path outside the globs stays a GC008 error (AC10d). The same pull request brings `design/`
+to the hub text of that decision, the AGENTS template included, re-renders every `AGENTS.md` with
+`eng-gate agents render --all` (each `.gate/agents.yml` takes the new `template-version`), and `max_sessions` is an
+estimate throughout. T41 is judged by the gate of its base, where such a path is still a GC008 error: its own test and
+CHANGELOG edits are inside its `files`.
 
 **T12** adds the `imports` check with the layer, public module, declared dependency, Sasaah, third-party and cycle rules.
 
