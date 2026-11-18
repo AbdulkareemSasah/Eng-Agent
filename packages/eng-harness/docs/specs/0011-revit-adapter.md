@@ -232,8 +232,8 @@ the real ports of this adapter against the synthetic fake.
   package. Tests: `tests/contract/test_revit_allowlist.py::test_fake_schemas_match_inventory`,
   `tests/unit/test_package_contents.py::test_revit_fake_not_shipped` (new; the CSI test of plan 0002 T4 is not changed).
 - AC31. Given recordings, then record mode drops model titles and paths and the adapter's contract tests pass on them;
-  the tests run on every recording committed under `acceptance/recordings` and on the synthetic recording of record
-  mode; the real server is verified only once the owner commits a recording (spec §12 item L15; amendment B-573).
+  the tests run on every applicable committed recording under `acceptance/recordings` and on a synthetic recording for
+  that adapter; the real server is verified only once the owner commits a recording (spec §12 item L15; amendment B-573).
   Tests: `tests/unit/servers/test_record.py::test_revit_sanitized`,
   `tests/contract/test_revit_recordings.py::test_adapter_on_recordings`.
 - AC32. Given `eng-harness doctor` with a `[servers.revit]` section, then it reports the configured pipe and whether the

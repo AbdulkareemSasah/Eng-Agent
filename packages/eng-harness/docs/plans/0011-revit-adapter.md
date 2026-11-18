@@ -385,9 +385,9 @@ basis fields (`compare.length_mm`, `mapping.offset_*`), exact arithmetic, the ou
 (draft), and golden cases derived by hand and written in each file's `derivation` field.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the
-sanitizer test, the recorded-reply contract tests (run on every recording committed under `acceptance/recordings` and
-on the synthetic recording of record mode; verified against the real server only once the owner commits recordings,
-spec §12 item L15; amendment B-573), and the record script for the owner's local run.
+sanitizer test, the recorded-reply contract tests (run on every applicable committed recording under
+`acceptance/recordings` and on a synthetic recording for that adapter; verified against the real server only once the
+owner commits recordings, spec §12 item L15; amendment B-573), and the record script for the owner's local run.
 
 **T14 Doctor** (AC32). The Revit checks as a `CheckProvider`: pipe and bridge, hashes, destructive toolset, Revit
 version, open document base name, and the warning when the `write` role's `call_timeout_s` is not above the add-in

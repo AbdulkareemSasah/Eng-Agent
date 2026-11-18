@@ -320,8 +320,8 @@ B-418). AC25's parametrized cases include SG-8, which T6 already raises and whic
 acceptable because the test-first gate counts the test red while any case fails.
 
 **T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the
-crash matrix at each write step, the recorded-reply contract tests (run on every recording committed under
-`acceptance/recordings` and on the synthetic recording of record mode; verified against the real server only once the
+crash matrix at each write step, the recorded-reply contract tests (run on every applicable committed recording under
+`acceptance/recordings` and on a synthetic recording for that adapter; verified against the real server only once the
 owner commits SAFE recordings, spec §12 item L14; amendment B-573), the record script gaining a SAFE scenario, and the
 SAFE part of `docs/local-testing.md` (spec §12 L1 to L15).
 

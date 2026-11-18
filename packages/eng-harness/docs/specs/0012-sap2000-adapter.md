@@ -151,8 +151,8 @@ the real `ToolPort` and `HostPort` against it.
   `tests/replay/test_sap2000_resume.py::test_crash_matrix`.
 - AC19. Given SAP2000 recordings, the adapter's contract tests pass on them and the synthetic fake gives the same reply
   shape and error codes for every recorded operation; the fake's SAP2000 tool schemas equal the S-12 inventory. The
-  tests run on every recording committed under `acceptance/recordings` and on the synthetic recording of record mode;
-  the real server is verified only once the owner commits a recording (spec §12 item L4; amendment B-573). Tests:
+  tests run on every applicable committed recording under `acceptance/recordings` and on a synthetic recording for that
+  adapter; the real server is verified only once the owner commits a recording (spec §12 item L9; amendment B-573). Tests:
   `tests/contract/test_csi_recordings.py::test_sap2000_adapter_on_recordings`,
   `::test_sap2000_synthetic_matches_recordings`, `tests/contract/test_csi_allowlist.py::test_sap2000_fake_schemas_match_inventory`.
 
@@ -335,3 +335,5 @@ Listed in `docs/local-testing.md` by the plan (no host program runs in CI), on a
 - L7. `csi_design_run` for steel and concrete and the shape of `csi_design_results` for steel and concrete columns (AC16, SP-3).
 - L8. `csi_frame_details` and `csi_export_joint` on the COM path (the evidence is for bridge targets), `csi_add_frame_by_coord`
   naming, section requirement and units, `csi_set_point_load` semantics (AC11, SP-5).
+- L9. Record mode on a SAP2000 copy: record-mode scenario, owner review and commit of recordings, and subsequent
+  contract-test verification against the real server (AC19; amendment B-573).
