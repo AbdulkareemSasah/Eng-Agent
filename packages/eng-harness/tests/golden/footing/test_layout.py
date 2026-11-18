@@ -4,10 +4,12 @@ import copy
 import math
 import sys
 from collections.abc import Mapping
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_contract.canonical import canonical_json
 from eng_contract.envelope import FailureEnvelope, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
@@ -152,7 +154,8 @@ def test_golden_cases() -> None:
             if set(actual) != set(case.expected) or len(actual_rows) != len(expected_rows):
                 failures[stem] = actual
             elif row_diffs := [
-                diff for act_row, exp_row in zip(actual_rows, expected_rows, strict=True)
+                diff
+                for act_row, exp_row in zip(actual_rows, expected_rows, strict=True)
                 if (diff := _row_mismatch(act_row, exp_row)) is not None
             ]:
                 failures[stem] = row_diffs
@@ -178,7 +181,8 @@ def test_trace_records_inputs_constants_and_steps() -> None:
     assert constants["pi"].value == math.pi
     assert "circle" in constants["pi"].source
     assert {
-        name: constants[name].value for name in ("zero_mm", "zero_count", "zero_area", "one", "two", "three", "four")
+        name: constants[name].value
+        for name in ("zero_mm", "zero_count", "zero_area", "one", "two", "three", "four", "max_safe_int")
     } == {
         "zero_mm": 0,
         "zero_count": 0,
@@ -187,6 +191,7 @@ def test_trace_records_inputs_constants_and_steps() -> None:
         "two": 2,
         "three": 3,
         "four": 4,
+        "max_safe_int": 2**53 - 1,
     }
     steps = {step.name: step for step in built.steps}
     assert [(n, steps[n].value) for n in ("footings", "width_too_small")] == [("footings", 2), ("width_too_small", 0)]
@@ -261,7 +266,8 @@ def test_missing_basis_field_is_refused(missing: str) -> None:
 def test_zero_cover_is_accepted() -> None:
     case = load_cases("layout")["layout-span-below-and-multiple"]
     dims = copy.deepcopy(case.input["dims"])
-    # J1: Lx=316, Ly=200, h=300, s=200; with c=0, db=16 -> span_x = 184 (n_x=2, s_x=184), span_y = 300 (n_y=ceil(300/200)+1=3, s_y=150)
+    # J1: Lx=316, Ly=200, h=300, s=200; c=0, db=16:
+    # span_x=184 (n_x=2, s_x=184), span_y=300 (n_y=ceil(300/200)+1=3, s_y=150)
     dims["footings"] = [dims["footings"][0]]
     out = _run(case, dims=dims, basis=_basis({"durability.cover_footing_mm": {"value": 0.0}}))
     row = out["footings"][0]
@@ -365,20 +371,11 @@ def test_unknown_footing_id_empty_dims_and_missing_meta_refs() -> None:
         assert ref_caught.value.detail.field == omitted
 
 
-def test_run_through_the_calc_port(tmp_path: Path) -> None:
+def _build_port(tmp_path: Path) -> tuple[HarnessCalcPort, ResultStore, Provenance]:
     clock = FixedClock(1_767_225_600_000, 1)
     ids = SeededIdSource(b"harness", clock)
     store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
     producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0)
-    case = load_cases("layout")["layout-x-bottom-top"]
-    payloads = {
-        "dims": _calc_meta("harness.footing_plan_size") | case.input["dims"],
-        "subjects": _calc_meta("harness.footing_subjects") | case.input["subjects"],
-        "basis": case.input["basis"],
-    }
-    args: dict[str, JsonValue] = {
-        name: {"$ref": store.put(kind, payloads[name], producer).result_id} for name, kind in KINDS.items()
-    }
     approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
     port = HarnessCalcPort(
         REGISTRY,
@@ -390,6 +387,28 @@ def test_run_through_the_calc_port(tmp_path: Path) -> None:
         ids,
         basis_fields={CALC_ID: BASIS_FIELDS},
     )
+    return port, store, producer
+
+
+def _store_port_args(
+    store: ResultStore,
+    producer: Provenance,
+    dims_payload: dict[str, Any],
+    subjects_payload: dict[str, Any],
+    basis: dict[str, Any],
+) -> dict[str, JsonValue]:
+    payloads = {
+        "dims": _calc_meta("harness.footing_plan_size") | dims_payload,
+        "subjects": _calc_meta("harness.footing_subjects") | subjects_payload,
+        "basis": basis,
+    }
+    return {name: {"$ref": store.put(kind, payloads[name], producer).result_id} for name, kind in KINDS.items()}
+
+
+def test_run_through_the_calc_port(tmp_path: Path) -> None:
+    port, store, producer = _build_port(tmp_path)
+    case = load_cases("layout")["layout-x-bottom-top"]
+    args = _store_port_args(store, producer, case.input["dims"], case.input["subjects"], case.input["basis"])
     info = port.describe(CALC_ID)
     assert info.basis_fields == BASIS_FIELDS
     assert {name: sorted(rule.kinds) for name, rule in info.ref_rules.items()} == {n: [k] for n, k in KINDS.items()}
@@ -403,3 +422,79 @@ def test_run_through_the_calc_port(tmp_path: Path) -> None:
     literal = port.run(CALC_ID, args | {"basis": case.input["basis"]})
     assert isinstance(literal, FailureEnvelope)
     assert literal.error.code is ErrorCode.INVALID_ARGUMENT
+
+
+def test_calc_port_refuses_bar_count_above_contract_limit(tmp_path: Path) -> None:
+    port, store, producer = _build_port(tmp_path)
+    case = load_cases("layout")["layout-x-bottom-top"]
+    subjects = {"subjects": [case.input["subjects"]["subjects"][0]], "excluded": []}
+
+    # 400 mm span with spacing 2^-45 mm gives 400 * 2^45 + 1 bars > 2^53 - 1
+    dims_small_s = copy.deepcopy(case.input["dims"])
+    dims_small_s["footings"] = [dims_small_s["footings"][0] | {"Lx_mm": 566.0, "Ly_mm": 566.0, "s_mm": 2.0**-45}]
+    args_small_s = _store_port_args(store, producer, dims_small_s, subjects, case.input["basis"])
+    out_small_s = port.run(CALC_ID, args_small_s)
+    assert isinstance(out_small_s, FailureEnvelope)
+    assert out_small_s.error.code is ErrorCode.OUT_OF_RANGE
+    assert out_small_s.error.field == "dims"
+    assert out_small_s.error.expected == {"max_count": 2**53 - 1}
+    assert canonical_json(out_small_s.model_dump(mode="json"))
+
+    # Exact boundary: 2^53 - 1 is accepted, 2^53 is refused
+    max_safe_basis = _basis(
+        {"reinforcement.bar_diameter_mm": {"value": 2.0}, "durability.cover_footing_mm": {"value": 0.0}}
+    )
+    dims_at_limit = copy.deepcopy(case.input["dims"])
+    dims_at_limit["footings"] = [
+        dims_at_limit["footings"][0] | {"Lx_mm": 100.0, "Ly_mm": float(2**53), "h_mm": 100.0, "s_mm": 1.0}
+    ]
+    out_at_limit = port.run(CALC_ID, _store_port_args(store, producer, dims_at_limit, subjects, max_safe_basis))
+    assert isinstance(out_at_limit, SuccessEnvelope)
+    stored = FootingDesign.model_validate(store.payload(out_at_limit.result_id))
+    assert stored.footings[0].n_x == 2**53 - 1
+
+    over_limit_basis = _basis(
+        {"reinforcement.bar_diameter_mm": {"value": 1.0}, "durability.cover_footing_mm": {"value": 0.0}}
+    )
+    out_over_limit = port.run(CALC_ID, _store_port_args(store, producer, dims_at_limit, subjects, over_limit_basis))
+    assert isinstance(out_over_limit, FailureEnvelope)
+    assert out_over_limit.error.code is ErrorCode.OUT_OF_RANGE
+    assert out_over_limit.error.field == "dims"
+
+
+def test_calc_port_large_finite_area_and_overflow_refusal(tmp_path: Path) -> None:
+    port, store, producer = _build_port(tmp_path)
+    case = load_cases("layout")["layout-x-bottom-top"]
+    subjects = {"subjects": [case.input["subjects"]["subjects"][0]], "excluded": []}
+
+    # db = 8e153 mm, n = 2 gives finite area ~1.0053e308 mm2 (would overflow pi * db^2 before / 4)
+    finite_basis = _basis(
+        {"reinforcement.bar_diameter_mm": {"value": 8e153}, "durability.cover_footing_mm": {"value": 0.0}}
+    )
+    dims_finite = copy.deepcopy(case.input["dims"])
+    dims_finite["footings"] = [
+        dims_finite["footings"][0] | {"Lx_mm": 3e154, "Ly_mm": 3e154, "h_mm": 2e154, "s_mm": 3e154}
+    ]
+    out_finite = port.run(CALC_ID, _store_port_args(store, producer, dims_finite, subjects, finite_basis))
+    assert isinstance(out_finite, SuccessEnvelope)
+    stored = FootingDesign.model_validate(store.payload(out_finite.result_id))
+    row = stored.footings[0]
+    assert (row.n_x, row.n_y) == (2, 2)
+    expected_area = float(Fraction(2) * Fraction(8e153) ** 2 * Fraction(math.pi) / Fraction(4))
+    assert math.isfinite(row.As_x_mm2)
+    assert math.isfinite(row.As_y_mm2)
+    assert abs(row.As_x_mm2 - expected_area) <= _AREA_REL_TOL * expected_area
+    assert abs(row.As_y_mm2 - expected_area) <= _AREA_REL_TOL * expected_area
+
+    # db = 1.5e154 mm, n = 2 overflows binary64 -> OUT_OF_RANGE on field dims
+    overflow_basis = _basis(
+        {"reinforcement.bar_diameter_mm": {"value": 1.5e154}, "durability.cover_footing_mm": {"value": 0.0}}
+    )
+    dims_overflow = copy.deepcopy(case.input["dims"])
+    dims_overflow["footings"] = [
+        dims_overflow["footings"][0] | {"Lx_mm": 4e154, "Ly_mm": 4e154, "h_mm": 4e154, "s_mm": 4e154}
+    ]
+    out_overflow = port.run(CALC_ID, _store_port_args(store, producer, dims_overflow, subjects, overflow_basis))
+    assert isinstance(out_overflow, FailureEnvelope)
+    assert out_overflow.error.code is ErrorCode.OUT_OF_RANGE
+    assert out_overflow.error.field == "dims"

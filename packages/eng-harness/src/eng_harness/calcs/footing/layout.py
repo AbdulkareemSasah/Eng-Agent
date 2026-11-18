@@ -5,7 +5,8 @@ bar counts and actual spacing (L1), steel areas (L2), effective depths (L3), cov
 Units: lengths in mm, steel areas in mm2. Span and depth comparisons are exact (`Fraction`).
 Errors: `ContractError` `INVALID_ARGUMENT` (missing/unconfirmed/non-numeric/invalid-choice basis field, input without
 record reference, or footing id not in `subjects`), `UNIT_MISMATCH` (wrong basis unit), `OUT_OF_RANGE` (non-positive
-bar diameter, negative cover, or depth with no room for both bottom layers on field `dims`).
+bar diameter, negative cover, or depth with no room for both bottom layers or unrepresentable bar count / float output
+on field `dims`).
 """
 
 import math
@@ -43,6 +44,11 @@ TWO = Cited(value=2, unit="1", source="Geometry: two opposite covers, half-diame
 THREE = Cited(value=3, unit="1", source="Geometry: second-layer centre at cover + 3*db/2")
 FOUR = Cited(value=4, unit="1", source="Geometry: circle area pi * db^2 / 4")
 PI = Cited(value=math.pi, unit="1", source="Mathematical constant, area of a circle")
+MAX_SAFE_INT = Cited(
+    value=9007199254740991,
+    unit="1",
+    source="RFC 8785 3.2.2.3 and eng-contract canonical.py: maximum exact I-JSON integer 2^53 - 1",
+)
 VERSION = Cited(value=1, unit="1", source="Calc version 1 of spec 0010 4.4.3; a change of method is a new version")
 
 
@@ -137,13 +143,44 @@ def _read_choice_basis[E: StrEnum](basis: DesignBasis, path: str, enum_type: typ
         ) from exc
 
 
-def _direction_layout(span: Fraction, s: Fraction, db_float: float) -> tuple[int, float, float]:
+def _to_finite_float(exact: Fraction, row: DimRow, what: str, *, positive: bool = False) -> float:
+    """Convert `exact` once to binary64, refusing overflow or underflow-to-zero as `OUT_OF_RANGE` on `dims`."""
+    try:
+        value = float(exact)
+    except OverflowError as exc:
+        raise ContractError(
+            ErrorCode.OUT_OF_RANGE,
+            f"footing {row.id} {what} is outside binary64 range",
+            field="dims",
+            expected={"finite_binary64": True},
+            received=row.id,
+        ) from exc
+    if not math.isfinite(value) or (positive and value <= float(ZERO_MM.value)):
+        raise ContractError(
+            ErrorCode.OUT_OF_RANGE,
+            f"footing {row.id} {what} cannot be represented as a valid binary64 number",
+            field="dims",
+            expected={"finite_binary64": True, "positive": positive},
+            received=row.id,
+        )
+    return value
+
+
+def _direction_layout(row: DimRow, span: Fraction, s: Fraction, db: Fraction) -> tuple[int, float, float]:
     """L1 and L2 for one bar direction with positive `span`: `(count, actual_spacing_mm, area_mm2)`."""
     spaces = math.ceil(span / s)
     count = spaces + int(ONE.value)
-    spacing = float(span / spaces)
-    bar_area = PI.value * (db_float**TWO.value) / FOUR.value
-    area = count * bar_area
+    if count > MAX_SAFE_INT.value:
+        raise ContractError(
+            ErrorCode.OUT_OF_RANGE,
+            f"footing {row.id} bar count exceeds contract integer limit",
+            field="dims",
+            expected={"max_count": MAX_SAFE_INT.value},
+            received=str(count),
+        )
+    spacing = _to_finite_float(span / spaces, row, "actual bar spacing", positive=True)
+    area_exact = Fraction(count) * db * db * Fraction(PI.value) / Fraction(FOUR.value)
+    area = _to_finite_float(area_exact, row, "steel area")
     return count, spacing, area
 
 
@@ -160,21 +197,31 @@ def _layout_row(
     d_lower = h - cover - db / two
     d_upper = h - cover - Fraction(THREE.value) * db / two
     if d_upper <= Fraction(ZERO_MM.value):
-        min_depth = float(cover + Fraction(THREE.value) * db / two)
+        try:
+            min_depth_val: float | str = float(cover + Fraction(THREE.value) * db / two)
+        except OverflowError:
+            min_depth_val = "outside_binary64"
+        if isinstance(min_depth_val, float) and not math.isfinite(min_depth_val):
+            min_depth_val = "outside_binary64"
         raise ContractError(
             ErrorCode.OUT_OF_RANGE,
             f"footing {row.id} depth {row.h_mm} mm leaves no room for both bottom layers",
             field="dims",
-            expected={"min_depth_exclusive_mm": min_depth},
+            expected={"min_depth_exclusive_mm": min_depth_val},
             received=row.h_mm,
         )
     d_x, d_y = (d_lower, d_upper) if bottom_layer is BottomLayer.X_BOTTOM else (d_upper, d_lower)
     d = (d_x + d_y) / two
+    d_x_float = _to_finite_float(d_x, row, "effective depth d_x", positive=True)
+    d_y_float = _to_finite_float(d_y, row, "effective depth d_y", positive=True)
+    d_float = _to_finite_float(d, row, "effective depth d", positive=True)
+    db_float = _to_finite_float(db, row, "bar diameter", positive=True)
+    cover_float = _to_finite_float(cover, row, "cover")
     two_c_plus_db = two * cover + db
     span_x = Fraction(row.Ly_mm) - two_c_plus_db
     span_y = Fraction(row.Lx_mm) - two_c_plus_db
     zero_mm = Fraction(ZERO_MM.value)
-    db_float = float(db)
+    reason: str | None
     if span_x <= zero_mm or span_y <= zero_mm:
         too_small = True
         n_x = n_y = int(ZERO_COUNT.value)
@@ -184,11 +231,10 @@ def _layout_row(
     else:
         too_small = False
         s_frac = Fraction(row.s_mm)
-        n_x, s_x, as_x = _direction_layout(span_x, s_frac, db_float)
-        n_y, s_y, as_y = _direction_layout(span_y, s_frac, db_float)
+        n_x, s_x, as_x = _direction_layout(row, span_x, s_frac, db)
+        n_y, s_y, as_y = _direction_layout(row, span_y, s_frac, db)
         status, reason = row.status, row.reason
     reaction_height = row.h_mm if reaction_point is ReactionPoint.TOP_OF_FOOTING else float(ZERO_MM.value)
-    cover_float = float(cover)
     return (
         DesignRow(
             id=row.id,
@@ -209,9 +255,9 @@ def _layout_row(
             s_y_mm=s_y,
             As_x_mm2=as_x,
             As_y_mm2=as_y,
-            d_x_mm=float(d_x),
-            d_y_mm=float(d_y),
-            d_mm=float(d),
+            d_x_mm=d_x_float,
+            d_y_mm=d_y_float,
+            d_mm=d_float,
             cover_mm=cover_float,
             end_cover_mm=cover_float,
             reaction_height_mm=reaction_height,
@@ -270,6 +316,7 @@ def footing_layout(inp: LayoutInput, meta: InputMeta, trace: TraceBuilder) -> La
         ("three", THREE),
         ("four", FOUR),
         ("pi", PI),
+        ("max_safe_int", MAX_SAFE_INT),
     )
     for const_name, cited in const_pairs:
         trace.constant(const_name, cited)
