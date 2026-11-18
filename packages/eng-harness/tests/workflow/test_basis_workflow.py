@@ -12,10 +12,10 @@ import pytest
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ErrorCode
 from eng_contract.kinds.basis import BasisField, DesignBasis
-from fakes.ports import failure
+from fakes.ports import FakeCalcPort, failure
 from pydantic import BaseModel
 from workflows.chain import ChainInput
-from workflows.rig import Rig, make_rig, request
+from workflows.rig import Rig, Spy, make_rig, request
 
 from eng_harness.basis import (
     BasisSetupAnswer,
@@ -26,8 +26,8 @@ from eng_harness.basis import (
     build_draft,
     freeze,
 )
-from eng_harness.block import workflow
-from eng_harness.engine import RunStatus
+from eng_harness.block import BlockDef, Registry, workflow
+from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunStatus
 from eng_harness.errors import HarnessCode, RunRefused
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
@@ -160,3 +160,32 @@ def test_unconfirmed_basis_refuses_the_run(tmp_path: Path) -> None:
     assert refused.value.code is HarnessCode.BASIS_INCOMPLETE
     assert refused.value.evidence == (METHOD,)
     assert rig.run_ids() == before
+
+
+def _store_engine(rig: Rig, *workflows: BlockDef[Any, Any]) -> Engine:
+    """An engine over `rig` whose basis port is `StoreBasisPort(rig.store)` instead of the in-memory fake."""
+    calc = FakeCalcPort(rig.run_class, rig.calc_infos)
+    calc.results, calc.runs = rig.calc_results, rig.calc_runs
+    ports = EnginePorts(
+        tool=Spy("tool", rig.host, rig.log),
+        host=Spy("host", rig.host, rig.log),
+        calc=Spy("calc", calc, rig.log),
+        basis=Spy("basis", StoreBasisPort(rig.store), rig.log),
+        approvals=Spy("approvals", rig.approvals, rig.log),
+        inputs=Spy("inputs", rig.inputs, rig.log),
+    )
+    return Engine(rig.workspace, Registry(workflows), ports, rig.store, EngineSettings(), rig.clock, rig.ids)
+
+
+def test_basis_reaches_ctx_over_the_store_port(tmp_path: Path) -> None:
+    """AC28 over `StoreBasisPort`: the frozen basis reaches `ctx.basis` from the store under the runtime guard."""
+    rig = make_rig(tmp_path)
+    ref = _frozen_basis(rig)
+    done = asyncio.run(_store_engine(rig, _reads_basis).start(request(workflow="reads_basis", basis_ref=ref)))
+    assert done.status is RunStatus.COMPLETED
+    assert isinstance(done.output, BasisOutput)
+    assert (done.output.tolerance, done.output.unit) == (2.5, "mm")
+    assert (done.output.stories, done.output.method) == (4, "b")
+    assert done.output.tolerance_ref == f"{ref}#/fields/{TOL}/value"
+    assert rig.header(done.run_id).basis_ref == ref
+    assert rig.log.count("basis.load") == 2

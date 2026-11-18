@@ -13,14 +13,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_contract.envelope import Provenance
 from eng_contract.errors import ErrorCode
-from fakes.ports import failure
+from fakes.ports import FakeCalcPort, failure
+from pydantic import JsonValue
+from workflows.chain import ChainInput, ChainOutput
 from workflows.ctx_flows import ChildInput, ChildOutput, child, flow
-from workflows.rig import make_rig, request
+from workflows.rig import Rig, Spy, make_rig, request
 
-from eng_harness.block import block
+from eng_harness.basis import StoreBasisPort
+from eng_harness.block import BlockDef, Registry, block, workflow
 from eng_harness.ctx import BasisCount
-from eng_harness.engine import RunStatus
+from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunStatus
 from eng_harness.errors import BlockRuleViolation, ToolFailed
 
 _MODULE = "colorsys"  # a stdlib module that nothing else in the tests imports
@@ -249,6 +253,30 @@ def test_engine_work_restores_the_state_when_the_call_raises() -> None:
     assert states == [False]
 
 
+def test_engine_section_restores_the_state_when_the_body_raises() -> None:
+    from eng_harness.engine._guard import block_code, engine_section, in_block_code
+
+    states: list[bool] = []
+
+    def failing() -> None:
+        with engine_section():
+            states.append(in_block_code())
+            raise ZeroDivisionError
+
+    with engine_section():
+        states.append(in_block_code())
+    assert in_block_code() is False
+    with block_code():
+        with engine_section():
+            states.append(in_block_code())
+        states.append(in_block_code())
+        with pytest.raises(ZeroDivisionError):
+            failing()
+        states.append(in_block_code())
+    assert states == [False, False, True, False, True]
+    assert in_block_code() is False
+
+
 def test_the_hook_is_installed_once_per_process(monkeypatch: pytest.MonkeyPatch) -> None:
     from eng_harness.engine import _guard
 
@@ -268,3 +296,75 @@ def test_the_hook_is_installed_once_per_process(monkeypatch: pytest.MonkeyPatch)
         monkeypatch.undo()
         _guard._install.cache_clear()
         _guard._install()
+
+
+def _store_engine(rig: Rig, *workflows: BlockDef[Any, Any]) -> Engine:
+    """An engine over `rig` whose basis port reads from `rig.store`."""
+    calc = FakeCalcPort(rig.run_class, rig.calc_infos)
+    calc.results, calc.runs = rig.calc_results, rig.calc_runs
+    ports = EnginePorts(
+        tool=Spy("tool", rig.host, rig.log),
+        host=Spy("host", rig.host, rig.log),
+        calc=Spy("calc", calc, rig.log),
+        basis=Spy("basis", StoreBasisPort(rig.store), rig.log),
+        approvals=Spy("approvals", rig.approvals, rig.log),
+        inputs=Spy("inputs", rig.inputs, rig.log),
+    )
+    return Engine(rig.workspace, Registry(workflows), ports, rig.store, EngineSettings(), rig.clock, rig.ids)
+
+
+def test_basis_load_is_engine_work(tmp_path: Path) -> None:
+    """The first `ctx.basis` read loads via `StoreBasisPort` as engine work; the guard stays on around it (AC18)."""
+    rig = make_rig(tmp_path / "run")
+    path = "modeling.merge_tolerance_mm"
+    fields: dict[str, JsonValue] = {
+        path: {
+            "value": 2.5,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": True,
+            "citation": None,
+        }
+    }
+    producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=rig.clock.now(), duration_ms=0)
+    basis_ref = rig.store.put("basis.design_basis/1", {"template": None, "fields": fields}, producer).result_id
+
+    @workflow(name="read_ref", version=1, description="Reads the basis record ref with no required_basis.")
+    async def read_ref(ctx: Any, inp: ChainInput) -> ChainOutput:
+        return ChainOutput(refs=[ctx.basis.record_ref().ref])
+
+    @workflow(name="read_qty", version=1, description="Reads a declared basis quantity.", required_basis=(path,))
+    async def read_qty(ctx: Any, inp: ChainInput) -> ChainOutput:
+        qty = ctx.basis.quantity(path)
+        assert (qty.value, qty.unit) == (2.5, "mm")
+        return ChainOutput(refs=[ctx.basis.ref(path).ref])
+
+    target = tmp_path / "after_basis.txt"
+    read_refs: list[str] = []
+
+    async def read_then_open(ctx: Any) -> list[str]:
+        read_refs.append(ctx.basis.record_ref().ref)
+        _write(target)
+        return []
+
+    first = asyncio.run(_store_engine(rig, read_ref).start(request(workflow="read_ref", basis_ref=basis_ref)))
+    assert first.status is RunStatus.COMPLETED
+    assert isinstance(first.output, ChainOutput)
+    assert first.output.refs == [basis_ref]
+
+    second = asyncio.run(_store_engine(rig, read_qty).start(request(workflow="read_qty", basis_ref=basis_ref)))
+    assert second.status is RunStatus.COMPLETED
+    assert isinstance(second.output, ChainOutput)
+    assert second.output.refs == [f"{basis_ref}#/fields/{path}/value"]
+
+    third = asyncio.run(
+        _store_engine(rig, flow(read_then_open, name="read_then_open")).start(
+            request(workflow="read_then_open", basis_ref=basis_ref)
+        )
+    )
+    assert third.status is RunStatus.NEEDS_ENGINEER
+    assert third.escalation is not None
+    assert third.escalation.reason == "block_rule_violation"
+    assert "open" in third.escalation.detail
+    assert read_refs == [basis_ref]
+    assert not target.exists()
