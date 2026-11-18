@@ -151,7 +151,11 @@ Integration
   run in fake-host mode, then the values arrive typed, the run header holds the `basis_ref`, and a replay of the journal
   shows no divergence; given a draft frozen without confirmation (built by hand in the test), then `start` raises
   `RunRefused` (`BASIS_INCOMPLETE`) with no run folder. Test:
-  `tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays`.
+  `tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays`. Amendment B-569: given the same
+  workflow wired with the production `StoreBasisPort` over the store that holds the frozen basis (in place of the
+  in-memory port), when its root block reads `ctx.basis` first, then the run completes with the same typed values,
+  because the load is engine work under the runtime guard (engine §4.3.4 rule 1, AC18). Test:
+  `tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_over_the_store_port` (engine plan 0001 T24).
 
 Shipped content
 - AC29. Given the template folder shipped with the package, then it holds no entry with a `value` (structure and asks
@@ -298,7 +302,8 @@ class BasisSetupPort(Protocol):
 The frozen basis is one `basis.design_basis/1` result (contract §4.10). `StoreBasisPort.load(basis_ref)` implements the
 engine `BasisPort`: it resolves the reference through the `ResultStore`, checks the kind and the payload hash, and
 returns `LoadedBasis`. The engine puts `basis_ref` in the run header and builds `ctx.basis` from it (engine §4.8,
-AC17); blocks read by reference (`res_<id>#/fields/<path>/value`), so a step records the basis value it used. The basis
+AC17); the first `ctx.basis` read loads it through this port as engine work, outside the runtime guard for the port
+call only (engine §4.3.4 rule 1, amendment B-569), so the store read is not refused as block-code I/O; blocks read by reference (`res_<id>#/fields/<path>/value`), so a step records the basis value it used. The basis
 is frozen for the run: a change means a new draft, a new confirmation, a new result and a new run (13 §4 step 6).
 
 ### 4.8 What v1 ships
@@ -374,7 +379,7 @@ Messages never contain file contents beyond the offending path and a reason key.
 | AC21 | unit | `tests/unit/test_basis_fields.py::test_field_spec_rules` |
 | AC22 to AC25 | contract (against the contract `ResultStore` and kind) | `tests/contract/test_basis_freeze.py::*` |
 | AC26, AC27 | unit | `tests/unit/test_basis_setup.py::*` |
-| AC28 | fake-host workflow and replay | `tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays` |
+| AC28 | fake-host workflow and replay | `tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_and_replays`, `::test_basis_reaches_ctx_over_the_store_port` (amendment B-569) |
 | AC29 | golden | `tests/golden/test_shipped_templates.py::test_shipped_templates_pinned` |
 | AC30 | property (Hypothesis) | `tests/property/test_template_basis_props.py::*` |
 
