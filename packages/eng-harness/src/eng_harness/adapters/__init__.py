@@ -166,7 +166,7 @@ def build_ports(
     allowlists: Mapping[str, Callable[[str | None], Allowlist]] | None = None,
     visible: bool = False,
 ) -> AdapterPorts:
-    """Wire the CSI ETABS ports of one run and its command-line tools (spec 0002 4.1, AC41, AC43 to AC45).
+    """Wire CSI ports for the server product and command-line tools (spec 0002 4.1, AC41, AC43 to AC45; spec 0008 4.1).
 
     Enter the result around Engine.start/resume. No process starts here. Each `[cli_tools.*]` entry is served by the
     command-line tool adapter beside the CSI tools (AC43); unsupported server adapters/configurations and a
@@ -177,13 +177,13 @@ def build_ports(
     for name, section in config.servers.items():
         if section.adapter not in loaders:
             raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
-        loaded[name] = loaders[section.adapter](section.route)
+        loaded[name] = loaders[section.adapter](section.route).for_product(section.product)  # spec 0008 4.1
     if len(config.servers) != 1:
         raise ConfigError("servers", "CSI port wiring requires one server section")
     name, section = next(iter(config.servers.items()))
     if section.adapter != "sasaah-csi-mcp":
         raise ConfigError(f"servers.{name}.adapter", "this adapter is not implemented")
-    product = "ETABS"  # spec 0002 4.6: the phase-1 CSI product profile
+    product = section.product  # the server's product profile (spec 0002 4.6, spec 0008 4.1)
     program = config.host_program(product)
     inspector = inspector if inspector is not None else platform_inspector()
     launcher = launcher if launcher is not None else platform_launcher(inspector)
