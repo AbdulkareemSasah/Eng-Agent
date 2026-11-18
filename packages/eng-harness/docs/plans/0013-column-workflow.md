@@ -223,12 +223,14 @@ tasks:
     depends_on: [T7]
   - id: T9
     title: Decision points and rules of the column workflow
+    # Amendment (B-573, documents only): rules.lock.json joins the files; required by test_lock, spec 0005 AC14 and plan 0005 T4. Its writer's trial passed the gate with exactly that file set.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.rules, eng_harness.rules.column_design, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/column_design/_points.py"
       - "packages/eng-harness/src/eng_harness/rules/column_design.py"
       - "packages/eng-harness/src/eng_harness/decisions.lock.json"
+      - "packages/eng-harness/src/eng_harness/rules.lock.json"  # required by test_lock, spec 0005 AC14 and plan 0005 T4 (amendment B-573)
       - "packages/eng-harness/tests/unit/rules/test_column_design_rules.py"
     max_changed_lines: 220
     max_sessions: 2
@@ -447,6 +449,8 @@ type changes, missing elements, `not_read`, `stale_ok` on `before` only.
 
 **T9 Points and rules** (spec §4.8). The four points with their state models, the rules `cm.no_proposal` (only
 for `PASS` columns), `cm.fail_matched`, `map.clean`, `rr.pass`, policy without the model and language-model tiers, lock entries.
+Amendment (B-573, documents only): `rules.lock.json` joins T9's files; required by `test_lock`, spec 0005 AC14 and
+plan 0005 T4 lock. Its writer's trial passed the gate with exactly that file set.
 
 **T10 Amendments** (spec §11 Q2 to Q4). `WorkflowDef.allowed_modes` with `RunRefused MODE_NOT_ALLOWED` before
 `run_started`; the edit cycle exports `read_state`, `apply_change_set`, `run_and_summarize` and `finish`, and
