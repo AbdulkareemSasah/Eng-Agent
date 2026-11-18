@@ -5,10 +5,11 @@ needs (spec 0010 4.2). Each later footing calc is added here by its plan task.
 """
 
 from eng_harness.calc import CalcDef
+from eng_harness.calcs.footing.plan_size import footing_plan_size
 from eng_harness.calcs.footing.subjects import footing_subjects
 from eng_harness.kinds.footing import FOOTING_KINDS
 
-FOOTING_CALCS: tuple[CalcDef, ...] = (footing_subjects,)
+FOOTING_CALCS: tuple[CalcDef, ...] = (footing_subjects, footing_plan_size)
 """The shipped footing calcs, in registration order."""
 
 __all__ = ["FOOTING_CALCS", "FOOTING_KINDS"]
