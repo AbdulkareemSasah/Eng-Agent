@@ -80,7 +80,7 @@ def test_run_is_unavailable_without_collaborators(tmp_path: Path) -> None:
         for missing in ("workflow_registry", "port_builder", "calc_port_factory"):
             assert rig.main(*argv, **{missing: None}) == ExitCode.USAGE
             assert f"command {argv[0]} is not available in this build" in rig.err.getvalue()
-        assert (rig.run_ids(), rig.engines, rig.built, rig.workspace.exists()) == ([], [], [], False)
+        assert (rig.run_ids(), rig.engines, rig.built, rig.runs.exists()) == ([], [], [], False)
 
 
 def test_arguments_no_command_knows_are_usage_errors(tmp_path: Path) -> None:
