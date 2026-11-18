@@ -21,6 +21,7 @@ from eng_harness import __version__
 from eng_harness.block import Registry
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl
+from eng_harness.cli._opener import write_to_terminal
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest
 from eng_harness.journal import JournalReader
 from eng_harness.pages import PageApprovalPort, PageInputPort, PageServer, accept_answers_file
@@ -79,11 +80,10 @@ def default_engine_factory(
     workspace: Workspace, registry: Registry, ports: RunPortSet, store: ResultStore, settings: EngineSettings,
     clock: Clock, ids: IdSource,
 ) -> Engine:  # fmt: skip
-    """The merged `Engine`, given the ports its `EnginePorts` holds (the decision, progress and run-control fields
-    reach it with plan 0006 T14b and T16b)."""
+    """The merged `Engine`, given the ports its `EnginePorts` holds (progress and run-control reach it with T16b)."""
     held = EnginePorts(
         tool=ports.tool, host=ports.host, calc=ports.calc, basis=ports.basis, approvals=ports.approvals,
-        inputs=ports.inputs,
+        inputs=ports.inputs, decision=ports.decision,
     )  # fmt: skip
     return Engine(workspace, registry, held, store, settings, clock, ids)
 
@@ -144,6 +144,7 @@ class PageSession:
         self, *, config: HarnessConfig, store: ResultStore, runs_dir: Path, cell: RunIdCell, clock: Clock,
         wait_timeout_s: int | None, no_wait: bool, no_browser: bool, opener: Callable[[str], bool], stderr: TextIO,
         answers: FileAnswers | None = None, answers_once: bool = False,
+        terminal_writer: Callable[[str], bool] = write_to_terminal,
     ) -> None:  # fmt: skip
         marks, control = release_marks(config), FileRunControl(runs_dir)
 
@@ -173,7 +174,7 @@ class PageSession:
         )
         self._serve = not no_wait
         self._browser = config.page.open_browser and not no_browser
-        self._opener, self._stderr = opener, stderr
+        self._opener, self._stderr, self._terminal = opener, stderr, terminal_writer
         self._server: PageServer | None = None
         wait = not no_wait
         self.approvals: ApprovalPort = _Shown(self._page, self._shown, lambda request: cell.fill(request.run_id), wait)
@@ -190,9 +191,10 @@ class PageSession:
             return
         self._server = PageServer(self._page.hub, self._settings)
         self._server.start()
-        if self._browser and self._opener(self._server.launch_address):
+        address = self._server.launch_address
+        if self._browser and self._opener(address):
             self._stderr.write("approval page opened in your browser\n")
-        else:
+        elif not self._terminal(f"approval page: {address}"):
             self._stderr.write(
                 "the launch address cannot be shown here; run from a terminal, or use --no-wait and resume later\n"
             )
