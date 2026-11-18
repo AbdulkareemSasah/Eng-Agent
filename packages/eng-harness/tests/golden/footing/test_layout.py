@@ -22,8 +22,8 @@ from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import TraceBuilder
 from eng_harness.calcs import REGISTRY
-from eng_harness.calcs.footing.layout import BASIS_FIELDS, LayoutInput, footing_layout
-from eng_harness.kinds.footing import FootingDesign, FootingDims, FootingSubjects
+from eng_harness.calcs.footing.layout import BASIS_FIELDS, LayoutInput, _direction_layout, footing_layout
+from eng_harness.kinds.footing import DesignRow, DimRow, FootingDesign, FootingDims, FootingSubjects
 from eng_harness.ports import RunClass
 
 from . import FootingGoldenCase, input_meta, load_cases
@@ -498,3 +498,269 @@ def test_calc_port_large_finite_area_and_overflow_refusal(tmp_path: Path) -> Non
     assert isinstance(out_overflow, FailureEnvelope)
     assert out_overflow.error.code is ErrorCode.OUT_OF_RANGE
     assert out_overflow.error.field == "dims"
+
+
+@pytest.mark.parametrize("confirmed", [False, None], ids=["unconfirmed", "missing"])
+def test_required_basis_diagnostic_identifies_field_and_remedy(confirmed: bool | None) -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    path = "reinforcement.bar_diameter_mm"
+    basis = _basis({path: {"confirmed": False}})
+    if confirmed is None:
+        del basis["fields"][path]
+
+    with pytest.raises(ContractError) as caught:
+        _run(case, basis=basis)
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.INVALID_ARGUMENT
+    assert detail.field == "basis"
+    assert detail.message == f"basis field {path} is missing or not confirmed"
+    assert detail.hint == f"confirm {path}"
+
+
+@pytest.mark.parametrize(
+    ("path", "patch", "code", "problem", "expected", "received"),
+    [
+        pytest.param(
+            "reinforcement.bar_diameter_mm",
+            {"value": "16"},
+            ErrorCode.INVALID_ARGUMENT,
+            "is not a finite number",
+            None,
+            None,
+            id="length-must-be-numeric",
+        ),
+        pytest.param(
+            "reinforcement.bar_diameter_mm",
+            {"value": 0.0},
+            ErrorCode.OUT_OF_RANGE,
+            "must be positive",
+            {"min_exclusive": 0},
+            0.0,
+            id="diameter-excludes-zero",
+        ),
+        pytest.param(
+            "durability.cover_footing_mm",
+            {"value": -0.5},
+            ErrorCode.OUT_OF_RANGE,
+            "is below zero",
+            {"min": 0},
+            -0.5,
+            id="cover-includes-zero",
+        ),
+        pytest.param(
+            "foundation.reaction_point",
+            {"unit": "mm"},
+            ErrorCode.UNIT_MISMATCH,
+            "must have no unit",
+            {"unit": None},
+            "mm",
+            id="choice-is-unitless",
+        ),
+        pytest.param(
+            "foundation.reaction_point",
+            {"value": 1},
+            ErrorCode.INVALID_ARGUMENT,
+            "is not a choice string",
+            {"choices": ["top_of_footing", "base_of_footing"]},
+            1,
+            id="reaction-point-needs-choice-string",
+        ),
+        pytest.param(
+            "reinforcement.bottom_layer",
+            {"value": "z_bottom"},
+            ErrorCode.INVALID_ARGUMENT,
+            "has unsupported choice 'z_bottom'",
+            {"choices": ["x_bottom", "y_bottom"]},
+            "z_bottom",
+            id="bottom-layer-reports-allowed-choices",
+        ),
+    ],
+)
+def test_invalid_basis_diagnostic_explains_constraint(
+    path: str,
+    patch: dict[str, Any],
+    code: ErrorCode,
+    problem: str,
+    expected: dict[str, Any] | None,
+    received: JsonValue,
+) -> None:
+    """Spec 0010 §4.4.3 and §4.7 define the quantities and the permitted choices."""
+    case = load_cases("layout")["layout-x-bottom-top"]
+    with pytest.raises(ContractError) as caught:
+        _run(case, basis=_basis({path: patch}))
+
+    detail = caught.value.detail
+    assert detail.code is code
+    assert detail.field == "basis"
+    assert detail.message == f"basis field {path} {problem}"
+    assert detail.expected == expected
+    assert detail.received == received
+
+
+def test_length_unit_diagnostic_reports_expected_and_received_units() -> None:
+    """Layout consumes lengths in mm (spec 0010 §4.7)."""
+    case = load_cases("layout")["layout-x-bottom-top"]
+    raw_basis = _basis()
+    path = "reinforcement.bar_diameter_mm"
+    fields = {key: BasisField.model_validate(val) for key, val in raw_basis["fields"].items()}
+    fields[path] = fields[path].model_copy(update={"unit": "deg"})
+    inp = LayoutInput.model_construct(
+        dims=FootingDims.model_validate(_calc_meta("harness.footing_plan_size") | case.input["dims"]),
+        subjects=FootingSubjects.model_validate(_calc_meta("harness.footing_subjects") | case.input["subjects"]),
+        basis=DesignBasis.model_construct(template=None, fields=fields),
+    )
+
+    with pytest.raises(ContractError) as caught:
+        footing_layout(inp, input_meta(case.refs, KINDS), TraceBuilder())
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.UNIT_MISMATCH
+    assert detail.field == "basis"
+    assert detail.message == f"basis field {path} must be in mm"
+    assert detail.expected == {"unit": "mm"}
+    assert detail.received == "deg"
+
+
+@pytest.mark.parametrize(
+    ("bottom_layer", "upper_direction"),
+    [("x_bottom", "d_y"), ("y_bottom", "d_x")],
+)
+def test_layout_refuses_unrepresentable_positive_effective_depth(bottom_layer: str, upper_direction: str) -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L3: with u = 2^-1074 mm, h = 4u, c = 2u, db = u, the lower and upper depths are 3u/2 and u/2.
+    # Binary64 rounds the upper depth to zero (ties to even), regardless of its direction.
+    u = math.ulp(0.0)
+    row = case.input["dims"]["footings"][0] | {"h_mm": 4 * u}
+    basis = _basis(
+        {
+            "reinforcement.bar_diameter_mm": {"value": u},
+            "reinforcement.bottom_layer": {"value": bottom_layer},
+            "durability.cover_footing_mm": {"value": 2 * u},
+        }
+    )
+
+    with pytest.raises(ContractError) as caught:
+        _run(case, dims={"footings": [row]}, basis=basis)
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.OUT_OF_RANGE
+    assert detail.field == "dims"
+    assert (
+        detail.message
+        == f"footing J1 effective depth {upper_direction} cannot be represented as a valid binary64 number"
+    )
+    assert detail.expected == {"finite_binary64": True, "positive": True}
+    assert detail.received == "J1"
+
+
+def test_layout_refuses_depth_when_required_depth_exceeds_binary64() -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L3: c and db near 10^308 mm require h > c + 3db/2, about 2.5e308 mm,
+    # beyond binary64's finite maximum (about 1.8e308 mm).
+    row = case.input["dims"]["footings"][0] | {"h_mm": 1e308}
+    basis = _basis({"reinforcement.bar_diameter_mm": {"value": 1e308}, "durability.cover_footing_mm": {"value": 1e308}})
+
+    with pytest.raises(ContractError) as caught:
+        _run(case, dims={"footings": [row]}, basis=basis)
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.OUT_OF_RANGE
+    assert detail.field == "dims"
+    assert detail.message == "footing J1 depth 1e+308 mm leaves no room for both bottom layers"
+    assert detail.expected == {"min_depth_exclusive_mm": "outside_binary64"}
+    assert detail.received == 1e308
+
+
+def test_layout_overflow_diagnostic_identifies_steel_area() -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L1: Lx = Ly = s = 4e154 mm, c = 0, db = 1.5e154 mm, hence span ≈ 2.5e154 mm
+    # and n = 2. L2: As ≈ 1.125e308 * pi mm², above binary64's finite maximum.
+    row = case.input["dims"]["footings"][0] | {"Lx_mm": 4e154, "Ly_mm": 4e154, "h_mm": 4e154, "s_mm": 4e154}
+    basis = _basis({"reinforcement.bar_diameter_mm": {"value": 1.5e154}, "durability.cover_footing_mm": {"value": 0.0}})
+
+    with pytest.raises(ContractError) as caught:
+        _run(case, dims={"footings": [row]}, basis=basis)
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.OUT_OF_RANGE
+    assert detail.field == "dims"
+    assert detail.message == "footing J1 steel area is outside binary64 range"
+    assert detail.expected == {"finite_binary64": True}
+    assert detail.received == "J1"
+
+
+@pytest.mark.parametrize("controlling_width", ["Ly_mm", "Lx_mm"])
+def test_bar_count_diagnostic_reports_exact_count_above_limit(controlling_width: str) -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L1: with c = 0 and db = s = 1 mm, a width of 2^53 mm gives a span of 2^53 - 1 mm.
+    # Only the direction using that width exceeds the I-JSON limit. The 2^53 bars remain exact as decimal text.
+    row = case.input["dims"]["footings"][0] | {"Lx_mm": 100.0, "Ly_mm": 100.0, "s_mm": 1.0}
+    row[controlling_width] = float(2**53)
+    basis = _basis({"reinforcement.bar_diameter_mm": {"value": 1.0}, "durability.cover_footing_mm": {"value": 0.0}})
+
+    with pytest.raises(ContractError) as caught:
+        _run(case, dims={"footings": [row]}, basis=basis)
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.OUT_OF_RANGE
+    assert detail.field == "dims"
+    assert detail.message == "footing J1 bar count exceeds contract integer limit"
+    assert detail.expected == {"max_count": 2**53 - 1}
+    assert detail.received == str(2**53)
+
+
+def test_direction_layout_refuses_spacing_that_rounds_to_zero() -> None:
+    """At the exact-fraction calculation boundary, L1 requires a positive actual spacing."""
+    case = load_cases("layout")["layout-x-bottom-top"]
+    row = DimRow.model_validate(case.input["dims"]["footings"][0])
+    # For span = s = 2^-1075 mm, L1 gives two bars and one space of exactly 2^-1075 mm.
+    # The spacing is halfway between zero and the least positive binary64 value and rounds to zero.
+    half_subnormal = Fraction(1, 2**1075)
+
+    with pytest.raises(ContractError) as caught:
+        _direction_layout(row, half_subnormal, half_subnormal, Fraction(16))
+
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.OUT_OF_RANGE
+    assert detail.field == "dims"
+    assert detail.message == "footing J1 actual bar spacing cannot be represented as a valid binary64 number"
+    assert detail.expected == {"finite_binary64": True, "positive": True}
+    assert detail.received == "J1"
+
+
+def test_positive_spans_preserve_engineer_status_and_reason() -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L1: with c = 75 mm and db = 16 mm, each 566 mm width leaves 400 mm.
+    # The three bars and 200 mm actual spacing are usable, so keep the incoming engineer reason.
+    row = case.input["dims"]["footings"][0] | {
+        "Lx_mm": 566.0,
+        "Ly_mm": 566.0,
+        "s_mm": 200.0,
+        "source": "engineer",
+        "status": "OUTSIDE_BASIS_BOUNDS",
+        "reason": "ENGINEER_SET_OUTSIDE_BASIS",
+    }
+
+    result = _run(case, dims={"footings": [row]})
+    design = DesignRow.model_validate(result["footings"][0])
+
+    assert (design.n_x, design.n_y, design.s_x_mm, design.s_y_mm) == (3, 3, 200.0, 200.0)
+    assert (design.source, design.status, design.reason) == ("engineer", "OUTSIDE_BASIS_BOUNDS", row["reason"])
+
+
+@pytest.mark.parametrize(("lx", "ly"), [(166.0, float(2**53 + 166)), (float(2**53 + 166), 166.0)])
+def test_zero_span_takes_precedence_over_count_overflow(lx: float, ly: float) -> None:
+    case = load_cases("layout")["layout-x-bottom-top"]
+    # L1: 2c + db = 166 mm, so the spans are zero and 2^53 mm in either order.
+    # At s = 1 mm, calculating the positive direction first would require 2^53 + 1 bars.
+    # B-568 marks the entire row before calculating either direction and reports only the given spacing.
+    row = case.input["dims"]["footings"][0] | {"Lx_mm": lx, "Ly_mm": ly, "s_mm": 1.0}
+
+    result = _run(case, dims={"footings": [row]})
+    design = DesignRow.model_validate(result["footings"][0])
+
+    assert (design.status, design.reason) == ("NEEDS_ENGINEER", "WIDTH_TOO_SMALL")
+    assert (design.n_x, design.n_y) == (0, 0)
+    assert (design.s_x_mm, design.s_y_mm) == (1.0, 1.0)
+    assert (design.As_x_mm2, design.As_y_mm2) == (0.0, 0.0)
