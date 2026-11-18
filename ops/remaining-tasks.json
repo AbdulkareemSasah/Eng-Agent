@@ -404,7 +404,8 @@
     "2026-11-17: the real six-write crash matrix found an EC1 original/copy handoff collision and post-open bookkeeping gaps. Owner approved an explicit conservative original-open content capability. Continue the existing branch; preserve local test-first eeae76fe and continuation 668c3830, and wait for B-562 spec/plan scope amendment before additional engine/port/journal implementation. Existing adapter work remains unmerged and under review.",
     "Current pause 2026-11-18: owner-authorized WIP is published at 0a407606b1b49c8f7d6277bd6a585d20fbcd6762 on the existing branch, preserving first red eeae76fe. All three writer sessions are used. B-562 merged as #418; the only pending prerequisite is the reviewed and merged DOC.B563 session amendment before a fresh fourth session. The stale-PID focused cases passed (3); full EC1/AC36/AC52 implementation and verification remain pending. Continue via docs/build/resume/PAUSE-2026-11-18.md after the owner resumes.",
     "2026-11-18: writer session 4 finished; Opus review APPROVE; pushed at 5991420 (merges build/v1 at 51d9573). Only integration is left: local CI on the current head after merging origin/build/v1, then merge. No per-task mutation run (owner decision 2026-11-18; the periodic run covers it). PR body draft: docs/build/resume/2026-11-18b/b138-pr-body.md; review record b138-review.md. 478 counted lines (information only)."
-   ]
+   ],
+   "merged_pr": 428
   },
   {
    "id": "B-139",
@@ -1733,9 +1734,7 @@
    "branch": "feat/b202-harness-wt8-workflow-part-1-definition",
    "prTitle": "feat(eng-harness): workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) (B-202)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "S.T19a"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1812,7 +1811,6 @@
    "prTitle": "test(eng-harness): replay test and crash matrix of the workflow (A6) (B-206)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "S.T19a",
     "W.T9b"
    ],
    "writer": "sonnet, medium",
@@ -1976,7 +1974,6 @@
    "prTitle": "feat(eng-harness): workflow isolated_footing_design (definition, basis fields, steps 1 to 13, review, code packs) (B-400)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "S.T19a",
     "X.T8",
     "Y.T3"
    ],
@@ -2506,8 +2503,7 @@
     "R.T11",
     "R.T12",
     "R.T13",
-    "R.T14",
-    "S.T19a"
+    "R.T14"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3016,8 +3012,7 @@
    "prTitle": "feat(eng-harness): bind the port builder default and draw the run id at step 1 for run (B-488)",
    "risk": "r3",
    "pending_deps": [
-    "I.T18a",
-    "S.T19a"
+    "I.T18a"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -3059,9 +3054,7 @@
    "branch": "feat/b490-harness-st19b-command-line-tool-adapter-in",
    "prTitle": "feat(eng-harness): command-line tool adapter in build_ports, closes gap H-G8 (B-490)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "S.T19a"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
