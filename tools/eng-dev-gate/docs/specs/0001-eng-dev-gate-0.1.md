@@ -18,7 +18,9 @@ Governing documents: [process/11](../../../../design/process/11-repository-stand
 [process/06](../../../../design/process/06-review-and-merge.md),
 [ADR-0021](../../../../design/docs/adr/0021-agent-agnostic-ci-enforced-process.md),
 [ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md),
-[ADR-0035](../../../../design/docs/adr/0035-no-changed-line-limit.md) (no changed-line limit). The plan is
+[ADR-0035](../../../../design/docs/adr/0035-no-changed-line-limit.md) (no changed-line limit),
+[ADR-0036](../../../../design/docs/adr/0036-collateral-test-edits-and-session-estimate.md) (collateral test edits and the
+session estimate). The plan is
 [0001-eng-dev-gate-0.1](../plans/0001-eng-dev-gate-0.1.md). Where a rule here goes beyond the process documents, §11
 lists it as a question for the owner. In bootstrap mode this spec counts as reviewed once a subagent that did not write
 it has reviewed it and it is on `build/v1` (ADR-0028 §4); the owner still approves it later.
@@ -79,13 +81,17 @@ gate-check (§4.5)
 - AC8. Given a plan or spec that is not on the gate branch, then GC004; given `status: draft`, then it passes in
   bootstrap mode and fails with GC006 otherwise.
 - AC9. Given a task id that the plan does not define, then GC007.
-- AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each.
-- AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
+- AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each, except as AC10d says.
+- AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other (a notice under AC10d).
 - AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008. Each of these gives GC008 as well: a changed `version` field; a package key added, removed or renamed without a count change of an in-scope package; a lowering (`ratchet --update`) of another package's count; a change anchored only by the workspace root (`.`).
 - AC10c. Given an `__init__.py` under a workspace member's `tests/` directory that is added or modified (not renamed),
   and is empty (0 bytes at head; whitespace only is not empty), when another changed file in the same
   directory matches a task glob, then no GC008 for it; a non-empty one, a renamed or deleted one, or one without such a neighbour, is GC008
-  (amendment B-363).
+  (a notice under AC10d; amendment B-363).
+- AC10d. Given a changed file that matches none of the task's globs and is a collateral test file (a path with a `tests/` directory segment; such a path also matches `test_globs`, a
+  `src/**/test_*.py` source module does not count) or the `CHANGELOG.md` of a workspace member or of the plan's package folder, then GC008 is a notice naming it
+  a collateral edit, not an error; a changed non-test source file outside the globs is still a GC008 error (ADR-0036;
+  amendment B-565).
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
   spike files are summed; GC009 is a notice with the sum, the task's `max_changed_lines` (an estimate) and the largest
   files, never a failure (ADR-0035; amendment B-552).
@@ -375,12 +381,16 @@ Checks, in order (all run; findings accumulate):
    under a member's `tests/` directory, added or modified (not renamed) and 0 bytes at head, is in scope when another changed file in the same directory matches a task glob:
    it is a test package marker that type checking of shared test helpers needs, and it holds no code (AC10c; amendment
    B-363). Else GC008.
+   A path that matches no glob and is a collateral test file (a path with a `tests/` directory segment; such a path also matches `test_globs`) or a `CHANGELOG.md` of a workspace member or of the
+   plan's package folder is a collateral edit: GC008 with severity notice and a message that names it a collateral edit
+   (AC10d; ADR-0036, amendment B-565). The pull request lists it under "Collateral edits". A non-test source file
+   outside the globs stays a GC008 error.
 7. **Counted lines.** From `git diff --numstat -z -M <merge-base> <head sha>`, sum additions plus deletions of every
    changed file except: test files (`test_globs`), generated files (`generated_globs`, including `uv.lock` and rendered
    `AGENTS.md`) and spike files (`spike_globs`). Binary files count zero and give a notice. The sum, the task's
    `max_changed_lines` and the largest files are the notice GC009, never a failure: `max_changed_lines` is an estimate,
-   and exceeding it needs no plan change (ADR-0035; amendment B-552). `max_sessions` cannot be observed and is left to
-   review.
+   and exceeding it needs no plan change (ADR-0035; amendment B-552). `max_sessions` is an estimate that the gate never
+   checks (ADR-0036; amendment B-565).
 8. **Spec and plan pull requests.** If any changed file matches `spec_globs` or `plan_globs`, every changed file must
    (GC010); each changed spec or plan must have valid front matter (GC005); a changed plan must cover every
    acceptance criterion (`AC<n>.` lines) of its spec in some task's `covers` (GC016); no cap applies to
@@ -859,7 +869,7 @@ Diagnostic codes (the contract of this tool; the package `CHANGELOG.md` lists ch
 
 | Prefix | Meaning | Codes |
 |---|---|---|
-| GC | gate-check | 001 no Plan-Task · 002 malformed or duplicate · 003 work item · 004 plan or spec not on the gate branch · 005 front matter invalid · 006 status not acceptable · 007 task unknown · 008 file outside task · 009 notice: counted lines · 010 spec or plan pull request mixed · 011 `none` reason · 012 lane · 013 base branch · 014 `approved` set in bootstrap · 015 approval missing · 016 criterion uncovered |
+| GC | gate-check | 001 no Plan-Task · 002 malformed or duplicate · 003 work item · 004 plan or spec not on the gate branch · 005 front matter invalid · 006 status not acceptable · 007 task unknown · 008 file outside task (notice for a collateral test or CHANGELOG edit) · 009 notice: counted lines · 010 spec or plan pull request mixed · 011 `none` reason · 012 lane · 013 base branch · 014 `approved` set in bootstrap · 015 approval missing · 016 criterion uncovered |
 | AW | awaiting owner (notice) | 01 to 09, §4.4 |
 | RF | risk-floor | 001 below floor · 002 body mismatch · 003 map invalid · 004 no recorded risk |
 | TF | test-first | 001 title · 002 no test commit · 003 test commit not tests only · 004 passes at base · 005 fails at head · 006 refactor changed tests · 007 test pull request changed code · 008 `tests_first` file missing · 009 pytest could not run · 010 no new test · 011 import probe |
@@ -914,7 +924,7 @@ projects in temporary directories (one test per tool step). Test files sit in `t
 | AC1 | unit | `test_cli.py::test_exit_codes`, `test_report.py::test_json_result_schema` |
 | AC2, AC3 | unit | `test_report.py::test_awaiting_owner_notice_and_summary`, `test_modes.py::test_normal_mode_never_awaits` |
 | AC4, AC5 | unit | `test_modes.py::test_mode_only_from_gate_yml`, `::test_bootstrap_off_needs_identities` |
-| AC6 to AC11 (with AC10a, AC10b and AC10c), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules`, `test_gate_check.py::test_empty_test_package_marker_in_scope` (T36) |
+| AC6 to AC11 (with AC10a, AC10b, AC10c and AC10d), AC13 | integration and unit | `test_gate_check.py::test_valid_pull_request_passes`, `::test_plan_task_line_errors`, `::test_plan_not_on_gate_branch`, `::test_unknown_task`, `::test_file_outside_globs_including_rename`, `::test_changelog_and_local_testing_in_scope`, `::test_ratchet_baseline_in_scope` (T14b; one case each for the AC10b rules: in scope, other package count, version change, key added, removed or renamed, lowering of another package, root-only anchor), `::test_budget_counting`, `test_frontmatter.py::test_plan_front_matter_rules`, `test_gate_check.py::test_empty_test_package_marker_in_scope` (T36) |
 | AC12b, AC13a | unit and integration | `test_config.py::test_root_gate_yml_clause_specs_are_specs`, `test_frontmatter.py::test_clause_spec_directory_plan`, `test_gate_check.py::test_plan_with_clause_spec_directory`, `test_gate_check_docs.py::test_plan_with_clause_spec_directory` (T31) |
 | AC12c | unit | `test_config.py::test_root_gate_yml_schema_snapshots_are_generated` (T35) |
 | AC12, AC14 to AC18 | integration | `test_gate_check_docs.py::test_spec_plan_pull_request_only`, `::test_lane_branch`, `::test_none_reasons`, `::test_status_approved`, `::test_protected_paths_awaiting_owner`, `::test_gate_branch_merge` |
