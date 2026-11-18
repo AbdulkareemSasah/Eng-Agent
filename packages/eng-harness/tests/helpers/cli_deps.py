@@ -10,31 +10,34 @@ import contextlib
 import io
 import threading
 import time
-from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Provenance
+from eng_contract.errors import ContractError
 from eng_contract.ids import FixedClock, IdSource, SeededIdSource
 from eng_contract.store import ResultStore, Workspace
-from pydantic import BaseModel, ConfigDict, JsonValue
+from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
+from workflows.rig import Host
 
 from eng_harness import __version__
 from eng_harness.block import Registry, workflow
 from eng_harness.calc import CalcStatus
 from eng_harness.cli import CliDeps, main
 from eng_harness.cli._config import HarnessConfig
-from eng_harness.cli._wiring import RunPortSet
+from eng_harness.cli._wiring import RunPortSet, default_engine_factory
 from eng_harness.engine import EngineSettings, RunOutcome, RunRequest, RunStatus
+from eng_harness.engine._inputs import build_request, check_answer, data_schema
 from eng_harness.errors import HarnessCode
 from eng_harness.journal import EventType, JournalWriter
 from eng_harness.pages import PageServer
 from eng_harness.pages._answers import bound_sha256
 from eng_harness.pages._security import CSRF_FIELD
-from eng_harness.ports import ApprovalRequest, HostPort, RunClass, ToolPort
+from eng_harness.ports import ApprovalRequest, HostPort, InputAnswer, InputRequest, RunClass, ToolPort
 from helpers.page_client import PageClient
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
@@ -84,7 +87,35 @@ async def needs_basis(ctx: Any, inp: FakeInput) -> FakeOutput:
     return FakeOutput()
 
 
-REGISTRY = Registry([fake_flow, needs_basis])
+FILE_FLOW = "file_flow"
+
+
+class FileInput(BaseModel):
+    """The input of the workflow with model files: two `Path` fields and the `visible_host` flag (spec 0006 AC67)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    model_file: Path
+    other_file: Path | None = None
+    visible_host: bool = False
+
+
+@workflow(name=FILE_FLOW, version=1, description="A workflow that works on model files.")
+async def file_flow(ctx: Any, inp: FileInput) -> FakeOutput:
+    """The body is never run."""
+    return FakeOutput()
+
+
+REGISTRY = Registry([fake_flow, needs_basis, file_flow])
+
+
+class Asked(BaseModel):
+    """The values of the data request the fake engine opens (`ctx.ask`)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    label: str
+    count: int = 1
 
 
 class Placeholder:
@@ -134,6 +165,38 @@ class Session:
         )
         return True
 
+    async def ask(self, request_id: str, *, wait: bool) -> bool:
+        """Journal a data request (not again on a resume), present it and take the answer as the engine does.
+
+        True when an answer fits the request and `Asked`; a refused or missing answer is False, the request stays open.
+        """
+        request = build_request(
+            self.engine.ids, request_id, "block", "Give the values", data_schema(Asked.model_json_schema())
+        )
+        self.engine.asked.append(request)
+        if not self.resumed:
+            self.writer.append(
+                EventType.INPUT_REQUESTED,
+                {
+                    "request_id": request_id, "kind": "block", "title": request.title,
+                    "fields_schema_sha256": request.fields_schema_sha256,
+                },
+            )  # fmt: skip
+        await self.ports.inputs.present(request)
+        answer = await self.ports.inputs.answer(request_id, wait=wait)
+        if answer is None:
+            return False
+        try:
+            check_answer(request, answer)
+            Asked.model_validate(dict(answer.values or {}))
+        except ContractError, ValidationError:
+            return False
+        stored = self.engine.store.put("harness.journal_blob/1", {"value": 1}, PRODUCER)
+        by = {"request_id": request_id, "answer_ref": stored.result_id, "by": "engineer:" + answer.by}
+        self.writer.append(EventType.INPUT_PROVIDED, by)
+        self.engine.answers.append(answer)
+        return True
+
     def paused(self, reason: str, pending: tuple[str, ...] = ()) -> RunOutcome:
         """Journal `run_paused` and return the paused outcome."""
         self.writer.append(EventType.RUN_PAUSED, {"reason": reason, "request_ids": list(pending)})
@@ -166,6 +229,30 @@ def approves(*, wait: bool) -> Script:
     return script
 
 
+def asks(*request_ids: str, wait: bool = False) -> Script:
+    """The run opens the data requests `request_ids` in order; at the first one without a fitting answer it pauses."""
+
+    async def script(session: Session) -> RunOutcome:
+        for request_id in request_ids:
+            if not await session.ask(request_id, wait=wait):
+                return session.paused("awaiting_input", (request_id,))
+        return session.completed()
+
+    return script
+
+
+def opens_choice(kind: str, request_id: str) -> Script:
+    """The run journals an engine request of `kind` (a choice) and pauses on it."""
+
+    async def script(session: Session) -> RunOutcome:
+        sha = "b" * 64
+        body = {"request_id": request_id, "kind": kind, "title": "A choice", "fields_schema_sha256": sha}
+        session.writer.append(EventType.INPUT_REQUESTED, body)
+        return session.paused("awaiting_input", (request_id,))
+
+    return script
+
+
 async def pauses_on_stop(session: Session) -> RunOutcome:
     """The run pauses when the run-control port says stop (the first check between steps), else it ends."""
     control = session.ports.run_control
@@ -184,6 +271,8 @@ class FakeEngine:
         self.workspace, self.ports, self.store, self.clock, self.ids = workspace, ports, store, clock, ids
         self._script, self._log, self._keep_basis_ref = script, log, keep_basis_ref
         self.request: ApprovalRequest | None = None  # the approval the script showed
+        self.asked: list[InputRequest] = []  # the data requests the script opened
+        self.answers: list[InputAnswer] = []  # the answers the script accepted
         self.run_request: RunRequest | None = None  # what `start` was asked
 
     def _writer(self, run_dir: Path) -> JournalWriter:
@@ -230,10 +319,10 @@ class FakeEngine:
 class FakePorts:
     """The ports a port builder returns: entering and leaving are logged."""
 
-    def __init__(self, log: list[str]) -> None:
+    def __init__(self, log: list[str], host: Host | None = None) -> None:
         self._log = log
-        self.tool_port = cast(ToolPort, Placeholder())
-        self.host_port = cast(HostPort, Placeholder())
+        self.tool_port = cast(ToolPort, host or Placeholder())
+        self.host_port = cast(HostPort, host or Placeholder())
 
     async def __aenter__(self) -> FakePorts:
         self._log.append("enter")
@@ -280,6 +369,9 @@ class Rig:
     engines: list[FakeEngine] = field(default_factory=list)
     calcs: list[FakeCalc] = field(default_factory=list)
     keep_basis_ref: bool = False  # journal the request's own basis reference, which the report cannot read (Q23)
+    real_engine: bool = False  # the merged `Engine` over a fake host, the page ports seen through `shown`
+    shown: list[ApprovalRequest] = field(default_factory=list)  # the approvals the real engine presented
+    models: list[tuple[Mapping[str, Path], bool]] = field(default_factory=list)  # `files`, `visible` of each build
 
     @property
     def workspace(self) -> Path:
@@ -302,19 +394,25 @@ class Rig:
     def _engine(
         self, workspace: Workspace, registry: Registry, ports: RunPortSet, store: ResultStore, settings: EngineSettings,
         clock: Any, ids: IdSource,
-    ) -> FakeEngine:  # fmt: skip
+    ) -> Any:  # fmt: skip
+        if self.real_engine:
+            held = replace(ports, approvals=_Recording(ports.approvals, self.shown))
+            return default_engine_factory(workspace, registry, held, store, settings, clock, ids)
         engine = FakeEngine(workspace, ports, store, clock, ids, self.script, self.log, self.keep_basis_ref)
         self.engines.append(engine)
         return engine
 
     def _port_builder(
         self, config: HarnessConfig, workspace: Workspace, store: ResultStore, run_folder: Callable[[], Path],
-        clock: Any, ids: IdSource,
+        clock: Any, ids: IdSource, *, files: Mapping[str, Path] | None = None, visible: bool = False,
     ) -> FakePorts:  # fmt: skip
         self.built.append((config, workspace, store, run_folder))
+        self.models.append((dict(files or {}), visible))
         if self.on_build is not None:
             self.on_build(workspace.root / "runs")
-        return FakePorts(self.log)
+        return FakePorts(
+            self.log, Host(cast(SeededIdSource, ids), clock, workspace.root / "runs") if self.real_engine else None
+        )
 
     def _calc(
         self, config: HarnessConfig, workspace: Workspace, store: ResultStore, run_class: RunClass, clock: Any,
@@ -347,21 +445,39 @@ class Rig:
         return str(path)
 
 
-def approving_opener(rig: Rig, *, by: str = "ada") -> Callable[[str], bool]:
-    """An opener that hands the launch address to a thread, which answers the open approval with Approve."""
+class _Recording:
+    """The page `ApprovalPort` of a real engine that keeps each request it is shown."""
+
+    def __init__(self, inner: Any, shown: list[ApprovalRequest]) -> None:
+        self._inner, self._shown = inner, shown
+
+    async def present(self, request: ApprovalRequest) -> None:
+        self._shown.append(request)
+        await self._inner.present(request)
+
+    async def answer(self, request_id: str, *, wait: bool) -> Any:
+        return await self._inner.answer(request_id, wait=wait)
+
+
+def approving_opener(
+    rig: Rig, *, by: str = "ada", current: Callable[[], ApprovalRequest | None] | None = None
+) -> Callable[[str], bool]:
+    """An opener that hands the launch address to a thread, which answers the open approval with Approve.
+
+    `current` names the approval to answer; by default it is the one the fake engine showed last.
+    """
+    shown = current or (lambda: rig.engines[-1].request)
 
     def answer(address: str) -> None:
         with contextlib.suppress(Exception):  # the command may end before the page has answered the browser
             client = client_for(address)
             client.open()
             end = time.monotonic() + 10
-            while rig.engines[-1].request is None or client.get("/request/apr_one").status != 200:
+            while (request := shown()) is None or client.get(f"/request/{request.request_id}").status != 200:
                 assert time.monotonic() < end
                 time.sleep(0.01)
-            request = rig.engines[-1].request
-            assert request is not None
-            form = {CSRF_FIELD: client.token("/request/apr_one"), "shown_sha256": bound_sha256(request)}
-            client.post("/answer/apr_one", form | {"by": by, "decision": "approve"})
+            form = {CSRF_FIELD: client.token(f"/request/{request.request_id}"), "shown_sha256": bound_sha256(request)}
+            client.post(f"/answer/{request.request_id}", form | {"by": by, "decision": "approve"})
 
     def opener(address: str) -> bool:
         threading.Thread(target=answer, args=(address,), daemon=True).start()

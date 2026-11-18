@@ -693,6 +693,30 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_model_keys.py::test_preview_and_promote_take_a_key"
     covers: [AC72]
     depends_on: [T16b]  # external: plan 0007 T6 (merged; also edits _modes.py and _ctx_impl.py)
+  - id: T24
+    title: The first ctx.basis read is engine work (StoreBasisPort under the runtime guard)
+    # Amendment (B-569, documents only): new (spec 4.3.2 row basis, 4.3.4 rule 1, AC18; spec 0004 AC28; spec section 11
+    # Q45). Found by the B-202 writer (plan 0007 T8) and reproduced by its verifiers: Ctx.basis loads the stored basis
+    # lazily from block code, so the production StoreBasisPort (a ResultStore read, audit event open) is refused by the
+    # guard and every block that reads ctx.basis before a decide ends NEEDS_ENGINEER (block_rule_violation); the fakes
+    # answer from memory. A synchronous engine section in _guard.py (about 10 lines) around port.load only, in the
+    # runner's basis loader that serves ctx.basis and the Decider (about 3), 1 of CHANGELOG.md: budget 30 (an estimate).
+    # After T17 (merged; _guard.py, test_guard.py) and T23 (merged; the last task that edited CHANGELOG.md); external:
+    # plan 0004 T10 (merged, B-164) wrote the lazy loader in _runner.py and owns test_basis_workflow.py. Plan 0007 T8
+    # waits for it (it removes the _Loaded workaround of its conftest.py then).
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/engine/_guard.py"
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_guard.py"
+      - "packages/eng-harness/tests/workflow/test_basis_workflow.py"  # the AC28 run over StoreBasisPort (spec 0004)
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/unit/test_guard.py::test_basis_load_is_engine_work"
+      - "packages/eng-harness/tests/workflow/test_basis_workflow.py::test_basis_reaches_ctx_over_the_store_port"  # spec 0004 AC28
+    covers: [AC18]  # and spec 0004 AC28 (its StoreBasisPort run), which plan 0004 T10 covers
+    depends_on: [T17, T23]
 ---
 
 # Implementation plan: eng-harness engine
@@ -717,7 +741,9 @@ files only: their lines are merged in pull-request order, and they share no othe
 B-414: its worker crashes through T18's progress sink). T16 and T16b (the B-499 split) also share `_modes.py`,
 `tests/workflows/**` and `tests/replay/test_in_flight.py`, and T16b shares `_inflight.py` with T15 and T21, so T21
 follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21. T23 (B-543) follows T16b
-(`_modes.py`, `_ctx_impl.py`) and shares only `CHANGELOG.md` with T19; plan 0007 T8 waits for it.
+(`_modes.py`, `_ctx_impl.py`) and shares only `CHANGELOG.md` with T19; plan 0007 T8 waits for it. T24 (B-569)
+follows T17 (`_guard.py`, `test_guard.py`) and T23 (`CHANGELOG.md`), all merged; it edits `_runner.py` after plan 0004
+T10 (merged) and that plan's `tests/workflow/test_basis_workflow.py`; plan 0007 T8 waits for it.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -1068,6 +1094,30 @@ at the base, where `Preview` refuses a `str` model. Amendment B-560 adds the exi
 the supplied revision-2 handle check while accepting the widened type. This collateral edit is in the implementation
 commit; the test already passes at the base. The budget, acceptance criteria and `tests_first` stay unchanged.
 
+**T24 The first `ctx.basis` read is engine work** (spec §4.3.2 row basis, §4.3.4 rule 1, AC18, §11 Q45; spec 0004
+AC28; amendment B-569). `Ctx.basis` is a synchronous property, not a step, and its first read calls the runner's lazy
+basis loader from block code, where `in_block_code` is true, so `StoreBasisPort.load` (a `ResultStore` read, audit
+event `open`) is refused and the run ends `NEEDS_ENGINEER` (`block_rule_violation`). `_guard.py` gains a synchronous
+engine section, the counterpart of `engine_work`: it sets the flag false and restores it in `finally`; it is engine
+internal, not exported to block code, installs nothing and runs no block-supplied code. In `_runner.py` only
+`port.load(basis_ref)` of the loader runs inside it; the `BasisView` is built after it. The one loader serves
+`ctx.basis` and the Decider (already guard-off; nesting is harmless). `Ctx.basis` keeps its cache, the load stays lazy
+(no eager load at start, which `tests/workflow/test_invariants.py::test_no_basis_read_when_nothing_is_required`
+refutes and which would change the port-call log the rig's tests pin), and that test stays unchanged.
+`test_basis_load_is_engine_work` builds an `Engine` with the workflows rig whose basis port is
+`StoreBasisPort(rig.store)` over a basis stored in the rig's store, and checks three cases: a root block whose first
+action is `ctx.basis.record_ref()` with no `required_basis` completes; a root block that reads a path declared in
+`required_basis` through `ctx.basis.quantity(...)` completes (the start's basis check does not mask the defect); and a
+root block that reads `ctx.basis` and then opens a file ends `NEEDS_ENGINEER`, reason `block_rule_violation`, detail
+naming the audit event `open` (the guard is back on after the section). At the base the first two end
+`block_rule_violation`, so the test is red for the right reason. A unit case may also show that the section restores
+the flag when its body raises. `test_basis_reaches_ctx_over_the_store_port` (spec 0004 AC28) runs the AC28 workflow
+over `StoreBasisPort` on the store where the basis was frozen, in place of the in-memory port, and completes with the
+same typed values; it fails at the base. Plan 0007 T8 waits for this task and then replaces the `_Loaded` workaround of
+its `tests/workflow/edit_cycle/conftest.py` by `StoreBasisPort(store)`. A separate observation, not built here: the
+Decider reloads the basis through the port at every decision call instead of sharing the `Ctx` cache (correct, but
+redundant reads).
+
 ## 3. Dependencies
 
 - Runtime: `eng-contract` (workspace member) and `pydantic` (named by
@@ -1087,6 +1137,14 @@ commit; the test already passes at the base. The budget, acceptance criteria and
   `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
   `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T14b passes
   `decision` and plan 0006 T16b passes `progress` and `run_control` in production once T18 has merged (amendment B-510).
+- External amendments of this plan's files by tasks of other plans (amendment B-569, from the B-202 findings): plan 0007
+  T8b ("Sanctioned result accessors for block code"; spec §4.3.2, AC12, AC61, AC19, §11 Q48) adds the read-only
+  properties `ReadResult.data` and `Answered.answer` to `ctx.py` and the forms that reach `value` (and the attribute
+  `parser`, §4.1.2, Q47) to the scan of `tests/rules/test_block_modules.py`, with `tests/unit/test_ctx_read.py` and
+  `tests/unit/test_ctx_ask.py`, together with the switch of the edit-cycle blocks to the accessors, which must land in
+  the same pull request; plan 0007 T8 or plan 0006 T14c, whichever merges first, adds `ModelFile` to `block.py` and its
+  test to `tests/unit/test_block.py` (§4.1.2, Q47). T24 of this plan is the engine part of the same findings; plan 0007
+  T8 waits for it.
 
 ## 4. Verification
 
@@ -1105,7 +1163,8 @@ commit; the test already passes at the base. The budget, acceptance criteria and
   here; every other step that drives a host program belongs to specs 0002 and 0007 (acceptance A2, A5, A6 of 18 §5).
 - Review: each pull request is reviewed by a subagent that did not write it, with the correctness, Python,
   type-design, silent-failure and test lenses; T3, T3b, T9, T9b, T11b, T11c, T12, T13, T13b, T13c, T15, T16, T16b and T22 additionally against the invariant
-  and replay rules of the spec (R1: model writes); T16, T16b and T17 with the security lens (file paths, the audit hook).
+  and replay rules of the spec (R1: model writes); T16, T16b, T17 and T24 with the security lens (file paths, the audit
+  hook; T24: nothing block-supplied runs inside the engine section, amendment B-569).
   The second-family review and the owner's approvals are `awaiting owner` in bootstrap mode (ADR-0028 §4).
 
 ## 5. Rollback

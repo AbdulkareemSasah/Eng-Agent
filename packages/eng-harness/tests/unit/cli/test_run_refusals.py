@@ -34,7 +34,7 @@ def test_refusals_create_no_run(tmp_path: Path) -> None:
         refusals=refused,
     )
     case("builder", ["run", WORKFLOW], ExitCode.USAGE, "configuration error: servers.csi", on_build=_boom)
-    case("answers", ["run", WORKFLOW, "--answers", "a.json"], ExitCode.USAGE, "--answers option is not available")
+    case("answers", ["run", WORKFLOW, "--answers", "a.json"], ExitCode.USAGE, "cannot read the answers file a.json")
     case("option", ["run", WORKFLOW, "--bogus"], ExitCode.USAGE, "unrecognized arguments: --bogus")
     case("quantity", ["run", WORKFLOW, "--load", "2"], ExitCode.USAGE, "unrecognized arguments: --load")
     case("no_run", ["resume", NO_RUN], ExitCode.NOT_FOUND, f"no run {NO_RUN}")

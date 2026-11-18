@@ -111,7 +111,7 @@ def test_page_server_is_not_started_or_not_opened(
     runs, opened, err = tmp_path / "ws" / "runs", list[str](), io.StringIO()
     config = HarnessConfig.model_validate({"page": {"open_browser": browser}})
     session = PageSession(
-        config=config, store=store, runs_dir=runs, cell=RunIdCell(runs, "run_x"), clock=clock, wait_timeout_s=None,
+        config=config, store=store, runs_dir=runs, cell=RunIdCell(runs, "run_x"), clock=clock, wait_timeout_s=1,
         no_wait=no_wait, no_browser=no_browser, opener=_recording(opened), stderr=err,
     )  # fmt: skip
     asyncio.run(session.inputs.present(_input_request()))
