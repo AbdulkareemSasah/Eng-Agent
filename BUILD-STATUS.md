@@ -819,3 +819,6 @@ Stated as in `docs/build/lead-findings.md` (entries of 2026-11-15 22:40 UTC and 
 | OD-4 | Spec 0006 Q22, Q23, Q24 (each has an interim reading in its task; Q24: an edit-cycle run whose report has exceptions cannot be signed until Q24 is answered and spec 0007 step 17 adds the `exc_<n>` items; reject still works) | Open, later |
 | OD-5 | Interim readings of spec 0007 section 4.9: (a) the A7 prompt counter does not count a decision request still open at the end of the journal, nor approvals answered by a mode caller; (b) machine time per cycle excludes scope steps and engineer steps, which differs from the run-level machine time of spec 0006 AC56: which one is the B-1 figure? | Open |
 | OD-6 | Engine Q40 (B-500 findings: a promotion resolved `applied` at a resume journals no `model_saved` role promoted; the backups folder is flat; the promote step journals no `model_key`), Q41 and Q43 (built as the writer's recommendation) | Open, owner queue |
+| B-570 | E.T24 | The first `ctx.basis` read is engine work (B-569 F1; blocks the first live run) | agy | codex | — | ready |
+| B-571 | W.T13b | Tool saves record the save; the save result carries the post-save revision (B-569 F2; blocks the first live run) | agy | codex | — | ready |
+| B-572 | W.T8b | Sanctioned result accessors for block code (B-569 F4) | agy | codex | — | after W.T8 |

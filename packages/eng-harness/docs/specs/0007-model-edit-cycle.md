@@ -40,6 +40,16 @@ exit for a model locked after analysis (§4.5, AC15); the visible launch (§4.2;
 step 2); and the re-read before step 6 (§4.5.1, AC13). Each choice is stated as a decision where it is made; the host
 facts it rests on are §12 (7) and (8).
 
+**Amendment B-569 (documents only, first live run of workflow part 1, from work item B-202).** The writer of plan T8
+and its independent verifiers reproduced four points on the merged code (engine spec 0001 §11 Q45 to Q48). For this
+spec: `EditCycleInput.model` is `eng_harness.block.ModelFile`, an alias of `pathlib.PurePath`, because a block module
+may not import `pathlib` (§4.2, §5; engine §4.1.2); a CSI tool save and `csi_open_revision` record the save on the
+host port before the result is stored, so the result's `provenance.host` carries the revision after the step and the
+step 8 writes after the step 7 save pass their re-check (§4.10, new criterion AC43; spec 0002 §4.5.3, plan T13b); the
+blocks read `ctx.read` results through `ReadResult.data` and `ctx.ask` answers through `Answered.answer` (engine
+§4.3.2, plan T8b); and the first `ctx.basis` read from a block loads the stored basis as engine work (engine §4.3.4
+rule 1, engine plan 0001 T24), so the edit-cycle tests run over the production `StoreBasisPort` (plan T8).
+
 ## 1. Problem
 
 The edit cycle is where the owner's time goes: 342 agent minutes and 500 engineer minutes in one reviewed task, against
@@ -300,6 +310,18 @@ defines its method; values are synthetic and say so.
   effects on `model.sections/1`. Tests: `tests/golden/edit_cycle/test_change_set_check.py::test_sections_absent`
   (cases `check-no-sections-*`), `tests/golden/edit_cycle/test_expected_effects.py::test_sections_absent` (cases
   `effects-no-sections-*`).
+- AC43. **[added: B-569]** Given a CSI tool port and host port wired together by `build_ports` against the CSI fake
+  server, after `csi_open_model` and `csi_save_model` with `as_new_revision` true, then the result's
+  `provenance.host.model_revision` equals the revision `model_state` reports right after it, which is one more than
+  the revision before the save, and the host port's warnings hold no `MODEL_CHANGED_OUTSIDE`; the same holds for an
+  in-place `csi_save_model` after a write, and for `csi_open_revision` (its result's revision equals the next
+  `model_state` revision); given a save made outside the port, then the next `model_state` still raises the revision
+  with `MODEL_CHANGED_OUTSIDE`. Given a workflow that saves with `as_new_revision` under an approval whose preview
+  names the save and a write, and then writes under the same approval, then the run completes with no `ApprovalVoid`
+  and the journal's `model_saved` (role `revision`) holds the host's revision after the save; and given a pause after
+  a tool save, then the resume meets no `host_state_mismatch` (§4.10; spec 0002 §4.5.3). Tests:
+  `tests/workflow/adapters/test_csi_tool_saves.py::test_save_result_carries_post_save_revision`,
+  `::test_save_then_write_under_one_approval`, `::test_resume_after_tool_save_has_no_mismatch`.
 - AC32. Given the kinds of §4.2, then the report renders them through registered renderers with a source on every value
   cell, and adds the timings of §4.9. Test: `tests/unit/report/test_edit_cycle_renderers.py::test_renderers_and_sources`.
 
@@ -337,8 +359,10 @@ Registration (amendment B-417, Q13): the block registry is immutable and has no 
 `block` and the workflow modules do not import each other at load time. Later workflows (plan 0010 T9, plan 0013 T11
 and T13) add their blocks to the same tuple. Decision points and rules are found by spec 0005's own discovery (§4.6).
 
-- Input `EditCycleInput`: `model` (`pathlib.Path`, the absolute path of the model file; the command line gives the
-  host port that file under its base name, which is the model key, spec 0006 §4.2.2 step 2; amendment B-536 replaces
+- Input `EditCycleInput`: `model` (`eng_harness.block.ModelFile`, that is `pathlib.PurePath`, the absolute path of
+  the model file; amendment B-569: a pure path, because a block module may not import `pathlib`, engine §4.1.2; the
+  block reads only its base name `inp.model.name`, the command line turns it into a `pathlib.Path` for its checks;
+  the command line gives the host port that file under its base name, which is the model key, spec 0006 §4.2.2 step 2; amendment B-536 replaces
   the `harness.file_input/1` reference, from which no component can find the file), `visible_host: bool` (default true: the engineer edits by hand in the instance the run launched,
   spec 0002 §4.6.1 step 2). The command line passes `visible_host` to the port builder as `visible` (spec 0006
   §4.2.2 step 2) and the CSI host port launches every instance of the run with it (spec 0002 §4.5.9; amendment
@@ -783,7 +807,11 @@ server tool):
   `wrote`), so `model_files`, `locate` and `model_state` name and find it on the same bound instance, its first
   `model_state` is a new baseline for the outside-edit check, and the engine's `model_saved` and the next host-state
   check find the file (amendment B-503, plan T13). Which model identity and revision the restored file takes is open
-  (§11 Q16).
+  (§11 Q16). Amendment B-569: the tool port calls `reopened` after the successful open and before it stores the
+  result, not after `super().call` has stored it, and builds the result's `provenance.host` from the binding read
+  after that record, so the stored `host.model_revision` is the revision of the reopened file (the interim reading of
+  Q16: the bound model's next revision through `IdentityStore.record_save`), and the first `model_state` after it
+  gives no `MODEL_CHANGED_OUTSIDE` (spec 0002 §4.5.3, §4.5.9 "Tool saves"; AC38, AC43; plan T13b).
 - `csi_read_analysis_messages` (effect `read`): the `Analysis Messages` table through `csi_db_table_read` (read
   only), stored as `harness.csi_analysis_messages/1`.
 - `csi_save_model` gains `as_new_revision`: saves the open file in place, then copies its files to a snapshot at a
@@ -795,12 +823,21 @@ server tool):
   file hash), which the engine checks against the model's file hash before it journals `model_saved` (role
   `revision`, `file_name` the working file `W`, not the snapshot); without it, `saves_new_file` is false and
   the engine journals the in-place save.
+  Amendment B-569 (spec 0002 §4.5.3, §4.5.9 "Tool saves"; engine §4.6 "Tool saves", §4.9, EC5): after a successful
+  `csi_save_model`, in place or with `as_new_revision`, and before the result is stored, the CSI tool port records the
+  save on the host port (`AdapterHostPort.tool_saved(model_key)`: `IdentityStore.record_save` with the working file
+  and its fingerprint, and that read as the new outside-edit baseline), then builds the result's `provenance.host`
+  from the binding read after the record, so `host.model_revision` is the revision the save produced. With
+  `as_new_revision` the record follows the in-place save and precedes the snapshot copy, so the snapshot's hash still
+  equals the recorded file hash. The engine's `model_saved` then equals the next `model_state`, a write under the
+  same approval after the save passes its re-check, a resume after the save meets no `host_state_mismatch`, and the
+  harness's own save is never `MODEL_CHANGED_OUTSIDE`; a save made outside the harness still is (AC43; plan T13b).
 
 ## 5. Inputs and outputs
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| `EditCycleInput.model` | `pathlib.Path`, absolute (amendment B-536) | — | an existing `.EDB` | no | engineer (`--input`) |
+| `EditCycleInput.model` | `eng_harness.block.ModelFile` (`pathlib.PurePath`), absolute (amendment B-536; B-569) | — | an existing `.EDB` | no | engineer (`--input`) |
 | `EditCycleInput.visible_host` | bool | — | — | no | engineer |
 | `ChangeSetDraft` values | basis path or number with unit | length, line load, area load, ratio (§4.3.1) | `bounds.*` (§4.8) and contract kind bounds | yes (basis) | design basis or engineer input |
 | Names in items | `str` | — | 1 to 200 characters, must exist | no | engineer; model state |
@@ -850,7 +887,7 @@ Errors of the engine, adapters and calcs pass through unchanged.
 | AC3 (kinds) | Contract | `tests/contract/` |
 | AC4, AC5, AC7, AC8, AC30 (summary input: unit, `tests/unit/calcs/`), AC36, AC37, AC39 | Golden | `tests/golden/edit_cycle/`, data in `tests/data/golden/edit_cycle/` |
 | AC8, AC25 (generated) | Property | `tests/property/` |
-| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38, AC41, AC42 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
+| AC9 to AC17, AC19 to AC24, AC26, AC31, AC34, AC38, AC41, AC42, AC43 | Fake-host workflow | `tests/workflow/edit_cycle/`, `tests/workflow/adapters/` |
 | AC27, AC28 | Replay | `tests/replay/edit_cycle_replay/` (with `__init__.py`; no `tests/replay/__init__.py`, so the package name must differ from `tests/unit/edit_cycle/`) |
 
 No host program and no network. Coverage floors 85% line and 75% branch; mutation score at least 80% on the R1
