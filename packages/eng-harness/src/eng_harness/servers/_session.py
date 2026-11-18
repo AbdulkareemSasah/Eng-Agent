@@ -243,7 +243,8 @@ class ServerManager:
         logger.info(
             "%s/%s %s, tool list %s", role.server, role.name, seen.server_info, tool_list_fingerprint(seen.tools)
         )
-        return check_build(role.server, role.config.build, expected, seen, self._min_builds.get(role.server, ""))
+        minimum = self._min_builds.get(role.server, "")
+        return check_build(role.server, role.config.build, expected, seen, minimum, product=role.config.product)
 
     async def call(
         self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect

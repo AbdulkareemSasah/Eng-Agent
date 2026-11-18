@@ -33,6 +33,7 @@ from eng_harness.cli._control import FileRunControl, remove_stop
 from eng_harness.cli._exit import ExitCode, Outcome, exit_code_for, exit_code_for_error
 from eng_harness.cli._options import parse_options
 from eng_harness.cli._parser import UsageError
+from eng_harness.cli._signals import install_interrupt_handler
 from eng_harness.cli._wiring import (
     EngineLike,
     FileAnswers,
@@ -46,7 +47,7 @@ from eng_harness.cli._wiring import (
 from eng_harness.engine import PermissionMode, RunOutcome, RunRequest, RunStatus
 from eng_harness.journal import Event, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import RunClass
+from eng_harness.ports import DecisionPort, RunClass
 from eng_harness.progress import ExpectedTimes, Mode, ProgressRenderer, TerminalProgress
 from eng_harness.report import ReportError, build_report, write_report
 from eng_harness.servers import ConfigError
@@ -101,7 +102,15 @@ def _say(deps: CliDeps, text: str) -> None:
 
 def _command(args: Namespace, deps: CliDeps, *, resume: bool) -> int:
     registry, port_builder, calc_factory = deps.workflow_registry, deps.port_builder, deps.calc_port_factory
-    if registry is None or port_builder is None or calc_factory is None:
+    assembler, decision_factory, policies = deps.decision_assembler, deps.decision_port_factory, deps.point_policies
+    if (
+        registry is None
+        or port_builder is None
+        or calc_factory is None
+        or assembler is None
+        or decision_factory is None
+        or policies is None
+    ):
         _say(deps, f"command {args.command} is not available in this build")
         return ExitCode.USAGE
     try:
@@ -109,43 +118,51 @@ def _command(args: Namespace, deps: CliDeps, *, resume: bool) -> int:
     except ContractError as error:  # a LocalWorkspaceError: nothing is created
         _say(deps, f"{error.detail.message} ({error.detail.hint})")
         return ExitCode.USAGE
-    if resume and _RUN_ID.fullmatch(args.run_id):  # before step 1: a file written later is kept (spec 4.4.8)
+    valid_id = resume and _RUN_ID.fullmatch(args.run_id) is not None
+    if valid_id:  # before step 1 and before installing signal handler: a file written later is kept (spec 4.4.8)
         remove_stop(workspace.root / "runs" / args.run_id)
     config: HarnessConfig = args.config_data
+    cell = RunIdCell(workspace.root / "runs", args.run_id if valid_id else None)
     store = ResultStore(workspace, HARNESS_KINDS, deps.ids, deps.clock)
     try:
-        plan = _resume_plan(args, workspace, registry, store) if resume else _run_plan(args, registry, config)
-        answers = _answers(args, config, plan, resume=resume)
-        cell = RunIdCell(workspace.root / "runs", plan.run_id)
-        try:
-            built = port_builder(
-                config, workspace, store, cell.folder, deps.clock, deps.ids, files=plan.files, visible=plan.visible
-            )
-        except errors.NotImplementedGap as gap:  # gap H-G8: the usage exit is returned here (spec 4.2.2 step 2)
-            raise _RefusedError(ExitCode.USAGE, gap.message) from gap
-        calc = calc_factory(config, workspace, store, plan.run_class, deps.clock, deps.ids)
-        # The workflow declares no calcs, so nothing is listed until it does; `run` refuses an unapproved calc at its
-        # step all the same (spec 0003 AC11).
-        refusals = calc.preflight(()) if not resume and plan.run_class is RunClass.PRODUCTION else []
-        if refusals:
-            lines = [f"{item.calc_id} is {item.status.value} ({item.code.value})" for item in refusals]
-            raise _RefusedError(ExitCode.REFUSED, "calcs refused for a production run: " + "; ".join(lines))
-        page = PageSession(
-            config=config, store=store, runs_dir=workspace.root / "runs", cell=cell, clock=deps.clock,
-            wait_timeout_s=args.wait_timeout, no_wait=args.no_wait, no_browser=args.no_browser,
-            opener=deps.opener, stderr=deps.stderr, answers=answers, answers_once=not resume,
-        )  # fmt: skip
-        progress = _progress(args, deps, config, workspace, plan.workflow)
-        try:
-            parts = _PortParts(calc, page, progress)
-            outcome = asyncio.run(_drive(deps, built, registry, config, workspace, store, parts, plan))
-        finally:
-            page.close()
-            if progress is not None:
-                progress.close()
-        if args.answers is not None and not page.answers_used:
-            _say(deps, "the --answers file was not used: no data request took it")
-        return _finish(args, deps, config, workspace, store, plan.workflow, outcome)
+        with install_interrupt_handler(cell, deps.clock, deps.stdout, deps.stderr):
+            providers = deps.providers_loader(config.providers)
+            plan = _resume_plan(args, workspace, registry, store) if resume else _run_plan(args, registry, config)
+            answers = _answers(args, config, plan, resume=resume)
+            try:
+                built = port_builder(
+                    config, workspace, store, cell.folder, deps.clock, deps.ids, files=plan.files, visible=plan.visible
+                )
+            except errors.NotImplementedGap as gap:  # gap H-G8: the usage exit is returned here (spec 4.2.2 step 2)
+                raise _RefusedError(ExitCode.USAGE, gap.message) from gap
+            calc = calc_factory(config, workspace, store, plan.run_class, deps.clock, deps.ids)
+            # The workflow declares no calcs, so nothing is listed until it does; `run` refuses an unapproved calc at
+            # its step all the same (spec 0003 AC11).
+            refusals = calc.preflight(()) if not resume and plan.run_class is RunClass.PRODUCTION else []
+            if refusals:
+                lines = [f"{item.calc_id} is {item.status.value} ({item.code.value})" for item in refusals]
+                raise _RefusedError(ExitCode.REFUSED, "calcs refused for a production run: " + "; ".join(lines))
+            runtime = assembler(providers, config.decisions, workspace, policies)
+            for warning in runtime.warnings:
+                _say(deps, warning)
+            decision = decision_factory(runtime, config, workspace, deps.clock, deps.ids)
+            page = PageSession(
+                config=config, store=store, runs_dir=workspace.root / "runs", cell=cell, clock=deps.clock,
+                wait_timeout_s=args.wait_timeout, no_wait=args.no_wait, no_browser=args.no_browser,
+                opener=deps.opener, stderr=deps.stderr, answers=answers, answers_once=not resume,
+                terminal_writer=deps.terminal_writer,
+            )  # fmt: skip
+            progress = _progress(args, deps, config, workspace, plan.workflow)
+            try:
+                parts = _PortParts(calc, page, progress, decision)
+                outcome = asyncio.run(_drive(deps, built, registry, config, workspace, store, parts, plan))
+            finally:
+                page.close()
+                if progress is not None:
+                    progress.close()
+            if args.answers is not None and not page.answers_used:
+                _say(deps, "the --answers file was not used: no data request took it")
+            return _finish(args, deps, config, workspace, store, plan.workflow, outcome)
     except _RefusedError as refused:
         _say(deps, str(refused))
         return refused.code
@@ -160,6 +177,7 @@ class _PortParts:
     calc: RunCalcPort
     page: PageSession
     progress: TerminalProgress | None
+    decision: DecisionPort
 
 
 def _run_plan(args: Namespace, registry: Registry, config: HarnessConfig) -> _Plan:
@@ -303,8 +321,8 @@ async def _drive(
     async with built as hosted:
         ports = RunPortSet(
             tool=hosted.tool_port, host=hosted.host_port, calc=parts.calc, basis=StoreBasisPort(store),
-            approvals=parts.page.approvals, inputs=parts.page.inputs, progress=parts.progress,
-            run_control=FileRunControl(workspace.root / "runs"),
+            approvals=parts.page.approvals, inputs=parts.page.inputs, decision=parts.decision,
+            progress=parts.progress, run_control=FileRunControl(workspace.root / "runs"),
         )  # fmt: skip
         engine = deps.engine_factory(workspace, registry, ports, store, engine_settings(config), deps.clock, deps.ids)
         return await plan.call(engine)
