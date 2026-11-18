@@ -87,7 +87,7 @@ def _allowlist() -> Allowlist:
         {
             "adapter": "test-adapter",
             "sasaah_commit": "a" * 40,
-            "tool_fingerprint": SHA,
+            "fingerprint": {"ETABS": SHA},
             "fingerprint_source": "s12-inventory",
             "tool": tools,
         }
@@ -101,6 +101,7 @@ def _config(*, cli_unreleased: bool = False, long_role: bool = True) -> ServersC
         "client_grace_s": 5,
         "build": {"sasaah_commit": "a" * 40, "exe_sha256": SHA},
         "host_key": "csi",
+        "product": "ETABS",
         "roles": {
             "main": {"classes": ["session", "call"], "call_timeout_s": 30},
             "long": {"classes": ["long"], "call_timeout_s": 900},

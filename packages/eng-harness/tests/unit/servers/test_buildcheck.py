@@ -71,6 +71,7 @@ EXPECTED = BuildExpectation(
     also_tested_commits=(OTHER_COMMIT,),
     tool_fingerprint=tool_list_fingerprint(SCHEMAS),
     tool_names=frozenset(SCHEMAS),
+    product="ETABS",
 )
 
 
@@ -89,7 +90,7 @@ def _tools_with(**extra: Any) -> dict[str, Any]:
 
 
 def test_matching_build_is_ok() -> None:
-    check = check_build("csi", PIN, EXPECTED, _observed(), COMMIT)
+    check = check_build("csi", PIN, EXPECTED, _observed(), COMMIT, product="ETABS")
     assert check.ok is True
     assert check.reason is None
     assert check.server == "csi"
@@ -99,11 +100,11 @@ def test_matching_build_is_ok() -> None:
 
 
 def test_other_tested_commit_satisfies_the_minimum() -> None:
-    assert check_build("csi", PIN, EXPECTED, _observed(), OTHER_COMMIT).ok is True
+    assert check_build("csi", PIN, EXPECTED, _observed(), OTHER_COMMIT, product="ETABS").ok is True
 
 
 def test_no_minimum_is_not_checked() -> None:
-    assert check_build("csi", PIN, EXPECTED, _observed()).ok is True
+    assert check_build("csi", PIN, EXPECTED, _observed(), product="ETABS").ok is True
 
 
 @pytest.mark.parametrize(
@@ -153,7 +154,7 @@ def test_each_mismatch(what: str, keyword: str) -> None:
             observed = _observed(status={"read_only": False, "script_enabled": True})
         case "script_unreported":
             observed = _observed(status={"read_only": False})
-    check = check_build("csi", pin, EXPECTED, observed, minimum)
+    check = check_build("csi", pin, EXPECTED, observed, minimum, product="ETABS")
     assert check.ok is False
     assert check.reason is not None
     assert keyword in check.reason.lower()
@@ -161,4 +162,32 @@ def test_each_mismatch(what: str, keyword: str) -> None:
 
 def test_db_tables_apply_is_tolerated_when_listed() -> None:
     observed = _observed(tools=_tools_with(csi_db_tables_apply={"type": "object"}))
-    assert check_build("csi", PIN, EXPECTED, observed, COMMIT).ok is True
+    assert check_build("csi", PIN, EXPECTED, observed, COMMIT, product="ETABS").ok is True
+
+
+def test_fingerprint_per_product() -> None:
+    """AC4: each product is checked against the fingerprint of its own tools; a wrong product never passes."""
+    etabs = BuildExpectation(
+        sasaah_commit=COMMIT,
+        also_tested_commits=(),
+        tool_fingerprint=tool_list_fingerprint({"csi_alpha": SCHEMAS["csi_alpha"]}),
+        tool_names=frozenset({"csi_alpha"}),
+        product="ETABS",
+    )
+    safe = replace(
+        etabs, tool_fingerprint=tool_list_fingerprint(SCHEMAS), tool_names=frozenset(SCHEMAS), product="SAFE"
+    )
+    assert etabs.tool_fingerprint != safe.tool_fingerprint
+    for want, server in ((etabs, "csi"), (safe, "csi_safe")):
+        check = check_build(server, PIN, want, _observed(), product=want.product)
+        assert (check.ok, check.reason) == (True, None)
+        assert check.fingerprint == check.expected_fingerprint == want.tool_fingerprint
+    # A tool only the other product lists does not move this product's fingerprint (adding SAFE leaves ETABS as it was).
+    grown = _observed(tools={**_observed().tools, "csi_safe_only": {"type": "object"}})
+    assert check_build("csi", PIN, etabs, grown, product="ETABS").ok is True
+    # The expectation of one product is refused for a server of the other.
+    wrong = check_build("csi_safe", PIN, etabs, _observed(), product="SAFE")
+    assert wrong.ok is False
+    assert wrong.reason is not None
+    assert "ETABS" in wrong.reason
+    assert "SAFE" in wrong.reason

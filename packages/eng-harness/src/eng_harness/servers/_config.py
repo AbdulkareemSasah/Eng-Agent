@@ -15,6 +15,8 @@ _FORBIDDEN_ARGS = ("--enable-script", "--enable-generic-invoke", "--allow-attach
 _ADAPTER_ONLY_ARGS = ("--call-timeout-sec", "--audit-log")
 _ADAPTER_ONLY_ENV = "SASAAH_CSI_CALL_TIMEOUT_SEC"
 _CSI_ADAPTER = "sasaah-csi-mcp"
+# The CSI products a server section can name (spec 0008 4.1); the adapter's profile registry holds the same names.
+KNOWN_PRODUCTS = ("ETABS", "SAFE")
 # Substrings that mark an escape-hatch tool name (script, generic invoke, table write); the full deny list is the
 # allowlist's (spec 0002 section 4.5.1).
 _ESCAPE_MARKERS = ("script", "invoke", "tables_apply")
@@ -93,6 +95,7 @@ class ServerConfig(_Model):
     shutdown_grace_s: Seconds = 10  # software setting, s
     build: BuildPin
     host_key: str
+    product: str  # the host product this server serves (spec 0008 4.1); required, one server section per product
     mcp_mode: str = "legacy"  # spec section 11 Q3
     audit_log: bool = Field(default=True, strict=True)  # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError
     route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), not this loader
@@ -102,6 +105,13 @@ class ServerConfig(_Model):
     @classmethod
     def _command_absolute(cls, value: str) -> str:
         return _absolute(value)
+
+    @field_validator("product")
+    @classmethod
+    def _product_known(cls, value: str) -> str:
+        if value not in KNOWN_PRODUCTS:
+            raise ValueError(f"unknown product {value!r}; one of {', '.join(KNOWN_PRODUCTS)}")
+        return value
 
     @field_validator("args")
     @classmethod
@@ -189,6 +199,24 @@ class ServersConfig(_Model):
     servers: Mapping[str, ServerConfig] = Field(default_factory=dict)
     cli_tools: Mapping[str, CliToolConfig] = Field(default_factory=dict)
     host_programs: Mapping[str, HostProgramConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _servers_consistent(self) -> Self:
+        """One host key per server, one build pin per executable (spec 0008 AC1); `ConfigError` names the later key."""
+        host_keys: dict[str, str] = {}
+        pins: dict[PureWindowsPath, tuple[str, BuildPin]] = {}  # Windows paths compare without case and separator
+        for name, server in self.servers.items():
+            other = host_keys.setdefault(server.host_key, name)
+            if other != name:
+                raise ConfigError(
+                    f"servers.{name}.host_key", f"host key {server.host_key!r} is also used by servers.{other}"
+                )
+            first, pin = pins.setdefault(PureWindowsPath(server.command), (name, server.build))
+            if pin != server.build:
+                raise ConfigError(
+                    f"servers.{name}.build", f"the build pin differs from servers.{first}, the same executable"
+                )
+        return self
 
     def unreleased_tools(self) -> dict[str, str]:
         """`{name: release_record}` of the unreleased `[cli_tools.*]` entries (AC38); empty when there are none."""

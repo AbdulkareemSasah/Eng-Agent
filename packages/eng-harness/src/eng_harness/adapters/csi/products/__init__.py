@@ -1,28 +1,65 @@
-"""CSI product profiles (spec 0002 section 4.6.5)."""
+"""CSI product profiles and the product of a model file (spec 0002 section 4.6.5, spec 0008 section 4.1).
+
+A profile is the only product-specific code; a shared module asks it and never branches on a product name. Resolving
+the product of a model by its file extension fails with `INVALID_ARGUMENT` (`field: model`) before any call.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import PureWindowsPath
+
+from eng_contract.errors import ContractError, ErrorCode
 
 from eng_harness.adapters.csi.products import _etabs
 
-__all__ = ["ProductProfile", "profile"]
+__all__ = ["ProductProfile", "product_of_model", "profile"]
 
 
 @dataclass(frozen=True, slots=True)
 class ProductProfile:
-    """Per-product tables and model file extensions."""
+    """Per-product tables, model file extensions and companion files."""
 
     name: str
-    model_extensions: tuple[str, ...]
+    model_extensions: tuple[str, ...]  # upper case, with the dot
     tables: Mapping[str, str]
     readback: Mapping[str, tuple[str, str, str]]  # read-back tables: (table, key column, value column)
+    companion_globs: tuple[str, ...] = ()  # files next to the model file that belong to it; empty until local test L2
 
 
 _ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES, _etabs.READBACK)
+# `.FDB` is the extension the Sasaah footing tool opens live (spec 0008 4.1); the readers come with later tasks.
+_SAFE = ProductProfile("SAFE", (".FDB",), {}, {})
+_PROFILES = {item.name: item for item in (_ETABS, _SAFE)}
 
 
 def profile(name: str) -> ProductProfile:
     """Return the profile; `KeyError` when the product has none."""
-    if name == "ETABS":
-        return _ETABS
-    raise KeyError(name)
+    return _PROFILES[name]
+
+
+def product_of_model(model: str, server_product: str | None = None) -> ProductProfile:
+    """The profile of the product that owns the model file, by its extension (spec 0008 AC2).
+
+    Args:
+        model: The model file name or path; either path separator and any letter case of the extension.
+        server_product: The product of the server the step addresses, when known.
+
+    Raises:
+        ContractError: `INVALID_ARGUMENT` (`field: model`) for an unknown extension, or for a product other than
+            `server_product`.
+    """
+    path = PureWindowsPath(model)
+    found = next((item for item in _PROFILES.values() if path.suffix.upper() in item.model_extensions), None)
+    name = path.name or model
+    if found is None:
+        known = ", ".join(sorted(ext for item in _PROFILES.values() for ext in item.model_extensions))
+        raise ContractError(
+            ErrorCode.INVALID_ARGUMENT, f"model: {name} has no known model extension ({known})", field="model"
+        )
+    if server_product is not None and found.name != server_product:
+        raise ContractError(
+            ErrorCode.INVALID_ARGUMENT,
+            f"model: {name} is a {found.name} model, the server serves {server_product}",
+            field="model",
+        )
+    return found

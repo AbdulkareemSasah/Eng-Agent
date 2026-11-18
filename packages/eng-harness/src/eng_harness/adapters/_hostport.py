@@ -96,8 +96,18 @@ class AdapterHostPort:
     async def save(self, model_key: str, role: str) -> SavedModel:
         path, opened = self._held(model_key)
         await self._session.save(path, opened)
-        fingerprint = (await self._reader.read(opened.pid, path)).fingerprint  # B-451 L3: the saved state's own
-        s = self._identity.record_save(self._models[model_key], path, fingerprint)
+        return await self._record_save(model_key, path, opened)
+
+    async def tool_saved(self, model_key: str) -> None:
+        """Record a save made through a tool and reset the outside-edit baseline (spec 4.5.3, 4.5.9)."""
+        path, opened = self._held(model_key)
+        await self._record_save(model_key, path, opened)
+
+    async def _record_save(self, model_key: str, path: Path, opened: OpenedInstance) -> SavedModel:
+        read = await self._reader.read(opened.pid, path)  # B-451 L3: the saved state's own
+        s = self._identity.record_save(self._models[model_key], path, read.fingerprint)
+        self._reads[model_key] = read
+        self._written.discard(model_key)
         digest = s.file_sha256
         if digest is None:
             raise ContractError(ErrorCode.INTERNAL, "the save recorded no file hash", incident_id=self._ids.new_ulid())
