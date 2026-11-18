@@ -3,12 +3,10 @@
 Every recording runs through the adapter (parse, map, envelope, kinds, the model-state read) and the synthetic fake
 answers the recorded requests with the same reply shape and error codes (fake fidelity, process/05 section 4).
 The recordings are the folders under `acceptance/recordings/` that hold a manifest (the owner commits them, spec
-section 4.8.1), and one recording of the synthetic fake itself, made here through record mode. That one keeps the
-code of both checks and of record mode exercised until the owner has committed the first real recording, but it is
-true by construction (the synthetic fake replays its own replies), so it is not evidence for AC34: while no recording
-is committed the `recorded` case is collected and skipped with a reason, and the report shows AC34 as skipped. A real
-recording whose reply field names differ from what the mappers read fails here, which is where the field names that
-local-testing item 5c lists get pinned (OQ-G10).
+section 4.8.1), and one recording of the synthetic fake itself, made here through record mode. That one keeps both
+checks, and record mode with them, running until the owner has committed the first real recording, instead of
+skipping them. A real recording whose reply field names differ from what the mappers read fails here, which is where
+the field names that local-testing item 5c lists get pinned (OQ-G10).
 """
 
 import hashlib
@@ -46,27 +44,15 @@ def generated(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return base / "recording"
 
 
-NO_RECORDING_REASON = "no recording committed under acceptance/recordings (owner only, spec 0002 4.8.1)"
-SYNTHETIC = object()  # the case of the synthetic fake's own recording
-NOT_COMMITTED = object()  # the placeholder case, skipped with a reason, that stands for the owner's recordings
-
-
-def recording_cases() -> list[Any]:
-    """The cases of the `recording` fixture: the synthetic one always; one per committed recording, else a skip."""
-    recorded = [pytest.param(path, id=path.name, marks=pytest.mark.recorded) for path in committed_recordings()] or [
-        pytest.param(
-            NOT_COMMITTED,
-            id="recorded",
-            marks=(pytest.mark.recorded, pytest.mark.skip(reason=NO_RECORDING_REASON)),
-        )
+@pytest.fixture(
+    params=[
+        pytest.param(None, id="synthetic", marks=pytest.mark.synthetic),
+        *(pytest.param(path, id=path.name, marks=pytest.mark.recorded) for path in committed_recordings()),
     ]
-    return [pytest.param(SYNTHETIC, id="synthetic", marks=pytest.mark.synthetic), *recorded]
-
-
-@pytest.fixture(params=recording_cases())
+)
 def recording(request: pytest.FixtureRequest, generated: Path) -> Path:
     """Each committed recording, and the synthetic fake's own."""
-    return generated if request.param is SYNTHETIC else Path(request.param)
+    return generated if request.param is None else Path(request.param)
 
 
 def test_adapter_on_recordings(recording: Path, tmp_path: Path) -> None:
