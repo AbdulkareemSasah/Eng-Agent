@@ -1,6 +1,6 @@
 # ADR-0035: No changed-line limit per task
 
-Status: Accepted (decided by the owner, 2026-11-17) · Date: 2026-11-17
+Status: Accepted (decided by the owner, 2026-11-17); amended by ADR-0036 · Date: 2026-11-17
 
 ## Context
 

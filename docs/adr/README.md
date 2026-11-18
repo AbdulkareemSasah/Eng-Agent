@@ -34,4 +34,5 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0025](0025-first-workflow-edit-cycle.md) | The first workflow is the model edit cycle | Accepted |
 | [0026](0026-project-lane-for-tools.md) | A project lane builds tools during live projects; the release lane runs before reuse | Accepted |
 | [0027](0027-phase-1-interface.md) | Phase 1 interface: command line, HTML approval page and run report | Accepted |
-| [0035](0035-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted |
+| [0035](0035-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted; amended by ADR-0036 |
+| [0036](0036-collateral-test-edits-and-session-estimate.md) | Test files and the changelog may be collateral edits; `max_sessions` is an estimate | Accepted |

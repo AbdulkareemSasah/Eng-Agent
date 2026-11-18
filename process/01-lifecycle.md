@@ -58,7 +58,7 @@ Gates are files and pull-request approvals on `main`, never labels or comments, 
 
 - Specs and plans carry YAML front matter: `id`, `issue`, `status` (`draft` or `approved`), `size`, `risk`, and for
   plans the task list with `files` (globs), `max_changed_lines` (an estimate, [04](04-implementation-rules.md) §4) and
-  `max_sessions` per task.
+  `max_sessions` (an estimate, [04](04-implementation-rules.md) §4) per task.
 - A spec or plan becomes approved only by merging the pull request that sets `status: approved`, with the approvals
   required in §5. A pull request that changes a spec or a plan changes nothing else.
 - An implementation pull request names `Plan-Task: docs/plans/<file>#T<n>` in its description. The `gate-check` job
@@ -96,8 +96,8 @@ A pull request whose recorded risk is below the floor fails `risk-floor`.
 
 - One work item per agent session; the claiming identity is the issue's assignee.
 - At most three open pull requests per repository from agents.
-- Each plan task has a session budget (`max_sessions`). Exceeding it means `BLOCKED` and a plan update, never "keep
-  going". Changed lines have no limit ([04](04-implementation-rules.md) §4).
+- Each plan task has a session estimate (`max_sessions`). Exceeding it is recorded in the handoff note, never a stop.
+  Changed lines have no limit ([04](04-implementation-rules.md) §4).
 - A work item blocked for more than five working days is re-triaged.
 
 ## 8. Change types and their first move

@@ -38,7 +38,10 @@ match the implementation's output (tests that assert whatever the code returns).
   `max_changed_lines` is an estimate: exceeding it is never a failure, never a reason to stop and never needs a plan
   amendment. `gate-check` reports the counted lines, the estimate and the largest files as a notice.
 - Reviewers judge whether a pull request is reviewable and may ask for a split as a finding; size alone never blocks.
-- A file outside the task's `files` globs still needs a plan amendment ([01](01-lifecycle.md) §4).
+- A non-test source file outside the task's `files` globs still needs a plan amendment ([01](01-lifecycle.md) §4).
+  A test file (under `tests/`) or the package `CHANGELOG.md` outside them may be edited when the task needs it: the
+  pull request lists each under "Collateral edits" and `gate-check` reports it as a notice ([ADR-0036](../docs/adr/0036-collateral-test-edits-and-session-estimate.md)).
+- `max_sessions` is an estimate as well: exceeding it is recorded in the handoff note, never a reason to stop ([ADR-0036](../docs/adr/0036-collateral-test-edits-and-session-estimate.md)).
 - One issue per pull request. No unrelated changes ("while I was here" edits are separate pull requests).
 
 ## 5. Python standards
