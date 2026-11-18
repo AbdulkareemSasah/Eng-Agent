@@ -15,7 +15,7 @@ COMMIT = "a" * 40
 SHA = "b" * 64
 HEADER = (
     f'adapter = "test-adapter"\nsasaah_commit = "{COMMIT}"\nalso_tested_commits = []\n'
-    f'tool_fingerprint = "{SHA}"\nfingerprint_source = "s12-inventory"\n'
+    f'fingerprint = {{ ETABS = "{SHA}" }}\nfingerprint_source = "s12-inventory"\n'
 )
 REQUIRED = ("name", "kind", "timeout_class", "effect", "action", "args_model", "units", "confirm", "products")
 
@@ -329,3 +329,90 @@ def test_unit_header_missing_on_unserved_tool() -> None:
     assert loaded.tool_names == frozenset({"csi_list_frames"})
     with pytest.raises(KeyError, match="host_set_loads"):
         loaded.descriptor("host_set_loads")
+
+
+HEADER_PRODUCTS = (
+    f'adapter = "test-adapter"\nsasaah_commit = "{COMMIT}"\nalso_tested_commits = []\n'
+    f'fingerprint = {{ ETABS = "{SHA}", SAFE = "{"c" * 64}" }}\nfingerprint_source = "s12-inventory"\n'
+)
+
+
+def test_tool_not_served_for_product() -> None:
+    """AC3: loaded for a product, only the entries that list it are served; the others are not on the allowlist."""
+    both = _tool(name="csi_list_frames", products=["ETABS", "SAFE"])
+    etabs_only = _tool(name="csi_results_story_drifts", products=["ETABS"])
+    text = _text(both, etabs_only, header=HEADER_PRODUCTS)
+    safe = load_allowlist(text, "test.toml", product="SAFE")
+    assert [tool.name for tool in safe.tools] == ["csi_list_frames"]
+    assert safe.tool_names == frozenset({"csi_list_frames"})
+    with pytest.raises(KeyError, match="csi_results_story_drifts"):
+        safe.descriptor("csi_results_story_drifts")
+    etabs = load_allowlist(text, "test.toml", product="ETABS")
+    assert etabs.tool_names == frozenset({"csi_list_frames", "csi_results_story_drifts"})
+    assert (etabs.tool_fingerprint, safe.tool_fingerprint) == (SHA, "c" * 64)
+    assert etabs.build_expectation().product == "ETABS"
+    assert safe.build_expectation().product == "SAFE"
+
+
+def test_header_pins_every_listed_product_and_only_those() -> None:
+    """Spec 0008 4.1: one fingerprint entry per product, none missing, none without an entry that lists it."""
+    with pytest.raises(AllowlistError, match="no entry for product SAFE"):
+        _load(_tool(products=["ETABS", "SAFE"]))
+    with pytest.raises(AllowlistError, match="product SAFE is listed by no allowlist entry"):
+        _load(_tool(), header=HEADER_PRODUCTS)
+    with pytest.raises(AllowlistError, match="fingerprint"):  # the single value of spec 0002 is gone
+        _load(_tool(), header=HEADER.replace("fingerprint = { ETABS =", "tool_fingerprint = { ETABS ="))
+    with pytest.raises(AllowlistError, match="fingerprint"):
+        _load(_tool(), header=HEADER.replace(SHA, "b" * 63))
+    with pytest.raises(AllowlistError, match="fingerprint"):
+        _load(_tool(), header=HEADER.replace("fingerprint = { ETABS = ", "fingerprint = {} #"))
+
+
+def test_for_product() -> None:
+    """The product a load serves: chosen once, repeatable, never switched; unchosen with several is an error."""
+    text = _text(
+        _tool(name="csi_list_frames", products=["ETABS", "SAFE"]), _tool(name="csi_results_story_drifts"),
+        header=HEADER_PRODUCTS,
+    )  # fmt: skip
+    full = load_allowlist(text, "test.toml")
+    assert len(full.tools) == 2
+    with pytest.raises(ValueError, match="several products"):
+        _ = full.product
+    with pytest.raises(ValueError, match="several products"):
+        full.build_expectation()
+    safe = full.for_product("SAFE")
+    assert (safe.product, safe.tool_fingerprint, [t.name for t in safe.tools]) == (
+        "SAFE",
+        "c" * 64,
+        ["csi_list_frames"],
+    )
+    assert safe.for_product("SAFE") is safe
+    with pytest.raises(AllowlistError, match="already loaded for product SAFE, not ETABS"):
+        safe.for_product("ETABS")
+    with pytest.raises(AllowlistError, match="no fingerprint for product STAAD"):
+        full.for_product("STAAD")
+    with pytest.raises(AllowlistError, match=r"test.toml: the header pins no fingerprint for product STAAD"):
+        load_allowlist(text, "test.toml", product="STAAD")
+    assert _load(_tool()).product == "ETABS"  # a header that pins one product needs no choice
+
+
+def test_product_with_routes() -> None:
+    """A route-filtered load still names every entry of the product in the fingerprint's tool set (AC41, AC4)."""
+    header = HEADER_PRODUCTS + 'routes = ["native", "rest"]\n'
+    both = ["ETABS", "SAFE"]
+    text = _text(
+        _tool(name="read_native", routes=["native"], products=both),
+        _tool(name="read_rest", routes=["rest"], products=both),
+        _tool(name="safe_native", routes=["native"], products=["SAFE"]),
+        _tool(name="etabs_rest", routes=["rest"]),
+        header=header,
+    )
+    by_route_first = load_allowlist(text, "test.toml", route="native").for_product("SAFE")
+    by_both = load_allowlist(text, "test.toml", route="native", product="SAFE")
+    for loaded in (by_route_first, by_both):
+        assert [tool.name for tool in loaded.tools] == ["read_native", "safe_native"]
+        assert loaded.tool_names == frozenset({"read_native", "read_rest", "safe_native"})
+        assert loaded.tool_fingerprint == "c" * 64
+    etabs = load_allowlist(text, "test.toml", route="native", product="ETABS")
+    assert [tool.name for tool in etabs.tools] == ["read_native"]
+    assert etabs.tool_names == frozenset({"read_native", "read_rest", "etabs_rest"})

@@ -71,6 +71,7 @@ def config(control: Path) -> ServersConfig:
                     "shutdown_grace_s": 5,
                     "build": {"sasaah_commit": csi_allowlist().sasaah_commit, "exe_sha256": digest},
                     "host_key": "csi",
+                    "product": "ETABS",
                     "roles": {
                         "main": {"classes": ["session", "call"], "call_timeout_s": 30},
                         "long": {"classes": ["long"], "call_timeout_s": 30},
