@@ -13,10 +13,12 @@ from eng_harness._calc import _hash
 from eng_harness.calc import CalcStatus
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.footing import FOOTING_CALCS
+from eng_harness.calcs.footing import layout as layout_module
 from eng_harness.calcs.footing import subjects as subjects_module
 
 ROOT = Path(__file__).resolve().parents[3]
 CALCS = {  # calc id -> (module, output kind, spec section naming its method)
+    "harness.footing_layout": (layout_module, "harness.footing_design/1", "§4.4.3"),
     "harness.footing_subjects": (subjects_module, "harness.footing_subjects/1", "§4.4.1"),
 }
 
@@ -63,7 +65,9 @@ def test_the_calcs_are_draft_in_the_shipped_approvals() -> None:
 
 
 def test_the_calc_modules_are_importable_by_their_public_names() -> None:
-    modules: list[ModuleType] = [importlib.import_module(f"eng_harness.calcs.footing.{n}") for n in ("subjects",)]
-    assert [m.__name__ for m in modules] == ["eng_harness.calcs.footing.subjects"]
+    names = ("subjects", "layout")
+    modules: list[ModuleType] = [importlib.import_module(f"eng_harness.calcs.footing.{n}") for n in names]
+    assert [m.__name__ for m in modules] == [f"eng_harness.calcs.footing.{n}" for n in names]
     public = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["eng-gate"]["public_modules"]
-    assert {"eng_harness.calcs", "eng_harness.calcs.footing", "eng_harness.calcs.footing.subjects"} <= set(public)
+    expected = {"eng_harness.calcs", "eng_harness.calcs.footing", *(f"eng_harness.calcs.footing.{n}" for n in names)}
+    assert expected <= set(public)
