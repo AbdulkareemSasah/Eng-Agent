@@ -1732,9 +1732,7 @@
    "branch": "feat/b202-harness-wt8-workflow-part-1-definition",
    "prTitle": "feat(eng-harness): workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) (B-202)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T13b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2081,7 +2079,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 437
   },
   {
    "id": "B-211",
@@ -2093,9 +2092,7 @@
    "branch": "feat/b211-harness-ft2-synthetic-safe-mode-of",
    "prTitle": "feat(eng-harness): synthetic SAFE mode of the CSI fake and its schema check (B-211)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2113,7 +2110,6 @@
    "prTitle": "feat(eng-harness): sAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries (B-212)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T1",
     "F.T2"
    ],
    "writer": "sonnet, medium",
@@ -2228,9 +2224,7 @@
    "branch": "feat/b230-harness-rt1-framework-extensions-attended-class",
    "prTitle": "feat(eng-harness): framework extensions (attended class, host_dialog confirm, optional pid, deny-list names) and the Revit server section (B-230)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2287,7 +2281,6 @@
    "prTitle": "feat(eng-harness): revit build check (excluded tools, toolset reason, catalog version), role start options and the pinned pipe (B-233)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T1",
     "R.T3"
    ],
    "writer": "sonnet, medium",
@@ -2522,7 +2515,6 @@
    "prTitle": "feat(eng-harness): sAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint (B-245)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T1",
     "F.T2",
     "F.T3",
     "S.T17"
@@ -2977,7 +2969,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "new plan task from B-484 (budget 40, one session); edits tests/data/golden/footing/subjects-*.json, a CODEOWNERS test-oracle path, so owner review notices are expected (AW02, GC015); regenerates its calcs.lock.json entry with the lock writer, never by hand, and whichever of T3b and another calc task merges second regenerates its own entry; keeps version 1 (the calc is draft and was never approved: OQ-Q90); tests_first lines were reasoned, not run: verify red at the base first; deferred set"
-   ]
+   ],
+   "merged_pr": 442
   },
   {
    "id": "B-486",
@@ -3840,7 +3833,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
-   ]
+   ],
+   "merged_pr": 433
   },
   {
    "id": "B-572",
