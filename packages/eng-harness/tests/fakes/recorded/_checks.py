@@ -21,7 +21,6 @@ from eng_harness.adapters._errors import parse_error_reply
 from eng_harness.adapters._toolport import Binding
 from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.adapters.csi._errors import CSI_ERROR_TABLE, CsiErrorMapper
-from eng_harness.adapters.csi._replies import CSI_KINDS
 from eng_harness.adapters.csi._state import CsiStateReader
 from eng_harness.adapters.csi._tools import READERS, TOKENS
 from eng_harness.ports import ServerCheck
@@ -107,9 +106,7 @@ def fidelity_problems(host: RecordedHost, run_dir: Path) -> list[str]:
 def _store(workspace: Path) -> tuple[ResultStore, FixedClock, SeededIdSource]:
     clock = FixedClock(1_767_225_600_000, 1)
     ids = SeededIdSource(b"recorded", clock)
-    store = ResultStore(
-        Workspace(root=workspace, classification=LocationClass.LOCAL), HARNESS_KINDS.extend(CSI_KINDS), ids, clock
-    )
+    store = ResultStore(Workspace(root=workspace, classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
     return store, clock, ids
 
 

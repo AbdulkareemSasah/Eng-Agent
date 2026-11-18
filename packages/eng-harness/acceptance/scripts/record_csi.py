@@ -21,9 +21,17 @@ from mcp.client.stdio import get_default_environment
 
 from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.adapters.csi._state import CsiStateReader
-from eng_harness.servers import CallEffect, Recording, RecordMode, ServerConfig, load_servers_config
+from eng_harness.servers import (
+    CallEffect,
+    Recording,
+    RecordMode,
+    ServerConfig,
+    load_servers_config,
+    platform_inspector,
+    platform_launcher,
+)
 from eng_harness.servers._launch_args import launch_argv
-from eng_harness.servers._launcher import JobPolicy, LaunchSpec, PosixLauncher, ProcessLauncher
+from eng_harness.servers._launcher import JobPolicy, LaunchSpec
 from eng_harness.servers._session import reply_body
 from eng_harness.servers._transport import ProcessTransport
 
@@ -33,14 +41,6 @@ _RESULTS = ("csi_results_joint_reactions", "csi_results_frame_forces", "csi_resu
 
 class RefusedError(Exception):
     """The server answered a step with an error reply (it has been recorded by then)."""
-
-
-def _launcher() -> ProcessLauncher:
-    if sys.platform == "win32":
-        from eng_harness.servers._launcher_windows import windows_launcher
-
-        return windows_launcher()
-    return PosixLauncher()
 
 
 async def _body(client: Client, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -84,7 +84,10 @@ async def record(
         stderr_path=run_dir / "servers" / f"{server.host_key}-{role_name}.stderr.log", job=JobPolicy.SERVER,
     )  # fmt: skip
     recording = Recording(folder, run_dir, adapter=server.adapter, build=build, tool_names=csi_allowlist().tool_names)
-    transport = RecordMode(ProcessTransport(_launcher().start(spec), grace_s=server.shutdown_grace_s), recording)
+    transport = RecordMode(
+        ProcessTransport(platform_launcher(platform_inspector()).start(spec), grace_s=server.shutdown_grace_s),
+        recording,
+    )
     refusal: RefusedError | None = None
     async with Client(transport, mode=server.mcp_mode, cache=None, read_timeout_seconds=None) as client:
         try:
