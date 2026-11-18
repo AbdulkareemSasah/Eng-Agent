@@ -8,7 +8,10 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import pytest
+from eng_contract.envelope import Provenance
 from eng_contract.errors import ErrorCode
+from eng_contract.kinds.basis import BasisField, DesignBasis
 from fakes.ports import failure
 from pydantic import BaseModel
 from workflows.chain import ChainInput
@@ -25,6 +28,7 @@ from eng_harness.basis import (
 )
 from eng_harness.block import workflow
 from eng_harness.engine import RunStatus
+from eng_harness.errors import HarnessCode, RunRefused
 from eng_harness.journal import EventType
 from eng_harness.journal import _events as ev
 from eng_harness.templates import Template, resolve
@@ -131,3 +135,28 @@ def test_basis_reaches_ctx_and_replays(tmp_path: Path) -> None:
     assert EventType.RUN_RESUMED in rig.types(stopped.run_id)
     assert [entry.tool for entry in rig.host.ledger][len(calls) :].count("read_a") == 0
     assert rig.header(stopped.run_id).basis_ref == ref
+
+
+def test_unconfirmed_basis_refuses_the_run(tmp_path: Path) -> None:
+    rig = make_rig(tmp_path)
+    ref = _frozen_basis(rig)
+    stored = rig.bases[ref].basis
+    unconfirmed = DesignBasis(
+        template=stored.template,
+        fields={
+            path: BasisField(
+                value=field.value, unit=field.unit, source=field.source, confirmed=path != METHOD,
+                citation=field.citation,
+            )
+            for path, field in stored.fields.items()
+        },
+    )  # fmt: skip
+    producer = Provenance(tool="harness", tool_version="test", inputs={}, started_at=AT, duration_ms=0)
+    raw = rig.store.put("basis.design_basis/1", unconfirmed.model_dump(mode="json"), producer)
+    rig.bases = {**rig.bases, raw.result_id: StoreBasisPort(rig.store).load(raw.result_id)}
+    before = rig.run_ids()
+    with pytest.raises(RunRefused) as refused:
+        asyncio.run(rig.engine(_reads_basis).start(request(workflow="reads_basis", basis_ref=raw.result_id)))
+    assert refused.value.code is HarnessCode.BASIS_INCOMPLETE
+    assert refused.value.evidence == (METHOD,)
+    assert rig.run_ids() == before

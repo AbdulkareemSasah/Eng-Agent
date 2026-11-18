@@ -31,6 +31,7 @@ from eng_harness.ctx import (
     ArgValue,
     Attempt,
     BasisCount,
+    BasisView,
     CalcResult,
     Decision,
     DecisionRequest,
@@ -114,13 +115,16 @@ class Ctx:
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
         pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort, mode: str,
-        always_ask: Sequence[str], run_dir: Path, limits: _resources.Limits, copy_on_open: bool = False,
+        always_ask: Sequence[str], run_dir: Path, limits: _resources.Limits, basis: Callable[[], BasisView],
+        copy_on_open: bool = False,
     ) -> None:  # fmt: skip
         """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
         pending hosts, host leases, decisions, approvals, permission mode, always-ask tools and limits."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
         self._pending, self._leases, self._decider, self._host, self._limits = pending, leases, decider, host, limits
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
+        self._load_basis = basis
+        self._view: BasisView | None = None
         self._modes = _modes.Modes(
             mode,
             always_ask,
@@ -145,6 +149,13 @@ class Ctx:
         self._revised = {  # the `model_saved` of each tool save, for the approvals it keeps its chain with (4.9)
             e.path: p for e in events if isinstance(p := e.payload, ev.ModelSaved) and p.role == "revision" and e.path
         }
+
+    @property
+    def basis(self) -> BasisView:
+        """The frozen design basis of the run, read from its port on first use (spec 0001 4.9)."""
+        if self._view is None:
+            self._view = self._load_basis()
+        return self._view
 
     def _begin(self, path: str, attempt: int, kind: str, name: str, args: _Obj, **fields: object) -> int:
         started = {"kind": kind, "name": name, "args": args, "args_sha256": payload_sha256(args), "effect": "none"}
