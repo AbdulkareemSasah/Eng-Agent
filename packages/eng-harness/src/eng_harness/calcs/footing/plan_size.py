@@ -90,7 +90,7 @@ def _choice(basis: DesignBasis, path: str, choices: tuple[str, ...], ref: str, t
             field="basis",
             hint=f"choose one of {', '.join(choices)}",
         )
-    trace.input(path.rpartition(".")[2], value, ref=f"{ref}#/fields/{path}/value")
+    trace.input(path.rpartition(".")[2], value, ref=f"{ref}#/fields/{path}")
     return value
 
 
@@ -113,7 +113,7 @@ def _read_quantities(basis: DesignBasis, ref: str, trace: TraceBuilder) -> dict[
                 received=raw,
             )
         name = path.rpartition(".")[2]
-        trace.input(name, raw, unit=unit, ref=f"{ref}#/fields/{path}/value")
+        trace.input(name, raw, unit=unit, ref=f"{ref}#/fields/{path}")
         quantities[name] = number
     return quantities
 

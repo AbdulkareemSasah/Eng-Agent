@@ -64,8 +64,8 @@ def test_trace_records_service_loads_and_exact_arithmetic() -> None:
     built = trace.build(REGISTRY[CALC_ID], "ab" * 32)
     inputs = {item.name: (item.value, item.unit, item.ref) for item in built.inputs}
     basis_ref = case.refs["basis"]
-    assert inputs["plan_shape"] == ("square", None, f"{basis_ref}#/fields/foundation.plan_shape/value")
-    assert inputs["plan_increment_mm"] == (200, "mm", f"{basis_ref}#/fields/foundation.plan_increment_mm/value")
+    assert inputs["plan_shape"] == ("square", None, f"{basis_ref}#/fields/foundation.plan_shape")
+    assert inputs["plan_increment_mm"] == (200, "mm", f"{basis_ref}#/fields/foundation.plan_increment_mm")
     assert inputs["service_cases"] == (
         case.input["service_cases"],
         None,
