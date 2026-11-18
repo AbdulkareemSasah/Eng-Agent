@@ -188,4 +188,4 @@ def test_basis_reaches_ctx_over_the_store_port(tmp_path: Path) -> None:
     assert (done.output.stories, done.output.method) == (4, "b")
     assert done.output.tolerance_ref == f"{ref}#/fields/{TOL}/value"
     assert rig.header(done.run_id).basis_ref == ref
-    assert "basis.load" in rig.log
+    assert rig.log.count("basis.load") == 2

@@ -319,10 +319,13 @@ def test_basis_load_is_engine_work(tmp_path: Path) -> None:
     path = "modeling.merge_tolerance_mm"
     fields: dict[str, JsonValue] = {
         path: {
-            "value": 2.5, "unit": "mm", "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
-            "confirmed": True, "citation": None,
+            "value": 2.5,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": True,
+            "citation": None,
         }
-    }  # fmt: skip
+    }
     producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=rig.clock.now(), duration_ms=0)
     basis_ref = rig.store.put("basis.design_basis/1", {"template": None, "fields": fields}, producer).result_id
 
@@ -337,9 +340,10 @@ def test_basis_load_is_engine_work(tmp_path: Path) -> None:
         return ChainOutput(refs=[ctx.basis.ref(path).ref])
 
     target = tmp_path / "after_basis.txt"
+    read_refs: list[str] = []
 
     async def read_then_open(ctx: Any) -> list[str]:
-        _ = ctx.basis.record_ref()
+        read_refs.append(ctx.basis.record_ref().ref)
         _write(target)
         return []
 
@@ -362,4 +366,5 @@ def test_basis_load_is_engine_work(tmp_path: Path) -> None:
     assert third.escalation is not None
     assert third.escalation.reason == "block_rule_violation"
     assert "open" in third.escalation.detail
+    assert read_refs == [basis_ref]
     assert not target.exists()
