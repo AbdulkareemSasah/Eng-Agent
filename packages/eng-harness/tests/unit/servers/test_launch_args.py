@@ -23,6 +23,7 @@ args = ["--disable-script"]
 client_grace_s = 5
 build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}" }}
 host_key = "csi"
+product = "ETABS"
 {extra}
 [servers.csi.roles.main]
 classes = ["call"]

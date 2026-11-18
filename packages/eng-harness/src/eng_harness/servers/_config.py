@@ -22,6 +22,8 @@ _IDEA_ROUTES = ("native", "rest")
 _IDEA_ARG = "--disable-script"  # the one argument the section may carry; the adapter adds the rest from the keys
 # The three aliases of each server option (E/IdeaModels.cs:441-452): the adapter sets options by argument only.
 _IDEA_ENV_PREFIXES = ("SASAAH_IDEA_", "SASAH_IDEA_", "IDEA_")
+# The CSI products a server section can name (spec 0008 4.1); the adapter's profile registry holds the same names.
+KNOWN_PRODUCTS = ("ETABS", "SAFE")
 # Substrings that mark an escape-hatch tool name (script, generic invoke, table write); the full deny list is the
 # allowlist's (spec 0002 section 4.5.1).
 _ESCAPE_MARKERS = ("script", "invoke", "tables_apply")
@@ -125,6 +127,8 @@ class ServerConfig(_Model):
     shutdown_grace_s: Seconds = 10  # software setting, s
     build: BuildPin
     host_key: str
+    # The host product this server serves (spec 0008 4.1): required for CSI, defaults to IDEA for sasaah-idea-mcp.
+    product: str = Field(default="", validate_default=True)
     mcp_mode: str = "legacy"  # spec section 11 Q3
     # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError; validated when absent too (the IDEA rule below)
     audit_log: bool = Field(default=True, strict=True, validate_default=True)
@@ -137,6 +141,19 @@ class ServerConfig(_Model):
     @classmethod
     def _command_absolute(cls, value: str) -> str:
         return _absolute(value)
+
+    @field_validator("product")
+    @classmethod
+    def _product_known(cls, value: str, info: ValidationInfo) -> str:
+        if info.data.get("adapter") == _IDEA_ADAPTER:
+            if value and value != "IDEA":
+                raise ValueError(f"unknown product {value!r} for {_IDEA_ADAPTER}; omit product or use 'IDEA'")
+            return "IDEA"
+        if not value:
+            raise ValueError("product is required")
+        if value not in KNOWN_PRODUCTS:
+            raise ValueError(f"unknown product {value!r}; one of {', '.join(KNOWN_PRODUCTS)}")
+        return value
 
     @field_validator("args")
     @classmethod
@@ -285,6 +302,24 @@ class ServersConfig(_Model):
     servers: Mapping[str, ServerConfig] = Field(default_factory=dict)
     cli_tools: Mapping[str, CliToolConfig] = Field(default_factory=dict)
     host_programs: Mapping[str, HostProgramConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _servers_consistent(self) -> Self:
+        """One host key per server, one build pin per executable (spec 0008 AC1); `ConfigError` names the later key."""
+        host_keys: dict[str, str] = {}
+        pins: dict[PureWindowsPath, tuple[str, BuildPin]] = {}  # Windows paths compare without case and separator
+        for name, server in self.servers.items():
+            other = host_keys.setdefault(server.host_key, name)
+            if other != name:
+                raise ConfigError(
+                    f"servers.{name}.host_key", f"host key {server.host_key!r} is also used by servers.{other}"
+                )
+            first, pin = pins.setdefault(PureWindowsPath(server.command), (name, server.build))
+            if pin != server.build:
+                raise ConfigError(
+                    f"servers.{name}.build", f"the build pin differs from servers.{first}, the same executable"
+                )
+        return self
 
     def unreleased_tools(self) -> dict[str, str]:
         """`{name: release_record}` of the unreleased `[cli_tools.*]` entries (AC38); empty when there are none."""
