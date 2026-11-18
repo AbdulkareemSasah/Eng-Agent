@@ -37,15 +37,19 @@ STEMS = ["status-family-order", "status-mixed-fail-and-needs-engineer", "status-
 DIGEST = "ab" * 32
 
 
-def _run(case: FootingGoldenCase, trace: TraceBuilder | None = None, **changes: Any) -> dict[str, Any]:
+def _run_with(case: FootingGoldenCase, trace: TraceBuilder | None, changes: dict[str, Any]) -> dict[str, Any]:
     raw = copy.deepcopy(case.input) | changes
     result = footing_status(StatusInput.model_validate(raw), input_meta(case.refs, KINDS), trace or TraceBuilder())
     return result.model_dump(mode="json")
 
 
+def _run(case: FootingGoldenCase, trace: TraceBuilder | None = None, **changes: Any) -> dict[str, Any]:
+    return _run_with(case, trace, changes)
+
+
 def _verdict_set(case: FootingGoldenCase, family: str, drop: str | None = None, **change: Any) -> dict[str, Any]:
     """The verdict set of `family` without the verdicts about footing `drop`, with `change` on each remaining one."""
-    payload = copy.deepcopy(case.input[family])
+    payload: dict[str, Any] = copy.deepcopy(case.input[family])
     kept = [v for v in payload["verdicts"] if v["subject"]["id"] != drop]
     payload["verdicts"] = [v | change for v in kept]
     payload["traces"] = payload["traces"][: len(kept)]
@@ -162,7 +166,7 @@ def test_a_footing_of_the_design_that_is_no_subject_is_refused() -> None:
 def test_a_footing_without_a_verdict_in_a_family_is_refused(family: str) -> None:
     case = load_cases("status")["status-mixed-fail-and-needs-engineer"]
     with pytest.raises(ContractError) as caught:
-        _run(case, **{family: _verdict_set(case, family, drop="J3")})
+        _run_with(case, None, {family: _verdict_set(case, family, drop="J3")})
     assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert caught.value.detail.field == family
     assert caught.value.detail.received == "J3"
