@@ -6,7 +6,7 @@
       "version": 1
     },
     {
-      "content_sha256": "45c6825f6cbd3b0dbb3727c4f295b9e40d9d6c2deeb290410c5246960d159c90",
+      "content_sha256": "88f4b21ef17922fd7334b5876d6c6641a689a802a6174deed9f66194d089fab6",
       "id": "harness.change_set_check",
       "version": 1
     },
@@ -16,7 +16,7 @@
       "version": 1
     },
     {
-      "content_sha256": "4ff712b68360c945374bf777d3bba8f9074cbf97557e1a1b30cb278e63dcdf2b",
+      "content_sha256": "91d9587697bd83b47973bd19b83f590687bcf8004e7945c5c0dbf39960da3a37",
       "id": "harness.expected_effects",
       "version": 1
     },

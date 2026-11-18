@@ -48,8 +48,8 @@ _LOAD_KINDS = (
 """The load kinds: kind, list of the load set, member naming the target, field of the value, property of the row."""
 
 
-def _ref(kind: str) -> Any:
-    return eng_param(ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
+def _ref(kind: str, default: Any = ...) -> Any:
+    return eng_param(default, ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
 
 
 class EffectsInput(CalcInput):
@@ -58,7 +58,7 @@ class EffectsInput(CalcInput):
     check: ChangeSetCheck = _ref("harness.change_set_check/1")
     approval_items: list[str]
     change_set: ChangeSetDraft = _ref("basis.engineer_input/1")
-    sections: Sections = _ref(_SECTIONS)
+    sections: Sections | None = _ref(_SECTIONS, None)
     loads: LoadSet = _ref(_LOADS)
     restraints: JointRestraints = _ref(_JOINTS)
     basis: DesignBasis = _ref("basis.design_basis/1")
@@ -91,7 +91,7 @@ class _Projection:
         self.traced: list[str] = []
         self.effects: list[Effect] = []
         loads = inp.loads
-        self.sections = {section.name for section in inp.sections.area_sections}
+        self.sections = None if inp.sections is None else {section.name for section in inp.sections.area_sections}
         self.joints = {row.joint for row in inp.restraints.joints}
         self.combinations = {combination.name: combination for combination in loads.combinations}
         self.rows = {("frame_loads", r.frame, r.pattern, str(r.direction)) for r in loads.frame_loads} | {
@@ -138,7 +138,7 @@ class _Projection:
         elif kind == "wall_section":
             thickness, uom = self.number(resolved, "/thickness_mm", item.thickness)
             key = ["area_sections", item.name]
-            if item.name in self.sections:
+            if self.sections is None or item.name in self.sections:  # no record: as on a held section (4.4.2)
                 self.put(name, _SECTIONS, key, "/material", item.material)
                 self.put(name, _SECTIONS, key, "/thickness_mm", thickness, uom)
             else:
@@ -237,13 +237,16 @@ def expected_effects(inp: EffectsInput, meta: InputMeta, trace: TraceBuilder) ->
     """Project every accepted item (4.4.2), number the effect ids and sort the effects."""
     refs: dict[str, str] = {}
     for name in _REFS:
+        if name == "sections" and inp.sections is None:  # optional (spec 0007 4.4.2)
+            continue
         if (ref := meta.refs.get(name)) is None:
             raise _refuse(name, "each input must be a record reference")
         refs[name] = ref.result_id
-    identities = {(meta.refs[name].model_id, meta.refs[name].model_revision) for name in _STATE}
+    given = [name for name in _STATE if name in refs]  # the state records supplied
+    identities = {(meta.refs[name].model_id, meta.refs[name].model_revision) for name in given}
     model_id, revision = identities.pop()
     if identities or model_id is None or revision is None:
-        raise _refuse("sections", "the state records must be reads of one host model revision")
+        raise _refuse(given[0], "the state records must be reads of one host model revision")
     if inp.check.status != "PASS":
         raise _refuse("check", "the check must have status PASS")
     resolved = {row.item_id: row for row in inp.check.resolved}

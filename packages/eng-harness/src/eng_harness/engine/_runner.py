@@ -97,6 +97,16 @@ class RunRequest(BaseModel):
     run_id: str | None = None
 
 
+def _lazy_basis(port: BasisPort, basis_ref: str, declared: tuple[str, ...]) -> Callable[[], BasisView]:
+    """The loader of `ctx.basis` and of decisions: the stored basis is read when first asked for, never earlier."""
+
+    def load() -> BasisView:
+        loaded = port.load(basis_ref)
+        return BasisView(loaded.result_id, loaded.basis, declared)
+
+    return load
+
+
 @dataclass(frozen=True)
 class RunOutcome:
     """How a run ended: its output when completed, its open request ids when paused, its escalation when stopped."""
@@ -346,10 +356,7 @@ class Engine:
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports, run_id, writer = self._ports, rt.run_id, rt.writer
 
-        def view() -> BasisView:  # loaded when the first decision needs it
-            loaded = ports.basis.load(basis_ref)
-            return BasisView(loaded.result_id, loaded.basis, workflow.required_basis)
-
+        view = _lazy_basis(ports.basis, basis_ref, workflow.required_basis)
         decider = _decide.Decider(
             ports.decision, ports.inputs, view, rt.events, writer, self._clock, self._ids, run_id, events
         )
@@ -360,7 +367,7 @@ class Engine:
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
             writer, events, _hostsafety.Pending(rt), leases, decider,
-            ports.approvals, head.mode, head.always_ask, rt.run_dir, limits, workflow.copy_on_open,
+            ports.approvals, head.mode, head.always_ask, rt.run_dir, limits, view, workflow.copy_on_open,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:

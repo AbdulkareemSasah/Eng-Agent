@@ -32,6 +32,8 @@ STEMS = [
     "effects-assignments",
     "effects-combination-replace",
     "effects-loads",
+    "effects-no-sections-loads",
+    "effects-no-sections-wall",
     "effects-none-accepted",
     "effects-pattern-and-delete",
     "effects-restraints",
@@ -96,6 +98,15 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_effects(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_sections_absent() -> None:
+    """AC39: no `model.sections/1` in the state; a wall section is projected as two `set` effects, as on a held one."""
+    cases = {stem: case for stem, case in load_cases("effects").items() if stem.startswith("effects-no-sections-")}
+    assert sorted(cases) == ["effects-no-sections-loads", "effects-no-sections-wall"]
+    for stem, case in cases.items():
+        assert ("sections" in case.input, "sections" in case.refs) == (False, False), stem
+        assert run_effects(case) == case.expected, stem
 
 
 def test_golden_bodies_are_valid_payloads() -> None:
@@ -251,6 +262,26 @@ def test_state_records_must_be_one_model_revision(kwargs: dict[str, Any]) -> Non
     case = _case()
     message = "the state records must be reads of one host model revision"
     _refused(case, "sections", message, meta=meta_for(case.refs, **kwargs))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"models": {"loads": OTHER}},
+        {"models": {"restraints": None}},
+        {"revisions": {"restraints": 4}},
+    ],
+)
+def test_state_records_without_sections_must_be_one_model_revision(kwargs: dict[str, Any]) -> None:
+    case = _case("effects-no-sections-wall")
+    message = "the state records must be reads of one host model revision"
+    _refused(case, "loads", message, meta=meta_for(case.refs, **kwargs))
+
+
+def test_sections_supplied_give_a_new_wall_section_as_an_add() -> None:
+    """The record present: a wall section it lacks is an `add` of the row, as before."""
+    case = _case("effects-wall-sections")
+    assert [(e["item_id"], e["op"]) for e in run_effects(case)["effects"]][2:] == [("b2", "add")]
 
 
 @pytest.mark.parametrize("change", [None, {"confirmed": False}, {"value": "thick"}])

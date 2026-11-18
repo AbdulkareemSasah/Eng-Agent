@@ -525,15 +525,18 @@ tasks:
     # forms), 4 of the lock (the check and expected_effects import the model), 4 of the record, 1 of CHANGELOG.md: about
     # 33; budget 50 (an estimate). After T16 and T17 (B-543), which edit change_set_check.py, calcs.lock.json, the record
     # and the golden test as this task does (T17 also expected_effects.py, whose lock entry this task moves).
+    # Amendment (B-564, documents only): kinds/edit_cycle.py and .gate/ratchet.json join the files; trial: the gate without mutation passes with exactly these. The measured size is about 90 counted lines (information only).
     files:
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/workflows/model_edit_cycle/_change_set.py"
+      - "packages/eng-harness/src/eng_harness/kinds/edit_cycle.py"  # canonical_number(number, symbol, quantity) -> float | None (amendment B-564): _change_set.py is a block module and tests/rules/test_block_modules.py forbids math, convert and arithmetic there; kinds modules are an allowed import
       - "packages/eng-harness/src/eng_harness/calcs/edit_cycle/change_set_check.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.change_set_check.md"
       - "packages/eng-harness/tests/unit/edit_cycle/test_change_set.py"
       - "packages/eng-harness/tests/golden/edit_cycle/test_change_set_check.py"
       - "packages/eng-harness/tests/data/golden/edit_cycle/check-*.json"
+      - ".gate/ratchet.json"  # eng-harness noqa count 13 -> 14 (amendment B-564)
     max_changed_lines: 50
     max_sessions: 1
     tests_first:
@@ -965,6 +968,15 @@ validates each resolved ref with `eng_contract` `validate_input(..., InputPolicy
 from the contract's unit table); it fails at the merge base with `INVALID_ARGUMENT`. The golden outputs of the check
 change their `ref` strings only, those of T17's `check-no-sections-*` cases included. T16b waits for T16 and T17, which
 edit the same four files.
+
+*Amendment (B-564):* `canonical_number(number, symbol, quantity) -> float | None` lives in `kinds/edit_cycle.py`, and the
+validator in `_change_set.py` calls it, because `_change_set.py` is a block module and
+`tests/rules/test_block_modules.py` forbids math, convert and arithmetic there; kinds modules are an allowed import.
+The lock therefore moves four entries (`harness.analysis_summary`, `harness.change_set_check`,
+`harness.design_summary`, `harness.expected_effects`), as the two summaries import `kinds/edit_cycle.py`.
+`.gate/ratchet.json` takes one more noqa for eng-harness (13 to 14) from the file-level `# ruff: noqa: N815` in
+`_change_set.py`. The writer of B-557 measured 74 counted lines at its head and about 90 with the helper (information
+only). No other open task lists `kinds/edit_cycle.py` (T1b and T4b are merged).
 
 **T9c Failed check at step 9 and exception items at step 17** (amendment B-544; spec §4.5, §4.6, AC17, AC22, Q14). The
 step 9 block catches `ModelIntegrityError` from the S' read and opens D-2 with the state of spec §4.6 (reason

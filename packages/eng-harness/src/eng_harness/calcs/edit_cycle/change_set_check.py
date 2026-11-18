@@ -68,8 +68,8 @@ def _is_page_token(text: str) -> bool:
     return 0 < len(text) <= 57 and all(char in _ID_CHARS for char in text)  # K3: 64 less the 7 of the prefix
 
 
-def _ref(kind: str) -> Any:
-    return eng_param(ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
+def _ref(kind: str, default: Any = ...) -> Any:
+    return eng_param(default, ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
 
 
 class CheckInput(CalcInput):
@@ -78,7 +78,7 @@ class CheckInput(CalcInput):
     change_set: ChangeSetDraft = _ref("basis.engineer_input/1")
     frames: FramePlacements = _ref(_FRAMES)
     areas: AreaPlacements = _ref(_AREAS)
-    sections: Sections = _ref(_SECTIONS)
+    sections: Sections | None = _ref(_SECTIONS, None)
     restraints: JointRestraints = _ref(_JOINTS)
     names: CsiNameLists = _ref("harness.csi_name_lists/1")
     diff: ModelDiff = _ref("harness.model_diff/1")
@@ -157,7 +157,8 @@ class _Check:
                 self.name(item.id, what, value)
             return sorted(set(given))
         rows: Sequence[Any] = self.inp.frames.frames if what == "frame" else self.inp.areas.areas
-        kinds = {s.name: s.kind.value for s in self.inp.sections.area_sections}
+        sections = self.inp.sections  # optional (spec 0007 4.4.1): no record, no area kind is known
+        kinds = {} if sections is None else {s.name: s.kind.value for s in sections.area_sections}
         sel = item.select
         found = sorted(
             row.id
@@ -167,7 +168,12 @@ class _Check:
             and getattr(sel, "area_kind", None) in (None, kinds.get(row.section))
         )
         if not found:
-            self.issue(item.id, "EMPTY_SELECTION", f"the selection of item {item.id} matches no {what}")
+            unread = (
+                ": the area kinds were not read (no model.sections/1)"
+                if getattr(sel, "area_kind", None) and sections is None
+                else ""
+            )
+            self.issue(item.id, "EMPTY_SELECTION", f"the selection of item {item.id} matches no {what}{unread}")
         return found
 
     def value(self, index: int, field: str, value: Any, quantity: str, pointer: str) -> tuple[ResolvedValue, str]:
@@ -286,6 +292,8 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
     """Check every item of the change set (K1 to K6) and give the status (K7)."""
     refs: dict[str, str] = {}
     for name in _REFS:
+        if name == "sections" and inp.sections is None:  # optional (spec 0007 4.4.1)
+            continue
         if (ref := meta.refs.get(name)) is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "each input must be a record reference", field=name)
         refs[name] = ref.result_id
@@ -327,5 +335,5 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
         "status", status, formula="FAIL when errors > 0, else PASS", source="spec 0007 4.4.1 K7", uses=["errors"]
     )
     trace.output("status")
-    complete = all(meta.refs[name].complete for name in _REFS) and inp.diff.complete
+    complete = all(meta.refs[name].complete for name in refs) and inp.diff.complete
     return CheckBody(status=status, resolved=resolved, issues=check.issues, complete=complete)
