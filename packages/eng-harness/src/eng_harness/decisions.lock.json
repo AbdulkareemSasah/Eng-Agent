@@ -11,7 +11,7 @@
   },
   {
     "name": "edit_cycle_readback_result",
-    "version": 1,
-    "schema_sha256": "3a3d99fb4b8278b2e896c69f7023c161a1b118f00d9b9326ee81a1352f7791dd"
+    "version": 2,
+    "schema_sha256": "42c48b1f6a4681a6c562b6caab38d1ed7eea88abb7e2e155bac800c0e56d711f"
   }
 ]

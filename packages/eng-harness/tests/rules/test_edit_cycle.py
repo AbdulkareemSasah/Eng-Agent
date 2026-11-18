@@ -2,14 +2,21 @@
 
 Expected picks are derived by hand from the rule lines of the table in spec 0007 section 4.6:
 `edit_cycle_readback_result.pass` is "status `PASS` and reason `readback` -> `continue`" and
-`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified` -> `continue`". Neither rule
-reads the basis (spec 0007 4.6: no rule holds a number), so the restricted basis view is built with no path.
+`edit_cycle_analysis_messages.clean` is "not `has_errors`, not `has_unclassified`, drift `PASS` -> `continue`".
+Neither rule reads the basis (spec 0007 4.6: no rule holds a number),
+so the restricted basis view is built with no path.
 A state outside the rule gives `None` (spec 0007 AC18), so the next rule or the engineer decides.
 """
+
+import json
+from math import inf, nextafter
+from pathlib import Path
 
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
 
+from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
+from eng_harness.calcs.edit_cycle.analysis_summary import SummaryBody, SummaryInput, analysis_summary
 from eng_harness.ctx import BasisView
 from eng_harness.decisions import _points, _rules
 from eng_harness.decisions._points import DecisionPoint
@@ -60,6 +67,8 @@ def test_pass_typical() -> None:
 
 def test_pass_boundary() -> None:
     # Each state differs from the one passing state in exactly one field of the rule's condition.
+    failed_check = _readback(reason=ReadbackReason("check_model_failed"))
+    assert readback_result_pass.fn(failed_check, _BASIS) is None
     changed = _readback(reason=ReadbackReason.MODEL_CHANGED_DURING_APPLY)
     assert readback_result_pass.fn(changed, _BASIS) is None
     for status in (VerdictStatus.FAIL, VerdictStatus.NEEDS_ENGINEER, VerdictStatus.NOT_APPLICABLE, VerdictStatus.ERROR):
@@ -77,9 +86,66 @@ def test_clean_boundary() -> None:
     assert analysis_messages_clean.fn(_analysis(has_errors=True), _BASIS) is None
     assert analysis_messages_clean.fn(_analysis(has_unclassified=True), _BASIS) is None
     assert analysis_messages_clean.fn(_analysis(has_errors=True, has_unclassified=True), _BASIS) is None
-    # The rule states nothing about the drift status: a drift above the limit does not leave it.
-    drift = _analysis().model_copy(update={"drift_status": VerdictStatus.NEEDS_ENGINEER})
-    assert analysis_messages_clean.fn(drift, _BASIS) == Pick(AnalysisAction.CONTINUE)
+    # Every non-PASS drift status leaves the clean rule (spec 0007 4.6, amendment B-544).
+    for status in VerdictStatus:
+        if status != VerdictStatus.PASS:
+            drift = _analysis().model_copy(update={"drift_status": status})
+            assert analysis_messages_clean.fn(drift, _BASIS) is None
+
+
+def _summary(inp: SummaryInput, meta: InputMeta) -> SummaryBody:
+    return SummaryBody.model_validate(analysis_summary(inp, meta, TraceBuilder()).model_dump())
+
+
+def test_clean_drift_at_and_above_the_limit() -> None:
+    """Spec 0007 4.4.4, 4.6, AC18: exact equality passes; the next stored float exceeds.
+
+    Source: data/golden/edit_cycle/analysis-clean.json, its confirmed synthetic basis limit
+    0.01 (dimensionless), no messages, X drifts 0.004 and 0.01. By hand: neither row is
+    strictly above 0.01, so exceeding is empty, drift_status PASS and D-3 continues.
+    Replace the highest row by nextafter(limit, +inf): it alone is strictly above the
+    limit, so exceeding has S2, drift_status NEEDS_ENGINEER and the clean rule gives None.
+    No tolerance or engineering limit is chosen here. No rows also means exceeding empty
+    and PASS under Q21's interim reading; this test adds no missing-row policy.
+    """
+    path = Path(__file__).resolve().parents[1] / "data/golden/edit_cycle/analysis-clean.json"
+    case = json.loads(path.read_text(encoding="utf-8"))
+    inp = SummaryInput.model_validate(case["input"])
+    kinds = {
+        "messages": "harness.csi_analysis_messages/1",
+        "drifts": "forces.story_drifts/1",
+        "basis": "basis.design_basis/1",
+    }
+    meta = InputMeta(
+        refs={
+            name: RefMeta(
+                result_id=result_id,
+                kind=kinds[name],
+                complete=True,
+                model_id=None,
+                model_revision=None,
+                parents=(),
+                producer_tool="fixture",
+            )
+            for name, result_id in case["refs"].items()
+        }
+    )
+    at = _summary(inp, meta)
+    assert at.exceeding == []
+    assert at.governing_drift["X"].ratio == at.limit_ratio
+    state = AnalysisState(
+        has_errors=at.has_errors, has_unclassified=at.has_unclassified, drift_status=VerdictStatus.PASS, refs=()
+    )
+    assert analysis_messages_clean.fn(state, _BASIS) == Pick(AnalysisAction.CONTINUE)
+    rows = list(inp.drifts.rows)
+    rows[1] = rows[1].model_copy(update={"drift_ratio": nextafter(at.limit_ratio, inf)})
+    above = _summary(inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": rows})}), meta)
+    assert [(row.story, row.ratio) for row in above.exceeding] == [("S2", nextafter(at.limit_ratio, inf))]
+    drift_status = VerdictStatus.NEEDS_ENGINEER if above.exceeding else VerdictStatus.PASS
+    assert analysis_messages_clean.fn(state.model_copy(update={"drift_status": drift_status}), _BASIS) is None
+    absent = _summary(inp.model_copy(update={"drifts": inp.drifts.model_copy(update={"rows": []})}), meta)
+    assert absent.exceeding == []
+    assert analysis_messages_clean.fn(state, _BASIS) == Pick(AnalysisAction.CONTINUE)
 
 
 def _values(point: DecisionPoint) -> list[str]:
@@ -101,7 +167,12 @@ def test_discovery_finds_the_points_and_rules() -> None:
         "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
         "edit_cycle_readback_result": ["continue", "restore_previous", "stop_cycle"],
     }
-    assert all(r.thresholds == () and r.version == 1 for r in rules.rules)
+    assert all(r.thresholds == () and r.version == 2 for r in rules.rules)
+    assert {p.name: p.version for p in points.points} == {
+        "edit_cycle_analysis_messages": 1,
+        "edit_cycle_engineer_turn": 1,
+        "edit_cycle_readback_result": 2,
+    }
 
 
 def test_policies_follow_the_table() -> None:
