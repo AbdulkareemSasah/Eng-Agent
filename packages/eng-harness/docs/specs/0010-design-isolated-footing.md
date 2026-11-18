@@ -94,7 +94,8 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   (`NO_COLUMN_AT_JOINT`, `SECTION_NOT_RECTANGULAR`, `COLUMN_ROTATED`, `TWO_COLUMNS_AT_JOINT`). Test:
   `tests/golden/footing/test_subjects.py::test_golden_cases`.
 - AC7. `harness.footing_plan_size`: golden cases of §4.4.2 (between and on multiples, the minimum plan governing, the
-  maximum reached, uplift, overburden above the allowable, net allowable, shape `equal_projection` as
+  maximum reached, uplift, overburden above the allowable, net allowable, no service load with the size of P6, a
+  maximum plan below the increment refused `OUT_OF_RANGE` (amendment B-567), shape `equal_projection` as
   `NotImplementedGap` FG-1); and properties: the plan area is at least `A_req`, one increment less is below it unless the
   minimum governs, and a larger load never gives a smaller plan. Tests:
   `tests/golden/footing/test_plan_size.py::test_golden_cases`, `tests/property/test_footing_plan_size.py::test_minimal_and_monotone`.
@@ -104,7 +105,8 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   `tests/property/test_footing_layout.py::test_spacing_bound`.
 - AC9. `harness.footing_resize`: each action of §4.4.4 gives the next size; a step past a bound leaves the size
   unchanged with `LIMIT_REACHED`; `engineer_set` takes the single plan size `L`, `h` and `s` as engineer-input
-  references, sets `Lx = Ly = L`, and flags values outside the basis bounds (`OUTSIDE_BASIS_BOUNDS`) and a plan that is
+  references (one triple per call, `engineer_plan`, `engineer_depth`, `engineer_spacing`), sets `Lx = Ly = L`, and
+  flags values outside the basis bounds of §4.4.4, each side (`OUTSIDE_BASIS_BOUNDS`), and a plan that is
   not a multiple of `plan_increment_mm` (`OFF_INCREMENT`); `enlarge_plan` from a plan that is not a multiple gives the
   smallest multiple above it (golden cases: an engineer plan between multiples, then enlarged). Test:
   `tests/golden/footing/test_resize.py::test_golden_cases`.
@@ -295,7 +297,8 @@ Output `harness.footing_dims/1` with `h = min_depth_mm`, `s = max_spacing_mm`.
 - P0. `allowable_bearing_kind` must be `gross`, else `NEEDS_ENGINEER` (`NET_ALLOWABLE`, BP G-2). `plan_shape` must be
   `square`, else `NotImplementedGap` FG-1.
 - P1. `N_k = FZ_k` for every service case `k` of the joint (BP S3 sign convention); any `N_k ≤ 0` gives
-  `NEEDS_ENGINEER` (`UPLIFT`).
+  `NEEDS_ENGINEER` (`UPLIFT`). A joint with no reaction row for any service case has no `N_k` (P3 has no maximum) and
+  gives `NEEDS_ENGINEER` (`NO_SERVICE_LOAD`) (amendment B-567, OQ-Q64).
 - P2. `w = h·γc + soil_depth·γs + surcharge` (BP S3 per unit area); `q_net = q_allow − w`; `q_net ≤ 0` gives
   `NEEDS_ENGINEER` (`OVERBURDEN`).
 - P3. `A_req = max_k N_k / q_net`. Moments are not used here. The bearing check then includes them: a bearing `FAIL`
@@ -305,7 +308,11 @@ Output `harness.footing_dims/1` with `h = min_depth_mm`, `s = max_spacing_mm`.
 - P4. `n` is the smallest integer with `(n·i)² ≥ A_req` and `n·i ≥ min_plan`, found with integer square roots of the
   exact fraction and confirmed by both comparisons; `Lx = Ly = n·i`.
 - P5. `n·i > max_plan` gives the largest multiple not above `max_plan`, `plan_at_max = true` and status
-  `LIMIT_REACHED` (the checks then decide).
+  `LIMIT_REACHED` (the checks then decide). A basis with `max_plan_dimension_mm < plan_increment_mm` has no positive
+  multiple to give and is refused with `OUT_OF_RANGE` (calcs §6) (amendment B-567, OQ-Q64).
+- P6. A footing with a `NEEDS_ENGINEER` status (P0, P1, P2) still carries a size in the output: `Lx = Ly` the smallest
+  multiple of `i` not below `min_plan_dimension_mm`, with `h` and `s` as above. The block closes it at §4.6 step 1
+  and passes no such size to a check (amendment B-567, OQ-Q64).
 
 #### 4.4.3 `harness.footing_layout` v1
 
@@ -324,14 +331,21 @@ across `Lx`); `c` is the cover, `db` the diameter.
 
 #### 4.4.4 `harness.footing_resize` v1
 
-Input: `dims`, `actions` (per footing: `enlarge_plan`, `increase_depth`, `reduce_bar_spacing`, `engineer_set` with
-references to the `basis.engineer_input/1` fields `L`, `h`, `s`, or `none`), `basis` (`foundation.plan_increment_mm`,
-`.max_plan_dimension_mm`, `.depth_increment_mm`, `.max_depth_mm`, `reinforcement.spacing_increment_mm`,
-`.min_spacing_mm`). Footings stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
+Input: `dims`, `actions` (per footing: `enlarge_plan`, `increase_depth`, `reduce_bar_spacing`, `engineer_set` or
+`none`), `engineer_plan`, `engineer_depth`, `engineer_spacing` (references to the fields `L`, `h`, `s` of one
+`basis.engineer_input/1` answer), `basis` (`foundation.plan_increment_mm`, `.min_plan_dimension_mm`,
+`.max_plan_dimension_mm`, `.depth_increment_mm`, `.min_depth_mm`, `.max_depth_mm`,
+`reinforcement.spacing_increment_mm`, `.min_spacing_mm`, `.max_spacing_mm`). The engineer values are one triple of
+top-level references per call (the CalcPort resolves top-level references only, calcs §4.7), taken by the footings
+of that call whose action is `engineer_set`; the block (plan T8, run by the workflow of plan T9) therefore calls the
+resize once per engineer answer (§4.6 step 7), and once for the footings with the other actions. The bounds of R4 are
+`min_plan_dimension_mm` to `max_plan_dimension_mm` for `L`, `min_depth_mm` to `max_depth_mm` for `h` and
+`min_spacing_mm` to `max_spacing_mm` for `s` (amendment B-567, OQ-Q64: the three lower or upper bounds
+`min_plan_dimension_mm`, `min_depth_mm` and `max_spacing_mm` join the six fields listed before). Footings stay square (FG-1): `Lx = Ly = L` in every output. R1 `enlarge_plan`: `L' = (⌊L/i⌋ + 1)·i`, the smallest multiple of
 `i` above `L` (`(n + 1)·i` when `L = n·i`; exact floor division of the fractions). R2 `increase_depth`: `h + depth_increment_mm`. R3 `reduce_bar_spacing`:
 `s − spacing_increment_mm`. A result past its bound leaves the size unchanged, sets the flag and status `LIMIT_REACHED`.
 R4 `engineer_set` takes the three values `L`, `h`, `s` of `basis.engineer_input/1` with `source: engineer` and sets
-`Lx = Ly = L`; the engineer cannot enter a rectangle (Q17). A value outside the basis bounds is kept and flagged
+`Lx = Ly = L`; the engineer cannot enter a rectangle (Q17). A value outside its basis bounds (above) is kept and flagged
 `OUTSIDE_BASIS_BOUNDS` (Q13); a plan that is not a multiple of `i` is kept and flagged `OFF_INCREMENT` (no check
 depends on the increment). Depths are counted from `min_depth_mm`, plans from zero.
 
@@ -538,7 +552,7 @@ code-pack route (additive to engine §4.8).
 | Q10 | The code-pack route (§4.3) amends specs 0001 and 0003 | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 and §6 name the one route |
 | Q11 | `eng-harness` depends on three workspace packages of `structural-codes` | Owner | No ADR (no third-party code; 03 §2 allows it from phase 2); spec 0013 Q12 asks the same and plan 0013 T6 lists `docs/adr/0004-workspace-code-packs.md`: one answer for both |
 | Q12 | New basis paths (`design.*`, `seismic.*`, `foundation.*` sizing, `reinforcement.*`, `safe.*`) | Owner | Adopt with spec 0004's template schema, with the clause-spec paths (ACI plan Q2) |
-| Q13 | Engineer dimensions outside the basis bounds are kept and flagged, not refused | Owner | Accept: the engineer decides; the report shows the flag |
+| Q13 | Engineer dimensions outside the basis bounds are kept and flagged, not refused | Owner | Accept: the engineer decides; the report shows the flag. The bounds are the minimum and maximum plan, depth and spacing fields of §4.4.4 (amendment B-567, OQ-Q64) |
 | Q14 | `foundation.min_depth_mm` is the engineer's value; the code minimum effective depth is not checked (ACI plan Q13) | Owner | Add the check to the pack later |
 | Q15 | Bar spacing limits of the code are not checked; the basis spacings are the engineer's (ACI plan Q7) | Owner | As Q14 |
 | Q16 | No measured manual time for footing design exists | Owner | Prepare a footing benchmark (two or three past projects) before the first release, for F6 and F7 |
