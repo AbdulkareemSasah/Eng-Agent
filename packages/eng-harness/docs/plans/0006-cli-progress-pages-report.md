@@ -479,12 +479,21 @@ tasks:
       - "packages/eng-harness/tests/helpers/cli_deps.py"  # the fake port builder takes files (B-536)
       - "packages/eng-harness/tests/workflow/test_cli_answers.py"
       - "packages/eng-harness/tests/workflow/test_cli_run.py"
+      - "packages/eng-harness/src/eng_harness/block.py"  # ModelFile, if this task merges before plan 0007 T8 (B-569)
+      - "packages/eng-harness/tests/unit/test_block.py"  # test_model_file_is_pure, in that case only (B-569)
     # About 30 lines for run --answers, 20 for resume --answers, 15 for the wait-mode wrapper, 5 for the engineer-name refusal and 5 of CHANGELOG.md (an estimate, not a measurement).
-    # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's Path and Path | None fields, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
+    # Amendment B-536: 35 to 45 lines for the model files (the walk over the input model's PurePath (ModelFile) and PurePath | None fields, amendment B-569, the three refusal messages, and at resume the registry lookup, the run-header read and the stored input), 3 for the field's type, 5 for the H-G8 exit and 1 of CHANGELOG.md (an estimate); 75 + 54 = 129, budget 130.
     # Amendment (B-543, documents only): the port builder also receives visible, the input's top-level visible_host bool or false (spec 4.2.2 step 2, AC67; spec 0007 4.2, spec 0002 4.1 item 6), at run and at resume from the stored input, passed by keyword as files is (build_ports takes both keyword-only); about 6 lines beside the model-files walk and 1 in the field's type: 129 + 7 = 136, budget 140; test_model_files_reach_the_port_builder also checks visible.
     # Amendment B-541: the moved ConfigError clause, about 3 lines deleted at T14's place and 3 added at the end of step 2 (an estimate): 129 + 6 = 135; budget 136.
     # Both amendments sit in this task: 129 + 6 (B-541) + 7 (B-543) = 142; budget 143.
-    max_changed_lines: 143
+    # Amendment (B-569, documents only): the walk over the input model is over PurePath (ModelFile) and PurePath | None
+    # fields, matched by identity (not issubclass: Path is a subclass of PurePath), each value turned into a Path by the
+    # command line for its checks at run (spec 4.2.2 step 2, AC67; engine spec 0001 4.1.2, section 11 Q47): a type
+    # change, no line added. Whichever of this task and plan 0007 T8 merges first adds ModelFile to block.py with
+    # test_model_file_is_pure (about 5 lines: budget 143 -> 148, an estimate); the other relies on it. The test is not in
+    # this task's tests_first, so the order stays free; this task's own first commit holds it when it adds the alias.
+    # Amendment (B-574, documents only): T14c merged before B-569 with the Path walk (B-528, #429); plan 0007 T8 makes the PurePath switch.
+    max_changed_lines: 148
     max_sessions: 1
     tests_first:
       - "packages/eng-harness/tests/workflow/test_cli_run.py::test_page_ports_wait_unless_no_wait_real_engine"
@@ -1037,8 +1046,9 @@ Workflow tests use a fake engine from `CliDeps` except the wait test; T17c re-ch
 engine. (4) Amendment B-536 (spec §4.2.2 step 2, AC67, AC68): the port builder is called at the end of step 2 as
 `port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` (`files` and `visible` by keyword;
 `visible` is the input's top-level `visible_host` bool or false, amendment B-543, spec 0007 §4.2), `files` mapping the base name of each
-top-level `pathlib.Path` field of the workflow's input model to its value (absolute and existing; a relative path, a
-missing file or a repeated base name is exit 2 with no run folder); `resume` builds the same mapping from the run's
+top-level `pathlib.PurePath` field (`eng_harness.block.ModelFile`, or `PurePath | None` with a value; amendment
+B-569) of the workflow's input model to its value (absolute and existing; a relative path, a missing file or a
+repeated base name is exit 2 with no run folder); `resume` builds the same mapping from the run's
 input read through `input_ref` of the run header before `Engine.resume`, without the existence check (a case of
 `test_model_files_reach_the_port_builder` removes the original before `resume`). A `NotImplementedGap` from the port
 builder (spec 0002 AC43, gap H-G8) prints its message on standard error and ends `run` and `resume` with
@@ -1049,6 +1059,14 @@ merge base, where the port builder takes no `files` and its exception is not cau
 keeps T14's `ConfigError` exit beside the H-G8 exit, and the `--answers` file is read as `utf-8-sig` (spec §4.7), a
 case of `test_run_answers_first_data_request`. The move deletes the `ConfigError` clause at T14's place and adds it at
 the end of step 2 (about 6 counted lines; the encoding is an argument of the read T14c writes), hence 130 to 136.
+Amendment B-569 (engine spec 0001 §4.1.2, §11 Q47; spec §4.2.2 step 2, AC67): a model-file field is annotated
+`PurePath` (`eng_harness.block.ModelFile`), because a block module may not import `pathlib`. The walk unwraps
+`X | None` and compares the annotation with `PurePath` by identity, never by `issubclass` (a `Path` field is not a
+model-file field), turns each value into a `Path` with `Path(str(value))` for the absolute-path and existence checks at
+`run`, keys it by `.name`, and at `resume` builds `files` from the stored input without checking.
+`test_model_files_reach_the_port_builder` uses a fixture input model with a `ModelFile` field and a `ModelFile | None`
+field, and a plain `Path` field that is not picked up. Whichever of this task and plan 0007 T8 merges first adds
+`ModelFile = PurePath` to `block.py` with `tests/unit/test_block.py::test_model_file_is_pure`; the other relies on it.
 
 **T14b Signals, launch address, decision layer** (spec §4.2.2). Signal handling (the first interrupt is a stop
 request, the second ends the process, AC10); the launch address shown on the controlling terminal only (AC61).

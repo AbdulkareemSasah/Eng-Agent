@@ -181,24 +181,31 @@ def _noting(build: Builder, written: WrittenItems) -> Builder:
     return run
 
 
+async def _no_save(key: str) -> None:
+    return None
+
+
 class CsiToolPort(AdapterToolPort):
     """`AdapterToolPort` over `tool_allowlist()` and its argument models, builders, readers; `wiring` as its parameters.
 
     `written` is the book that `AdapterHostPort.check_model` reads (its `ReadBack`) and `wrote` is the host port's; a
     port made without them records into a book nobody reads. `revisions` holds the run's snapshots: without it
     `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked. `reopened`
-    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file after a
-    successful `csi_open_revision` only. `opener` is the host port's `open_original`: `csi_open_model` with no path
-    calls it (spec 4.5.9); without it that open is refused with `INTERNAL`.
+    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file when
+    `csi_open_revision` settles, before the result is stored. `saved` is the host port's (`AdapterHostPort.tool_saved`):
+    awaited with the model key when `csi_save_model` settles, before the result is stored. `opener` is the host port's
+    `open_original`: `csi_open_model` with no path calls it (spec 4.5.9); without it that open is refused with
+    `INTERNAL`.
     """
 
     def __init__(
         self, *, binder: ModelBinder, written: WrittenItems | None = None, wrote: Callable[[str], None] | None = None,
         revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None,
+        saved: Callable[[str], Awaitable[None]] | None = None,
         opener: Callable[[str], Awaitable[Path]] | None = None, **wiring: Any,
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
-        self._reopened, self._opener = reopened or (lambda key, path: None), opener
+        self._reopened, self._saved, self._opener = reopened or (lambda key, path: None), saved or _no_save, opener
         builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
@@ -230,8 +237,13 @@ class CsiToolPort(AdapterToolPort):
                 return await self._read_parts(descriptor, args, model)
             if tool == "csi_open_revision":
                 return await self._open_revision(args, op_id, model)
-            if tool == "csi_save_model" and args.get("as_new_revision") is True:
-                return await self._new_revision(descriptor, args, op_id, model)
+            if tool == "csi_save_model":
+                validated = validate_call(
+                    SaveModelArgs, args, source=self._store, current_revision=self._binder.revision
+                )
+                model = self._resolve_model_key(validated.model.model, model)
+                if validated.model.as_new_revision:
+                    return await self._new_revision(descriptor, args, op_id, model)
             if self._revisions is not None and descriptor.effect == "write":
                 self._not_a_snapshot(await self._open_file(descriptor, model))
         except (ContractError, ToolFailed) as error:
@@ -284,13 +296,15 @@ class CsiToolPort(AdapterToolPort):
         self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], op_id: str, model: str | None
     ) -> Envelope:
         """`csi_save_model` with `as_new_revision`: the open file saved in place, then copied to a verified snapshot."""
+        validated = validate_call(SaveModelArgs, args, source=self._store, current_revision=self._binder.revision)
+        key = self._resolve_model_key(validated.model.model, model)
         revisions = self._wired()
-        working = await self._open_file(descriptor, model)
+        working = await self._open_file(descriptor, key)
         if working is None:
             raise ContractError(ErrorCode.PRECONDITION_FAILED, "no model is open", precondition=Precondition.model_open)
         self._not_a_snapshot(working)
         target = revisions.target(working)  # refused before anything is saved
-        reply = await super().call("csi_save_model", args, op_id=op_id, model=model)
+        reply = await super().call("csi_save_model", args, op_id=op_id, model=key)
         if not isinstance(reply, SuccessEnvelope):
             return reply
         return _with_saved_file(reply, revisions.snapshot(working, target))
@@ -303,11 +317,11 @@ class CsiToolPort(AdapterToolPort):
         self._health.check(server.host_key)
         started, began = self._clock.now(), self._clock.now_ms()
         validated = validate_call(OpenModelArgs, args, source=self._store, current_revision=self._binder.revision)
+        key = self._resolve_model_key(validated.model.model, model)
         if validated.model.path is not None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "csi_open_model opens the original: no path", field="path")
         if self._opener is None:
             raise ContractError(ErrorCode.INTERNAL, "no opener wiring", incident_id=self._ids.new_ulid())
-        key = validated.model.model
         opened = await self._opener(key)
         binding = await self._binder.binding(server.host_key, key, descriptor)
         return make_envelope(
@@ -316,17 +330,43 @@ class CsiToolPort(AdapterToolPort):
             host=binding.host, inputs=validated.inputs, started_at=started, duration_ms=self._clock.now_ms() - began,
         )  # fmt: skip
 
+    async def _settled(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None, binding: Binding
+    ) -> Binding:
+        """Record a save or reopened file on the host port and return the post-step binding (spec 0007 4.10)."""
+        if descriptor.name == "csi_save_model":
+            key = self._resolve_model_key(args.get("model"), model)
+            await self._saved(key)
+        elif descriptor.name == "csi_open_model" and isinstance(path := args.get("path"), str):
+            key = self._resolve_model_key(args.get("model"), model)
+            self._reopened(key, Path(path))
+        else:
+            return binding
+        return await self._binder.binding(self._config.servers[self._server].host_key, key, descriptor)
+
+    @staticmethod
+    def _resolve_model_key(raw: object, model: str | None) -> str:
+        arg_key = raw if isinstance(raw, str) else None
+        if arg_key is not None and model is not None and arg_key != model:
+            raise ContractError(
+                ErrorCode.INVALID_ARGUMENT,
+                f"model {model!r} does not match args model {arg_key!r}",
+                field="model",
+            )
+        resolved = arg_key if arg_key is not None else model
+        if resolved is None:
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, "missing model key", field="model")
+        return resolved
+
     async def _open_revision(self, args: Mapping[str, JsonValue], op_id: str, model: str | None) -> Envelope:
         """`csi_open_revision`: a copy of an unchanged snapshot becomes the working file, opened without saving."""
         revisions = self._wired()
         validated = validate_call(OpenRevisionArgs, args, source=self._store, current_revision=self._binder.revision)
+        key = self._resolve_model_key(validated.model.model, model)
         path, saved = revisions.reopen(validated.model.revision)
-        reply = await super().call(
-            "csi_open_model", {"model": validated.model.model, "path": str(path)}, op_id=op_id, model=model
-        )
+        reply = await super().call("csi_open_model", {"model": key, "path": str(path)}, op_id=op_id, model=key)
         if not isinstance(reply, SuccessEnvelope):
             return reply
-        self._reopened(validated.model.model, path)
         return _with_saved_file(reply, saved)
 
 

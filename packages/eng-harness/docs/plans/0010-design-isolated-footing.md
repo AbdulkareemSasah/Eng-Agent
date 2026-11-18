@@ -91,31 +91,51 @@ tasks:
     covers: [AC6]
     depends_on: [T3]
   - id: T4
-    title: Calcs harness.footing_plan_size and harness.footing_resize
+    # Amendment (B-567, documents only): split (D-12, OQ-Q61), as B-458 split calcs T8; the B-395 branch measured 462
+    # counted lines against 360 for both calcs. T4 keeps harness.footing_plan_size (about 274 lines); budget 360 -> 300.
+    # The resize calc is T4b. Spec §4.4.2 records the behaviour B-395 measured (OQ-Q64).
+    title: Calc harness.footing_plan_size
     files:
-      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.plan_size and more (amendment B-356)
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.plan_size (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/footing/plan_size.py"
-      - "packages/eng-harness/src/eng_harness/calcs/footing/resize.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md"
-      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"
       - "packages/eng-harness/tests/unit/footing/test_calcs_registered.py"
       - "packages/eng-harness/tests/golden/footing/test_plan_size.py"
-      - "packages/eng-harness/tests/golden/footing/test_resize.py"
       - "packages/eng-harness/tests/property/test_footing_plan_size.py"
       - "packages/eng-harness/tests/data/golden/footing/plan-*.json"
-      - "packages/eng-harness/tests/data/golden/footing/resize-*.json"
-    max_changed_lines: 360
-    max_sessions: 3
+    max_changed_lines: 300
+    max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/footing/test_plan_size.py::test_golden_cases"
       - "packages/eng-harness/tests/property/test_footing_plan_size.py::test_minimal_and_monotone"
-      - "packages/eng-harness/tests/golden/footing/test_resize.py::test_golden_cases"
-    covers: [AC7, AC9]
+    covers: [AC7]
     depends_on: [T3]
+  - id: T4b
+    # Amendment (B-567, documents only): split from T4 (D-12, OQ-Q61): harness.footing_resize (about 190 counted lines
+    # on the B-395 branch); budget 210. Spec §4.4.4 records the bounds fields and the input forms (OQ-Q64).
+    title: Calc harness.footing_resize
+    files:
+      - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs.footing.resize (amendment B-356)
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/resize.py"
+      - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"
+      - "packages/eng-harness/tests/unit/footing/test_calcs_registered.py"
+      - "packages/eng-harness/tests/golden/footing/test_resize.py"
+      - "packages/eng-harness/tests/data/golden/footing/resize-*.json"
+    max_changed_lines: 210
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/golden/footing/test_resize.py::test_golden_cases"
+    covers: [AC9]
+    depends_on: [T4]
   - id: T5
+    # Amendment (B-568, documents only): owner answer of 2026-11-18 (OQ-Q60): rule L1 takes the ceiling; the two
+    # points of OQ-Q63 (depth with no room for both layers, numbers of a WIDTH_TOO_SMALL row) are recorded (prose of T5).
     title: Calc harness.footing_layout
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.layout (amendment B-356)
@@ -208,7 +228,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_no_provider"
       - "packages/eng-harness/tests/workflow/footing/test_decisions.py::test_one_screen_per_round"
     covers: [AC15, AC16, AC17, AC18, AC19, AC20]
-    depends_on: [T2, T4, T5, T6, T7]
+    depends_on: [T2, T4, T4b, T5, T6, T7]  # amendment (B-567): T4 split, plan size in T4, resize in T4b
   - id: T9
     # Amendment (B-418, documents only): T9 adds the structural-codes-sbc304-2018 workspace dependency and the SBC
     # allowlist ids (moved from T2); uv.lock, _calc/_code_packs.py and test_code_pack_route.py added
@@ -333,7 +353,8 @@ plans 0001 to 0009; golden data, fixtures and journals are test data. File paths
 
 Data first, then the R1 parts, each small enough to review against its spec section: the kinds (T1); the code-pack
 route (T2), the one framework change, kept apart from engineering content because it touches the CalcPort and adds the
-workspace dependencies; the six footing calcs in four tasks (T3 to T6), which carry the sizing and go to the owner as soon
+workspace dependencies; the six footing calcs in five tasks (T3 to T6, with T4b split from T4 by amendment B-567),
+which carry the sizing and go to the owner as soon
 as they merge; the decision point and rules (T7), reviewed separately from the block. The block (T8) and the workflow
 (T9) are tested end to end against the synthetic CSI fake server process with the real ACI 318-14 and SBC 304-2018 packs.
 The SAFE stage is last (T10, T11), because it depends on the SAFE adapter and never changes a verdict: the workflow is
@@ -386,10 +407,31 @@ order: the first `test:` commit holds the three `test_subjects.py` tests and the
 the base because the merged calc reads `compare.angle`; the kind fixtures, snapshots and change-set test come in a
 later commit (they pass at the base).
 
-**T4 Plan size and resize** (spec §4.4.2, §4.4.4). Exact integer search on fractions; `LIMIT_REACHED`; FG-1. The
-minimality and monotonicity properties run with Hypothesis.
+**T4 Plan size** (spec §4.4.2). Exact integer search on fractions; `LIMIT_REACHED`; FG-1. The minimality and
+monotonicity properties run with Hypothesis. The golden cases also hold the rules spec §4.4.2 records from the B-395
+branch (OQ-Q64): `NO_SERVICE_LOAD`, the size given to a `NEEDS_ENGINEER` footing (the smallest multiple of the
+increment not below `foundation.min_plan_dimension_mm`) and the `OUT_OF_RANGE` refusal of a
+`foundation.max_plan_dimension_mm` below `foundation.plan_increment_mm`. Amendment B-567 (D-12, OQ-Q61): the former
+T4 measured 462 counted lines against 360 on the B-395 branch with both calcs, so it is split like calcs T8 (B-458);
+the resize calc is T4b, and the B-395 work continues on the two tasks in turn.
+
+**T4b Resize** (spec §4.4.4; split from T4 by amendment B-567). The four actions and their bounds (`LIMIT_REACHED`),
+`engineer_set` with the `OUTSIDE_BASIS_BOUNDS` and `OFF_INCREMENT` flags against the nine basis fields of spec §4.4.4,
+and the input forms that T8 and T9 use: `actions` per footing and one triple of engineer references
+(`engineer_plan`, `engineer_depth`, `engineer_spacing`) per call. Depends on T4 (the `harness.footing_dims/1` output
+of the plan size and the shared `calcs/footing/__init__.py`, `calcs.lock.json` and registration test).
 
 **T5 Layout** (spec §4.4.3). Bar counts, areas, effective depths for both bottom layers and both reaction points.
+By the owner answer of 2026-11-18 (OQ-Q60, amendment B-568), with `span = L − 2c − db` (the spec's distance between
+the outer bar centres), `WIDTH_TOO_SMALL` (`NEEDS_ENGINEER`) applies when `span ≤ 0` before computing any actual
+spacing; for `span > 0`, the bar count of L1 is the ceiling `n = ⌈span/s⌉ + 1` (at least two bars, with `n = 2` for
+`0 < span ≤ s`), taken on the exact fraction: the smallest count whose actual spacing is at most the input `s`. A depth
+with no room for both layers (the upper layer's effective depth of L3 zero or less) is refused with `OUT_OF_RANGE`,
+field `dims` (OQ-Q63). The golden cases of `test_golden_cases` include a positive span that is an exact multiple of `s`,
+a span just above one, a span of zero and the `OUT_OF_RANGE` depth; `test_spacing_bound` checks that for each valid
+layout the actual spacing is at most `s`, and either `n = 2` or `span/(n − 2) > s`. The numbers of a
+`WIDTH_TOO_SMALL` row (the given spacing shown, the steel of 0 or 1 bars) are informative only; T8 never uses them.
+No engineering number is added: the golden values come from the basis fields of each case.
 
 **T6 Status and schedule** (spec §4.4.5, §4.4.6). Family statuses, closure, decision state, clearance by exact squared
 distances, assembled schedule.
@@ -439,7 +481,7 @@ determinism. The non-test lines are at most a test-support helper.
 |---|---|
 | T1 | eng-contract T11, T12 (kinds); plan 0001 T3 (`_kinds.py`); plan 0003 T4 |
 | T2 | plan 0003 T5 (CalcPort); SC T8, T11 (evaluate, lifecycle); the documents pull requests of spec Q10 and C4 (B-405) |
-| T3 to T6, T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
+| T3 to T6 (with T4b), T10 | plan 0003 T1 to T6 (calc framework, hash, approvals, port, rules test, golden loader); plan 0004 T5 (`FieldSpec`) |
 | T3b | eng-contract T19 (suffixed basis paths, B-464; merged) |
 | T7 | plan 0005 T1 to T4, T7 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
@@ -469,8 +511,8 @@ determinism. The non-test lines are at most a test-support helper.
 
 ## 5. Rollback
 
-Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 depends on T2 and
-T4 to T7; T9 on T8; T11 on T9 and T10). Until T9 merges, nothing registers the workflow. Calcs, points, rules and blocks
+Each task is one squash-merged pull request into `build/v1`; a revert removes it and its dependants (T8 depends on T2,
+T4, T4b and T5 to T7; T4b on T4; T9 on T8; T11 on T9 and T10). Until T9 merges, nothing registers the workflow. Calcs, points, rules and blocks
 are versioned with lock files, so a fix after runs have been journaled is a new version; old journals keep replaying
 against the version they recorded or stop with `ReplayDivergence`, never silently. Reverting T2 removes the core and ACI
 `structural-codes` dependencies with it; reverting T9 removes the SBC one.
