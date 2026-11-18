@@ -267,7 +267,7 @@ def footing_plan_size(inp: PlanSizeInput, meta: InputMeta, trace: TraceBuilder) 
     )
     trace.input(
         "service_cases",
-        inp.service_cases,
+        list(inp.service_cases),
         ref=f"{meta.refs['service_cases'].result_id}#/fields/service_cases/value",
     )
     loads = _service_loads(inp.reactions, inp.service_cases)
@@ -276,7 +276,7 @@ def footing_plan_size(inp: PlanSizeInput, meta: InputMeta, trace: TraceBuilder) 
         prefix = f"footing_{index}"
         selected = loads.get(subject.joint, [])
         trace.input(f"{prefix}_id", subject.id, ref=f"{meta.refs['subjects'].result_id}#/subjects/{index}/id")
-        trace.input(f"{prefix}_fz", selected, unit="kN", ref=meta.refs["reactions"].result_id)
+        trace.input(f"{prefix}_fz", list(selected), unit="kN", ref=meta.refs["reactions"].result_id)
         rows.append(_plan_row(subject.id, selected, kind, q_net, values, trace, prefix))
     trace.output("min_depth_mm", "max_spacing_mm")
     return PlanSizeBody(footings=rows)
