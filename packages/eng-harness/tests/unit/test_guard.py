@@ -253,6 +253,30 @@ def test_engine_work_restores_the_state_when_the_call_raises() -> None:
     assert states == [False]
 
 
+def test_engine_section_restores_the_state_when_the_body_raises() -> None:
+    from eng_harness.engine._guard import block_code, engine_section, in_block_code
+
+    states: list[bool] = []
+
+    def failing() -> None:
+        with engine_section():
+            states.append(in_block_code())
+            raise ZeroDivisionError
+
+    with engine_section():
+        states.append(in_block_code())
+    assert in_block_code() is False
+    with block_code():
+        with engine_section():
+            states.append(in_block_code())
+        states.append(in_block_code())
+        with pytest.raises(ZeroDivisionError):
+            failing()
+        states.append(in_block_code())
+    assert states == [False, False, True, False, True]
+    assert in_block_code() is False
+
+
 def test_the_hook_is_installed_once_per_process(monkeypatch: pytest.MonkeyPatch) -> None:
     from eng_harness.engine import _guard
 
