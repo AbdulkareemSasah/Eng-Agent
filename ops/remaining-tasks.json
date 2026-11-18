@@ -605,9 +605,7 @@
    "branch": "feat/b353-harness-it14b-commands-run-and-resume",
    "prTitle": "feat(eng-harness): commands run and resume: signals, launch address on the terminal only, decision layer wiring (B-353)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14c"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -3292,7 +3290,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 429
   },
   {
    "id": "B-534",
