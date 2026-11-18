@@ -727,7 +727,7 @@ tasks:
     max_sessions: 1
     tests_first:
       - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_collateral_test_and_changelog_edits_are_notices"
-      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_non_test_source_outside_globs_is_still_gc008_error"
+      - "tools/eng-dev-gate/tests/integration/test_gate_check.py::test_non_test_source_outside_globs_stays_the_only_gc008_error"
     covers: [AC10, AC10d]
     depends_on: [T14, T40]
 ---
@@ -830,12 +830,16 @@ still fails above 260.
 
 Amendment (B-565): T41 follows the owner's decision of 2026-11-18
 ([ADR-0036](../../../../design/docs/adr/0036-collateral-test-edits-and-session-estimate.md)): in the scope check of
-`gate_check.py`, a changed path outside the task's globs that is a test file (`test_globs`) or the `CHANGELOG.md` of a
+`gate_check.py`, a changed path outside the task's globs that is a collateral test file (a path with a `tests/` directory segment; a `src/**/test_*.py` module is not one) or the `CHANGELOG.md` of a
 workspace member or of the plan's package folder is reported as GC008 with severity notice and a message that names it
 a collateral edit; any other path outside the globs stays a GC008 error (AC10d). The same pull request brings `design/`
 to the hub text of that decision, the AGENTS template included, re-renders every `AGENTS.md` with
 `eng-gate agents render --all` (each `.gate/agents.yml` takes the new `template-version`), and `max_sessions` is an
-estimate throughout. T41 is judged by the gate of its base, where such a path is still a GC008 error: its own test and
+estimate throughout. The second `tests_first` case changes a non-test source file (also a `src/**/test_*.py` module) and a
+`tests/` file, both outside the globs, and asserts that the source path is the only GC008 error: it fails at the base,
+where both are errors. `test_empty_test_package_marker_in_scope` in `test_gate_check.py` asserted `{"GC008"}` for a
+non-empty, renamed or lone `tests/**/__init__.py`; T41 changes it to a GC008 notice (AC10a, AC10c, AC10d), not a weaker
+test. T41 is judged by the gate of its base, where such a path is still a GC008 error: its own test and
 CHANGELOG edits are inside its `files`.
 
 **T12** adds the `imports` check with the layer, public module, declared dependency, Sasaah, third-party and cycle rules.

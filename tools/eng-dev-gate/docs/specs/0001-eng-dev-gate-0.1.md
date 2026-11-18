@@ -82,14 +82,14 @@ gate-check (§4.5)
   bootstrap mode and fails with GC006 otherwise.
 - AC9. Given a task id that the plan does not define, then GC007.
 - AC10. Given a changed file that matches none of the task's globs (a rename counts both paths), then GC008 for each, except as AC10d says.
-- AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other.
+- AC10a. Given a changed `CHANGELOG.md` or `docs/local-testing.md` of a workspace member or of the plan's package folder, and another changed file under the same directory that matches a task glob, then no GC008 for those two files; without such a file they are GC008 like any other (a notice under AC10d).
 - AC10b. Given a changed `.gate/ratchet.json` whose changed counts all belong to packages with another in-scope change, then no GC008 for it; a changed count of any other package is GC008. Each of these gives GC008 as well: a changed `version` field; a package key added, removed or renamed without a count change of an in-scope package; a lowering (`ratchet --update`) of another package's count; a change anchored only by the workspace root (`.`).
 - AC10c. Given an `__init__.py` under a workspace member's `tests/` directory that is added or modified (not renamed),
   and is empty (0 bytes at head; whitespace only is not empty), when another changed file in the same
   directory matches a task glob, then no GC008 for it; a non-empty one, a renamed or deleted one, or one without such a neighbour, is GC008
-  (amendment B-363).
-- AC10d. Given a changed file that matches none of the task's globs and is a test file (`test_globs`, any path under
-  `tests/`) or the `CHANGELOG.md` of a workspace member or of the plan's package folder, then GC008 is a notice naming it
+  (a notice under AC10d; amendment B-363).
+- AC10d. Given a changed file that matches none of the task's globs and is a collateral test file (a path with a `tests/` directory segment; such a path also matches `test_globs`, a
+  `src/**/test_*.py` source module does not count) or the `CHANGELOG.md` of a workspace member or of the plan's package folder, then GC008 is a notice naming it
   a collateral edit, not an error; a changed non-test source file outside the globs is still a GC008 error (ADR-0036;
   amendment B-565).
 - AC11. Given a diff, when counting lines, then additions plus deletions of files that are not tests, generated files or
@@ -381,7 +381,7 @@ Checks, in order (all run; findings accumulate):
    under a member's `tests/` directory, added or modified (not renamed) and 0 bytes at head, is in scope when another changed file in the same directory matches a task glob:
    it is a test package marker that type checking of shared test helpers needs, and it holds no code (AC10c; amendment
    B-363). Else GC008.
-   A path that matches no glob and is a test file (`test_globs`) or a `CHANGELOG.md` of a workspace member or of the
+   A path that matches no glob and is a collateral test file (a path with a `tests/` directory segment; such a path also matches `test_globs`) or a `CHANGELOG.md` of a workspace member or of the
    plan's package folder is a collateral edit: GC008 with severity notice and a message that names it a collateral edit
    (AC10d; ADR-0036, amendment B-565). The pull request lists it under "Collateral edits". A non-test source file
    outside the globs stays a GC008 error.
