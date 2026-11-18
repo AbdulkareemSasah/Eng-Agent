@@ -116,6 +116,8 @@ tasks:
     covers: [AC7, AC9]
     depends_on: [T3]
   - id: T5
+    # Amendment (B-568, documents only): owner answer of 2026-11-18 (OQ-Q60): rule L1 takes the ceiling; the two
+    # points of OQ-Q63 (depth with no room for both layers, numbers of a WIDTH_TOO_SMALL row) are recorded (prose of T5).
     title: Calc harness.footing_layout
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.layout (amendment B-356)
@@ -390,6 +392,15 @@ later commit (they pass at the base).
 minimality and monotonicity properties run with Hypothesis.
 
 **T5 Layout** (spec §4.4.3). Bar counts, areas, effective depths for both bottom layers and both reaction points.
+By the owner answer of 2026-11-18 (OQ-Q60, amendment B-568) the bar count of L1 is the ceiling,
+`n = ⌈span/s⌉ + 1` with `span = L − 2c − db` (the spec's distance between the outer bar centres), taken on the exact
+fraction: the smallest count whose actual spacing is at most `s`. `WIDTH_TOO_SMALL` (`NEEDS_ENGINEER`) applies when
+the span is zero or less; a depth with no room for both layers (the upper layer's effective depth of L3 zero or less)
+is refused with `OUT_OF_RANGE`, field `dims` (OQ-Q63). The golden cases of `test_golden_cases` include a span that is
+an exact multiple of `s`, a span just above one, a span of zero and the `OUT_OF_RANGE` depth; `test_spacing_bound`
+checks that the actual spacing is at most `s` and that one bar fewer would exceed it. The numbers of a
+`WIDTH_TOO_SMALL` row (the given spacing shown, the steel of 0 or 1 bars) are informative only; T8 never uses them.
+No engineering number is added: the golden values come from the basis fields of each case.
 
 **T6 Status and schedule** (spec §4.4.5, §4.4.6). Family statuses, closure, decision state, clearance by exact squared
 distances, assembled schedule.
