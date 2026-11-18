@@ -7,15 +7,27 @@ spec 0001 4.1.2 and the gate's FB004 list `pathlib` among the modules block code
 """
 
 import ast
+import importlib.util
+from collections.abc import Callable
 from pathlib import Path
-
-from rules.test_block_modules import check_source
+from types import ModuleType
 
 import eng_harness.workflows.model_edit_cycle as package
 
 FOLDER = Path(package.__file__).resolve().parent
 PATH_IMPORT = "from pathlib import Path"  # the one known exception, see the module docstring
 IO_CALLS = {"open", "input", "print"}
+
+
+def _scan() -> Callable[[str], list[str]]:
+    """`check_source` of `test_block_modules.py`, loaded by path (importing it by name would make mypy see it twice)."""
+    spec = importlib.util.spec_from_file_location("block_rules_scan", Path(__file__).with_name("test_block_modules.py"))
+    assert spec is not None
+    assert spec.loader is not None
+    module: ModuleType = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    found: Callable[[str], list[str]] = module.check_source
+    return found
 
 
 def _literals(tree: ast.AST) -> list[int]:
@@ -40,12 +52,13 @@ def _literals(tree: ast.AST) -> list[int]:
 
 
 def test_modules_follow_block_rules() -> None:
+    scan = _scan()
     names = {p.name for p in FOLDER.glob("*.py")}
     assert {"__init__.py", "_cycle.py", "_change_set.py", "_points.py"} <= names
     for path in sorted(FOLDER.glob("*.py")):
         source = path.read_text(encoding="utf-8")
         lines = source.splitlines()
-        found = [p for p in check_source(source) if lines[int(p.partition(":")[0]) - 1].strip() != PATH_IMPORT]
+        found = [p for p in scan(source) if lines[int(p.partition(":")[0]) - 1].strip() != PATH_IMPORT]
         assert found == [], (path.name, found)
         tree = ast.parse(source)
         assert _literals(tree) == [], path.name
