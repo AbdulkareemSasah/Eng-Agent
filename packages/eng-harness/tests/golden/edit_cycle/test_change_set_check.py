@@ -21,6 +21,8 @@ STEMS = [
     "check-item-id-refused-kind",
     "check-item-id-slash",
     "check-item-id-token",
+    "check-no-sections-area-kind",
+    "check-no-sections-other-rules",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -44,6 +46,15 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_check(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_sections_absent() -> None:
+    """AC39: no `model.sections/1`; a selection with `area_kind` is EMPTY_SELECTION, the rest as before."""
+    cases = {stem: case for stem, case in load_cases("check").items() if stem.startswith("check-no-sections-")}
+    assert sorted(cases) == ["check-no-sections-area-kind", "check-no-sections-other-rules"]
+    for stem, case in cases.items():
+        assert ("sections" in case.input, "sections" in case.refs) == (False, False), stem
+        assert run_check(case) == case.expected, stem
 
 
 def test_golden_bodies_are_valid_payloads() -> None:

@@ -32,6 +32,8 @@ STEMS = [
     "effects-assignments",
     "effects-combination-replace",
     "effects-loads",
+    "effects-no-sections-loads",
+    "effects-no-sections-wall",
     "effects-none-accepted",
     "effects-pattern-and-delete",
     "effects-restraints",
@@ -96,6 +98,15 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_effects(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_sections_absent() -> None:
+    """AC39: no `model.sections/1` in the state; a wall section is projected as two `set` effects, as on a held one."""
+    cases = {stem: case for stem, case in load_cases("effects").items() if stem.startswith("effects-no-sections-")}
+    assert sorted(cases) == ["effects-no-sections-loads", "effects-no-sections-wall"]
+    for stem, case in cases.items():
+        assert ("sections" in case.input, "sections" in case.refs) == (False, False), stem
+        assert run_effects(case) == case.expected, stem
 
 
 def test_golden_bodies_are_valid_payloads() -> None:
