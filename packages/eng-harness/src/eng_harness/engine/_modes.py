@@ -142,7 +142,7 @@ class Modes:
         self.approvals = ModeApprovals(mode, self.copies, port, host, store, writer, producer, run_id, events)
         self._mode, self._always, self._tools, self._host, self._store = mode, frozenset(always_ask), tools, host, store
         self._writer, self._producer, self._leases, self._lock = writer, producer, leases, asyncio.Lock()
-        self._on_open = copy_on_open
+        self._on_open, self._handed = copy_on_open, set[str]()
         copied = {e.path for e in events if isinstance(p := e.payload, ev.StepStarted) and p.name == "working_copy"}
         self._taken: dict[str, tuple[_Phase, Mapping[str, JsonValue]]] = {
             e.path.split("~")[0]: ("post" if "~post." in e.path else "pre", p.result.summary) for e in events
@@ -162,7 +162,8 @@ class Modes:
             param = info.model_param if info is not None else None
             key = args.get(param) if param is not None else None
             if (taken := self._taken.get(path)) is not None:
-                await self._copy(ctx, path, str(taken[1]["model"]), None, taken[0])
+                if await self._copy(ctx, path, str(taken[1]["model"]), None, taken[0]) and taken[0] == "post":
+                    self._handed.add(path)
             elif info is not None and self._copies_first(info, key):
                 await self._copy(ctx, path, str(key), info.host_key, "pre")
             args = {k: self._swap(k, v, param, journaled) for k, v in args.items()}
@@ -191,6 +192,11 @@ class Modes:
             async with self._lock:
                 await self._copy(ctx, path, key, host_key, "post")
 
+    def handed(self, path: str) -> bool:
+        """Whether `enter` replayed the open at `path`'s recorded `~post.working_copy`, so the original is not bound
+        again (spec 4.7 EC1 recovery, B-562)."""
+        return path in self._handed
+
     def _copies_first(self, info: ToolInfo, key: JsonValue) -> bool:
         """A write, in `work_on_copy`, to a model without a working copy (an `open` tool is none)."""
         return (
@@ -217,11 +223,12 @@ class Modes:
         state = None if instance is None else await self._host.model_state(key, instance.instance_id)
         return state if state is not None and state.loaded else None
 
-    async def _copy(self, ctx: _Step, path: str, origin: str, host_key: str | None, phase: _Phase) -> None:
-        """Take, or replay, the working copy of `origin` as `<path>~<phase>.working_copy.<origin>` (spec 4.7)."""
+    async def _copy(self, ctx: _Step, path: str, origin: str, host_key: str | None, phase: _Phase) -> bool:
+        """Take, or replay, the working copy of `origin` as `<path>~<phase>.working_copy.<origin>` (spec 4.7); whether
+        the journal held it (replayed)."""
         step, args = inserted_path(path, phase, "working_copy", path_key(origin)), _Obj(model=origin)
         recorded = ctx._look(step, "read", "working_copy", args)
-        done = None if recorded is None else ctx._replayed(recorded)
+        done = replayed = None if recorded is None else ctx._replayed(recorded)
         if done is None and host_key is not None:
             await self._leases.acquire(host_key)
             done = await self._take(ctx, step, origin, args)
@@ -229,6 +236,7 @@ class Modes:
             kept = done.summary
             self.copies[origin], self.records[str(kept["copy"])] = str(kept["copy"]), kept
             self.approvals.rebase(origin, cast(_Obj, kept["before"]), cast(_Obj, kept["after"]))
+        return replayed is not None
 
     async def _take(self, ctx: _Step, step: str, origin: str, args: _Obj) -> ev.StepResult | None:
         before = await self._state(origin)

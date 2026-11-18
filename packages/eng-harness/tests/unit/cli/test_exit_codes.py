@@ -53,6 +53,7 @@ def test_every_outcome_is_mapped() -> None:
 @pytest.mark.parametrize(
     ("error", "code"),
     [
+        ("NOT_IMPLEMENTED", 2),
         ("INVALID_ARGUMENT", 2),
         ("BASIS_INCOMPLETE", 3),
         ("SERVER_CHECK_FAILED", 3),

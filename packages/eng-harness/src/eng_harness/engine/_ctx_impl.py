@@ -48,7 +48,7 @@ from eng_harness.engine._invariants import SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalPort, CalcPort, HostPort, ToolPort
+from eng_harness.ports import ApprovalPort, CalcPort, HostPort, ToolInfo, ToolPort
 
 if TYPE_CHECKING:
     from eng_harness.engine._hostsafety import Leases, Pending
@@ -242,9 +242,12 @@ class Ctx:
             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
             if recorded is not None and (done := self._replayed(recorded)) is not None:
                 if prior.effect == "write":
-                    self._guard.mark(prior.model_key)
+                    if not prior.opens_model_without_writing:  # the recorded attempt's guarantee (B-562)
+                        self._guard.mark(prior.model_key)
                     self._guard.note_stored(done.ref)
                     self._approvals.stepped(prior.under, prior.model_key, done.ref, self._revised.get(path))
+                if not self._modes.handed(path):  # a missing post-open binding and units before a live copy (EC1)
+                    await self._pending.bind(self, path, prior.model_key, prior.host_key, prior.action, after=True)
                 await self._modes.opened(self, path, prior.action, prior.model_key, prior.host_key)
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
@@ -255,21 +258,24 @@ class Ctx:
         if prior is None:  # the first live attempt; a retry already prepared above
             self._guard.literals(raw, info.engineering_params)
             await self._guard.touch(key, info.effect == "write")
-            await self._pending.bind(
-                self, path, key, info
-            )  # the model is bound and its units read before its first step
+            await self._pending.bind(  # the model is bound and its units read before its first step
+                self, path, key, info.host_key, info.action
+            )
             await self._guard.prepare(self, path, key, info.effect, info.action)
         await self._approvals.authorize(under, item, key, write=info.effect == "write")  # before any port call
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
+        free = info.effect == "write" and info.action == "open" and info.opens_model_without_writing(args)
         approval = None if under is None else under.request_id
         while True:
             await self._pending.reconnected(self, path, attempt, info.host_key)  # units after a new session (4.6 #9)
             await self._pending.settle(info.host_key)  # a write of unknown outcome on this host is reconciled first
             op = _steps.op_id(self._run_id, path, attempt)
-            fields = {
+            fields: dict[str, object] = {
                 "effect": info.effect, "op_id": op if info.effect == "write" else None, "host_key": info.host_key,
                 "action": info.action, "under": approval, "item": item,
             }  # fmt: skip
+            if free:  # recorded before the open is sent (spec 4.4.2, B-562)
+                fields["opens_model_without_writing"] = True
             began = self._begin(path, attempt, "tool", name, args, model_key=key, **fields)
             try:
                 async with self._limits.host(info.host_key):  # one call at a time on a host (4.10)
@@ -285,22 +291,22 @@ class Ctx:
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
-                    self._guard.mark(key)
+                    if not free:
+                        self._guard.mark(key)
                     saved = await self._guard.revised(path, key, info, args, envelope)  # a tool save (4.6)
                     self._approvals.stepped(approval, key, envelope.result_id, saved)
-                await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
-                await self._modes.opened(self, path, info.action, key, info.host_key)
-                return _result(name, done)
+                return await self._opened(path, name, key, info, done)
             if envelope is None or envelope.error.code in _TIMEOUTS:
                 self._pending.timed_out(info.host_key)  # read or write: the units are read before the next step
             if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
                 await self._pending.reconnected(self, path, attempt, info.host_key)  # before 4.5.3 runs
                 found = await self._pending.resolve(info.host_key, path, attempt)
                 if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
-                    self._guard.mark(key)
+                    if not free:
+                        self._guard.mark(key)
                     self._guard.note_stored(found.result.ref)
                     self._approvals.stepped(approval, key, found.result.ref)
-                    return _result(name, found.result)
+                    return await self._opened(path, name, key, info, found.result)  # as a success (EC1, B-562)
                 attempt += 1  # not applied: the step runs again as the next attempt, with a new op_id (ADR-0030)
                 continue
             error = envelope.error
@@ -308,6 +314,13 @@ class Ctx:
             if attempt >= last or not error.retryable or RETRY_RULES[error.code] not in _RETRIED:
                 raise errors.ToolFailed(error)
             attempt += 1
+
+    async def _opened(self, path: str, name: str, key: str | None, info: ToolInfo, done: ev.StepResult) -> ToolResult:
+        """After a tool step's success or applied outcome: an `open` binds its model, reads its units and, with
+        `copy_on_open`, takes the working copy (spec 4.7 EC1, 4.8)."""
+        await self._pending.bind(self, path, key, info.host_key, info.action, after=True)
+        await self._modes.opened(self, path, info.action, key, info.host_key)
+        return _result(name, done)
 
     def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
         recorded = self.index.lookup(path, kind, name, payload_sha256(args), child)

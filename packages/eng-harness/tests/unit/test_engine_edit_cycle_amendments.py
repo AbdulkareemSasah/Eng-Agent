@@ -458,3 +458,135 @@ def test_basis_view_record_ref() -> None:
     )
     with pytest.raises(errors.BlockRuleViolation):
         view.ref("limits.drift_ratio")  # a field's value is still read only through a declared path
+
+
+class ContentFree(ToolInfo):
+    """A write `open` that guarantees unchanged model content without `path` (engine 4.8, B-562)."""
+
+    def opens_model_without_writing(self, args: Mapping[str, JsonValue]) -> bool:
+        """True without `path`."""
+        return "path" not in args
+
+
+def free_rig(root: Path) -> Rig:
+    """The rig of this module with `open_w`, a write-classified open that may change no model content."""
+    rig = make_rig(root)
+    tool = ContentFree(name="open_w", effect="write", action="open", host_key="csi", model_param="model")
+    rig.host._tools[tool.name] = tool
+    return rig
+
+
+def checked(rig: Rig, run_id: str) -> list[str]:
+    """The paths of the `check_model` steps of the run, in order."""
+    return [e.path or "" for e in rig.events(run_id) if isinstance(e.payload, ev.StepStarted) and e.payload.name
+            == "check_model"]  # fmt: skip
+
+
+def opened(rig: Rig, run_id: str, path: str) -> ev.StepStarted:
+    """The latest `step_started` of the step at `path`."""
+    found = [e.payload for e in rig.events(run_id) if e.path == path and isinstance(e.payload, ev.StepStarted)]
+    return found[-1]
+
+
+@pytest.mark.parametrize(
+    ("first", "args", "dirty"),
+    [
+        (False, {"model": "m1"}, False),  # recorded true: no dirty mark, so no check
+        (False, {"model": "m1", "path": "x"}, True),  # no guarantee: an ordinary write
+        (True, {"model": "m1"}, True),  # an earlier write's flag stays set
+    ],
+)
+def test_content_free_open_skips_only_its_own_dirty_mark(
+    tmp_path: Path, first: bool, args: dict[str, JsonValue], dirty: bool
+) -> None:
+    """Invariant 1 (B-562): an open recorded as changing no content leaves the dirty flag as it was; the replay after a
+    process death reads the recorded value."""
+    rig = free_rig(tmp_path)
+    rig.host.script("read_a", Raise(_Cut()))  # the process dies after the open: the resume replays it
+
+    async def body(ctx: Any) -> list[str]:
+        if first:
+            await ctx.tool("write_b", {"n": 1, "model": "m1"})
+        await ctx.tool("open_w", args)
+        return [(await ctx.tool("read_a", {"n": 2})).ref.ref]
+
+    engine = rig.engine(wf(body))
+    with pytest.raises(_Cut):
+        asyncio.run(engine.start(request(mode=AUTO)))
+    (run_id,) = rig.run_ids()
+    began = opened(rig, run_id, "1" if first else "0")
+    assert (began.effect, began.action) == ("write", "open")  # the write effect is kept
+    assert began.opens_model_without_writing is (None if "path" in args else True)
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    assert checked(rig, run_id) == (["~end.check_model.m1"] if dirty else [])
+
+
+def _applied(rig: Rig) -> Callable[..., Any]:
+    """A reconciler that reports every write `applied` with a stored result (the call itself raised)."""
+
+    async def reconcile(tool: str, args: Mapping[str, JsonValue], op_id: str) -> Reconciliation:
+        return Reconciliation(outcome="applied", result=saved(rig, "m1", 0))
+
+    return reconcile
+
+
+def test_immediately_applied_open_binds_and_copies(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """EC1 (B-562): an open confirmed `applied` during its call binds the model, reads its units and takes the copy,
+    as a successful call does, before the next step on the model; it marks nothing dirty."""
+    rig = free_rig(tmp_path)
+    rig.host.script("open_w", Raise(RuntimeError("the call raised")))
+    monkeypatch.setattr(rig.host, "reconcile", _applied(rig))
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("open_w", {"model": "m1"})
+        return [(await ctx.tool("read_m", {"model": "m1"})).ref.ref]
+
+    outcome = asyncio.run(rig.engine(wf(body, copy_on_open=True)).start(request(mode=AUTO)))
+    assert outcome.status is RunStatus.COMPLETED
+    run_id, events = outcome.run_id, rig.events(outcome.run_id)
+    (reconciled,) = [e.seq for e in events if e.path == "0" and isinstance(e.payload, ev.StepReconciled)]
+    (bound,) = [e.seq for e in events if isinstance(e.payload, ev.ModelBound) and e.payload.model_key == "m1"]
+    (units,) = [e.seq for e in events if e.path == "0~post.units.m1" and isinstance(e.payload, ev.StepCompleted)]
+    (copy,) = [e.seq for e in events if e.path == "0~post.working_copy.m1" and isinstance(e.payload, ev.ModelSaved)]
+    (read,) = [e.seq for e in events if e.path == "1" and isinstance(e.payload, ev.StepStarted)]
+    assert reconciled < bound < units < copy < read
+    assert [(e.tool, e.model) for e in rig.host.ledger] == [("open_w", "m1"), ("read_m", "m1.copy")]
+    assert checked(rig, run_id) == []  # the applied open marked no model dirty
+
+
+def test_replayed_open_binds_before_the_live_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """EC1 (B-562): a process that died after an open completed, before its binding, binds the model and reads its units
+    at the replay, from the journaled host and action, before it takes the still-live copy; once recorded, the copy
+    replays with no second binding or copy."""
+    rig = free_rig(tmp_path)
+    locate, cut = rig.host.locate, {"on": True}
+
+    async def located(key: str) -> Any:
+        if cut["on"]:
+            raise _Cut
+        return await locate(key)
+
+    monkeypatch.setattr(rig.host, "locate", located)
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.tool("open_w", {"model": "m1"})
+        return [(await ctx.tool("read_m", {"model": "m1"})).ref.ref]
+
+    engine = rig.engine(wf(body, copy_on_open=True))
+    with pytest.raises(_Cut):
+        asyncio.run(engine.start(request(mode=AUTO)))
+    (run_id,) = rig.run_ids()
+    assert not [e for e in rig.events(run_id) if isinstance(e.payload, ev.ModelBound)]
+    cut["on"] = False
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    events = rig.events(run_id)
+    bound = [e.seq for e in events if isinstance(e.payload, ev.ModelBound) and e.payload.model_key == "m1"]
+    units = [e.seq for e in events if e.path == "0~post.units.m1" and isinstance(e.payload, ev.StepCompleted)]
+    copy = [e.seq for e in events if e.path == "0~post.working_copy.m1" and isinstance(e.payload, ev.ModelSaved)]
+    assert len(bound) == len(units) == len(copy) == 1
+    assert bound[0] < units[0] < copy[0]
+    assert checked(rig, run_id) == []
+    mark = len(events)
+    assert asyncio.run(rig.engine(wf(body, copy_on_open=True)).resume(run_id)).status is RunStatus.COMPLETED
+    assert len(rig.events(run_id)) == mark  # the recorded copy replays: no second binding, units read or copy
+    assert rig.log.count("host.working_copy") == 1

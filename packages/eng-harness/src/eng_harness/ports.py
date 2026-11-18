@@ -70,6 +70,11 @@ class ToolInfo(_M):
         (engine spec 4.8); plain tools never do."""
         return False
 
+    def opens_model_without_writing(self, args: _Obj) -> bool:
+        """True only for a write `open` with `args` that leaves model content unchanged in memory and creates or writes
+        no model file (engine spec 4.8, B-562); the base never claims it."""
+        return False
+
 
 class Reconciliation(_M):
     """What reconciliation found about an in-flight operation (spec 0001 section 4.5.3)."""

@@ -14,6 +14,8 @@ from pydantic import JsonValue
 
 from eng_harness.engine._inflight import Fold, Resume
 from eng_harness.engine._inputs import Question
+from eng_harness.engine._invariants import path_key
+from eng_harness.engine._steps import inserted_path
 from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
 from eng_harness.ports import HostModelState, HostPort, SavedModel, UnitsState
@@ -75,7 +77,7 @@ def _difference(rt: Resume, f: Fold, key: str, state: HostModelState) -> tuple[s
     want: tuple[str | None, int | None, str | None] = (saved.model_id, saved.revision, saved.fingerprint)
     since = max(seq, f.bound_at[key] if f.bound[key].reason == "reopened" else 0)  # a reopened file starts at its save
     results = [
-        (s.closed_at, s.closing.result) for s in f.writes(key)
+        (s.closed_at, s.closing.result) for s in f.content(key)
         if isinstance(s.closing, ev.StepCompleted | ev.StepReconciled) and s.closing.result and s.closed_at > since
     ]  # fmt: skip
     digest: JsonValue = None
@@ -98,7 +100,7 @@ async def check(rt: Resume) -> None:
     """
     for key in Fold(rt.events()).written():
         f = Fold(rt.events())  # an earlier model's answer may have added events
-        if key not in f.bound:
+        if key not in f.bound or handed_off(f, key):
             continue
         state = await rt.host.model_state(key, f.bound[key].instance_id)
         rt.note("model_state", key, {"loaded": state.loaded, "revision": state.revision})
@@ -106,6 +108,29 @@ async def check(rt: Resume) -> None:
             await _resolve(rt, f, key, *found)
         else:
             await _revision(rt, f, key, state)
+
+
+def handed_off(f: Fold, key: str) -> bool:
+    """Whether the journal proves the EC1 handoff of the original `key` to its working copy (4.5.4, B-562).
+
+    Its latest write is an open recorded as changing no model content that completed or was applied, every write on it
+    is such an open, none was cut by a restore, and the open's `~post.working_copy` completed after the open's outcome
+    with a distinct copy whose `model_saved` (role `working_copy`) lies within that step, before any later binding.
+    """
+    writes = sorted(f.writes(key, live=False), key=lambda s: s.seq)
+    if not writes or f.content(key) or any(s.rerun is not None for s in writes):
+        return False
+    opened = writes[-1]
+    copy = f.steps.get(inserted_path(opened.path, "post", "working_copy", path_key(key)))
+    if copy is None or not isinstance(done := copy.closing, ev.StepCompleted) or done.result is None:
+        return False
+    if copy.rerun is not None or not opened.closed_at < copy.seq or f.bound_at.get(key, 0) > copy.seq:
+        return False
+    target = done.result.summary.get("copy")
+    if done.result.summary.get("model") != key or not isinstance(target, str) or target == key:
+        return False
+    return any(p == copy.path and saved.model_key == target and copy.seq < seq < copy.closed_at
+               for seq, p, saved in f.copies)  # fmt: skip
 
 
 def _saved_paths(rt: Resume) -> set[str | None]:
@@ -117,7 +142,7 @@ async def _revision(rt: Resume, f: Fold, key: str, state: HostModelState) -> Non
     has no `model_saved` (the process stopped between the two, or it was reconciled): append it, role `revision`, from
     the check's own read `state`. A result without `provenance.host`, or a new-file save without `saved_file`, gets none
     and raises nothing (spec 4.6 "Tool saves", EC2)."""
-    last = max(f.writes(key), key=lambda s: s.seq, default=None)
+    last = max(f.content(key), key=lambda s: s.seq, default=None)  # a content-free open hides no save (B-562)
     if last is None or last.began.kind != "tool" or last.began.action not in ("save", "open"):
         return  # no port call for any other step: only a save, or an open that may save to a new file, is asked about
     done = last.closing.result if isinstance(last.closing, ev.StepCompleted | ev.StepReconciled) else None

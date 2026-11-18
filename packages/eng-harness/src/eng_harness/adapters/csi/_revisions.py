@@ -45,13 +45,18 @@ class SavedFile(BaseModel):
 
 
 class CsiToolInfo(ToolInfo):
-    """`ToolInfo` that knows which calls write a new file (engine 4.8 `saves_new_file`, spec 0007 4.10)."""
+    """`ToolInfo` that knows which calls write a new file (engine 4.8 `saves_new_file`, spec 0007 4.10) and which open
+    changes no model content (`opens_model_without_writing`, B-562)."""
 
     def saves_new_file(self, args: Mapping[str, JsonValue]) -> bool:
         """True for `csi_open_revision` and for `csi_save_model` with `as_new_revision` true."""
         return self.name == "csi_open_revision" or (
             self.name == "csi_save_model" and args.get("as_new_revision") is True
         )
+
+    def opens_model_without_writing(self, args: Mapping[str, JsonValue]) -> bool:
+        """True only for `csi_open_model` without `path`: the step 2 open of the original (spec 0002 4.5.9, AC52)."""
+        return self.name == "csi_open_model" and "path" not in args
 
 
 class Revisions:

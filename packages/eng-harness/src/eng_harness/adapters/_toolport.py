@@ -20,7 +20,7 @@ from typing import Any, Literal, Protocol
 
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Envelope, HostInfo, LiteralInput, RefInput, SuccessEnvelope, make_failure
-from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
+from eng_contract.errors import ContractError, ErrorCode, ErrorDetail, Precondition
 from eng_contract.ids import Clock, IdSource, Timestamp
 from eng_contract.params import ParamModel, ParamSpec
 from eng_contract.refs import Ref, RefRule, RefString, resolve_ref
@@ -34,6 +34,7 @@ from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._envelope import make_envelope, parse_reply
 from eng_harness.adapters._errors import WEDGING_CODES, HostErrorMapper, HostHealth, parse_error_reply
 from eng_harness.adapters._ledger import LedgerEntry, WriteLedger
+from eng_harness.ctx import ModelHandle, Preview, PreviewItem
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import Reconciliation, ServerCheck, ToolInfo
 from eng_harness.servers import CallEffect, ServersConfig
@@ -162,12 +163,17 @@ class AdapterToolPort:
         health: HostHealth | None = None,
         errors: HostErrorMapper | None = None,
         reconciler: Reconciler | None = None,
+        record_pre_image: bool = False,
+        open_model_bound: Callable[[str | None], bool] | None = None,
     ) -> None:
         """Wire the port; `ValueError` when a tool lacks its argument model, a serving role or a needed reader.
 
         `errors` maps host error replies (without it an error reply is `HOST_ERROR` with the host's code).
         Without a `reconciler` no tool supports reconciliation and the engine asks the engineer.
+        `record_pre_image` opts production wiring into pre-write observation; otherwise the binder's ref is retained.
+        `open_model_bound` is a cache-only query for the unbound-open preview exception; without it the binder decides.
         """
+        self._record_pre_image, self._open_model_bound = record_pre_image, open_model_bound
         self._health, self._errors, self._reconciler = health or HostHealth(), errors, reconciler
         self._allowlist, self._config, self._server = allowlist, config, server
         self._caller, self._binder, self._store, self._ledger = caller, binder, store, ledger
@@ -245,6 +251,8 @@ class AdapterToolPort:
         )
         effect = CallEffect.WRITE if descriptor.effect == "write" else CallEffect.READ
         if effect is CallEffect.WRITE:
+            if self._record_pre_image:
+                binding = binding.model_copy(update={"pre_image_ref": await self._pre_image(descriptor.name, args)})
             entry = LedgerEntry(
                 op_id=op_id,
                 tool=descriptor.name,
@@ -284,6 +292,59 @@ class AdapterToolPort:
             inputs=validated.inputs,
             started_at=started,
             duration_ms=self._clock.now_ms() - began,
+        )
+
+    async def _pre_image(self, tool: str, args: _Obj) -> RefString | None:
+        """Store the observed pre-write state, for the ledger and preview (spec 4.5.7); absent for no read-back."""
+        if not self.supports_reconcile(tool):
+            return None
+        before = await self.read_back(tool, args)
+        if before is not None and not isinstance(before, SuccessEnvelope):
+            raise _raised(before.error)
+        return None if before is None else RefString(f"{before.result_id}#/value/observed")
+
+    async def preview(self, tool: str, args: _Obj) -> Preview:
+        """Canonical arguments and the observed pre-image, without sending a write (spec 4.5.9, AC45)."""
+        descriptor = self._find(tool)
+        validated = validate_call(
+            self._models[descriptor.args_model], args, source=self._store, current_revision=self._binder.revision
+        )
+        key = args.get(MODEL_PARAM)
+        key = key if isinstance(key, str) else None
+        models: tuple[ModelHandle | str, ...] = ()
+        binding = None
+        unopened = (
+            descriptor.action == "open" and self._open_model_bound is not None and not self._open_model_bound(key)
+        )
+        if not unopened:
+            binding = await self._binder.binding(self._config.servers[self._server].host_key, key, descriptor)
+            if binding.host is None:
+                raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
+            models = (
+                ModelHandle(model_key=key or "", model_id=binding.host.model_id, revision=binding.host.model_revision),
+            )
+        started, began = self._clock.now(), self._clock.now_ms()
+        canonical = make_envelope(
+            self._store,
+            tool=f"{self._allowlist.adapter}/{tool}",
+            kind="harness.run_output/1",
+            payload={"value": validated.model.model_dump(mode="json", exclude_none=True)},
+            summary={},
+            reply={},
+            check=self._check,
+            host=None if binding is None else binding.host,
+            inputs=validated.inputs,
+            started_at=started,
+            duration_ms=self._clock.now_ms() - began,
+        )
+        refs: tuple[Ref, ...] = (Ref.model_validate({"$ref": canonical.result_id}),)
+        before = None if binding is None else binding.pre_image_ref
+        if not unopened and self._record_pre_image:
+            before = await self._pre_image(tool, args)
+        if before is not None:
+            refs += (Ref.model_validate({"$ref": before}),)
+        return Preview(
+            items=(PreviewItem(id=tool, label=f"{tool}: {key or 'host'}", refs=refs),), models=models, diff_ref=None
         )
 
     def supports_reconcile(self, tool: str) -> bool:
@@ -328,7 +389,7 @@ class AdapterToolPort:
     async def read_back(self, tool: str, args: _Obj) -> Envelope | None:
         """The state a write of `tool` left, as a stored `value.observed`; `None` for a tool with no read-back."""
         descriptor = self._find(tool)
-        if self._reconciler is None or descriptor.effect != "write":
+        if self._reconciler is None or not self.supports_reconcile(tool):
             return None
         started, began = self._clock.now(), self._clock.now_ms()
         validated = validate_call(
