@@ -155,20 +155,23 @@ def _values(point: DecisionPoint) -> list[str]:
 
 def test_discovery_finds_the_points_and_rules() -> None:
     points, rules = _points.discover(), _rules.discover()
-    assert [p.name for p in points.points] == [
+    # Other workflows ship their own points and rules; this test judges those of the edit cycle.
+    cycle_points = [p for p in points.points if p.name.startswith("edit_cycle_")]
+    cycle_rules = [r for r in rules.rules if r.point.startswith("edit_cycle_")]
+    assert [p.name for p in cycle_points] == [
         "edit_cycle_analysis_messages",
         "edit_cycle_engineer_turn",
         "edit_cycle_readback_result",
     ]
-    assert [r.id for r in rules.rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
+    assert [r.id for r in cycle_rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
     RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
-    assert {p.name: _values(p) for p in points.points} == {
+    assert {p.name: _values(p) for p in cycle_points} == {
         "edit_cycle_analysis_messages": ["continue", "stop_cycle"],
         "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
         "edit_cycle_readback_result": ["continue", "restore_previous", "stop_cycle"],
     }
-    assert all(r.thresholds == () and r.version == 2 for r in rules.rules)
-    assert {p.name: p.version for p in points.points} == {
+    assert all(r.thresholds == () and r.version == 2 for r in cycle_rules)
+    assert {p.name: p.version for p in cycle_points} == {
         "edit_cycle_analysis_messages": 1,
         "edit_cycle_engineer_turn": 1,
         "edit_cycle_readback_result": 2,

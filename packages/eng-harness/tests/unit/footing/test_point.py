@@ -7,8 +7,18 @@ Expected values are the lines of spec 0010 section 4.5: `footing_fix_strategy` (
 
 import json
 from enum import StrEnum
+from typing import Any
 
+import pytest
 from eng_contract.verdicts import VerdictStatus
+from pydantic import BaseModel, ConfigDict, TypeAdapter
+
+from eng_harness.decisions import _points
+from eng_harness.decisions._points import LOCK_PATH, DecisionPoint, check_lock, load_lock
+from eng_harness.decisions._redaction import check_state, denied_token
+from eng_harness.decisions._rules import RuleRegistry
+from eng_harness.decisions._rules import discover as discover_rules
+from eng_harness.decisions.types import DecisionDefinitionError, decision_point
 from eng_harness.workflows.isolated_footing._points import (
     FIX_STRATEGY_POLICY,
     REVIEW_POLICY,
@@ -17,13 +27,6 @@ from eng_harness.workflows.isolated_footing._points import (
     FootingReviewAction,
     FootingReviewState,
 )
-from pydantic import TypeAdapter
-
-from eng_harness.decisions import _points
-from eng_harness.decisions._points import LOCK_PATH, DecisionPoint, check_lock, load_lock
-from eng_harness.decisions._redaction import check_state
-from eng_harness.decisions._rules import RuleRegistry
-from eng_harness.decisions._rules import discover as discover_rules
 
 _FAMILIES = ["bearing", "one_way_shear", "punching", "flexure", "min_steel", "development"]
 _FLAGS = ["plan_at_max", "depth_at_max", "spacing_at_min", "hand_sized"]
@@ -78,7 +81,8 @@ def test_point_definition() -> None:
 
     # A point is defined only when its state passes the redaction rules by construction (spec 0005 AC32), and a state
     # of statuses and booleans has no value that could leave the machine.
-    state = FootingFailureState(**dict.fromkeys(_FAMILIES, VerdictStatus.PASS), **dict.fromkeys(_FLAGS, False))
+    values: dict[str, Any] = {**dict.fromkeys(_FAMILIES, VerdictStatus.PASS), **dict.fromkeys(_FLAGS, False)}
+    state = FootingFailureState.model_validate(values)
     assert check_state(TypeAdapter(FootingFailureState).dump_python(state, mode="json"), ()) == ()
     labels = FootingReviewState(counts=("passed 2", "needs engineer 1"), refs=())
     assert check_state(labels.model_dump(mode="json"), ()) == ()
@@ -99,3 +103,21 @@ def test_point_definition() -> None:
         }
     assert [f for f in check_lock(_points.discover(), load_lock(LOCK_PATH)) if f.name.startswith("footing_")] == []
     assert RuleRegistry(discover_rules().rules, _points.discover()).get("footing_fix_strategy.bearing_only")
+
+
+def test_spec_flag_name_engineer_sized_is_refused() -> None:
+    """Spec 0010 4.5 names the fourth flag `engineer_sized`; spec 0005 4.10 denies the token `engineer` in a field name.
+
+    The point therefore holds the flag as `hand_sized`. By hand: `engineer_sized` splits on `_` into `engineer` and
+    `sized`; `engineer` is on the deny list, so a point with that field cannot be defined (spec 0005 AC32).
+    """
+    assert denied_token("engineer_sized", frozenset()) == "engineer"
+    assert denied_token("hand_sized", frozenset()) is None
+
+    class Named(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="forbid")
+
+        engineer_sized: bool
+
+    with pytest.raises(DecisionDefinitionError, match="engineer"):
+        decision_point(name="footing_named", version=1, title="Named", options=FootingAction, state=Named)(object)
