@@ -9,6 +9,9 @@ from typing import Any
 
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
+
+from eng_harness.ctx import BasisView
+from eng_harness.decisions.types import Pick, RuleBasis
 from eng_harness.rules.footing import (
     bearing_only,
     development_only,
@@ -17,9 +20,6 @@ from eng_harness.rules.footing import (
     steel_only,
 )
 from eng_harness.workflows.isolated_footing._points import FootingAction, FootingFailureState
-
-from eng_harness.ctx import BasisView
-from eng_harness.decisions.types import Pick, RuleBasis
 
 _BASIS = RuleBasis(BasisView("res_01ARZ3NDEKTSV4RRFFQ69G5FAV", DesignBasis(template=None, fields={}), ()), ())
 _PASS, _FAIL = VerdictStatus.PASS, VerdictStatus.FAIL

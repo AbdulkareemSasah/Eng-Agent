@@ -24,6 +24,11 @@ from typing import Any
 import pytest
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.verdicts import VerdictStatus
+
+from eng_harness.ctx import BasisView
+from eng_harness.decisions import _points, _rules
+from eng_harness.decisions._rules import RuleRegistry
+from eng_harness.decisions.types import Pick, Rule, RuleBasis
 from eng_harness.rules.footing import (
     FOOTING_RULES,
     bearing_only,
@@ -33,11 +38,6 @@ from eng_harness.rules.footing import (
     steel_only,
 )
 from eng_harness.workflows.isolated_footing._points import FootingAction, FootingFailureState
-
-from eng_harness.ctx import BasisView
-from eng_harness.decisions import _points, _rules
-from eng_harness.decisions._rules import RuleRegistry
-from eng_harness.decisions.types import Pick, Rule, RuleBasis
 
 _BASIS = RuleBasis(BasisView("res_01ARZ3NDEKTSV4RRFFQ69G5FAV", DesignBasis(template=None, fields={}), ()), ())
 _PASS, _FAIL, _NEEDS = VerdictStatus.PASS, VerdictStatus.FAIL, VerdictStatus.NEEDS_ENGINEER
