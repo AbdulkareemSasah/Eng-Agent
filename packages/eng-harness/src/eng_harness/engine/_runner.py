@@ -30,7 +30,7 @@ from eng_harness.block import Registry, WorkflowDef
 from eng_harness.ctx import BasisView
 from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight, _resources
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
-from eng_harness.engine._guard import block_code
+from eng_harness.engine._guard import block_code, engine_section
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
@@ -101,7 +101,8 @@ def _lazy_basis(port: BasisPort, basis_ref: str, declared: tuple[str, ...]) -> C
     """The loader of `ctx.basis` and of decisions: the stored basis is read when first asked for, never earlier."""
 
     def load() -> BasisView:
-        loaded = port.load(basis_ref)
+        with engine_section():
+            loaded = port.load(basis_ref)
         return BasisView(loaded.result_id, loaded.basis, declared)
 
     return load
