@@ -321,9 +321,9 @@ acceptable because the test-first gate counts the test red while any case fails.
 
 **T8 End to end** (spec AC26 to AC28). The cycle test block through the real engine and fake processes, the
 crash matrix at each write step, the recorded-reply contract tests (run on every applicable committed recording under
-`acceptance/recordings` and on a synthetic recording for that adapter; verified against the real server only once the
-owner commits SAFE recordings, spec §12 item L14; amendment B-573), the record script gaining a SAFE scenario, and the
-SAFE part of `docs/local-testing.md` (spec §12 L1 to L15).
+`acceptance/recordings` and on the synthetic recording produced by record mode for that adapter; verified against the
+real server only once the owner commits SAFE recordings, spec §12 item L14; amendment B-573), the record script
+gaining a SAFE scenario, and the SAFE part of `docs/local-testing.md` (spec §12 L1 to L15).
 
 **T9 Slab design (blocked).** Starts only after the owner has run L5 and L11 and committed recordings of the result tables
 and of `csi_design_run` on SAFE, and decided whether `csi_design_run` and a design read are allowlisted for SAFE. Then:

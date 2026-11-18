@@ -902,8 +902,8 @@ build-artifact pins, exit-code mapping, reconciliation by completion record; a P
 
 **T17 Record mode** (§4.8.1, §4.8.2). The recording transport wrapper, the sanitizer, the manifest, the recorded-reply
 fake, the contract and fidelity tests (run on every applicable committed recording under `acceptance/recordings` and
-on a synthetic recording for that adapter; verified against the real server only once the owner commits recordings,
-local-testing item 13; amendment B-573), the owner's record script and its README.
+on the synthetic recording produced by record mode for that adapter; verified against the real server only once the
+owner commits recordings, spec §12 item 13; amendment B-573), the owner's record script and its README.
 
 **T18 Doctor** (§4.9). The checks behind interfaces (installed programs, integrity level, location probe), table and
 JSON output, exit codes; the unreleased-tools check and the `extra_checks` extension point for spec 0006 (AC39, B-068).
