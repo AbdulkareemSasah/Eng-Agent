@@ -48,7 +48,7 @@ def _run(case: FootingGoldenCase, trace: TraceBuilder | None = None, **changes: 
 
 def _basis(**field: Any) -> dict[str, Any]:
     base = {"value": 1.0, "unit": "deg", "source": "engineer:x@2026-01-01T00:00:00.000Z", "confirmed": True}
-    return {"template": None, "fields": {"compare.angle": base | {"citation": None} | field}}
+    return {"template": None, "fields": {"compare.angle_deg": base | {"citation": None} | field}}
 
 
 def test_golden_cases() -> None:
@@ -66,7 +66,7 @@ def test_trace_records_inputs_constants_and_counts() -> None:
     inputs = {i.name: i for i in built.inputs}
     angle = inputs["compare_angle"]
     assert (angle.value, angle.unit) == (1.0, "deg")
-    assert angle.ref == f"{cases['subjects-basic'].refs['basis']}#/fields/compare.angle"
+    assert angle.ref == f"{cases['subjects-basic'].refs['basis']}#/fields/compare.angle_deg"
     assert inputs["frames"].value == 5
     assert inputs["reaction_rows"].value == 8
     assert inputs["reaction_rows"].ref == cases["subjects-basic"].refs["reactions"]
@@ -118,7 +118,7 @@ def test_missing_basis_field_is_refused() -> None:
         _run(load_cases("subjects")["subjects-basic"], basis={"template": None, "fields": {}})
     assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert caught.value.detail.field == "basis"
-    assert BASIS_FIELDS == ("compare.angle",)
+    assert BASIS_FIELDS == ("compare.angle_deg",)
 
 
 def test_a_zero_angle_tolerance_is_accepted() -> None:
