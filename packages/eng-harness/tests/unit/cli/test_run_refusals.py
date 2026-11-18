@@ -34,7 +34,7 @@ def test_refusals_create_no_run(tmp_path: Path) -> None:
         refusals=refused,
     )
     case("builder", ["run", WORKFLOW], ExitCode.USAGE, "configuration error: servers.csi", on_build=_boom)
-    case("answers", ["run", WORKFLOW, "--answers", "a.json"], ExitCode.USAGE, "--answers option is not available")
+    case("answers", ["run", WORKFLOW, "--answers", "a.json"], ExitCode.USAGE, "cannot read the answers file a.json")
     case("option", ["run", WORKFLOW, "--bogus"], ExitCode.USAGE, "unrecognized arguments: --bogus")
     case("quantity", ["run", WORKFLOW, "--load", "2"], ExitCode.USAGE, "unrecognized arguments: --load")
     case("no_run", ["resume", NO_RUN], ExitCode.NOT_FOUND, f"no run {NO_RUN}")
@@ -80,7 +80,7 @@ def test_run_is_unavailable_without_collaborators(tmp_path: Path) -> None:
         for missing in ("workflow_registry", "port_builder", "calc_port_factory"):
             assert rig.main(*argv, **{missing: None}) == ExitCode.USAGE
             assert f"command {argv[0]} is not available in this build" in rig.err.getvalue()
-        assert (rig.run_ids(), rig.engines, rig.built, rig.workspace.exists()) == ([], [], [], False)
+        assert (rig.run_ids(), rig.engines, rig.built, rig.runs.exists()) == ([], [], [], False)
 
 
 def test_arguments_no_command_knows_are_usage_errors(tmp_path: Path) -> None:

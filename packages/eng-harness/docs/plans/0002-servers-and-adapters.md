@@ -749,13 +749,16 @@ own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. E
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
 share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
-T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503), `_hostport.py` (T10, T11b,
-T12b, plan 0007 T13, T19c, T23, T19a; B-503, B-530, B-543), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
+T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503; plan 0007 T13b adds a
+no-op hook and is not ordered with T16 either, B-569), `_hostport.py` (T10, T11b,
+T12b, plan 0007 T13, T19c, T23, T19a, then plan 0007 T13b; B-503, B-530, B-543, B-569), `_identity.py` and `test_csi_session_ops.py` (T10, T19c;
 B-530), `csi/_session_ops.py` (T10, T23; B-543),
-`csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them), `adapters/__init__.py` (T22, T19a, T19b; B-541) and
+`csi/_reconcile.py` (T14, T19a; plan 0008 T6 after them), `adapters/__init__.py` (T22, T19a, T19b; B-541; plan 0007 T13b wires one callback and is not ordered with T19b, so
+whichever lands second adapts, B-569) and
 `test_build_ports.py` (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
 adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15, T23; plan 0007 T5 and T13, B-503: T15 and
-those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts),
+those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts; plan 0007 T13b
+after T13 and T23, not ordered with T15, B-569),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
 T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
@@ -898,8 +901,9 @@ gains the action `unlock` in the engine plan, not here; the edit-cycle workflow'
 build-artifact pins, exit-code mapping, reconciliation by completion record; a Python stand-in for the scripts.
 
 **T17 Record mode** (§4.8.1, §4.8.2). The recording transport wrapper, the sanitizer, the manifest, the recorded-reply
-fake, the contract and fidelity tests (skipped with a reason until the owner commits recordings), the owner's record
-script and its README.
+fake, the contract and fidelity tests (run on every applicable committed recording under `acceptance/recordings` and
+on the synthetic recording produced by record mode for that adapter; verified against the real server only once the
+owner commits recordings, spec §12 item 13; amendment B-573), the owner's record script and its README.
 
 **T18 Doctor** (§4.9). The checks behind interfaces (installed programs, integrity level, location probe), table and
 JSON output, exit codes; the unreleased-tools check and the `extra_checks` extension point for spec 0006 (AC39, B-068).

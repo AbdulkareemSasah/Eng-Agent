@@ -65,6 +65,7 @@ def make_config(control: Path) -> ConfigFactory:
                 "shutdown_grace_s": shutdown_grace_s,
                 "build": {"sasaah_commit": COMMIT, "exe_sha256": exe_sha256()},
                 "host_key": "csi",
+                "product": "ETABS",
                 "roles": {
                     "main": {"classes": ["session", "call"], "call_timeout_s": call_timeout_s},
                     "long": {"classes": ["long"], "call_timeout_s": call_timeout_s},
