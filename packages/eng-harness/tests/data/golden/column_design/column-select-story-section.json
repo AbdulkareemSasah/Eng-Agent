@@ -1,0 +1,231 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (rules L1 to L3) and spec 0003 section 4.11 P2; synthetic data, no project value",
+  "method_ref": "§4.4.1 L1",
+  "synthetic": true,
+  "derivation": "t = 5 mm. L1 by selection: stories [L2] and sections [C40, W1], so a frame is in scope when its story is L2 AND its section is C40 or W1. C1 (L1, C40): story not selected. C2 (L2, C40): in. C3 (L2, W1): in. C4 (L2, C50): section not selected. C5 (L3, C40): story not selected. C6 (no story, C40): no story, so not in the story filter. B2 (L2, C40) is in. Both names L2, C40 and W1 are known (L2 is the story of a frame; C40 and W1 are frame sections), so no issue. L2: C2 and C3 plan d^2 = 0 <= 25: columns; B2 runs 5000 mm along y: d^2 = 25000000 > 25, excluded NOT_VERTICAL. L3: C2 C40 rectangular C30, L2, length |6500 - 3000| = 3500.0; C3 W1 other S355, L2, length 3500.0. Status PASS.",
+  "input": {
+    "scope": {
+      "select": {
+        "stories": [
+          "L2"
+        ],
+        "sections": [
+          "W1",
+          "C40"
+        ]
+      },
+      "combinations": [
+        "ULS1"
+      ],
+      "special_seismic": false
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 6500
+          },
+          "story": "L2",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C3",
+          "kind": "other",
+          "section": "W1",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 6500
+          },
+          "story": "L2",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C4",
+          "kind": "other",
+          "section": "C50",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 5000,
+            "z_mm": 3000
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 5000,
+            "z_mm": 6500
+          },
+          "story": "L2",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C5",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 6500
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 10000
+          },
+          "story": "L3",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C6",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 5000,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 5000,
+            "z_mm": 3000
+          },
+          "story": null,
+          "rotation_deg": 0
+        },
+        {
+          "id": "B2",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 6500
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 5000,
+            "z_mm": 6500
+          },
+          "story": "L2",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "B30",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C50",
+          "material": "C35",
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
+        },
+        {
+          "name": "W1",
+          "material": "S355",
+          "shape": {
+            "type": "other",
+            "host_shape": "SD Section"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "scope": "res_01KCC000000000000000000001",
+    "frames": "res_01KCC000000000000000000002",
+    "sections": "res_01KCC000000000000000000003",
+    "basis": "res_01KCC000000000000000000004"
+  },
+  "expected": {
+    "status": "PASS",
+    "columns": [
+      {
+        "frame_id": "C2",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L2",
+        "length_mm": 3500.0
+      },
+      {
+        "frame_id": "C3",
+        "section": "W1",
+        "shape": "other",
+        "material": "S355",
+        "story": "L2",
+        "length_mm": 3500.0
+      }
+    ],
+    "excluded": [
+      {
+        "frame_id": "B2",
+        "reason": "NOT_VERTICAL"
+      }
+    ],
+    "issues": []
+  }
+}

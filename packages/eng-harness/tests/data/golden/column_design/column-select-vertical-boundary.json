@@ -1,0 +1,162 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (rules L1 to L3) and spec 0003 section 4.11 P2; synthetic data, no project value",
+  "method_ref": "§4.4.1 L2",
+  "synthetic": true,
+  "derivation": "t = 5 mm, t^2 = 25; all coordinates are integers, so Fraction of the stored value is the integer. C_in: plan offset (1, 2), d^2 = 1 + 4 = 5 < 25: column; length = sqrt(1 + 4 + 3000^2) = sqrt(9000005) = 3000.0008333332175 (3000 * (1 + 5/(2 * 9000000)) = 3000.000833, display float). C_at: offset (3, 4), d^2 = 9 + 16 = 25 = t^2: column (the boundary is inclusive, d^2 <= t^2); length = sqrt(25 + 4000^2) = sqrt(16000025) = 4000.003124998779 (4000 * (1 + 25/(2 * 16000000)) = 4000.003125). C_neg: offset (-4, -3) from i to j, d^2 = 16 + 9 = 25: column; length = sqrt(25 + 3500^2) = sqrt(12250025) = 3500.003571426749 (3500 * (1 + 25/(2 * 12250000)) = 3500.003571). Status PASS.",
+  "input": {
+    "scope": {
+      "frames": [
+        "C_neg",
+        "C_at",
+        "C_in"
+      ],
+      "combinations": [
+        "ULS1"
+      ],
+      "special_seismic": false
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C_in",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 1,
+            "y_mm": 2,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C_at",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6003,
+            "y_mm": 4,
+            "z_mm": 4000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C_neg",
+          "kind": "other",
+          "section": "C50",
+          "i": {
+            "x_mm": 100,
+            "y_mm": 100,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 96,
+            "y_mm": 97,
+            "z_mm": 3500
+          },
+          "story": "L2",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "B30",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C50",
+          "material": "C35",
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
+        },
+        {
+          "name": "W1",
+          "material": "S355",
+          "shape": {
+            "type": "other",
+            "host_shape": "SD Section"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "scope": "res_01KCC000000000000000000001",
+    "frames": "res_01KCC000000000000000000002",
+    "sections": "res_01KCC000000000000000000003",
+    "basis": "res_01KCC000000000000000000004"
+  },
+  "expected": {
+    "status": "PASS",
+    "columns": [
+      {
+        "frame_id": "C_at",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 4000.003124998779
+      },
+      {
+        "frame_id": "C_in",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 3000.0008333332175
+      },
+      {
+        "frame_id": "C_neg",
+        "section": "C50",
+        "shape": "circular",
+        "material": "C35",
+        "story": "L2",
+        "length_mm": 3500.003571426749
+      }
+    ],
+    "excluded": [],
+    "issues": []
+  }
+}
