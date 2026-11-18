@@ -7,14 +7,21 @@ import copy
 from typing import Any
 
 import pytest
-from golden.edit_cycle import load_cases, run_check
-from pydantic import ValidationError
+from eng_contract.envelope import Provenance
+from eng_contract.params import InputPolicy, validate_input
+from eng_contract.store import ResultStore
+from golden.edit_cycle import input_meta, load_cases, run_check
+from pydantic import JsonValue, ValidationError
 
+from eng_harness.adapters.csi._edits import AddLoadPatternArgs, DefineWallSectionArgs, SetFrameLoadDistributedArgs
 from eng_harness.workflows.model_edit_cycle._change_set import (
     REFUSED_KIND_GAPS,
+    AreaLoadInput,
     ChangeSetDraft,
     ChangeSetSettings,
     LengthInput,
+    LineLoadInput,
+    RatioInput,
     WallSection,
     refused_gap,
 )
@@ -220,3 +227,109 @@ def test_refused_kinds_name_their_gap(item: dict[str, Any], gap: str) -> None:
         }
     ]
     assert [resolved["item_id"] for resolved in body["resolved"]] == ["ok"]
+
+
+def test_value_refs_are_write_arguments(store: ResultStore) -> None:
+    """AC40: each resolved ref of the check is a valid engineering argument of the CSI tool port (`require_refs`).
+
+    By hand from the contract's unit table: 1 m = 1000 mm, so 0.2 m is 200 mm; a basis value and a ratio are stored
+    as they are (12 kN/m, 0.5). The answer is stored as the engine stores it (`basis.engineer_input/1`, `fields`).
+    """
+    case = load_cases("check")["check-resolve-added-earlier"]
+    basis = copy.deepcopy(case.input["basis"])
+    basis["fields"]["loads.line_kN_m"] = {**basis["fields"]["loads.sdl_kPa"], "value": 12.0, "unit": "kN/m"}
+    items = [
+        {
+            "id": "w1",
+            "kind": "wall_section",
+            "name": "W200",
+            "material": "C30",
+            "thickness": {"source": "input", "value": 0.2, "unit": "m"},
+            "shell_type": "ShellThick",
+        },
+        {
+            "id": "l1",
+            "kind": "frame_uniform_load",
+            "frames": ["B1"],
+            "pattern": "DEAD",
+            "direction": "gravity",
+            "w": {"source": "basis", "path": "loads.line_kN_m"},
+        },
+        {
+            "id": "p1",
+            "kind": "load_pattern_add",
+            "name": "SDL",
+            "type": "dead",
+            "self_weight": {"source": "input", "value": 0.5, "unit": "1"},
+        },
+    ]
+    stored = ChangeSetDraft.model_validate({"items": items}).model_dump(mode="json")
+    provenance = Provenance(
+        tool="harness", tool_version="1", host=None, inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0
+    )
+    entered = {"unit": None, "entered_by": "test", "entered_at": provenance.started_at}
+    held: dict[str, JsonValue] = {"change_set": {"value": stored, **entered}}
+    answer = store.put("basis.engineer_input/1", {"step": "s", "fields": held}, provenance).result_id
+    basis_id = store.put("basis.design_basis/1", basis, provenance).result_id
+    meta = input_meta({**case.refs, "change_set": answer, "basis": basis_id})
+    body = run_check(case, items=stored["items"], meta=meta, basis=basis)
+    assert body["status"] == "PASS"
+    refs = [value["ref"] for item in body["resolved"] for value in item["values"]]
+
+    def argument(model: Any, **fields: Any) -> Any:
+        raw = {"model": "mdl_01ARZ3NDEKTSV4RRFFQ69G5FAV", **fields}
+        policy = InputPolicy(require_refs=True)
+        return validate_input(model, raw, source=store, current_revision=lambda _: None, policy=policy).model
+
+    wall = argument(DefineWallSectionArgs, name="W200", material="C30", thickness_mm={"$ref": refs[0]})
+    load = argument(SetFrameLoadDistributedArgs, frame="B1", pattern="DEAD", w_kN_m={"$ref": refs[1]})
+    pattern = argument(AddLoadPatternArgs, name="SDL", type="dead", self_weight_ratio={"$ref": refs[2]})
+    assert (wall.thickness_mm, load.w_kN_m, pattern.self_weight_ratio) == (200.0, 12.0, 0.5)
+    assert refs == [
+        f"{answer}#/fields/change_set/value/items/0/thickness/value_mm",
+        f"{basis_id}#/fields/loads.line_kN_m/value",
+        f"{answer}#/fields/change_set/value/items/2/self_weight/value_ratio",
+    ]
+
+
+CANONICAL: list[tuple[type[Any], dict[str, Any], str, float]] = [
+    (LengthInput, {"value": 0.2, "unit": "m"}, "value_mm", 200.0),  # 1 m = 1000 mm
+    (LengthInput, {"value": 250.0, "unit": "mm"}, "value_mm", 250.0),
+    (LineLoadInput, {"value": 12000.0, "unit": "N/m"}, "value_kN_m", 12.0),  # 1 N/m = 0.001 kN/m
+    (AreaLoadInput, {"value": 1500.0, "unit": "Pa"}, "value_kPa", 1.5),  # 1 Pa = 0.001 kPa
+    (RatioInput, {"value": 0.5, "unit": "1"}, "value_ratio", 0.5),
+]
+
+
+@pytest.mark.parametrize(("model", "literal", "name", "canonical"), CANONICAL)
+def test_input_value_holds_its_canonical_number(
+    model: type[Any], literal: dict[str, Any], name: str, canonical: float
+) -> None:
+    """AC40: `value_<suffix>` is filled from `value` and `unit`, kept when given right, and refused when it differs."""
+    raw = {"source": "input", **literal}
+    filled = model.model_validate(raw)
+    assert getattr(filled, name) == canonical
+    assert model.model_validate(filled.model_dump(mode="json")) == filled  # the stored answer validates on replay
+    assert model.model_validate({**raw, name: None}) == filled  # an absent number and a null are the same
+    for wrong in (canonical + 1.0, canonical * 1.0000001):
+        with pytest.raises(ValidationError, match=f"{name} {wrong!r} is not"):
+            model.model_validate({**raw, name: wrong})
+
+
+def test_canonical_field_is_declared_on_the_four_models_only() -> None:
+    declared = {
+        m: sorted(name for name in m.model_fields if name.startswith("value_"))
+        for m in (LengthInput, LineLoadInput, AreaLoadInput, RatioInput)
+    }
+    assert list(declared.values()) == [["value_mm"], ["value_kN_m"], ["value_kPa"], ["value_ratio"]]
+    from eng_harness.workflows.column_design._requests import _Area  # the frozen column model is unchanged
+
+    assert not [name for name in _Area.model_fields if name.startswith("value_")]
+
+
+def test_canonical_number_of_a_bad_literal_is_not_invented() -> None:
+    """A bad unit, a non-finite or boolean value fail on their own field; no number is filled for them."""
+    for bad in ({"value": 1.0, "unit": "kN"}, {"value": float("inf"), "unit": "mm"}, {"value": True, "unit": "mm"}):
+        with pytest.raises(ValidationError) as caught:
+            LengthInput.model_validate({"source": "input", **bad})
+        assert "value_mm" not in str(caught.value)

@@ -394,7 +394,7 @@
         "values": [
           {
             "pointer": "/thickness_mm",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/thickness",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/thickness/value_mm",
             "unit": "mm"
           }
         ]
@@ -408,7 +408,7 @@
         "values": [
           {
             "pointer": "/thickness_mm",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/thickness",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/thickness/value_mm",
             "unit": "mm"
           }
         ]

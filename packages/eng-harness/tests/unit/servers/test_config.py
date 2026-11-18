@@ -1,10 +1,11 @@
 """`harness.toml` server and tool sections (plan 0002 T1, T20; spec 0002 AC1 to AC3, AC40, section 4.2)."""
 
+import tomllib
 from pathlib import Path
 
 import pytest
 
-from eng_harness.servers import ConfigError, ServersConfig, load_servers_config
+from eng_harness.servers import ConfigError, ServersConfig, load_servers_config, servers_config
 
 COMMIT = "a" * 40
 SHA = "b" * 64
@@ -227,3 +228,33 @@ def test_audit_log_flag(tmp_path: Path) -> None:
     for value in ('"false"', '"true"', '"yes"', "0", "1", "1.0"):
         with pytest.raises(ConfigError, match="audit_log"):
             load_servers_config(_write(tmp_path, _minimal(extra=f"audit_log = {value}")))
+
+
+def test_servers_config_from_tables(tmp_path: Path) -> None:
+    """AC50: the validation of `load_servers_config` over tables already parsed, with the dotted key of a fault."""
+    data = tomllib.loads(FULL)
+    assert servers_config(data) == load_servers_config(_write(tmp_path, FULL))
+    assert servers_config({"engine": {}}) == ServersConfig()
+    broken = tomllib.loads(_minimal(extra="audit_log = 1"))
+    with pytest.raises(ConfigError) as caught:
+        servers_config(broken)
+    assert caught.value.key == "servers.csi.audit_log"
+
+
+def test_byte_order_mark_accepted(tmp_path: Path) -> None:
+    """AC50: a file saved with a UTF-8 byte-order mark reads as the same file without it."""
+    path = tmp_path / "harness.toml"
+    path.write_bytes(b"\xef\xbb\xbf" + FULL.encode("utf-8"))
+    assert load_servers_config(path) == servers_config(tomllib.loads(FULL))
+
+
+def test_host_program_of_product(tmp_path: Path) -> None:
+    """AC50: the entry named by the product in lower case, else a `ConfigError` naming `host_programs.<name>`."""
+    config = servers_config(tomllib.loads(FULL))
+    assert config.host_program("ETABS") is config.host_programs["etabs"]
+    assert config.host_program("etabs").executables == ("ETABS.exe",)
+    with pytest.raises(ConfigError) as caught:
+        config.host_program("SAP2000")
+    assert caught.value.key == "host_programs.sap2000"
+    with pytest.raises(ConfigError, match=r"^host_programs\.etabs: "):
+        ServersConfig().host_program("Etabs")

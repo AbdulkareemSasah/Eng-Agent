@@ -128,11 +128,7 @@ def _documents_risk(git: Git, head: str, changed: list[str], config: GateConfig)
     for path in changed:
         try:
             text = git.show(head, path)
-            doc = (
-                parse_plan(text, config.limits.max_task_lines)
-                if matches_any(path, config.plan_globs)
-                else parse_spec(text)
-            )
+            doc = parse_plan(text) if matches_any(path, config.plan_globs) else parse_spec(text)
         except (PathNotFoundError, FrontMatterError) as error:
             return _rf004(f"{path}: {error}")
         risks |= set(doc.risk)
@@ -146,7 +142,7 @@ def _plan_risk(git: Git, gate_ref: str, body: str, config: GateConfig) -> set[st
     if not found or not safe_relative_path(found[1]) or not matches_any(found[1], config.plan_globs):
         return _rf004("the body needs exactly one `Plan-Task: <plan path>#T<n>` line")
     try:
-        return set(parse_plan(git.show(gate_ref, found[1]), config.limits.max_task_lines).risk)
+        return set(parse_plan(git.show(gate_ref, found[1])).risk)
     except (PathNotFoundError, FrontMatterError) as error:
         return _rf004(f"plan {found[1]} on {gate_ref}: {error}")
 
@@ -160,7 +156,7 @@ def _ratchet_accepted(
     if not found or not safe_relative_path(found[1]) or not matches_any(found[1], config.plan_globs):
         return False
     try:
-        plan = parse_plan(git.show(gate_ref, found[1]), config.limits.max_task_lines)
+        plan = parse_plan(git.show(gate_ref, found[1]))
     except PathNotFoundError, FrontMatterError:
         return False
     base = git.merge_base(*shas)
@@ -184,7 +180,7 @@ def check_risk_floor(
 
     Args:
         git: the git port.
-        config: the gate configuration (globs, line cap).
+        config: the gate configuration (globs).
         shas: base and head commit.
         head_ref: the head branch name, None when unknown (then it is never a lane branch).
         body: the pull-request body.

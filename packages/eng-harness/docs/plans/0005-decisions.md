@@ -132,6 +132,7 @@ tasks:
     depends_on: [T3, T5]
   - id: T7
     # Amendment (B-411, documents only): redaction findings over settings and call sensitive values (spec 4.5 step 1), passed to append(label, findings); Ref fields on the screen (AC34).
+    # Amendment (B-512, documents only): no longer waits for engine T17; rule_guard is an injected argument (section 3).
     title: Cascade core (validation, tier 1, engineer tier, pending, record)
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
@@ -154,6 +155,7 @@ tasks:
     depends_on: [T4, T6]
   - id: T8
     # Amendment (B-411, documents only): test_redaction_skip carries the cascade side of AC33; the property test adds a call-supplied sensitive value.
+    # Amendment (B-512, documents only): presence assertions in the absence tests (TF004); where the skipped field paths are recorded is spec Q16.
     title: Tiers 2 and 3, shadow mode, timeouts, policy switches, local_only
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions (amendment B-356)
@@ -192,6 +194,7 @@ tasks:
     covers: [AC27, AC28, AC29]
     depends_on: [T8]
   - id: T10
+    # Amendment (B-512, documents only): tests_first keeps the two tests that can be red at its base (TF004); the other six are regression tests.
     title: Engine wiring, workflow, replay, conformance and performance tests, local-testing notes
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.decisions, eng_harness.engine (amendment B-356)
@@ -206,14 +209,8 @@ tasks:
     max_changed_lines: 170
     max_sessions: 3
     tests_first:
-      - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_rules_run_under_the_guard"
-      - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_engineer_decision_pauses_and_resumes"
-      - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_decision_made_record"
-      - "packages/eng-harness/tests/replay/test_decision_replay.py::test_replay_does_not_requery"
-      - "packages/eng-harness/tests/replay/test_decision_replay.py::test_crash_while_pending"
-      - "packages/eng-harness/tests/contract/test_decision_port.py::test_cascade_conforms"
-      - "packages/eng-harness/tests/perf/test_rule_latency.py::test_rule_decision_p95"
       - "packages/eng-harness/tests/workflow/decisions/test_engine_decisions.py::test_runtime_summary_in_run_header"
+      - "packages/eng-harness/tests/contract/test_decision_port.py::test_cascade_conforms"
     covers: [AC16, AC17, AC20, AC30, AC40, AC41, AC43]
     depends_on: [T9]
 ---
@@ -294,6 +291,8 @@ the rest as the recorded gap.
 
 **T7 Cascade core** (spec §4.5 steps 1 to 4 and 6). Call validation, rule evaluation under `rule_guard`, pending and
 answered flow, label append, record building. Provider tiers are absent here, which is the phase 1 deployment (AC17).
+Amendment B-512: `rule_guard` is the constructor's injected context-manager factory (spec §4.5), a no-op in the unit
+tests, so T7 imports nothing from the engine and does not wait for engine T17 (section 3).
 Amendment B-411: step 1 computes the redaction findings once over `settings.sensitive_values ∪ call.sensitive_values`
 (T8 consumes them for the tier skips; here they are passed to T6's `append(label, findings)`, which makes the label
 hash-only, AC36), and
@@ -303,7 +302,15 @@ hash-only, AC36), and
 timeouts, failure capture, `local_only`, redaction skips; property tests over random provider answers and sensitive
 strings. Amendment B-411: `test_redaction_skip` carries the cascade side of AC33 (provider not called, outcome
 `skipped_redaction` with the field paths, engineer asked), and the property test also asserts one value supplied only
-through `DecisionCall.sensitive_values`.
+through `DecisionCall.sensitive_values`. Amendment B-512: test-first (TF004): each absence assertion of
+`test_policy_switches` (AC25) and of the property test (AC33) is paired with a presence assertion in the same test
+(with `policy.model=False` the llm provider is called; with `require_engineer=True` the same cascade with the switch off
+calls the allowed provider; in the property test a state that passes the redaction check does reach the provider), so
+both tests fail at the T7 base. Where the field paths of a `skipped_redaction` entry are recorded is spec Q16: the
+merged `Suggestion` has no field for them and `_record.py` is not in T8's files. Until the owner answers, T8 records the
+entry without paths (no other field carries them; `error` stays a class name and code), and `test_redaction_skip`
+asserts the provider not called, the outcome `skipped_redaction` and the engineer asked; the answer adds the paths and
+`_record.py` by its own amendment.
 
 **T9 `decide_many`** (spec §4.8). Per-provider batching with fallback, one batch id and screen, stored outcomes for
 resume, all-or-nothing engineer answers.
@@ -314,13 +321,19 @@ call the port; if so this task is tests, documents and the `engine.decision` req
 the engine plan has not merged, this task waits. Amendment B-098: the cascade's `runtime_summary()` (spec §4.12,
 AC43; `_cascade.py` gains the constructor argument and the getter, about 20 lines, which raised the budget from 150 to
 170), tested through the real engine's run header (engine AC69, engine plan T14b).
+Amendment B-512 (test-first, TF004): at T10's base T7 to T9 and engine T14, T14b and T17 are merged, so only
+`test_runtime_summary_in_run_header` and `test_cascade_conforms` (it calls `runtime_summary()` on a cascade built
+without a summary, expecting `{}`, and on one built with a summary) can fail there; the other six named tests are
+written after the implementation commit as regression tests, as plan 0009 T10b does. The summary argument and getter
+are what plan 0009 T10a expects of this task; the pre-flight audit found no mismatch.
 
 ## 3. Dependencies
 
 - Runtime: none new (`eng-contract`, `pydantic` from engine plan T1; standard library otherwise). No ADR is needed.
 - Development: none new.
 - Work items: the engine plan (B-060) T2 (errors), T6 (ports and fakes), T7 (ctx types, `BasisView`), T14 (`_decide`), T14b (`decision_runtime` in the run header, before T10 only),
-  T17 (guard) merged before T7 and T10 here; T1 to T6 here need engine T1, T2, T6 and T7 (`BasisView`, already merged;
+  T17 (guard, `rule_guard()`) merged before T10 here (T7 to T9 take `rule_guard` as an injected argument, a no-op in
+  unit tests, and import nothing from the engine; amendment B-512); T1 to T6 here need engine T1, T2, T6 and T7 (`BasisView`, already merged;
   amendment B-411, engine spec Q19). The amendments
   of spec Q1 are made in the engine spec's own pull request before T10. Specs 0006 and 0007 depend on T10.
 - Command line (amendment B-412 sixth review): spec 0006 §4.2.2 step 5 builds the `Cascade` in the command line through

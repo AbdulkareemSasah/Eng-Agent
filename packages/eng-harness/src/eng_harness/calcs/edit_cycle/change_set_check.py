@@ -1,12 +1,15 @@
 """Calc `harness.change_set_check` v1: the change set against the model and the basis (spec 0007 4.4.1, K1 to K7).
 
 Purpose: resolve each item's selection to sorted explicit names (K1), check every name (K2), refuse two items on one
-target and property (K3), check each value's source, unit and bounds (K4), name the gap of a refused kind (K5), warn
-where the engineer changed a property an item also sets (K6), and fail on any error (K7).
+target and property and an item id that is not a page token (K3), check each value's source, unit and bounds (K4), name
+the gap of a refused kind (K5), warn where the engineer changed a property an item also sets (K6), and fail on any
+error (K7).
 Inputs: `change_set` (the answer field), the step 3 read set as flat fields (`frames`, `areas`, `sections`,
 `restraints`), `names` (`harness.csi_name_lists/1`), `diff` (the step 4 `harness.model_diff/1`) and `basis`.
 Units: a value is compared exactly in the canonical unit of its quantity kind (the unit of its bounds), converted by
-`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only.
+`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only, each
+pointing at the number: `.../value` of a basis field, `.../value_<suffix>` of an input (K4), so step 8 passes it as the
+engineering argument.
 Errors: `ContractError` `INVALID_ARGUMENT` (with `field`) for a bounds field that is missing, unconfirmed or not a
 number (no default), or an input given without a record. Every finding about the change set is an issue.
 """
@@ -44,6 +47,10 @@ ANSWER_FIELD = "fields/change_set/value"
 _FRAMES, _AREAS = "model.frame_placements/1", "model.area_placements/1"
 _SECTIONS, _LOADS, _JOINTS = "model.sections/1", "model.load_set/1", "model.joint_restraints/1"
 _GRAVITY = "gravity"
+_ID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.-"
+_RESERVED_IDS = ("revision", "unlock")
+"""K3 (spec 0007 4.4.1): an item id is a page token of spec 0006 AC49 (`[A-Za-z0-9_.-]`, at most 64) less the 7 of the
+field prefix `reject_` and `reason_` (1 to 57 characters), and not an id step 6 adds to the preview itself."""
 _REFS = ("change_set", "frames", "areas", "sections", "restraints", "names", "diff", "basis")
 _VALUES = (
     ("wall_section", "thickness", "length", "/thickness_mm"),
@@ -59,8 +66,21 @@ Bounds = dict[str, tuple[Fraction, Fraction, str]]
 """Per quantity kind: exact lower and upper bound and their (canonical) unit."""
 
 
-def _ref(kind: str) -> Any:
-    return eng_param(ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
+def _is_page_token(text: str) -> bool:
+    return 0 < len(text) <= 57 and all(char in _ID_CHARS for char in text)  # K3: 64 less the 7 of the prefix
+
+
+def _number_key(quantity: str) -> str:
+    """The key under which an input value of this quantity kind holds its canonical number (spec 0007 4.3.1)."""
+    return next(
+        f"value{kind.suffix}"
+        for name, low, _ in BOUNDS
+        if name == quantity and (kind := kind_for_field(low.rpartition(".")[2])) is not None
+    )
+
+
+def _ref(kind: str, default: Any = ...) -> Any:
+    return eng_param(default, ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
 
 
 class CheckInput(CalcInput):
@@ -69,7 +89,7 @@ class CheckInput(CalcInput):
     change_set: ChangeSetDraft = _ref("basis.engineer_input/1")
     frames: FramePlacements = _ref(_FRAMES)
     areas: AreaPlacements = _ref(_AREAS)
-    sections: Sections = _ref(_SECTIONS)
+    sections: Sections | None = _ref(_SECTIONS, None)
     restraints: JointRestraints = _ref(_JOINTS)
     names: CsiNameLists = _ref("harness.csi_name_lists/1")
     diff: ModelDiff = _ref("harness.model_diff/1")
@@ -148,7 +168,8 @@ class _Check:
                 self.name(item.id, what, value)
             return sorted(set(given))
         rows: Sequence[Any] = self.inp.frames.frames if what == "frame" else self.inp.areas.areas
-        kinds = {s.name: s.kind.value for s in self.inp.sections.area_sections}
+        sections = self.inp.sections  # optional (spec 0007 4.4.1): no record, no area kind is known
+        kinds = {} if sections is None else {s.name: s.kind.value for s in sections.area_sections}
         sel = item.select
         found = sorted(
             row.id
@@ -158,7 +179,12 @@ class _Check:
             and getattr(sel, "area_kind", None) in (None, kinds.get(row.section))
         )
         if not found:
-            self.issue(item.id, "EMPTY_SELECTION", f"the selection of item {item.id} matches no {what}")
+            unread = (
+                ": the area kinds were not read (no model.sections/1)"
+                if getattr(sel, "area_kind", None) and sections is None
+                else ""
+            )
+            self.issue(item.id, "EMPTY_SELECTION", f"the selection of item {item.id} matches no {what}{unread}")
         return found
 
     def value(self, index: int, field: str, value: Any, quantity: str, pointer: str) -> tuple[ResolvedValue, str]:
@@ -168,7 +194,7 @@ class _Check:
         exact: Fraction | None
         if value.source == "basis":
             path, shown = value.path, f"basis {value.path}"
-            ref, stored = f"{self.refs['basis']}#/fields/{path}", self.inp.basis.fields.get(path)
+            ref, stored = f"{self.refs['basis']}#/fields/{path}/value", self.inp.basis.fields.get(path)
             kind = kind_for_field(path.rpartition(".")[2])
             exact = as_fraction(stored.value) if stored is not None and stored.confirmed else None
             if exact is None:
@@ -179,7 +205,7 @@ class _Check:
         else:
             shown, ref = (
                 f"{value.value} {value.unit}",
-                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}",
+                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}/{_number_key(quantity)}",
             )
             exact = Fraction(value.value) * unit(value.unit).factor / unit(canonical).factor  # no offset, no pi
         if exact is not None and not low <= exact <= high:
@@ -277,6 +303,8 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
     """Check every item of the change set (K1 to K6) and give the status (K7)."""
     refs: dict[str, str] = {}
     for name in _REFS:
+        if name == "sections" and inp.sections is None:  # optional (spec 0007 4.4.1)
+            continue
         if (ref := meta.refs.get(name)) is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "each input must be a record reference", field=name)
         refs[name] = ref.result_id
@@ -288,6 +316,15 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
         changes.setdefault((change.section, tuple(change.key)), []).append(change)
     resolved: list[ResolvedItem] = []
     for index, item in enumerate(items):
+        if "/" in item.id:  # K3: effect ids join the item id with `/` (spec 0007 4.4.2)
+            check.issue(item.id, "INVALID_ITEM_ID", f"item id {item.id} contains / (spec 0007 4.4.1 K3)")
+        elif not _is_page_token(item.id) or item.id in _RESERVED_IDS:  # K3: the change-set screen's field names
+            check.issue(
+                item.id,
+                "INVALID_ITEM_ID",
+                f"item id {item.id} is not 1 to 57 ASCII letters, digits, _, . or -, or is revision or unlock"
+                " (spec 0007 4.4.1 K3)",
+            )
         if (gap := refused_gap(item)) is not None:  # K5
             check.issue(item.id, "NOT_IMPLEMENTED", f"{item.kind} is refused in v1 (spec 0007 4.3.2)", gap=gap)
             continue
@@ -309,5 +346,5 @@ def change_set_check(inp: CheckInput, meta: InputMeta, trace: TraceBuilder) -> C
         "status", status, formula="FAIL when errors > 0, else PASS", source="spec 0007 4.4.1 K7", uses=["errors"]
     )
     trace.output("status")
-    complete = all(meta.refs[name].complete for name in _REFS) and inp.diff.complete
+    complete = all(meta.refs[name].complete for name in refs) and inp.diff.complete
     return CheckBody(status=status, resolved=resolved, issues=check.issues, complete=complete)

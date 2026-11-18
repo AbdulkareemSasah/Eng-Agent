@@ -15,6 +15,7 @@ Units are the Sasaah tokens of the S-12 report (section 4); the fake invents no 
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -114,6 +115,10 @@ def _launch_pid(*, fresh: bool) -> int:
     launch of the instance this server last started, takes the next pid so a restore can see a distinct instance.
     """
     global _NEXT_PID
+    if CONTROL:
+        data = json.loads(Path(CONTROL).read_text())
+        if data.get("persist_model"):
+            return int(max(data.get("launched", [PID - 1]))) + 1
     if not fresh and STATE.target is not None and STATE.target.get("pid") != _NEXT_PID - 1:
         return PID
     pid = _NEXT_PID
@@ -345,7 +350,9 @@ def _note(name: str, args: dict[str, Any]) -> None:
     if not isinstance(data, dict):
         return
     pid = STATE.target["pid"] if STATE.target is not None else None
-    entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path")}
+    audit = sys.argv[sys.argv.index("--audit-log") + 1] if "--audit-log" in sys.argv else ""
+    role = Path(audit).name.removesuffix("-audit.jsonl").rsplit("-", 1)[-1]
+    entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path"), "role": role}
     if name == "csi_launch" and isinstance(pid, int):
         entry["visible"] = bool(args.get("visible", False))
         launched = data.get("launched")
@@ -358,11 +365,21 @@ def _note(name: str, args: dict[str, Any]) -> None:
 async def on_call_tool(ctx: ServerRequestContext[Any], params: types.CallToolRequestParams) -> types.CallToolResult:
     """Run one tool and answer in the Sasaah reply shape."""
     args = dict(params.arguments or {})
+    if CONTROL:
+        data = json.loads(Path(CONTROL).read_text())
+        if data.get("persist_model") and "model" in data:
+            STATE.model = data["model"]
     try:
         return _reply(await _call(params.name, args), error=False)
     except SasaahError as error:
         return _reply({"code": error.code, "message": str(error), "data": error.data}, error=True)
     finally:
+        if CONTROL:
+            path = Path(CONTROL)
+            data = json.loads(path.read_text())
+            if data.get("persist_model"):
+                data["model"] = STATE.model
+                path.write_text(json.dumps(data))
         _note(params.name, args)  # os._exit on crash_during_call skips this, so that fault is not recorded as a call
 
 

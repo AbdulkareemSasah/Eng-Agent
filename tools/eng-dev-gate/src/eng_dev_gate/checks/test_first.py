@@ -218,7 +218,7 @@ def resolve_task(body: str, config: GateConfig, git: Git, gate_ref: str) -> Task
     found = _PLAN_TASK.fullmatch(lines[0][1]) if len(lines) == 1 else None
     if found and safe_relative_path(found[1]) and matches_any(found[1], config.plan_globs):
         try:
-            plan = parse_plan(git.show(gate_ref, found[1]), config.limits.max_task_lines)
+            plan = parse_plan(git.show(gate_ref, found[1]))
         except (PathNotFoundError, FrontMatterError) as error:
             reason = f"plan {found[1]} cannot be used: {error}"
         else:

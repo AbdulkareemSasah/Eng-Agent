@@ -1,0 +1,23 @@
+{
+ "lane": "interface-5",
+ "tasks": [
+  {
+   "id": "B-429",
+   "num": 429,
+   "key": "I.T7b",
+   "kind": "impl",
+   "plan": "packages/eng-harness/docs/plans/0006-cli-progress-pages-report.md",
+   "planTask": "T7b",
+   "title": "Stop-file run control and the voided approval display",
+   "member": "eng-harness",
+   "branch": "feat/b429-harness-it7b-stop-file-run-control-and-th",
+   "prTitle": "feat(eng-harness): stop-file run control and the voided approval display (B-429)",
+   "risk": "r3",
+   "writerModel": "sonnet",
+   "writerEffort": "medium",
+   "reviewerModel": "sonnet",
+   "engineering": false,
+   "notes": "AUTHORITY: this task is assigned by the lead under the owner's standing instruction to build the whole project; NEEDS_OWNER only for a decision the documents do not contain. First-live-run path. THIS TASK IS ALREADY WRITTEN AND REVIEWED: the worktree <worktrees>/b429 holds it on the branch above (head 7c944fb, 100 counted lines of 130, review rounds 1 and 2 APPROVE in <lead>/reports/b429-review.md, writer notes in <lead>/reports/b429-writer.md). Do NOT rewrite it and do not create a new worktree or branch. What remains is one addition, which amendment B-517 (merged as pull request 363) homed in this task by adding pages/_routes.py and tests/helpers/page_client.py to the T7b file list: the single-use race defect of merged T7 code (two concurrent answers to one approval return 200 and 404 where spec 0006 AC30 requires 200 and 409, because the router fetches the screen before submit and a recorded request has no screen). WRITER: (1) in the worktree merge origin/build/v1 (never rebase; CHANGELOG.md conflicts keep both sides); (2) apply the lead's diagnosed fix <lead>/reports/flaky-single-use.patch (diagnosis in <lead>/reports/flaky-single-use.md: an `answering` keyword of the screen lookup, used by the router on POST; 6 lines added and 5 deleted in pages/_ports.py and pages/_routes.py, one line in the test helper), check it against the current code and the spec rather than trusting it blindly; (3) add one deterministic regression test in a tests file of the T7b list or in tests/unit/pages/test_single_use.py only if that file is in the list (read the T7b front matter): a POST to a request that is already recorded answers 409, not 404, while a GET of it still answers 404; commit the test and the fix as `test:` then `fix(eng-harness): ...` commits AFTER the existing commits (the task's first `test:` commit stays as it is: gate rule TF004 looks at it); if no listed test file can hold that test, say so in your summary and rely on tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins, which you then run 200 times in a loop under load to show 0 failures; (4) add a CHANGELOG.md line for the fix; (5) gate without mutation, counted lines (expected about 111 of 130), update the writer note, write the pull request body file (the body says the pull request also fixes the T7 single-use defect under AC30, per B-517), push fast-forward. REVIEWER: rounds 1 and 2 already approved the task at 7c944fb; judge the commits made after 7c944fb (the merge, the regression test, the fix) for correctness against spec 0006 AC30 and section 4.4, scope (files of the amended T7b list) and budget, and confirm that the earlier approved content is unchanged."
+  }
+ ]
+}

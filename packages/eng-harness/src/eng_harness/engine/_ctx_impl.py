@@ -6,9 +6,11 @@ returns its recorded result, or raises its recorded failure again, with no port 
 `ContractError` if unknown.
 """
 
+import inspect
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from eng_contract.canonical import payload_sha256
@@ -29,20 +31,24 @@ from eng_harness.ctx import (
     ArgValue,
     Attempt,
     BasisCount,
+    BasisView,
     CalcResult,
     Decision,
     DecisionRequest,
+    ModelHandle,
     Preview,
+    Promotion,
     ReadResult,
     ToolResult,
 )  # fmt: skip
-from eng_harness.engine import _approvals, _decide, _steps
+from eng_harness.engine import _approvals, _decide, _modes, _promote, _resources, _steps
 from eng_harness.engine._codec import decode, decode_summary
+from eng_harness.engine._guard import block_code, engine_work, enter_block_code
 from eng_harness.engine._invariants import SiblingBoard
 from eng_harness.engine._replay import Recorded, ReplayIndex
 from eng_harness.journal import Event, EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalPort, CalcPort, HostPort, ToolPort
+from eng_harness.ports import ApprovalPort, CalcPort, HostPort, ToolInfo, ToolPort
 
 if TYPE_CHECKING:
     from eng_harness.engine._hostsafety import Leases, Pending
@@ -108,19 +114,48 @@ class Ctx:
     def __init__(
         self, tools: ToolPort, calc: CalcPort, host: HostPort, store: ResultStore, settings: EngineSettings,
         clock: Clock, producer: Callable[[], Provenance], run_id: str, writer: JournalWriter, events: Sequence[Event],
-        pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort,
+        pending: Pending, leases: Leases, decider: _decide.Decider, approvals: ApprovalPort, mode: str,
+        always_ask: Sequence[str], run_dir: Path, limits: _resources.Limits, basis: Callable[[], BasisView],
+        copy_on_open: bool = False,
     ) -> None:  # fmt: skip
-        """Serve one run: its ports, store, settings, clock, run id, journal writer, events to replay, pending hosts,
-        host leases, decisions and approvals."""
+        """Serve one run in `run_dir`: its ports, store, settings, clock, run id, journal writer, events to replay,
+        pending hosts, host leases, decisions, approvals, permission mode, always-ask tools and limits."""
         self._tools, self._calc, self._store, self._settings, self._clock = tools, calc, store, settings, clock
-        self._pending, self._leases, self._decider = pending, leases, decider
+        self._pending, self._leases, self._decider, self._host, self._limits = pending, leases, decider, host, limits
         self._producer, self._run_id, self._writer, self.index = producer, run_id, writer, ReplayIndex(events)
-        self._approvals = _approvals.Approvals(approvals, host, store, writer, producer, run_id, events)
+        self._load_basis = basis
+        self._view: BasisView | None = None
+        self._modes = _modes.Modes(
+            mode,
+            always_ask,
+            run_dir,
+            tools,
+            host,
+            store,
+            writer,
+            producer,
+            leases,
+            approvals,
+            run_id,
+            events,
+            copy_on_open,
+        )
+        self._approvals, self._files = self._modes.approvals, _promote.LocalFileOps()
         self._guard = _approvals.ApprovalGuard(self._approvals, host, store, writer, producer)
         self._guard.install()
         self._started = {e.path: e.payload for e in events if isinstance(e.payload, ev.StepStarted) and e.path}
         done = [(e.path, e.payload.calc) for e in events if isinstance(e.payload, ev.StepCompleted) and e.payload.calc]
         self._calcs, self.draft = dict(done), False  # the calc of each completed calc step, for its replay
+        self._revised = {  # the `model_saved` of each tool save, for the approvals it keeps its chain with (4.9)
+            e.path: p for e in events if isinstance(p := e.payload, ev.ModelSaved) and p.role == "revision" and e.path
+        }
+
+    @property
+    def basis(self) -> BasisView:
+        """The frozen design basis of the run, read from its port on first use (spec 0001 4.9)."""
+        if self._view is None:
+            self._view = self._load_basis()
+        return self._view
 
     def _begin(self, path: str, attempt: int, kind: str, name: str, args: _Obj, **fields: object) -> int:
         started = {"kind": kind, "name": name, "args": args, "args_sha256": payload_sha256(args), "effect": "none"}
@@ -153,6 +188,7 @@ class Ctx:
             raise errors.ReplayDivergence(f"a step recorded the harness code {done.harness_code}")
         return done
 
+    @engine_work
     async def tool(
         self, name: str, args: Mapping[str, ArgValue] | None = None, *, under: Approval | None = None,
         item: str | None = None,
@@ -187,47 +223,63 @@ class Ctx:
             args = cast(_Obj, _json(raw))
         return await self._tool_json(path, name, raw, args, under, item)
 
+    def _journaled(self, began: ev.StepStarted) -> _Obj:
+        return began.args if began.args is not None else cast(_Obj, self._store.payload(began.args_ref or "")["value"])
+
     async def _tool_json(
         self, path: str, name: str, raw: Mapping[str, ArgValue], args: _Obj, under: Approval | None, item: str | None
     ) -> ToolResult:  # fmt: skip
-        recorded = self._look(path, "tool", name, args)
         prior = self._started.get(path)
+        info = None if prior is not None else await self._tools.describe(name)
+        journaled = None if prior is None else self._journaled(prior)
+        args, under = await self._modes.enter(
+            self, path, name, args, info, prior, journaled, under, item
+        )  # copy and approval (4.7)
+        recorded = self._look(path, "tool", name, args)
         if prior is not None:  # a recorded step: replay its inserted steps, and do not call describe
             self._pending.replay(self, path, prior.model_key)
             await self._guard.touch(prior.model_key, prior.effect == "write")
             await self._guard.prepare(self, path, prior.model_key, prior.effect, prior.action)
             if recorded is not None and (done := self._replayed(recorded)) is not None:
                 if prior.effect == "write":
-                    self._guard.mark(prior.model_key)
+                    if not prior.opens_model_without_writing:  # the recorded attempt's guarantee (B-562)
+                        self._guard.mark(prior.model_key)
                     self._guard.note_stored(done.ref)
-                    self._approvals.stepped(prior.under, prior.model_key, done.ref)
+                    self._approvals.stepped(prior.under, prior.model_key, done.ref, self._revised.get(path))
+                if not self._modes.handed(path):  # a missing post-open binding and units before a live copy (EC1)
+                    await self._pending.bind(self, path, prior.model_key, prior.host_key, prior.action, after=True)
+                await self._modes.opened(self, path, prior.action, prior.model_key, prior.host_key)
                 return _result(name, done)
         attempt = 1 if recorded is None else recorded.attempt + 1  # a retryable failure runs again as the next attempt
-        info = await self._tools.describe(name)
+        info = info or await self._tools.describe(name)
         await self._leases.acquire(info.host_key)  # one driver per host: leased before the first step on it (4.6 #10)
         model = args.get(info.model_param) if info.model_param else None
         key = model if isinstance(model, str) else None
         if prior is None:  # the first live attempt; a retry already prepared above
             self._guard.literals(raw, info.engineering_params)
             await self._guard.touch(key, info.effect == "write")
-            await self._pending.bind(
-                self, path, key, info
-            )  # the model is bound and its units read before its first step
+            await self._pending.bind(  # the model is bound and its units read before its first step
+                self, path, key, info.host_key, info.action
+            )
             await self._guard.prepare(self, path, key, info.effect, info.action)
         await self._approvals.authorize(under, item, key, write=info.effect == "write")  # before any port call
         last = attempt + (self._settings.step_retry_limit if info.effect == "read" else 0)
+        free = info.effect == "write" and info.action == "open" and info.opens_model_without_writing(args)
         approval = None if under is None else under.request_id
         while True:
             await self._pending.reconnected(self, path, attempt, info.host_key)  # units after a new session (4.6 #9)
             await self._pending.settle(info.host_key)  # a write of unknown outcome on this host is reconciled first
             op = _steps.op_id(self._run_id, path, attempt)
-            fields = {
+            fields: dict[str, object] = {
                 "effect": info.effect, "op_id": op if info.effect == "write" else None, "host_key": info.host_key,
                 "action": info.action, "under": approval, "item": item,
             }  # fmt: skip
+            if free:  # recorded before the open is sent (spec 4.4.2, B-562)
+                fields["opens_model_without_writing"] = True
             began = self._begin(path, attempt, "tool", name, args, model_key=key, **fields)
             try:
-                envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
+                async with self._limits.host(info.host_key):  # one call at a time on a host (4.10)
+                    envelope: Envelope | None = await self._tools.call(name, args, op_id=op, model=key)
             except Exception as exc:  # a write that raised is in flight (spec 4.5.3); a read leaves the step as it is
                 if info.effect != "write":
                     await self._leases.started(info.host_key)  # the raised read may have started an instance (4.6 #10)
@@ -239,20 +291,22 @@ class Ctx:
                 self._done(path, attempt, began, done := _stored(envelope))
                 self._guard.note(envelope.provenance.host)
                 if info.effect == "write":
-                    self._guard.mark(key)
-                    self._approvals.stepped(approval, key, envelope.result_id)
-                await self._pending.bind(self, path, key, info, after=True)  # an `open` tool binds its model after it
-                return _result(name, done)
+                    if not free:
+                        self._guard.mark(key)
+                    saved = await self._guard.revised(path, key, info, args, envelope)  # a tool save (4.6)
+                    self._approvals.stepped(approval, key, envelope.result_id, saved)
+                return await self._opened(path, name, key, info, done)
             if envelope is None or envelope.error.code in _TIMEOUTS:
                 self._pending.timed_out(info.host_key)  # read or write: the units are read before the next step
             if envelope is None or (info.effect == "write" and envelope.error.code in _UNKNOWN):
                 await self._pending.reconnected(self, path, attempt, info.host_key)  # before 4.5.3 runs
                 found = await self._pending.resolve(info.host_key, path, attempt)
                 if found.result is not None:  # applied: the block gets the reconciled result, and it is not sent again
-                    self._guard.mark(key)
+                    if not free:
+                        self._guard.mark(key)
                     self._guard.note_stored(found.result.ref)
                     self._approvals.stepped(approval, key, found.result.ref)
-                    return _result(name, found.result)
+                    return await self._opened(path, name, key, info, found.result)  # as a success (EC1, B-562)
                 attempt += 1  # not applied: the step runs again as the next attempt, with a new op_id (ADR-0030)
                 continue
             error = envelope.error
@@ -261,9 +315,20 @@ class Ctx:
                 raise errors.ToolFailed(error)
             attempt += 1
 
-    def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
-        return self.index.lookup(path, kind, name, payload_sha256(args), child)
+    async def _opened(self, path: str, name: str, key: str | None, info: ToolInfo, done: ev.StepResult) -> ToolResult:
+        """After a tool step's success or applied outcome: an `open` binds its model, reads its units and, with
+        `copy_on_open`, takes the working copy (spec 4.7 EC1, 4.8)."""
+        await self._pending.bind(self, path, key, info.host_key, info.action, after=True)
+        await self._modes.opened(self, path, info.action, key, info.host_key)
+        return _result(name, done)
 
+    def _look(self, path: str, kind: str, name: str, args: _Obj, child: _Pair | None = None) -> Recorded | None:
+        recorded = self.index.lookup(path, kind, name, payload_sha256(args), child)
+        if recorded is None:  # a live step is next: the engineer may have asked for a stop (4.8, `RunControlPort`)
+            self._limits.check_stop(path)
+        return recorded
+
+    @engine_work
     async def read(self, ref: Ref | ToolResult | CalcResult, pointer: str = "") -> ReadResult:
         """Read the value at `pointer` (added to the one in `ref`) of a stored result as one step.
 
@@ -294,6 +359,7 @@ class Ctx:
         self._done(path, 1, began, ev.StepResult(ref=target, summary={"kind": read.kind}, warnings=[], complete=True))
         return read
 
+    @engine_work
     async def calc(self, calc_id: str, args: Mapping[str, ArgValue] | None = None) -> CalcResult:
         """Run the calc `calc_id` as one step; a draft or verified calc marks the run's outputs DRAFT (AC13).
 
@@ -337,6 +403,7 @@ class Ctx:
             draft=status in _DRAFT,
         )  # fmt: skip
 
+    @engine_work
     async def decide(
         self, question: str, options: object, state: BaseModel, rules: Sequence[object], policy: object
     ) -> Decision[Any]:
@@ -351,6 +418,7 @@ class Ctx:
         request = DecisionRequest(question, options, state, rules, policy)
         return (await _steps.step(lambda path: self._decided(path, "decide", question, [request])))[0]
 
+    @engine_work
     async def decide_many(self, requests: Sequence[DecisionRequest]) -> list[Decision[Any]]:
         """Decide the requests as one step; the calls the engineer must choose are one input request (AC66)."""
         return await _steps.step(lambda path: self._decided(path, "decide_many", "decide_many", list(requests)))
@@ -365,7 +433,8 @@ class Ctx:
         self._guard.refs(_decide.held(items), {})  # invariant 3: the default rule for every reference
         began = self._clock.now_ms()
         try:
-            settled = await self._decider.settle(path, items, many=kind == "decide_many")
+            async with self._limits.decisions:  # at most `max_concurrent_decisions` requests at once (4.10)
+                settled = await self._decider.settle(path, items, many=kind == "decide_many")
             value: list[JsonValue] = [
                 {"choice": a.choice, "decided_by": a.decided_by, "confidence": a.confidence} for _, a, _ in settled
             ]
@@ -388,6 +457,7 @@ class Ctx:
         self._done(path, 1, began, result)
         return out
 
+    @engine_work
     async def ask[M: BaseModel](self, fields: type[M], *, title: str) -> Answered[M]:
         """Ask the engineer for the values of `fields` as one step; the run pauses until a valid answer is given.
 
@@ -421,6 +491,7 @@ class Ctx:
         self._done(path, 1, began, ev.StepResult(ref=stored.result_id, summary={}, warnings=[], complete=True))
         return Answered(value=cast(M, given), ref=Ref.model_validate({"$ref": stored.result_id}))
 
+    @engine_work
     async def approve(
         self, title: str, preview: Preview, *, kind: ApprovalKind = ApprovalKind.CHANGE_SET
     ) -> Approval:  # fmt: skip
@@ -438,20 +509,23 @@ class Ctx:
             raise errors.BlockRuleViolation("the preview of ctx.approve must be a Preview")
         return await _steps.step(lambda path: self._approved(path, title, preview, kind))
 
-    async def _approved(self, path: str, title: str, preview: Preview, kind: ApprovalKind) -> Approval:
+    async def _approved(
+        self, path: str, title: str, preview: Preview, kind: ApprovalKind, *, engine: bool = False
+    ) -> Approval:  # fmt: skip
         args = cast(_Obj, preview.model_dump(mode="json", by_alias=True))
         recorded = self._look(path, "approve", kind.value, args)
-        await self._guard.sweep(self, path, "pre")  # an approval waits for the dirty models to be checked (spec 4.6 #1)
+        await self._guard.sweep(self, path.partition("~")[0], "pre")  # an approval waits for dirty models (spec 4.6 #1)
         if recorded is not None and self._replayed(recorded) is not None:
-            return (await self._approvals.settle(path, title, preview, kind, args))[0]
+            return (await self._approvals.settle(path, title, preview, kind, args, engine=engine))[0]
         held = {"diff_ref": preview.diff_ref, "items": [list(i.refs) for i in preview.items]}
         self._guard.refs(held, {})  # invariant 3: the default rule for every reference
-        approval, shown = await self._approvals.settle(path, title, preview, kind, args)
+        approval, shown = await self._approvals.settle(path, title, preview, kind, args, engine=engine)
         began = self._begin(path, 1, "approve", kind.value, args)
         summary: _Obj = {"request_id": approval.request_id, "approved": approval.approved}
         self._done(path, 1, began, ev.StepResult(ref=shown, summary=summary, warnings=[], complete=True))
         return approval
 
+    @engine_work
     async def block[I: BaseModel, O: BaseModel](self, child: BlockDef[I, O], inp: I) -> O:
         """Run `child` as a scope: its steps are `<path>/0`, `<path>/1`; input and output are checked (AC15).
 
@@ -472,7 +546,8 @@ class Ctx:
         except errors.NeedsReconciliation:  # entered, not completed
             begun = True
         began = self._clock.now_ms() if begun else self._begin(path, 1, "block", ref.name, args, child=ref.model_dump())
-        out = await child.fn(self, inp)
+        with block_code():  # the child's own code runs as block code, its ctx calls as engine work
+            out = await child.fn(self, inp)
         await self._guard.sweep(self, path, "end")  # the child block's return checks the models it left dirty
         self._approvals.leave(path)  # and ends the approvals asked inside it (spec 4.9)
         if not isinstance(out, child.output_model):
@@ -483,6 +558,7 @@ class Ctx:
             self._done(path, 1, began, result, output_ref=stored.result_id)
         return out
 
+    @engine_work
     async def parallel[T](self, *steps: Awaitable[T]) -> list[T]:
         """Run the steps concurrently, child `i` in scope `<path>/i`; results come in argument order (AC5, AC8)."""
         board = SiblingBoard()
@@ -490,15 +566,30 @@ class Ctx:
         async def before(path: str) -> None:
             await self._guard.sweep(self, path, "pre")  # children read no model the parent left dirty (spec 4.3.1)
 
+        def enter(index: int) -> None:
+            enter_block_code()  # this child's task runs block code; its own context, so nothing to restore
+            self._guard.enter(board, index)
+
         async def after(path: str, models: Sequence[str]) -> None:
             for model in models:
                 await self._guard.check(self, path, "post", model)
 
-        return await _steps.parallel(
-            steps, before=before, after=after, enter=lambda index: self._guard.enter(board, index),
-            leave=self._guard.dirty_models,
-        )  # fmt: skip
+        async def gated(step: Awaitable[T]) -> T:
+            async with gate:  # children start in argument order, at most `max_parallel_children` at once (4.10)
+                return await step
 
+        gate = self._limits.children()
+        try:
+            return await _steps.parallel(
+                [gated(step) for step in steps], before=before, after=after, enter=enter,
+                leave=self._guard.dirty_models,
+            )  # fmt: skip
+        finally:
+            for step in steps:  # a step that never started (a refused `parallel`) is closed, not left to warn
+                if inspect.iscoroutine(step):
+                    step.close()
+
+    @engine_work
     async def finish(self) -> None:
         """`~end` checks after the root returns; an early end diverges before a live check (spec 4.5.2, 4.6 #1)."""
         await self._guard.sweep(self, "", "end", live=False)
@@ -522,3 +613,55 @@ class Ctx:
     async def escalate(self, reason: str, evidence: Sequence[Ref]) -> NoReturn:
         """Stop the block: the run needs an engineer (`run_escalated`, reason `block_escalation`, AC14)."""
         raise errors.Escalation(reason, evidence=[ref.ref for ref in evidence])
+
+    @engine_work
+    async def promote(self, model: ModelHandle | str, how: Promotion, approval: Approval) -> ModelHandle:
+        """Make the accepted revision of the working copy of `model` the model of record, as one step (spec 4.7, AC52).
+
+        The original is backed up in the run folder and its files are replaced by the copy's; `approval` answers a
+        `PROMOTION` approval bound to `model` (a handle or its key). The step is a write with an `op_id` that is never
+        sent to the `ToolPort`.
+
+        Raises:
+            NotImplementedGap: `Promotion.REPLAY_WRITES` (gap E-G1). BlockRuleViolation, ApprovalVoid: no working copy,
+                or see `ModeApprovals.promotable`. ContractError: `CONFLICT`, the original changed since the copy.
+        """
+        if how is Promotion.REPLAY_WRITES:
+            raise errors.NotImplementedGap(
+                "promotion by replaying writes is not implemented (gap E-G1)", evidence=["E-G1"]
+            )
+        return await _steps.step(lambda path: self._promoted(path, model, approval))
+
+    async def _promoted(self, path: str, model: ModelHandle | str, approval: Approval) -> ModelHandle:
+        key = _approvals.model_key(model)
+        copy = self._modes.copies.get(key, key)
+        args: _Obj = {"model": key, "copy": copy, "approval": approval.request_id}
+        recorded = self._look(path, "promote", Promotion.FILE_COPY.value, args)
+        if recorded is not None and (done := self._replayed(recorded)) is not None:
+            return ModelHandle.model_validate(done.summary)
+        if (record := self._modes.records.get(copy)) is None:
+            raise errors.BlockRuleViolation(f"model {key} has no working copy to promote")
+        state = await self._approvals.promotable(approval, key, path)
+        origin, origin_sha256 = str(record["model"]), str(cast(_Obj, record["before"])["file_sha256"])
+        originals, accepted = self._host.model_files(origin), self._host.model_files(copy)
+        attempt = 1 if recorded is None else recorded.attempt + 1  # a promotion reconciled `not_applied` runs again
+        op = _steps.op_id(self._run_id, path, attempt)  # no model_key: the host's model is not written (spec 4.5.4)
+        began = self._begin(path, attempt, "promote", Promotion.FILE_COPY.value, args, effect="write", op_id=op)
+        try:
+            _promote.copy_files(self._files, originals, accepted, self._modes.run_dir / "backups", origin_sha256)
+        except ContractError as exc:
+            self._fail(path, attempt, began, exc.detail, False)
+            raise
+        except OSError as exc:  # the copy may be half done: in flight (spec 4.5.3)
+            raise errors.NeedsReconciliation(f"the file copy of step {path} failed: {exc}") from exc
+        handle = ModelHandle(model_key=origin, model_id=state.model_id or "", revision=state.revision or 0)
+        saved = state.model_dump(mode="json", exclude={"loaded"}) | {"model_key": origin, "role": "promoted"}
+        saved |= {"file_name": originals[0].name, "origin_sha256": origin_sha256}
+        saved |= {"origin_file_names": [p.name for p in originals]}
+        self._writer.append(EventType.MODEL_SAVED, saved, path=path)
+        summary = handle.model_dump(mode="json")
+        stored = self._store.put("harness.journal_blob/1", {"value": summary}, self._producer())
+        self._done(
+            path, attempt, began, ev.StepResult(ref=stored.result_id, summary=summary, warnings=[], complete=True)
+        )
+        return handle

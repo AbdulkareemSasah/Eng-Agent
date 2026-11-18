@@ -21,7 +21,7 @@ TASK_BODY = "Work-Item: B-001\nPlan-Task: {}\n"
 
 
 def _evaluate(repo: Repo, base: str, title: str = "feat: x", plan: str | None = None) -> Outcome:
-    task = parse_plan(plan, 400).tasks[0] if plan else None
+    task = parse_plan(plan).tasks[0] if plan else None
     return evaluate(title, base, head_of(repo), load_gate_config(repo.root), SubprocessCommitLog(repo.root), task)
 
 

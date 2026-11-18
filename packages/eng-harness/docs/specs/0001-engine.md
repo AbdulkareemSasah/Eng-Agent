@@ -69,6 +69,13 @@ and T16b): the journal and port forms of the approval binding as merged (§4.9),
 flight (§4.5.3), a rejected item of an inserted approval (§4.7), and five open questions (§11 Q40 to Q44); it adds no
 criterion.
 
+**Amendment B-543.** Spec 0007 (§4.5, first-live-run walk) found that no component gives block code a `ModelHandle`
+(`ToolResult.model` is always `None`, and a handle's model id and revision are in the envelope's provenance, which a
+block cannot read), while `Preview.models` and `ctx.promote` take one. Both now also take a model key (`str`), and
+`ToolResult.model` stays `None` in v1 (§4.3.2, §4.9). Decision: the engine binds an approval to the live state of each
+named key and uses only `model_key` of a handle (approval binding, promotion), so the key carries everything it needs
+and a block never invents a model id or revision. The new criterion is AC72, built by plan T23.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -227,6 +234,9 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   block-module rules test reports each; and every module matching `block_modules` or `rule_modules` in this package
   passes. Tests: `tests/rules/test_block_modules.py::test_rules_detect_violations`,
   `::test_package_block_modules_pass`.
+  Under mutation testing (environment variable `MUTANT_UNDER_TEST` set) the test does not judge the
+  `mutmut` import that the mutation tool inserts into its copy of a rule or block module; it judges every other line of
+  that copy, and in every other run it judges in full. Amendment (B-542; the pattern of spec 0003 §9, B-437).
 
 ### 3.3 Journal
 
@@ -328,8 +338,10 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
 - AC37. Invariant 1: given a write on a model, then before the next read on that model, any approval, any calc or
   decision, and the block's return, a `check_model` step runs; errors raise `ModelIntegrityError`; no ctx argument or
   setting disables it; and over generated step programs every write is followed by a check before any of those steps.
-  Tests: `tests/workflow/test_invariants.py::test_check_after_write`,
-  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`.
+  A success envelope whose summary is not clean is such an error (amendment B-503, §4.6 row 1). Tests:
+  `tests/workflow/test_invariants.py::test_check_after_write`,
+  `tests/property/test_check_after_write.py::test_no_unchecked_use_after_write`,
+  `tests/workflow/test_invariants.py::test_unclean_check_stops_run` (plan task T22).
 - AC38. Invariant 2: given a literal (number, quantity object or `Quantity`) for a parameter the ToolPort or CalcPort
   marks `engineering_quantity`, then `ContractError` `INVALID_ARGUMENT` with `field`, and no port call. Test:
   `tests/workflow/test_invariants.py::test_engineering_literal_rejected`.
@@ -394,6 +406,11 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `::test_promotion_rechecks_approval`.
 - AC53. Given `ctx.promote(model, Promotion.REPLAY_WRITES)`, then `NotImplementedGap` (`NOT_IMPLEMENTED`, gap E-G1).
   Test: `tests/unit/test_promote.py::test_replay_promotion_is_a_gap`.
+- AC72. **[added: B-543]** Given a `Preview` whose `models` names a model by its key (a `str`) and a `ctx.promote`
+  given a key, then the approval is bound to that key's live state exactly as for a `ModelHandle` of the same key
+  (the original's key followed to its working copy, §4.7), the stored preview holds the key and no model id or
+  revision, and the promotion runs as AC52 and returns the promoted `ModelHandle`. Test:
+  `tests/workflow/test_model_keys.py::test_preview_and_promote_take_a_key`.
 
 ### 3.7 Approvals (11 §3)
 
@@ -514,14 +531,27 @@ modules (`rule_modules`: `src/eng_harness/rules/**`) may import only: `eng_harne
 `StepError` family of `eng_harness.errors`, other block modules (child blocks) and rule modules, `eng_contract.quantity`,
 `eng_contract.refs` (`Ref`, `RefString` only), `eng_contract.errors` (`ErrorCode` only, for routing),
 `eng_contract.verdicts` (`VerdictStatus` only), `eng_contract.kinds` and its submodules (payload types),
+`eng_contract.units` (`QUANTITY_KINDS`, `UNITS` only; amendment B-509), `eng_harness.kinds.edit_cycle` (payload
+types; amendment B-509),
 `eng_harness.decisions.types` (spec 0005 §4.1; it imports no engine, journal, port, network or database module), `pydantic`,
 `enum`, `typing`, `collections.abc`, and `__future__`. Everything else, in particular `eng_harness.engine`,
 `eng_harness.journal`, `eng_harness.ports`, adapters, the store, `asyncio` and any I/O module, is refused. This is
 types and the ctx API only, never I/O. Enforced by the block-module rules test (AC19) and by the gate's FB004 and FB005
 ([eng-dev-gate spec](../../../../tools/eng-dev-gate/docs/specs/0001-eng-dev-gate-0.1.md) §4.8).
 
-**Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix).** `eng_harness.block` exports
-`FieldSpec` (§4.2) by importing it from `eng_harness.basis._fields`, never from the package `eng_harness.basis`. That
+**Kinds and units admitted by name (amendment B-509).** The merged workflow modules `model_edit_cycle._change_set` and
+`column_design._requests` import them. `eng_harness.kinds.edit_cycle` is admitted by that module's own name, never
+the package `eng_harness.kinds`. Its imports are limited to `collections.abc`, `typing`, `pydantic`,
+`eng_contract.refs` (`RefString`) and `eng_harness.kinds.calcs` (`CalcPayload`), whose chain reaches
+`eng_harness.calc` (`CalcStatus`), which `eng_harness.ctx` already imports: no engine, journal, port, adapter or I/O
+module. A new import in that module needs an amendment of this section first. `eng_contract.units` imports only the
+standard library, `pydantic`, `eng_contract._unit_table` and `eng_contract.errors`. Loading
+`eng_harness.kinds.edit_cycle` also runs `eng_harness/kinds/__init__.py`; as for `FieldSpec` below, that is a run-time
+load, not an import statement of block code.
+
+**Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix; amendment B-511).**
+`eng_harness.block` exports `FieldSpec` (§4.2) from `eng_harness.basis._fields`, never from the package
+`eng_harness.basis`. That
 module imports only the standard library, `eng_contract` and `pydantic` (spec 0004 §4.1) and must keep doing so, so
 the import statements reachable from `eng_harness.block` gain no `eng_harness.basis` package, `eng_harness.templates`,
 `eng_harness.ports` or `eng_harness.journal`. This keeps spec 0005 AC42: its test
@@ -534,8 +564,12 @@ function would be found as well). The import of a private module is allowed beca
 gains one name, `FieldSpec`, a frozen data model with no I/O method, and still may not import `eng_harness.basis`.
 When Python loads `eng_harness.basis._fields` it also runs the package `eng_harness/basis/__init__.py`; that is a
 run-time load, not an import statement of block code, and Invariant 1's guard (§4.6) acts on the operations block
-code performs, not on which modules are loaded. No import cycle arises: `eng_harness.basis._fields` imports no
-`eng_harness` module. T6 of plan 0007 runs the AC42 test unchanged (EC4).
+code performs, not on which modules are loaded. That load runs `basis/_port.py`, which imports `eng_harness.ports`,
+whose chain reaches `eng_harness.decisions` and `decisions/_points.py`, which imports `eng_harness.block`: a
+module-level import of `eng_harness.basis._fields` in `block.py` is an import cycle (amendment B-511, shown on
+`build/v1`). So `block.py` exposes `FieldSpec` through a `TYPE_CHECKING` import and a module-level `__getattr__` that
+imports it on first use, and imports `check_declaration` inside `workflow()`. T6 of plan 0007 runs the AC42 test
+unchanged (EC4).
 
 ### 4.2 Blocks, workflows and the registry
 
@@ -643,11 +677,12 @@ options **[added: 11 §3 writes `**args`]**.
 | parallel | `parallel(*steps: Awaitable[T]) -> list[T]` (typed overloads up to six arguments return tuples) | `parallel`; scope |
 | attempts | `attempts(limit: BasisCount) -> AsyncIterator[Attempt]` (use: `async for a in ctx.attempts(...)`) | `attempts`; scope |
 | escalate | `escalate(reason: str, evidence: Sequence[Ref]) -> NoReturn` | `escalate` |
-| promote | `promote(model: ModelHandle, how: Promotion, approval: Approval) -> ModelHandle` **[added]** | `promote`; write |
-| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E` | not a step (the basis is frozen and in the run header) |
+| promote | `promote(model: ModelHandle \| str, how: Promotion, approval: Approval) -> ModelHandle` **[added]**; a `str` is a model key (amendment B-543, AC72) | `promote`; write |
+| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E`, `record_ref() -> Ref` (the reference `res_<id>` to the whole `basis.design_basis/1` result, for a calc input `basis`, spec 0003 §4.4; it reads no path and needs no declaration; amendment B-511, plan 0007 T6, criterion spec 0007 AC33) | not a step (the basis is frozen and in the run header) |
 
 Result types (frozen Pydantic models): `ToolResult` (`tool`, `ref: Ref`, `summary: Mapping[str, SummaryValue]`,
-`warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`), where `SummaryValue` is a JSON
+`warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`, `None` in v1: a block names a
+model by its key, amendment B-543), where `SummaryValue` is a JSON
 value in which every quantity object of contract §4.8 is a `Quantity` or `LabeledQuantity`; `ReadResult` (`ref`,
 `kind`, `value`); `CalcResult` (`calc_id`, `calc_version`, `status`, `ref`, `summary`, `draft: bool`); `Decision`
 (`choice`, `decided_by`, `confidence: float | None`); `Answered[M]` (`value: M`, `ref: Ref` of the
@@ -759,7 +794,7 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | Event | Payload | Durability |
 |---|---|---|
 | `run_started` | Run header: `run_id`, `workflow`, `block {name, version, code_sha256}`, `input_ref`, `input_sha256`, `basis_ref`, `mode`, `run_class` (`trial`, `production`), `engine_version`, `contract_version`, `settings_sha256`, `servers` (ServerCheck list), `always_ask`, `unreleased_tools` (tool name to record, from `ToolPort.unreleased_tools()`; empty when none), `decision_runtime` (the JSON object from `DecisionPort.runtime_summary()`, recorded as given and opaque to the engine: spec 0009's `DecisionRuntime.summary`, providers and released points without endpoints or keys; empty when none) | FULL |
-| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `action` (the tool's `ToolInfo.action`; optional, so earlier journals read unchanged; it records what a replay rule needs to detect a removed inserted save step, AC47, but no §4.5.2 rule reads it yet, Q35; draft decision B-434, owner queue), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
+| `step_started` | `kind`, `name`, `args` (canonical JSON, references as `$ref` objects) or `args_ref`, `args_sha256`, `effect` (`none`, `read`, `write`), `action` (the tool's `ToolInfo.action`; optional, so earlier journals read unchanged; it records what a replay rule needs to detect a removed inserted save step, AC47, but no §4.5.2 rule reads it yet, Q35; draft decision B-434, owner queue), `opens_model_without_writing` (optional strict boolean, B-562, below), `op_id` (writes), `host_key`, `model_key`, `under` (approval request id), `item`, `child {name, version, code_sha256}` (block steps) | FULL for writes, else NORMAL |
 | `step_completed` | `result` (`ref`, `summary`, `warnings`, `complete`) or the block output ref, `duration_ms`, `calc {id, version, content_sha256, status}` (calc steps) | NORMAL |
 | `step_failed` | `error` (contract `ErrorDetail`, or `{harness_code, message}`), `retryable`, `duration_ms` | NORMAL |
 | `step_reconciled` | `op_id`, `outcome` (`applied`, `not_applied`), `result`, `decided_by` (`adapter`, `engineer:<name>`), `evidence` (refs) | FULL |
@@ -779,6 +814,13 @@ The events of 11 §5 plus `step_reconciled`, `step_rerun`, `host_started` and `m
 | `run_completed` | `output_ref`, `output_sha256`, `draft` | FULL |
 | `run_failed` | `reason` (`abandoned`), `by` | FULL |
 | `signed_off` | `outputs` (refs), `approval_request_id`, `by` | FULL |
+
+**Open capability (B-562).** Before sending a tool call with effect `write` and action `open`, the engine records
+`opens_model_without_writing: true` on that attempt's `step_started` if the adapter explicitly returns true for the
+call arguments (§4.8). Validation accepts true only for a `tool` step with that effect and action. An absent field,
+`null`, or false retains the ordinary write behavior. Canonical serialization omits the field when its value is
+`None`, preserving earlier payloads and their hashes. Replay uses the recorded field for that attempt's content
+classification, without asking the adapter for a new description of the recorded call.
 
 `run_escalated` is not terminal: the journal is unchanged and a resume replays (S-10). Terminal events are
 `run_completed` and `run_failed`; after them the run only accepts `signed_off`. A block that raises an uncaught
@@ -856,7 +898,8 @@ root block.
    rerun marking of reads in flight. A write in flight on a lost or reopened model is not reconciled (the host's memory
    since the last save is gone, so a reconciler could report `not_applied` for an edit that is only gone from memory);
    step 8 resolves it.
-8. Host-state check (§4.5.4) for every model the run wrote; a lost model is a mismatch.
+8. Host-state check (§4.5.4) for every model the run wrote to, subject to the recorded open capability and the
+   rules for lost or reopened models in that section.
    8a. (Amendment B-415.) For each tool save reconciled `applied` (or journaled without its `model_saved`) whose
    model passed the check, append its `model_saved` from the check's read (§4.6 "Tool saves", EC2), reading
    `HostPort.model_files(model_key)` for its `file_name` (review fix B-415: the check's `HostModelState` holds no file
@@ -896,22 +939,40 @@ attempt. At resume, and at once when a write step's call raises, returns `TIMEOU
 
 | Step | Rule |
 |---|---|
-| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty (invariant 1), and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
+| Write (`effect: write`, including save, analysis, design, promote) | Reconciled before anything else on its host: `ToolPort.reconcile(tool, args, op_id)`. `applied` → `step_reconciled` with the result, the model is marked dirty as invariant 1 specifies, and replay returns the result. `not_applied` → `step_reconciled`; the step runs again as attempt + 1 with a new `op_id` (ADR-0030; OQ-Q16, §11 Q6), automatically once: when the adapter reports `not_applied` for an attempt that is itself that rerun, no `step_reconciled` is recorded from the adapter and the step goes to the engineer as below (owner answer of 2026-11-14, B-495; §11 Q39, AC71). `partial`, `unknown`, no reconciler, or a reconciler error → `NeedsReconciliation`: `run_escalated` and an engineer input request (`engine.in_flight`) with choices `applied`, `not_applied`, `abandon`. For `applied` the engine asks `ToolPort.read_back` for the result; if the adapter has none, the step completes with an empty summary and `decided_by: engineer:<name>`. The write is never run again until its outcome is known |
 | Read, calc, decision (tiers other than the engineer) | `step_rerun`, then the step runs again with the same attempt (no side effect) |
 | Approval, ask, engineer-tier decision | Presented again with the same request id (AC36). An approval or ask step in flight gets `step_rerun` with reason `read_in_flight` and runs again as the same attempt, which presents it again (amendment B-499) |
 | Block, parallel, attempts | Scopes, not steps: their children are handled one by one |
 
 #### 4.5.4 Host-state check before live execution
 
-For every model the run wrote to, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
+For every model with a write to check, the engine reads `HostPort.model_state(model_key, instance_id)` on its bound instance (identity, revision,
 fingerprint, file hash) as housekeeping steps `@resume<n>.model_state.<model_key>` and compares it with the model's
 last `model_saved`, or, when a write on it completed or was reconciled `applied` after that save (§4.5.1 step 7), with
 the model identity and revision of the latest such result's `provenance.host` (the contract's `HostInfo` has no
 fingerprint, so against a result the fingerprint is not compared; draft decision B-427, owner queue). A model with `HostModelState.loaded` false (a lost model,
 §4.5.1 step 6) is a mismatch with reason `model_not_loaded`. A reopened model is compared with its last `model_saved`
 only, never with a reconciled result, and any write on it after that save (completed, reconciled or in flight) is a
-mismatch with reason `model_reopened`: the reopened file cannot hold it. On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input
-request (`engine.host_state`) offering three choices (11 §5):
+mismatch with reason `model_reopened`: the reopened file cannot hold it.
+
+**Content comparison (B-562).** Exclude an open explicitly recorded as `opens_model_without_writing: true` from
+the latest write result used for comparison and the latest tool save candidate in step 8a. A completed or applied
+open with this guarantee leaves the comparison for actual writes on the same key intact, including whether a
+reopened file lacks those writes.
+
+Skip the original's host-state check only after journal evidence establishes the EC1 handoff. The original's
+latest write must be an explicitly marked open that completed or was confirmed `applied`, with no other
+model-content write or unresolved write to check on that key. Its `p~post.working_copy.<model_key>` must have a
+completed, current attempt started after the open's outcome and naming that original and a distinct copy key.
+The same path must have a matching `model_saved` for the copy with role `working_copy` between that attempt's
+start and completion. A later save of the copy leaves this historical evidence valid. The original open and the
+copy evidence must survive any restore cut.
+A later original binding takes precedence over the handoff. The copy's writes remain subject to the normal
+check. If a lost or reopened binding prevents reconciliation of a pending open, the bound key still requires
+host-state recovery. Leases, in-flight reconciliation and restore restrictions use the recorded write effect.
+
+On a mismatch the run stops (`run_escalated`, reason `host_state_mismatch`) with an engineer input request
+(`engine.host_state`) offering three choices (11 §5):
 
 - `accept`: the differences are engineer changes. The engine saves the model (`model_saved`, role `baseline`) and
   continues; the workflow shows and records the differences itself (18 step 4). Not offered for a lost model (there is
@@ -946,7 +1007,7 @@ turns an invariant off (AC37); in every case the block's call raises before any 
 
 | # | Where and how | Raises | Tests |
 |---|---|---|---|
-| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty; before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
+| 1 Check after write (P7) | `_invariants`: a successful or reconciled-`applied` write marks the model dirty, except for an open with `opens_model_without_writing: true` on that attempt (§4.4.2). Such an open leaves the existing dirty flag as it was, both live and in replay. Before a read on that model, any `calc`, `decide`, `approve` and the block's return, the step `p~pre.check_model.<model>` (or `~end`) calls `HostPort.check_model` (for Sasaah servers, the adapter's read-back check, spec 0002); a clean result clears the flag. Clean means a success envelope whose summary validates as the `CheckModelSummary` of `issues.model_check/1` with `clean` true; any other summary (an `error` issue such as `READBACK_MISMATCH` or `READBACK_UNAVAILABLE`, or a summary of another shape) fails the check as a failure envelope does: the step fails, `check_enforced` is `fail` and the flag stays set (amendment B-503) | `ModelIntegrityError` (`StepError`, so the block may route it to a decision or escalate) | AC37, AC47 |
 | 2 References for engineering quantities (P2) | `_invariants`, before the port call: every argument at a path in `ToolInfo.engineering_params` or `CalcInfo.engineering_params` must be a `Ref` or a result; a number, a quantity object or a `Quantity` is refused | `ContractError` `INVALID_ARGUMENT` with `field` (contract §5 step 2) | AC38 |
 | 3 No stale inputs | `_invariants`: every reference to `calc`, `decide`, `approve` is resolved with `eng_contract.refs.resolve_ref` and a `current_revision` that knows every model attached in the run (contract Q4). For `calc`, each argument's `RefRule` is `CalcInfo.ref_rules[path]` (the argument's field path); a path not listed gets the default `RefRule` (no kinds, no unit, `stale_ok` false), so `stale_ok` exists only where the calc declares it (spec 0003 §4.13). `decide` and `approve` use the default `RefRule` | `ContractError` `REF_STALE` (and the contract's other `REF_*` codes) | AC39 |
 | 4 Decisions cannot produce numbers (P10) | `_decide`: options must be a `StrEnum` subclass or a sequence of `Ref`; the answer must be a member value or an index into the sequence; the block receives the member or the `Ref` | `BlockRuleViolation` (options), `DecisionInvalid` (answer) | AC40 |
@@ -1023,6 +1084,12 @@ again.
   `csi_open_revision`) takes no working copy and does not change the `origin_sha256` that promotion compares (§4.7
   "Promotion"); its new working file is recorded by "Tool saves" (§4.6). Without `copy_on_open`, the working copy is
   taken as each mode states (EC1).
+  **Recovery (B-562).** An open confirmed `applied` during the call follows the same post-open binding, units and
+  copy rules as a successful call. On replay the engine uses the recorded host, action and model key to complete
+  any missing post-open binding and units check before a still-live first copy. An already completed copy is
+  replayed from the journal without rebinding the original or taking the copy again. The open capability (§4.8)
+  affects model-content checks only. The write effect still governs approvals, leases, units checks, parallel
+  sibling conflicts, reconciliation and retries.
 - **`approve_each_write`.** Before each write, the inserted step `p~pre.approve` presents `ToolPort.preview(tool,
   args)` as a `CHANGE_SET` approval; a rejection raises `ApprovalRejected` (a `StepError`) and the write is not called.
   An answer that rejects any item of an inserted approval is a rejection: the write is one step (amendment B-499).
@@ -1080,7 +1147,12 @@ Port data types (frozen models): `ToolInfo` (`name`, `effect` read or write, `ac
 `engineering_params` (field paths), `overwrites_original(args) -> bool` is a method on the adapter's `ToolInfo`
 subclass, and so is `saves_new_file(args) -> bool` (amendment B-415: true when a call with `args` writes the saved
 model to a new file that did not exist before the call and leaves every existing file's content as it was, apart
-from the open working file saved in place; the base `ToolInfo` returns false; §4.6 "Tool saves", §4.7)); `Reconciliation` (`outcome` `applied`, `not_applied`, `partial`, `unknown`; `result: Envelope | None`;
+from the open working file saved in place; the base `ToolInfo` returns false; §4.6 "Tool saves", §4.7), and
+`opens_model_without_writing(args) -> bool` (B-562). The base returns false. An adapter may explicitly return true
+for a write-classified `open` only when that call leaves model content unchanged in memory and creates or writes no
+model file. The two file classifiers alone cannot establish this guarantee. See spec 0002 §4.5.9 for the CSI
+original open, §4.4.2 for the recorded capability, and §4.5.4 and invariant 1 for its use); `Reconciliation`
+(`outcome` `applied`, `not_applied`, `partial`, `unknown`; `result: Envelope | None`;
 `missing: list[str]`; `evidence: list[Ref]`); `ServerCheck` (`server`, `build`, `min_build`, `fingerprint`,
 `expected_fingerprint`, `ok`, `reason`); `HostModelState` (`loaded`, `model_id`, `revision`, `fingerprint`,
 `file_sha256`; the last four `None` when `loaded` is false);
@@ -1134,7 +1206,8 @@ explicitly (contract `ResultStore`, `Clock`, `IdSource`).
 
 - `ctx.approve(title, preview, kind)`: `request_id = "apr_" + sha256(run_id + "\n" + path).hexdigest()[:32]`, stable
   across replay. `Preview` (`items: list[PreviewItem]` with unique `id`, `label`, `refs`; `diff_ref: Ref | None`;
-  `models: list[ModelHandle]`) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
+  `models: list[ModelHandle | str]`, a `str` being a model key, of which the engine uses only the key, amendment B-543,
+  AC72) is stored as `harness.approval_preview/1`; `shown_sha256` is its `payload_sha256`.
   `binding` holds `model_id`, `revision`, `fingerprint` and `file_sha256` of every model in `preview.models`, read from
   HostPort when the request is made (after invariant 1 has checked them): in `approval_requested` a map keyed by model
   key, in `ApprovalRequest.binding` a list of `ModelBinding` with its `model_key` (amendment B-499, as merged).
@@ -1292,7 +1365,7 @@ journaled `step_failed` then `run_escalated` (`unhandled_error`).
 | AC1 to AC18, AC20 to AC26, AC40, AC52 to AC56, AC58, AC59, AC61, AC65 to AC69 | Unit | `tests/unit/` |
 | AC19 | Unit (source rules) | `tests/rules/` |
 | AC4 (lock), AC57 | Contract | `tests/contract/` |
-| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51, AC71 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
+| AC10, AC33, AC37 to AC39, AC41 to AC46, AC48 to AC51, AC71, AC72 | Fake-host workflow (real engine, fake ports, real SQLite) | `tests/workflow/` |
 | AC27 to AC32, AC34 to AC36, AC46 (resume case), AC47, AC62 to AC64, AC71 (resume case) | Replay (process/05 §1) | `tests/replay/` |
 | AC37 (generated programs) | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC60 | Performance | `tests/perf/` |
@@ -1305,8 +1378,9 @@ at least 80% on the R1 modules listed in the plan.
 
 ## 10. Version impact
 
-New package; `eng-harness` 0.1.0 when phase 1 is complete. The journal `schema_version` is 1; a change to it or to an
-event payload is a new schema version that the reader must still read (its changelog entry states the impact). The
+New package; `eng-harness` 0.1.0 when phase 1 is complete. The journal `schema_version` is 1. Except for the
+version-1 additions below, a change to the schema or to an event payload requires a new schema version and the
+reader must still read earlier versions (its changelog entry states the impact). The
 B-068 fields (`run_class`, `unreleased_tools`, `item_reasons`, `acknowledged_unreleased`, `decision_made.request_id`,
 `model_bound.file_names`, `model_saved.origin_file_names`, the kind `engine.decision`) are part of version 1, because
 no journal exists yet; `item_reasons`, `unreleased_tools`, `file_names` and `origin_file_names` default to empty,
@@ -1317,6 +1391,9 @@ The B-415 members `WorkflowDef.basis_fields` (default `()`) and `copy_on_open` (
 `ToolInfo.saves_new_file` (default false) change no journal payload: a tool save is journaled with the existing
 `model_saved` payload and its existing role `revision`, so the journal schema stays version 1.
 The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload, nor does the B-495 rerun limit.
+The owner approved the conservative opt-in capability on 2026-11-17 (B-562). Its optional `step_started` field is
+an additive change within journal version 1. The reader preserves the canonical form and conservative write
+treatment of earlier payloads (§4.4.2). The base port method defaults to false for existing adapters.
 
 ## 11. Open questions, gaps and additions
 
@@ -1352,7 +1429,7 @@ The B-471 member `RunRequest.run_id` (default `None`) changes no journal payload
 | Q27 | B-349: what the host-state check compares a model with when a write on it completed (not reconciled) after its last save | Owner | Draft decision B-427, owner queue: the latest completed or reconciled-`applied` result's `provenance.host`, as for a reconciled write (§4.5.4; AC34 amended to match) |
 | Q28 | B-349: the contract's `HostInfo` has no fingerprint, and `Precondition` has `model_open`, not `model_loaded` | Owner | Draft decision B-427, owner queue: against a result compare identity and revision only, and use `model_open`; no contract change (§4.5.4, §4.8; AC34 amended to match) |
 | Q29 | B-349: who refuses a step when `locate` returns `None`, where `first_use` `model_bound` lands, and which models resume step 6 covers | Owner | Draft decision B-427, owner queue: engine plan T13b (amendment B-454) refuses (`PRECONDITION_FAILED`, `model_open`), moves the seam so `model_bound` lands before `step_started`, and covers every model the journal addressed (§4.5.1, §4.8) |
-| Q30 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which imports it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
+| Q30 | Spec 0004 Q7: `WorkflowDef` carries `required_basis` only, so each workflow repeats its fields' required paths | Owner | Accept (amendment B-415, draft): `WorkflowDef.basis_fields` (`FieldSpec`, exported by `eng_harness.block`, which takes it from `eng_harness.basis._fields` so that its import chain reaches no ports or journal and spec 0005 AC42 holds, through a `TYPE_CHECKING` import and a module-level `__getattr__`, because a module-level import is an import cycle, amendment B-511, §4.1.2), `required_basis` derived from it, an explicit `required_basis` with a different set of paths, or a repeated path, refused, as `check_declaration` refuses it (§4.2, EC4). Owner choice: keep the import of the private module, or later move `FieldSpec` to a public module that imports only `eng_contract` and `pydantic` (moves merged spec 0004 code) |
 | Q31 | Spec 0007 Q2: 18 §3 works on a copy in every case, while §4.7 copies only before the first write and only in `work_on_copy` | Owner | Accept (amendment B-415, draft): `WorkflowDef.copy_on_open`, the copy taken right after the first open of a model key, in every mode; later opens of that key take none (§4.7, EC1). The hub's 11 §7 needs the same amendment; it is not a spec or plan file, so it goes to the owner queue |
 | Q32 | Spec 0007 Q3: a tool save (18 step 7) is not journaled as `model_saved`, its file-hash change voids the step 6 approval at the next write, and `approve_each_write` would preview a save that changes no model content | Owner | Accept (amendment B-415, draft): tool saves journal `model_saved` role `revision` (§4.6 "Tool saves", EC2), and a save reconciled `applied` at a resume only after the host-state check passed, from that check's read; a save `under=` an approval is re-checked and continues the chain, as does each engine `p~post.save` (§4.9, EC5); no `p~pre.approve` preview for a save to a new file that overwrites no original (§4.7, EC6). The hub's 11 §7 `approve_each_write` row (every write step shows its dry-run change set) needs the matching amendment (a save to a new file that overwrites no original is not previewed); it is not a spec or plan file, so it goes to the owner queue |
 | Q33 | Spec 0007 Q5: ADR-0018's always-ask list applies in every mode, but `under=` a mode-resolved approval satisfied it | Owner | Accept (amendment B-415, draft): only an approval resolved `engineer:<name>` that accepts the step's item satisfies an always-ask step; a mode-resolved one never does (§4.7, EC3) |

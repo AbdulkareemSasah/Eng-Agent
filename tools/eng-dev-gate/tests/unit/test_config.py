@@ -135,7 +135,7 @@ def test_root_gate_yml_initial_values() -> None:
     assert config.bootstrap.enabled is True
     assert config.gate_branch == "build/v1"
     assert config.main_branch == "main"
-    assert config.limits.max_task_lines == 400
+    assert "max_task_lines" not in type(config.limits).model_fields
     assert config.agents.unmanaged_ok == ["design/**"]
     assert "uv.lock" in config.generated_globs
 

@@ -118,6 +118,12 @@ def test_version_keyword_of_versioned_callable() -> None:
     allowed = """\
 calc(version=1)
 CheckMeta(version=1)
+block(version=1)
+workflow(version=1)
+decision_point(version=1)
+rule(version=1)
+foo.block(version=1)
+foo.rule(version=1)
 foo.calc(version=1)
 from pkg.decorators import calc as define
 define(version=-1)
@@ -125,9 +131,14 @@ define(version=-1)
 @calc(name="beam", version=1)
 def beam() -> None:
     return None
+
+@workflow(name="cycle", version=1)
+def cycle() -> None:
+    return None
 """
     assert scan_b(allowed, "src/pkg/calc/c.py") == []
     assert lines(scan_b("calc(limit=1)\nother(version=1)\n", "src/pkg/calc/c.py"), "FB005") == [1, 2]
+    assert lines(scan_b("rule(limit=1)\nblock(1)\nworkflow(version=1.0)\n", "src/pkg/calc/c.py"), "FB005") == [1, 2, 3]
     assert lines(scan_b("calc(version=1.0)\ncalc(1)\ncalc(version=1 + 0)\n", "src/pkg/calc/c.py"), "FB005") == [
         1,
         2,

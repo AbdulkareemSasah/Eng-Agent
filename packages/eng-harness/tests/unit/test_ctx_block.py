@@ -56,8 +56,10 @@ def test_child_block(tmp_path: Path) -> None:
 def test_input_and_output_are_checked_against_the_models(tmp_path: Path) -> None:
     rig = make_rig(tmp_path)
 
+    inner = child(_two_reads)  # built outside block code: it reads its own source
+
     async def wrong_input(ctx: Any) -> list[str]:
-        await ctx.block(child(_two_reads), ChainInput())  # not a ChildInput
+        await ctx.block(inner, ChainInput())  # not a ChildInput
         return []
 
     refused = asyncio.run(rig.engine(flow(wrong_input)).start(request()))

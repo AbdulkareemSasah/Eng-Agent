@@ -61,7 +61,7 @@ def _commit_and_check(repo: Repo, base: str, files: dict[str, str], body: str, n
         ({PLAN_PATH: plan_text() + MORE}, BODY, "GC011", "spec and plan"),
         ({PLAN_PATH: plan_text() + MORE}, "Work-Item: B-001\n", "GC001", ""),
         ({PLAN_PATH: plan_text(status="maybe")}, DOCS, "GC005", "status"),
-        ({PLAN_PATH: plan_text(max_changed_lines=401)}, DOCS, "GC005", "401"),
+        ({PLAN_PATH: plan_text(max_changed_lines=401)}, DOCS, None, ""),
         ({SPEC_PATH: "no front matter\n"}, DOCS, "GC005", "front matter"),
         ({PLAN_PATH: plan_text(spec="pkg/docs/specs/9999-none.md")}, DOCS, "GC004", "9999-none"),
         ({PLAN_PATH: plan_text() + MORE, SPEC_PATH: spec_text() + SECOND_CRITERION}, DOCS, "GC016", "AC2"),
@@ -225,7 +225,10 @@ def test_protected_paths_awaiting_owner(repo: Repo) -> None:
     plan = plan_text(files=("pkg/src/**", ".github/**"))
     base = make_gate_repo(repo, plan=plan, base_files={CODEOWNERS: OWNERS, "pkg/src/protected/a.py": "a = 1\n"})
     ok = _commit_and_check(repo, base, {"pkg/src/free.py": "f = 1\n"}, BODY)
-    assert (ok.code, _findings(ok)) == (0, [("AW08", "awaiting", None), ("AW03", "awaiting", None)])
+    assert (ok.code, _findings(ok)) == (
+        0,
+        [("GC009", "notice", None), ("AW08", "awaiting", None), ("AW03", "awaiting", None)],
+    )
     result = _commit_and_check(repo, base, {"pkg/src/protected/a.py": "a = 2\n"}, BODY, name="p.json")
     assert result.code == 0
     data = json.loads(result.out)
@@ -238,7 +241,9 @@ def test_protected_paths_awaiting_owner(repo: Repo) -> None:
     repo.rename("pkg/src/protected/a.py", "pkg/src/moved.py")  # a rename counts both paths
     moved = gate_check(repo, write_event(repo, base, BODY, name="m.json"))[0]
     assert moved.code == 0
-    assert "pkg/src/protected/a.py" in json.loads(moved.out)["steps"][0]["findings"][0]["message"]
+    protected = [f for f in json.loads(moved.out)["steps"][0]["findings"] if f["code"] == "AW02"]
+    assert len(protected) == 1
+    assert "pkg/src/protected/a.py" in protected[0]["message"]
 
 
 def test_protected_paths_with_bootstrap_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -296,7 +301,7 @@ def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
     quiet = Repo(tmp_path / "quiet")  # a draft spec of risk r3 and a draft plan that is not large wait for no owner
     base = make_gate_repo(quiet, plan=plan_text(status="draft"), base_files={SPEC_PATH: r3_spec})
     result = _commit_and_check(quiet, base, {"pkg/src/new.py": "y = 2\n"}, BODY)
-    waiting = [("AW08", "awaiting", None), ("AW03", "awaiting", None)]  # step 10 only; no AW01
+    waiting = [("GC009", "notice", None), ("AW08", "awaiting", None), ("AW03", "awaiting", None)]  # no AW01
     assert (result.code, _findings(result)) == (0, waiting)
     loud = Repo(tmp_path / "loud")
     base = make_gate_repo(loud, plan=large, base_files={SPEC_PATH: spec_text("draft")})
@@ -307,6 +312,7 @@ def test_draft_documents_that_need_the_owner(tmp_path: Path) -> None:
         ("AW01", "awaiting", SPEC_PATH),
         ("AW03", "awaiting", None),
         ("AW08", "awaiting", None),
+        ("GC009", "notice", None),
     ]
 
 

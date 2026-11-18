@@ -1,5 +1,7 @@
 # HANDOFF: resume point of the v1 build
 
+> **Current owner pause (2026-11-18).** Start at the [authoritative build handoff](docs/build/HANDOFF.md) and the [next-agent resume checklist](docs/build/resume/PAUSE-2026-11-18.md). The notes below are historical.
+
 The lead engineer's resume point for the next agent (any tool), written on 2026-11-11 when the build was paused at the
 owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `git log origin/build/v1`, before doing anything.
 
@@ -8,7 +10,7 @@ owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `
 - Remaining work, machine-readable: [ops/remaining-tasks.json](ops/remaining-tasks.json) (one entry per unmerged work item).
 - Local CI (the definition of done while GitHub Actions is unavailable, D-23): [ops/localci.py](ops/localci.py), described in [ops/README.md](ops/README.md).
 
-**Latest checkpoint: [docs/build/HANDOFF.md](docs/build/HANDOFF.md) (cloud session of 2026-11-14, 185 of 309 plan tasks). Read it first; it supersedes sections 1, 3 and 4 below.**
+**Latest checkpoint: [docs/build/HANDOFF.md](docs/build/HANDOFF.md) (hand-over of 2026-11-18, 238 of 355 plan tasks). Read its first section first; it supersedes sections 1, 3 and 4 below.**
 
 ## 0. Resume prompt for a cloud agent (2026-11-11, second pause)
 

@@ -3,7 +3,8 @@
 Purpose: for the engineer turn and the run report (18 §4 step 14), list the governing verdict, every failing verdict
 and member, every verdict that needs attention, the top N by ratio, the frames without design results and the member
 changes from a previous summary, and give `PASS`, `FAIL` or `NEEDS_ENGINEER`.
-Inputs: `verdicts` (`verdicts.set/1`, host verdicts as spec 0002 maps them), optional `frames`
+Inputs: `verdicts` (`verdicts.set/1`, host verdicts as spec 0002 maps them, or `harness.host_design_verdicts/1`; only
+its `verdicts` member is read), optional `frames`
 (`model.frame_placements/1`), optional `previous` (`harness.design_summary/1`) and `basis` (`report.top_n`).
 Units: ratios have none and `station_mm` is in millimetres; statuses and ratios are taken as the host reported them,
 nothing is recomputed or converted and no limit of the summary's own is applied (S1).
@@ -34,6 +35,7 @@ from eng_harness.kinds.calcs import (
     Top,
     VerdictRow,
 )
+from eng_harness.kinds.edit_cycle import HostDesignVerdicts
 
 __all__ = ["BASIS_FIELDS", "SEVERITY", "SummaryBody", "SummaryInput", "compare_members", "design_summary", "order_key"]
 
@@ -48,8 +50,8 @@ _TOP_N = TypeAdapter(Annotated[PositiveInt, Strict()])
 Key = tuple[SubjectKind, str, str]
 
 
-def _ref(kind: str) -> Any:
-    return eng_param(ref_capable=True, ref_kinds={kind}, engineering_quantity=True)
+def _ref(*kinds: str) -> Any:
+    return eng_param(ref_capable=True, ref_kinds=set(kinds), engineering_quantity=True)
 
 
 def _optional(kind: str) -> Any:
@@ -59,7 +61,7 @@ def _optional(kind: str) -> Any:
 class SummaryInput(CalcInput):
     """The host verdicts, the frames that should have results, the previous summary and the design basis."""
 
-    verdicts: VerdictSet = _ref("verdicts.set/1")
+    verdicts: VerdictSet | HostDesignVerdicts = _ref("verdicts.set/1", "harness.host_design_verdicts/1")
     frames: FramePlacements | None = _optional("model.frame_placements/1")
     previous: DesignSummary | None = _optional("harness.design_summary/1")
     basis: DesignBasis = _ref("basis.design_basis/1")

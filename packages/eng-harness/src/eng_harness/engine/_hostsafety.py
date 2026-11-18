@@ -26,7 +26,7 @@ from eng_harness.engine._invariants import _Ctx, path_key
 from eng_harness.engine._steps import inserted_path
 from eng_harness.journal import Event, EventType
 from eng_harness.journal import _events as ev
-from eng_harness.ports import BasisPort, HostInstance, HostLease, HostPort, ServerCheck, ToolInfo
+from eng_harness.ports import BasisPort, HostInstance, HostLease, HostPort, ServerCheck
 
 _Obj = dict[str, JsonValue]
 
@@ -166,17 +166,20 @@ class Pending:
                 return event.payload
         raise errors.JournalIntegrityError(f"the write at step {path} was reconciled without a step_reconciled")
 
-    async def bind(self, ctx: _Ctx, path: str, key: str | None, info: ToolInfo, *, after: bool = False) -> None:
+    async def bind(
+        self, ctx: _Ctx, path: str, key: str | None, host_key: str | None, action: str | None, *, after: bool = False
+    ) -> None:  # fmt: skip
         """Bind the model `key` to the instance that holds it and read its units, before its first step (4.8, 4.6 #9 a).
 
         The binding (`first_use`) and the step `<path>~pre.units.<key>` come before the step at `path`; for a tool
-        with action `open` the model is not open before it, so both come after it (`after`, `~post.units`).
+        with action `open` the model is not open before it, so both come after it (`after`, `~post.units`). The host
+        key and action are the tool's, or those a recorded open journaled, so a replay needs no description (B-562).
 
         Raises:
             ContractError: `PRECONDITION_FAILED` `model_open` when no instance holds the model before the step.
             Stopped: its units differ (the run is escalated, `units_mismatch`).
         """
-        if key is None or after != (info.action == "open"):
+        if key is None or host_key is None or after != (action == "open"):
             return
         async with self._turn:
             if key not in self._bound:
@@ -185,8 +188,8 @@ class Pending:
                         return
                     message = f"the model {key} is not open in any host instance"
                     raise ContractError(ErrorCode.PRECONDITION_FAILED, message, precondition=Precondition.model_open)
-                _hoststate.bind(self._rt.writer, self._rt.host, key, info.host_key, found.instance_id, "first_use")
-                self._bound[key] = (info.host_key, found.instance_id)
+                _hoststate.bind(self._rt.writer, self._rt.host, key, host_key, found.instance_id, "first_use")
+                self._bound[key] = (host_key, found.instance_id)
             first = inserted_path(path, "post" if after else "pre", "units", path_key(key))
             ctx._look(first, "read", "units", {"model_key": key})  # a recorded step is visited, so replay finds it
             if key not in self._read:

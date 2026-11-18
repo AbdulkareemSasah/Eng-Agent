@@ -212,7 +212,8 @@ section is optional and may be empty. Only these keys exist (AC3).
   `sha256 = payload_sha256({chain: [{name, version, file_sha256}...], resolved: <model>})`. The `file_sha256` of each
   link is the hash of its own validated model, not of its bytes, so formatting never changes identity (AC11).
 - `TemplateRepository(shipped_dir, user_dir, allow_synthetic=False)` finds `name@version` and lists templates. Shipped
-  templates are package data; the user folder comes from the settings file of spec 0006. Same name and version in both is
+  templates are package data; the user folder comes from the settings file of spec 0006 (its key is open: spec 0006
+  Q22, amendment B-510). Same name and version in both is
   an error, so a user file never silently shadows a shipped one.
 - `meta.status: draft` templates are usable and are flagged on the page and in the run report (§4.6). A shipped template
   moves to `approved` only with the owner's approval (process/10 §4).
@@ -317,7 +318,7 @@ is frozen for the run: a change means a new draft, a new confirmation, a new res
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
 | Template file | YAML, `eng-template/1` | canonical per suffix | at most 1 MiB, depth 8 | no | shipped folder or user folder |
-| Values file (`--basis`) | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` | no | engineer or a coding agent |
+| Values file (`--basis`) | YAML or JSON `{name, values}` (`name` corrected from `engineer` to the model of §4.4 by B-541) | canonical per suffix | by `FieldSpec` | no | engineer or a coding agent |
 | `FieldSpec` list | `tuple[FieldSpec, ...]` | canonical | see §4.5 | no | workflow module |
 | `DetectedValue` | `path, value, unit, ref` | canonical | by `FieldSpec` | `ref` | the caller (spec 0006, 0007) |
 | `BasisDraft` | model | | | no | `build_draft` |
@@ -398,4 +399,4 @@ that is not assumed.
 | Q6. Template and basis errors have no contract code | Owner | `INVALID_ARGUMENT` plus a `reason` key now (as engine Q7); a `HarnessCode` family only if the engine needs to branch on them |
 | Q7. `WorkflowDef` carries `required_basis` (paths) only | Owner (engine) | Add `basis_fields: tuple[FieldSpec, ...]` to `WorkflowDef` in spec 0007's plan and derive `required_basis`; this spec's check (AC21) then becomes trivial. Engine text written by amendment B-415 (engine §4.2, rule EC4, Q30; built by plan 0007 T6; draft until the owner approves) |
 | Q8. Whether v1 should ship any engineering values | Owner | No. Ship `blank` only; the owner supplies values with citations by pull request when wanted |
-| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `engineer` member is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |
+| Q9. Engineer name for `engineer:<name>@<timestamp>` | Owner | The values file's `name` member (`EngineerValues.name`, §4.4; called `engineer` here before B-541) is only the name the page proposes; the recorded name is the confirming answer's `by` (spec 0006's settings may default it); never from the operating system account |

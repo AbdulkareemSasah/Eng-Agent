@@ -50,6 +50,28 @@ report shows the run's decision runtime (§4.6.1), and the command line draws th
 **Amendment B-495.** By the owner answer of 2026-11-14, the refusal of `[cli_tools.*]` entries before servers plan
 T19b (spec 0002 AC43, gap H-G8) exits 2 (`USAGE`), not 70 (§4.2.3, §6; spec 0002 §11 Q9).
 
+**Amendment B-510.** After the pre-flight audit of plan 0006: the merged engine asks the ports with `wait=False`, so
+the command line gives the page ports the process wait mode (§4.4.5 step 2); a file answer's `by` comes only from
+`[engine] engineer` and is refused while it is unset (§4.2.1, AC46, AC64); the inputs of `--template`, the
+`basis_ref` of a workflow without required basis fields and the item that carries a sign-off exception's reason are
+open (Q22 to Q24).
+
+**Amendment B-536.** First-live-run gaps: the command line builds the host port's model files from the run's input
+and catches the port builder's H-G8 refusal (§4.2.2 step 2, AC67, AC68; spec 0002 H-G10 closed), and `report` writes
+`report/cycle-timings.json` (AC69).
+
+**Amendment B-541.** First-live-run gaps, third set (launch): `main` resolves the workspace once, so `--workspace` and
+the default workspace reach the configuration lookup, the store and `doctor` (§4.2.1, AC70); the command line enters
+the ports around `Engine.start` and `Engine.resume`, so the servers start and shut down (§4.2.2 step 5; spec 0002
+§4.1, AC48); a configuration error from the port builder, a workspace that is not local and a host instance held by
+another engine have exit codes (§4.2.3, §6, AC71); `doctor` receives the configuration path and the environment
+(AC13); `run` prints the run id at step 1 (AC66); the `--basis` file's name member is `name` (§5); hand-written files
+may start with a byte-order mark (§4.7).
+
+**Amendment B-545.** First-live-run gaps of the page: the voided display matches the request kinds the engine journals
+(§4.4.5, AC34); the input screen tells how a waiting run takes a data answer (§4.4.5, AC46); a closed browser is
+recovered by stop and resume (§4.4.4); a change-set item id is a page token, refused upstream by spec 0007 §4.4.1 K3.
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -139,7 +161,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   existing file without `--force`; an altered journal gives exit 5 and writes nothing. Test:
   `tests/unit/cli/test_report_command.py::test_output_rules`.
 - AC13. Given `doctor`, then it calls `eng_harness.doctor.run` of spec 0002 with the options passed through and returns
-  its exit code unchanged. Test: `tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough`.
+  its exit code unchanged. Test: `tests/unit/cli/test_doctor_command.py::test_exit_code_passthrough`. **[added:
+  B-541]** It passes the `harness.toml` path `main` found (`None` when none was found) and the command's environment
+  (§4.2.1, AC70) as `env`; a `ConfigError` that `doctor.run` raises is a usage error (exit 2) naming the key. Test:
+  `tests/unit/cli/test_doctor_command.py::test_doctor_receives_config_path_and_environment`.
 - AC14. Given a workflow with an `options_model`, then `run` offers one `--<field-name>` option for each top-level
   field of type `str`, `int`, `bool`, enum or `Literal`, and offers none for a field that holds a quantity or a nested
   model: those values come from `--input FILE`, as references or literals (P2). Test:
@@ -149,8 +174,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   a usage error (exit 2) naming the key, with no run folder, no journal event and no credential-store access; then
   `assemble_decision_runtime` (spec 0009 §4.1, §4.10) is called exactly once, in step 5 of §4.2.2, before
   `Engine.start` or `Engine.resume`, also when no `[providers.*]` table exists, and the `DecisionPort` given to the
-  engine is the cascade of spec 0005 built from the returned runtime (its providers, its verified releases and its
-  summary); the runtime's build warnings and release findings are printed to standard error as warnings and are not an
+  engine is the cascade of spec 0005 built from the returned runtime (its `model`, its `llm` and its
+  summary); the runtime's warnings (which include the release findings) are printed to standard error and are not an
   error. Test: `tests/unit/cli/test_decision_wiring.py::test_providers_read_and_runtime_assembled` (with
   `CliDeps` holding a recording assembler).
 - AC63. Given a run started through `run` with a runtime whose summary is a known JSON object, then the journal's
@@ -159,7 +184,8 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   standard-error line holds a `base_url`, a `key_ref` or a key. Test:
   `tests/workflow/test_cli_run.py::test_run_header_records_decision_runtime`.
 - AC64. Given `run --answers FILE` (B-354), then the file is read and checked to be one JSON object in step 2 of
-  §4.2.2, and a file that is missing, not valid JSON or not an object is a usage error (exit 2) with no run folder;
+  §4.2.2, and a file that is missing, not valid JSON or not an object is a usage error (exit 2) with no run folder, as
+  is any file while `[engine] engineer` is unset (§4.2.1, B-510);
   given a workflow whose first data request (kind `block`, marker `x-eng-input: data`) opens, then that request, and
   only that one, is answered from the file through `pages.accept_answers_file` (no page is served for it) and the
   journal holds `input_provided` for it with the same `by` as `resume --answers`; an answer that fails the request's
@@ -176,7 +202,42 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 - AC66. Given `run` with the default `CliDeps()` (amendment B-471, Q20 answer A), then the `port_builder` default is
   spec 0002 `build_ports`; the run id (`run_` + ULID from the ids source) is drawn at step 1 of §4.2.2 and the run-id
   cell holds it before any port is built; the engine receives the same id in `RunRequest.run_id` (engine AC70); and
-  `run` and `resume` are available. Test: `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
+  `run` and `resume` are available. **[added: B-541]** Standard error holds the line `run id: <run_id>` before any port
+  is built, and the default passes `build_ports` the server sections converted by spec 0002 `servers_config`. Test:
+  `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
+- AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.Path` and an
+  input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
+  `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
+  mapping from the run's stored input, also when the original file has been moved since `run`; and a relative path, a
+  missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2); and the
+  port builder receives `visible` equal to the input's `visible_host`, or false for an input model without that field
+  (amendment B-543). Test: `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder`.
+- AC68. **[added: B-536]** Given a port builder that raises `NotImplementedGap` (spec 0002 AC43, gap H-G8), when `run`
+  or `resume` is called, then its message, which names H-G8 and the entries, is printed on standard error, the exit
+  code is 2 (`exit_code_for(Outcome.USAGE)`, returned by the command itself), no run folder is created by `run`, and nothing is journaled (§4.2.2 step 2). Test:
+  `tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2`.
+- AC69. **[added: B-536]** Given `report <run_id>` for a run whose journal holds at least one edit cycle (spec 0007
+  §4.9), then after the HTML it writes `<run>/report/cycle-timings.json` by
+  `write_cycle_timings(edit_cycle_timings(reader, store), path)`, in the run folder whatever `--out` says; given a run
+  without an edit cycle, it writes no such file. Decision (B-536): only the `report` command writes it, not step 6 of
+  `run`, because the owner's guide collects it with `report` and one writer keeps one rule. Test:
+  `tests/unit/cli/test_report_command.py::test_cycle_timings_file`.
+- AC70. **[added: B-541]** Given neither `--config` nor `ENG_HARNESS_CONFIG`, then `harness.toml` is looked up in the
+  root of the workspace that `resolve_workspace` returns over the environment in which `--workspace`, when given, is
+  `ENG_WORKSPACE` (the default workspace `%LOCALAPPDATA%\eng\workspaces\default` included, contract §4.5.1); the
+  handler receives that environment; when `resolve_workspace` raises `LocalWorkspaceError`, no workspace file is looked
+  up and the command still reaches its handler; and a `harness.toml` that starts with a UTF-8 byte-order mark loads
+  as without it (§4.2.1, §4.7). Test: `tests/unit/cli/test_config.py::test_default_workspace_and_option_reach_lookup`.
+- AC71. **[added: B-541]** Given `run` or `resume`, then the ports the port builder returns are entered before
+  `Engine.start` or `Engine.resume` and left after it returns or raises (spec 0002 AC48); a `ConfigError` from the
+  port builder is printed and ends the command with exit 2 before any run folder, with nothing journaled; a
+  `ContractError` `HOST_LOCKED` from the engine ends it with exit 4; a `LocalWorkspaceError` while `run`, `resume`,
+  `status`, `stop` or `report` builds its workspace prints the error's message and remedy and ends it with exit 2,
+  nothing created; and an `--input` file that starts with a byte-order mark is read as without it (§4.2.2, §4.2.3,
+  §4.7). Tests: `tests/workflow/test_cli_run.py::test_ports_entered_around_engine_call`,
+  `tests/unit/cli/test_run_refusals.py::test_refusals_create_no_run`, `tests/unit/cli/test_exit_codes.py::test_error_codes`
+  (plan T14), `tests/unit/cli/test_status.py::test_states_and_read_only` (the workspace case of `status`, `stop` and
+  `report`, plan T16).
 
 ### 3.2 Terminal progress
 
@@ -277,7 +338,9 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   write, then `ApprovalVoid` is raised before the write (engine AC55), nothing is written, and the page shows the
   request as voided with the engine's message. Test: `tests/workflow/test_page_approval.py::test_void_after_model_change`
   (plan T17, real engine). The page half (§4.4.5: a `step_failed` with code `APPROVAL_VOID` marks the approved request
-  voided) is tested by `tests/unit/pages/test_void.py::test_void_shown_on_resolved_request` (plan T7b, B-412).
+  voided) is tested by `tests/unit/pages/test_void.py::test_void_shown_on_resolved_request` (plan T7b, B-412), and
+  for the kinds the engine journals (`change_set`, `promotion`) by
+  `tests/unit/pages/test_void.py::test_void_marks_the_engine_kinds` (plan T10c, amendment B-545).
 - AC35. Given a run waiting at an approval whose process is killed, when it is resumed, then the same request id with
   the same preview hash is shown again, an answer completes the run, and no `approval_resolved` exists for the killed
   wait. Test: `tests/replay/test_page_resume.py::test_kill_while_waiting_then_resume`.
@@ -308,7 +371,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   verdict counts, each verdict that is not `PASS` or `NOT_APPLICABLE` as an exception with its own reason field, and
   the engineer name; signing is refused unless every exception has a reason; and when results depend on unreleased
   tools (§4.6.3) the screen lists them and signing is refused without the acknowledgement. Test:
-  `tests/workflow/test_signoff.py::test_signoff_rules`.
+  `tests/workflow/test_signoff.py::test_signoff_rules`. The verdicts are those of every stored result of kind
+  `verdicts.set/1` or `harness.host_design_verdicts/1` among the run's step results (§4.4.6; amendment B-544): given a
+  run whose only verdicts are in a `harness.host_design_verdicts/1` result, then the counts and exceptions are its
+  verdicts. Test: `tests/workflow/test_signoff.py::test_signoff_reads_host_design_verdicts`.
 - AC43. Given the engineer-turn request of the edit cycle (18 step 15) with the options `accept`, `more_edits` and
   `hand_edit`, then the screen shows exactly three buttons with the catalog labels, the `hand_edit` label tells the
   engineer to save in the host program first, and one press is one answer that carries only the option id. Test:
@@ -321,13 +387,16 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   choice screens showing the reason and the evidence, and they can be answered only there (the file path refuses them, AC46). Test:
   `tests/unit/pages/test_choice_screen.py::test_engine_requests_choices`.
 - AC46. Given a `ctx.ask` data request (schema marker `x-eng-input: data`, §4.4.6), then the page shows its fields
-  (name, type, unit, bounds) read-only with the text "provide the answers with `resume --answers FILE`"; given such a
+  (name, type, unit, bounds) read-only with the text of §4.4.5 (stop the run, then `resume RUN_ID --answers FILE`;
+  amendment B-545); given such a
   file, `pages.accept_answers_file` builds the `InputAnswer`, the engine validates it (engine AC61) and journals
-  `input_provided` with `by` = `engineer:<name>`. The file path refuses, with exit 2 and nothing journaled: an answer for
+  `input_provided` with `by` = `engineer:<name>` (`<name>` from `[engine] engineer`; while it is unset the file is
+  refused with exit 2 and nothing journaled, §4.2.1, B-510). The file path refuses, with exit 2 and nothing journaled: an answer for
   an unknown request id; a request that is not of kind `block`; any request whose id starts with `engine.`
   (`engine.in_flight`, `engine.host_state`, `engine.escalation`); and every request whose schema does not carry
   `x-eng-input: data`, which includes the engineer turn and batched decisions (choice requests, marker `choice` or no
   marker). Tests: `tests/workflow/test_cli_answers.py::test_form_request_answers_file`,
+  `tests/unit/pages/test_choice_screen.py::test_data_request_names_stop_and_resume` (the text, plan T10c),
   `tests/unit/pages/test_answers_file.py::test_file_refuses_choice_engine_and_unmarked_requests` (an answers file for
   the engineer turn, a batched decision and `engine.in_flight` is refused and the journal bytes are unchanged).
 - AC47. Given a basis draft with every required field present, when `run` is called, then the page shows the sections
@@ -413,7 +482,7 @@ page tests use a real server on the loopback interface and `http.client`; no bro
 | `eng_harness.cli` | `main(argv, *, deps) -> int`, `ExitCode`, `CliDeps`, `HarnessConfig`, `ConfigError` | the entry point, tests |
 | `eng_harness.progress` | `ExpectedTimes`, `ProgressRenderer`, `TerminalProgress` (the `ProgressSink`), `Heartbeat`, `Liveness`, `read_liveness` | `cli`, tests |
 | `eng_harness.pages` | `PageServer`, `PageApprovalPort`, `PageInputPort`, `PageBasisSetupPort`, `Screen`, `accept_answers_file` | `cli` (only `PageServer`, the ports and `accept_answers_file`, AC2), tests |
-| `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError` | `cli`, `pages` (sign-off screen), tests |
+| `eng_harness.report` | `build_report`, `write_report`, `ReleaseMarks`, `unreleased_dependencies`, `ReportError`, `edit_cycle_timings` and `write_cycle_timings` (spec 0007 §4.9; amendment B-536) | `cli`, `pages` (sign-off screen), tests |
 
 Internal modules: `_text.py` (sanitizing, durations, timestamps, numbers), `_html.py` (§4.5), `cli/_parser.py`,
 `_exit.py`, `_config.py`, `_encoding.py`, `_opener.py` (launch-address opener and terminal writer, §4.4.4), `_options.py`,
@@ -448,13 +517,25 @@ package's `[project.scripts]` entry is plan T3's.
 
 Global options: `--workspace DIR` (absolute; overrides `ENG_WORKSPACE`, contract §4.5.1), `--config FILE`.
 
+**[added: B-541]** `main` resolves the workspace once, before it loads the configuration: it calls the contract's
+`resolve_workspace` with the default location probe over a copy of the environment in which `--workspace`, when
+given, is `ENG_WORKSPACE`; the root it returns is the `<workspace>` of the configuration lookup (AC4), and the handler
+receives that environment (`CliDeps.environ`), so the `Workspace` and store of `run`, `resume`, `status`, `stop` and
+`report` and the workspace row of `doctor` use the same folder. `main` also keeps the path of the `harness.toml` it
+found (none when none was found) for `doctor` (AC13). When `resolve_workspace` raises `LocalWorkspaceError` (not
+configured, relative, not creatable or not local), the configuration is looked up by `--config` and
+`ENG_HARNESS_CONFIG` only and `main` still calls the handler: `doctor` reports the error in its workspace row, and the
+other commands refuse with exit 2 where they build their workspace (§4.2.3, AC71). Decision: `main` reuses
+`resolve_workspace` and passes `--workspace` as `ENG_WORKSPACE`, because the contract defines the default folder
+(`%LOCALAPPDATA%\eng\workspaces\default`) only there and that function reads the environment alone (AC70).
+
 | Command | Purpose and options |
 |---|---|
 | `run <workflow>` | Start a run. `--input FILE` (JSON, the workflow input; values may be `$ref`), `--basis FILE` (the values file, spec 0004 §4.4), `--template NAME[@VERSION]` **[added]**, `--mode {work_on_copy,approve_each_write,autonomous_logged}` (default `[engine] default_mode`), `--run-class {trial,production}` (spec 0003 §4; default `production`, Q7), `--answers FILE` (B-354, AC64: the bare JSON object of one answer, given to the first `ctx.ask` data request the run opens; the keyed form of `resume` is not taken, because request ids depend on the run id), generated `--<field>` options (AC14), and the shared options below |
 | `resume <run_id>` | Replay and continue (engine §4.5.1). `--answers FILE` answers pending `ctx.ask` data requests only (AC46), as JSON `{"<request_id>": {...}}`, or the bare object when exactly one data request is pending; and the shared options |
 | `status [<run_id>]` | Without an id: the 20 most recent runs. With an id: AC11. `--json`. Read-only |
 | `stop <run_id>` | Ask a live run to pause at the next safe point (`--wait SECONDS` waits for it to end) |
-| `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force` |
+| `report <run_id>` | Build the report (§4.6). `--out FILE`, `--force`. Also writes `<run>/report/cycle-timings.json` (spec 0007 §4.9; AC69) |
 | `doctor` | Spec 0002 §4.9 (`--json`, `--show-paths`) |
 
 Shared options of `run` and `resume`: `--no-wait` (never wait for an answer: exit 10 at the first open request),
@@ -475,7 +556,10 @@ an `InputAnswer` only through `pages.accept_answers_file(request, payload, by)`,
 kind `block`, its id does not start with `engine.`, and its schema carries the marker `x-eng-input: data` (the marker
 `ctx.ask` sets and the choice helpers never set, §4.4.6). The engineer turn, batched decisions and the engine's own
 requests are choices and can only be answered on the page; any other request is refused with exit 2 and nothing is
-journaled (AC46). For `run`, the CLI holds the file's object and wraps the page `InputPort`: the first `present` of a
+journaled (AC46). The answer's `by` is `engineer:<name>`, `<name>` being the `[engine] engineer` setting: no option
+names an engineer (AC1), the operating-system account is never used (AC39) and a file serves no page, so while the
+setting is unset `run --answers` and `resume --answers` are refused with exit 2 and a message naming
+`[engine] engineer`, before any run folder is created and with nothing journaled (B-510). For `run`, the CLI holds the file's object and wraps the page `InputPort`: the first `present` of a
 data request is answered from it once through `pages.accept_answers_file`; every other request, a later data request
 included, goes to the page port unchanged (AC64).
 
@@ -488,28 +572,63 @@ or open the page; the approval is the engineer's. The rule is generated into the
 #### 4.2.2 Flow of `run`
 
 1. Resolve the workspace and configuration (including `[providers.*]` through `load_providers_config` of spec 0009
-   §4.2, AC62); for `run`, draw the run id (`run_` + ULID from the ids source) and fill the run-id cell (§4.4.8,
-   Q20); build the registry and ports from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise).
+   §4.2, AC62; the workspace as §4.2.1 says, B-541); for `run`, draw the run id (`run_` + ULID from the ids source),
+   fill the run-id cell (§4.4.8, Q20) and print the line `run id: <run_id>` on standard error (AC66; B-541: the
+   engineer needs the id for `status`, `stop` and `resume` while the run waits, and the progress line of `run_started`
+   does not show it); build the registry from `CliDeps`; find the workflow (`RunRefused`-like refusal otherwise). The
+   ports (built at the end of step 2) take no basis: the CSI host port reads the read-back tolerance from the basis frozen at step 3, through the
+   run header, when its first check runs (spec 0002 §4.5.8, AC44; amendment B-503), so neither `run` nor `resume`
+   passes it.
 2. Validate the input file against the workflow's input model, without creating anything (engine AC16). Read the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
-   the request opens.
+   the request opens. Then build the tool and host ports as
+   `port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` (amendment B-536, AC67): `files` maps a
+   model key to a file for each top-level field of the workflow's input model annotated `pathlib.Path` (a model file);
+   the key is the file's base name and the file is the field's value, which must be absolute and name an existing
+   file. `visible` is the input's top-level `visible_host` when the input model declares that `bool` field, else
+   false (amendment B-543, spec 0007 §4.2; spec 0002 §4.1 keyword `visible`), at `run` and at `resume` from the stored
+   input. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
+   folder; these refusals apply to `run`. `resume` builds `files` from the run's stored input and does not check that
+   the files still exist. Decision (B-536): `resume` passes a moved original on unchecked, because once the working
+   copy exists the host port works on the copy in the run folder and never reads the original again (spec 0002 §4.5.9
+   `working_copy`); a run that stopped before its copy existed meets `NOT_FOUND` at `working_copy`, as today. A
+   `NotImplementedGap` from the port builder (spec 0002 AC43, gap H-G8) is printed on standard error and ends the
+   command with `exit_code_for(Outcome.USAGE)` (2), before any run folder and with nothing journaled (AC68). A
+   `ConfigError` from the port builder (an invalid server section, or no host program for a server's product, spec
+   0002 §4.1) is printed as `main` prints one and ends the command the same way (AC71; B-541); the default port
+   builder converts the server sections with spec 0002 `servers_config` (AC66). Decision
+   (B-536): the command returns the usage exit itself rather than through `exit_code_for_error`, because the merged
+   error-code table maps `NOT_IMPLEMENTED` only once servers plan T19a adds it. Decision (B-536): the
+   command line builds `files`, because only it holds the file's path at `run` and at `resume`. Decision (B-536): a
+   model file is written in `--input` as its absolute path, not as a `harness.file_input/1` reference, because a
+   reference holds only the base name, hash and size, from which no component can find the file, while the path is
+   kept in the run's input for `resume`. Decision (B-536): the model key is the base name, because the journal records
+   base names of model files only (engine §4.4.2 `model_saved`) and the workflow can derive it from its input.
 3. If the workflow declares required basis fields: build the draft from `--template` and `--basis` (spec 0004
-   `build_draft`). If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
+   `build_draft`; the template folders and the version rule are Q22, and the `basis_ref` of a workflow without
+   required basis fields is Q23). **[added: B-541]** The `--basis` file is read with spec 0004's `load_strict` (YAML
+   1.2, which also reads a JSON file; a byte-order mark is accepted) and validated as `EngineerValues`
+   (`{name, values}`, §5); a refusal is a usage error (exit 2) naming the file. If a required field is missing, print the paths and exit 3 without serving a page. Otherwise show the
    basis confirmation screen (§4.4.7), wait, then `freeze`. This happens before a run exists; nothing is journaled.
 4. Production run class: `HarnessCalcPort.preflight`; a refusal lists the calcs and exits 3. The calc port is built
    with the run's store, the run class (`--run-class` for `run`; for `resume` the run header's `run_class`, read before
    `Engine.resume`), the clock and the ids; the calc registry, the approvals file of spec 0003 (`src/eng_harness/calcs/approvals.yaml`) and the calc
    settings are those of spec 0003 §4.12 (B-412), and so is its `basis_fields` map (spec 0007 §4.5; amendment B-498).
 5. Build the decision layer: call `assemble_decision_runtime` (spec 0009 §4.1, §4.10) with the `ProvidersConfig`, the
-   `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release check needs (Q16), print its build warnings and release findings to
-   standard error, and build the cascade of spec 0005 from the returned runtime (providers, verified releases, summary)
-   as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
+   `DecisionSettings` (spec 0005 §4.3, read from `[decisions]`; Q15), the workspace and the point policies its release
+   check needs (Q16), print its `warnings` (which include the release findings) to standard error, and build the
+   cascade of spec 0005 from the returned runtime (`model`, `llm` and `summary`; spec 0009 §4.1; the cascade reads
+   released points from the `DecisionSettings` it is given, spec 0005 §4.3) as the `DecisionPort`; the cascade hands the summary to the engine for the run header (spec 0005 §4.12, engine
    AC69; AC62, AC63). Install `TerminalProgress` as the `ProgressSink` (and the page server as a second sink for
    AC37), `FileRunControl` as the `RunControlPort`, the page ports as `ApprovalPort` and `InputPort`, and start
-   `Engine.start` with the run id of step 1 in `RunRequest.run_id`.
+   `Engine.start` with the run id of step 1 in `RunRequest.run_id`. **[added: B-541]** The ports of step 2 are an async
+   context manager (spec 0002 §4.1 `AdapterPorts`): the command enters them just before `Engine.start` (and
+   `Engine.resume`) and leaves them when the call returns or raises, which shuts the servers down (spec 0002 §4.3.5,
+   AC71).
 6. On return, write the report (unless `--no-report`), print the summary, map the outcome to the exit code.
 
-`resume` is steps 1, 5 and 6 with `Engine.resume`; it removes a stale stop file first, at the start of the command, before step 1 (§4.4.8). The page server starts lazily at
+`resume` is steps 1, 5 and 6 with `Engine.resume`, building its ports after step 1 by the rule of step 2 from the
+run's input (the run header's `input_ref`, read before `Engine.resume` as step 4 reads `run_class`; AC67); it removes a stale stop file first, at the start of the command, before step 1 (§4.4.8). The page server starts lazily at
 the first `present` (never when `--no-wait` is given or no request opens) and stops when the process returns.
 
 #### 4.2.3 Exit codes
@@ -518,9 +637,9 @@ the first `present` (never when `--no-wait` is given or no request opens) and st
 |---|---|---|
 | 0 | `OK` | Run completed; `status`, `stop`, `report` succeeded |
 | 1 | `RUN_FAILED` | The run ended `FAILED`; `doctor` reported a failed check (spec 0002 AC37) |
-| 2 | `USAGE` | Usage or configuration error; invalid input file; a configuration this build cannot serve (`[cli_tools.*]` entries before servers plan T19b, spec 0002 AC43, gap H-G8; owner answer of 2026-11-14, B-495) |
+| 2 | `USAGE` | Usage or configuration error; invalid input file; a configuration this build cannot serve (`[cli_tools.*]` entries before servers plan T19b, spec 0002 AC43, gap H-G8; owner answer of 2026-11-14, B-495); a workspace that is not configured or not local (`LocalWorkspaceError`, B-541) |
 | 3 | `REFUSED` | `RunRefused` (`BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`), unknown workflow, calcs refused, basis rejected on the page |
-| 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`) |
+| 4 | `RUN_LOCKED` | Another process holds the run (`RunLocked`), or another engine holds a host instance the run needs (`HOST_LOCKED`, B-541: the same remedy, wait for or stop the other run) |
 | 5 | `JOURNAL_INTEGRITY` | `JournalIntegrityError` |
 | 6 | `NOT_FOUND` | No such run |
 | 10 | `AWAITING_ENGINEER` | Paused at an open approval or input, or basis confirmation pending with `--no-wait` |
@@ -666,7 +785,11 @@ honours `BROWSER`: the default opener is `os.startfile` on Windows, `open` on ma
 If opening fails, or with `--no-browser`, the address is written only to the controlling terminal (`/dev/tty`, or
 `CONOUT$` on Windows). When there is no controlling terminal the process prints "the launch address cannot be shown
 here; run from a terminal, or use --no-wait and resume later", and the page cannot be reached (AC61). After the first
-launch the cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. This does not protect against a
+launch the cookie serves other tabs of the same browser at `http://127.0.0.1:<port>/`. A closed browser, or a launch
+code already spent, leaves no way back to that process's server: the engineer stops the run (`stop <run_id>`, or the
+first interrupt) and resumes it, and the new process serves a new address (§4.4.5 step 5 re-presents the open
+requests). Decision (B-545): no second launch code is issued, because the code is single use by design (§4.4.2) and
+`resume` already gives a new one. This does not protect against a
 process of the same user that has the terminal, reads the opener's command line or drives the server itself (Q2).
 
 #### 4.4.5 How the run waits, and the approval binding
@@ -675,9 +798,19 @@ process of the same user that has the terminal, reads the opener's command line 
    binding and the items, then calls `ApprovalPort.present(request)`. The page registers the request with its view and
    renders from the stored `harness.approval_preview/1` result after checking that its hash equals `shown_sha256`
    (else the screen says the preview is damaged and offers no button).
-2. The engine calls `answer(request_id, wait=True)`. The port awaits an `asyncio.Event`, polling the stop file
-   (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once for `wait=False`; the engine then pauses
-   (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop).
+2. The merged engine calls `answer(request_id, wait=False)` at every request and pauses on `None` (engine §4.9). The
+   process wait mode is the command line's (§4.2.1: wait unless `--no-wait`, up to `--wait-timeout`), so
+   `cli/_wiring.py` wraps the page ports: the wrapper ignores the engine's `wait` and asks the page port with the
+   process wait mode (B-510). Waiting, the port awaits an `asyncio.Event`, polling the stop file
+   (§4.4.8) every second. It returns `None` on a stop request, on `--wait-timeout`, or at once with `--no-wait`; the engine then pauses
+   (`run_paused`, reason `awaiting_approval`) and the process exits 10 (or 12 for a stop). A data request (§4.4.6
+   Input; a re-asked change set or a first change set the engine refused included) is answered by a file only, and
+   `resume --answers` exits 4 while the waiting process holds the run lock, so the input screen says: "These fields
+   are read-only here. To answer them, stop the run (`stop RUN_ID` from another terminal, or Ctrl+C once in its
+   terminal), then run `resume RUN_ID --answers FILE`; `status` lists the run ids." (plan T10c). Decision (B-545): a
+   waiting run takes a data answer only through stop and `resume --answers`, because values never travel in a page
+   form (§4.2.1) and no other file is read (step 3), and those commands exist (`stop`, the first interrupt,
+   `resume --answers`), so only the page text changes.
 3. A POST that passes §4.4.2 and the answer checks (below) is parsed into an `ApprovalSubmission` (the validated form),
    turned into an `ApprovalAnswer` (an `InputAnswer` for a choice) and handed to the waiting `answer` call. **The answer is held in memory only**: it is not written anywhere until the engine journals it, one
    `approval_resolved` event, FULL durability. There is no answer file in the run folder, so nothing else can place an
@@ -699,6 +832,9 @@ first write under the approval and voids the approval on a mismatch (engine §4.
 single use and ends at the first `check_model` of a bound model. No journal event names a void: `ApprovalVoid` is a
 `StepError`, journaled as `step_failed` with code `APPROVAL_VOID`, and it carries no request id (Q21). When the page
 sink sees such a `step_failed`, the page marks as voided the most recent approved `CHANGE_SET` or `PROMOTION` request
+(amendment B-545: the kind `change_set` or `promotion`, the `ApprovalKind` value the engine journals, which the
+merged hub missed by comparing only the upper-case names; decision (B-545): the upper-case names stay accepted, as in
+the report's change-set section (`report/_sections.py`), because the shared test stand-in journals them)
 resolved in this process, and its screen shows "voided" with the error's message (an untrusted `field`), no form and
 no button (AC34, B-412). With no such request in this process (the answer was given before a resume), the message is
 shown on the index page as a run message.
@@ -707,14 +843,14 @@ shown on the index page as a run message.
 
 | Screen | Request | Content and answers |
 |---|---|---|
-| Change set (18 step 6) | `CHANGE_SET` | Title; items (label, referenced values with their sources); differences from the last revision as a table (`diff_ref`), engineer changes marked; binding table; preview hash; per-item reject boxes with a reason field each; Approve; Reject with a reason |
+| Change set (18 step 6) | `CHANGE_SET` | Title; items (label, referenced values with their sources); differences from the last revision as a table (`diff_ref`), engineer changes marked; binding table; preview hash; per-item reject boxes with a reason field each (named by the item id, so an id that is not a page token gives the refusal screen of §4.4.5 step 1; spec 0007 §4.4.1 K3 refuses such an id first, amendment B-545); Approve; Reject with a reason |
 | Promotion (18 step 16) | `PROMOTION` | Target and backup by base name; hash of the original and the working copy's `origin_sha256`; Approve; Reject |
 | Info | `INFO` | The text; Acknowledge (approve) or Reject |
 | Sign-off (18 step 17) | `SIGN_OFF` | Link to `/report`; verdict counts; each exception (a verdict whose status is not `PASS` or `NOT_APPLICABLE`) with an accept box and a written reason; the unreleased-tool list with an acknowledgement box when it is not empty; the engineer name; Sign; Reject |
 | Engineer turn (18 step 15) | choice request | Three buttons: accept this revision, ask for more edits, I edited by hand: continue. One press, one option id |
 | Batched decisions (11 §3 `decide_many`) | choice request, N questions | One form: per question the prompt, labeled evidence, one option group; one Submit |
 | Engine requests | `engine.in_flight`, `engine.host_state`, `engine.escalation` | The reason, the evidence references, the choices of engine §4.5 (`applied`, `not_applied`, `abandon`; `accept`, `restore`, `abandon`) |
-| Input | `block` data request (`x-eng-input: data`) | The fields read-only (name, type, unit, bounds) and the instruction to use `resume --answers FILE` |
+| Input | `block` data request (`x-eng-input: data`) | The fields read-only (name, type, unit, bounds) and the instruction of §4.4.5 step 2 (stop the run, then `resume RUN_ID --answers FILE`) |
 | Basis confirmation (13 §4) | `BasisSetupView` | §4.4.7 |
 
 An input request carries a marker in its JSON Schema, `x-eng-input`, with the value `data` (set by `ctx.ask`: values
@@ -728,8 +864,15 @@ marker, and the engine refusing a request whose schema has `enum` properties but
 are an amendment of engine §4.9; the alignment with the engineer tier of spec 0005 is Q6.
 
 An exception on the sign-off screen is accepted with its own reason; the reasons travel as `item_reasons` of the answer
-(14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8). Sign-off is refused by the page
+(14 §6; the engine's `ApprovalAnswer` and `approval_resolved` gain the member, Q8; which item carries an exception's
+reason is Q24). Sign-off is refused by the page
 when an exception has no reason, and the engine appends `signed_off` for the approved `SIGN_OFF` request (engine §4.9).
+Amendment B-544: the page reads its verdicts from every stored result of the run's steps whose kind is
+`verdicts.set/1` or `harness.host_design_verdicts/1` (the edit cycle's design verdicts, spec 0007 §4.4.3, which carry
+the calc port's members as well), in the order the journal holds the steps and each result's verdicts in stored order,
+and numbers the exceptions `exc_1`, `exc_2`, ... in that order; the edit cycle's step 17 adds the items in the same
+order (spec 0007 §4.5 step 17). Plan T9c changes the page; plan 0007 T9c adds the items. Decision (B-544): the page
+validates each result as the model of its kind, because the verdict-set model refuses the other kind's members.
 
 #### 4.4.7 Basis confirmation
 
@@ -787,7 +930,7 @@ reader never sees a partial file. `cli/_control.py` holds the protocol:
     builder takes the run folder as a callable that reads the cell (and raises while it is empty), and its real
     default is bound with that fill (plan T18b).
   `Engine.start` takes the run id chosen by the caller (Q20 answer A, decided by amendment B-471; engine §4.5.1, AC70),
-  so the cell is filled for `run` as for `resume` before step 1 builds anything.
+  so the cell is filled for `run` as for `resume` before any port is built (end of step 2, amendment B-536).
 - `stop <run_id>` writes the file only when the run lock is held (a live engine); otherwise it writes nothing, exits 0
   and says the run is not running (AC9). `stop --wait SECONDS` then waits until the run lock is released, or the
   seconds pass.
@@ -880,7 +1023,10 @@ acknowledgement (AC42, AC54), so the engineer signs knowing which results came f
 contract `Timestamp` into `YYYY-MM-DD HH:MM:SS UTC`), `format_number` (`format(x, ".6g")`-style with an explicit
 specification, ASCII digits), `sanitize_terminal`, `sanitize_html`, `truncate`. Nothing in this spec imports `locale`
 or calls `strftime`, `%c`, `%x`, `%X`, `%A`, `%B`, `%p` or the `n` format type (AC58); `datetime` is used only to parse
-and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`; the standard streams are reconfigured at
+and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`, except that the files a person writes by hand
+(`harness.toml`, `--input`, `--answers` and `--basis`) are read as `utf-8-sig`, so a leading byte-order mark is
+accepted (B-541; Windows PowerShell 5 and older Notepad write one, and it carries no meaning; a UTF-16 file stays a
+usage error); the standard streams are reconfigured at
 start (AC5): redirected streams to UTF-8, a console keeps its encoding with `errors="backslashreplace"`. Paths are
 `pathlib.Path` values and are never encoded by hand, so Arabic folder names work; messages show base names unless a
 path is needed to act (the report path).
@@ -895,8 +1041,8 @@ heartbeat task runs on the engine loop.
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref` | engineer or agent |
-| `--basis` file | YAML or JSON `{engineer, values}` | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
+| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref`; a model file (a `pathlib.Path` field) is an absolute path (§4.2.2 step 2) | engineer or agent |
+| `--basis` file | YAML or JSON `{name, values}` (spec 0004 `EngineerValues`; B-541) | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
 | `--answers` file | JSON | per request fields | the request's model | no | engineer or agent |
 | Page form fields | `application/x-www-form-urlencoded` | none | §4.4.3; reasons 1 to 500; name 1 to 100; body at most `max_body_bytes` | no | engineer; carry decisions and option ids, never engineering values |
 | Final result (`--json`) | JSON object | none | AC7 | no | the process |
@@ -908,9 +1054,11 @@ heartbeat task runs on the engine loop.
 | Condition | Code | Exit |
 |---|---|---|
 | Usage, configuration, input file invalid | `INVALID_ARGUMENT` | 2 |
+| Workspace not configured or not local (B-541) | `PRECONDITION_FAILED` (`LocalWorkspaceError`, `local_workspace`), caught where the command builds its workspace, not through the error-code table | 2 |
 | Configuration this build cannot serve (spec 0002 AC43, gap H-G8; B-495) | `NOT_IMPLEMENTED` | 2 |
 | Basis incomplete or rejected, server check failed, calcs refused, unknown workflow | `BASIS_INCOMPLETE`, `SERVER_CHECK_FAILED`, `CALC_NOT_APPROVED`, `CALC_WITHDRAWN` (engine §6, spec 0003) | 3 |
 | Another process holds the run | `RUN_LOCKED` | 4 |
+| Another engine holds a host instance the run needs (B-541) | `HOST_LOCKED` (spec 0002 §4.4.1) | 4 |
 | Journal altered | `JOURNAL_INTEGRITY` | 5 |
 | Unknown run | `REF_NOT_FOUND` | 6 |
 | Page request refused | HTTP 400, 403, 404, 405, 409, 413, 415, 421, 503 (no run data in the body) | — |
@@ -956,18 +1104,22 @@ heartbeat task runs on the engine loop.
 | AC16, AC40, AC41, AC51 | Golden (document and text snapshots; not engineering oracles, so kept under `tests/data/snapshots/`, not the protected `tests/data/golden/`) | `tests/golden/` |
 | AC15 (bounds), AC21, AC48, AC54 | Property (Hypothesis, CI profile `derandomize=True`) | `tests/property/` |
 | AC43 to AC45, AC46 (file refusals) | Unit | `tests/unit/pages/` |
+| AC67, AC68 (amendment B-536) | Fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/workflow/` |
+| AC69 (amendment B-536), AC70 (amendment B-541) | Unit | `tests/unit/cli/` |
+| AC71 (amendment B-541) | Unit and fake-host workflow (fake engine and port builder from `CliDeps`) | `tests/unit/cli/`, `tests/workflow/` |
 | AC20 | Performance | `tests/perf/` |
 | AC58 (Windows) | Windows job, marker `windows` | `tests/windows/` |
 
 Staged engine (B-412): a workflow or replay test whose task is built before the engine it needs has merged drives the
 port under test with a test-local stand-in for the engine (it journals through the merged `JournalWriter` and feeds
 the events to the sink) or with a fake engine from `CliDeps`. This holds for every such criterion: AC29 and AC37 (plan
-T7), AC42 (plan T9), AC7, AC8, AC46 and AC64 (plan T14), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
+T7), AC42 (plan T9b), AC7 and AC8 (plan T14), AC46 and AC64 (plan T14c), AC61 and AC63 (plan T14b), AC47 (plan T15) and AC9 (plan
 T16). AC33, AC34 and AC35 are tested end to end only in plan T17, with the real engine; the page's voided display that
 AC34 needs is built and unit-tested in plan T7b, so T17 adds tests only. Plans T17 and T17c wait for the real engine
 with approvals (engine plan T15, which brings engine T9 to T14b); T17 also waits for progress delivery and the
 run-control check between steps (engine plan T18; the run-control half is added to it by amendment B-412). Until the
-engine's `EnginePorts` holds the decision, progress and run-control fields (engine plan T14 and T18), `cli/_wiring.py`
+engine's `EnginePorts` holds the progress and run-control fields (engine plan T18; its `decision` field, engine plan
+T14, is merged and plan T14b maps the cascade into it, B-510), `cli/_wiring.py`
 builds those ports and gives them to the `CliDeps` engine factory, whose default passes the real engine only the
 fields `EnginePorts` holds; plan T16b completes that mapping, and plans T17 and T17c depend on it, so they re-check each
 staged criterion with the real engine through the production wiring; the engine half of AC19 is the one exception,
@@ -990,7 +1142,9 @@ No engineering value is computed here, so there are no golden engineering tests.
 and `SeededIdSource`, a fake browser opener, and the engine's fake ports. Coverage floors 85% line and 75% branch
 (process/05 §2); mutation score at least 80% on `pages/_security.py`, `pages/_answers.py`, `pages/_ports.py`,
 `_html.py`, `_text.py` and `report/_lineage.py`. Browser-level checks need the owner's machine
-(`docs/local-testing.md`).
+(`docs/local-testing.md`), and so does the Windows location probe that must classify the default workspace
+`%LOCALAPPDATA%\eng\workspaces\default` as local, which `main` reaches through `resolve_workspace` for every command
+on a first run with no workspace configured (§4.2.1, AC70; B-541; plan item (6) of the local-test list).
 
 ## 10. Version impact
 
@@ -1027,4 +1181,7 @@ basis-confirmation exit of `--no-wait` is stated (AC47); no journal or contract 
 | Q19 | Amendment B-412. Neither this spec nor engine §4.4.1 named the stop file's path, content or remover; engine §4.4.1 lists only `journal.sqlite`, `run.lock`, `copies/` and `backups/` | Owner | Decided here **[added]**: `runs/<run_id>/stop.json` with `requested_at` and `by`, written by rename, removed by the run process and by `resume` (§4.4.8); add `stop.json` and `heartbeat.json` to engine §4.4.1 at its next amendment |
 | Q20 | Amendment B-412 (eighth review). For `run`, the run folder does not exist when the command line must build the tool and host ports: spec 0002 `build_ports` takes `run_dir`, the engine takes its ports at construction and calls `ToolPort.unreleased_tools()` before `run_started`, and `Engine.start` draws the run id itself (engine §4.4.1, `run_` + ULID from its `IdSource`). The run-id cell of §4.4.8 cannot fill early enough | Owner | (A, recommended) amend the engine spec: `RunRequest` gains an optional `run_id` chosen by the caller (`run_` + ULID, the engine's pattern), which `Engine.start` uses when given and refuses with `INVALID_ARGUMENT`, creating nothing, when that run folder exists; `cli/_wiring.py` then draws the run id at step 1 and fills the cell at once for `run` as for `resume`, so every run-folder binding is set before anything is built. (B) amend spec 0002: `build_ports` takes the run folder as a callable resolved at the first call that needs it, and `unreleased_tools()` needs none. Either way the `CliDeps` port builder already takes the run folder as a callable (plan T14); binding its default (plan T18) waits for the answer, and under (A) the lead adds the engine task and plan T18 draws the run id in `cli/_wiring.py`. Decided: answer A (owner instruction of 2026-11-12; amendment B-471): engine §4.4.1, §4.5.1 and AC70 (engine plan T20, work item B-472); §4.2.2 and §4.4.8 here; plan T18 split into T18a (every default but the port builder) and T18b (the port builder and the run id at step 1, after engine plan T20; AC66) |
 | Q21 | Amendment B-412 (eighth review). `ApprovalVoid` carries no request id, so the page ties a void to the most recent approved `CHANGE_SET` or `PROMOTION` request of the process (§4.4.5); with nested approvals in force that may name the wrong one | Owner | Add the approval's `request_id` to the `ApprovalVoid` detail (engine §4.9, §6) at the engine's next amendment; the page then marks that request. Until then the rule of §4.4.5 holds, and the message itself is always shown |
+| Q22 | Amendment B-510. The inputs of `--template NAME[@VERSION]` (§4.2.1, §4.2.2 step 3) are not defined: spec 0004 §4.3 takes the user folder of `TemplateRepository(shipped_dir, user_dir)` from "the settings file of spec 0006", but §4.2.4 has no such key and `harness.toml` refuses an unknown section; and `TemplateRepository.get` needs an exact version, while no document says which version `NAME` alone means | Owner | Writer's recommendation (B-510): add `[templates] user_dir` (a path; unset means no user folder) to §4.2.4 and name it in spec 0004 §4.3; require `@VERSION` (`NAME` alone is a usage error, exit 2), because the template version is part of the basis's identity and a "highest version" rule would change the draft of one command when a file is added. Interim reading until answered (plan T15): shipped templates only (the user folder is a path that cannot exist, named in plan T15, which `TemplateRepository` reads as empty), and `--template NAME` without `@VERSION` exits 2 naming the form `NAME@VERSION` |
+| Q23 | Amendment B-510. `RunRequest.basis_ref` is required (engine §4.5.1), but step 3 of §4.2.2 freezes a basis only when the workflow declares required basis fields, and no document says what `run` passes for a workflow without them | Owner | Writer's recommendation (B-510): pass `res_` followed by 26 zeros, a well-formed reference that names no stored result; the engine loads the basis at the start only when a field is required (engine invariant 5), so such a run does not read it. Such workflows are test workflows in v1 (the shipped workflows declare required basis fields); a run that reaches a decision or the report's basis rows would fail on the reference, so a report guard or an optional `basis_ref` is a later amendment if such workflows are wanted in production. Interim reading until answered: the same value (plan T14) |
+| Q24 | Amendment B-510. Each sign-off exception is accepted with its own reason carried in `item_reasons` (§4.4.6, AC42), but the engine and the page accept `item_reasons` keys that are items of the request only (engine §4.9; `pages/_answers.py`), the preview items of the sign-off are the outputs (spec 0007 §4.5 step 17), and a verdict has no id (several verdicts can share one output): no key exists for one reason per verdict | Owner | Writer's recommendation (B-510): the `SIGN_OFF` preview holds one item per output and one item per exception, in report verdict order, with id `exc_<n>` (n from 1) and no refs, so `signed_off.outputs` is unchanged; an exception's reason is the `item_reasons` entry of its item, and the page refuses sign-off while an exception item has no reason (amend §4.4.6, AC42 and spec 0007 §4.5 step 17; plan T9b and plan 0007 T9b follow). Interim reading until answered (plan T9b): the page follows the recommendation, so each exception keeps its own reason field (AC42); an exception without its `exc_<n>` item has no reason and signing is refused, so a workflow run with exceptions can be signed only once its step 17 adds the items (spec 0007 §4.5 step 17 and plan 0007 T9b follow at the answer). Amendment B-544: the page reads both verdict kinds (§4.4.6, plan T9c) and the edit cycle's step 17 adds the `exc_<n>` items in the page's order (spec 0007 §4.5, plan 0007 T9c), so a run with exceptions can be signed or rejected under this reading |
 | G1 | Browser behavior (CSP enforcement, bidi rendering, print layout of the report) cannot be tested in CI | Owner | `docs/local-testing.md` lists the manual checks; nothing is claimed working before then |

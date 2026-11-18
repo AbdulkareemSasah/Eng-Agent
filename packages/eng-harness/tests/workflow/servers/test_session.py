@@ -556,3 +556,26 @@ def test_preflight_of_a_server_that_cannot_start(
         assert "cannot start" in check.reason
 
     _run(tmp_path, make_config(command=str(tmp_path / "no-such-program")), launcher, body, _checks())
+
+
+def test_build_mismatch_stops_run(tmp_path: Path) -> None:
+    """AC9: preflight uses the real build check, refusing before the run is journaled or any model opens."""
+    from fakes.sasaah_csi.wiring import config, rig
+
+    from eng_harness.errors import HarnessCode, RunRefused
+
+    r = rig(tmp_path)
+    cfg = config(r.control)
+    section = cfg.servers["csi"]
+    wrong = section.model_copy(update={"build": section.build.model_copy(update={"exe_sha256": "0" * 64})})
+    cfg = cfg.model_copy(update={"servers": {"csi": wrong}})
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            with pytest.raises(RunRefused) as refused:
+                await r.engine(p).start(r.request())
+            assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
+            assert not (r.run_dir / "journal.sqlite").exists()
+            assert r.calls("csi_open_model") == []
+
+    anyio.run(body)

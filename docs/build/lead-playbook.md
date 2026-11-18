@@ -1,5 +1,3 @@
-<!-- The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text. -->
-
 # Lead playbook for workflow agents (v1 build of the Eng-Agent platform)
 
 You are one agent in a chain run by the lead engineer. The repository is `AbdulkareemSasah/Eng-Agent`; the integration
@@ -31,13 +29,12 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
 
 - Never invent an engineering number. Every constant is cited (code clause, design basis) exactly as the spec says. An
   uncertain clause is an explicit `NOT_IMPLEMENTED` gap with a test. Never change a test expectation to make it pass.
-- Stay inside the plan task: only its `files` globs, at most its `max_changed_lines` counted lines. Counted lines =
+- Stay inside the plan task: only its `files` globs. Measure counted lines for reporting; `max_changed_lines` is an estimate, never a limit or reason to stop, split or amend a plan. Reviewability remains part of review. Counted lines =
   additions + deletions over `git diff --numstat -M $(git merge-base origin/build/v1 HEAD) HEAD`, excluding test files
   (`**/tests/**`, `test_*.py`, `conftest.py`), generated files (`uv.lock`, `AGENTS.md`, `**/docs/schema/**`) and
   `spikes/**`. A member's `CHANGELOG.md`, `docs/local-testing.md` and `.gate/ratchet.json` are in scope when another
   in-scope file of that member changes.
-- If the task cannot fit its budget or needs a file outside its list, STOP and report `NEEDS_PLAN_AMENDMENT` with the
-  measured numbers and the exact amendment you propose. Before you report missing files, make the proposal COMPLETE:
+- If the task needs a file outside its list or more than `max_sessions`, STOP and report `NEEDS_PLAN_AMENDMENT` with the exact file or session amendment you propose. A counted-line estimate alone is never a stop or amendment reason. Before you report missing files, make the proposal COMPLETE:
   apply every out-of-list edit the task needs as an uncommitted trial, run the gate (`--skip mutation`) for every
   workspace member the change can affect (a contract change affects eng-harness; a calc input change affects the calc
   lock, the calc's verification record and the tests that pin them) until each says `check: pass`, list every file
@@ -69,7 +66,7 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
    only in `tests/contract/test_calc_lock.py`.
 5. Do not open a pull request. Push only as section 7 item 6 says, and only when your role text tells you to push
    (a role text that says "do not push" wins). Leave the tree clean (everything committed). Write your handoff note to
-   `<lead>/reports/b<NNN>-writer.md` (done, how verified with command output tails, counted lines of budget,
+   `<lead>/reports/b<NNN>-writer.md` (done, how verified with command output tails, counted lines and the plan estimate,
    what is left, risks, anything a later task must know).
 6. Engineering tasks (code-pack checks, harness calcs): every expected value in a golden or case file carries its
    derivation by hand from the clause spec; watch X/Y swaps, sign conventions, units and which side a boundary falls on.
@@ -77,7 +74,7 @@ for fetch and push. If `git fetch` or `git push` stalls, run `git repack -d` and
 ## 3. Reviewer (you did not write the change; you never edit the code)
 
 Review the full diff `git diff $(git merge-base origin/build/v1 HEAD) HEAD` in the task worktree against the plan task
-and the spec: scope (files), budget (counted lines), test-first (first commit is `test:` and its tests fail at the merge
+and the spec: scope (files), counted lines for information, test-first (first commit is `test:` and its tests fail at the merge
 base for the right reason), correctness against each acceptance criterion in `covers`, error codes and units per the
 contract, no weakened checks, no invented number. For engineering content recompute expected values by hand from the
 clause spec. Mark every finding `author` (fix in this change) or `lead` (the code is right; a spec or plan must change;
@@ -103,7 +100,7 @@ run the full gate as above. Repeat the second command until the process has ende
 minutes; do not give up, do not start a second run). Read the result from the log. If a step fails, fix it inside the task scope (usually: more
 tests for surviving mutants; `uv run eng-gate check --package <member> --only mutation` reruns that step alone, under
 the same lock) and run again. Load-sensitive tests `tests/unit/progress/test_sink.py` and
-`tests/unit/pages/test_routes.py` may fail under load: rerun once before treating them as real.
+`tests/unit/pages/test_routes.py` and `tests/unit/pages/test_single_use.py::test_concurrent_answers_one_wins` may fail under load: rerun once before treating them as real.
 
 ## 5. Integrator (push, pull request, local CI, merge)
 
@@ -133,7 +130,7 @@ remove the owner file.
    section starts with the three lines `Work-Item: B-NNN`, `Plan-Task: <plan path>#T<n>` and `Risk: <the plan's
    front-matter risk set, for example r1, r2, r3>` exactly; acceptance criteria table; Verification (local gate commands
    and results); Engineering impact; Version impact; the self-review checklist filled with facts (counted lines of
-   budget, the `test:` commit sha); a `## Review` section holding the content of `<lead>/reports/b<NNN>-review.md`
+   counted lines and estimate, the `test:` commit sha); a `## Review` section holding the content of `<lead>/reports/b<NNN>-review.md`
    and one line on who wrote the change (a subagent of the lead) ; no "Progress and handoff" placeholders left.
    For a documents amendment the second line is `Plan-Task: none (spec and plan)`.
 4. Open the pull request into `build/v1` with `mcp__github__create_pull_request` (title = the registry `prTitle`,
@@ -229,17 +226,17 @@ guess). Three consecutive failed attempts at the same failure means stop and rep
 The owner approved six measures on 2026-11-14 («طبق الاقتراحات فقط كتعديل على ملفات اسلوب العمل»). They change how work
 flows, never what is checked: test-first, the independent review, the adversarial verification of engineering content,
 the mutation step and local CI on the merged head stay exactly as sections 1 to 5 describe. Nothing here lets an agent
-skip a check, weaken a test or stretch a task past its file list or its budget. Items 4a, 5 and 6 apply to lanes started
+skip a check, weaken a test or stretch a task past its file list. Items 4a, 5 and 6 apply to lanes started
 with lane script version 2 (`<lead>/build-lane-v2.workflow.js`); a lane resumed from an older run keeps its
 older role texts, and a role text always wins over this section for that role.
 
 1. **Pre-flight audit of the plans (lead step, in force at the next start).** Before a wave of tasks is launched the
    lead runs `<lead>/plan-audit.workflow.js` over the plans of that wave (read-only: an auditor per plan checks
-   every remaining task's `files`, budget, `tests_first` and `depends_on` against the merged code; a second agent tries
+   every remaining task's `files`, `tests_first` and `depends_on` against the merged code; a second agent tries
    to refute each finding), and turns the confirmed findings into ONE documents amendment per plan. First the plans on
-   the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0008, providers 0009),
+   the first-live-run path (engine 0001, servers 0002, interface 0006, edit cycle 0007, decisions 0005, providers 0009),
    later plans when their wave is near (an audit of code that will still change goes stale). Writers keep their own
-   duty: check the file list and the budget before writing everything, and stop early when the plan cannot hold the task.
+   duty: check the file list before writing, and stop early when the task needs a file outside it.
 2. **Small edits of existing tests outside the file list (approved; NOT in force until the gate rule merges, work item
    B-507).** A pull request is judged by the gate of its base commit, so until B-507's gate change is on `build/v1` the
    rule of section 1 stands: a needed file outside `files` means `NEEDS_PLAN_AMENDMENT`. When the only out-of-list files
@@ -282,3 +279,109 @@ older role texts, and a role text always wins over this section for that role.
 Lead bookkeeping for these measures: the queue and the order at the next start are in
 `<lead>/resume/RESUME.md`; the owner's words are in `<lead>/reports/owner-answers-2026-11-14.md`,
 section F.
+
+## 8. Low-cost mode (owner's demand of 2026-11-15 for the fastest finish on a limited usage allowance; work item B-514)
+
+Measured over the whole session (agent records): about 140 million fresh tokens for about 75 merged pull requests, that
+is about 1.9 million per merged pull request, plus about 2.7 billion cache-read tokens from agents that wait in many
+turns. The integrator role alone used 29 million fresh tokens (74 agents), almost as much as all Sonnet writers (32
+million, 55 agents); Opus roles (writers of amendments and calcs, reviewers, fix rounds, verifiers) used 46 million.
+The checks do not change (test-first, independent review, adversarial verification of engineering content, mutation,
+local CI on the merged head); what changes is who does the mechanical work and which model does which role. Applies to
+lanes started with lane script version 3 (`<lead>/build-lane-v3.workflow.js`).
+
+1. **Models.** Opus only where the content is engineering (harness calcs, code-pack checks: writer, reviewer,
+   verifiers) or a documents amendment that must decide a design question. Every other writer and reviewer is Sonnet.
+   The gate runner is the small model (section 7 item 5). The integrator is Sonnet at low effort with the fixed sequence
+   below.
+2. **The writer writes the pull request body.** Before it pushes, the writer (code and documents alike) writes
+   `<lead>/pr/b<NNN>-body.md` exactly as section 5 step 3 describes (the three first lines `Work-Item:`,
+   `Plan-Task:`, `Risk:`; acceptance criteria table; Verification; Engineering impact; Version impact; the self-review
+   checklist filled with facts), WITHOUT a `## Review` and WITHOUT a `## Local CI` section: the script adds both. A fix
+   round that changes facts in the body (counted lines, commit shas, results) updates the file.
+3. **The integrator runs a fixed sequence** with `<lead>/tools/integrate.sh` (same lock, merge rules, local
+   CI and merge conditions as section 5): `merge <NNN>` (takes the lock, merges `origin/build/v1`, keeps both sides of
+   CHANGELOG.md and docs/local-testing.md, says whether the gate without mutation must be rerun), `gate <NNN> <member>`
+   when asked, `push <NNN>`, `body <NNN>` (appends the Review section from the review record), then the pull request
+   is found or created with the GitHub tools, `ci <NNN> <number>` (starts local CI and waits; appends the Local CI
+   section on PASS), the body is updated and the pull request squash-merged with `expectedHeadSha`, and always last
+   `finish <NNN>` (releases local CI and the lock). Exit code 3 means run the same command again; 4 conflict; 7 behind
+   (start again from `merge`); 1 failed. The integrator edits no file and decides nothing; on anything unexpected it
+   runs `finish` and reports.
+4. **Fewer turns.** Every turn of an agent re-reads its whole context. Batch independent commands into one call, wait
+   for a long process with one blocking command per call (never a loop of short sleeps), read the sections of a spec
+   your task covers and not the whole file, and stop reading once you can act.
+5. **Scope.** Until the first live run works on the owner's machine, only the first-live-run path is built (lead
+   decision D-32 as the owner restated it on 2026-11-15). Off the path and frozen: the task log (plan 0015), the gate
+   changes B-507 and B-508, the column workflow, the footing design, the adapters of other hosts, calcs T11 and T12,
+   servers T17 and T19b.
+6. **Mechanical plan amendments are written by the lead (owner's permission of 2026-11-15: «نعم، اكتب التعديلات
+   الآلية مباشرة»).** Mechanical means: a file added to a task's `files` with the evidence of a writer's trial (the
+   gate passed with exactly that file set), an optional `max_changed_lines` estimate refreshed from a measured count,
+   a `tests_first` entry moved to the implementation commits because it cannot be red at the base (TF004), a
+   `depends_on` id corrected after a split, stale prose corrected to what merged. The lead edits the plan in a
+   worktree, opens a documents pull request (`Plan-Task: none (spec and plan)`, `Risk: r0`, the Review section says
+   "mechanical plan amendment written by the lead under the owner's permission of 2026-11-15; no independent review;
+   evidence: ..."), runs `integrate.sh` and merges on a local CI PASS. NOT mechanical, full cycle with a writer and an
+   independent reviewer: any spec sentence, acceptance criterion, error code, engineering rule, a task split, a new
+   task, anything that needs a decision.
+7. **The machine has 4 processor cores (measured 2026-11-15: load average 9 with seven lanes).** More lanes than the
+   cores can serve make every gate and every local CI run two to three times slower and make load-sensitive tests fail
+   (a failed local CI run costs the queue about half an hour). The lead runs at most three lanes that write code at the
+   same time; lanes that only wait for the integration lock do not count. The lead pushes no state file to `build/v1`
+   while a local CI run is in progress (a moved base makes the run `BEHIND`). An agent never starts a CPU-heavy job
+   (a full test run, a stress loop) that its role does not require.
+8. **Mutation runs once per change and once per ten merges (owner decision of 2026-11-15, work item B-516).** The gate
+   runner still runs the mutation step on every code change before its pull request is opened (sections 4 and 7). The
+   local CI run of a pull request runs everything else (`check --all --skip mutation`). After every ten merges the lead
+   runs `bash <lead>/tools/periodic-mutation.sh <the build/v1 commit of the previous periodic run>` in the
+   background: the mutation step over every R1 and R2 module changed since that commit, on `origin/build/v1` as it is
+   now, in the separate worktree `<worktrees>/full-ci`, at low priority, judged by the base's gate as local CI does.
+   The base is required: run on `build/v1` without one, the mutation step finds no changed module and mutates nothing
+   (measured on 2026-11-16). The push mode of `ops/localci.py` is not used for this: it holds the local CI lock for the
+   whole run and stops the merge queue. A failure there becomes a fix work item at once. A pull request
+   body never says the mutation step ran in local CI: the summary states which run it was.
+
+9. **No second gate run under the integration lock (lead decision of 2026-11-15, follows B-516).** The local CI run of
+   a pull request now is the gate without mutation over all packages on the merged head. The gate rerun "after a merge
+   that brought changes" of section 5 would run the same checks on the same head while the lock is held, so the
+   integrator skips it (`integrate.sh merge` always answers `NEED_GATE=0`) and goes straight to push, pull request and
+   local CI. A failure shows in the CI gate job with the same lines; the repair writer then runs the whole gate without
+   mutation (never only the tests) before the next attempt.
+10. **Hold marker.** `locks/hold.b<NNN>` (written and removed by the lead only) makes `integrate.sh merge <NNN>` wait
+   (exit 3) until a dependency of that task, usually its plan amendment, has merged.
+11. **The writer runs the test-first check before its first push (lead decision of 2026-11-16, after B-489 and B-149).**
+   A test in the first `test:` commit that passes at the base (TF004) cannot be repaired once the branch is pushed: it
+   costs a rebuild on a fresh branch. So, in the worktree, before the first push and again after any change to the
+   first `test:` commit: `uv run -q eng-gate test-first --base $(git merge-base origin/build/v1 HEAD) --head HEAD
+   --title "<pull request title>"`, and the result goes into the handoff note. If it reports TF004 before anything is
+   pushed, rewrite the local commits (nothing is published yet); after a push, stop and report it to the lead.
+12. **Batch merge (owner decision of 2026-11-16, work item B-539).** Local CI may test up to three waiting pull
+   requests as one batch: every job except the gate job runs for each pull request as before; the gate job runs once
+   on the tree that the batch's squash merges produce together; on a PASS every member merges; on a FAIL each member
+   is tested alone. After the merges local CI compares the tree of `build/v1` with the tested tree. When the file
+   `<lead>/BATCH_MODE` exists, `integrate.sh` does not take the integration lock (local CI queues the runs
+   itself and always tests on the newest base); the integrator's sequence is unchanged. A merge call that fails because
+   the base branch moved is repeated after twenty seconds, up to five times. The lead writes or removes the mode file;
+   an agent never does.
+13. **Scripts that agents run are replaced, never rewritten in place (lead rule of 2026-11-16).** bash reads a script
+   while it runs it: rewriting `<lead>/tools/*.sh` in place made three running integrations fail. The lead
+   writes the new version to a new file and renames it over the old one (`mv`), so that a running process keeps the
+   file it started with. An agent that sees a syntax error from a lead script stops, runs `finish` and reports, as the
+   three integrators did.
+14. **The live local CI run has CPU priority (lead rule of 2026-11-16).** A helper of the lead raises the priority of
+   the live local CI run, because a few merged tests assert wall-clock bounds and failed once under load. Agents do not
+   change process priorities; a dry run or any other extra heavy job that an agent is asked to start runs in the idle
+   class (`chrt -i 0 nice -n 19 ...`).
+15. **Pause file (lead rule of 2026-11-17, after the pause of 2026-11-16 was not kept).** When the owner orders a pause
+   the lead creates `<lead>/locks/pause.lane`. Every writer, reviewer, verifier and gate runner of lane script
+   version 3.4 checks it first and returns BLOCKED with "PAUSED by the lead" at once, so that no lane starts new work;
+   integrators already running finish their sequence. The lead removes the file when the owner says to continue.
+
+## 9. Cost and speed measures (owner decision of 2026-11-18, «طبق الاقتراحات»)
+1. Reviewer model: Sonnet by default. Opus only for engineering calcs and checks (with the Opus verifiers) and the core wiring tasks (S.T19a, W.T8 to W.T9c, I.T16b, I.T18a, I.T18b).
+2. One review round: reviewers return CHANGES only for findings that must be fixed before merge; minor points go to lead findings. Round cap 2 (engineering 3). Lane script v3.6.
+3. Writer effort medium, high only for the core tasks.
+4. No documents audits or walk-throughs before the first live run.
+5. No per-task mutation run in the lane (Gate phase only when a task sets mutation: true); the periodic full mutation every ten merges stays.
+6. Collateral edits (ADR-0036): a test file or the package CHANGELOG.md outside a task's files may be edited and listed under "Collateral edits"; gate GC008 becomes a notice for them B-566 merged #426 (2026-11-18): start every new lane with collateral: true. max_sessions is an estimate: never a stop.

@@ -1,0 +1,189 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 load_pattern_add is add, load_combination_delete is remove, unaccepted items give nothing",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. State: patterns DEAD and LIVE; combinations COMB1 and COMB9. d1 adds pattern SDL (type dead, self weight 0 as a ratio of 1): one `add` of the whole pattern {name SDL, type dead, self_weight_ratio 0} on [patterns, SDL] of model.load_set/1. d2 deletes COMB9: one `remove` on [combinations, COMB9]. d3 deletes COMB1 but is not among the accepted items, so it gives no effect. Sorted by key: combinations before patterns, so d2 then d1. Each item gives one effect, so the ids are plain.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "d1",
+          "kind": "load_pattern_add",
+          "targets": [
+            "SDL"
+          ],
+          "values": [
+            {
+              "pointer": "/self_weight_ratio",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/self_weight",
+              "unit": "1"
+            }
+          ]
+        },
+        {
+          "item_id": "d2",
+          "kind": "load_combination_delete",
+          "targets": [
+            "COMB9"
+          ],
+          "values": []
+        },
+        {
+          "item_id": "d3",
+          "kind": "load_combination_delete",
+          "targets": [
+            "COMB1"
+          ],
+          "values": []
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "d1",
+      "d2"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "d1",
+          "kind": "load_pattern_add",
+          "name": "SDL",
+          "type": "dead",
+          "self_weight": {
+            "source": "input",
+            "value": 0.0,
+            "unit": "1"
+          }
+        },
+        {
+          "id": "d2",
+          "kind": "load_combination_delete",
+          "name": "COMB9"
+        },
+        {
+          "id": "d3",
+          "kind": "load_combination_delete",
+          "name": "COMB1"
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [
+        {
+          "name": "DEAD",
+          "type": "dead",
+          "self_weight_ratio": 1.0
+        },
+        {
+          "name": "LIVE",
+          "type": "live",
+          "self_weight_ratio": 0.0
+        }
+      ],
+      "combinations": [
+        {
+          "name": "COMB1",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            }
+          ]
+        },
+        {
+          "name": "COMB9",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "LIVE",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            }
+          ]
+        }
+      ],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {}
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "d2",
+        "section": "model.load_set/1",
+        "key": [
+          "combinations",
+          "COMB9"
+        ],
+        "op": "remove",
+        "pointer": null,
+        "value": null,
+        "unit": null
+      },
+      {
+        "item_id": "d1",
+        "section": "model.load_set/1",
+        "key": [
+          "patterns",
+          "SDL"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "name": "SDL",
+          "type": "dead",
+          "self_weight_ratio": 0.0
+        },
+        "unit": null
+      }
+    ]
+  }
+}
