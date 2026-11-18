@@ -113,6 +113,7 @@ def test_page_server_is_not_started_or_not_opened(
     session = PageSession(
         config=config, store=store, runs_dir=runs, cell=RunIdCell(runs, "run_x"), clock=clock, wait_timeout_s=1,
         no_wait=no_wait, no_browser=no_browser, opener=_recording(opened), stderr=err,
+        terminal_writer=lambda _: False,
     )  # fmt: skip
     asyncio.run(session.inputs.present(_input_request()))
     assert asyncio.run(session.inputs.answer("in_one", wait=False)) is None
