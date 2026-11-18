@@ -22,7 +22,7 @@ before acting, and quote the rule.
 3. Find the spec and plan on `main` and check their `status`. Work only in the stage the gates allow.
 4. Read the plan task: its files, session estimate (`max_sessions`) and tests. Read every file you will touch.
 5. Check the working tree: correct branch, clean state, up to date with `main`.
-6. State in one short message: issue, tier, risk, stage, plan task, session budget, and what "done" means for it.
+6. State in one short message: issue, tier, risk, stage, plan task, session estimate, and what "done" means for it.
 
 ## 3. Hard prohibitions
 

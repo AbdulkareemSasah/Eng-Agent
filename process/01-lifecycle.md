@@ -16,7 +16,7 @@ flowchart LR
 | S1 Discovery | Problem statement, acceptance criteria, reuse research | The problem is measurable; reuse options were checked |
 | S2 Spec | Spec file of the right type ([03](03-specs-and-design-review.md)); an ADR if architecture changes | Spec review checklist passes |
 | **G1** | The spec merged to `main` through its own pull request, front matter `status: approved` | Approvals per §5, verified by the `gate-check` CI job |
-| S3 Plan | Plan file `docs/plans/<issue>-<slug>.md` ([templates/implementation-plan.md](templates/implementation-plan.md)) | Every acceptance criterion maps to a test; every task lists its files, size estimate and session budget |
+| S3 Plan | Plan file `docs/plans/<issue>-<slug>.md` ([templates/implementation-plan.md](templates/implementation-plan.md)) | Every acceptance criterion maps to a test; every task lists its files, size estimate and session estimate |
 | **G2** | The plan merged to `main` through its own pull request, `status: approved` | Approvals per §5, verified by `gate-check` |
 | S4 Implement | Per task: a `test:` commit with failing tests, then code, then refactor | Task tests green |
 | S5 Pre-checks | Local gate (`uv run eng-gate check`) and optional author-side review tools | Local gate green |

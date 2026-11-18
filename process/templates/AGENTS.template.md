@@ -41,7 +41,7 @@ Never use pip, poetry, conda or a manually created virtual environment.
 3. Never invent an engineering number: cite it, take it from the design basis, or ask.
 4. Never improvise a missing capability: in a live project, build it as a permanent tool through the project lane
    when the owner asks; otherwise file a gap report and report `BLOCKED`.
-5. Stay inside the plan task: its files and its session budget.
+5. Stay inside the plan task: its files and its session estimate.
 6. Nobody approves their own work; reviews that count are run by CI or given by the owner.
 7. CI is the definition of done; nothing bypasses CI or branch protection.
 8. uv only for Python.
@@ -81,8 +81,8 @@ credentials or deployment; anything security-sensitive; three consecutive attemp
 ## 8. Session protocol
 
 Start: read this file and the stage's process documents; confirm the issue is assigned to you; find the approved spec
-and plan on `main`; read the plan task (files, session budget, tests) and every file you will touch; check the
-branch; state issue, tier, risk, stage, task, session budget and "done".
+and plan on `main`; read the plan task (files, session estimate, tests) and every file you will touch; check the
+branch; state issue, tier, risk, stage, task, session estimate and "done".
 Work: `test:` commit first; then code; run the local gate before pushing.
 End: commit and push the branch, write the handoff note (done, verified how, left, risks, sessions used), report `DONE`,
 `DONE_WITH_CONCERNS`, `BLOCKED` or `NEEDS_CONTEXT` with evidence. Leave the tree clean by committing, never by deleting.
