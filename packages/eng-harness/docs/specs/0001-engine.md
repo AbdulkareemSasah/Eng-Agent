@@ -76,6 +76,20 @@ block cannot read), while `Preview.models` and `ctx.promote` take one. Both now 
 named key and uses only `model_key` of a handle (approval binding, promotion), so the key carries everything it needs
 and a block never invents a model id or revision. The new criterion is AC72, built by plan T23.
 
+**Amendment B-569.** The writer of spec 0007's workflow part 1 (plan 0007 T8, work item B-202) and its independent
+verifiers found four points, each reproduced on the merged code (§11 Q45 to Q48); it adds no criterion. (1) The first
+read of `ctx.basis` loads the stored basis through `BasisPort` from block code, so the production `StoreBasisPort`
+(a store read) is refused by the runtime guard: the load is engine work, `in_block_code` false for the port call only
+(§4.3.2 row basis, §4.3.4 rule 1; AC18 names the test, and spec 0004 AC28 gains a run over `StoreBasisPort`),
+built by plan T24. (2) EC2 and EC5 rely on an adapter
+guarantee that the CSI adapter did not keep: a tool save's result carries in `provenance.host` the revision after the
+save (§4.6 "Tool saves"; spec 0002 §4.5.3, spec 0007 §4.10), built by plan 0007 T13b. (3) A workflow input field that
+names a model file is typed `eng_harness.block.ModelFile`, an alias of `pathlib.PurePath`, because block code may not
+import `pathlib` (§4.1.1, §4.1.2, §4.2; spec 0006 §4.2.2 step 2, spec 0007 §4.2), built by plan 0007 T8 or plan 0006
+T14c, whichever merges first. (4) Block code reads a result through the read-only accessors `ReadResult.data` and
+`Answered.answer`, because the attribute `value` is refused, and the block-module rules test also reports the forms
+that reach `value` around that rule (§4.3.2, AC12, AC61, AC19), built by plan 0007 T8b.
+
 ## 1. Problem
 
 The first workflow, the model edit cycle ([ADR-0025](../../../../design/docs/adr/0025-first-workflow-edit-cycle.md)),
@@ -156,7 +170,8 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `tests/unit/test_ctx_tool.py::test_tool_result_and_failure`.
 - AC12. Given a stored result, when `ctx.read(ref, pointer)` runs, then the step is journaled with kind `read`, the
   value is returned with quantity objects as `Quantity`, and pointer and reference errors are the contract's
-  `REF_*` codes. Test: `tests/unit/test_ctx_read.py::test_read`.
+  `REF_*` codes; the read-only property `ReadResult.data` returns that decoded value, a nested quantity object still a
+  `Quantity` (amendment B-569, §4.3.2). Test: `tests/unit/test_ctx_read.py::test_read`.
 - AC13. Given a calc, when `ctx.calc(id, args)` runs, then the step is journaled with the calc's id, version, content
   hash and status, and returns a `CalcResult`; a `draft` or `verified` calc marks the run's outputs `DRAFT`; a
   `CalcRefused` raised by the CalcPort is journaled `step_failed` and reaches the block as a `StepError` with its code
@@ -171,7 +186,8 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   `input_requested` (kind `block`) is journaled, the run pauses (`run_paused`, reason `awaiting_input`) and the process
   returns `PAUSED`; when it is resumed with an answer that validates against `fields`, then the answer is stored as a
   `basis.engineer_input/1` result, `input_provided` records its `answer_ref` and `by`, the block receives
-  `Answered[M]` whose `value` is the validated model and whose `field_ref(name)` is a reference into that result, and a
+  `Answered[M]` whose `value` is the validated model, whose read-only property `answer` returns that model instance
+  (amendment B-569, §4.3.2) and whose `field_ref(name)` is a reference into that result, and a
   further resume replays it without asking again; an answer that fails `fields` is refused and the request presented
   again. Test: `tests/unit/test_ctx_ask.py::test_ask_stores_engineer_input`.
 - AC66. Given `ctx.decide` whose DecisionPort returns a `PendingAnswer`, when no answer is stored, then
@@ -228,12 +244,21 @@ workspace (process/05 §1 "Workflow" layer, engine side; the server-process side
   §4.3.4), then the runtime guard raises `BlockRuleViolation` and the operation does not happen; the engine's own I/O
   in the same process, including during those calls, is unaffected. Tests:
   `tests/unit/test_guard.py::test_guard_blocks_io_in_block_code`, `::test_guard_covers_parallel_children_and_child_blocks`,
-  `::test_rule_guard_factory`.
+  `::test_rule_guard_factory`. Amendment B-569: the engine's own I/O includes the `BasisPort` load behind the first
+  `ctx.basis` read (§4.3.4 rule 1): given a run over `StoreBasisPort` whose root block's first action reads
+  `ctx.basis` (`record_ref()` with no declared path, and `quantity(path)` of a path in `required_basis`), then the run
+  completes; and given a block that reads `ctx.basis` and then opens a file, then the open is still refused
+  (`block_rule_violation`). Test: `tests/unit/test_guard.py::test_basis_load_is_engine_work`.
 - AC19. Given fixture block and rule modules with an import outside the allowlist of §4.1.2, a read of an attribute
   named `value`, an arithmetic operator, a `while` loop, a bare `except` or `except BaseException`, then the
   block-module rules test reports each; and every module matching `block_modules` or `rule_modules` in this package
   passes. Tests: `tests/rules/test_block_modules.py::test_rules_detect_violations`,
-  `::test_package_block_modules_pass`.
+  `::test_package_block_modules_pass`. Amendment B-569: it also reports the forms that reach `value` around that rule,
+  `getattr(<expression>, "value")` with a constant string, a read of `__dict__` or a call of `vars(...)`, and a
+  subscript `["value"]` applied directly to a `model_dump(...)` or `model_dump_json(...)` call, and a read of an
+  attribute named `parser` (the `pathlib.PurePath.parser` of a `ModelFile` reaches `os.path`, §4.1.2); a `"value"` key
+  of a plain mapping and a subscript of a `model_dump(...)` call with another constant key still pass. Test:
+  `::test_rules_detect_violations` (its fixture lines, plan 0007 T8b).
   Under mutation testing (environment variable `MUTANT_UNDER_TEST` set) the test does not judge the
   `mutmut` import that the mutation tool inserts into its copy of a rule or block module; it judges every other line of
   that copy, and in every other run it judges in full. Amendment (B-542; the pattern of spec 0003 §9, B-437).
@@ -507,7 +532,7 @@ module has a leading underscore (contract §4.1 convention, 03 §3 rule 2).
 | Module | Public names | Who may import |
 |---|---|---|
 | `eng_harness` | `__version__` | anyone |
-| `eng_harness.block` | `block`, `workflow`, `BlockDef`, `WorkflowDef`, `Registry`, `RegistryError`, `check_lock`, `LockFinding`; `FieldSpec` (the object `eng_harness.basis` exports, imported from `eng_harness.basis._fields`, amendment B-415) | block code, engine, CLI |
+| `eng_harness.block` | `block`, `workflow`, `BlockDef`, `WorkflowDef`, `Registry`, `RegistryError`, `check_lock`, `LockFinding`; `FieldSpec` (the object `eng_harness.basis` exports, imported from `eng_harness.basis._fields`, amendment B-415); `ModelFile` (an alias of `pathlib.PurePath`, §4.1.2, amendment B-569) | block code, engine, CLI |
 | `eng_harness.ctx` | `Ctx` (Protocol), `ToolResult`, `ReadResult`, `CalcResult`, `Decision`, `DecisionRequest`, `Answered`, `Approval`, `ApprovalKind`, `Preview`, `PreviewItem`, `Attempt`, `BasisView`, `BasisCount`, `ModelHandle`, `Promotion`, `ArgValue` | block code |
 | `eng_harness.errors` | `HarnessCode`, `EngineStop` and subclasses, `StepError` and subclasses (§6) | block code (the `StepError` family only), engine |
 | `eng_harness.ports` | the ports and data types of §4.8 | engine, later specs' implementations, tests |
@@ -548,6 +573,20 @@ module. A new import in that module needs an amendment of this section first. `e
 standard library, `pydantic`, `eng_contract._unit_table` and `eng_contract.errors`. Loading
 `eng_harness.kinds.edit_cycle` also runs `eng_harness/kinds/__init__.py`; as for `FieldSpec` below, that is a run-time
 load, not an import statement of block code.
+
+**Model-file paths admitted by name (amendment B-569).** `eng_harness.block` exports `ModelFile`, a plain type alias of
+`pathlib.PurePath`: a pure path, with no method that touches the file system. It is the type of a workflow input field
+that names a model file (§4.2; spec 0006 §4.2.2 step 2, spec 0007 §4.2). Block code takes it from `eng_harness.block`
+and still may not import `pathlib` (or `PurePath`, `PurePosixPath`, `PureWindowsPath`) itself; the gate's FB004 and the
+AC19 rules test are unchanged and keep refusing every `pathlib` import in block and rule modules. A value of the field
+is a `PurePath` (`PureWindowsPath` on Windows, `PurePosixPath` elsewhere); block code reads its base name (`.name`),
+which is the model key, and nothing on it opens, reads, stats or changes a file. Its `parser` attribute (the
+`os.path` module of its flavour) is refused by name in block and rule modules (AC19). Decision (B-569): a pure path
+rather than `pathlib.Path` admitted by name, because FB004 has no per-name exemption (admitting `Path` would need
+owner edits of protected gate paths) and because `Path` would give block code `chmod`, `rmdir`, `symlink_to`,
+`hardlink_to` and `stat`, which the runtime guard of §4.3.4 does not stop (shown by the B-202 verification); rather
+than `str`, because the command line needs a type to find model-file fields by and the base name of a `str` depends on
+the separator.
 
 **Where `eng_harness.block` takes `FieldSpec` (amendment B-415, draft; review fix; amendment B-511).**
 `eng_harness.block` exports `FieldSpec` (§4.2) from `eng_harness.basis._fields`, never from the package
@@ -608,6 +647,12 @@ async def model_edit_cycle(ctx: Ctx, inp: EditCycleInput) -> EditCycleOutput: ..
   tuple, so both verdicts agree for every declaration (EC4). Invariant 5 reads `required_basis` as before. With
   `basis_fields` empty, `required_basis` is as passed, or `()` when not passed (the workflows of earlier specs keep
   working). Neither member changes `code_sha256` rules; both are recorded through the block's code hash.
+- **Model-file input fields (amendment B-569).** A top-level field of a workflow's input model that names a model file
+  is annotated `eng_harness.block.ModelFile` (`pathlib.PurePath`, §4.1.2), or `ModelFile | None`. The engine validates
+  the input as for any other field (strict JSON mode gives a `PurePath` of the running platform's flavour) and checks
+  nothing about the file, at start or at a resume; the command line finds these fields by the identity of the
+  annotation, converts each value to a `pathlib.Path` for its own checks at `run` and gives the host port the files
+  (spec 0006 §4.2.2 step 2).
 - The decorators only build the definition; they never register globally (no global mutable state, process/04 §5).
   `Registry(blocks: Iterable[BlockDef])` is immutable; `Registry.with_(...)` returns a new one. Rules of AC2; a
   workflow is also a block (`WorkflowDef` is a `BlockDef`).
@@ -678,15 +723,17 @@ options **[added: 11 §3 writes `**args`]**.
 | attempts | `attempts(limit: BasisCount) -> AsyncIterator[Attempt]` (use: `async for a in ctx.attempts(...)`) | `attempts`; scope |
 | escalate | `escalate(reason: str, evidence: Sequence[Ref]) -> NoReturn` | `escalate` |
 | promote | `promote(model: ModelHandle \| str, how: Promotion, approval: Approval) -> ModelHandle` **[added]**; a `str` is a model key (amendment B-543, AC72) | `promote`; write |
-| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E`, `record_ref() -> Ref` (the reference `res_<id>` to the whole `basis.design_basis/1` result, for a calc input `basis`, spec 0003 §4.4; it reads no path and needs no declaration; amendment B-511, plan 0007 T6, criterion spec 0007 AC33) | not a step (the basis is frozen and in the run header) |
+| basis | `basis: BasisView` (property, synchronous): `ref(path) -> Ref`, `quantity(path) -> Quantity`, `count(path) -> BasisCount`, `choice(path, enum: type[E]) -> E`, `record_ref() -> Ref` (the reference `res_<id>` to the whole `basis.design_basis/1` result, for a calc input `basis`, spec 0003 §4.4; it reads no path and needs no declaration; amendment B-511, plan 0007 T6, criterion spec 0007 AC33) | not a step (the basis is frozen and in the run header); the first read loads the stored basis through `BasisPort` as engine work, `in_block_code` false for that port call only (§4.3.4 rule 1, amendment B-569), and later reads use the loaded view |
 
 Result types (frozen Pydantic models): `ToolResult` (`tool`, `ref: Ref`, `summary: Mapping[str, SummaryValue]`,
 `warnings: tuple[ContractWarning, ...]`, `complete: bool`, `model: ModelHandle | None`, `None` in v1: a block names a
 model by its key, amendment B-543), where `SummaryValue` is a JSON
 value in which every quantity object of contract §4.8 is a `Quantity` or `LabeledQuantity`; `ReadResult` (`ref`,
-`kind`, `value`); `CalcResult` (`calc_id`, `calc_version`, `status`, `ref`, `summary`, `draft: bool`); `Decision`
+`kind`, `value`; the read-only property `data -> SummaryValue` returns `value` as decoded, amendment B-569);
+`CalcResult` (`calc_id`, `calc_version`, `status`, `ref`, `summary`, `draft: bool`); `Decision`
 (`choice`, `decided_by`, `confidence: float | None`); `Answered[M]` (`value: M`, `ref: Ref` of the
-`basis.engineer_input/1` result, `field_ref(name) -> Ref`); `Approval` (§4.9); `Attempt` (`index`, `is_last`).
+`basis.engineer_input/1` result, `field_ref(name) -> Ref`; the read-only property `answer -> M` returns the validated
+model, amendment B-569); `Approval` (§4.9); `Attempt` (`index`, `is_last`).
 `DecisionRequest`, the block-level item of `decide_many` (`question`, `options`, `state`, `rules`, `policy`, the
 arguments of `decide`), is not a Pydantic model: it is a frozen, slotted standard-library dataclass, which Python 3.14
 builds without evaluating its annotations, so `rules` and `policy` need no run-time import. The engine checks its
@@ -698,6 +745,13 @@ unchanged; the cascade validates them (spec 0005 §4.5 step 1).
 `typing.TYPE_CHECKING`, in the `Ctx` protocol and in `DecisionRequest`, neither of which Pydantic validates), so
 `eng_harness.ctx` does not import the decision layer at run time and can be built before it (decision plan T4 needs
 `BasisView`), and the engine passes them to `DecisionCall` unchanged.
+
+**Result accessors (amendment B-569).** Block and rule code reads a `ReadResult` through `data` and an `Answered`
+through `answer`, never through the field `value`: an attribute read named `value` is refused by the rules test
+(§4.3.4 rule 2, AC19), which cannot tell `ReadResult.value` from `Quantity.value`, and the forms that reach `value`
+around it (`getattr`, `__dict__`, `vars`, `model_dump()["value"]`) are refused too (AC19), since a dump turns every
+nested `Quantity` back into a raw number. Neither accessor opens a `Quantity`: the only exit to a number stays
+`Quantity.value`, which block code may not read. The fields, the codec and the stored forms do not change.
 
 **Parallel error choice.** `ctx.parallel` waits for every child (no child is cancelled, so no write is interrupted)
 and then raises one error: the first by class rank `ReplayDivergence` > `NeedsReconciliation` > `BlockRuleViolation`
@@ -723,7 +777,7 @@ The gate's lint (FB004, FB005) and the block-module rules test (AC19) check the 
 
 | Rule (11 §3) | Runtime enforcement |
 |---|---|
-| 1 No direct I/O | Runtime guard: one `sys.addaudithook` hook per process, installed by the first `Engine`. A context variable (`in_block_code`) is false only while the engine executes its own step work (port calls, journal and store writes, codec, invariant checks) and true whenever control is in block or rule code, including the children of `ctx.parallel`, the function of a child block run by `ctx.block`, and the body of an `async for` over `ctx.attempts`: each ctx call sets it false on entry and restores true before it awaits or returns into block-supplied code (a child coroutine, a child block's function, the next loop iteration). While true, the audit events `open`, `os.*` file and process events (`os.remove`, `os.rename`, `os.mkdir`, `os.listdir`, `os.scandir`, `os.system`, `os.exec`, `os.posix_spawn`, `os.spawn`, `os.startfile`), `subprocess.Popen`, `socket.*`, `sqlite3.connect`, `ctypes.*` and `import` raise `BlockRuleViolation` (AC18). The decision layer (0005) evaluates rules inside the same guard: `eng_harness.engine.rule_guard()` returns a context manager that installs the hook if needed and sets `in_block_code` true for its body; the cascade is constructed with it as its `rule_guard` (spec 0005 §4.5) |
+| 1 No direct I/O | Runtime guard: one `sys.addaudithook` hook per process, installed by the first `Engine`. A context variable (`in_block_code`) is false only while the engine executes its own step work (port calls, journal and store writes, codec, invariant checks) and true whenever control is in block or rule code, including the children of `ctx.parallel`, the function of a child block run by `ctx.block`, and the body of an `async for` over `ctx.attempts`: each ctx call sets it false on entry and restores true before it awaits or returns into block-supplied code (a child coroutine, a child block's function, the next loop iteration). The first read of `ctx.basis` (a synchronous property, not a step, §4.3.2) loads the stored basis through `BasisPort` as engine work: `in_block_code` is false for that port call only, and true again before the property returns the view to block code; the load stays lazy (a run that never reads the basis never calls `BasisPort.load`), and the same loader serves the decision layer (amendment B-569; the production `StoreBasisPort` reads the store, which the guard refused while the flag was true). While true, the audit events `open`, `os.*` file and process events (`os.remove`, `os.rename`, `os.mkdir`, `os.listdir`, `os.scandir`, `os.system`, `os.exec`, `os.posix_spawn`, `os.spawn`, `os.startfile`), `subprocess.Popen`, `socket.*`, `sqlite3.connect`, `ctypes.*` and `import` raise `BlockRuleViolation` (AC18). The decision layer (0005) evaluates rules inside the same guard: `eng_harness.engine.rule_guard()` returns a context manager that installs the hook if needed and sets `in_block_code` true for its body; the cascade is constructed with it as its `rule_guard` (spec 0005 §4.5) |
 | 2 No engineering arithmetic | `Quantity` has no arithmetic (contract §4.8); values reach blocks only as `Quantity`; arguments that are numbers or `Quantity` objects for `engineering_quantity` parameters are refused (invariant 2) |
 | 3 No literal thresholds | Source lint only (FB005); at runtime, `ctx.attempts` accepts only a `BasisCount` |
 | 4 Deterministic | Replay divergence (§4.5.2); overlap detection (§4.3.1); the replay test of every workflow (process/05 §2) |
@@ -1041,6 +1095,14 @@ the step's model key (`ToolInfo.model_param`) with role `revision`:
 A result without `provenance.host`, a new-file save whose summary has no `saved_file` (name and SHA-256 hex digest),
 or a `saved_file.sha256` that differs from the model's file hash raises `ModelIntegrityError` (a `StepError`) and no
 `model_saved` is appended; the host-state check (§4.5.4) then still compares with the earlier save (EC2).
+
+Adapter guarantee (amendment B-569). EC2 and EC5, and the host-state check at a resume, rely on the adapter: a tool
+save's result (and that of a tool for which `saves_new_file(args)` is true) carries in `provenance.host` the model
+identity and the revision after the step, recorded by the adapter as its own save, never as an outside edit, so the
+`model_saved` revision taken from it equals the revision `HostPort.model_state` reports right after the step (spec
+0002 §4.5.3; for the CSI adapter spec 0007 §4.10, plan 0007 T13b). The engine does not correct a result that breaks
+this: the next write under the approval then meets `ApprovalVoid` (§4.9) and a resume meets `host_state_mismatch`
+(§4.5.4), which is what the B-202 verification reproduced with the CSI adapter before that fix.
 
 At a resume, a tool save reconciled `applied` (§4.5.3), or one whose `step_completed` is journaled without the
 `model_saved` that should follow it (the process stopped between the two), is never journaled from a live read made
@@ -1444,3 +1506,7 @@ treatment of earlier payloads (§4.4.2). The base port method defaults to false 
 | Q42 | B-499: promotion of a model that has no working copy (written in place in another mode, or never written). §4.7 names `FILE_COPY` for "the edit cycle and new models" but no target for a model with no original | Owner | Writer's recommendation (B-499, open): `BlockRuleViolation`, nothing copied, as the B-115 draft does, until a workflow that promotes new models has a spec naming the target; plan T16b builds the answer |
 | Q43 | B-499: an approval shown before the working copy exists. Its binding is the original's state (§4.9), the first write under it takes the copy and goes to it (§4.7), and the re-check reads the copy, whose key and file hash differ, so approving before the first write always ends in `ApprovalVoid` | Owner | Writer's recommendation (B-499, open): when the copy is taken while the original still equals the binding, the binding moves to the copy's state and a write to the copy counts as one to the bound model, as the B-115 draft does; the alternative is to take the working copy before an approval whose preview names an open model without one is shown; plan T16 builds the answer |
 | Q44 | B-499: the file hash of a model. Promotion compares `FileOps.sha256` of the original's files with `origin_sha256`, taken from `HostModelState.file_sha256`, but neither this spec nor spec 0002 (§4.6.4: "of the last save") defines that hash for a model with several files | Owner | Writer's recommendation (B-499, open): the SHA-256 of the files' bytes in the order of `HostPort.model_files`, as the B-115 draft computes it, which for the one-file adapters (spec 0002 §4.5.9, spec 0011: "the model file only") is the file's SHA-256; spec 0002 states it at its next amendment; plan T16b builds the answer |
+| Q45 | **[added: B-569]** B-202 F1: `ctx.basis` is a synchronous property that loads the stored basis lazily from block code, where `in_block_code` is true, so the production `StoreBasisPort` (a `ResultStore` read, audit event `open`) is refused by the guard and every workflow that reads the basis from a block before a `decide` has loaded it ends `NEEDS_ENGINEER` (`block_rule_violation`); the fakes answer from memory and never showed it | Owner | Decided as a clarification of rule 1 (lead, B-569; no behaviour of the rule changes): the first read loads through `BasisPort` as engine work, `in_block_code` false for the port call only, by a synchronous engine section around the load in the engine's basis loader, which serves `ctx.basis` and the decision layer alike; the load stays lazy, so `tests/workflow/test_invariants.py::test_no_basis_read_when_nothing_is_required` stays unchanged; an eager load at start was rejected (that test, and two load paths) (§4.3.2, §4.3.4, AC18); built by plan T24 |
+| Q46 | **[added: B-569]** B-202 F2: EC2 and EC5 take a tool save's revision from its result's `provenance.host`, but the CSI tool port stored the result with the binding read before the call and did not record the save, so the next `model_state` saw the new file hash as an outside save (revision + 1, `MODEL_CHANGED_OUTSIDE`): the first write after the step 7 save met `ApprovalVoid`, and a resume after any tool save met `host_state_mismatch` | Owner | Decided as an adapter guarantee (lead, B-569; the engine and its rules unchanged): §4.6 "Tool saves" states it; spec 0002 §4.5.3 and spec 0007 §4.10 make the adapter record the save before it stores the result; built by plan 0007 T13b |
+| Q47 | **[added: B-569]** B-202 F3: spec 0007 §4.2 and spec 0006 AC67 (amendment B-536) typed the model-file input field `pathlib.Path`, which §4.1.2, FB004 and the AC19 rules test refuse in block modules | Owner | Decided (lead, B-569): `eng_harness.block.ModelFile`, an alias of `pathlib.PurePath`, admitted by that name; no `pathlib` import in block code, no change of FB004 or of a protected path; the `parser` attribute refused by AC19 (§4.1.1, §4.1.2, §4.2); the alias built by plan 0007 T8 or plan 0006 T14c, whichever merges first, and the `parser` rule by plan 0007 T8b. Separate finding for the owner, not decided here: the guard's audit events (rule 1) do not list `os.chmod`, `os.rmdir`, `os.symlink` or `os.link` |
+| Q48 | **[added: B-569]** B-202 F4: the rules test refuses an attribute named `value`, while `ReadResult.value` and `Answered.value` were the only documented way to read a result, so block code read them through `model_dump()["value"]`, which the scan does not see and which turns nested quantities into raw numbers | Owner | Decided (lead, B-569): the read-only accessors `ReadResult.data` and `Answered.answer`, and the rules test reports `getattr(x, "value")`, `__dict__`, `vars(...)` and `["value"]` on a `model_dump` call (§4.3.2, AC12, AC61, AC19); built by plan 0007 T8b with the switch of the merged edit-cycle blocks to the accessors. Not verified, open: whether a `ctx.read` pointer ending inside a quantity object (`.../value`) returns a raw number; if it does, refusing such a pointer is a later amendment |
