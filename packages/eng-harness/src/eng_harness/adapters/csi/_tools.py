@@ -10,21 +10,38 @@ their `action` makes the engine save the model first (engine invariant 7).
 Each write is recorded for the read-back (plan 0002 T12b): the wrapped builder, which sees the canonical model and the
 binding before the send, prepares the item; a successful reply commits it and marks the write on the host port, so the
 fingerprint change is not an outside edit; a failed call records nothing (an unknown outcome is T14's reconciliation).
+
+Adapter-local tools (plan 0007 T5; spec 0007 4.10) are defined here, not in the allowlist file, whose names the build
+check compares with the server's tool list: the reads of `_read_state_tool.py`, `csi_open_revision` and `csi_save_model`
+with `as_new_revision` (`_revisions.py`). Each composes allowlisted host tools; `csi_open_model` is allowlisted for
+`csi_open_revision` and, with no path, the step 2 open of the original (`opener`). With `Revisions` wired, the open
+file is read before every write but an open: a snapshot is never written. A save or restore a timeout cut off is
+not reconciled: the engineer decides. The summary of a snapshot save and of a restore carries `saved_file` (`name`,
+`sha256`).
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
+from pathlib import Path
 from typing import Any, Literal
 
-from eng_contract.envelope import Envelope, SuccessEnvelope
+from eng_contract.envelope import Envelope, SuccessEnvelope, make_failure
+from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.params import ParamModel
 from pydantic import BaseModel, Field, JsonValue
 
 from eng_harness.adapters._allowlist import Allowlist
+from eng_harness.adapters._args import validate_call
 from eng_harness.adapters._descriptors import ToolDescriptor
+from eng_harness.adapters._envelope import make_envelope
 from eng_harness.adapters._toolport import AdapterToolPort, Binding, Builder, ModelBinder, Reader
 from eng_harness.adapters.csi import _replies, csi_allowlist
 from eng_harness.adapters.csi._checks import WrittenItems
 from eng_harness.adapters.csi._edits import EDIT_BUILDERS, EDIT_MODELS
+from eng_harness.adapters.csi._read_state_tool import READ_TOOLS, ModelArgs
+from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, Revisions, SavedFile, SaveModelArgs
+from eng_harness.errors import ToolFailed
+from eng_harness.ports import ToolInfo
+from eng_harness.servers import CallEffect
 
 __all__ = ["READERS", "TOKENS", "CsiToolPort", "tool_allowlist"]
 
@@ -76,6 +93,29 @@ class _ObjectResultsArgs(_ResultsArgs):
     object: str | None = None
 
 
+class OpenModelArgs(ParamModel):
+    """`csi_open_model`: with no `path` the original of `model` (step 2); a `path` only `csi_open_revision` sends."""
+
+    model: str
+    path: str | None = None
+
+
+def _local(name: str, args_model: str, *, write: bool) -> ToolDescriptor:
+    return ToolDescriptor(
+        name=name, kind="write" if write else "read", timeout_class="call", effect="write" if write else "read",
+        action="open" if write else "plain", args_model=args_model, units="none", confirm="never",
+        readback="model_file" if write else None, products=("ETABS",),
+    )  # fmt: skip
+
+
+LOCAL_TOOLS = (  # adapter-local (spec 0007 4.10): not in the server's tool list, so not in the allowlist file
+    _local("csi_read_model_state", "ModelArgs", write=False),
+    _local("csi_read_analysis_messages", "ModelArgs", write=False),
+    _local("csi_open_revision", "OpenRevisionArgs", write=True),
+)
+SESSION_TOOLS = frozenset({"csi_save_model", "csi_open_model"})  # allowlisted; their canonical arguments are below
+_UNRECONCILED = SESSION_TOOLS | {"csi_open_revision"}
+
 ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_model`
     "RunAnalysisArgs": _ModelArgs,
     "AnalysisStatusArgs": _ModelArgs,
@@ -84,6 +124,10 @@ ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_mod
     "ResultsJointReactionsArgs": _ObjectResultsArgs,
     "ResultsFrameForcesArgs": _ObjectResultsArgs,
     "ResultsStoryDriftsArgs": _ResultsArgs,
+    "ModelArgs": ModelArgs,
+    "OpenRevisionArgs": OpenRevisionArgs,
+    "SaveModelArgs": SaveModelArgs,
+    "OpenModelArgs": OpenModelArgs,
 }
 
 
@@ -106,9 +150,11 @@ READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1);
 
 
 def tool_allowlist() -> Allowlist:
-    """The packaged CSI allowlist reduced to the edit tools of spec 4.6.2 and the analysis, design and result tools."""
+    """The packaged CSI allowlist reduced to the edit tools of spec 4.6.2, the analysis, design and result tools and the
+    session tools of `SESSION_TOOLS`, plus the adapter-local `LOCAL_TOOLS`."""
     full = csi_allowlist()
-    return full.model_copy(update={"tools": tuple(t for t in full.tools if t.name in EDIT_BUILDERS | READERS.keys())})
+    kept = EDIT_BUILDERS | READERS.keys() | SESSION_TOOLS
+    return full.model_copy(update={"tools": (*(t for t in full.tools if t.name in kept), *LOCAL_TOOLS)})
 
 
 class _TokenBinder:
@@ -139,25 +185,151 @@ class CsiToolPort(AdapterToolPort):
     """`AdapterToolPort` over `tool_allowlist()` and its argument models, builders, readers; `wiring` as its parameters.
 
     `written` is the book that `AdapterHostPort.check_model` reads (its `ReadBack`) and `wrote` is the host port's; a
-    port made without them records into a book nobody reads.
+    port made without them records into a book nobody reads. `revisions` holds the run's snapshots: without it
+    `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked. `reopened`
+    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file after a
+    successful `csi_open_revision` only. `opener` is the host port's `open_original`: `csi_open_model` with no path
+    calls it (spec 4.5.9); without it that open is refused with `INTERNAL`.
     """
 
     def __init__(
         self, *, binder: ModelBinder, written: WrittenItems | None = None, wrote: Callable[[str], None] | None = None,
-        **wiring: Any,
+        revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None,
+        opener: Callable[[str], Awaitable[Path]] | None = None, **wiring: Any,
     ) -> None:  # fmt: skip
-        self._written, self._wrote = written or WrittenItems(), wrote or (lambda key: None)
-        builders: Mapping[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
+        self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
+        self._reopened, self._opener = reopened or (lambda key, path: None), opener
+        builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
+        builders["csi_save_model"] = (
+            lambda model, descriptor, binding: {}
+        )  # the open file in place; no `as_new_revision`
         super().__init__(
             allowlist=tool_allowlist(), arg_models=EDIT_MODELS | ANALYSIS_MODELS, builders=builders, readers=READERS,
             binder=_TokenBinder(binder), **wiring,
         )  # fmt: skip
 
+    async def describe(self, tool: str) -> ToolInfo:
+        """As `AdapterToolPort.describe`, as a `CsiToolInfo` (`saves_new_file`)."""
+        return CsiToolInfo(**(await super().describe(tool)).model_dump())
+
+    def supports_reconcile(self, tool: str) -> bool:
+        """As `AdapterToolPort.supports_reconcile`; false for saves and restores (the engineer decides)."""
+        return tool not in _UNRECONCILED and super().supports_reconcile(tool)
+
     async def call(self, tool: str, args: Mapping[str, JsonValue], *, op_id: str, model: str | None) -> Envelope:
-        """As `AdapterToolPort.call`; a successful edit is committed to the book and marked on the host port."""
+        """As `AdapterToolPort.call`; a successful edit is committed to the book and marked on the host port.
+
+        Raises:
+            ContractError: `INVALID_ARGUMENT` for a tool outside the allowlist.
+        """
+        descriptor = self._find(tool)
+        try:
+            if tool == "csi_open_model":
+                return await self._open_original(descriptor, args, model)
+            if tool in READ_TOOLS:
+                return await self._read_parts(descriptor, args, model)
+            if tool == "csi_open_revision":
+                return await self._open_revision(args, op_id, model)
+            if tool == "csi_save_model" and args.get("as_new_revision") is True:
+                return await self._new_revision(descriptor, args, op_id, model)
+            if self._revisions is not None and descriptor.effect == "write":
+                self._not_a_snapshot(await self._open_file(descriptor, model))
+        except (ContractError, ToolFailed) as error:
+            return make_failure(error.detail)
         reply = await super().call(tool, args, op_id=op_id, model=model)
         key = str(args.get("model"))
         if isinstance(reply, SuccessEnvelope) and tool in EDIT_BUILDERS:  # analysis and reads change no model row
             self._written.commit(key)
             self._wrote(key)
         return reply
+
+    def _wired(self) -> Revisions:
+        if self._revisions is None:
+            raise ContractError(ErrorCode.INTERNAL, "no revision wiring", incident_id=self._ids.new_ulid())
+        return self._revisions
+
+    async def _open_file(self, descriptor: ToolDescriptor, model: str | None) -> Path | None:
+        """The path the host reports for the model open in the bound instance, `None` when none is open."""
+        binding = await self._binder.binding(self._config.servers[self._server].host_key, model, descriptor)
+        info = await self._read("csi_model_info", {"target": binding.target.model_dump()}, CallEffect.READ)
+        path = info.get("model_path")
+        return Path(path) if isinstance(path, str) else None
+
+    def _not_a_snapshot(self, path: Path | None) -> None:
+        if path is not None and self._wired().is_snapshot(path):
+            raise ContractError(ErrorCode.CONFLICT, "the open file is a snapshot of this run", received=path.name)
+
+    async def _read_parts(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None
+    ) -> Envelope:
+        """An adapter-local read: each part stored as its own result, the last one answers (`_read_state_tool`)."""
+        server = self._config.servers[self._server]
+        self._health.check(server.host_key)  # a wedged host gets nothing until the engine has reconciled
+        started, began = self._clock.now(), self._clock.now_ms()
+        validated = validate_call(ModelArgs, args, source=self._store, current_revision=self._binder.revision)
+        binding = await self._binder.binding(server.host_key, model, descriptor)
+        *others, (_, kind, payload) = await READ_TOOLS[descriptor.name](self._read, binding.target)
+
+        def put(kind: str, payload: dict[str, JsonValue], summary: dict[str, JsonValue]) -> SuccessEnvelope:
+            return make_envelope(
+                self._store, tool=f"{self._allowlist.adapter}/{descriptor.name}", kind=kind, payload=payload,
+                summary=summary, reply={}, check=self._check, host=binding.host, inputs=validated.inputs,
+                started_at=started, duration_ms=self._clock.now_ms() - began,
+            )  # fmt: skip
+
+        refs: dict[str, JsonValue] = {key: put(part, body, {}).result_id for key, part, body in others}
+        return put(kind, payload, refs)
+
+    async def _new_revision(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], op_id: str, model: str | None
+    ) -> Envelope:
+        """`csi_save_model` with `as_new_revision`: the open file saved in place, then copied to a verified snapshot."""
+        revisions = self._wired()
+        working = await self._open_file(descriptor, model)
+        if working is None:
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, "no model is open", precondition=Precondition.model_open)
+        self._not_a_snapshot(working)
+        target = revisions.target(working)  # refused before anything is saved
+        reply = await super().call("csi_save_model", args, op_id=op_id, model=model)
+        if not isinstance(reply, SuccessEnvelope):
+            return reply
+        return _with_saved_file(reply, revisions.snapshot(working, target))
+
+    async def _open_original(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None
+    ) -> Envelope:
+        """`csi_open_model` with no path: the host port opens the original, nothing is ledgered (spec 4.5.9)."""
+        server = self._config.servers[self._server]
+        self._health.check(server.host_key)
+        started, began = self._clock.now(), self._clock.now_ms()
+        validated = validate_call(OpenModelArgs, args, source=self._store, current_revision=self._binder.revision)
+        if validated.model.path is not None:
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, "csi_open_model opens the original: no path", field="path")
+        if self._opener is None:
+            raise ContractError(ErrorCode.INTERNAL, "no opener wiring", incident_id=self._ids.new_ulid())
+        key = validated.model.model
+        opened = await self._opener(key)
+        binding = await self._binder.binding(server.host_key, key, descriptor)
+        return make_envelope(
+            self._store, tool=f"{self._allowlist.adapter}/csi_open_model", kind="harness.run_output/1",
+            payload={"value": {"model": key, "file": opened.name}}, summary={}, reply={}, check=self._check,
+            host=binding.host, inputs=validated.inputs, started_at=started, duration_ms=self._clock.now_ms() - began,
+        )  # fmt: skip
+
+    async def _open_revision(self, args: Mapping[str, JsonValue], op_id: str, model: str | None) -> Envelope:
+        """`csi_open_revision`: a copy of an unchanged snapshot becomes the working file, opened without saving."""
+        revisions = self._wired()
+        validated = validate_call(OpenRevisionArgs, args, source=self._store, current_revision=self._binder.revision)
+        path, saved = revisions.reopen(validated.model.revision)
+        reply = await super().call(
+            "csi_open_model", {"model": validated.model.model, "path": str(path)}, op_id=op_id, model=model
+        )
+        if not isinstance(reply, SuccessEnvelope):
+            return reply
+        self._reopened(validated.model.model, path)
+        return _with_saved_file(reply, saved)
+
+
+def _with_saved_file(reply: SuccessEnvelope, saved: SavedFile) -> SuccessEnvelope:
+    """`reply` whose summary also names the file written (engine 4.6 "Tool saves": `saved_file`)."""
+    return reply.model_copy(update={"summary": {**reply.summary, "saved_file": saved.model_dump()}})

@@ -1,0 +1,137 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.3 (host design verdicts, concrete), gap EC-G2, S-12 inventory step 13, synthetic fixture",
+  "method_ref": "§4.4.3 concrete: every row is NEEDS_ENGINEER, host concrete design output not mapped (EC-G2)",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. Concrete beam rows as S-12 step 13 names them (frame, location, top_combo, top_area, bot_combo, bot_area, shear_combo, shear_area): no single ratio and no combo column. Gap EC-G2: every row gives one verdict NEEDS_ENGINEER with no ratio and the message \"host concrete design output not mapped\" (the verdict's assumptions list holds it, the contract verdict has no message field), check_id host.concrete_design_ratio, code host_concrete_design, subject {frame, row frame, case null} because the rows have no combo. The basis limit 0.9 is the ratio_limit of each verdict (a verdict without a ratio is not compared with it). Three rows give three verdicts in row order. Counts: NEEDS_ENGINEER 3, the others 0.",
+  "input": {
+    "results": {
+      "rows": [
+        {
+          "frame": "B1",
+          "location": 0.0,
+          "top_combo": "COMB1",
+          "top_area": 0.0012,
+          "bot_combo": "COMB2",
+          "bot_area": 0.0008,
+          "shear_combo": "COMB1",
+          "shear_area": 0.0003
+        },
+        {
+          "frame": "B2",
+          "location": 0.0,
+          "top_combo": "COMB3",
+          "top_area": 0.0012,
+          "bot_combo": "COMB3",
+          "bot_area": 0.0008,
+          "shear_combo": "COMB2",
+          "shear_area": 0.0003
+        },
+        {
+          "frame": "B3",
+          "location": 0.0,
+          "top_combo": "COMB1",
+          "top_area": 0.0012,
+          "bot_combo": "COMB1",
+          "bot_area": 0.0008,
+          "shear_combo": "COMB1",
+          "shear_area": 0.0003
+        }
+      ]
+    },
+    "kind": "concrete",
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.ratio_limit_ratio": {
+          "value": 0.9,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "results": "res_00000000000000000000000001",
+    "basis": "res_00000000000000000000000002"
+  },
+  "expected": {
+    "verdicts": [
+      {
+        "source": "host",
+        "check_id": "host.concrete_design_ratio",
+        "code": "host_concrete_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B1",
+          "station_mm": null,
+          "case": null
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": null,
+        "ratio_limit": 0.9,
+        "status": "NEEDS_ENGINEER",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": [
+          "host concrete design output not mapped"
+        ]
+      },
+      {
+        "source": "host",
+        "check_id": "host.concrete_design_ratio",
+        "code": "host_concrete_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B2",
+          "station_mm": null,
+          "case": null
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": null,
+        "ratio_limit": 0.9,
+        "status": "NEEDS_ENGINEER",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": [
+          "host concrete design output not mapped"
+        ]
+      },
+      {
+        "source": "host",
+        "check_id": "host.concrete_design_ratio",
+        "code": "host_concrete_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B3",
+          "station_mm": null,
+          "case": null
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": null,
+        "ratio_limit": 0.9,
+        "status": "NEEDS_ENGINEER",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": [
+          "host concrete design output not mapped"
+        ]
+      }
+    ],
+    "traces": [],
+    "counts": {
+      "PASS": 0,
+      "FAIL": 0,
+      "NOT_APPLICABLE": 0,
+      "NEEDS_ENGINEER": 3,
+      "ERROR": 0
+    }
+  }
+}

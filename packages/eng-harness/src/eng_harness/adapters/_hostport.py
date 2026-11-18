@@ -3,24 +3,28 @@
 import hashlib
 import json
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 from eng_contract.envelope import Envelope, HostInfo
 from eng_contract.errors import ContractError, ContractWarning, ErrorCode, Precondition, WarningCode
-from eng_contract.ids import Clock, IdSource
+from eng_contract.ids import Clock, IdSource, Timestamp
 from eng_contract.store import ModelStateStore
 
+from eng_harness.adapters._args import HostTarget
+from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._identity import IdentityStore
+from eng_harness.adapters._toolport import Binding
 from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of, snapshot
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
 from eng_harness.adapters.csi._state import CsiStateReader, StateRead
-from eng_harness.ports import HostInstance, HostModelState, SavedModel, UnitsState
+from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
-from eng_harness.servers._procinfo import ProcessInspector
-from eng_harness.servers._session import ServerManager
+from eng_harness.servers._procinfo import ProcessIdentity, ProcessInspector
+from eng_harness.servers._session import CallEffect, ServerManager
 
 
 class AdapterHostPort:
@@ -28,11 +32,13 @@ class AdapterHostPort:
         self, *, identity: IdentityStore, sessions: ServerManager, guard: ProcessGuard, inspector: ProcessInspector,
         locks: HostLocks, clock: Clock, ids: IdSource, run_dir: Path, product: str, program: str, exe_name: str,
         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
-        readback: ReadBack | None = None,
+        readback: ReadBack | None = None, visible: bool = False,
+        tolerance: Callable[[], float | None] | None = None,
     ) -> None:  # fmt: skip
-        self._identity, self._clock, self._ids = identity, clock, ids
+        self._identity, self._clock, self._ids, self._sessions, self._locks = identity, clock, ids, sessions, locks
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
         self._product, self._profile, self._readback = product, products.profile(product), readback
+        self._tolerance = tolerance
         self._files = {key: path.resolve() for key, path in files.items()}
         self._models: dict[str, str] = {}
         self._bound: dict[str, str] = {}
@@ -43,9 +49,38 @@ class AdapterHostPort:
         self._written: set[str] = set()
         self._warnings: list[tuple[str, WarningCode]] = []
         self._session = CsiSession(
-            sessions, guard, inspector, locks, ids, server=server, product=product, program=program, exe_name=exe_name
-        )
+            sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
+            exe_name=exe_name, visible=visible,
+        )  # fmt: skip
         self._reader = CsiStateReader(product=product, call=self._session._call)  # B-451: no public read on CsiSession
+        self._load(files)
+
+    async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
+        return await self._sessions.preflight(min_builds)
+
+    def session_epoch(self, host_key: str) -> int:
+        return self._sessions.session_epoch(host_key)
+
+    async def acquire(self, host_key: str) -> HostLease:
+        """Lease the host: lock again each live instance of the run state (`HOST_LOCKED` when held elsewhere)."""
+        if host_key == self._host_key:
+            for opened in self._instances.values():
+                if self._session.alive(opened):
+                    self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
+        return HostLease(host_key=host_key, lease_id=self._ids.new_ulid())
+
+    async def release(self, lease: HostLease) -> None:
+        self._locks.release_all()
+
+    async def open_original(self, model_key: str) -> Path:
+        """Open the file of `model_key` in the run's instance (launching one) and bind it (spec 4.5.9, step 2 open)."""
+        source = self._file(model_key)
+        model_id = self._identity.resolve(source).model_id
+        opened = await self._session.open_file(source, self._reusable(), self._clock.now())
+        self._keep(model_key, source, model_id, opened)
+        self._units[model_key] = await self._session.units(opened)
+        self._persist()
+        return source
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
         source = self._file(model_key)
@@ -61,7 +96,8 @@ class AdapterHostPort:
     async def save(self, model_key: str, role: str) -> SavedModel:
         path, opened = self._held(model_key)
         await self._session.save(path, opened)
-        s = self._identity.record_save(self._models[model_key], path)
+        fingerprint = (await self._reader.read(opened.pid, path)).fingerprint  # B-451 L3: the saved state's own
+        s = self._identity.record_save(self._models[model_key], path, fingerprint)
         digest = s.file_sha256
         if digest is None:
             raise ContractError(ErrorCode.INTERNAL, "the save recorded no file hash", incident_id=self._ids.new_ulid())
@@ -114,6 +150,8 @@ class AdapterHostPort:
         """
         if self._readback is None:
             raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())
+        if self._readback.tolerance_ratio is None and self._tolerance is not None:
+            self._readback = replace(self._readback, tolerance_ratio=self._tolerance())
         path, opened = self._held(model_key)
         started, began = self._clock.now(), self._clock.now_ms()
         read = await self._reader.read(opened.pid, path)
@@ -133,6 +171,50 @@ class AdapterHostPort:
         self._readback.written.clear(model_key)  # only now: a failed store leaves the items to the next check
         return envelope
 
+    def open_model_bound(self, model: str | None) -> bool:
+        """Whether an open's model key has an instance binding, without reading the model (preview exception)."""
+        return bool(self._bound) if model is None else model in self._bound
+
+    async def binding(self, host_key: str, model: str | None, descriptor: ToolDescriptor) -> Binding:
+        """The live, locked instance and current identity; version from the last state read, else model info (4.5.9).
+
+        Reading model info here never installs an outside-edit baseline. Missing/ambiguous bindings are model_open.
+        """
+        keys = [model] if model is not None else list(self._bound)
+        live = [key for key in keys if host_key == self._host_key and await self.locate(key) is not None]
+        if len(live) != 1:
+            raise ContractError(
+                ErrorCode.PRECONDITION_FAILED, "no unique open model", precondition=Precondition.model_open
+            )
+        key = live[0]
+        _, opened = self._held(key)
+        self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
+        resolved = self._identity._known(self._models[key])  # read-only: binding must not consume an outside file edit
+        read = self.last_read(key)
+        if read is None:
+            info = await self._session._call("csi_model_info", self._session._target(opened.pid), CallEffect.READ)
+            value = info.get("program_version")
+            version = value if isinstance(value, str) else ""
+        else:
+            version = read.status.program_version
+        revision = self.revision(resolved.model_id)
+        return Binding(
+            target=HostTarget(product=self._product, pid=opened.pid),
+            units_system=self._units.get(key),
+            host=HostInfo(
+                program=self._program,
+                version=version,
+                model_id=resolved.model_id,
+                model_revision=resolved.revision if revision is None else revision,
+            ),
+            owned=self._session.owns(opened),
+        )
+
+    def revision(self, model_id: str) -> int | None:
+        """The model state's current revision; absent identities are untracked (reference staleness)."""
+        state = None if self._states is None else self._states.get(model_id)
+        return None if state is None else state.revision
+
     def last_read(self, model_key: str) -> StateRead | None:
         """The payloads, status and fingerprint of the last `model_state` of `model_key`, or `None`."""
         return self._reads.get(model_key)
@@ -140,6 +222,20 @@ class AdapterHostPort:
     def wrote(self, model_key: str) -> None:
         """Mark an adapter write: the next fingerprint change of `model_key` is the adapter's, not an outside edit."""
         self._written.add(model_key)
+
+    def reopened(self, model_key: str, path: Path) -> None:
+        """Bind `model_key` to `path`, the file the bound instance now has open (spec 0007 4.10: `csi_open_revision`).
+
+        The binding keeps its model id and the file is recorded as its next revision (spec 0007 Q16 is open). The last
+        state read is dropped, so the next `model_state` is a new baseline. `ContractError` `NOT_FOUND`: no such key.
+        """
+        self._file(model_key)
+        resolved = path.resolve()
+        self._files[model_key] = resolved
+        self._identity.record_save(self._models[model_key], resolved)
+        self._reads.pop(model_key, None)
+        self._written.discard(model_key)
+        self._persist()
 
     def take_warnings(self) -> list[tuple[str, WarningCode]]:
         """The `MODEL_CHANGED_OUTSIDE` warnings (model key, code) noted by `model_state` since the last call."""
@@ -206,6 +302,7 @@ class AdapterHostPort:
         self._written.discard(model_key)
         self._bound[model_key] = opened.instance_id
         self._instances[opened.instance_id] = opened
+        self._sessions.bind_instance(self._host_key, pid=opened.pid, product=self._product)
 
     def _host(self, opened: OpenedInstance) -> HostInstance:
         at = opened.observed_at
@@ -213,10 +310,41 @@ class AdapterHostPort:
             instance_id=opened.instance_id, pid=opened.pid, process_started_at=at, program=self._program
         )
 
+    def _load(self, files: Mapping[str, Path]) -> None:
+        """Take the run state of an earlier port as a cache (spec 4.5.9; the journal wins); instances get session -1."""
+        path = self._run_dir / "adapter" / "state.json"
+        if not path.is_file():
+            return
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        for r in saved["instances"]:
+            opened = OpenedInstance(
+                r["instance_id"],
+                r["pid"],
+                r["started_at"],
+                Timestamp(r["observed_at"]),
+                r["exe_name"],
+                -1,
+                r["visible"],
+            )
+            self._instances[opened.instance_id] = opened
+            if self._session.alive(opened):
+                self._sessions.bind_instance(self._host_key, pid=opened.pid, product=self._product)
+        for key, b in saved["bindings"].items():
+            self._bound[key], self._models[key] = b["instance_id"], b["model_id"]
+            self._files.setdefault(key, Path(b["file"]))
+        self._units.update(saved["expected_units"])
+        self._files.update({key: path.resolve() for key, path in files.items()})  # the constructor's files win
+
     def _persist(self) -> None:
         path = self._run_dir / "adapter" / "state.json"
         path.parent.mkdir(parents=True, exist_ok=True)
-        rows = [{"instance_id": i.instance_id, "pid": i.pid, "visible": i.visible} for i in self._instances.values()]
+        rows = [
+            {
+                "instance_id": i.instance_id, "pid": i.pid, "visible": i.visible, "started_at": i.started_at,
+                "observed_at": i.observed_at, "exe_name": i.exe_name,
+            }
+            for i in self._instances.values()
+        ]  # fmt: skip
         bound: dict[str, dict[str, str]] = {}
         for key in self._bound:
             bound[key] = {"instance_id": self._bound[key], "model_id": self._models[key], "file": str(self._files[key])}

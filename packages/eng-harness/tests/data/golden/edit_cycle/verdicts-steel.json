@@ -1,0 +1,149 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.3 (host design verdicts, steel), S-12 inventory step 13, synthetic fixture",
+  "method_ref": "§4.4.3 steel: PASS when the host ratio is at most the basis limit, else FAIL",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. Steel rows as S-12 step 13 names them (frame, ratio, ratio_type, location, combo); basis limits.ratio_limit_ratio 0.95, so every verdict has ratio_limit 0.95. One verdict per row, in the row order, with check_id host.steel_design_ratio, code host_steel_design and subject {frame, row frame, case row combo}. C1 1.25 > 0.95 is FAIL. B2 0.95 is equal to the limit and not above it, so PASS. B1 0.4 <= 0.95 is PASS. B3 0.96 > 0.95 is FAIL, just above the limit. The ratio is the host's, copied. Counts: PASS 2 (B2, B1), FAIL 2 (C1, B3), the other statuses 0. No verdict cites a trace, so traces is empty.",
+  "input": {
+    "results": {
+      "rows": [
+        {
+          "frame": "C1",
+          "ratio": 1.25,
+          "ratio_type": "PMM",
+          "location": 0.0,
+          "combo": "COMB3"
+        },
+        {
+          "frame": "B2",
+          "ratio": 0.95,
+          "ratio_type": "PMM",
+          "location": 0.0,
+          "combo": "COMB2"
+        },
+        {
+          "frame": "B1",
+          "ratio": 0.4,
+          "ratio_type": "PMM",
+          "location": 0.0,
+          "combo": "COMB1"
+        },
+        {
+          "frame": "B3",
+          "ratio": 0.96,
+          "ratio_type": "Shear",
+          "location": 0.0,
+          "combo": "COMB1"
+        }
+      ]
+    },
+    "kind": "steel",
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.ratio_limit_ratio": {
+          "value": 0.95,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "results": "res_00000000000000000000000001",
+    "basis": "res_00000000000000000000000002"
+  },
+  "expected": {
+    "verdicts": [
+      {
+        "source": "host",
+        "check_id": "host.steel_design_ratio",
+        "code": "host_steel_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "C1",
+          "station_mm": null,
+          "case": "COMB3"
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": 1.25,
+        "ratio_limit": 0.95,
+        "status": "FAIL",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": []
+      },
+      {
+        "source": "host",
+        "check_id": "host.steel_design_ratio",
+        "code": "host_steel_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B2",
+          "station_mm": null,
+          "case": "COMB2"
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": 0.95,
+        "ratio_limit": 0.95,
+        "status": "PASS",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": []
+      },
+      {
+        "source": "host",
+        "check_id": "host.steel_design_ratio",
+        "code": "host_steel_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B1",
+          "station_mm": null,
+          "case": "COMB1"
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": 0.4,
+        "ratio_limit": 0.95,
+        "status": "PASS",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": []
+      },
+      {
+        "source": "host",
+        "check_id": "host.steel_design_ratio",
+        "code": "host_steel_design",
+        "clause": null,
+        "subject": {
+          "kind": "frame",
+          "id": "B3",
+          "station_mm": null,
+          "case": "COMB1"
+        },
+        "demand": null,
+        "capacity": null,
+        "ratio": 0.96,
+        "ratio_limit": 0.95,
+        "status": "FAIL",
+        "governing": false,
+        "trace_ref": null,
+        "assumptions": []
+      }
+    ],
+    "traces": [],
+    "counts": {
+      "PASS": 2,
+      "FAIL": 2,
+      "NOT_APPLICABLE": 0,
+      "NEEDS_ENGINEER": 0,
+      "ERROR": 0
+    }
+  }
+}

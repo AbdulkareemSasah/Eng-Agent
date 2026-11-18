@@ -42,7 +42,7 @@ how the accepted ETABS sections reach Revit by reference, with read-back, under 
 |---|---|---|
 | Edit cycle (EC §4.5) | Read, difference report, approval, revision save, writes, read-back, analysis, design, engineer turn, promotion, sign-off | Reused as child blocks `read_state`, `apply_change_set`, `run_and_summarize` and `_finish` (Q3) |
 | `harness.section_round` (0003 §4.10) | Smallest basis multiple not below a required size | Used for every proposed dimension; no rounding here |
-| `harness.design_summary` (0003 §4.9) | Summary of one `verdicts.set/1`; traces are local to a payload, so sets cannot be merged | Its member method S5 is cited by `harness.column_review` (§4.4.3), which reads several sets by reference without copying verdicts |
+| `harness.design_summary` (0003 §4.9) | Summary of one verdict set (`verdicts.set/1` or `harness.host_design_verdicts/1`, 0003 §4.9); traces are local to a payload, so sets cannot be merged | Its member method S5 is cited by `harness.column_review` (§4.4.3), which reads several sets by reference without copying verdicts |
 | `harness.host_design_verdicts` (EC §4.4.3) | Steel ratio per frame; concrete `NEEDS_ENGINEER` | Used unchanged; concrete columns have no host verdict (CW-G1) |
 | `harness.frame_element_map` (RV §4.11) | Exact geometric pairing, links as hints | Used unchanged |
 | Code checks `aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits` (CK §1) | Draft, pure, `evaluate_batch` (CF §4) | Called through the CalcPort code-pack route (§4.5, C2) |
@@ -295,7 +295,7 @@ E5 as steps. Each code-check input is passed as a reference into this result.
 
 #### 4.4.3 `harness.column_review` v1
 
-Input: `selection`, `host` (`verdicts.set/1` from `harness.host_design_verdicts`), `code` (the three code-check
+Input: `selection`, `host` (`harness.host_design_verdicts/1`, the output of `harness.host_design_verdicts`), `code` (the three code-check
 `verdicts.set/1` results), `items` (for `not_checked`), optional `previous` (`harness.column_review/1`), `basis`
 (`report.top_n`). Method: R1 only verdicts whose subject is a selected column (`frame`, id) are read. R2 members and
 member status per 0003 §4.9 S5 (key: column, source, check id); a column's `status` is the worst of its members, and

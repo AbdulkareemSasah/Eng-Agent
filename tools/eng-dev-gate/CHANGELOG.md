@@ -7,6 +7,9 @@ contains every entry listed below; README documents every command with an exampl
 
 ## Unreleased
 
+- `gate-check`: a changed path outside the task's globs that has a `tests/` directory segment, or is the `CHANGELOG.md` of a workspace member or of the plan's package folder, is a GC008 notice naming it a collateral edit; any other path outside the globs (also a `src/**/test_*.py` module) stays a GC008 error. `max_sessions` is an estimate that the gate never checks (B-566, plan task T41, AC10d, ADR-0036).
+- `gate-check`: GC009 always reports counted lines, the task estimate and largest files as a notice; `max_changed_lines` has no cap and `limits.max_task_lines` is removed (B-553, plan task T40, AC11, AC13).
+
 - `forbidden`: FB005 form A4 admits an integer literal given directly as the `version=` keyword of a callable named in `versioned.callables` of `.gate/forbidden.yml` (initially `calc` and `CheckMeta`). A version is an identity, so it carries no threshold (B-439, plan task T39, AC33a).
 - Fix: the `mutation` step bounds `mutmut run` by the new `limits.mutation_run_seconds` (7200 s in the root `.gate/gate.yml`, owner queue), not by the 900 s bound of one tool call; a timeout is MU002 naming the limit; `ToolRunner.run` gains the keyword `timeout_seconds` and a timeout raises `ToolTimeoutError` (B-384, plan task T38, AC53c).
 - Fix: the `mutation` step lists the member's other top-level files and folders (README, LICENSE, docs and so on) under mutmut's `also_copy`, so a mutated test run that builds the package or reads its own files behaves as in the tests step (B-371, plan task T37, AC53b).

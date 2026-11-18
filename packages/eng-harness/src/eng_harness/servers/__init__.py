@@ -10,7 +10,9 @@ from eng_harness.servers._config import (
     ServerConfig,
     ServersConfig,
     load_servers_config,
+    servers_config,
 )
+from eng_harness.servers._platform import platform_inspector, platform_launcher
 from eng_harness.servers._record import Recording, RecordMode, Sanitizer, verify_manifest
 from eng_harness.servers._session import CallEffect, ServerManager
 
@@ -29,5 +31,8 @@ __all__ = [
     "ServerManager",
     "ServersConfig",
     "load_servers_config",
+    "platform_inspector",
+    "platform_launcher",
+    "servers_config",
     "verify_manifest",
 ]

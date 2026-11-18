@@ -12,8 +12,6 @@ from eng_dev_gate.frontmatter import (
 )
 from support.pullrequest import plan_text, spec_text
 
-CAP = 400
-
 
 def _task(task_id: str, **fields: str) -> str:
     values = {
@@ -44,12 +42,12 @@ def _plan(tasks: str, **header: str) -> str:
 
 def test_valid_plan_and_spec() -> None:
     """A plan and a spec parse; risk is one class or a list; issue may be a number or a string."""
-    plan = parse_plan(plan_text(), CAP)
+    plan = parse_plan(plan_text())
     assert [t.id for t in plan.tasks] == ["T1", "T2"]
     assert plan.tasks[0].files == ["pkg/src/**"]
     assert plan.tasks[0].max_changed_lines == 10
     assert (plan.status, plan.risk, plan.spec) == ("approved", ["r1"], "pkg/docs/specs/0001-x.md")
-    assert parse_plan(_plan(_task("T2a"), risk="[r1, r3]", issue="42"), CAP).risk == ["r1", "r3"]
+    assert parse_plan(_plan(_task("T2a"), risk="[r1, r3]", issue="42")).risk == ["r1", "r3"]
     spec = parse_spec(spec_text("draft"))
     assert (spec.status, spec.size, spec.risk) == ("draft", "small", ["r1"])
 
@@ -69,16 +67,16 @@ def test_front_matter_must_be_a_yaml_mapping_between_dashes(text: str) -> None:
     with pytest.raises(FrontMatterError):
         parse_spec(text)
     with pytest.raises(FrontMatterError):
-        parse_plan(text, CAP)
+        parse_plan(text)
 
 
 def test_crlf_front_matter() -> None:
     """Line endings are normalized: a CRLF file parses like an LF file."""
-    assert parse_plan(plan_text().replace("\n", "\r\n"), CAP).id == "plan-1"
+    assert parse_plan(plan_text().replace("\n", "\r\n")).id == "plan-1"
 
 
 def test_plan_front_matter_rules() -> None:
-    """AC13: invalid fields, repeated task ids, unknown or cyclic depends_on and an oversized task are rejected."""
+    """AC13: invalid fields, repeated task ids, unknown or cyclic depends_on are rejected."""
     bad_header = [
         {"status": "maybe"},
         {"size": "huge"},
@@ -90,11 +88,14 @@ def test_plan_front_matter_rules() -> None:
     ]
     for header in bad_header:
         with pytest.raises(FrontMatterError):
-            parse_plan(_plan(_task("T1"), **header), CAP)
+            parse_plan(_plan(_task("T1"), **header))
     bad_task = [
         {"files": "[]"},
         {"files": '[""]'},
         {"max_changed_lines": "0"},
+        {"max_changed_lines": "-1"},
+        {"max_changed_lines": "true"},
+        {"max_changed_lines": "1.5"},
         {"max_changed_lines": '"12"'},
         {"max_sessions": "-1"},
         {"max_sessions": "true"},
@@ -105,27 +106,31 @@ def test_plan_front_matter_rules() -> None:
     ]
     for fields in bad_task:
         with pytest.raises(FrontMatterError):
-            parse_plan(_plan(_task("T1", **fields)), CAP)
+            parse_plan(_plan(_task("T1", **fields)))
     with pytest.raises(FrontMatterError, match="id"):
-        parse_plan(_plan(_task("task-1")), CAP)
+        parse_plan(_plan(_task("task-1")))
     with pytest.raises(FrontMatterError):
-        parse_plan(_plan(""), CAP)
+        parse_plan(_plan(""))
     with pytest.raises(FrontMatterError, match="T1"):
-        parse_plan(_plan(_task("T1") + _task("T1")), CAP)
+        parse_plan(_plan(_task("T1") + _task("T1")))
     with pytest.raises(FrontMatterError, match="T9"):
-        parse_plan(_plan(_task("T1", depends_on="[T9]")), CAP)
+        parse_plan(_plan(_task("T1", depends_on="[T9]")))
     with pytest.raises(FrontMatterError, match="cycl"):
         parse_plan(
-            _plan(_task("T1", depends_on="[T2]") + _task("T2", depends_on="[T3]") + _task("T3", depends_on="[T1]")), CAP
+            _plan(_task("T1", depends_on="[T2]") + _task("T2", depends_on="[T3]") + _task("T3", depends_on="[T1]"))
         )
     with pytest.raises(FrontMatterError, match="cycl"):
-        parse_plan(_plan(_task("T1", depends_on="[T1]")), CAP)
-    with pytest.raises(FrontMatterError, match="400"):
-        parse_plan(_plan(_task("T1", max_changed_lines="401")), CAP)
+        parse_plan(_plan(_task("T1", depends_on="[T1]")))
     ok = _plan(
         _task("T1", max_changed_lines="400") + _task("T2", depends_on="[T1]") + _task("T3", depends_on="[T1, T2]")
     )
-    assert len(parse_plan(ok, CAP).tasks) == 3
+    assert len(parse_plan(ok).tasks) == 3
+
+
+@pytest.mark.parametrize("estimate", [401, 10000])
+def test_task_estimate_above_400_parses(estimate: int) -> None:
+    """AC13: positive line estimates have no upper cap."""
+    assert parse_plan(plan_text(max_changed_lines=estimate)).tasks[0].max_changed_lines == estimate
 
 
 def test_spec_front_matter_rules() -> None:
@@ -145,9 +150,9 @@ def test_uncovered_criteria() -> None:
         "---\nx: 1\n---\n- AC1. Given a\n- AC2. Given b\n- AC5a. Given c\nAC7. bare line\n"
         "| AC9. in a table |\nAC10 no dot\n"
     )
-    plan = parse_plan(_plan(_task("T1", covers="[AC1, AC7]") + _task("T2", covers="[AC5a]")), CAP)
+    plan = parse_plan(_plan(_task("T1", covers="[AC1, AC7]") + _task("T2", covers="[AC5a]")))
     assert uncovered_criteria(plan, spec) == ["AC2"]
-    full = parse_plan(_plan(_task("T1", covers="[AC1, AC2, AC5a, AC7]")), CAP)
+    full = parse_plan(_plan(_task("T1", covers="[AC1, AC2, AC5a, AC7]")))
     assert uncovered_criteria(full, spec) == []
 
 
@@ -181,26 +186,26 @@ def _clause_plan(covers: str) -> str:
 
 def test_clause_spec_directory_plan() -> None:
     """AC13a: a spec path ending in `/` and prefixed `covers` ids parse; GC016 counts the covered prefixes' criteria."""
-    plan = parse_plan(_clause_plan("[BP-AC1, AC4, PK-AC1]"), CAP)
+    plan = parse_plan(_clause_plan("[BP-AC1, AC4, PK-AC1]"))
     assert plan.spec == CLAUSES
     assert plan.tasks[0].covers == ["BP-AC1", "AC4", "PK-AC1"]
     for bad in ("[bp-AC1]", "[B-AC1]", "[ABCD-AC1]", "[BP-AC]", "[BP-ac1]", "[BP_AC1]"):
         with pytest.raises(FrontMatterError, match="covers"):
-            parse_plan(_clause_plan(bad), CAP)
+            parse_plan(_clause_plan(bad))
     for bad_spec in ("a//", "/a/", "a/../", "a\\b/", "/", "a/./"):
         with pytest.raises(FrontMatterError, match="spec"):
-            parse_plan(_plan(_task("T1"), spec=f"'{bad_spec}'"), CAP)
+            parse_plan(_plan(_task("T1"), spec=f"'{bad_spec}'"))
     clauses = [BP_CLAUSE, OV_CLAUSE]
     own = "\n# Plan\n\n- PK-AC1. Given the package, then it imports.\nPK-AC2. bare line\nPK-AC3 no dot\n"
     # only the prefix BP is covered: OV-AC1 of the other clause spec is not demanded; the plan's own PK criteria are
-    part = parse_plan(_clause_plan("[BP-AC1, BP-AC3a]"), CAP)
+    part = parse_plan(_clause_plan("[BP-AC1, BP-AC3a]"))
     assert uncovered_criteria(part, clauses, own) == ["BP-AC2", "PK-AC1", "PK-AC2"]
-    full = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, PK-AC1, PK-AC2]"), CAP)
+    full = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, PK-AC1, PK-AC2]"))
     assert uncovered_criteria(full, clauses, own) == []
-    both = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, OV-AC1, PK-AC1, PK-AC2]"), CAP)
+    both = parse_plan(_clause_plan("[BP-AC1, BP-AC2, BP-AC3a, OV-AC1, PK-AC1, PK-AC2]"))
     assert uncovered_criteria(both, clauses, own) == []
-    none = parse_plan(_clause_plan("[PK-AC1, PK-AC2]"), CAP)  # no clause prefix covered: no clause criterion demanded
+    none = parse_plan(_clause_plan("[PK-AC1, PK-AC2]"))  # no clause prefix covered: no clause criterion demanded
     assert uncovered_criteria(none, clauses, own) == []
     # a plan whose spec is a file ignores prefixed lines of the spec and the plan's own text
-    single = parse_plan(_plan(_task("T1", covers="[AC1]")), CAP)
+    single = parse_plan(_plan(_task("T1", covers="[AC1]")))
     assert uncovered_criteria(single, "- AC1. a\n- BP-AC1. b\n", own) == []

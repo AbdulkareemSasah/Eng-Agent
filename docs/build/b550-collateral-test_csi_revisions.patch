@@ -1,0 +1,24 @@
+diff --git a/packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py b/packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py
+index 0fad7e7..7510c3b 100644
+--- a/packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py
++++ b/packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py
+@@ -276,14 +276,14 @@ def test_revision_files_need_the_wiring(
+ def test_open_model_is_not_a_tool_of_the_workflow(
+     make_config: ConfigFactory, control: Path, store: ResultStore, run_dir: Path
+ ) -> None:
+-    """`csi_open_model` takes any path; only `csi_open_revision` reaches it, so the port refuses it by name."""
++    """`csi_open_model` takes no path from a block; only `csi_open_revision` sends one: a failure envelope (B-543)."""
+     _seeded(control)
+ 
+     async def body(port: Any, recorder: Any, pid: int, manager: ServerManager) -> None:
+-        with pytest.raises(ContractError) as refused:
+-            await _call(port, "csi_open_model", path="x.EDB")
+-        assert refused.value.detail.code is ErrorCode.INVALID_ARGUMENT
+-        assert refused.value.detail.field == "tool"
++        refused = await _call(port, "csi_open_model", path="x.EDB")
++        assert isinstance(refused, FailureEnvelope), refused
++        assert refused.error.code is ErrorCode.INVALID_ARGUMENT
++        assert refused.error.field == "path"
+         assert recorder.sent == []
+ 
+     run_port(make_config(), run_dir, store, body, revisions=_revisions(run_dir))

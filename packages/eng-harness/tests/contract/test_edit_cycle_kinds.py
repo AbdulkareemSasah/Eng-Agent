@@ -17,6 +17,7 @@ KINDS = {
     "change_set_check": "harness.change_set_check/1",
     "analysis_summary": "harness.analysis_summary/1",
     "csi_name_lists": "harness.csi_name_lists/1",
+    "host_design_verdicts": "harness.host_design_verdicts/1",
 }
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -101,6 +102,38 @@ def _names_empty(p: dict[str, Any]) -> None:
     p["materials"] = [""]
 
 
+def _hdv_counts(p: dict[str, Any]) -> None:
+    p["counts"]["PASS"] = 2
+
+
+def _hdv_status_contradicts_ratio(p: dict[str, Any]) -> None:
+    p["verdicts"][1]["status"] = "PASS"
+
+
+def _hdv_trace_out_of_range(p: dict[str, Any]) -> None:
+    p["verdicts"][0]["trace_ref"] = "#/traces/1"
+
+
+def _hdv_trace_not_local(p: dict[str, Any]) -> None:
+    p["verdicts"][0]["trace_ref"] = "res_00000000000000000000000001#/steps/0"
+
+
+def _hdv_other_calc_trace(p: dict[str, Any]) -> None:
+    p["trace"]["calc_id"] = "harness.analysis_summary"
+
+
+def _hdv_no_calc(p: dict[str, Any]) -> None:
+    del p["calc"]
+
+
+def _hdv_no_draft(p: dict[str, Any]) -> None:
+    del p["draft"]
+
+
+def _hdv_no_traces(p: dict[str, Any]) -> None:
+    del p["traces"]
+
+
 INVALID: list[tuple[str, Mutation, str]] = [
     ("change_set_check", _check_status, "status"),
     ("change_set_check", _check_fail_without_error, "status"),
@@ -120,6 +153,14 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("csi_name_lists", _names_unsorted, "sorted"),
     ("csi_name_lists", _names_duplicate, "sorted"),
     ("csi_name_lists", _names_empty, "materials"),
+    ("host_design_verdicts", _hdv_counts, "counts must match"),
+    ("host_design_verdicts", _hdv_status_contradicts_ratio, "contradicts"),
+    ("host_design_verdicts", _hdv_trace_out_of_range, "out of range"),
+    ("host_design_verdicts", _hdv_trace_not_local, "LocalTraceRef"),
+    ("host_design_verdicts", _hdv_other_calc_trace, "those of calc"),
+    ("host_design_verdicts", _hdv_no_calc, "calc"),
+    ("host_design_verdicts", _hdv_no_draft, "draft"),
+    ("host_design_verdicts", _hdv_no_traces, "traces"),
 ]
 
 

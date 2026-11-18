@@ -536,3 +536,156 @@ def test_a_crash_inside_the_restore_is_safe(
     assert [(c.tool, c.op_id) for c in host.ledger] == [
         ("write_b", op_id(run_id, "1", 2)), ("read_c", op_id(run_id, "2", 1)),
     ]  # fmt: skip
+
+
+COPY = "0~post.working_copy.m1"
+
+
+def _open(path: str = "0", *, flag: bool | None = True) -> Forged:
+    """The `step_started` of a write `open` of m1; `flag` is its recorded `opens_model_without_writing` (B-562)."""
+    kind, at, attempt, body = start(path, "open_w", {"model": "m1"}, write=True)
+    marked = {} if flag is None else {"opens_model_without_writing": flag}
+    return kind, at, attempt, body | {"action": "open"} | marked
+
+
+def _copy_saved(rig: Rig, host: ScriptedHost, copy: str = "m1@copy", role: str = "working_copy") -> Forged:
+    host.add_model(copy, INSTANCE)
+    kind, _, _, body = saved(rig, copy, role)
+    return kind, COPY, None, body
+
+
+def _handoff(rig: Rig, host: ScriptedHost, case: str) -> list[Forged]:
+    """A forged EC1 handoff of m1 to `m1@copy` (engine 4.5.4), altered by `case`."""
+    args: dict[str, JsonValue] = {"model": "m1"}
+    copy_start = (T.STEP_STARTED, COPY, 1, {
+        "kind": "read", "name": "working_copy", "args": args, "args_sha256": payload_sha256(args), "effect": "read",
+        "model_key": "m1",
+    })  # fmt: skip
+    summary = {"model": "m2" if case == "other_origin" else "m1", "copy": "m1" if case == "same_key" else "m1@copy"}
+    copy_done = (T.STEP_COMPLETED, COPY, 1, {
+        "result": {"ref": REF, "summary": summary, "warnings": [], "complete": True}, "duration_ms": 0,
+    })  # fmt: skip
+    applied: dict[str, Any] = {"op_id": OP, "outcome": "applied", "decided_by": "engineer:test", "evidence": []}
+    closing: Forged = {
+        "applied": (T.STEP_RECONCILED, "0", 1, applied | {"result": done("0")[3]["result"]}),
+        "not_applied": (T.STEP_RECONCILED, "0", 1, applied | {"outcome": "not_applied", "result": None}),
+    }.get(case, done("0"))
+    saved_copy = _copy_saved(rig, host, role="revision" if case == "other_role" else "working_copy")
+    events: list[Forged] = [_open(flag=None if case == "legacy" else case != "unflagged"), closing]
+    events += [bound("m1", INSTANCE), copy_start, saved_copy, copy_done]
+    if case == "pending":
+        events.remove(closing)
+    elif case == "copy_cut_off":
+        events.remove(copy_done)
+    elif case == "save_outside":
+        events[3:5] = [saved_copy, copy_start]
+    elif case == "before_outcome":
+        events[1:4] = [bound("m1", INSTANCE), copy_start, closing]
+    elif case == "rebound":
+        events.append(bound("m1", REOPENED, "reopened"))
+    elif case == "content_write":
+        events += [start("1", "write_b", M1, write=True), done("1")]
+    elif case == "pending_write":
+        events.append(start("1", "write_b", M1, write=True))
+    elif case == "restored":
+        events.append((T.RUN_RESUMED, None, None, {"resume_no": 1, "code_hash_changed": False, "servers": [],
+                                                  "restored_to_seq": 1}))  # fmt: skip
+    return events
+
+
+@pytest.mark.parametrize(
+    ("case", "proven"),
+    [
+        ("complete", True), ("applied", True), ("legacy", False), ("unflagged", False), ("pending", False),
+        ("not_applied", False), ("copy_cut_off", False), ("same_key", False), ("other_origin", False),
+        ("other_role", False), ("save_outside", False), ("before_outcome", False), ("rebound", False),
+        ("content_write", False), ("pending_write", False), ("restored", False),
+    ],
+)  # fmt: skip
+def test_the_ec1_handoff_needs_its_whole_journal_proof(tmp_path: Path, case: str, proven: bool) -> None:
+    """Engine 4.5.4 (B-562): the unloaded original is left out of the check only on the journaled EC1 handoff."""
+    from eng_harness.engine._hoststate import handed_off
+    from eng_harness.engine._inflight import Fold
+
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    run_id = forge(rig, chain(ORIGINAL), *_handoff(rig, host, case))
+    assert handed_off(Fold(rig.events(run_id)), "m1") is proven
+    assert handed_off(Fold(rig.events(run_id)), "m2") is False  # a model with no write
+
+
+@pytest.mark.parametrize(
+    ("flag", "closed", "counted"),
+    [(True, "done", False), (True, "applied", False), (True, None, True), (False, "done", True), (None, "done", True)],
+)
+def test_content_writes_leave_out_only_resolved_content_free_opens(
+    tmp_path: Path, flag: bool | None, closed: str | None, counted: bool
+) -> None:
+    """Engine 4.5.4 (B-562): the content view drops a marked open that completed or was applied; a pending one, a
+    legacy one and an unmarked one stay, also among the writes a reopened file lacks. The raw view keeps them all."""
+    from eng_harness.engine._inflight import Fold
+
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    ending = {"done": [done("0")], None: []}.get(closed, [(T.STEP_RECONCILED, "0", 1, {
+        "op_id": OP, "outcome": "applied", "decided_by": "adapter", "evidence": [], "result": done("0")[3]["result"],
+    })])  # fmt: skip
+    steps = [bound("m1", INSTANCE), saved(rig, "m1"), _open(flag=flag), *ending, bound("m1", REOPENED, "reopened")]
+    f = Fold(rig.events(forge(rig, chain(ORIGINAL), *steps)))
+    assert [s.path for s in f.writes("m1")] == ["0"]
+    assert [s.path for s in f.content("m1")] == (["0"] if counted else [])
+    assert [s.path for s in f.lacking("m1")] == (["0"] if counted else [])
+
+
+def test_a_later_content_free_open_keeps_the_earlier_write_as_the_comparison(tmp_path: Path) -> None:
+    """Engine 4.5.4 (B-562): the result of a marked open is not the latest write result the state is compared with."""
+    from types import SimpleNamespace
+
+    from eng_harness.engine._hoststate import _difference
+    from eng_harness.engine._inflight import Fold
+
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    steps = [bound("m1", INSTANCE), saved(rig, "m1"), start("1", "write_b", M1, write=True)]
+    steps += [done("1", ref=_result(rig, host, 1)), _open("2"), done("2", ref=_result(rig, host, 9))]
+    f = Fold(rig.events(forge(rig, chain(ORIGINAL), *steps)))
+    at = host.models["m1"].model_copy(update={"revision": 1, "fingerprint": "fp1"})
+    rt: Any = SimpleNamespace(store=rig.store)
+    assert _difference(rt, f, "m1", at) is None  # the edit's revision 1, not the open's 9
+    assert _difference(rt, f, "m1", at.model_copy(update={"revision": 9})) == (
+        "model_differs", "m1 is at revision 9 (fp1), the journal has 1",
+    )  # fmt: skip
+
+
+def test_a_pending_content_free_open_on_a_lost_model_still_needs_recovery(tmp_path: Path) -> None:
+    """Engine 4.5.4 (B-562): a marked open that a lost binding keeps from being reconciled is no handoff."""
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    run_id = forge(rig, chain(ORIGINAL), _open("1"), bound("m1", INSTANCE))
+    host.crash("csi")
+    stopped = resume(rig, chain(ORIGINAL), run_id)
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "host_state_mismatch"
+    assert options(rig.inputs.presented[-1], "state") == ["abandon"]
+    assert all(c[0] != "reconcile" for c in host.calls)
+    assert ("model_state", "m1", "csi-1") in host.calls
+
+
+@pytest.mark.parametrize(("case", "asked_about"), [("complete", "m1@copy"), ("legacy", "m1")])
+def test_after_the_handoff_the_copy_is_still_checked(tmp_path: Path, case: str, asked_about: str) -> None:
+    """Engine 4.5.4 (B-562): the handed-off original reads no state at the resume and its copy's writes are compared;
+    without the recorded guarantee the unloaded original is a lost model."""
+    rig, host = scripted_rig(tmp_path)
+    host.add_model("m1", INSTANCE)
+    steps = _handoff(rig, host, case)
+    steps += [bound("m1@copy", INSTANCE), start("1", "write_b", {"n": 1, "model": "m1@copy"}, write=True)]
+    steps.append(done("1", ref=_result(rig, host, hosted=False)))
+    run_id = forge(rig, chain(ORIGINAL), *steps)
+    host.models["m1"] = host.models["m1"].model_copy(update={"loaded": False})  # the instance holds the copy now
+    _drift(host, "m1@copy")
+    stopped = resume(rig, chain(ORIGINAL), run_id)
+    assert stopped.escalation is not None
+    assert stopped.escalation.reason == "host_state_mismatch"
+    assert rig.inputs.presented[-1].title == f"A model changed while the run was stopped ({asked_about})"
+    assert (("model_state", "m1", "csi-1") in host.calls) is (case == "legacy")
+    assert host.ledger == []

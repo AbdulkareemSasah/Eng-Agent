@@ -1,8 +1,9 @@
 """Steps in flight at a resume, and the request the engine puts to the engineer (spec 0001 4.5.1 step 7, 4.5.3).
 
 Purpose: a write whose `step_started` has no result is reconciled before the block is called (`applied` and
-`not_applied` become `step_reconciled`; anything else asks the engineer through `engine.in_flight`); a read, calc or
-similar step in flight gets `step_rerun`. `Fold` reads the steps a resume needs from the journal, and `ResumeIndex`
+`not_applied` become `step_reconciled`, except an adapter `not_applied` for the rerun of an attempt it reconciled
+`not_applied`; anything else asks the engineer through `engine.in_flight`); a read, calc or similar step in flight
+gets `step_rerun`. `Fold` reads the steps a resume needs from the journal, and `ResumeIndex`
 replays a step marked for a rerun as one that runs again. Units: none. Errors: `Stopped` ends the resume with the
 journaled stop (or the abandoned run), also for a write found applied whose result could not be read;
 `JournalIntegrityError` for a write without an `op_id`; `ContractError` from a port call.
@@ -23,6 +24,7 @@ from eng_contract.store import ResultStore
 from pydantic import JsonValue, TypeAdapter
 
 from eng_harness import errors
+from eng_harness.ctx import ModelHandle
 from eng_harness.engine._ctx_impl import _stored
 from eng_harness.engine._inputs import Evidence, Kind, Question, build_request, check_answer, choice_schema
 from eng_harness.engine._replay import Recorded, ReplayIndex
@@ -50,7 +52,7 @@ class _Stored(TypedDict):
 _STORED = TypeAdapter(_Stored)
 _Closing = ev.StepCompleted | ev.StepFailed | ev.StepReconciled
 _Reason = Literal["needs_reconciliation", "units_mismatch", "host_state_mismatch"]
-_RERUN = ("tool", "read", "calc", "decide", "decide_many", "approve")  # rerun when in flight; an ask is asked again
+_RERUN = ("tool", "read", "calc", "decide", "decide_many", "approve", "ask")  # an approval or ask is presented again
 
 
 class Stopped(errors.Escalation):
@@ -82,7 +84,9 @@ class Fold:
         """Fold `events`; housekeeping (`@`) and host (`~host.`) steps are audit records and are left out."""
         # a restore's cut (a, b): the saves and steps between sequence a and its second `run_resumed` b are undone
         cuts = [(r.restored_to_seq or e.seq, e.seq) for e in events if isinstance(r := e.payload, ev.RunResumed)]
+        self.cuts = cuts
         self.steps: dict[str, Step] = {}
+        self.copies: list[tuple[int, str | None, ev.ModelSaved]] = []  # each uncut working copy save: seq, path
         self.bound: dict[str, ev.ModelBound] = {}
         self.bound_at: dict[str, int] = {}
         self.saved: dict[str, tuple[int, ev.ModelSaved]] = {}
@@ -92,6 +96,8 @@ class Fold:
                 self.bound[p.model_key], self.bound_at[p.model_key] = p, e.seq
             elif isinstance(p, ev.ModelSaved) and not any(a < e.seq < b for a, b in cuts):
                 self.saved[p.model_key] = (e.seq, p)
+                if p.role == "working_copy":
+                    self.copies.append((e.seq, path, p))
             if path is None or e.attempt is None or path.startswith("@") or "~host." in path:
                 continue
             if isinstance(p, ev.StepStarted):
@@ -117,6 +123,10 @@ class Fold:
             and (s.rerun != 1 or not live)
         ]  # fmt: skip
 
+    def content(self, key: str | None = None) -> list[Step]:
+        """As `writes`, without an open recorded as changing no model content that completed or was applied (B-562)."""
+        return [s for s in self.writes(key) if not _content_free(s)]
+
     def written(self) -> list[str]:
         """The keys of the models the run wrote to, sorted (a restore does not make a model unwritten)."""
         return sorted({s.began.model_key for s in self.writes(live=False) if s.began.model_key})
@@ -126,7 +136,14 @@ class Fold:
         if key not in self.bound or self.bound[key].reason != "reopened":
             return []
         after = self.saved[key][0] if key in self.saved else 0
-        return [s for s in self.writes(key) if after < s.seq < self.bound_at[key]]
+        return [s for s in self.content(key) if after < s.seq < self.bound_at[key]]
+
+
+def _content_free(step: Step) -> bool:
+    """An open whose attempt recorded `opens_model_without_writing` true and that completed or was applied (B-562)."""
+    done = step.closing
+    applied = isinstance(done, ev.StepCompleted) or (isinstance(done, ev.StepReconciled) and done.outcome == "applied")
+    return step.began.opens_model_without_writing is True and applied
 
 
 class ResumeIndex(ReplayIndex):
@@ -268,16 +285,20 @@ async def _write(rt: Resume, step: Step) -> None:
         began.args if began.args is not None else rt.store.payload(began.args_ref or "")["value"]
     )
     found, why = None, "the adapter has no reconciler for this tool"
-    if rt.tool.supports_reconcile(began.name):
+    if began.kind == "promote":  # never sent to the tool port (spec 11 Q40)
+        why = "a file copy has no reconciler"
+    elif rt.tool.supports_reconcile(began.name):
         try:
             found = await rt.tool.reconcile(began.name, args, op)
         except ContractError as exc:
             why = f"the reconciler failed: {exc.detail.message}"
         else:
             why = f"the adapter could not decide: {found.outcome}" + "".join(f", missing {m}" for m in found.missing)
-    if found is not None and found.outcome in ("applied", "not_applied"):
+    again = found is not None and found.outcome == "not_applied" and _is_rerun(rt.events(), step)
+    if found is not None and found.outcome in ("applied", "not_applied") and not again:
         outcome, by, evidence = str(found.outcome), "adapter", [r.ref for r in found.evidence]
     else:
+        why = "the adapter again reports not_applied for the automatic rerun" if again else why  # AC71
         question = Question(
             name="outcome", prompt="What happened to the write", options=("applied", "not_applied", "abandon")
         )
@@ -289,6 +310,15 @@ async def _write(rt: Resume, step: Step) -> None:
     rt.writer.append(EventType.STEP_RECONCILED, payload | {"evidence": evidence}, path=step.path, attempt=step.attempt)
 
 
+def _is_rerun(events: Sequence[Event], step: Step) -> bool:
+    """Whether `step` is the automatic rerun of an attempt the adapter reconciled `not_applied` (AC71)."""
+    return any(
+        e.path == step.path and e.attempt == step.attempt - 1 and isinstance(p := e.payload, ev.StepReconciled)
+        and (p.outcome, p.decided_by) == ("not_applied", "adapter")
+        for e in events
+    )  # fmt: skip
+
+
 async def _applied(
     rt: Resume, step: Step, op: str, found: Reconciliation | None, args: dict[str, JsonValue]
 ) -> ev.StepResult:
@@ -297,6 +327,8 @@ async def _applied(
     The empty summary is only for an adapter with no read-back (`None`). A failure, returned or raised, stops the
     resume with the step still in flight, so that the next resume reads it again.
     """
+    if step.began.kind == "promote":
+        return await _promoted(rt, step, args)
     name, error = step.began.name, None
     reply = found.result if found is not None and found.outcome == "applied" else None
     try:
@@ -310,6 +342,19 @@ async def _applied(
         _LOG.warning("the result of the write at %s (%s) could not be read: %s", step.path, name, why)
         rt.stop(f"the write at step {step.path} was found applied, but its result could not be read: {why}", None)
     return _stored(reply) if isinstance(reply, SuccessEnvelope) else _nothing(rt, op)
+
+
+async def _promoted(rt: Resume, step: Step, args: dict[str, JsonValue]) -> ev.StepResult:
+    """The result of a promotion found applied (spec 11 Q40): the handle of the working copy's state, no read-back."""
+    copy = str(args["copy"])
+    instance = await rt.host.locate(copy)
+    state = None if instance is None else await rt.host.model_state(copy, instance.instance_id)
+    if state is None or not state.loaded:
+        rt.stop(f"the promotion at step {step.path} was found applied, but the working copy {copy} is not open")
+    handle = ModelHandle(model_key=str(args["model"]), model_id=state.model_id or "", revision=state.revision or 0)
+    summary = handle.model_dump(mode="json")
+    ref = rt.store.put("harness.journal_blob/1", {"value": summary}, rt.producer()).result_id
+    return ev.StepResult(ref=ref, summary=summary, warnings=[], complete=True)
 
 
 def _nothing(rt: Resume, op: str) -> ev.StepResult:

@@ -1,0 +1,100 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.host_design_verdicts",
+    "status": "draft",
+    "version": 1
+  },
+  "counts": {
+    "ERROR": 0,
+    "FAIL": 1,
+    "NEEDS_ENGINEER": 1,
+    "NOT_APPLICABLE": 0,
+    "PASS": 1
+  },
+  "draft": true,
+  "trace": {
+    "calc_id": "harness.host_design_verdicts",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  },
+  "traces": [
+    {
+      "calc_id": "harness.host_design_verdicts",
+      "calc_version": "1",
+      "constants": [],
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "inputs": [],
+      "outputs": [],
+      "steps": []
+    }
+  ],
+  "verdicts": [
+    {
+      "assumptions": [],
+      "capacity": null,
+      "check_id": "host.steel_design_ratio",
+      "clause": null,
+      "code": "host_steel_design",
+      "demand": null,
+      "governing": false,
+      "ratio": 0.5,
+      "ratio_limit": 0.95,
+      "source": "host",
+      "status": "PASS",
+      "subject": {
+        "case": "COMB1",
+        "id": "B1",
+        "kind": "frame",
+        "station_mm": null
+      },
+      "trace_ref": "#/traces/0"
+    },
+    {
+      "assumptions": [],
+      "capacity": null,
+      "check_id": "host.steel_design_ratio",
+      "clause": null,
+      "code": "host_steel_design",
+      "demand": null,
+      "governing": false,
+      "ratio": 1.25,
+      "ratio_limit": 0.95,
+      "source": "host",
+      "status": "FAIL",
+      "subject": {
+        "case": "COMB2",
+        "id": "B2",
+        "kind": "frame",
+        "station_mm": null
+      },
+      "trace_ref": null
+    },
+    {
+      "assumptions": [
+        "host concrete design output not mapped"
+      ],
+      "capacity": null,
+      "check_id": "host.concrete_design_ratio",
+      "clause": null,
+      "code": "host_concrete_design",
+      "demand": null,
+      "governing": false,
+      "ratio": null,
+      "ratio_limit": 0.95,
+      "source": "host",
+      "status": "NEEDS_ENGINEER",
+      "subject": {
+        "case": null,
+        "id": "B3",
+        "kind": "frame",
+        "station_mm": null
+      },
+      "trace_ref": null
+    }
+  ]
+}

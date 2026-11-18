@@ -7,7 +7,7 @@ Spec 0006 owns where the file is found and its `[engine]` section; this module r
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
@@ -196,6 +196,13 @@ class ServersConfig(_Model):
             n: t.release_record for n, t in self.cli_tools.items() if t.release_record and t.release == "unreleased"
         }
 
+    def host_program(self, product: str) -> HostProgramConfig:
+        """The `[host_programs.<product in lower case>]` entry; `ConfigError` (`key` names it) when there is none."""
+        name = product.lower()
+        if name not in self.host_programs:
+            raise ConfigError(f"host_programs.{name}", "no host program entry for this product")
+        return self.host_programs[name]
+
 
 def load_servers_config(path: Path) -> ServersConfig:
     """Load and validate the server sections of a `harness.toml`.
@@ -210,9 +217,14 @@ def load_servers_config(path: Path) -> ServersConfig:
         ConfigError: The file cannot be read or parsed, or a key is missing, invalid or forbidden; `key` names it.
     """
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        data = tomllib.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise ConfigError(path.name, f"cannot read harness.toml: {error}") from error
+    return servers_config(data)
+
+
+def servers_config(data: Mapping[str, Any]) -> ServersConfig:
+    """`load_servers_config` over tables already parsed; a `ConfigError` names the dotted key."""
     try:
         return ServersConfig.model_validate({k: data[k] for k in ServersConfig.model_fields if k in data})
     except ValidationError as error:

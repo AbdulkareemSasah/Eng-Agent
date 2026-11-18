@@ -1,7 +1,6 @@
 """`eng-harness doctor` (plan 0002 T18; spec 0002 section 4.9, AC37, AC39)."""
 
 import hashlib
-import importlib
 import json
 import os
 import platform
@@ -11,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PureWindowsPath
 from typing import Any, Protocol, TextIO
 
@@ -27,7 +26,9 @@ from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig, load_servers_config
 from eng_harness.servers._buildcheck import tool_list_fingerprint
 from eng_harness.servers._hostlock import default_lock_dir
-from eng_harness.servers._procinfo import PosixProcessInspector, ProcessIdentity, ProcessInspector
+from eng_harness.servers._launcher import ProcessLauncher
+from eng_harness.servers._platform import platform_inspector, platform_launcher
+from eng_harness.servers._procinfo import ProcessIdentity, ProcessInspector
 
 # ADR-0028 §5; spec 0002 §4.2 (CsiServerConfig.cs:18); uv bound of cli/_opener.py; medium RID (winnt.h).
 _PY, _SASAAH_S, _UV_S, _MEDIUM = (3, 14), 120, 30, 0x2000
@@ -83,8 +84,11 @@ class DoctorDeps:
 
 
 class LiveRoles:
+    def __init__(self, inspector: ProcessInspector | None = None) -> None:
+        self._inspector = inspector or platform_inspector()
+
     def inspect(self, config: ServersConfig, run_dir: Path) -> Mapping[tuple[str, str], RoleFacts]:
-        return anyio.run(_gather, config, run_dir)
+        return anyio.run(_gather, config, run_dir, platform_launcher(self._inspector))
 
 
 def _uv() -> str | None:
@@ -101,22 +105,15 @@ def _uv() -> str | None:
     return line[0] if done.returncode == 0 and line else None
 
 
-def _inspector() -> ProcessInspector:
-    if os.name != "nt":
-        return PosixProcessInspector()
-    module = importlib.import_module("eng_harness.servers._procinfo")
-    found: ProcessInspector = module.WindowsProcessInspector(module.CtypesKernel32(module.PROCESS_SIGNATURES))
-    return found
-
-
 def default_deps() -> DoctorDeps:
+    inspector = platform_inspector()
     return DoctorDeps(
         env=os.environ, which=shutil.which, uv_version=_uv, implementation=platform.python_implementation(),
         version=(sys.version_info[0], sys.version_info[1]), location=default_location_probe(),
         programs=type("_Dir", (), {"exists": staticmethod(lambda d: Path(d).is_dir())})(),
-        roles=LiveRoles(),
+        roles=LiveRoles(inspector),
         allowlist_for=lambda a: csi_allowlist() if a == "sasaah-csi-mcp" else None,
-        inspector=_inspector(), tokens=WindowsTokens() if os.name == "nt" else None,
+        inspector=inspector, tokens=WindowsTokens() if os.name == "nt" else None,
         home=Path.home(), windows=os.name == "nt",
     )  # fmt: skip
 
@@ -272,11 +269,12 @@ def _locks(config: ServersConfig, deps: DoctorDeps) -> Check:
 
 
 def run(
-    config_path: Path, *, json_output: bool, show_paths: bool,
-    extra_checks: Sequence[CheckProvider] = (), out: TextIO | None = None, deps: DoctorDeps | None = None,
+    config_path: Path | None, *, json_output: bool, show_paths: bool, extra_checks: Sequence[CheckProvider] = (),
+    out: TextIO | None = None, deps: DoctorDeps | None = None, env: Mapping[str, str] | None = None,
 ) -> int:  # fmt: skip
-    config = load_servers_config(config_path)
-    report = _collect(config, deps or default_deps(), show_paths, extra_checks)
+    config = ServersConfig() if config_path is None else load_servers_config(config_path)
+    found = deps or default_deps()
+    report = _collect(config, found if env is None else replace(found, env=env), show_paths, extra_checks)
     (out or sys.stdout).write(
         json.dumps({"checks": [c.model_dump() for c in report.checks]}, indent=2) + "\n"
         if json_output
@@ -302,9 +300,9 @@ async def _one(manager: ServerManager, server: str, role: str) -> RoleFacts:
     return RoleFacts({tool.name: tool.input_schema for tool in listed}, status, None)
 
 
-async def _gather(config: ServersConfig, run_dir: Path) -> dict[tuple[str, str], RoleFacts]:
+async def _gather(config: ServersConfig, run_dir: Path, launcher: ProcessLauncher) -> dict[tuple[str, str], RoleFacts]:
     pairs = [(name, role) for name, server in config.servers.items() for role in server.roles]
-    async with ServerManager(config, run_dir) as manager:
+    async with ServerManager(config, run_dir, launcher=launcher) as manager:
         return {key: await _one(manager, *key) for key in pairs}
 
 

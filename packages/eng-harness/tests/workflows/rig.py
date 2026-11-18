@@ -20,7 +20,7 @@ import pytest
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import FailureEnvelope, Provenance
-from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.ids import FixedClock, SeededIdSource, new_model_id
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from fakes.ports import ENVELOPE, FakeApprovalPort, FakeBasisPort, FakeCalcPort, FakeHost, FakeInputPort, Raise
@@ -90,7 +90,7 @@ class Host(FakeHost):
             self.add_model(key, rig_instance)
         self.unreleased: dict[str, str] = dict(unreleased or {})
         self.locked: list[bool] = []
-        self._runs_dir = runs_dir
+        self._runs_dir, self.ids, self.alias_copies = runs_dir, ids, True
         self._checks: dict[str, deque[ENVELOPE | Raise]] = {}
         self.preflight_checks: list[ServerCheck] | None = None
         self.started: list[HostInstance] = []
@@ -104,6 +104,17 @@ class Host(FakeHost):
         await super().close_started(host_key, instances)
         gone = {i.instance_id for i in instances}
         self.started = [i for i in self.started if i.instance_id not in gone]
+
+    async def working_copy(self, model_key: str, folder: Path) -> str:
+        """Open a copy of the model as `<model_key>.copy` (a key that fits the path grammar of spec 4.3.1), or, when
+        `alias_copies` is true, hand the model itself back as its copy."""
+        if self.alias_copies:
+            return model_key
+        copy_key = f"{model_key}.copy"
+        self.bound[copy_key] = self.bound[model_key]
+        self.models[copy_key] = self.models[model_key].model_copy(update={"model_id": new_model_id(self.ids)})
+        self.units[copy_key] = self.units[model_key]
+        return copy_key
 
     def script_check(self, model_key: str, outcome: ENVELOPE | Raise) -> None:
         """Queue `outcome` for the next `check_model` of `model_key`; with none queued the check succeeds."""
@@ -238,7 +249,7 @@ class Rig:
             header = {
                 "run_id": run_id, "workflow": workflow.name, "block": block, "input_ref": stored.result_id,
                 "input_sha256": input_sha256 or payload_sha256(given), "basis_ref": BASIS_REF,
-                "mode": "work_on_copy", "run_class": self.run_class.value, "engine_version": __version__,
+                "mode": "autonomous_logged", "run_class": self.run_class.value, "engine_version": __version__,
                 "contract_version": CONTRACT_VERSION, "settings_sha256": "e" * 64, "servers": [], "always_ask": [],
             }  # fmt: skip
             writer.append(EventType.RUN_STARTED, header)
@@ -285,10 +296,15 @@ def request(
     *,
     basis_ref: str = BASIS_REF,
     run_class: RunClass = RunClass.PRODUCTION,
-    mode: PermissionMode = PermissionMode.WORK_ON_COPY,
+    mode: PermissionMode = PermissionMode.AUTONOMOUS_LOGGED,
 ) -> RunRequest:
     """A request to run `workflow` with the input `values`."""
     return RunRequest(workflow=workflow, input=dict(values or {}), basis_ref=basis_ref, mode=mode, run_class=run_class)
+
+
+def asking(workflow: str = "chain", values: Mapping[str, JsonValue] | None = None) -> RunRequest:
+    """A request in `work_on_copy`, where the engineer answers every approval (`request` is in `autonomous_logged`)."""
+    return request(workflow, values, mode=PermissionMode.WORK_ON_COPY)
 
 
 def _hold(run_dir: str, conn: Connection) -> None:

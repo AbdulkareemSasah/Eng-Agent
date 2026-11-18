@@ -13,6 +13,7 @@ Errors: `ContractError` from a host read (the tool port turns a timeout into `un
 lines of the op (no reader exists yet).
 """
 
+from collections.abc import Callable
 from typing import Any, Literal
 
 from pydantic import JsonValue
@@ -73,9 +74,19 @@ def _outcome(
 class CsiReconciler:
     """The `Reconciler` of the CSI tool port: `product` names the host, `tolerance_ratio` the read-back tolerance."""
 
-    def __init__(self, *, product: str, tolerance_ratio: float | None) -> None:
-        """`tolerance_ratio`: the frozen `checks.readback_relative_tolerance_ratio`, `None` when the basis has none."""
+    def __init__(
+        self,
+        *,
+        product: str,
+        tolerance_ratio: float | None,
+        tolerance: Callable[[], float | None] | None = None,
+    ) -> None:
+        """`tolerance_ratio` is the frozen ratio; `tolerance` lazily supplies it and is queried until a value arrives.
+
+        Without either, a quantity read-back remains unknown. A supplied zero is a value, never a missing tolerance.
+        """
         self._product, self._tolerance, self._profile = product, tolerance_ratio, products.profile(product)
+        self._provider = tolerance
 
     async def decide(self, lost: LostWrite, read: HostRead) -> Decision:
         """The outcome of `lost` (spec 4.5.7); the evidence is what was read."""
@@ -83,6 +94,8 @@ class CsiReconciler:
             return await self._long(lost, read)
         item = expect(lost.model)
         snap = await self._snapshot(lost, read)
+        if self._tolerance is None and self._provider is not None:
+            self._tolerance = self._provider()
         outcome, missing = _outcome(lost, item, snap, self._tolerance)
         seen: dict[str, JsonValue] = {
             "requested": item.want, "observed": _seen(item, snap)[1], "pre_image_known": lost.known,

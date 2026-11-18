@@ -11,7 +11,17 @@ from typing import Annotated, Literal, Self
 from eng_contract.errors import ErrorDetail
 from eng_contract.ids import ModelId, ResultId, Timestamp
 from eng_contract.refs import RefString
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    SerializerFunctionWrapHandler,
+    StrictBool,
+    StringConstraints,
+    model_serializer,
+    model_validator,
+)
 
 from eng_harness.errors import HarnessCode
 
@@ -108,7 +118,8 @@ class StepStarted(_P):
     """`step_started`: exactly one of `args` and `args_ref` (a `harness.journal_blob/1` result).
 
     `action` is the tool's `ToolInfo.action` (spec 4.4.2). It is optional, so a journal written before it existed
-    still reads.
+    still reads. `opens_model_without_writing` (B-562) is a strict optional boolean, true only on a `tool` step with
+    effect `write` and action `open`; `None` is left out of the serialized payload, so earlier payloads keep their form.
     """
 
     kind: str
@@ -118,6 +129,7 @@ class StepStarted(_P):
     args_sha256: _Sha
     effect: Literal["none", "read", "write"]
     action: Literal["plain", "open", "save", "analysis", "design", "delete", "unlock"] | None = None
+    opens_model_without_writing: StrictBool | None = None
     op_id: str | None = None
     host_key: str | None = None
     model_key: str | None = None
@@ -129,7 +141,16 @@ class StepStarted(_P):
     def _one_args(self) -> Self:
         if (self.args is None) is (self.args_ref is None):
             raise ValueError("exactly one of args and args_ref must be set")
+        if self.opens_model_without_writing and (self.kind, self.effect, self.action) != ("tool", "write", "open"):
+            raise ValueError("opens_model_without_writing is true only on a tool write with action open")
         return self
+
+    @model_serializer(mode="wrap")
+    def _omit_unset(self, handler: SerializerFunctionWrapHandler) -> dict[str, object]:
+        data: dict[str, object] = handler(self)
+        if data.get("opens_model_without_writing") is None:
+            data.pop("opens_model_without_writing", None)
+        return data
 
 
 class StepCompleted(_P):

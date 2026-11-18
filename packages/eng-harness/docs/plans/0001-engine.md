@@ -555,6 +555,13 @@ tasks:
       - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
       - "packages/eng-harness/tests/unit/test_guard.py"
       - "packages/eng-harness/tests/rules/**"
+      # Amendment (B-529, documents only): a writer's trial (gate pass with exactly this file set, 122 counted lines).
+      # Engine._drive in _runner.py is the only place that can make the root block block code (AC18 "directly"); three
+      # existing tests ran I/O inside block code, which the guard now refuses (no expectation changes).
+      - "packages/eng-harness/src/eng_harness/engine/_runner.py"
+      - "packages/eng-harness/tests/unit/test_ctx_block.py"
+      - "packages/eng-harness/tests/unit/test_ctx_decide.py"
+      - "packages/eng-harness/tests/unit/test_promote.py"
     max_changed_lines: 250
     max_sessions: 2
     tests_first:
@@ -663,6 +670,29 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_invariants.py::test_unclean_check_stops_run"
     covers: [AC37]
     depends_on: [T15]
+  - id: T23
+    title: Preview.models and ctx.promote take a model key
+    # Amendment (B-543, documents only): new (spec 4.3.2, 4.9, AC72). No component gives block code a ModelHandle, so
+    # spec 0007 steps 6 and 16 could only pass invented model ids and revisions. ctx.py: Preview.models and the Ctx
+    # protocol's promote take ModelHandle | str (about 4 lines); one helper for the key and its use in _approvals.py
+    # _request, _modes.py enter and _ctx_impl.py promote and _promoted (about 10); 1 of CHANGELOG.md: budget 30 (an
+    # estimate). After T16b and plan 0007 T6 (merged), the last tasks that edited these modules; it shares only
+    # CHANGELOG.md with T19. Plan 0007 T8 waits for it.
+    files:
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/ctx.py"
+      - "packages/eng-harness/src/eng_harness/engine/_approvals.py"
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/tests/workflow/test_model_keys.py"
+      # Amendment (B-560): test-only collateral; compare the supplied handle instead of accessing .revision on the union.
+      - "packages/eng-harness/tests/unit/test_ctx_basis.py"
+    max_changed_lines: 30
+    max_sessions: 1
+    tests_first:
+      - "packages/eng-harness/tests/workflow/test_model_keys.py::test_preview_and_promote_take_a_key"
+    covers: [AC72]
+    depends_on: [T16b]  # external: plan 0007 T6 (merged; also edits _modes.py and _ctx_impl.py)
 ---
 
 # Implementation plan: eng-harness engine
@@ -686,7 +716,8 @@ to `pyproject.toml`, so tasks that may run in parallel (T5 beside T3, T3b, T6 an
 files only: their lines are merged in pull-request order, and they share no other file. T19 follows T18 (amendment
 B-414: its worker crashes through T18's progress sink). T16 and T16b (the B-499 split) also share `_modes.py`,
 `tests/workflows/**` and `tests/replay/test_in_flight.py`, and T16b shares `_inflight.py` with T15 and T21, so T21
-follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21.
+follows T16b. T22 (B-503) follows T15 and shares only `CHANGELOG.md` with T16 to T21. T23 (B-543) follows T16b
+(`_modes.py`, `_ctx_impl.py`) and shares only `CHANGELOG.md` with T19; plan 0007 T8 waits for it.
 
 Every task is test-first: its first commit is `test:` with the tests in `tests_first`, failing on `build/v1`
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds the public modules it
@@ -1024,6 +1055,19 @@ evidence, that no port call follows, and that the journal holds the failed `p~pr
 port's passing check (`tests/fakes/ports.py`) answers a clean summary (zero counts, `clean` true), so the merged tests
 keep their expectations. What the edit cycle does with this error at its step 9 is spec 0007 §11 Q14.
 
+**T23 A model key in previews and promotion** (spec §4.3.2, §4.9, AC72; amendment B-543). `Preview.models` becomes
+`tuple[ModelHandle | str, ...]` and `promote` (the `Ctx` protocol and `_ctx_impl.py`) takes `ModelHandle | str`; one
+engine helper answers the key of either, and `Approvals._request` (the binding), `Modes.enter` (the models of an
+inserted preview) and `_promoted` use it in place of `.model_key`. A stored preview that names a key reads back as the
+key (`ModeApprovals.stored`). `ToolResult.model` stays `None`. `test_preview_and_promote_take_a_key` runs, on the fake
+rig in `work_on_copy` once the working copy is taken, a write under a `CHANGE_SET` approval whose preview names the
+original's key, then a `PROMOTION` approval and promotion given the key: the binding is the working copy's state, the
+stored preview holds the key, and the promotion returns the promoted handle as with a handle of the same key. It fails
+at the base, where `Preview` refuses a `str` model. Amendment B-560 adds the existing
+`test_ctx_basis.py::test_preview_and_approval` assertion to T23: compare `preview.models` with `(handle,)`, preserving
+the supplied revision-2 handle check while accepting the widened type. This collateral edit is in the implementation
+commit; the test already passes at the base. The budget, acceptance criteria and `tests_first` stay unchanged.
+
 ## 3. Dependencies
 
 - Runtime: `eng-contract` (workspace member) and `pydantic` (named by
@@ -1041,8 +1085,8 @@ keep their expectations. What the edit cycle does with this error at its step 9 
   defaults to `None`, so an `EnginePorts` built before the field existed (plan 0006 `cli/_wiring.py`, tests) still
   builds. `progress` `None` means no sink; `run_control` `None` means no stop request; `decision` `None` means
   `runtime_summary` is taken as empty (the header's `decision_runtime` is then empty, spec §4.4.2) and a `decide` or
-  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T16b passes
-  all three in production once T14, T14b and T18 have merged.
+  `decide_many` call is refused with the error T14 settles (a lead item if it needs a new code). Plan 0006 T14b passes
+  `decision` and plan 0006 T16b passes `progress` and `run_control` in production once T18 has merged (amendment B-510).
 
 ## 4. Verification
 

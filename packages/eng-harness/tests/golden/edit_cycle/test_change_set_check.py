@@ -18,6 +18,11 @@ STEMS = [
     "check-bounds-unit-scale",
     "check-conflict-engineer",
     "check-duplicate-target",
+    "check-item-id-refused-kind",
+    "check-item-id-slash",
+    "check-item-id-token",
+    "check-no-sections-area-kind",
+    "check-no-sections-other-rules",
     "check-resolve-added-earlier",
     "check-resolve-empty-selection",
     "check-resolve-select",
@@ -41,6 +46,15 @@ def test_golden_cases() -> None:
     assert sorted(cases) == STEMS
     actual = {stem: run_check(case) for stem, case in cases.items()}
     assert {stem: body for stem, body in actual.items() if body != cases[stem].expected} == {}
+
+
+def test_sections_absent() -> None:
+    """AC39: no `model.sections/1`; a selection with `area_kind` is EMPTY_SELECTION, the rest as before."""
+    cases = {stem: case for stem, case in load_cases("check").items() if stem.startswith("check-no-sections-")}
+    assert sorted(cases) == ["check-no-sections-area-kind", "check-no-sections-other-rules"]
+    for stem, case in cases.items():
+        assert ("sections" in case.input, "sections" in case.refs) == (False, False), stem
+        assert run_check(case) == case.expected, stem
 
 
 def test_golden_bodies_are_valid_payloads() -> None:
@@ -103,6 +117,91 @@ def test_trace_records_bounds_count_and_status() -> None:
     assert built.outputs == ["status"]
 
 
+@pytest.mark.parametrize("item_id", ["a/b", "/a", "a/", "/", "a//b"])
+def test_item_id_with_a_slash_is_refused(item_id: str) -> None:
+    """K3 and AC4: an item id that contains `/` is the error INVALID_ITEM_ID, wherever the slash is."""
+    case = _case()
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(case, items=[item])
+    assert body["issues"] == [
+        {
+            "item_id": item_id,
+            "severity": "error",
+            "code": "INVALID_ITEM_ID",
+            "detail": f"item id {item_id} contains / (spec 0007 4.4.1 K3)",
+            "gap": None,
+        }
+    ]
+    assert body["status"] == "FAIL"
+    assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
+
+
+ID_DETAIL = "item id {} is not 1 to 57 ASCII letters, digits, _, . or -, or is revision or unlock (spec 0007 4.4.1 K3)"
+
+
+@pytest.mark.parametrize(
+    "item_id",
+    ["beam 1", "b\u00e9", "\u0663", "a" * 58, "a" * 64, "ab\n", "a,b", "a\\b", "revision", "unlock"],
+)
+def test_item_id_not_a_page_token_is_refused(item_id: str) -> None:
+    """K3 and AC4: an id that is not 1 to 57 ASCII token characters, or is revision or unlock, is INVALID_ITEM_ID."""
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    body = run_check(_case(), items=[item])
+    assert body["issues"] == [
+        {
+            "item_id": item_id,
+            "severity": "error",
+            "code": "INVALID_ITEM_ID",
+            "detail": ID_DETAIL.format(item_id),
+            "gap": None,
+        }
+    ]
+    assert body["status"] == "FAIL"
+    assert [resolved["item_id"] for resolved in body["resolved"]] == [item_id]
+
+
+def test_item_id_that_is_a_page_token_is_not_refused() -> None:
+    item = {"id": "a-b.c_1d", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    assert run_check(_case(), items=[item])["issues"] == []
+
+
+@pytest.mark.parametrize("item_id", ["a", "a" * 57, "a.b_c-1", "A9", "revision1", "Revision", "unlock-2"])
+def test_item_id_page_token_boundaries_are_accepted(item_id: str) -> None:
+    """The accepted side: 1 and 57 characters, every allowed character, near-misses of the reserved ids."""
+    item = {"id": item_id, "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    assert run_check(_case(), items=[item])["issues"] == []
+
+
+def test_item_id_with_a_slash_and_not_a_token_gives_the_slash_issue_only() -> None:
+    item = {"id": "a/ b", "kind": "frame_section", "frames": ["B1"], "section": "C400"}
+    issues = run_check(_case(), items=[item])["issues"]
+    assert [(i["code"], i["detail"]) for i in issues] == [
+        ("INVALID_ITEM_ID", "item id a/ b contains / (spec 0007 4.4.1 K3)")
+    ]
+
+
+def test_item_id_token_rule_comes_before_the_other_issues_of_its_item() -> None:
+    items = [{"id": "x y", "kind": "frame_section", "frames": ["B1"], "section": "NOPE"}]
+    assert _issues(run_check(_case(), items=items)) == [("x y", "INVALID_ITEM_ID"), ("x y", "UNKNOWN_SECTION")]
+
+
+def test_item_id_rule_changes_no_other_rule() -> None:
+    """The slash issue comes first for its item; the issues of the other rules follow as without it."""
+    case = _case()
+    items: list[dict[str, Any]] = [
+        {"id": "a/1", "kind": "frame_section", "frames": ["B1"], "section": "NOPE"},
+        {"id": "a/2", "kind": "frame_section", "frames": ["B1"], "section": "C400"},
+    ]
+    assert _issues(run_check(case, items=items)) == [
+        ("a/1", "INVALID_ITEM_ID"),
+        ("a/1", "UNKNOWN_SECTION"),
+        ("a/2", "INVALID_ITEM_ID"),
+        ("a/2", "DUPLICATE_TARGET"),
+    ]
+    ok = [item | {"id": item["id"].replace("/", "-")} for item in items]
+    assert _issues(run_check(case, items=ok)) == [("a-1", "UNKNOWN_SECTION"), ("a-2", "DUPLICATE_TARGET")]
+
+
 def test_warnings_counted_in_the_trace() -> None:
     trace = TraceBuilder()
     run_check(_case("check-conflict-engineer"), trace=trace)
@@ -151,6 +250,20 @@ def test_incomplete_record_makes_the_check_incomplete(name: str) -> None:
     case = _case()
     body = run_check(case, meta=input_meta(case.refs, frozenset({name})))
     assert (body["complete"], body["status"]) == (False, "PASS")
+
+
+def test_absent_sections_leave_the_check_complete_and_incomplete_sections_do_not() -> None:
+    case = load_cases("check")["check-no-sections-other-rules"]
+    assert run_check(case)["complete"] is True
+    assert run_check(case, meta=input_meta(case.refs, frozenset({"diff"})))["complete"] is False
+    full = _case()
+    assert run_check(full, meta=input_meta(full.refs, frozenset({"sections"})))["complete"] is False
+
+
+def test_unread_area_kinds_are_named_only_for_a_selection_with_an_area_kind() -> None:
+    case = load_cases("check")["check-no-sections-area-kind"]
+    body = run_check(case, items=[{"id": "a1", "kind": "area_section", "select": {"story": "L3"}, "section": "S150"}])
+    assert [issue["detail"] for issue in body["issues"]] == ["the selection of item a1 matches no area"]
 
 
 def test_incomplete_difference_report_makes_the_check_incomplete() -> None:

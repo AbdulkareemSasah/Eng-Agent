@@ -1,0 +1,420 @@
+{
+  "source": "eng-harness spec 0007 sections 4.4.1 (rules K1 to K7, absent model.sections/1, amendment B-543), AC39, synthetic fixture",
+  "method_ref": "§4.4.1 K1 K7",
+  "synthetic": true,
+  "derivation": "Synthetic state (every case, with no model.sections/1 record in the read set, so no area kind is known): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200 (name list only), material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm.Every rule other than the area kind of a selection is unchanged. a1 selects story L1: frames B1 and C1. a2 selects story L1 and section W200: area W1; S150 is in the name list. a3 defines wall section W300 with material C30 (in the name list) and thickness 0.25 m: 0.25 m x 1000 mm/m = 250 mm, inside 100 to 1000 mm; the value reference points at items/2/thickness/value_mm, unit mm. a4 puts 12 kN/m on frame B2 in pattern DEAD (in the name list): 12 is inside 0 to 100 kN/m; reference items/3/w/value_kN_m, unit kN/m. No two items set one target and property, the diff has no change: no issue, status PASS, complete true.",
+  "input": {
+    "change_set": {
+      "items": [
+        {
+          "id": "a1",
+          "kind": "frame_section",
+          "select": {
+            "story": "L1",
+            "section": null
+          },
+          "section": "C400"
+        },
+        {
+          "id": "a2",
+          "kind": "area_section",
+          "select": {
+            "story": "L1",
+            "section": "W200"
+          },
+          "section": "S150"
+        },
+        {
+          "id": "a3",
+          "kind": "wall_section",
+          "name": "W300",
+          "material": "C30",
+          "thickness": {
+            "source": "input",
+            "value": 0.25,
+            "unit": "m"
+          },
+          "shell_type": "ShellThick"
+        },
+        {
+          "id": "a4",
+          "kind": "frame_uniform_load",
+          "frames": [
+            "B2"
+          ],
+          "pattern": "DEAD",
+          "w": {
+            "source": "input",
+            "value": 12.0,
+            "unit": "kN/m"
+          },
+          "direction": "gravity"
+        }
+      ]
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "B1",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J1",
+          "j_joint": "J2",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "B2",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J3",
+          "j_joint": "J4",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "story": "L2",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "C1",
+          "kind": "column",
+          "section": "C400",
+          "i_joint": "J0",
+          "j_joint": "J1",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        }
+      ]
+    },
+    "areas": {
+      "areas": [
+        {
+          "id": "F1",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": [
+            "J1",
+            "J2",
+            "J5"
+          ],
+          "story": "L1"
+        },
+        {
+          "id": "F2",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L2"
+        },
+        {
+          "id": "W1",
+          "kind": "wall",
+          "section": "W200",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L1"
+        }
+      ]
+    },
+    "restraints": {
+      "joints": [
+        {
+          "joint": "J0",
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": true,
+          "ry": true,
+          "rz": true
+        }
+      ]
+    },
+    "names": {
+      "frame_sections": [
+        "C400",
+        "R300x600"
+      ],
+      "area_sections": [
+        "S150",
+        "W200"
+      ],
+      "materials": [
+        "C30"
+      ],
+      "patterns": [
+        "DEAD",
+        "LIVE"
+      ],
+      "combinations": [
+        "COMB1"
+      ]
+    },
+    "diff": {
+      "calc": {
+        "id": "harness.model_diff",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.model_diff",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "before": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "tolerances": {},
+      "changes": [],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {},
+      "identical": true,
+      "complete": true
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "bounds.thickness_min_mm": {
+          "value": 100.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.thickness_max_mm": {
+          "value": 1000.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_min_kN_m": {
+          "value": 0.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_max_kN_m": {
+          "value": 100.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_min_kPa": {
+          "value": 0.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_max_kPa": {
+          "value": 50.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_min_ratio": {
+          "value": 0.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_max_ratio": {
+          "value": 10.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.sdl_kPa": {
+          "value": 1.5,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.partition_kN_m": {
+          "value": 2.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": false,
+          "citation": null
+        },
+        "geometry.offset_mm": {
+          "value": 50.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "change_set": "res_00000000000000000000000001",
+    "frames": "res_00000000000000000000000002",
+    "areas": "res_00000000000000000000000003",
+    "restraints": "res_00000000000000000000000005",
+    "names": "res_00000000000000000000000006",
+    "diff": "res_00000000000000000000000007",
+    "basis": "res_00000000000000000000000008"
+  },
+  "expected": {
+    "status": "PASS",
+    "resolved": [
+      {
+        "item_id": "a1",
+        "kind": "frame_section",
+        "targets": [
+          "B1",
+          "C1"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a2",
+        "kind": "area_section",
+        "targets": [
+          "W1"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a3",
+        "kind": "wall_section",
+        "targets": [
+          "W300"
+        ],
+        "values": [
+          {
+            "pointer": "/thickness_mm",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness/value_mm",
+            "unit": "mm"
+          }
+        ]
+      },
+      {
+        "item_id": "a4",
+        "kind": "frame_uniform_load",
+        "targets": [
+          "B2"
+        ],
+        "values": [
+          {
+            "pointer": "/w_kN_m",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/w/value_kN_m",
+            "unit": "kN/m"
+          }
+        ]
+      }
+    ],
+    "issues": [],
+    "complete": true
+  }
+}
