@@ -465,7 +465,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/w",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/w/value_kN_m",
             "unit": "kN/m"
           }
         ]
