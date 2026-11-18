@@ -280,25 +280,26 @@ def test_depth_just_above_threshold_is_accepted() -> None:
 def test_width_too_small_in_y_direction_only_and_status_handling() -> None:
     case = load_cases("layout")["layout-span-zero-and-negative"]
     dims = copy.deepcopy(case.input["dims"])
-    # J1: Lx = 166 (span_y = 0), Ly = 566 (span_x = 400), s = 200 -> n_x = 3, s_x = 200, n_y = 0, s_y = 200
+    # J1: Lx = 166 (span_y = 0), Ly = 466 (span_x = 300 > 0; calculated s_x would be 150.0 != 200.0), s = 200
+    # -> WIDTH_TOO_SMALL applies before computing spacing in either direction: n = 0, s_x = s_y = 200.0, As = 0.0
     # J2: valid spans, status OUTSIDE_BASIS_BOUNDS is preserved
     dims["footings"] = [
-        dims["footings"][0] | {"Lx_mm": 166.0, "Ly_mm": 566.0, "status": "OK", "reason": None},
+        dims["footings"][0] | {"Lx_mm": 166.0, "Ly_mm": 466.0, "status": "OK", "reason": None},
         dims["footings"][1] | {"Lx_mm": 566.0, "Ly_mm": 566.0, "status": "OUTSIDE_BASIS_BOUNDS", "reason": None},
     ]
     trace = TraceBuilder()
     out = _run(case, trace=trace, dims=dims)
     r1, r2 = out["footings"]
-    assert (r1["status"], r1["reason"], r1["n_x"], r1["s_x_mm"], r1["n_y"], r1["s_y_mm"], r1["As_y_mm2"]) == (
-        "NEEDS_ENGINEER",
-        "WIDTH_TOO_SMALL",
-        3,
-        200.0,
-        0,
-        200.0,
-        0.0,
-    )
-    assert r1["As_x_mm2"] == 3 * math.pi * (16.0**2) / 4
+    assert (
+        r1["status"],
+        r1["reason"],
+        r1["n_x"],
+        r1["s_x_mm"],
+        r1["As_x_mm2"],
+        r1["n_y"],
+        r1["s_y_mm"],
+        r1["As_y_mm2"],
+    ) == ("NEEDS_ENGINEER", "WIDTH_TOO_SMALL", 0, 200.0, 0.0, 0, 200.0, 0.0)
     assert (r2["status"], r2["reason"], r2["n_x"], r2["n_y"]) == ("OUTSIDE_BASIS_BOUNDS", None, 3, 3)
     steps = {s.name: s.value for s in trace.build(REGISTRY[CALC_ID], DIGEST).steps}
     assert steps == {"footings": 2, "width_too_small": 1}

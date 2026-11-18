@@ -137,19 +137,14 @@ def _read_choice_basis[E: StrEnum](basis: DesignBasis, path: str, enum_type: typ
         ) from exc
 
 
-def _direction_layout(
-    width: Fraction, s: Fraction, two_c_plus_db: Fraction, db_float: float
-) -> tuple[int, float, float, bool]:
-    """L1 and L2 for one bar direction across `width`: `(count, actual_spacing_mm, area_mm2, width_too_small)`."""
-    span = width - two_c_plus_db
-    if span <= Fraction(ZERO_MM.value):
-        return int(ZERO_COUNT.value), float(s), float(ZERO_AREA.value), True
+def _direction_layout(span: Fraction, s: Fraction, db_float: float) -> tuple[int, float, float]:
+    """L1 and L2 for one bar direction with positive `span`: `(count, actual_spacing_mm, area_mm2)`."""
     spaces = math.ceil(span / s)
     count = spaces + int(ONE.value)
     spacing = float(span / spaces)
     bar_area = PI.value * (db_float**TWO.value) / FOUR.value
     area = count * bar_area
-    return count, spacing, area, False
+    return count, spacing, area
 
 
 def _layout_row(
@@ -176,13 +171,22 @@ def _layout_row(
     d_x, d_y = (d_lower, d_upper) if bottom_layer is BottomLayer.X_BOTTOM else (d_upper, d_lower)
     d = (d_x + d_y) / two
     two_c_plus_db = two * cover + db
-    s_frac = Fraction(row.s_mm)
+    span_x = Fraction(row.Ly_mm) - two_c_plus_db
+    span_y = Fraction(row.Lx_mm) - two_c_plus_db
+    zero_mm = Fraction(ZERO_MM.value)
     db_float = float(db)
-    n_x, s_x, as_x, bad_x = _direction_layout(Fraction(row.Ly_mm), s_frac, two_c_plus_db, db_float)
-    n_y, s_y, as_y, bad_y = _direction_layout(Fraction(row.Lx_mm), s_frac, two_c_plus_db, db_float)
-    too_small = bad_x or bad_y
-    status = _NEEDS_ENGINEER if too_small else row.status
-    reason = _WIDTH_TOO_SMALL if too_small else row.reason
+    if span_x <= zero_mm or span_y <= zero_mm:
+        too_small = True
+        n_x = n_y = int(ZERO_COUNT.value)
+        s_x = s_y = row.s_mm
+        as_x = as_y = float(ZERO_AREA.value)
+        status, reason = _NEEDS_ENGINEER, _WIDTH_TOO_SMALL
+    else:
+        too_small = False
+        s_frac = Fraction(row.s_mm)
+        n_x, s_x, as_x = _direction_layout(span_x, s_frac, db_float)
+        n_y, s_y, as_y = _direction_layout(span_y, s_frac, db_float)
+        status, reason = row.status, row.reason
     reaction_height = row.h_mm if reaction_point is ReactionPoint.TOP_OF_FOOTING else float(ZERO_MM.value)
     cover_float = float(cover)
     return (
