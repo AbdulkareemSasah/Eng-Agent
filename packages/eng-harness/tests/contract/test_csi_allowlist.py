@@ -127,7 +127,9 @@ def test_safe_fake_schemas_match_inventory(tmp_path: Path) -> None:
         assert target["product"] == "SAFE"
         listed = rpc.request("tools/list", {})["tools"]
         actual = {tool["name"]: tool["inputSchema"] for tool in listed}
-        expected = {tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]}
+        expected = {
+            tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]
+        }
         assert len(listed) == len(actual)
         assert actual == expected
     finally:

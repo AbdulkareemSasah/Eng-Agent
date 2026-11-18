@@ -86,7 +86,7 @@ def rpc(control: Path) -> Iterator[Rpc]:
 
 def _fault(control: Path, fault: str, **extra: Any) -> None:
     data = json.loads(control.read_text())
-    data["faults"].append({"fault": fault, **extra})
+    data.setdefault("faults", []).append({"fault": fault, **extra})
     control.write_text(json.dumps(data))
 
 
@@ -308,5 +308,85 @@ def test_design_needs_its_run_and_results_are_seeded(control: Path) -> None:
         drifts = client.call("csi_results_story_drifts", units="kN_m_C")[1]
         assert (drifts["items"], drifts["units"]) == ([{"story": "S1"}], "kN_m_C")
         assert client.call("csi_results_frame_forces", units="kN_m_C")[1]["items"] == []  # nothing seeded
+    finally:
+        client.close()
+
+
+def test_safe_mode_seed_loads_results_and_faults(control: Path) -> None:
+    control.write_text(
+        json.dumps(
+            {
+                "product": "SAFE",
+                "seed": {
+                    "points": [{"name": "P1"}],
+                    "areas": [{"name": "A1"}],
+                    "area_sections": [{"name": "S1"}],
+                    "materials": [{"name": "C1"}],
+                    "load_patterns": [{"name": "D"}],
+                    "load_combos": [{"name": "U"}],
+                    "tables": {
+                        "Area Assignments - Area Springs": [{"UniqueName": "A1", "SpringProp": "K"}],
+                        "Spring Property Definitions - Area Springs": [{"Name": "K"}],
+                        "Joint Loads Assignments - Force": [
+                            {"UniqueName": "P1", "LoadPattern": "D", "XDim": 2, "YDim": 3}
+                        ],
+                    },
+                    "results": {"csi_results_base_reactions": [{"case": "D"}, {"case": "U"}]},
+                },
+            }
+        )
+    )
+    client = Rpc(control)
+    try:
+        assert client.call("csi_launch")[1]["product"] == "SAFE"
+        assert client.call("csi_new_model", confirm=True)[1]["code"] == "unsupported_by_version"
+        for kind in ("points", "areas", "area_sections", "materials", "load_patterns", "load_combos"):
+            assert client.call("csi_list_" + kind)[1]["count"] == 1
+        assert (
+            client.call("csi_db_table_read", table="Area Assignments - Area Springs")[1]["rows"][0]["SpringProp"] == "K"
+        )
+        assert (
+            "Name"
+            in client.call("csi_db_table_fields", table="Spring Property Definitions - Area Springs")[1]["fields"]
+        )
+        error, _ = client.call("csi_set_point_load", name="P1", load_pattern="D", force=[1, 2, 3], moment=[4, 5, 6])
+        assert not error
+        rows = client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"]
+        assert rows == [
+            {
+                "UniqueName": "P1",
+                "LoadPattern": "D",
+                "XDim": 2,
+                "YDim": 3,
+                "FX": 1,
+                "FY": 2,
+                "FZ": 3,
+                "MX": 4,
+                "MY": 5,
+                "MZ": 6,
+            }
+        ]
+        result = client.call("csi_results_base_reactions", limit=1)[1]
+        assert result["count"] == 1
+        assert result["truncated"] is True
+        _fault(control, "present_units_mm", tool="csi_model_info")
+        assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
+        assert client.call("csi_list_points", units="kN_m_C")[1]["units"] == "kN_m_C"
+        assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
+    finally:
+        client.close()
+
+
+def test_safe_point_load_missing_and_zero(control: Path) -> None:
+    control.write_text(json.dumps({"product": "SAFE", "seed": {"points": [{"name": "P1"}]}}))
+    client = Rpc(control)
+    try:
+        client.call("csi_launch")
+        args = {"load_pattern": "D", "force": [1, 0, 0], "moment": [0, 0, 0]}
+        assert client.call("csi_set_point_load", name="missing", **args)[1]["code"] == "not_found"
+        assert not client.call("csi_set_point_load", name="P1", **args)[0]
+        args["force"] = [0, 0, 0]
+        assert not client.call("csi_set_point_load", name="P1", **args)[0]
+        assert client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"] == []
     finally:
         client.close()
