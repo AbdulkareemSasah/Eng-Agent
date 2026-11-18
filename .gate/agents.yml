@@ -2,7 +2,7 @@ template: design/process/templates/AGENTS.template.md
 output: AGENTS.md
 values:  # key = the exact text between the double braces in the template
   "package-name": "eng-platform (workspace root)"
-  "template-version": "sha256:7a1a12af2a76"
+  "template-version": "sha256:a6f4a4f274b3"
   "hub-path": "design"
   "one-paragraph purpose": "The workspace root of eng-platform, the private incubation workspace (ADR-0028) in which every package of the Eng-Agent platform is built before the owner splits them into repositories. It holds the uv workspace configuration, CI, the gate configuration (`.gate/`), the state files (`BUILD-STATUS.md`, `LOCAL-TESTING.md`) and the design hub (`design/`). It contains no importable code."
   "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "workspace root (CI, gate configuration, state files)"

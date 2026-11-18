@@ -2,7 +2,7 @@ template: ../../design/process/templates/AGENTS.template.md
 output: AGENTS.md
 values:  # key = the exact text between the double braces in the template
   "package-name": "eng-contract"
-  "template-version": "sha256:7a1a12af2a76"
+  "template-version": "sha256:a6f4a4f274b3"
   "hub-path": "../../design"
   "one-paragraph purpose": "The contract package (eng-contract/1) of the Eng-Agent platform: error codes and retry rules, canonical JSON (RFC 8785) and payload hashes, ULID identifiers, units of canonical/1, quantities, envelopes, records, references, verdicts, traces, neutral kinds and the MCP mapping. Every other package depends on it, so a change here is a contract change. It never talks to a host program and holds no engineering decisions beyond the cited unit factors."
   "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "1 contract (import name `eng_contract`)"
