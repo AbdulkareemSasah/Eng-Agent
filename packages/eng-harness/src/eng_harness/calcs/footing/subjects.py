@@ -23,17 +23,17 @@ from pydantic import BaseModel, ConfigDict
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.kinds.footing import Excluded, Subject
 
-BASIS_FIELDS = ("compare.angle",)
+BASIS_FIELDS = ("compare.angle_deg",)
 """The basis paths this calc reads (spec 0003 4.4); the workflow declares them required."""
 ZERO_TURN = Cited(
-    value=0, unit="deg", source="Geometry: zero rotation; also the lower bound of compare.angle (spec 0003 4.4)"
+    value=0, unit="deg", source="Geometry: zero rotation; also the lower bound of compare.angle_deg (spec 0003 4.4)"
 )
 QUARTER_TURN = Cited(value=90, unit="deg", source="Geometry: a right angle is 90 degrees")
 HALF_TURN = Cited(value=180, unit="deg", source="Geometry: a straight angle is 180 degrees")
 THREE_QUARTER_TURN = Cited(value=270, unit="deg", source="Geometry: three right angles are 270 degrees")
 FULL_TURN = Cited(value=360, unit="deg", source="Geometry: a full turn is 360 degrees")
 VERSION = Cited(value=1, unit="1", source="Calc version 1 of spec 0010 4.4.1; a change of method is a new version")
-_ANGLE = "compare.angle"
+_ANGLE = "compare.angle_deg"
 
 
 class ExclusionReason(StrEnum):
