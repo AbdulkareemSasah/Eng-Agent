@@ -501,3 +501,39 @@ def test_non_test_source_outside_globs_stays_the_only_gc008_error(repo: Repo) ->
     assert (result.code, set(errors)) == (1, {"GC008"})
     assert _gc008_paths(result.out) == ["pkg/src/mod.py", "pkg/src/test_helper.py"]
     assert sorted(_notices(result.out)) == ["pkg/tests/test_x.py"]
+
+
+def test_look_alikes_of_collateral_edits_stay_errors(repo: Repo) -> None:
+    """AC10d: only a ``tests`` directory segment or a holder's own ``CHANGELOG.md`` is collateral."""
+    base = _scope_repo(repo, ("lib/src/**",))
+    files = {
+        "lib/src/a.py": "a = 1\n",
+        "pkg/src/tests.py": "t = 1\n",  # a file named tests, no directory
+        "pkg/mytests/x.py": "x = 1\n",  # a directory whose name only ends in tests
+        "pkg/docs/CHANGELOG.md": NOTES,  # not the CHANGELOG.md at the holder's top
+        "pkg/CHANGELOG.md.bak": NOTES,
+        "other/CHANGELOG.md": NOTES,  # not a member and not the plan's package
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == sorted(set(files) - {"lib/src/a.py"})
+    assert _notices(result.out) == {}
+
+
+def test_rename_into_tests_directory_is_a_notice_for_the_new_path_only(repo: Repo) -> None:
+    """AC10, AC10d: a rename counts both paths; the old non-test path stays an error, the new test path is a notice."""
+    base = make_gate_repo(repo, base_files={"pkg/other/old.py": "a = 1\nb = 2\nc = 3\nd = 4\n"})
+    repo.rename("pkg/other/old.py", "pkg/tests/moved.py")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == ["pkg/other/old.py"]
+    assert sorted(_notices(result.out)) == ["pkg/tests/moved.py"]
+
+
+def test_root_member_changelog_is_a_notice(repo: Repo) -> None:
+    """AC10d: when the workspace root is a member, its top-level CHANGELOG.md is a collateral edit."""
+    root = {"pyproject.toml": '[project]\nname = "root"\nversion = "0"\n[tool.uv.workspace]\nmembers = ["."]\n'}
+    base = make_gate_repo(repo, base_files=root, plan=plan_text(files=("pkg/src/**",)))
+    result, errors = gate_check(repo, _change(repo, base, files={"CHANGELOG.md": NOTES}))
+    assert (result.code, errors) == (0, {})
+    assert sorted(_notices(result.out)) == ["CHANGELOG.md"]

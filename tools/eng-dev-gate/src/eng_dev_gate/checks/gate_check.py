@@ -187,6 +187,19 @@ def _test_markers(changes: list[Change], member_dirs: Sequence[str], git: Git, h
     return markers
 
 
+def _holders(plan_path: str, member_dirs: Sequence[str]) -> list[str]:
+    """The workspace members' directories and the plan's package folder (the holders of ``CHANGELOG.md``)."""
+    plan = PurePosixPath(plan_path)
+    return [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
+
+
+def _collateral(path: str, holders: Sequence[str]) -> bool:
+    """A test path (a ``tests`` directory segment) or the ``CHANGELOG.md`` of a holder is a collateral edit (AC10d)."""
+    if "tests" in PurePosixPath(path).parent.parts:
+        return True
+    return any(path == ("CHANGELOG.md" if d == "." else f"{d}/CHANGELOG.md") for d in holders)
+
+
 def accepted_paths(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
 ) -> tuple[list[str], set[str]]:
@@ -194,14 +207,13 @@ def accepted_paths(
 
     The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
     scope when another changed file under that directory matches a glob of the task (AC10a); so is the ratchet
-    baseline when it changes only counts of packages with such a file (AC10b).
+    baseline when it changes only counts of packages with such a file (AC10b). A collateral edit (AC10d) is not in
+    scope here; ``_scope`` reports it as a notice.
     """
     paths = dict.fromkeys(p for change in changes for p in change.paths)
     inside = {p for p in paths if matches_any(p, task.files)}
     anchors = set(inside)
-    plan = PurePosixPath(plan_path)
-    holders = [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
-    for directory in holders:
+    for directory in _holders(plan_path, member_dirs):
         prefix = "" if directory == "." else f"{directory}/"
         inside |= {
             f
@@ -217,9 +229,24 @@ def accepted_paths(
 def _scope(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
 ) -> list[Finding]:
-    """GC008 for each changed path outside the task's globs."""
+    """GC008 for each changed path outside the task's globs: a notice for a collateral edit, else an error."""
     paths, inside = accepted_paths(changes, task, plan_path, member_dirs, git, base, head)
-    return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
+    holders = _holders(plan_path, member_dirs)
+    findings: list[Finding] = []
+    for p in (p for p in paths if p not in inside):
+        message = f"{p} matches no file glob of task {task.id}"
+        if _collateral(p, holders):
+            findings.append(
+                Finding(
+                    code="GC008",
+                    severity=Severity.NOTICE,
+                    path=p,
+                    message=f"{message}: collateral edit (list it under Collateral edits in the pull request)",
+                )
+            )
+        else:
+            findings.append(_error("GC008", message, p))
+    return findings
 
 
 def _counted(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
