@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Change-set values as write arguments: `LengthInput`, `LineLoadInput`, `AreaLoadInput` and `RatioInput` hold `value_mm`, `value_kN_m`, `value_kPa` and `value_ratio`, filled from `value` and `unit` by `eng_contract.units` when absent and refused when they differ, and the resolved `ref` of `harness.change_set_check` points at that number (`.../value_<suffix>` of an input, `.../value` of a basis field), so step 8 can pass it as the tool's engineering argument; the check and `harness.expected_effects` stay at version 1 and their content hashes in `calcs.lock.json` move (plan 0007 T16b, B-557; spec 0007 4.3.1, 4.4.1 K4, AC40).
 - Calcs `harness.change_set_check` and `harness.expected_effects` take an absent `model.sections/1` (the field `sections` is optional; a supplied record keeps its reference, completeness and single-revision checks): without it a `select` that names `area_kind` is `EMPTY_SELECTION` with the detail that the area kinds were not read, every other rule is unchanged, and a `wall_section` is projected as the two `set` effects of a held section; the two content hashes in `calcs.lock.json` move (plan 0007 T17, B-555; spec 0007 4.4.1, 4.4.2, AC39).
 - D-3 continues only when drift status is `PASS` as well as no error or unclassified message; D-2 accepts the reason `check_model_failed` without an automatic continue. Both edit-cycle rules and the D-2 point move to version 2; D-3 stays at version 1 (plan 0007 T7b, B-556; spec 0007 4.6, AC18, Q20, Q14 interim reading).
 

@@ -437,7 +437,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/w",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/w/value_kN_m",
             "unit": "kN/m"
           }
         ]
@@ -451,7 +451,7 @@
         "values": [
           {
             "pointer": "/q_kPa",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/q",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/1/q/value_kPa",
             "unit": "kPa"
           }
         ]
@@ -465,7 +465,7 @@
         "values": [
           {
             "pointer": "/self_weight_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/self_weight",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/self_weight/value_ratio",
             "unit": "1"
           }
         ]
@@ -479,7 +479,7 @@
         "values": [
           {
             "pointer": "/q_kPa",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/q",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/q/value_kPa",
             "unit": "kPa"
           }
         ]
@@ -493,7 +493,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/w",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/w/value_kN_m",
             "unit": "kN/m"
           }
         ]

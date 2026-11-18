@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0007 sections 4.4.1 (rules K1 to K7, absent model.sections/1, amendment B-543), AC39, synthetic fixture",
   "method_ref": "§4.4.1 K1 K7",
   "synthetic": true,
-  "derivation": "Synthetic state (every case, with no model.sections/1 record in the read set, so no area kind is known): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200 (name list only), material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm.Every rule other than the area kind of a selection is unchanged. a1 selects story L1: frames B1 and C1. a2 selects story L1 and section W200: area W1; S150 is in the name list. a3 defines wall section W300 with material C30 (in the name list) and thickness 0.25 m: 0.25 m x 1000 mm/m = 250 mm, inside 100 to 1000 mm; the value reference points at items/2/thickness, unit mm. a4 puts 12 kN/m on frame B2 in pattern DEAD (in the name list): 12 is inside 0 to 100 kN/m; reference items/3/w, unit kN/m. No two items set one target and property, the diff has no change: no issue, status PASS, complete true.",
+  "derivation": "Synthetic state (every case, with no model.sections/1 record in the read set, so no area kind is known): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200 (name list only), material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm.Every rule other than the area kind of a selection is unchanged. a1 selects story L1: frames B1 and C1. a2 selects story L1 and section W200: area W1; S150 is in the name list. a3 defines wall section W300 with material C30 (in the name list) and thickness 0.25 m: 0.25 m x 1000 mm/m = 250 mm, inside 100 to 1000 mm; the value reference points at items/2/thickness/value_mm, unit mm. a4 puts 12 kN/m on frame B2 in pattern DEAD (in the name list): 12 is inside 0 to 100 kN/m; reference items/3/w/value_kN_m, unit kN/m. No two items set one target and property, the diff has no change: no issue, status PASS, complete true.",
   "input": {
     "change_set": {
       "items": [
@@ -394,7 +394,7 @@
         "values": [
           {
             "pointer": "/thickness_mm",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness/value_mm",
             "unit": "mm"
           }
         ]
@@ -408,7 +408,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/w",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/w/value_kN_m",
             "unit": "kN/m"
           }
         ]

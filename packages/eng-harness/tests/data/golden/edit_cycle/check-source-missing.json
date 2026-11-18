@@ -409,7 +409,7 @@
         "values": [
           {
             "pointer": "/q_kPa",
-            "ref": "res_00000000000000000000000008#/fields/loads.absent_kPa",
+            "ref": "res_00000000000000000000000008#/fields/loads.absent_kPa/value",
             "unit": "kPa"
           }
         ]
@@ -423,7 +423,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000008#/fields/loads.partition_kN_m",
+            "ref": "res_00000000000000000000000008#/fields/loads.partition_kN_m/value",
             "unit": "kN/m"
           }
         ]
@@ -437,7 +437,7 @@
         "values": [
           {
             "pointer": "/q_kPa",
-            "ref": "res_00000000000000000000000008#/fields/geometry.offset_mm",
+            "ref": "res_00000000000000000000000008#/fields/geometry.offset_mm/value",
             "unit": "kPa"
           }
         ]

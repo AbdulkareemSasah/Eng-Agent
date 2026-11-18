@@ -4,14 +4,17 @@ Purpose: the engineer's answer to the change-set request, as data: items of nine
 are a basis path or a number with a unit, and the refused kinds and variants as parseable models so that the check
 can name their gap instead of the engineer meeting a schema error. No logic beyond validation.
 Units: a literal value names its unit; the unit must have the dimension of the field (length, line load, area load,
-dimensionless). Values are not converted here; `eng_contract.units` converts them in the check.
+dimensionless). The change-set input models also hold the value in the canonical unit as `value_<suffix>`, filled and
+checked here by `eng_contract.units` (spec 0007 4.3.1); the check compares and converts by `eng_contract.units` too.
 Errors: `pydantic.ValidationError` for every violated rule, naming the field (engine AC61: `INVALID_ARGUMENT`).
 """
+# ruff: noqa: N815  # B-557: field names are fixed by the contract's unit suffixes (EC §4.7.2), e.g. value_kN_m
 
+import math
 from typing import Annotated, Any, ClassVar, Literal, Self
 
 from eng_contract.kinds.basis import BasisPath
-from eng_contract.units import QUANTITY_KINDS, UNITS
+from eng_contract.units import QUANTITY_KINDS, UNITS, convert
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from eng_harness.kinds.edit_cycle import NONEMPTY, Label
@@ -76,28 +79,61 @@ class _InputValue(_M):
         return unit
 
 
-class LengthInput(_InputValue):
+class _CanonicalInput(_InputValue):
+    """An input value that also holds its number in the canonical unit (`value_<suffix>`, spec 0007 4.3.1).
+
+    A reference can reach a number only under a key with a unit suffix (contract 4.6.2), so the model fills the field
+    from `value` and `unit` when it is absent and refuses a given one that differs from the conversion.
+    """
+
+    @model_validator(mode="before")
+    @classmethod
+    def _canonical(cls, data: Any) -> Any:
+        number, symbol = (data.get("value"), data.get("unit")) if isinstance(data, dict) else (None, None)
+        known = UNITS.get(symbol) if isinstance(symbol, str) else None
+        kind = QUANTITY_KINDS[cls.quantity]
+        if (
+            not isinstance(number, int | float)
+            or isinstance(number, bool)
+            or not math.isfinite(number)
+            or known is None
+            or known.dimension != kind.dimension
+        ):
+            return data  # the field validators name the fault
+        name, exact = f"value{kind.suffix}", convert(number, str(symbol), kind.canonical_unit)
+        if data.get(name) is None:
+            return {**data, name: exact}
+        if data[name] != exact:
+            raise ValueError(f"{name} {data[name]!r} is not {number} {symbol} in {kind.canonical_unit} ({exact})")
+        return data
+
+
+class LengthInput(_CanonicalInput):
     """A literal length."""
 
     quantity = "length"
+    value_mm: float | None = None
 
 
-class LineLoadInput(_InputValue):
+class LineLoadInput(_CanonicalInput):
     """A literal line load."""
 
     quantity = "line_load"
+    value_kN_m: float | None = None
 
 
-class AreaLoadInput(_InputValue):
+class AreaLoadInput(_CanonicalInput):
     """A literal area load."""
 
     quantity = "area_load"
+    value_kPa: float | None = None
 
 
-class RatioInput(_InputValue):
+class RatioInput(_CanonicalInput):
     """A literal dimensionless number."""
 
     quantity = "dimensionless"
+    value_ratio: float | None = None
 
 
 LengthValue = Annotated[BasisValue | LengthInput, Field(discriminator="source")]

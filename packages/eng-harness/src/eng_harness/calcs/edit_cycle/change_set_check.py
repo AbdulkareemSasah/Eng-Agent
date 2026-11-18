@@ -7,7 +7,9 @@ error (K7).
 Inputs: `change_set` (the answer field), the step 3 read set as flat fields (`frames`, `areas`, `sections`,
 `restraints`), `names` (`harness.csi_name_lists/1`), `diff` (the step 4 `harness.model_diff/1`) and `basis`.
 Units: a value is compared exactly in the canonical unit of its quantity kind (the unit of its bounds), converted by
-`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only.
+`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only, each
+pointing at the number: `.../value` of a basis field, `.../value_<suffix>` of an input (K4), so step 8 passes it as the
+engineering argument.
 Errors: `ContractError` `INVALID_ARGUMENT` (with `field`) for a bounds field that is missing, unconfirmed or not a
 number (no default), or an input given without a record. Every finding about the change set is an issue.
 """
@@ -38,6 +40,12 @@ BOUNDS: tuple[tuple[str, str, str], ...] = (
     ("dimensionless", "bounds.ratio_min_ratio", "bounds.ratio_max_ratio"),
 )
 """Spec 0007 4.8 and K4: the quantity kind of a value and the basis paths of its lower and upper bound."""
+_NUMBER = {
+    quantity: f"value{kind.suffix}"
+    for quantity, low, _ in BOUNDS
+    if (kind := kind_for_field(low.rpartition(".")[2])) is not None
+}
+"""The key under which an input value holds its number in the canonical unit of its quantity kind (spec 0007 4.3.1)."""
 BASIS_FIELDS = tuple(path for _, low, high in BOUNDS for path in (low, high))
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
 ANSWER_FIELD = "fields/change_set/value"
@@ -183,7 +191,7 @@ class _Check:
         exact: Fraction | None
         if value.source == "basis":
             path, shown = value.path, f"basis {value.path}"
-            ref, stored = f"{self.refs['basis']}#/fields/{path}", self.inp.basis.fields.get(path)
+            ref, stored = f"{self.refs['basis']}#/fields/{path}/value", self.inp.basis.fields.get(path)
             kind = kind_for_field(path.rpartition(".")[2])
             exact = as_fraction(stored.value) if stored is not None and stored.confirmed else None
             if exact is None:
@@ -194,7 +202,7 @@ class _Check:
         else:
             shown, ref = (
                 f"{value.value} {value.unit}",
-                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}",
+                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}/{_NUMBER[quantity]}",
             )
             exact = Fraction(value.value) * unit(value.unit).factor / unit(canonical).factor  # no offset, no pi
         if exact is not None and not low <= exact <= high:
