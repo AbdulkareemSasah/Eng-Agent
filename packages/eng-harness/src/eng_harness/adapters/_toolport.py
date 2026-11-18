@@ -41,8 +41,13 @@ from eng_harness.servers import CallEffect, ServersConfig
 
 __all__ = [
     "AdapterToolPort", "Binding", "Builder", "Decision", "HostCaller", "HostRead", "LostWrite", "ModelBinder",
-    "Reader", "Reconciler",
+    "Reader", "Reconciler", "SettlementError",
 ]  # fmt: skip
+
+
+class SettlementError(Exception):
+    """Post-success tool settlement failed after the host applied the call; leaves a write in flight."""
+
 
 _LOG = logging.getLogger(__name__)
 MODEL_PARAM = "model"  # the canonical argument models name the model key `model`; it never goes to the host
@@ -217,6 +222,7 @@ class AdapterToolPort:
 
         Raises:
             ContractError: `INVALID_ARGUMENT` for a tool outside the allowlist; nothing is sent.
+            SettlementError: a post-success settlement hook failed after the host applied the call.
         """
         descriptor = self._find(tool)
         try:
@@ -278,7 +284,10 @@ class AdapterToolPort:
             detail = self._errors.map(failure, effect=effect, tool=descriptor.name, op_id=op_id)
             raise self._lost(detail, server.host_key, op_id, bump_epoch=True)
         reply = parse_reply(dumped)
-        binding = await self._settled(descriptor, args, model, binding)
+        try:
+            binding = await self._settled(descriptor, args, model, binding)
+        except Exception as exc:
+            raise SettlementError(f"{descriptor.name} settlement failed after host reply: {exc}") from exc
         reader = self._readers.get(descriptor.name)
         payload, summary = reader(reply, binding) if reader else ({"value": reply}, {})
         return make_envelope(
