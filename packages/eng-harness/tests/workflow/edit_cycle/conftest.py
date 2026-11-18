@@ -12,7 +12,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from eng_contract.envelope import Provenance
@@ -272,7 +272,7 @@ class Stand:
 
     def choose(self, request: InputRequest, option: str) -> InputAnswer:
         """The engineer's choice: `option` for every question of the request (the properties with an enum)."""
-        props: dict[str, Any] = dict(request.fields_schema["properties"])  # type: ignore[arg-type]
+        props: dict[str, Any] = cast(dict[str, Any], request.fields_schema["properties"])
         choices = {name: option for name, prop in props.items() if "enum" in prop and option in prop["enum"]}
         accept = {name: "accept" for name, prop in props.items() if "enum" in prop and "accept" in prop["enum"]}
         return InputAnswer(

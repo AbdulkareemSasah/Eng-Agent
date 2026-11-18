@@ -6,7 +6,7 @@ The change sets and the model are synthetic. Expected model values are derived b
 import copy
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from pydantic import JsonValue
 
@@ -46,7 +46,8 @@ def _seeded(stand: Stand) -> dict[str, Any]:
 
 def _row(model: dict[str, Any], table: str, key: str, name: str) -> dict[str, Any]:
     (row,) = [r for r in model["tables"][table] if r[key] == name]
-    return row  # type: ignore[no-any-return]
+    found: dict[str, Any] = row
+    return found
 
 
 def _written(stand: Stand) -> list[str]:
@@ -98,7 +99,7 @@ def test_rejected_set_writes_nothing(stand: Stand) -> None:
     outcome = stand.play(stand.flow(), _responder(decision="reject"))
     assert outcome.status is RunStatus.COMPLETED, outcome
     assert outcome.output is not None
-    assert [c.route for c in outcome.output.cycles] == ["rejected"]  # type: ignore[attr-defined]
+    assert [c.route for c in cast(Any, outcome.output).cycles] == ["rejected"]
     assert _written(stand) == []
     assert "csi_save_model" not in [c["tool"] for c in stand.calls()]
     assert stand.results("harness.expected_effects") == []
