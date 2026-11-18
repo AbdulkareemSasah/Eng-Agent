@@ -1733,7 +1733,6 @@
    "prTitle": "feat(eng-harness): workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) (B-202)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "E.T24",
     "W.T13b"
    ],
    "writer": "sonnet, medium",
@@ -3820,7 +3819,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
-   ]
+   ],
+   "merged_pr": 432
   },
   {
    "id": "B-571",
