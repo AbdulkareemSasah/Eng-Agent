@@ -262,7 +262,7 @@
     "basis": {
       "template": null,
       "fields": {
-        "compare.angle": {
+        "compare.angle_deg": {
           "value": 1.0,
           "unit": "deg",
           "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",

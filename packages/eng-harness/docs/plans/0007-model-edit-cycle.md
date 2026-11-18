@@ -294,6 +294,10 @@ tasks:
     # B-482 pattern); waits for plan 0001 T24 (external) and then replaces the _Loaded basis port of conftest.py by
     # StoreBasisPort(store); waits for T13b, without which its three apply tests stay red; budget 400 -> 415 (an
     # estimate; the B-202 writer measured 639 counted lines on its branch, information only).
+    # Amendment (B-574, documents only): plan 0006 T14c merged first (B-528, #429) with the Path walk, so this task
+    # also switches _model_files to PurePath identity match and updates test_model_files_reach_the_port_builder
+    # (changed test; spec 0006 4.2.2 step 2, AC67); src/eng_harness/cli/_run.py and tests/workflow/test_cli_run.py added;
+    # budget 415 -> 425 (about 10 lines, an estimate).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -310,8 +314,10 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
       - "packages/eng-harness/src/eng_harness/block.py"  # ModelFile (amendment B-569)
       - "packages/eng-harness/tests/unit/test_block.py"  # test_model_file_is_pure (amendment B-569)
+      - "packages/eng-harness/src/eng_harness/cli/_run.py"  # PurePath identity match in _model_files (amendment B-574)
+      - "packages/eng-harness/tests/workflow/test_cli_run.py"  # test_model_files_reach_the_port_builder (amendment B-574)
     # Amendment (B-544, documents only): EditCycleOutput.summaries is the ordered tuple of spec 4.2; step 8 passes the resolved references unchanged, which T16b makes valid write arguments; waits for T7b and T16b; no line added, files and budget unchanged.
-    max_changed_lines: 415
+    max_changed_lines: 425
     max_sessions: 3
     tests_first:
       - "packages/eng-harness/tests/unit/edit_cycle/test_definition.py::test_workflow_definition"
@@ -934,6 +940,12 @@ waits for engine plan 0001 T24 and replaces the `_Loaded` basis port of `tests/w
 written and go green once T13b has merged. (4) T8b switches this task's result reads to `ReadResult.data` and
 `Answered.answer` after it merges; until then the `model_dump()["value"]` reads stay, because every value T8 reads that
 way is a string, a list, a reference, a pointer or an item id.
+Amendment (B-574; spec 0006 §4.2.2 step 2, AC67): because plan 0006 T14c merged first (B-528, #429) with the Path
+walk, T8 also switches `_model_files` in `packages/eng-harness/src/eng_harness/cli/_run.py` to the PurePath identity
+match that plan 0006 T14c's B-569 comment describes. That means: unwrap `X | None`; match `annotation is PurePath`,
+never `issubclass`; turn each value into a `Path` in the command line for the run-time checks; resume unchanged. T8
+also updates `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder` (changed test) to use a
+`ModelFile` field and a `ModelFile | None` field, and asserts that a plain `Path` field is not picked up.
 
 **T8b Sanctioned result accessors** (amendment B-569; engine spec 0001 §4.3.2, AC12, AC61, AC19, §11 Q48; covers
 spec AC2). `ctx.py` gains two read-only properties, additive only (the fields, the codec and the stored forms do not
@@ -1168,7 +1180,7 @@ paths; the merged cases, which pass the record, keep their expectations. T17 wai
 | T5 | plan 0002 T4, T11 to T14 (fake, reader, edits, analysis, reconciliation); plan 0002 T21 waits for T5, not T5 for T21: T5's `test_csi_read_state_tool.py` builds `HARNESS_KINDS.extend(CSI_KINDS)`, which `extend` refuses once T21 registers `CSI_KINDS`, so T21 adapts that line (amendment B-503) |
 | T6 | plan 0001 T5, T15, T16 (registry, approvals, modes), T16b (it shares `_modes.py` and `_ctx_impl.py`, B-499), T11c (split from T11b by B-427; `_hoststate.py`, `_runner.py`: host-state check and resume order, extended for EC2, amendment B-415), T22 (it shares `_invariants.py`, amendment B-503); the engine spec amendment, work item B-415 (documents pull request; engine spec §3.9 rules EC1 to EC6, covered by spec AC33) |
 | T7 | plan 0005 T1 to T4, T7 (points, rules, cascade core; T2 and T4 carry the discovery of spec 0005 §4.2 and §4.4); T15 of this plan (FB005, amendment B-511) |
-| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths; plan 0001 T23 (`Preview.models` takes the key) and T17 of this plan (amendment B-543); plan 0001 T24 (the first `ctx.basis` read as engine work; T8 then replaces `_Loaded` in `conftest.py` by `StoreBasisPort`) and T13b of this plan (amendment B-569); `ModelFile` in `block.py` from this task or plan 0006 T14c, whichever merges first (amendment B-569) |
+| T8 | plan 0001 T10 to T17 and T22 (the stop on a check that is not clean, which step 9 can meet; until spec Q14 is answered T8 adds no routing for it, see T8; amendment B-503); plan 0002 T19a (amendment B-475); plan 0004 T8 to T10; plan 0005 T10; plan 0006 T7 (answer models); B-417 (unit-suffixed basis paths, spec §4.8); eng-contract plan 0001 T19 (work item B-464, owner decision OQ-Q44) and the renames in specs 0002 and 0003 of spec Q12 (owner queue, no work item yet), so that a basis holding the §4.8 paths can be frozen and the calcs' `basis_fields` equal the declared paths; plan 0001 T23 (`Preview.models` takes the key) and T17 of this plan (amendment B-543); plan 0001 T24 (the first `ctx.basis` read as engine work; T8 then replaces `_Loaded` in `conftest.py` by `StoreBasisPort`) and T13b of this plan (amendment B-569); `ModelFile` in `block.py` from this task, which also switches `_model_files` to `PurePath` identity match after plan 0006 T14c merged first with the `Path` walk (amendments B-569, B-574) |
 | T8b | plan 0001 T17 (`tests/rules/test_block_modules.py`) and T23 (`ctx.py`), both merged: an external amendment of plan 0001 files, recorded in that plan's section 3; T8 of this plan (`_cycle.py`); T9a waits for T8b (amendment B-569) |
 | T9a | plan 0002 T13 (analysis and design tools); plan 0006 T10 (engineer-turn labels) |
 | T9b | plan 0001 T16b (promotion; B-499) and T23 (`ctx.promote` takes the key, through T8; amendment B-543); plan 0002 T15 (for the final unlock test; until then the v1 exit) |
