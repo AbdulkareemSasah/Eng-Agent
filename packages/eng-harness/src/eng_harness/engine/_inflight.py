@@ -84,7 +84,9 @@ class Fold:
         """Fold `events`; housekeeping (`@`) and host (`~host.`) steps are audit records and are left out."""
         # a restore's cut (a, b): the saves and steps between sequence a and its second `run_resumed` b are undone
         cuts = [(r.restored_to_seq or e.seq, e.seq) for e in events if isinstance(r := e.payload, ev.RunResumed)]
+        self.cuts = cuts
         self.steps: dict[str, Step] = {}
+        self.copies: list[tuple[int, str | None, ev.ModelSaved]] = []  # each uncut working copy save: seq, path
         self.bound: dict[str, ev.ModelBound] = {}
         self.bound_at: dict[str, int] = {}
         self.saved: dict[str, tuple[int, ev.ModelSaved]] = {}
@@ -94,6 +96,8 @@ class Fold:
                 self.bound[p.model_key], self.bound_at[p.model_key] = p, e.seq
             elif isinstance(p, ev.ModelSaved) and not any(a < e.seq < b for a, b in cuts):
                 self.saved[p.model_key] = (e.seq, p)
+                if p.role == "working_copy":
+                    self.copies.append((e.seq, path, p))
             if path is None or e.attempt is None or path.startswith("@") or "~host." in path:
                 continue
             if isinstance(p, ev.StepStarted):
@@ -119,6 +123,10 @@ class Fold:
             and (s.rerun != 1 or not live)
         ]  # fmt: skip
 
+    def content(self, key: str | None = None) -> list[Step]:
+        """As `writes`, without an open recorded as changing no model content that completed or was applied (B-562)."""
+        return [s for s in self.writes(key) if not _content_free(s)]
+
     def written(self) -> list[str]:
         """The keys of the models the run wrote to, sorted (a restore does not make a model unwritten)."""
         return sorted({s.began.model_key for s in self.writes(live=False) if s.began.model_key})
@@ -128,7 +136,14 @@ class Fold:
         if key not in self.bound or self.bound[key].reason != "reopened":
             return []
         after = self.saved[key][0] if key in self.saved else 0
-        return [s for s in self.writes(key) if after < s.seq < self.bound_at[key]]
+        return [s for s in self.content(key) if after < s.seq < self.bound_at[key]]
+
+
+def _content_free(step: Step) -> bool:
+    """An open whose attempt recorded `opens_model_without_writing` true and that completed or was applied (B-562)."""
+    done = step.closing
+    applied = isinstance(done, ev.StepCompleted) or (isinstance(done, ev.StepReconciled) and done.outcome == "applied")
+    return step.began.opens_model_without_writing is True and applied
 
 
 class ResumeIndex(ReplayIndex):
