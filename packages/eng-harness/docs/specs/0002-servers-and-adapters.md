@@ -212,8 +212,10 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   manifest of SHA-256 hashes; the manifest verifies. Test: `tests/unit/servers/test_record.py::test_sanitized_and_manifest`.
 - AC34. Given recordings, when the recorded-reply fake serves a session, then the adapter's contract tests pass on
   them, and the synthetic fake gives the same reply shape and error codes for every recorded operation (fake
-  fidelity, process/05 §4). Tests: `tests/contract/test_csi_recordings.py::test_adapter_on_recordings`,
-  `::test_synthetic_matches_recordings` (skip with reason when no recording exists).
+  fidelity, process/05 §4). The tests run on every recording committed under `acceptance/recordings` and on the
+  synthetic recording of record mode; the real server is verified only once the owner commits a recording
+  (local-testing item 12; amendment B-573). Tests: `tests/contract/test_csi_recordings.py::test_adapter_on_recordings`,
+  `::test_synthetic_matches_recordings`.
 - AC35. Given the synthetic CSI fake, then its tool list equals the S-12 inventory schemas for every allowlisted tool
   (so its fingerprint equals the pinned one) and it is never part of the built package. Tests:
   `tests/contract/test_csi_allowlist.py::test_fake_schemas_match_inventory`,

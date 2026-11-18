@@ -150,9 +150,11 @@ the real `ToolPort` and `HostPort` against it.
   without a repeated write. Tests: `tests/workflow/test_sap2000_cycle.py::test_cycle_steps`,
   `tests/replay/test_sap2000_resume.py::test_crash_matrix`.
 - AC19. Given SAP2000 recordings, the adapter's contract tests pass on them and the synthetic fake gives the same reply
-  shape and error codes for every recorded operation; the fake's SAP2000 tool schemas equal the S-12 inventory. Tests:
-  `tests/contract/test_csi_recordings.py::test_sap2000_adapter_on_recordings`, `::test_sap2000_synthetic_matches_recordings`
-  (skip with reason when none exists), `tests/contract/test_csi_allowlist.py::test_sap2000_fake_schemas_match_inventory`.
+  shape and error codes for every recorded operation; the fake's SAP2000 tool schemas equal the S-12 inventory. The
+  tests run on every recording committed under `acceptance/recordings` and on the synthetic recording of record mode;
+  the real server is verified only once the owner commits a recording (spec §12 item L4; amendment B-573). Tests:
+  `tests/contract/test_csi_recordings.py::test_sap2000_adapter_on_recordings`,
+  `::test_sap2000_synthetic_matches_recordings`, `tests/contract/test_csi_allowlist.py::test_sap2000_fake_schemas_match_inventory`.
 
 ## 4. Design
 

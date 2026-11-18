@@ -194,9 +194,10 @@ real engine with the real `ToolPort` and `HostPort` against the fake.
   reconciles and completes without a repeated load write. Test: `tests/replay/test_safe_resume.py::test_crash_matrix`.
 - AC28. Given SAFE recordings, then the adapter's contract tests pass on them and the synthetic SAFE fake gives the same
   reply shape and error codes for every recorded operation; the fake's tool list for SAFE entries equals the S-12
-  inventory schemas. Tests: `tests/contract/test_csi_recordings.py::test_safe_adapter_on_recordings`,
-  `::test_safe_synthetic_matches_recordings` (skip with reason when no recording exists),
-  `tests/contract/test_csi_allowlist.py::test_safe_fake_schemas_match_inventory`.
+  inventory schemas. The tests run on every recording committed under `acceptance/recordings` and on the synthetic
+  recording of record mode; the real server is verified only once the owner commits a recording
+  (spec §12 item L14; amendment B-573). Tests: `tests/contract/test_csi_recordings.py::test_safe_adapter_on_recordings`,
+  `::test_safe_synthetic_matches_recordings`, `tests/contract/test_csi_allowlist.py::test_safe_fake_schemas_match_inventory`.
 
 ## 4. Design
 
