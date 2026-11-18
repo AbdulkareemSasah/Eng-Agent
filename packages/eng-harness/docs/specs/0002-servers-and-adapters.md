@@ -224,6 +224,10 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
 - AC36. Given a test block that runs launch, open copy, read state, unlock-free edits, save, analysis, design and
   results through the real engine and real server processes, then the journal holds every step, check and save, and
   a kill of the engine at each write step followed by a resume reconciles and completes without a repeated write.
+  The matrix supplies explicit engineer decisions for unreconciled opens and saves and for unknown analysis
+  and design outcomes (H-G7). If an engineer confirms an interrupted save as applied and its result carries no
+  read-back evidence, the existing host-state check may also request acceptance of the working copy as a new
+  baseline (engine AC34, §4.5.4). A revision record still requires the evidence in engine §4.6.
   Tests: `tests/workflow/test_csi_cycle.py::test_cycle_steps`, `tests/replay/test_csi_resume.py::test_crash_matrix`.
 - AC37. Given `eng-harness doctor`, then it reports uv and Python, each server executable and its hash against the
   pin, each live tool-list fingerprint, installed host programs, the integrity level (warning when not medium), and
@@ -334,6 +338,15 @@ with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
   `visible` true sends `csi_launch` with `visible: true` and records the launch as visible, while the default sends
   `visible: false`. Tests: `tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy`,
   `::test_open_refusals_are_envelopes`, `::test_visible_launch` (plan task T23).
+- AC52. **[added: B-562]** The CSI tool descriptor guarantees unchanged model content for a pathless
+  `csi_open_model` of the original (§4.5.9). A call specifying `path`, a revision open, and ordinary writes get no
+  such guarantee. In the real-engine cycle the journal records that guarantee and the original's write effect.
+  After the working copy opens in the same instance, the original's open triggers no model-content checks, and the
+  working copy's writes are still checked. After a confirmed applied original open, any missing binding, units
+  check and first working copy occur before later steps on the model (engine EC1). The existing engineer decision
+  path still resolves an unknown open. Tests: `tests/workflow/adapters/test_csi_revisions.py`,
+  `tests/workflow/test_csi_cycle.py`, `tests/replay/test_csi_resume.py`, and the focused engine and journal
+  regressions of plan T19a.
 
 ## 4. Design
 
@@ -866,6 +879,12 @@ at step 2. Visible launch: `AdapterHostPort` and its `CsiSession` take
 records it and keeps it in the run state, so a visible instance is reported, never terminated, at `close_started`
 (§4.4.2).
 
+**Open capability (B-562, AC52).** `CsiToolInfo.opens_model_without_writing(args)` returns true only for this
+adapter's `csi_open_model` without `path` (spec 0007 §4.5 step 2). It returns false for `csi_open_revision`, which
+creates a new working file (§4.6, spec 0007 §4.10), and for all other calls. The pathless original open keeps its
+`write` effect and `open` action. Engine §§4.4.2, 4.5.4 and 4.6 describe how the recorded capability governs
+the model-content checks after the open.
+
 ### 4.6 CSI adapter for the edit cycle on ETABS
 
 Product-specific parts (tool availability, design kinds, result tools that exist only for ETABS such as story
@@ -1117,8 +1136,9 @@ Output: a table, or JSON with `--json`; paths shown as base names unless `--show
 | AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
 | AC5, AC6, AC7, AC37, AC49 (Windows; AC49 in `tests/windows/test_platform_windows.py`, B-541) | Unit, marker `windows` | `tests/windows/` |
 | AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
-| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47, AC51 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
-| AC36 (crash matrix) | Replay | `tests/replay/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47, AC51, AC52 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC36 (crash matrix), AC52 (content comparison and recovery) | Replay | `tests/replay/` |
+| AC52 (journal compatibility and engine post-open behavior) | Unit | `tests/unit/` |
 | AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
 
 No golden engineering tests: the adapters compute no engineering value (conversions are the contract's). Coverage

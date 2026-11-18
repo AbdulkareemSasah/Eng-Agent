@@ -522,8 +522,7 @@ tasks:
     # test_csi_session_ops.py leave the files. Added: the production binder (AdapterHostPort.binding and revision,
     # about 35), the reconciler's tolerance provider (csi/_reconcile.py, about 6), the keyword seams of build_ports
     # (spec 4.1, about 25), the route argument of csi_allowlist (csi/__init__.py, about 2) and record_pre_image in
-    # _toolport.py (about 3). Estimate 313 - 13 + 35 + 6 + 25 + 2 + 3 = about 371; budget 380 (the cap). If the writer
-    # measures more, it stops with NEEDS_PLAN_AMENDMENT; the binder is the next split candidate.
+    # _toolport.py (about 3). Estimate 313 - 13 + 35 + 6 + 25 + 2 + 3 = about 371, rounded to 380.
     # Amendment (B-543, documents only): build_ports takes the keyword visible and gives it to AdapterHostPort, and
     # passes host.open_original to CsiToolPort as opener (spec 4.1 item 6, 4.5.9; built by T23, which T19a now waits
     # for); about 4 lines in adapters/__init__.py; and preview answers a tool with action open on a key with no bound
@@ -537,6 +536,8 @@ tasks:
     # and host_exes from host_program(product) (spec 4.1); its workflow tests enter the ports around Engine.start and Engine.resume (test
     # code). Estimate unchanged at about 371: the AdapterPorts class and the platform default it no longer writes offset
     # the servers field and the host_program call; files and budget unchanged.
+    # Amendment (B-562, documents only): record the CSI original-open content guarantee in the journal (AC52).
+    # Keep write recovery and complete the post-open lifecycle. The regressions below accompany the implementation.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -544,16 +545,28 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # the tolerance provider (B-503); binding and revision (B-530)
       - "packages/eng-harness/src/eng_harness/adapters/_toolport.py"  # pre-image on a write's binding, preview (B-503); record_pre_image (B-530)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"  # the tolerance provider of CsiReconciler (B-530)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_revisions.py"  # CSI descriptor capability (B-562)
       - "packages/eng-harness/src/eng_harness/adapters/csi/__init__.py"  # csi_allowlist takes a route (B-530)
       - "packages/eng-harness/src/eng_harness/cli/_exit.py"  # NOT_IMPLEMENTED to exit 2, spec 0006 section 6 (B-495)
+      - "packages/eng-harness/src/eng_harness/ports.py"
+      - "packages/eng-harness/src/eng_harness/journal/_events.py"
+      - "packages/eng-harness/src/eng_harness/engine/_ctx_impl.py"
+      - "packages/eng-harness/src/eng_harness/engine/_inflight.py"
+      - "packages/eng-harness/src/eng_harness/engine/_hoststate.py"
+      - "packages/eng-harness/src/eng_harness/engine/_hostsafety.py"
+      - "packages/eng-harness/src/eng_harness/engine/_modes.py"  # distinguish a replayed copy from a still-live one
       - "packages/eng-harness/docs/local-testing.md"
       - "packages/eng-harness/tests/workflow/test_csi_cycle.py"
       - "packages/eng-harness/tests/replay/test_csi_resume.py"
+      - "packages/eng-harness/tests/replay/test_host_state.py"
       - "packages/eng-harness/tests/workflow/test_build_ports.py"
       - "packages/eng-harness/tests/workflow/servers/test_session.py"  # the ETABS stop (from T6b), B-413; the SAFE stop is plan 0008 T3's (B-475)
+      - "packages/eng-harness/tests/workflow/adapters/test_csi_revisions.py"
       - "packages/eng-harness/tests/workflow/adapters/test_units_after_timeout.py"  # test_units_trap (from T11, B-413)
       - "packages/eng-harness/tests/fakes/sasaah_csi/**"  # test code (B-413)
       - "packages/eng-harness/tests/unit/cli/test_exit_codes.py"  # the NOT_IMPLEMENTED case (B-495)
+      - "packages/eng-harness/tests/unit/test_engine_edit_cycle_amendments.py"
+      - "packages/eng-harness/tests/unit/test_journal_events.py"
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
@@ -569,7 +582,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_csi_preview_sends_no_write"  # AC45 (B-503)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_binder_from_host_port"  # the production binder (B-530)
       - "packages/eng-harness/tests/workflow/test_build_ports.py::test_open_preview_without_binding"  # AC45 (B-543)
-    covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
+    covers: [AC9, AC22, AC36, AC41, AC43, AC44, AC45, AC52]  # AC43: only its interim refusal (gap H-G8); T19b covers the rest
     depends_on: [T14, T18, T19c, T20, T21, T22, T23]  # external: engine plan 0001 T13, T15, T16, T16b and T19; plan 0007 T5 and T13 (section 3); T22 by B-541, T23 by amendment B-543
   - id: T19b
     title: Command-line tool adapter in build_ports (closes gap H-G8)
@@ -989,6 +1002,30 @@ checks, through the built ports, that a written edit is in the book that `check_
 before the write, and that `csi_save_model` with `as_new_revision` and `csi_open_revision` work on the run's copies
 folder; `test_csi_preview_sends_no_write` checks the preview, that the fake server logged no write, and that a binding
 without `host` is refused with nothing stored.
+
+**Original-open capability (B-562, AC52).** Add `ToolInfo.opens_model_without_writing(args)` with a false default
+and the CSI override in `CsiToolInfo` (spec §4.5.9). Record an explicit true on the live attempt's `StepStarted`
+before sending the open. Use the recorded value in live, immediate `applied`, and replay handling. Skip only
+the dirty mark for that step. Keep the write effect for approvals, leases, units, sibling conflicts, unknown
+outcomes and retries. Keep journal version 1 and earlier canonical payloads (engine §§4.4.2 and 10).
+
+During resume, compare actual writes and retain the existing recovery for pending, lost or reopened models.
+Exclude the unloaded original from the content check only with the completed, journaled EC1 handoff described
+in engine §4.5.4. Use the content-writing view for expected provenance and revision-save candidates so a later
+content-free open cannot hide evidence of an earlier edit or save. The recorded host and action support any
+missing post-open binding and units checks before a still-live EC1 copy, and a recorded copy is replayed without
+rebinding the original. Finish the same lifecycle when an open is resolved `applied` during its live call
+(engine §4.7).
+
+Add implementation regressions in `test_journal_events.py` (strict optional marker and unchanged legacy payloads),
+`test_csi_revisions.py` (CSI descriptor opt-in and exclusions), `test_engine_edit_cycle_amendments.py` (binding,
+units and EC1 after an immediately applied or replayed open, and preservation of earlier dirty state), and
+`test_host_state.py` (complete and incomplete handoffs, lost or reopened pending opens, legacy starts, and actual
+writes and revision checks on the original and copy). The existing cycle and crash matrix verify that the original
+is handed off to the copy without a spurious original content check or a repeated applied write. Exercise the
+existing engineer decision for unreconciled or unknown outcomes, and the existing host-state baseline choice for
+an applied save without read-back evidence when required (AC36). Add these regressions in the implementation
+commits. Keep the `tests_first` list and its existing first commit.
 
 **T19b Command-line tools in the port wiring** (split from T19 by amendment B-475; spec §4.7, AC43). `build_ports`
 routes each `[cli_tools.*]` entry to the command-line tool adapter of T16, so `ToolPort.describe` and `ToolPort.call`
