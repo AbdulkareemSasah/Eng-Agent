@@ -112,7 +112,7 @@ def _store(workspace: Path) -> tuple[ResultStore, FixedClock, SeededIdSource]:
 
 def _call_problems(exchange: Exchange, store: ResultStore, clock: FixedClock, ids: SeededIdSource) -> list[str]:
     label = f"{exchange.seq} {exchange.tool}"
-    allowlist = csi_allowlist()
+    allowlist = csi_allowlist().for_product("ETABS")
     if exchange.tool not in allowlist.tool_names:
         return [f"{label}: not an allowlisted tool"]
     if exchange.result is None:
@@ -162,7 +162,7 @@ def _state_problems(host: RecordedHost) -> list[str]:
 
 def adapter_problems(host: RecordedHost, workspace: Path) -> list[str]:
     """The adapter on a recording (AC34): the tool-list fingerprint, every recorded reply, the model-state read."""
-    allowlist = csi_allowlist()
+    allowlist = csi_allowlist().for_product("ETABS")
     listed = {n: s for n, s in host.tool_schemas.items() if n in allowlist.tool_names}
     problems: list[str] = []
     if host.manifest["tool_fingerprint"] != tool_list_fingerprint(listed):

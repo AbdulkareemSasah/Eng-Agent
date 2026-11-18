@@ -3,13 +3,12 @@
 Every recording runs through the adapter (parse, map, envelope, kinds, the model-state read) and the synthetic fake
 answers the recorded requests with the same reply shape and error codes (fake fidelity, process/05 section 4).
 The recordings are the folders under `acceptance/recordings/` that hold a manifest (the owner commits them, spec
-section 4.8.1), and one recording of the synthetic fake itself, made here through record mode. That one keeps the
-code of both checks and of record mode exercised, but it is true by construction (the synthetic fake replays its own
-replies), so it is NOT evidence for AC34: until the owner has committed the first real recording these tests have
-only the `synthetic` case and no real reply has been checked. The tests cannot skip with a reason in that state (spec
-0002 AC34 asks for it): a skip fails the ratchet (RT001 to RT003) and the test-first check (TF005, none skipped).
-A real recording whose reply field names differ from what the mappers read fails here, which is where the field names
-that local-testing item 5c lists get pinned (OQ-G10).
+section 4.8.1), and the synthetic recording of the synthetic fake itself, made here through record mode. Under
+spec 0002 AC34 (amendment B-573), these tests run on every applicable committed recording and on that synthetic
+recording; the synthetic case keeps the code of both checks and of record mode exercised, while the real server is
+verified only once the owner commits a recording (spec section 12 item 13). A real recording whose reply field names
+differ from what the mappers read fails here, which is where the field names that local-testing item 5c lists get
+pinned (OQ-G10).
 """
 
 import hashlib
@@ -43,7 +42,7 @@ def generated(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The scripted session on the synthetic fake, recorded through record mode."""
     base = tmp_path_factory.mktemp("recorded")
     (base / "run").mkdir()
-    record_synthetic(base / "recording", base / "run", tool_names=csi_allowlist().tool_names)
+    record_synthetic(base / "recording", base / "run", tool_names=csi_allowlist().for_product("ETABS").tool_names)
     return base / "recording"
 
 
@@ -100,7 +99,7 @@ def test_the_synthetic_recording(generated: Path) -> None:
     assert tools.count("csi_model_info") == 2  # the model-state read reads the units before and after
     assert tools.count("csi_db_table_read") == 6  # and the Project Information read of the script is not among them
     assert tools[-3:] == ["csi_run_analysis", "csi_design_results", "csi_analysis_status"]
-    assert host.manifest["tool_fingerprint"] == csi_allowlist().tool_fingerprint
+    assert host.manifest["tool_fingerprint"] == csi_allowlist().for_product("ETABS").tool_fingerprint
     assert host.manifest["adapter"] == "sasaah-csi-mcp"
     text = "".join(p.read_text(encoding="utf-8") for p in sorted(generated.glob("[0-9]*.json")))
     assert USER not in text
@@ -347,6 +346,7 @@ def _config(tmp_path: Path, control: Path) -> Path:
     text = f"""
 [servers.csi]
 adapter = "sasaah-csi-mcp"
+product = "ETABS"
 command = {quoted(sys.executable)}
 args = [{quoted(str(SERVER))}, "--disable-script"]
 client_grace_s = 5

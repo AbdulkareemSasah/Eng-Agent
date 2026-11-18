@@ -50,18 +50,20 @@ async def _body(client: Client, tool: str, arguments: dict[str, Any]) -> dict[st
     return body
 
 
-async def _session(client: Client, model: Path, analysis: dict[str, list[str]] | None) -> None:
+async def _session(
+    client: Client, model: Path, analysis: dict[str, list[str]] | None, *, product: str = _PRODUCT
+) -> None:
     await client.list_tools()
     await _body(client, "csi_status", {})
-    pid = (await _body(client, "csi_launch", {"product": _PRODUCT}))["pid"]
-    target = {"target": {"product": _PRODUCT, "pid": pid}}
+    pid = (await _body(client, "csi_launch", {"product": product}))["pid"]
+    target = {"target": {"product": product, "pid": pid}}
     try:
         await _body(client, "csi_open_model", {"path": str(model), "confirm": True, **target})
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
             return await _body(client, tool, arguments)
 
-        await CsiStateReader(product=_PRODUCT, call=call).read(pid, model)
+        await CsiStateReader(product=product, call=call).read(pid, model)
         if analysis is not None:
             await _body(client, "csi_run_analysis", {"confirm": True, **target})
             await _body(client, "csi_analysis_status", target)
@@ -83,7 +85,8 @@ async def record(
         env={**get_default_environment(), **server.env}, cwd=run_dir,
         stderr_path=run_dir / "servers" / f"{server.host_key}-{role_name}.stderr.log", job=JobPolicy.SERVER,
     )  # fmt: skip
-    recording = Recording(folder, run_dir, adapter=server.adapter, build=build, tool_names=csi_allowlist().tool_names)
+    allowlist = csi_allowlist().for_product(server.product)
+    recording = Recording(folder, run_dir, adapter=server.adapter, build=build, tool_names=allowlist.tool_names)
     transport = RecordMode(
         ProcessTransport(platform_launcher(platform_inspector()).start(spec), grace_s=server.shutdown_grace_s),
         recording,
@@ -91,7 +94,7 @@ async def record(
     refusal: RefusedError | None = None
     async with Client(transport, mode=server.mcp_mode, cache=None, read_timeout_seconds=None) as client:
         try:
-            await _session(client, model, analysis)
+            await _session(client, model, analysis, product=server.product)
         except RefusedError as error:  # raised again outside the client, whose task group would wrap it
             refusal = error
     if refusal is not None:
@@ -111,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--combos", nargs="*", default=[], help="combinations of the results to read")
     args = parser.parse_args(argv)
     servers = load_servers_config(args.config).servers.values()
-    server = next((s for s in servers if s.adapter == "sasaah-csi-mcp"), None)
+    server = next((s for s in servers if s.adapter == "sasaah-csi-mcp" and s.product == _PRODUCT), None)
     if server is None or not args.model.is_file():
         parser.error("no sasaah-csi-mcp server in the configuration, or the model copy was not found")
     run_dir = args.run_dir or Path(tempfile.mkdtemp(prefix="record-csi-"))
