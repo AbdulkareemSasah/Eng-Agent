@@ -181,24 +181,31 @@ def _noting(build: Builder, written: WrittenItems) -> Builder:
     return run
 
 
+async def _no_save(key: str) -> None:
+    return None
+
+
 class CsiToolPort(AdapterToolPort):
     """`AdapterToolPort` over `tool_allowlist()` and its argument models, builders, readers; `wiring` as its parameters.
 
     `written` is the book that `AdapterHostPort.check_model` reads (its `ReadBack`) and `wrote` is the host port's; a
     port made without them records into a book nobody reads. `revisions` holds the run's snapshots: without it
     `csi_open_revision` and a save `as_new_revision` are refused with `INTERNAL` and writes are not checked. `reopened`
-    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file after a
-    successful `csi_open_revision` only. `opener` is the host port's `open_original`: `csi_open_model` with no path
-    calls it (spec 4.5.9); without it that open is refused with `INTERNAL`.
+    is the host port's (`AdapterHostPort.reopened`): called with the model key and the new working file when
+    `csi_open_revision` settles, before the result is stored. `saved` is the host port's (`AdapterHostPort.tool_saved`):
+    awaited with the model key when `csi_save_model` settles, before the result is stored. `opener` is the host port's
+    `open_original`: `csi_open_model` with no path calls it (spec 4.5.9); without it that open is refused with
+    `INTERNAL`.
     """
 
     def __init__(
         self, *, binder: ModelBinder, written: WrittenItems | None = None, wrote: Callable[[str], None] | None = None,
         revisions: Revisions | None = None, reopened: Callable[[str, Path], None] | None = None,
+        saved: Callable[[str], Awaitable[None]] | None = None,
         opener: Callable[[str], Awaitable[Path]] | None = None, **wiring: Any,
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
-        self._reopened, self._opener = reopened or (lambda key, path: None), opener
+        self._reopened, self._saved, self._opener = reopened or (lambda key, path: None), saved or _no_save, opener
         builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
@@ -316,6 +323,27 @@ class CsiToolPort(AdapterToolPort):
             host=binding.host, inputs=validated.inputs, started_at=started, duration_ms=self._clock.now_ms() - began,
         )  # fmt: skip
 
+    async def _settled(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None, binding: Binding
+    ) -> Binding:
+        """Record a save or reopened file on the host port and return the post-step binding (spec 0007 4.10)."""
+        if descriptor.name == "csi_save_model":
+            await self._saved(self._model_key(args, model))
+        elif descriptor.name == "csi_open_model" and isinstance(path := args.get("path"), str):
+            self._reopened(self._model_key(args, model), Path(path))
+        else:
+            return binding
+        return await self._binder.binding(self._config.servers[self._server].host_key, model, descriptor)
+
+    @staticmethod
+    def _model_key(args: Mapping[str, JsonValue], model: str | None) -> str:
+        raw = args.get("model")
+        if isinstance(raw, str):
+            return raw
+        if model is not None:
+            return model
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, "missing model key", field="model")
+
     async def _open_revision(self, args: Mapping[str, JsonValue], op_id: str, model: str | None) -> Envelope:
         """`csi_open_revision`: a copy of an unchanged snapshot becomes the working file, opened without saving."""
         revisions = self._wired()
@@ -326,7 +354,6 @@ class CsiToolPort(AdapterToolPort):
         )
         if not isinstance(reply, SuccessEnvelope):
             return reply
-        self._reopened(validated.model.model, path)
         return _with_saved_file(reply, saved)
 
 

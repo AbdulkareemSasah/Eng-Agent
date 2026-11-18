@@ -278,6 +278,7 @@ class AdapterToolPort:
             detail = self._errors.map(failure, effect=effect, tool=descriptor.name, op_id=op_id)
             raise self._lost(detail, server.host_key, op_id, bump_epoch=True)
         reply = parse_reply(dumped)
+        binding = await self._settled(descriptor, args, model, binding)
         reader = self._readers.get(descriptor.name)
         payload, summary = reader(reply, binding) if reader else ({"value": reply}, {})
         return make_envelope(
@@ -293,6 +294,10 @@ class AdapterToolPort:
             started_at=started,
             duration_ms=self._clock.now_ms() - began,
         )
+
+    async def _settled(self, descriptor: ToolDescriptor, args: _Obj, model: str | None, binding: Binding) -> Binding:
+        """Return the binding whose `host` goes on the stored result after a successful reply (spec 4.5.3, 4.5.9)."""
+        return binding
 
     async def _pre_image(self, tool: str, args: _Obj) -> RefString | None:
         """Store the observed pre-write state, for the ledger and preview (spec 4.5.7); absent for no read-back."""
