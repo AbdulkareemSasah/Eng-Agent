@@ -8,6 +8,7 @@ definition (basis fields, copy on open) and returns what each cycle produced.
 
 import asyncio
 import json
+import sys
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -96,6 +97,22 @@ STOP = object()
 """What a responder returns to end `Stand.play` at the request it was shown; the outcome is then the paused one."""
 
 
+def _warm_coverage_multiline_maps(folder: Path, rules_file: Path) -> None:
+    """Pre-compute coverage.py's sysmon multiline maps outside `block_code()`.
+
+    Under `coverage run --branch` on Python 3.14, `SysMonitor` lazily calls `open()` on a file the first time a
+    branch inside it runs; for block and rule modules that happens while the runtime guard blocks `open()`.
+    """
+    cov_mod = sys.modules.get("coverage")
+    current = getattr(getattr(cov_mod, "Coverage", None), "current", lambda: None)()
+    collector = getattr(current, "_collector", None)
+    for tracer in getattr(collector, "tracers", ()):
+        get_map = getattr(tracer, "get_multiline_map", None)
+        if callable(get_map):
+            for path in (*folder.glob("*.py"), rules_file):
+                get_map(str(path))
+
+
 @dataclass
 class Stand:
     """One test's workspace, store, fake server control file, ports and engineer."""
@@ -132,8 +149,14 @@ class Stand:
 
         The workflow code is imported here, so that a missing module fails the test and not the collection.
         """
+        from eng_harness.rules import edit_cycle as edit_rules
+        from eng_harness.workflows import model_edit_cycle
         from eng_harness.workflows.model_edit_cycle import BASIS_FIELDS, EditCycleInput
         from eng_harness.workflows.model_edit_cycle._cycle import CycleInput, CycleOutput, edit_cycle_once
+
+        _warm_coverage_multiline_maps(
+            Path(model_edit_cycle.__file__).resolve().parent, Path(edit_rules.__file__).resolve()
+        )
 
         class FlowOutput(BaseModel):
             """What the test workflow returns: the output of each cycle."""
