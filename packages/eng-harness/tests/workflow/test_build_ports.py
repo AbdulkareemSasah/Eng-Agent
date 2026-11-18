@@ -46,6 +46,25 @@ def test_allowlist_loaded_for_route(tmp_path: Path) -> None:
         csi_allowlist("left")
 
 
+def test_allowlist_loaded_for_the_servers_product(tmp_path: Path) -> None:
+    """Spec 0008 4.1: the build check of a server is made from the allowlist loaded for the server's product."""
+    r = rig(tmp_path)
+    text = Path(__file__).parents[2].joinpath("src/eng_harness/adapters/csi/_allowlist.toml").read_text()
+    status = '{ name = "csi_status"'
+    entries = [
+        line.replace('"ETABS"]', '"ETABS", "SAFE"]') if line.lstrip().startswith(status) else line
+        for line in text.splitlines()
+    ]
+    two = "\n".join(entries).replace("fingerprint = { ETABS", f'fingerprint = {{ SAFE = "{"c" * 64}", ETABS')
+    cfg = config(r.control)
+    section = cfg.servers["csi"].model_copy(update={"product": "SAFE"})
+    program = cfg.host_programs["etabs"].model_copy(update={"executables": ("SAFE.exe",)})
+    cfg = cfg.model_copy(update={"servers": {"csi": section}, "host_programs": {"safe": program}})
+    p = r.ports(config=cfg, allowlists={"sasaah-csi-mcp": lambda route: load_allowlist(two, "synthetic", route=route)})
+    want = p.servers._check["csi"]
+    assert (want.product, want.tool_fingerprint, want.tool_names) == ("SAFE", "c" * 64, frozenset({"csi_status"}))
+
+
 def test_cli_tools_not_wired_gap(tmp_path: Path) -> None:
     r = rig(tmp_path)
     cfg = config(r.control).model_copy(update={"cli_tools": {"prepare": object(), "build": object()}})

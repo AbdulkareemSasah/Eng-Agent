@@ -25,6 +25,7 @@ max_restarts_per_run = 2
 shutdown_grace_s = 7
 build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}", server_info_version = "1.2" }}
 host_key = "csi"
+product = "ETABS"
 mcp_mode = "legacy"
 audit_log = false
 
@@ -65,6 +66,7 @@ args = [{extra_args}]
 client_grace_s = 5
 build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}" }}
 host_key = "csi"
+product = "ETABS"
 {extra}
 [servers.csi.roles.main]
 classes = ["call"]
@@ -258,3 +260,67 @@ def test_host_program_of_product(tmp_path: Path) -> None:
     assert caught.value.key == "host_programs.sap2000"
     with pytest.raises(ConfigError, match=r"^host_programs\.etabs: "):
         ServersConfig().host_program("Etabs")
+
+
+def _server(
+    name: str, *, product: str | None, host_key: str, command: str = "/opt/sasaah/sasaah-csi-mcp", sha: str = SHA
+) -> str:
+    """One `[servers.<name>]` section of the CSI adapter with a main role, as the spec 0008 AC1 example."""
+    product_line = f'product = "{product}"' if product is not None else ""
+    return f"""
+[servers.{name}]
+adapter = "sasaah-csi-mcp"
+command = "{command}"
+args = ["--disable-script"]
+client_grace_s = 5
+build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{sha}" }}
+host_key = "{host_key}"
+{product_line}
+
+[servers.{name}.roles.main]
+classes = ["session", "call"]
+call_timeout_s = 10
+"""
+
+
+SAFE_PROGRAM = '\n[host_programs.safe]\nexecutables = ["SAFE.exe"]\n'
+
+
+def test_safe_server_section(tmp_path: Path) -> None:
+    """AC1: `[servers.csi_safe]` runs the same executable with its own product, host key, roles and timeouts."""
+    safe = _server("csi_safe", product="SAFE", host_key="csi_safe").replace(
+        "call_timeout_s = 10", "call_timeout_s = 77"
+    )
+    text = _server("csi", product="ETABS", host_key="csi") + safe + SAFE_PROGRAM
+    config = load_servers_config(_write(tmp_path, text))
+    assert set(config.servers) == {"csi", "csi_safe"}
+    etabs, safe_server = config.servers["csi"], config.servers["csi_safe"]
+    assert (etabs.product, safe_server.product) == ("ETABS", "SAFE")
+    assert (etabs.host_key, safe_server.host_key) == ("csi", "csi_safe")
+    assert etabs.command == safe_server.command
+    assert (etabs.roles["main"].call_timeout_s, safe_server.roles["main"].call_timeout_s) == (10, 77)
+    assert config.host_program("SAFE").executables == ("SAFE.exe",)
+
+
+@pytest.mark.parametrize(
+    ("text", "key"),
+    [
+        (_server("csi", product=None, host_key="csi"), "servers.csi.product"),
+        (_server("csi", product="STAAD", host_key="csi"), "servers.csi.product"),
+        (_server("csi", product="safe", host_key="csi"), "servers.csi.product"),
+        (
+            _server("csi", product="ETABS", host_key="shared") + _server("csi_safe", product="SAFE", host_key="shared"),
+            "servers.csi_safe.host_key",
+        ),
+        (
+            _server("csi", product="ETABS", host_key="csi")
+            + _server("csi_safe", product="SAFE", host_key="csi_safe", sha="c" * 64),
+            "servers.csi_safe.build",
+        ),
+    ],
+)
+def test_product_and_host_key_rules(tmp_path: Path, text: str, key: str) -> None:
+    """AC1: no product, an unknown product, one host key twice, or two pins for one executable name the key."""
+    with pytest.raises(ConfigError) as error:
+        load_servers_config(_write(tmp_path, text))
+    assert error.value.key == key

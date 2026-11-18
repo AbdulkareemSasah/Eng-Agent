@@ -6,7 +6,8 @@
 adapter = "sasaah-csi-mcp"
 sasaah_commit = "61da80f61a6562c8e3553168056bc107e3f93013"
 also_tested_commits = []
-tool_fingerprint = "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+# One pinned fingerprint per product, over the entries that list it (spec 0008 4.1); the ETABS value is unchanged.
+fingerprint = { ETABS = "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1" }
 fingerprint_source = "s12-inventory"
 tool = [
   { name = "csi_status", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "StatusArgs", units = "none", confirm = "never", products = ["ETABS"] },
