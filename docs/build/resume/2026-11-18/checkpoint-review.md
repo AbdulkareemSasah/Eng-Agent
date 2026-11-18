@@ -1,0 +1,13 @@
+# Independent review of the 2026-11-18 pause checkpoint
+
+**Verdict: APPROVE.** The state reviewer did not write the checkpoint. Scope is all seven modified tracked files and all 15 new archive and checklist files identified in the writer handoff, based on `686578fed6faf4ed8ec83b05b325f0d63c6e1c7a`.
+
+The writer corrected the B-563 registry entry to use the established `lead_notes` array consumed by the tracked workflow. The notes, prepared patch and proposed scope match.
+
+## Verified evidence
+
+- GitHub shows #417 and #418 merged at `78d37e186d51b7edf239c4595c5007b66c884d12` and `686578fed6faf4ed8ec83b05b325f0d63c6e1c7a`. Their tested heads, base, shared 956-second gate, exact final tree `7bae8899e8ffeb9b25bc28ef06260553337b4b81`, and release markers agree with the archived evidence. The B-556 MU003 outcome reports zero mutants and no score or coverage. The audit, Windows and real-host boundaries are correctly carried forward.
+- GitHub shows B-138's branch at `0a407606b1b49c8f7d6277bd6a585d20fbcd6762` with no PR. The checkpoint correctly distinguishes the isolated stale-PID approval and 3 passing cases in 18.02 seconds from the still-incomplete B-138 implementation. Reviewed the existing two-checkpoint diff, the first test-only commit identity, local red and green logs, and the 8-commit, 16-file, 323 counted and 946 test line measurements. The earlier diagnostics and reviews are identified as historical or scoped. The in-memory save-cut diagnostic claims neither recovered `saved_file` nor provenance.
+- Current T19a still allows three sessions, all used. The saved B-563 patch passed `git apply --check` and changes the one session count and explanatory prose. It was left unapplied. The checkpoint calls for independent review, package verification, the documents test-first exemption and exact-head CI before a fourth writer session can begin. The source continuation preserves first red and follows the already approved B-562 scope.
+- Static validation confirmed 354 tasks across 21 plans, 233 merged as recorded, 185 unique registry entries, no known merged pending dependencies, and the exact B-138 and B-202 prerequisites. GitHub #323, #331 and #384 remain open as documented. First-parent history confirms five PRs since periodic run 5 and supports the next run after five more merges. The startup order is consistent between the handoff and checklist.
+- Checked 82 relative references and 11 heading fragments against tracked and intended new files. All 15 ignored archive and checklist files are present. `git diff --check HEAD` and archive whitespace checks passed. The checkpoint edits remain within state and handoff paths. No tests, CI, source commits or pushes were made in this review.

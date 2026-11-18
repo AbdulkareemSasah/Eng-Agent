@@ -1,3 +1,9 @@
+# Current pause checkpoint of 2026-11-18
+
+The owner paused the build. Use the [current resume checklist](PAUSE-2026-11-18.md) and [authoritative handoff](../HANDOFF.md) for the next session. The records below preserve earlier lane history.
+
+---
+
 # Resume note: all lanes stopped by the owner at 20:38 UTC, 2026-11-12 (he needs the usage allowance)
 
 Owner instruction: launch no new workflow and resume nothing until he says to continue.

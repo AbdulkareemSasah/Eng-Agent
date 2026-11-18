@@ -9,6 +9,8 @@ are what the specs say should happen. They are not results. If what you see diff
 
 Today you can run section 1, section 2 (the spikes) and the items in section 7 that need no eng-harness code (for example 7.1). Sections 3 to 5 wait for eng-harness to merge; check [BUILD-STATUS.md](BUILD-STATUS.md) §3. Section 6 applies to every section.
 
+At the [2026-11-18 pause](docs/build/HANDOFF.md), local CI passed for B-556 and the B-562 documents. The B-138 implementation is in progress. Windows, the dependency audit and real-host acceptance remain owner checks.
+
 ## How to read this guide
 
 - **A terminal** is the text window where you type commands. On Windows we use PowerShell. Commands are in grey
@@ -797,8 +799,7 @@ the build ran CI inside its container instead (BUILD-STATUS.md D-23). Each pull 
 CI" section. Two steps cannot run there. Run them on your machine before `build/v1` goes to `main`:
 
 - [N] The dependency audit. From the repository folder, run `uv audit --locked`. What you should see: no known
-  vulnerability reported. It needs the network: it asks the OSV vulnerability database (osv.dev), which the build
-  container may not contact. If it reports a vulnerability, send its output to the agent.
+  vulnerability reported. It needs the network: it asks the OSV vulnerability database at `api.osv.dev`, outside the allowed services in [AGENTS.md §9](AGENTS.md#9-allowed-services). If it reports a vulnerability, send its output to the agent.
 - [M] The windows job. From the repository folder, run `uv sync --all-packages`, then `uv run eng-gate windows-tests`,
   then `uv run --script spikes/S-10-replay/windows_check.py` (the job's second step, the Windows spike checks). What you
   should see: each command ends without a failed test or case (exit code 0). `eng-gate windows-tests` runs the

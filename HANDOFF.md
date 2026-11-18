@@ -1,5 +1,7 @@
 # HANDOFF: resume point of the v1 build
 
+> **Current owner pause (2026-11-18).** Start at the [authoritative build handoff](docs/build/HANDOFF.md) and the [next-agent resume checklist](docs/build/resume/PAUSE-2026-11-18.md). The notes below are historical.
+
 The lead engineer's resume point for the next agent (any tool), written on 2026-11-11 when the build was paused at the
 owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `git log origin/build/v1`, before doing anything.
 

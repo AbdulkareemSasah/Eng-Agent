@@ -1,5 +1,7 @@
 # B-138 / S.T19a resume blocker refutation
 
+> Historical diagnostic. The proposed repair below is superseded by the merged B-562 contract and scope. See the [current B-138 checkpoint](../resume/2026-11-18/b138-writer-session-3.md).
+
 Historical read-only finding and follow-up, prepared before the owner approved the explicit conservative capability. The initial two-file/tool-name proposal below is superseded by B-562's reviewed specification and complete scope. It is retained as evidence of the discovered collision, not as the implementation instruction.
 
 **CONFIRMED** at B-138 checkpoint `f0f68cc9` and reference `cf56035b`. The real-engine matrix exercises the specified original-to-copy transition. The engine mistakes the unloaded original for a lost model with writes after it has already reconciled a write on the loaded working copy.

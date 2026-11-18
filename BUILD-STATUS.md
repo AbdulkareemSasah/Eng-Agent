@@ -6,6 +6,7 @@ After a restart or a context compaction, read this file and `git log origin/buil
 - Integration branch: `build/v1` · Draft pull request to `main`: [AbdulkareemSasah/Eng-Agent#2](https://github.com/AbdulkareemSasah/Eng-Agent/pull/2)
 - Mode: bootstrap (ADR-0028 §4). Checks that need the owner or another identity report `awaiting owner`.
 - Live steps: [LOCAL-TESTING.md](LOCAL-TESTING.md). Nothing that needs a host program is claimed as working.
+- **Current owner pause, 2026-11-18.** 233 of 354 plan tasks are merged and the registry has 185 entries. B-556/#417 and B-562/#418 passed exact-head local CI and are integrated at the verified batch tree. B-138 is published as work in progress at `0a407606` with three of three writer sessions used. The proposed B-563 documents amendment must merge before session 4. Wait for the owner to resume. [Authoritative handoff](docs/build/HANDOFF.md) · [Resume checklist](docs/build/resume/PAUSE-2026-11-18.md).
 - **Paused for a handoff on 2026-11-11 (owner's request): resume from [HANDOFF.md](HANDOFF.md).** The remaining work is in `ops/remaining-tasks.json`; local CI is `ops/localci.py` (D-23).
 - **Second pause, 2026-11-11 about 16:45 UTC:** B-438 merged (#267); B-437 (#260), B-440 (#270) and B-330 (#269) reviewed and fixed, waiting for local CI; the build moves to a cloud session (HANDOFF.md section 0, D-29).
 - **Checkpoint of the cloud session of 2026-11-12 (second cloud session, B-473):** 9 pull requests merged (#301 to #308 and #310); lanes stopped at about 14:30 UTC by the model usage limit and restarted at 17:25 UTC; the remaining build is reordered to the first live run first (D-32). Resume from [docs/build/HANDOFF.md](docs/build/HANDOFF.md).
@@ -227,7 +228,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-135 | S.T16 | Command-line tool adapter (dxf-prep, etabs-model build) | sonnet, medium | opus, medium | — | queued in the servers lane |
 | B-136 | S.T17 | Record mode, sanitizer and manifest, recorded-reply fake, contract tests on recordings | sonnet, high | opus, medium | — | queued in the servers lane |
 | B-137 | S.T18 | eng-harness doctor | sonnet, medium | opus, medium | [#281](https://github.com/AbdulkareemSasah/Eng-Agent/pull/281) | done (3d0b4fb) |
-| B-138 | S.T19a | Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (T19 split by B-475; the command-line tools are S.T19b, B-490) | sonnet, high | opus, medium | — | not started; waits for E.T15, E.T16 and E.T19 (and W.T5, which shares the CSI fake files) |
+| B-138 | S.T19a | Port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (T19 split by B-475; the command-line tools are S.T19b, B-490) | sonnet, high | opus, medium | — | paused after 3 of 3 writer sessions; WIP published at `0a407606`; DOC.B563 must merge before session 4; B-562 implementation and final verification pending |
 | B-139 | S.T20 | Framework additions for the IDEA adapter (routes, route key, audit_log flag, unit header) (B-085) | sonnet, medium | opus, medium | [#273](https://github.com/AbdulkareemSasah/Eng-Agent/pull/273) | done (3968ae7) |
 | B-140 | C.T1 | Calc decorator, registry, inputs, input metadata, trace builder, statuses and harness codes | sonnet, medium | opus, medium | [#141](https://github.com/AbdulkareemSasah/Eng-Agent/pull/141) | done (3a39971) |
 | B-141 | C.T2 | Content hash over the static import closure and the calc lock file | sonnet, high | opus, medium | [#147](https://github.com/AbdulkareemSasah/Eng-Agent/pull/147) | done (33fa492) |
@@ -250,7 +251,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-161 | B.T7 | Setup view, answer model and BasisSetupPort | sonnet, medium | opus, medium | [#193](https://github.com/AbdulkareemSasah/Eng-Agent/pull/193) | done (b63fd42) |
 | B-162 | B.T8 | Freeze, storage as basis.design_basis/1 and StoreBasisPort | sonnet, medium | opus, medium | [#202](https://github.com/AbdulkareemSasah/Eng-Agent/pull/202) | done (279f15c) |
 | B-163 | B.T9 | Shipped blank template, package data and golden pin | sonnet, low | opus, medium | [#176](https://github.com/AbdulkareemSasah/Eng-Agent/pull/176) | done (0ef59f2) |
-| B-164 | B.T10 | Property tests and the fake-host workflow with replay | sonnet, medium | opus, medium | [#323](https://github.com/AbdulkareemSasah/Eng-Agent/pull/323) | open, local CI FAIL on test-first rule TF004 (three listed tests pass at the base); no gate exemption (D-37); rebuilt on a fresh branch only after E.T19 (B-118) merges, then #323 is closed or replaced |
+| B-164 | B.T10 | Property tests and the fake-host workflow with replay | sonnet, medium | opus, medium | [#323](https://github.com/AbdulkareemSasah/Eng-Agent/pull/323) | PR #323 open after TF004; retain source `f3686ac7` and rebuild on a fresh `-r2` branch per D-37 and the current handoff before B-202 |
 | B-165 | D.T1 | Types, policy, settings, public modules | sonnet, medium | opus, low | [#194](https://github.com/AbdulkareemSasah/Eng-Agent/pull/194) | done (dcc2932) |
 | B-166 | D.T2 | Decision points, state field rules, point registry and lock | sonnet, medium | opus, low | [#229](https://github.com/AbdulkareemSasah/Eng-Agent/pull/229) | done (84ff345) |
 | B-167 | D.T3 | Redaction check (by construction and at runtime) | sonnet, high | opus, medium | [#232](https://github.com/AbdulkareemSasah/Eng-Agent/pull/232) | done (5ac1f26) |
@@ -285,7 +286,7 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-199 | W.T5 | CSI adapter read tool, revision save and open, analysis-messages read (spec 0002 amendment) | sonnet, medium | opus, medium | — | waits for S.T13 and S.T14 (B-132, B-133) |
 | B-200 | W.T6 | Engine amendments (copy on open, tool saves journaled, mode approvals and always-ask, basis fields) | sonnet, medium | opus, medium | — | waits for E.T15 and E.T16 (B-114, B-115) |
 | B-201 | W.T7 | Decision points and rules of the edit cycle | sonnet, medium | opus, medium | — | not started or in writing |
-| B-202 | W.T8 | Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) | sonnet, medium | opus, medium | — | not started or in writing |
+| B-202 | W.T8 | Workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) | sonnet, medium | opus, medium | — | waiting for B-164 (B.T10), B-138 (S.T19a), B-555 (W.T17) and B-557 (W.T16b) |
 | B-203 | W.T9 | Workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop | sonnet, medium | opus, medium | — | not started or in writing |
 | B-204 | W.T10 | Report renderers, value-source audit, prompt counter and B-1 cycle timings | sonnet, medium | opus, medium | — | not started or in writing |
 | B-205 | W.T11 | Acceptance support in CI (A3 and A7 over the workflow scenarios) and the local-testing list | sonnet, medium | opus, medium | — | not started or in writing |
@@ -532,6 +533,9 @@ squash after CI is green. Ids are `B-NNN`; branches are `<type>/b<NNN>-<slug>`.
 | B-489 | I.T13b | Report status section: the run's decision runtime (new task from B-471, budget 50) | sonnet (subagent) | opus (subagent) | — | not started; registered by B-487; needs engine T14b (B-350) for `RunView.decision_runtime` (read from the plan prose, check before launching) |
 | B-490 | S.T19b | Command-line tool adapter in `build_ports`, closes gap H-G8 (new task from B-475, budget 120) | sonnet (subagent) | opus (subagent) | — | not started (off the first-live-run path); registered by B-487; after S.T16 and S.T19a |
 | B-491 | P.T10b | Runtime assembly with built providers and verified releases, shadow-mode workflow, replay and isolation tests, local-testing notes; closes PR-G1 (new task from B-475, budget 200) | sonnet (subagent) | opus (subagent) | — | not started (off the first-live-run path); registered by B-487; after P.T7, P.T9, P.T10a and decisions T9 |
+| B-556 | W.T7b | D-3 drift stop and D-2 check_model_failed reason | delegated writer | independent review | [#417](https://github.com/AbdulkareemSasah/Eng-Agent/pull/417) | merged (`78d37e18`), exact-head local CI PASS |
+| B-562 | DOC.B562 | Conservative original-open capability and S.T19a completion scope | delegated writer | independent review | [#418](https://github.com/AbdulkareemSasah/Eng-Agent/pull/418) | merged (`686578fe`), exact-head local CI PASS |
+| B-563 | DOC.B563 | Proposed increase of T19a max_sessions from 3 to 4 | pending | pending | — | queued [documents patch](docs/build/resume/2026-11-18/b138-session-budget.patch); apply after owner resumes |
 
 ## 4. Decisions by the lead
 

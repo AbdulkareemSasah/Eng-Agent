@@ -1,6 +1,6 @@
 {
- "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries.",
- "count": 184,
+ "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries.",
+ "count": 185,
  "tasks": [
   {
    "id": "B-437",
@@ -390,20 +390,21 @@
    "prTitle": "feat(eng-harness): port wiring for the CSI adapter (ETABS), edit-cycle step sequence and crash matrix against real fake-server processes (B-138)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "DOC.B562"
+    "DOC.B563"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false,
+   "branch_pushed": true,
    "lead_notes": [
     "B-487: T19 was split by amendment B-475 into T19a (this item: CSI only, on the first-live-run path) and T19b (command-line tools: B-490); T17 left the dependencies; the plan waits for engine T13, T15, T16 and T19; it also edits tests/fakes/sasaah_csi/** like W.T5 (B-199), so run after W.T5",
     "Plan audit 2 found seven blockers; amendment B-530 adds T19c before T19a.",
     "2026-11-17: every dependency is merged except S.T23 (B-550). The plan front matter risk is r1, r2, r3 (B-537).",
     "Current checkpoint 2026-11-17: S.T23 prerequisite B-550 merged as PR #411; dependency satisfied.",
     "Integrated prerequisite B-550 as PR #411; S.T23 dependency is satisfied.",
-    "2026-11-17: the real six-write crash matrix found an EC1 original/copy handoff collision and post-open bookkeeping gaps. Owner approved an explicit conservative original-open content capability. Continue the existing branch; preserve local test-first eeae76fe and continuation 668c3830, and wait for B-562 spec/plan scope amendment before additional engine/port/journal implementation. Existing adapter work remains unmerged and under review."
+    "2026-11-17: the real six-write crash matrix found an EC1 original/copy handoff collision and post-open bookkeeping gaps. Owner approved an explicit conservative original-open content capability. Continue the existing branch; preserve local test-first eeae76fe and continuation 668c3830, and wait for B-562 spec/plan scope amendment before additional engine/port/journal implementation. Existing adapter work remains unmerged and under review.",
+    "Current pause 2026-11-18: owner-authorized WIP is published at 0a407606b1b49c8f7d6277bd6a585d20fbcd6762 on the existing branch, preserving first red eeae76fe. All three writer sessions are used. B-562 merged as #418; the only pending prerequisite is the reviewed and merged DOC.B563 session amendment before a fresh fourth session. The stale-PID focused cases passed (3); full EC1/AC36/AC52 implementation and verification remain pending. Continue via docs/build/resume/PAUSE-2026-11-18.md after the owner resumes."
    ]
   },
   {
@@ -1126,8 +1127,11 @@
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": null,
-   "branch_pushed": false
+   "open_pr": 323,
+   "branch_pushed": true,
+   "lead_notes": [
+    "PR #323 failed TF004 and remains open. Retain published source f3686ac74c3c5f73a7a36497a2c72cb57c44541f as the rebuild input. After the pause and in the current first-live-run order, rebuild on the fresh -r2 branch using B-482 and the recipe in docs/build/lead-findings.md, before B-202."
+   ]
   },
   {
    "id": "B-280",
@@ -1731,7 +1735,8 @@
    "pending_deps": [
     "B.T10",
     "S.T19a",
-    "W.T7b"
+    "W.T17",
+    "W.T16b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3554,7 +3559,8 @@
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "From documents item B-543. Engineering calcs: adversarial verification. First-live-run path: steps 5 and 6 cannot run without it."
+    "From documents item B-543. Engineering calcs: adversarial verification. First-live-run path: steps 5 and 6 cannot run without it.",
+    "Read-only pre-flight READY. See docs/build/integration-2026-11-17/b555-preflight.md. Start in the order given in the current pause handoff after B-138."
    ]
   },
   {
@@ -3573,12 +3579,14 @@
    "verifier_lenses": [
     "sources"
    ],
-   "open_pr": 417,
+   "open_pr": null,
    "branch_pushed": true,
    "lead_notes": [
     "From documents item B-544 (owner decision of 2026-11-16 on D-3). Estimate 30 is tight (about 26 to 28); the count is informational after B-553. W.T8 waits for it.",
-    "2026-11-17: PR #417 open at f35b53830a05380e35075ee4ed849a66bcd502ae after a state-only base merge; entire eng-harness tree matches tested 9ff084d5. Package gate, 144 focused tests, formal test-first and independent reviews passed. Mutation gate passed with MU003/no mutants/no numerical score; local CI and integration remain pending, planned with B-562 documents."
-   ]
+    "2026-11-17: PR #417 open at f35b53830a05380e35075ee4ed849a66bcd502ae after a state-only base merge; entire eng-harness tree matches tested 9ff084d5. Package gate, 144 focused tests, formal test-first and independent reviews passed. Mutation gate passed with MU003/no mutants/no numerical score; local CI and integration remain pending, planned with B-562 documents.",
+    "2026-11-18: integrated as PR #417 at 78d37e186d51b7edf239c4595c5007b66c884d12 after exact-head local CI PASS. Evidence: docs/build/resume/2026-11-18/b556-b562-integration.md."
+   ],
+   "merged_pr": 417
   },
   {
    "id": "B-557",
@@ -3616,8 +3624,7 @@
    "prTitle": "feat(eng-harness): step 9 opens D-2 on a failed check, and step 17 adds the exception items of the sign-off (B-558)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T9b",
-    "W.T7b"
+    "W.T9b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -3711,9 +3718,31 @@
    "reviewer": "independent lead review",
    "verifier_lenses": [],
    "open_pr": null,
+   "branch_pushed": true,
+   "lead_notes": [
+    "Owner decision of 2026-11-17: add an explicit conservative tool capability identifying an original open that does not change model content; default remains conservative for other tools and legacy journals. Required to finish S.T19a without treating the superseded original as a mutated active model. Preserve write-effect permissions, leases, units, unknown-outcome reconciliation, actual-data checks and restore safety. A reviewed spec/plan amendment must merge before B-138 edits its additional engine/port/journal files. No engineering number or new dependency is authorized.",
+    "2026-11-18: integrated as PR #418 at 686578fed6faf4ed8ec83b05b325f0d63c6e1c7a after exact-head local CI PASS. The approved docs and expanded scope are merged. The implementation remains B-138."
+   ],
+   "merged_pr": 418
+  },
+  {
+   "id": "B-563",
+   "task": "DOC.B563",
+   "plan": null,
+   "planTask": null,
+   "kind": "docs",
+   "title": "Increase the S.T19a writer session budget by one for the saved B-138 continuation",
+   "branch": "docs/b563-harness-st19a-session-budget",
+   "prTitle": "docs(eng-harness): allow one additional S.T19a writer session (B-563)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [],
+   "writer": "delegated writer",
+   "reviewer": "independent lead review",
+   "verifier_lenses": [],
+   "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "Owner decision of 2026-11-17: add an explicit conservative tool capability identifying an original open that does not change model content; default remains conservative for other tools and legacy journals. Required to finish S.T19a without treating the superseded original as a mutated active model. Preserve write-effect permissions, leases, units, unknown-outcome reconciliation, actual-data checks and restore safety. A reviewed spec/plan amendment must merge before B-138 edits its additional engine/port/journal files. No engineering number or new dependency is authorized."
+    "After the owner explicitly resumes the build, apply docs/build/resume/2026-11-18/b138-session-budget.patch on a fresh branch from origin/build/v1. Amend only T19a in packages/eng-harness/docs/plans/0002-servers-and-adapters.md: max_sessions 3 -> 4 and a short reason in T19a prose. Three writer sessions were used for initial wiring, the environment handoff and resume, and the stale-process attachment fix before the owner pause. The extra session is for remaining work already scoped by merged B-562. Preserve files, tests_first, acceptance criteria, dependencies and risk. Obtain independent documents review and the eng-harness package gate. Use Work-Item: B-563, Plan-Task: none (spec and plan), Risk: r1, r2, r3 and the documents-only test-first exemption. Run local CI on the exact current PR head and merge before starting a fourth B-138 writer session. This is an operational plan amendment with no new plan task."
    ]
   }
  ]
