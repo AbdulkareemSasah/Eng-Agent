@@ -1,6 +1,7 @@
 """`run` and `resume` refuse before anything is created (spec 0006 AC6, AC62 refusals, AC71)."""
 
 from pathlib import Path
+from typing import Any
 
 from helpers.cli_deps import NEEDS_BASIS, WORKFLOW, Rig
 
@@ -20,8 +21,8 @@ def test_refusals_create_no_run(tmp_path: Path) -> None:
     refused = [(("harness.model_diff", CalcStatus.DRAFT, HarnessCode.CALC_NOT_APPROVED))]
     cases: list[tuple[str, Rig, list[str], int, str]] = []
 
-    def case(name: str, argv: list[str], code: int, text: str, **rig: object) -> None:
-        cases.append((name, Rig(tmp_path / name, **rig), argv, code, text))  # type: ignore[arg-type]
+    def case(name: str, argv: list[str], code: int, text: str, **rig: Any) -> None:
+        cases.append((name, Rig(tmp_path / name, **rig), argv, code, text))
 
     case("unknown", ["run", "nosuch"], ExitCode.REFUSED, "workflow 'nosuch' is not registered")
     case("basis", ["run", NEEDS_BASIS], ExitCode.USAGE, "required basis fields is not available")
@@ -71,3 +72,19 @@ def test_trial_run_makes_no_calc_preflight(tmp_path: Path) -> None:
     rig = Rig(tmp_path / "production")
     assert rig.main("run", WORKFLOW, "--no-report") == ExitCode.OK
     assert [(c.run_class.value, c.preflighted) for c in rig.calcs] == [("production", True)]
+
+
+def test_run_is_unavailable_without_collaborators(tmp_path: Path) -> None:
+    for argv in (["run", WORKFLOW], ["resume", NO_RUN]):
+        rig = Rig(tmp_path / argv[0])
+        for missing in ("workflow_registry", "port_builder", "calc_port_factory"):
+            assert rig.main(*argv, **{missing: None}) == ExitCode.USAGE
+            assert f"command {argv[0]} is not available in this build" in rig.err.getvalue()
+        assert (rig.run_ids(), rig.engines, rig.built, rig.workspace.exists()) == ([], [], [], False)
+
+
+def test_arguments_no_command_knows_are_usage_errors(tmp_path: Path) -> None:
+    rig = Rig(tmp_path)
+    for argv in (["status", "--bogus"], ["resume", NO_RUN, "--title", "T"], ["stop", NO_RUN, "extra"]):
+        assert rig.main(*argv) == ExitCode.USAGE, argv
+    assert "eng-harness resume: error: unrecognized arguments: --title T" in rig.err.getvalue()

@@ -179,10 +179,10 @@ class FakeEngine:
 
     def __init__(
         self, workspace: Workspace, ports: RunPortSet, store: ResultStore, clock: FixedClock, ids: IdSource,
-        script: Script, log: list[str],
+        script: Script, log: list[str], keep_basis_ref: bool = False,
     ) -> None:  # fmt: skip
         self.workspace, self.ports, self.store, self.clock, self.ids = workspace, ports, store, clock, ids
-        self._script, self._log = script, log
+        self._script, self._log, self._keep_basis_ref = script, log, keep_basis_ref
         self.request: ApprovalRequest | None = None  # the approval the script showed
         self.run_request: RunRequest | None = None  # what `start` was asked
 
@@ -204,7 +204,8 @@ class FakeEngine:
         header = {
             "run_id": run_id, "workflow": request.workflow,
             "block": {"name": request.workflow, "version": "1", "code_sha256": SHA},
-            "input_ref": stored.result_id, "input_sha256": payload_sha256(request.input), "basis_ref": base,
+            "input_ref": stored.result_id, "input_sha256": payload_sha256(request.input),
+            "basis_ref": request.basis_ref if self._keep_basis_ref else base,
             "mode": request.mode.value, "run_class": request.run_class.value, "engine_version": __version__,
             "contract_version": "eng-contract/1", "settings_sha256": SHA, "servers": [], "always_ask": [],
         }  # fmt: skip
@@ -278,6 +279,7 @@ class Rig:
     err: io.StringIO = field(default_factory=io.StringIO)
     engines: list[FakeEngine] = field(default_factory=list)
     calcs: list[FakeCalc] = field(default_factory=list)
+    keep_basis_ref: bool = False  # journal the request's own basis reference, which the report cannot read (Q23)
 
     @property
     def workspace(self) -> Path:
@@ -301,7 +303,7 @@ class Rig:
         self, workspace: Workspace, registry: Registry, ports: RunPortSet, store: ResultStore, settings: EngineSettings,
         clock: Any, ids: IdSource,
     ) -> FakeEngine:  # fmt: skip
-        engine = FakeEngine(workspace, ports, store, clock, ids, self.script, self.log)
+        engine = FakeEngine(workspace, ports, store, clock, ids, self.script, self.log, self.keep_basis_ref)
         self.engines.append(engine)
         return engine
 
