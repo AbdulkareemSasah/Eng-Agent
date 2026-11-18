@@ -31,6 +31,8 @@ _LENGTH = "compare.length_mm"
 BASIS_FIELDS = (_LENGTH,)
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
 _RADIX = Cited(value=2, unit="1", source="IEEE 754 binary64 radix for even-power-of-two scaling before sqrt")
+_MAX_FINITE_FLOAT = Fraction(math.nextafter(math.inf, -math.inf))
+_MAX_FINITE_FLOAT_SQ = _MAX_FINITE_FLOAT * _MAX_FINITE_FLOAT
 _Names = Annotated[list[Label], Field(min_length=NONEMPTY)]
 _Issue = Literal["UNKNOWN_FRAME", "UNKNOWN_STORY", "UNKNOWN_SECTION"]
 
@@ -137,6 +139,9 @@ def length_mm(frame: Frame) -> float:
     """L3: distance between ends from exact squared distance, scaled by 2^(2k) for display float (0003 P2)."""
     dz = Fraction(frame.j.z_mm) - Fraction(frame.i.z_mm)
     d_sq = plan_distance_sq(frame) + dz * dz
+    if d_sq > _MAX_FINITE_FLOAT_SQ:
+        message = f"length of column {frame.id} exceeds representable float range"
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, message, field="frames")
     radix = int(_RADIX.value)
     half_shift = (d_sq.numerator.bit_length() - d_sq.denominator.bit_length()) // radix
     scaled = d_sq * (Fraction(radix) ** (-(radix * half_shift)))
@@ -215,6 +220,7 @@ def column_select(inp: SelectInput, meta: InputMeta, trace: TraceBuilder) -> Sel
     tolerance = read_tolerance(inp.basis)
     ref = {name: meta.refs[name].result_id for name in ("scope", "frames", "sections", "basis")}
     frames, rows = inp.frames.frames, inp.sections.frame_sections
+    trace.constant("radix", _RADIX)
     trace.input("scope", _scope_names(inp.scope), ref=ref["scope"])
     trace.input("frames", len(frames), ref=ref["frames"])
     trace.input("frame_sections", len(rows), ref=ref["sections"])
