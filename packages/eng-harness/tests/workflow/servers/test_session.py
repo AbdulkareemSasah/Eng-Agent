@@ -579,3 +579,41 @@ def test_build_mismatch_stops_run(tmp_path: Path) -> None:
             assert r.calls("csi_open_model") == []
 
     anyio.run(body)
+
+
+def test_idea_launcher_receives_no_audit_log(tmp_path: Path, launcher: RecordingLauncher) -> None:
+    """Spec 0014 AC1: Sasaah ignores unknown arguments, so the argv the launcher receives must carry no audit log.
+
+    The section is the IDEA one (`audit_log = false`, one role `main`); a wrapper program stands in for the server
+    executable and starts the paged double, which records the arguments it was started with.
+    """
+    from eng_harness.servers import ServerConfig
+
+    wrapper = tmp_path / "sasaah-idea-mcp"
+    wrapper.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{_paged(tmp_path)}" "$@"\n')
+    wrapper.chmod(0o755)
+    section = ServerConfig.model_validate(
+        {
+            "adapter": "sasaah-idea-mcp",
+            "command": str(wrapper),
+            "args": ["--disable-script"],
+            "route": "rest",
+            "service_url": "http://127.0.0.1:5000",
+            "audit_log": False,
+            "client_grace_s": 5,
+            "shutdown_grace_s": 5,
+            "build": {"sasaah_commit": "a" * 40, "exe_sha256": "b" * 64},
+            "host_key": "idea",
+            "roles": {"main": {"classes": ["session", "call", "long"], "call_timeout_s": 42}},
+        }
+    )
+
+    async def body(manager: ServerManager) -> None:
+        assert len(await manager.list_tools("idea", "main")) == 5
+
+    _run(tmp_path, ServersConfig(servers={"idea": section}), launcher, body)
+    expected = ["--disable-script", "--call-timeout-sec", "42", "--service-url", "http://127.0.0.1:5000"]
+    assert json.loads((tmp_path / "run" / "argv.json").read_text()) == expected
+    assert launcher.specs[0].argv == [str(wrapper), *expected]
+    assert not any("audit" in item for item in launcher.specs[0].argv)
+    assert not (tmp_path / "run" / "servers" / "idea-main-audit.jsonl").exists()

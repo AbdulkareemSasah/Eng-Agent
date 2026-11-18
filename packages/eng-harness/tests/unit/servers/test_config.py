@@ -258,3 +258,163 @@ def test_host_program_of_product(tmp_path: Path) -> None:
     assert caught.value.key == "host_programs.sap2000"
     with pytest.raises(ConfigError, match=r"^host_programs\.etabs: "):
         ServersConfig().host_program("Etabs")
+
+
+IDEA_URL = "http://127.0.0.1:5000"
+IDEA_NATIVE = 'route = "native"\naudit_log = false'
+IDEA_REST = f'route = "rest"\nservice_url = "{IDEA_URL}"\naudit_log = false'
+IDEA_SECOND_ROLE = '[servers.idea.roles.long]\nclasses = ["long"]\ncall_timeout_s = 20'
+
+
+def _idea(*, args: str = '"--disable-script"', extra: str = IDEA_NATIVE, roles: str = "") -> str:
+    """A `[servers.idea]` section of spec 0014 section 4.2; `extra` holds the section's own keys."""
+    return f"""
+[servers.idea]
+adapter = "sasaah-idea-mcp"
+command = "/opt/x"
+args = [{args}]
+client_grace_s = 5
+build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}" }}
+host_key = "idea"
+{extra}
+[servers.idea.roles.main]
+classes = ["session", "call", "long"]
+call_timeout_s = 10
+{roles}
+"""
+
+
+def test_idea_server_section(tmp_path: Path) -> None:
+    """Spec 0014 AC1: the IDEA section with one role `main`, a route, a loopback service URL and the timeouts loads."""
+    rest_extra = f'{IDEA_REST}\nidea_dir = "/opt/idea"\nenv = {{ EXTRA = "1" }}'
+    rest = load_servers_config(_write(tmp_path, _idea(extra=rest_extra))).servers["idea"]
+    assert (rest.adapter, rest.route, rest.service_url, rest.idea_dir) == (
+        "sasaah-idea-mcp",
+        "rest",
+        IDEA_URL,
+        "/opt/idea",
+    )
+    assert (rest.args, rest.audit_log, rest.host_key, dict(rest.env)) == (
+        ("--disable-script",),
+        False,
+        "idea",
+        {"EXTRA": "1"},
+    )
+    assert tuple(rest.roles) == ("main",)
+    assert rest.roles["main"].classes == ("session", "call", "long")
+    assert rest.roles["main"].call_timeout_s == 10
+    native = load_servers_config(_write(tmp_path, _idea())).servers["idea"]
+    assert (native.route, native.service_url, native.idea_dir) == ("native", None, None)
+    local = _idea(extra=f'{IDEA_NATIVE}\nservice_url = "http://localhost:5000"')
+    assert load_servers_config(_write(tmp_path, local)).servers["idea"].service_url == "http://localhost:5000"
+    windows = _idea(extra=f'{IDEA_NATIVE}\nidea_dir = "C:\\\\Program Files\\\\IDEA"')
+    assert load_servers_config(_write(tmp_path, windows)).servers["idea"].idea_dir == "C:\\Program Files\\IDEA"
+
+
+@pytest.mark.parametrize(
+    ("text", "key"),
+    [
+        (_idea(roles=IDEA_SECOND_ROLE), r"servers\.idea\.roles"),
+        (_idea().replace("roles.main", "roles.other"), r"servers\.idea\.roles"),
+        (_idea(args='"--disable-script", "--read-only"'), r"servers\.idea\.args: .*--read-only"),
+        (_idea(args='"--disable-script", "--read-only=true"'), r"servers\.idea\.args: .*--read-only"),
+        (_idea(args='"--disable-script", "--default-project"'), r"servers\.idea\.args: .*--default-project"),
+        (_idea(args='"--disable-script", "--default-project", "p"'), r"servers\.idea\.args: .*--default-project"),
+        (_idea(args='"--disable-script", "--other"'), r"servers\.idea\.args: .*--other"),
+        (_idea(args='"--disable-script", "--idea-dir"'), r"servers\.idea\.args: .*--idea-dir"),
+        (_idea(args='"--disable-script", "--service-url"'), r"servers\.idea\.args: .*--service-url"),
+        (_idea(args='"--disable-script", "--call-timeout-sec", "5"'), r"servers\.idea\.args: .*--call-timeout-sec"),
+        (_idea(args='"--disable-script", "--audit-log"'), r"servers\.idea\.args: .*--audit-log"),
+        (_idea(args='"--disable-script=false"'), r"servers\.idea\.args: .*--disable-script=false"),
+        (_idea(args=""), "--disable-script"),
+        (_idea(args='"--other"'), "--other"),
+        (_idea(extra="audit_log = false"), r"servers\.idea: route"),
+        (_idea(extra='route = "both"\naudit_log = false'), r"servers\.idea\.route"),
+        (_idea(extra='route = "REST"\naudit_log = false'), r"servers\.idea\.route"),
+        (_idea(extra='route = ""\naudit_log = false'), r"servers\.idea\.route"),
+        (_idea(extra='route = "native"'), r"servers\.idea\.audit_log"),
+        (_idea(extra='route = "native"\naudit_log = true'), r"servers\.idea\.audit_log"),
+        (_idea(extra='route = "rest"\naudit_log = false'), r"servers\.idea: service_url"),
+        (_idea(extra=f'{IDEA_NATIVE}\nidea_dir = "relative/idea"'), r"servers\.idea\.idea_dir"),
+        (_minimal(extra=f'service_url = "{IDEA_URL}"'), r"servers\.csi\.service_url"),
+        (_minimal(extra='idea_dir = "/opt/idea"'), r"servers\.csi\.idea_dir"),
+    ],
+)
+def test_idea_forbidden_options(tmp_path: Path, text: str, key: str) -> None:
+    """Spec 0014 AC1: a second role, a forbidden or unknown argument, a missing requirement or route is refused."""
+    with pytest.raises(ConfigError, match=key):
+        load_servers_config(_write(tmp_path, text))
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:5000",
+        "http://127.0.0.1",
+        "http://127.0.0.2:8080",
+        "http://localhost:5000",
+        "HTTP://LOCALHOST:5000",
+        "http://[::1]:5000",
+        "https://127.0.0.1:5001",
+    ],
+)
+def test_idea_service_url_loopback_accepted(tmp_path: Path, url: str) -> None:
+    """Spec 0014 AC1: loopback hosts (IPv4, IPv6, `localhost`) are accepted for the REST service URL."""
+    text = _idea(extra=f'route = "rest"\nservice_url = "{url}"\naudit_log = false')
+    assert load_servers_config(_write(tmp_path, text)).servers["idea"].service_url == url
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://example.com:5000",
+        "http://10.0.0.5:5000",
+        "http://192.168.1.10:5000",
+        "http://0.0.0.0:5000",
+        "http://127.0.0.1.example.com:5000",
+        "http://localhost.example.com:5000",
+        "http://[::2]:5000",
+        "http://user@127.0.0.1:5000",
+        "http://127.0.0.1@example.com:5000",
+        "ftp://127.0.0.1:5000",
+        "127.0.0.1:5000",
+        "http://",
+        "http://127.0.0.1:99999",
+        "http://[::1",
+        "",
+    ],
+)
+def test_idea_service_url_loopback_only(tmp_path: Path, url: str) -> None:
+    """Spec 0014 AC1: a `service_url` whose host is not loopback (or that is not a plain http(s) URL) is refused."""
+    good = _idea(extra=IDEA_REST)  # the section itself is valid: only the URL under test differs
+    assert load_servers_config(_write(tmp_path, good)).servers["idea"].service_url == IDEA_URL
+    for extra in (f'route = "rest"\nservice_url = "{url}"\naudit_log = false', f'{IDEA_NATIVE}\nservice_url = "{url}"'):
+        with pytest.raises(ConfigError) as caught:
+            load_servers_config(_write(tmp_path, _idea(extra=extra)))
+        assert caught.value.key == "servers.idea.service_url"
+    with pytest.raises(ConfigError, match=r"servers\.idea\.service_url"):
+        load_servers_config(_write(tmp_path, _idea(extra=f"{IDEA_NATIVE}\nservice_url = 5000")))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "SASAH_IDEA_READ_ONLY",
+        "IDEA_DIR",
+        "SASAAH_IDEA_SERVICE_URL",
+        "sasaah_idea_default_project",
+        "Sasah_Idea_X",
+        "idea_dir",
+    ],
+)
+def test_idea_env_keys_refused(tmp_path: Path, name: str) -> None:
+    """Spec 0014 AC1: the three aliases of each server option are refused in `env`, in any letter case."""
+    with pytest.raises(ConfigError, match=rf"servers\.idea\.env: .*{name.upper()}") as caught:
+        load_servers_config(_write(tmp_path, _idea(extra=f'{IDEA_NATIVE}\nenv = {{ {name} = "1" }}')))
+    assert caught.value.key == "servers.idea.env"
+    # Other variables stay allowed, and the prefixes are the IDEA section's rule only.
+    other = _idea(extra=f'{IDEA_NATIVE}\nenv = {{ IDEAL_X = "1", MY_IDEA_X = "2", IDEAS = "3" }}')
+    assert set(load_servers_config(_write(tmp_path, other)).servers["idea"].env) == {"IDEAL_X", "MY_IDEA_X", "IDEAS"}
+    csi = _minimal(extra=f'env = {{ {name} = "1" }}')
+    assert name in load_servers_config(_write(tmp_path, csi)).servers["csi"].env
