@@ -24,16 +24,12 @@ from eng_harness.decisions.types import Pick, RuleBasis
 from eng_harness.rules.column_design import map_result_clean, member_fail_matched, member_no_proposal, readback_pass
 from eng_harness.workflows.column_design._points import (
     COLUMN_POLICY,
-    EngineerTurnPoint,
     MapAction,
-    MapResultPoint,
     MapState,
     MemberAction,
-    MemberActionPoint,
     MemberState,
     ProposalState,
     RevitReadbackAction,
-    RevitReadbackPoint,
     RevitReadbackState,
     TurnAction,
     TurnState,
@@ -117,10 +113,7 @@ def test_points_and_options() -> None:
     assert [m.value for m in MapAction] == ["continue_matched", "stop"]
     assert [m.value for m in RevitReadbackAction] == ["accept", "abandon"]
     assert [m.value for m in ProposalState] == ["none", "matched", "no_section_in_model", "ambiguous"]
-    found = {
-        (p.name, p.version, p.options, p.state)
-        for p in (MemberActionPoint, EngineerTurnPoint, MapResultPoint, RevitReadbackPoint)
-    }
+    found = {(p.name, p.version, p.options, p.state) for p in _points.discover().points if p.name.startswith("column_")}
     assert found == {
         ("column_design_member_action", 1, MemberAction, MemberState),
         ("column_design_engineer_turn", 1, TurnAction, TurnState),
