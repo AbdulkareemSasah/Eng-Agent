@@ -18,7 +18,7 @@ from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.refs import Ref, parse_ref
 from eng_contract.store import ResultStore
 from eng_contract.verdicts import VerdictStatus
-from pydantic import JsonValue, ValidationError
+from pydantic import BaseModel, JsonValue, ValidationError
 
 from eng_harness import _html as h
 from eng_harness._html import DEFAULT_MAX_CHARS, Element, Node, SafeToken, Tag, Text, Trusted, el
@@ -26,6 +26,7 @@ from eng_harness._text import format_number, truncate
 from eng_harness.ctx import ApprovalKind, Preview
 from eng_harness.journal import JournalReader
 from eng_harness.kinds.calcs import Change, ModelDiff
+from eng_harness.kinds.edit_cycle import HostDesignVerdicts
 from eng_harness.pages import _labels as lb
 from eng_harness.pages._answers import REASON, REJECT, AnswerError, Request, bound_sha256
 from eng_harness.pages._ports import FormCheck, PageHub, ScreenBuilder
@@ -37,6 +38,10 @@ from eng_harness.report._lineage import ReportError, unreleased_dependencies
 _SHORT = 12  # characters of a hash shown on the change-set screen; a promotion shows the whole hash
 type _Journal = Callable[[], JournalReader]
 _ACK = "acknowledged_unreleased"
+_VERDICT_KINDS: dict[str, type[BaseModel]] = {  # the kinds the sign-off reads; each validates as its own model
+    "verdicts.set/1": VerdictSet,
+    "harness.host_design_verdicts/1": HostDesignVerdicts,  # the edit cycle's (spec 0006 4.4.6; plan 0006 T9c)
+}
 _OK = frozenset({VerdictStatus.PASS, VerdictStatus.NOT_APPLICABLE})  # the other statuses are exceptions (AC42)
 type _Exception = tuple[
     str, str, str, str
@@ -230,8 +235,9 @@ class _Screens:
             ids = dict.fromkeys(parse_ref(s.result_ref)[0] for s in reader.steps() if s.result_ref is not None)
             counts: Counter[VerdictStatus] = Counter()
             exceptions: list[_Exception] = []
-            for result_id in (i for i in ids if self._store.get(i).kind == "verdicts.set/1"):
-                for v in VerdictSet.model_validate(self._store.payload(result_id)).verdicts:
+            for result_id in (i for i in ids if self._store.get(i).kind in _VERDICT_KINDS):
+                model = _VERDICT_KINDS[self._store.get(result_id).kind].model_validate(self._store.payload(result_id))
+                for v in cast(VerdictSet | HostDesignVerdicts, model).verdicts:
                     counts[v.status] += 1
                     if v.status not in _OK:
                         exceptions.append(
