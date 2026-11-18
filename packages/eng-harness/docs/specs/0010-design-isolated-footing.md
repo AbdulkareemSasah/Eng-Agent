@@ -28,6 +28,13 @@ engine amendments and report helpers), SAFE [0008](0008-safe-adapter.md) ("SAFE 
 owner's practice is a read-only reading of the Sasaah footing tool and sessions (WS §2). Items marked **[added]** are
 not in the architecture and are listed in §11.
 
+**Amendment B-568.** By the owner answer of 2026-11-18 (OQ-Q60), rule L1 of §4.4.3 takes the ceiling: `WIDTH_TOO_SMALL`
+applies when the span between the outer bar centres is zero or less, and for each positive span the bar count is the
+smallest count whose actual spacing is at most the input `s`, which plan sizing initialises from
+`reinforcement.max_spacing_mm` (§4.4.3 L1, AC8). The same amendment records the two points of OQ-Q63: a depth with no
+room for both bottom layers is refused with `OUT_OF_RANGE`, field `dims` (§4.4.3 L3, §6), and the numbers of a
+`WIDTH_TOO_SMALL` row are informative only (§4.4.3 L1, §4.6). No engineering number is added (Q21).
+
 ## 1. Problem
 
 The footing workflow is the second workflow (10 §9, phase 2 of
@@ -99,9 +106,11 @@ values are synthetic and say so. Synthetic basis templates follow spec 0004 §4.
   `NotImplementedGap` FG-1); and properties: the plan area is at least `A_req`, one increment less is below it unless the
   minimum governs, and a larger load never gives a smaller plan. Tests:
   `tests/golden/footing/test_plan_size.py::test_golden_cases`, `tests/property/test_footing_plan_size.py::test_minimal_and_monotone`.
-- AC8. `harness.footing_layout`: golden cases of §4.4.3 for both bottom layers and both reaction points; a width that
-  holds fewer than two bars gives `NEEDS_ENGINEER` (`WIDTH_TOO_SMALL`); properties: the actual spacing is at most `s`
-  and `As` grows with the bar count. Tests: `tests/golden/footing/test_layout.py::test_golden_cases`,
+- AC8. `harness.footing_layout`: golden cases of §4.4.3 for both bottom layers and both reaction points; a span
+  between the outer bar centres of zero or less gives `NEEDS_ENGINEER` (`WIDTH_TOO_SMALL`), and a depth with no room
+  for both layers gives `OUT_OF_RANGE`, field `dims` (L1, L3; amendment B-568); properties: for each valid layout the
+  actual spacing is at most `s`, and either `n = 2` or `span/(n − 2) > s`, and `As` grows with the bar count. Tests:
+  `tests/golden/footing/test_layout.py::test_golden_cases`,
   `tests/property/test_footing_layout.py::test_spacing_bound`.
 - AC9. `harness.footing_resize`: each action of §4.4.4 gives the next size; a step past a bound leaves the size
   unchanged with `LIMIT_REACHED`; `engineer_set` takes the single plan size `L`, `h` and `s` as engineer-input
@@ -320,12 +329,21 @@ Input: `dims`, `subjects`, `basis` (`reinforcement.bar_diameter_mm`, `.bottom_la
 `foundation.reaction_point`). Output `harness.footing_design/1`. Bars spanning in X lie across the width `Ly` (and Y
 across `Lx`); `c` is the cover, `db` the diameter.
 
-- L1. `n_x = ⌊(Ly − 2c − db)/s⌋ + 1`, `s_x = (Ly − 2c − db)/(n_x − 1)`; the same for `n_y` with `Lx`. `n < 2` gives
-  `NEEDS_ENGINEER` (`WIDTH_TOO_SMALL`).
+- L1. The span between the outer bar centres is `span_x = Ly − 2c − db`. If `span_x ≤ 0`, the row is `NEEDS_ENGINEER`
+  (`WIDTH_TOO_SMALL`) before computing any actual spacing (its numbers — the given spacing `s` shown, the steel of 0
+  or 1 bars — are informative only: the block closes the footing at §4.6 step 2.1 and never passes them to a check,
+  plan T8). For `span_x > 0`, `n_x = ⌈span_x/s⌉ + 1` (at least two bars, with `n_x = 2` for `0 < span_x ≤ s`), the
+  smallest bar count whose actual spacing is at most the input `s`, which plan sizing initialises from
+  `reinforcement.max_spacing_mm` (AC8; §4.4.2; rule R4 lets `engineer_set` keep and flag a value above that bound),
+  and the actual spacing is `s_x = span_x/(n_x − 1)`. The same holds for `n_y` and `s_y` with `span_y = Lx − 2c − db`.
+  The ceiling is taken on the exact fraction, so a positive span that is an exact multiple of `s` gives `s_x = s`.
+  Amendment B-568: the ceiling by the owner answer of 2026-11-18 (OQ-Q60, Q21), in place of the floor
+  `⌊span/s⌋ + 1`, which could give an actual spacing above the input `s`.
 - L2. `As = n·π·db²/4` each way (geometry). `As` is a float output (`As_x_mm2`, `As_y_mm2`) passed to the checks by
   reference; no comparison inside the calcs of §4.4 uses it, so the exact-comparison rule holds.
 - L3. `bottom_layer = x_bottom`: `d_x = h − c − db/2`, `d_y = h − c − 3·db/2`; `y_bottom` swaps them; `d = (d_x + d_y)/2`
-  for punching (ACI plan Q5).
+  for punching (ACI plan Q5). A depth with no room for both layers (the upper layer's effective depth,
+  `h − c − 3·db/2`, zero or less) is refused with `OUT_OF_RANGE`, field `dims` (calcs §6; amendment B-568, OQ-Q63).
 - L4. `cover_x = cover_y = end_cover = c` (bars end at the cover from each face).
 - L5. `reaction_point = top_of_footing` gives `reaction_height = h`; `base_of_footing` gives 0 (BP §3).
 
@@ -394,7 +412,8 @@ Input: `subjects`, `reactions`, `service_cases`, `factored_cases` (references), 
 
 1. `dims = ctx.calc("harness.footing_plan_size", ...)`. Footings with a `NEEDS_ENGINEER` status are closed.
 2. `async for a in ctx.attempts(ctx.basis.count("attempts.footing_rounds"))`, over the open footings:
-   1. `ctx.calc("harness.footing_layout", ...)`; `WIDTH_TOO_SMALL` closes.
+   1. `ctx.calc("harness.footing_layout", ...)`; `WIDTH_TOO_SMALL` closes (its numbers are informative only, §4.4.3
+      L1).
    2. Six `ctx.calc` batches, items per open footing: bearing per service case; one-way shear, punching, flexure per
       factored case; minimum steel and development once. Inputs are references: reaction rows by pointer
       (`/rows/<n>/FX_kN`, ...), basis fields (the ACI clause-spec paths, ACI plan Q2), design fields
@@ -497,7 +516,8 @@ on, and no SAFE result changes a verdict.
 |---|---|
 | Model not analysed; seismic scope refused | `NEEDS_ENGINEER` escalation before sizing |
 | Unknown cases after the attempts | `attempts_exhausted` escalation |
-| A footing that cannot be sized, laid out, resized or fixed | that footing `NEEDS_ENGINEER` with its reason; the run continues |
+| A footing returned with a per-footing `NEEDS_ENGINEER` status | that footing `NEEDS_ENGINEER` with its reason; the run continues |
+| Layout with a depth that leaves no room for both bottom layers (§4.4.3 L3) | `harness.footing_layout` refuses with `OUT_OF_RANGE`, field `dims` (calcs §6; amendment B-568) |
 | FG-1, FG-2 | `NotImplementedGap` (`NOT_IMPLEMENTED`) |
 | Draft check or calc in a production run | `CalcRefused` (calcs §4.12) |
 | Check id outside the code-pack route's allowlist, or unknown to the registry | `ContractError` `NOT_FOUND` before any evaluation (§4.3, calcs §6) |
@@ -560,6 +580,7 @@ code-pack route (additive to engine §4.8).
 | Q18 | A large moment can give partial contact (`q_min < 0`) at the size found from `N` only; bearing is then `NEEDS_ENGINEER` (BP G-1), not `FAIL`, so the footing goes to the engineer with no enlargement round | Owner | Accept for v1 (explicit and tested, AC19). Later, preferred: a cited calc that sizes for `q_min ≥ 0` from the moments (BP S5 solved for the plan), so the first size already has full contact; alternative: a rule that may enlarge a bearing `NEEDS_ENGINEER` with reason `FULL_CONTACT` while `plan_at_max` is false (needs the reason in the decision state, a new point version) |
 | Q19 | `compare.length_mm` and `checks.equilibrium_relative_tolerance_ratio` are required in every run, also with `safe.cross_check = off`, because spec 0004 has no conditional requirement (`FieldSpec.required: bool`; conditionals are its non-goal) | Owner | Accept for v1 (two values confirmed and unused when off); derive `required_basis` from a choice field in spec 0004 if more conditional fields appear |
 | Q20 | **[added]** A code-pack check's `CalcInfo.version` (§4.3 step 1): engine §4.8 and `eng_harness.ports.CalcInfo` require an integer of at least 1 (also `ctx` `calc_version` and the journaled step version, engine AC13), but a merged check has no integer version: `CheckMeta` has none, and the only version is the pack's string `version`, which CF AC9 makes the trace's `calc_version` | Owner, lead | Decided (draft, B-442; owner queue): each check has an integer `version` in `CheckMeta` (default 1, raised when the check's behaviour changes; CF §4.2, structural-codes core plan T15), which the route passes as `CalcInfo.version`; the pack's string version stays in the trace (CF AC9) |
+| Q21 | Rule L1 of §4.4.3 (`⌊span/s⌋ + 1`) could give an actual spacing above the input `s`, contradicting AC8 (and `reinforcement.max_spacing_mm` when plan sizing initialises `s` from it); §4.4.3 was silent on a depth with no room for both layers and on the numbers of a `WIDTH_TOO_SMALL` row (OQ-Q60, OQ-Q63) | Owner | Decided (owner answer of 2026-11-18, OQ-Q60; amendment B-568): `WIDTH_TOO_SMALL` for a span of zero or less before computing actual spacing, and the ceiling `⌈span/s⌉ + 1` for a positive span so the actual spacing is at most the input `s`, which plan sizing initialises from `reinforcement.max_spacing_mm` (while rule R4 lets `engineer_set` keep and flag a value above that bound); a depth with no room for both layers is `OUT_OF_RANGE`, field `dims`; the numbers of a `WIDTH_TOO_SMALL` row are informative only and plan T8 never uses them (OQ-Q63); no engineering number is added |
 | FG-1 | Plan shapes other than square | — | `NotImplementedGap` |
 | FG-2 | SAFE as the source of column loads: SAFE models carry no column frames (SAFE §4.4); loads would come from `harness.joint_loads/1` with a sign change | Owner | After SAFE L5 and L8, a calc from joint loads with the punching dimensions as column sizes |
 | FG-3 | Footings cannot be resized in SAFE (SAFE SG-4); the cross-check uses the prepared geometry | Owner | Sasaah typed `csi_resize_area_rect` (SAFE Q5) |
