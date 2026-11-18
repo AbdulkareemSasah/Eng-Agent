@@ -50,20 +50,31 @@ def _verdict(subject: str, status: str) -> dict[str, JsonValue]:
 
 @contextmanager
 def _signoff(
-    root: Path, *, marks: ReleaseMarks, exceptions: Sequence[str] = ("exc_1", "exc_2")
+    root: Path,
+    *,
+    marks: ReleaseMarks,
+    exceptions: Sequence[str] = ("exc_1", "exc_2"),
+    kind: str = "verdicts.set/1",
+    statuses: Sequence[str] = STATUSES,
 ) -> Iterator[tuple[Wired, ApprovalRequest]]:
     engine = EngineStandIn(root)
     store = engine.store
     counts: dict[str, JsonValue] = {
-        s: STATUSES.count(s) for s in ("PASS", "FAIL", "NOT_APPLICABLE", "NEEDS_ENGINEER", "ERROR")
+        s: statuses.count(s) for s in ("PASS", "FAIL", "NOT_APPLICABLE", "NEEDS_ENGINEER", "ERROR")
     }
     body: dict[str, JsonValue] = {
-        "verdicts": [_verdict(f"C{n}", status) for n, status in enumerate(STATUSES, 1)],
+        "verdicts": [_verdict(f"C{n}", status) for n, status in enumerate(statuses, 1)],
         "traces": [],
         "counts": counts,
         "draft": False,
     }
-    verdicts = store.put("verdicts.set/1", body, _producer("csi/new-tool"))
+    if kind == "harness.host_design_verdicts/1":  # the calc port's three members (spec 0007 4.4.3)
+        calc_id = "harness.host_design_verdicts"
+        trace: dict[str, JsonValue] = {"inputs": [], "constants": [], "steps": [], "outputs": []}
+        trace |= {"calc_id": calc_id, "calc_version": "1", "content_sha256": SHA}
+        calc: dict[str, JsonValue] = {"id": calc_id, "version": 1, "content_sha256": SHA, "status": "draft"}
+        body |= {"calc": calc, "trace": trace, "draft": True}
+    verdicts = store.put(kind, body, _producer("csi/new-tool"))
     started = {"kind": "tool", "name": "design", "args": {}, "args_sha256": SHA, "effect": "read"}
     done = {"result": {"ref": verdicts.result_id, "summary": {}, "warnings": [], "complete": True}, "duration_ms": 1}
     engine._writer.append(EventType.STEP_STARTED, started, path="0", attempt=1)  # the stand-in has no step helper
@@ -166,3 +177,24 @@ def test_rejecting_the_sign_off_needs_no_exception_reasons(tmp_path: Path) -> No
         answer = future.result(timeout=5)
     assert answer is not None
     assert (answer.decision, answer.reason, answer.acknowledged_unreleased) == ("reject", "not yet", False)
+
+
+def test_signoff_reads_host_design_verdicts(tmp_path: Path) -> None:
+    """The edit cycle stores `harness.host_design_verdicts/1`, never `verdicts.set/1` (plan 0006 T9c, B-559)."""
+    kind, statuses = "harness.host_design_verdicts/1", ("NEEDS_ENGINEER", "FAIL")
+    with _signoff(tmp_path, marks=ReleaseMarks(records={}), kind=kind, statuses=statuses) as (w, request):
+        future = w.open(request)
+        body = w.client.get(f"/request/{request.request_id}").body
+        for status in ("NEEDS_ENGINEER", "FAIL"):
+            assert f">{status}<" in body
+        assert body.index("frame C1") < body.index("frame C2")  # journal order: exc_1 is C1, exc_2 is C2
+        assert 'name="reason_exc_1"' in body
+        assert 'name="reason_exc_2"' in body
+        assert w.answer(request) == HTTPStatus.BAD_REQUEST  # nothing is refused when the counts are zero
+        assert w.answer(request, reason_exc_1=REASON) == HTTPStatus.BAD_REQUEST
+        assert w.answer(request, reason_exc_2="second") == HTTPStatus.BAD_REQUEST
+        assert not future.done()
+        assert w.answer(request, reason_exc_1=REASON, reason_exc_2="second") == HTTPStatus.OK
+        answer = future.result(timeout=5)
+    assert answer is not None
+    assert dict(answer.item_reasons) == {"exc_1": REASON, "exc_2": "second"}
