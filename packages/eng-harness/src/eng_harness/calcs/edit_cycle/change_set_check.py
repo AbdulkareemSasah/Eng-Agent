@@ -7,7 +7,9 @@ error (K7).
 Inputs: `change_set` (the answer field), the step 3 read set as flat fields (`frames`, `areas`, `sections`,
 `restraints`), `names` (`harness.csi_name_lists/1`), `diff` (the step 4 `harness.model_diff/1`) and `basis`.
 Units: a value is compared exactly in the canonical unit of its quantity kind (the unit of its bounds), converted by
-`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only.
+`eng_contract.units`; the bounds are the `bounds.*` fields of spec 0007 4.8. Resolved values hold references only, each
+pointing at the number: `.../value` of a basis field, `.../value_<suffix>` of an input (K4), so step 8 passes it as the
+engineering argument.
 Errors: `ContractError` `INVALID_ARGUMENT` (with `field`) for a bounds field that is missing, unconfirmed or not a
 number (no default), or an input given without a record. Every finding about the change set is an issue.
 """
@@ -66,6 +68,15 @@ Bounds = dict[str, tuple[Fraction, Fraction, str]]
 
 def _is_page_token(text: str) -> bool:
     return 0 < len(text) <= 57 and all(char in _ID_CHARS for char in text)  # K3: 64 less the 7 of the prefix
+
+
+def _number_key(quantity: str) -> str:
+    """The key under which an input value of this quantity kind holds its canonical number (spec 0007 4.3.1)."""
+    return next(
+        f"value{kind.suffix}"
+        for name, low, _ in BOUNDS
+        if name == quantity and (kind := kind_for_field(low.rpartition(".")[2])) is not None
+    )
 
 
 def _ref(kind: str, default: Any = ...) -> Any:
@@ -183,7 +194,7 @@ class _Check:
         exact: Fraction | None
         if value.source == "basis":
             path, shown = value.path, f"basis {value.path}"
-            ref, stored = f"{self.refs['basis']}#/fields/{path}", self.inp.basis.fields.get(path)
+            ref, stored = f"{self.refs['basis']}#/fields/{path}/value", self.inp.basis.fields.get(path)
             kind = kind_for_field(path.rpartition(".")[2])
             exact = as_fraction(stored.value) if stored is not None and stored.confirmed else None
             if exact is None:
@@ -194,7 +205,7 @@ class _Check:
         else:
             shown, ref = (
                 f"{value.value} {value.unit}",
-                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}",
+                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}/{_number_key(quantity)}",
             )
             exact = Fraction(value.value) * unit(value.unit).factor / unit(canonical).factor  # no offset, no pi
         if exact is not None and not low <= exact <= high:

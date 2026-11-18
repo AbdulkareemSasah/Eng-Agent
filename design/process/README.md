@@ -22,7 +22,7 @@ documents means a package directory of the `eng-platform` workspace; repository-
 4. **Never improvise a missing capability.** In live work, log it in the task log and continue with what is possible;
    build it as a permanent tool through the project lane only when the owner asks ([01](01-lifecycle.md) §9, §10);
    outside live work, file a gap report ([02](02-work-items.md) §5).
-5. **Stay inside the plan task**: its files and its session budget.
+5. **Stay inside the plan task**: its files and its session estimate.
 6. **Nobody approves their own work.** Reviews that count are run by CI or given by the owner.
 7. **CI is the definition of done.** Nothing bypasses CI; nobody bypasses branch protection. The only commits that
    reach the integration branch without a pull request are log-only commits

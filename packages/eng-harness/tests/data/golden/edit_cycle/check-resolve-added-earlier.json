@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0007 section 4.4.1 (rules K1 to K7), synthetic fixture",
   "method_ref": "§4.4.1 K1 K2 K4 K7",
   "synthetic": true,
-  "derivation": "Synthetic state (every case): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200, material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm. a1 adds pattern SDL (self weight 0, the lower ratio bound, inside). a2 loads F1 in SDL, added by a1, with the basis field loads.sdl_kPa (1.5 kPa, confirmed, inside 0 to 50). a3 defines wall section W250 of material C30, 250 mm inside 100 to 1000. a4 assigns W250, added by a3, to W1. a5 sets the new combination COMB2 of DEAD (scale 1) and SDL (scale 0.5, added by a1); scales inside 0 to 10. Every value resolves to a reference: answer fields items/0/self_weight, items/2/thickness, items/4/items/0/scale and items/4/items/1/scale, and basis field loads.sdl_kPa. No issue: PASS.",
+  "derivation": "Synthetic state (every case): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200, material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm. a1 adds pattern SDL (self weight 0, the lower ratio bound, inside). a2 loads F1 in SDL, added by a1, with the basis field loads.sdl_kPa (1.5 kPa, confirmed, inside 0 to 50). a3 defines wall section W250 of material C30, 250 mm inside 100 to 1000. a4 assigns W250, added by a3, to W1. a5 sets the new combination COMB2 of DEAD (scale 1) and SDL (scale 0.5, added by a1); scales inside 0 to 10. Every value resolves to a reference: answer fields items/0/self_weight/value_ratio, items/2/thickness/value_mm, items/4/items/0/scale/value_ratio and items/4/items/1/scale/value_ratio, and basis field loads.sdl_kPa/value. No issue: PASS.",
   "input": {
     "change_set": {
       "items": [
@@ -444,7 +444,7 @@
         "values": [
           {
             "pointer": "/self_weight_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/self_weight",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/0/self_weight/value_ratio",
             "unit": "1"
           }
         ]
@@ -458,7 +458,7 @@
         "values": [
           {
             "pointer": "/q_kPa",
-            "ref": "res_00000000000000000000000008#/fields/loads.sdl_kPa",
+            "ref": "res_00000000000000000000000008#/fields/loads.sdl_kPa/value",
             "unit": "kPa"
           }
         ]
@@ -472,7 +472,7 @@
         "values": [
           {
             "pointer": "/thickness_mm",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness/value_mm",
             "unit": "mm"
           }
         ]
@@ -494,12 +494,12 @@
         "values": [
           {
             "pointer": "/items/0/scale_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/items/0/scale",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/items/0/scale/value_ratio",
             "unit": "1"
           },
           {
             "pointer": "/items/1/scale_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/items/1/scale",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/items/1/scale/value_ratio",
             "unit": "1"
           }
         ]

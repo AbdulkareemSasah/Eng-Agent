@@ -21,7 +21,7 @@ if last is None:
     sys.exit('no Workflow call found for lane ' + lane)
 src = open(base, encoding='utf-8').read()
 assert 'args.tasks' in src and 'args.lane' in src
-src = src.replace('args.tasks', 'ARGS.tasks').replace('args.lane', 'ARGS.lane')
+src = src.replace('args.', 'ARGS.')
 src = src.replace('const STATUS =', 'const ARGS = ' + json.dumps(last) + '\nconst STATUS =', 1)
 open(out, 'w', encoding='utf-8').write(src)
 print(lane, 'tasks:', ' '.join(t['id'] for t in last['tasks']), '->', out)

@@ -2,7 +2,7 @@ template: ../../design/process/templates/AGENTS.template.md
 output: AGENTS.md
 values:  # key = the exact text between the double braces in the template
   "package-name": "structural-codes"
-  "template-version": "sha256:7a1a12af2a76"
+  "template-version": "sha256:a6f4a4f274b3"
   "hub-path": "../../design"
   "one-paragraph purpose": "The engineering-library folder of the Eng-Agent platform (architecture 10): the core framework (check metadata, inputs, applicability, trace recorder, verdict builder, registry, content hash, lifecycle, verification, overlays, notes) and, in later skeleton tasks, one package per code edition. It is pure computation over contract types: no host program, no network, no clock, no randomness. A check cites every constant and records every step in a trace; a wrong verdict is an R1 defect."
   "1 contract / 2 MCP server / 3 engineering library / 4 harness / desktop add-in": "3 engineering library (import name `structural_codes`; folders `core/`, `aci318-14/`, `sbc304-2018/`, each a workspace member added by its own skeleton task)"

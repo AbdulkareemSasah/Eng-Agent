@@ -1,3 +1,68 @@
+# Hand-over checkpoint of 2026-11-18 (build/v1 at 3ac04ff): paused for the owner's allowance
+
+Written by the lead of the cloud session after the owner said to let the running tasks finish, start nothing new, and
+hand over to another agent. **Paused until the owner says to continue.** This section is the newest; older sections
+below stay for their history.
+
+## A. State
+
+- **238 of 355 plan tasks merged (67 %).** Merged on 2026-11-18: B-556 #417, B-562 #418, B-563 #419, B-555 #420,
+  B-164 #421 (rebuild; PR 323 closed), B-564 #422, B-565 #423, B-557 #424, B-559 #425, B-566 #426, B-188 #427.
+- Registry `ops/remaining-tasks.json`: 188 entries, `merged_pr` refreshed, B-564 to B-566 added.
+- Nothing is running. `<lead>/locks/pause.lane` was set; recreate it on a new machine while paused.
+- Periodic mutation: run 5 passed (base 4f1a7e6, head d9c19fb). Ten PR merges (#418 to #427) followed it, so
+  **run 6 is due now**: `tools/periodic-mutation.sh d9c19fb` (in the idle CPU class).
+
+## B. Owner decisions of 2026-11-17 and 2026-11-18 (all in force)
+
+1. **No changed-line limit** (ADR-0035, gate B-553): `max_changed_lines` is an estimate; GC009 is a notice.
+2. **Collateral edits and the session estimate** (ADR-0036, gate B-565/B-566): a test file under `tests/` or the
+   package `CHANGELOG.md` outside a task's `files` may be edited and listed under "Collateral edits" in the PR body;
+   GC008 reports it as a notice. A non-test source file outside `files` still needs a plan amendment. `max_sessions`
+   is an estimate: never a stop.
+3. **Cost and speed measures** (playbook section 9; lane script [build-lane-v36.workflow.js](build-lane-v36.workflow.js),
+   start every new lane with `collateral: true`):
+   - Reviewer Sonnet by default; Opus only for engineering calcs and checks (with the Opus verifiers) and the core
+     wiring tasks (S.T19a, W.T8 to W.T9c, I.T16b, I.T18a, I.T18b).
+   - One review round: CHANGES only for findings that block the merge; round cap 2 (engineering 3).
+   - Writer effort medium, high only for the core tasks.
+   - No per-task mutation run (set `mutation: true` only when a task needs it); the periodic run every ten merges stays.
+   - No documents audits or walk-throughs before the first live run.
+4. The D-3 drift decision (B-544) and the conservative original-open capability (B-562) are merged.
+
+## C. Next order (first live run)
+
+1. **B-138 (S.T19a, port wiring): integration only.** Writer session 4 finished, Opus review APPROVE, branch
+   `feat/b138-harness-st19-port-wiring-edit-cycle` pushed at 5991420. Merge origin/build/v1 into it (B-164 added a
+   `basis` loader parameter of `Ctx` before `copy_on_open`; keep it), run the package gate without mutation, open the
+   PR with the drafted body ([b138-pr-body.md](resume/2026-11-18b/b138-pr-body.md); review:
+   [b138-review.md](resume/2026-11-18b/b138-review.md)), local CI on the exact head, merge. Optional two-line
+   assertion for AC52 in test_cycle_steps (review note).
+2. **W.T8 (B-202)** right after B-138: every other dependency is merged. Then W.T9a (B-526), W.T9b (B-527),
+   W.T9c (B-558).
+3. **Interface chain** (arguments saved in [interface-7.args.json](resume/2026-11-18b/interface-7.args.json)):
+   B-528 (I.T14c), B-353 (I.T14b), then B-190 (I.T16) and B-189 (I.T15), then B-430 (I.T16b), then B-433 (I.T18a),
+   B-488 (I.T18b). The B-188 review raised spec gaps for this chain (lead-findings, 2026-11-18): the calc ids that
+   run's step 4 preflights; AC6's basis case has no owning task (T15 should cover it); cli imports from private pages
+   modules; extra names in `eng_harness.cli.__all__`; generated options vs shared option names.
+4. Then W.T11 (B-205), W.T12 (B-206) and the owner-guide corrections (C4, C6, C7/C30, C15, C26 and the notes in
+   lead-findings).
+5. One small documents item can collect the open wording notes of B-557, B-565 and B-566 (lead-findings): spec 0007
+   file table and 4.3.1 unit list, T16b prose, AC40 test reference, CHANGELOG line, the PR template's "Collateral
+   edits" heading, frontmatter.py docstring "session budget", spec line 386.
+6. Keep the other host lanes frozen until the first owner live run (D-32).
+
+## D. Machine layout
+
+As before (section E of the checkpoint below): placeholders `<lead>`, `<build-v1>`, `<worktrees>`, `<hub>`,
+`<lane-scripts>`; copy the playbook, priority list, findings, resume files, `tools/` and the lane scripts
+(v3.6 is current) to the lead scratch folder and replace the placeholders. Keep `<lead>/BATCH_MODE`. The hub branch
+`claude/pensive-volta-gcx0y9` holds ADR-0035 and ADR-0036. Workflow run ids in RESUME.md belong to the old session.
+Old local drafts B-136 (S.T17) and B-150 (C.T11), both frozen, were pushed to their branches; the old B-183 draft is
+superseded by #368.
+
+---
+
 # Owner pause and continuation checkpoint of 2026-11-18
 
 **Paused until the owner explicitly says to continue.** The owner asked for the current work to be uploaded to GitHub and for a precise continuation point. The already-passing batch was integrated and the in-progress B-138 branch was saved. This checkpoint supersedes older current-state entries below. Start with the [resume checklist](resume/PAUSE-2026-11-18.md).
