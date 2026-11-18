@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import anyio
+from eng_contract.refs import Ref
 from fakes.sasaah_csi.wiring import rig
 
 from eng_harness.engine import PermissionMode, RunStatus
@@ -26,7 +27,7 @@ def test_units_trap(tmp_path: Path) -> None:
                 "model": "m",
                 "name": "W1",
                 "material": "C30",
-                "thickness_mm": r.value("thickness_mm", 250.0),
+                "thickness_mm": Ref.model_validate(r.value("thickness_mm", 250.0)),  # a reference, invariant 2
                 "shell_type": "ShellThin",
             },
         ),
