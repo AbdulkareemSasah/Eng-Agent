@@ -26,7 +26,7 @@ from eng_harness.workflows.model_edit_cycle._change_set import (
     refused_gap,
 )
 
-BASIS = {"source": "basis", "path": "loads.floor_dead_kpa"}
+BASIS = {"source": "basis", "path": "loads.floor_dead_kPa"}
 KINDS = {
     "frame_section",
     "area_section",

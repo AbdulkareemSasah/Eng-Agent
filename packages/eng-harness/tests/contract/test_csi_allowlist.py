@@ -111,4 +111,4 @@ def test_pinned_fingerprint_from_inventory() -> None:
     assert allowlist.fingerprint_source == "s12-inventory"
     schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in allowlist.tool_names}
     assert set(schemas) == {tool.name for tool in allowlist.tools}
-    assert tool_list_fingerprint(schemas) == allowlist.tool_fingerprint
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["ETABS"]
