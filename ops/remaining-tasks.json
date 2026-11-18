@@ -1,6 +1,6 @@
 {
  "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries. Checkpoint of 2026-11-18 (hand-over 2): merged_pr refreshed, B-564 to B-566 added, B-138 integration-only.",
- "count": 188,
+ "count": 191,
  "tasks": [
   {
    "id": "B-437",
@@ -605,9 +605,7 @@
    "branch": "feat/b353-harness-it14b-commands-run-and-resume",
    "prTitle": "feat(eng-harness): commands run and resume: signals, launch address on the terminal only, decision layer wiring (B-353)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14c"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1734,7 +1732,9 @@
    "branch": "feat/b202-harness-wt8-workflow-part-1-definition",
    "prTitle": "feat(eng-harness): workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) (B-202)",
    "risk": "r1, r2, r3",
-   "pending_deps": [],
+   "pending_deps": [
+    "W.T13b"
+   ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -3250,7 +3250,8 @@
    "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T8"
+    "W.T8",
+    "W.T8b"
    ],
    "writer": "sonnet, medium",
    "reviewer": "sonnet, medium",
@@ -3292,7 +3293,8 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 429
   },
   {
    "id": "B-534",
@@ -3798,6 +3800,69 @@
     "Owner decision of 2026-11-18."
    ],
    "merged_pr": 426
+  },
+  {
+   "id": "B-570",
+   "task": "E.T24",
+   "plan": "packages/eng-harness/docs/plans/0001-engine.md",
+   "planTask": "T24",
+   "kind": "impl",
+   "title": "The first ctx.basis read is engine work (StoreBasisPort under the runtime guard)",
+   "branch": "feat/b570-harness-et24-basis-load-is-engine-work",
+   "prTitle": "feat(eng-harness): the first ctx.basis read is engine work (B-570)",
+   "risk": "r3",
+   "pending_deps": [],
+   "writer": "agy hydrogen high",
+   "reviewer": "codex sol",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "registered after B-569 (#430): verified B-202 finding"
+   ],
+   "merged_pr": 432
+  },
+  {
+   "id": "B-571",
+   "task": "W.T13b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T13b",
+   "kind": "impl",
+   "title": "Tool saves record the save; the save result carries the post-save revision",
+   "branch": "feat/b571-harness-wt13b-tool-saves-post-save-revision",
+   "prTitle": "feat(eng-harness): tool saves record the save and carry the post-save revision (B-571)",
+   "risk": "r1, r3",
+   "pending_deps": [],
+   "writer": "agy hydrogen high",
+   "reviewer": "codex sol",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "registered after B-569 (#430): verified B-202 finding"
+   ]
+  },
+  {
+   "id": "B-572",
+   "task": "W.T8b",
+   "plan": "packages/eng-harness/docs/plans/0007-model-edit-cycle.md",
+   "planTask": "T8b",
+   "kind": "impl",
+   "title": "Sanctioned result accessors for block code",
+   "branch": "feat/b572-harness-wt8b-result-accessors",
+   "prTitle": "feat(eng-harness): sanctioned result accessors for block code (B-572)",
+   "risk": "r3",
+   "pending_deps": [
+    "W.T8"
+   ],
+   "writer": "agy hydrogen medium",
+   "reviewer": "codex terra",
+   "verifier_lenses": [],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "registered after B-569 (#430): verified B-202 finding"
+   ]
   }
  ]
 }

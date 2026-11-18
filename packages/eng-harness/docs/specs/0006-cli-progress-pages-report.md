@@ -72,6 +72,11 @@ may start with a byte-order mark (§4.7).
 (§4.4.5, AC34); the input screen tells how a waiting run takes a data answer (§4.4.5, AC46); a closed browser is
 recovered by stop and resume (§4.4.4); a change-set item id is a page token, refused upstream by spec 0007 §4.4.1 K3.
 
+**Amendment B-569.** A model-file input field is annotated `pathlib.PurePath` (`eng_harness.block.ModelFile`, engine
+spec 0001 §4.1.2), or `PurePath | None`, not `pathlib.Path`, because block modules may not import `pathlib` and the
+gate's FB004 refuses it (engine §11 Q47): the command line finds these fields by the identity of the annotation and
+turns each value into a `Path` for its own checks at `run`; `resume` is unchanged (§4.2.2 step 2, §4.7, §5, AC67).
+
 ## 1. Problem
 
 In the sessions behind ADR-0024, more than 20 hours went into interface work while host work stalled, the engineer
@@ -205,9 +210,10 @@ page tests use a real server on the loopback interface and `http.client`; no bro
   `run` and `resume` are available. **[added: B-541]** Standard error holds the line `run id: <run_id>` before any port
   is built, and the default passes `build_ports` the server sections converted by spec 0002 `servers_config`. Test:
   `tests/unit/cli/test_default_deps.py::test_port_builder_bound_and_run_id_drawn`.
-- AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.Path` and an
-  input file that gives it the absolute path of an existing file, when `run` is called, then the port builder receives
-  `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
+- AC67. **[added: B-536]** Given a workflow whose input model has a top-level field annotated `pathlib.PurePath`
+  (`eng_harness.block.ModelFile`, or `PurePath | None`; amendment B-569, matched by identity, so a field annotated
+  `pathlib.Path` is not one) and an input file that gives it the absolute path of an existing file, when `run` is
+  called, then the port builder receives `files` mapping the file's base name to that path; when `resume` is called for that run, then it receives the same
   mapping from the run's stored input, also when the original file has been moved since `run`; and a relative path, a
   missing file or two such fields with one base name ends `run` with exit 2 and no run folder (§4.2.2 step 2); and the
   port builder receives `visible` equal to the input's `visible_host`, or false for an input model without that field
@@ -583,9 +589,12 @@ or open the page; the approval is the engineer's. The rule is generated into the
    `--answers` file, if given, and check that it is one JSON object (AC64); its fields are checked by the engine when
    the request opens. Then build the tool and host ports as
    `port_builder(config, workspace, store, run_folder, clock, ids, files, visible)` (amendment B-536, AC67): `files` maps a
-   model key to a file for each top-level field of the workflow's input model annotated `pathlib.Path` (a model file);
-   the key is the file's base name and the file is the field's value, which must be absolute and name an existing
-   file. `visible` is the input's top-level `visible_host` when the input model declares that `bool` field, else
+   model key to a file for each top-level field of the workflow's input model annotated `pathlib.PurePath`
+   (`eng_harness.block.ModelFile`), or `PurePath | None` with a value (a model file; amendment B-569: the annotation,
+   with `X | None` unwrapped, is compared by identity with `PurePath`, never by `issubclass`, because `Path` is a
+   subclass of `PurePath` and a block module may not import `pathlib`, engine spec 0001 §4.1.2); the key is the
+   file's base name and the file is the field's value, turned into a `pathlib.Path` by the command line (outside
+   block code) for its checks, which must be absolute and name an existing file. `visible` is the input's top-level `visible_host` when the input model declares that `bool` field, else
    false (amendment B-543, spec 0007 §4.2; spec 0002 §4.1 keyword `visible`), at `run` and at `resume` from the stored
    input. A relative path, a missing file or two such fields with one base name is a usage error (exit 2) with no run
    folder; these refusals apply to `run`. `resume` builds `files` from the run's stored input and does not check that
@@ -1028,7 +1037,8 @@ and compare. All files are opened with `encoding="utf-8"` and `newline="\n"`, ex
 accepted (B-541; Windows PowerShell 5 and older Notepad write one, and it carries no meaning; a UTF-16 file stays a
 usage error); the standard streams are reconfigured at
 start (AC5): redirected streams to UTF-8, a console keeps its encoding with `errors="backslashreplace"`. Paths are
-`pathlib.Path` values and are never encoded by hand, so Arabic folder names work; messages show base names unless a
+`pathlib.Path` values (a model-file input field holds a `PurePath`, which the command line turns into a `Path`,
+§4.2.2 step 2; amendment B-569) and are never encoded by hand, so Arabic folder names work; messages show base names unless a
 path is needed to act (the report path).
 
 ### 4.8 Concurrency
@@ -1041,7 +1051,7 @@ heartbeat task runs on the engine loop.
 
 | Name | Type | Unit | Bounds | Ref-capable | Source |
 |---|---|---|---|---|---|
-| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref`; a model file (a `pathlib.Path` field) is an absolute path (§4.2.2 step 2) | engineer or agent |
+| `--input` file | JSON object | per workflow model | the workflow input model | values may be `$ref`; a model file (a `pathlib.PurePath` field, `eng_harness.block.ModelFile`; amendment B-569) is an absolute path (§4.2.2 step 2) | engineer or agent |
 | `--basis` file | YAML or JSON `{name, values}` (spec 0004 `EngineerValues`; B-541) | canonical per suffix | by `FieldSpec` (spec 0004) | no | engineer or agent, confirmed on the page |
 | `--answers` file | JSON | per request fields | the request's model | no | engineer or agent |
 | Page form fields | `application/x-www-form-urlencoded` | none | §4.4.3; reasons 1 to 500; name 1 to 100; body at most `max_body_bytes` | no | engineer; carry decisions and option ids, never engineering values |

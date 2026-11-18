@@ -10,10 +10,12 @@ from collections.abc import Callable, Mapping
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, TextIO
+from typing import Any, Protocol, TextIO
 
+from eng_contract.errors import ContractError
 from eng_contract.ids import Clock, IdSource
 from eng_contract.store import ResultStore, Workspace, default_location_probe, resolve_workspace
+from pydantic import JsonValue
 
 from eng_harness import __version__
 from eng_harness.block import Registry
@@ -21,7 +23,7 @@ from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest
 from eng_harness.journal import JournalReader
-from eng_harness.pages import PageApprovalPort, PageInputPort, PageServer
+from eng_harness.pages import PageApprovalPort, PageInputPort, PageServer, accept_answers_file
 from eng_harness.pages._ports import _NO_REPORT
 from eng_harness.pages._screens_approval import approval_screens, sign_off_screens
 from eng_harness.pages._screens_choice import choice_screens
@@ -33,6 +35,7 @@ from eng_harness.ports import (
     DecisionPort,
     HostPort,
     InputPort,
+    InputRequest,
     ProgressSink,
     RunControlPort,
     ToolPort,
@@ -132,12 +135,15 @@ class PageSession:
     """The page ports of one command and the page server behind them.
 
     The server starts when the first request is shown, never with `no_wait`; the launch address goes to `opener` only
-    (spec 4.4.4), and a failed or declined opening says that the address cannot be shown here.
+    (spec 4.4.4), and a failed or declined opening says that the address cannot be shown here. The ports wait for the
+    page unless `no_wait` (spec 4.4.5 step 2): the engine's own `wait` is ignored. `answers` (from the `--answers`
+    file) names the object that answers a data request; such a request is not shown on the page.
     """
 
     def __init__(
         self, *, config: HarnessConfig, store: ResultStore, runs_dir: Path, cell: RunIdCell, clock: Clock,
         wait_timeout_s: int | None, no_wait: bool, no_browser: bool, opener: Callable[[str], bool], stderr: TextIO,
+        answers: FileAnswers | None = None, answers_once: bool = False,
     ) -> None:  # fmt: skip
         marks, control = release_marks(config), FileRunControl(runs_dir)
 
@@ -169,8 +175,15 @@ class PageSession:
         self._browser = config.page.open_browser and not no_browser
         self._opener, self._stderr = opener, stderr
         self._server: PageServer | None = None
-        self.approvals: ApprovalPort = _Shown(self._page, self._shown, lambda request: cell.fill(request.run_id))
-        self.inputs: InputPort = _Shown(PageInputPort(self._page), self._shown)
+        wait = not no_wait
+        self.approvals: ApprovalPort = _Shown(self._page, self._shown, lambda request: cell.fill(request.run_id), wait)
+        self._file: _FromFile[Any] | None = None
+        self.inputs: InputPort = _Shown(PageInputPort(self._page), self._shown, wait=wait)
+        if answers is not None:
+            self._file = _FromFile(
+                self.inputs, accept_answers_file, config.engine.engineer or "", answers, once=answers_once
+            )
+            self.inputs = self._file
 
     def _shown(self) -> None:
         if self._server is not None or not self._serve:
@@ -183,6 +196,11 @@ class PageSession:
             self._stderr.write(
                 "the launch address cannot be shown here; run from a terminal, or use --no-wait and resume later\n"
             )
+
+    @property
+    def answers_used(self) -> bool:
+        """True when the `--answers` file answered a request."""
+        return self._file is not None and self._file.used
 
     def close(self) -> None:
         """Stop the page server, if one started."""
@@ -203,12 +221,16 @@ class _Port[Req, Ans](Protocol):
 
 
 class _Shown[Req, Ans]:
-    """A page port that runs `before` on each request, shows it, then starts the page server."""
+    """A page port that runs `before` on each request, shows it, starts the page server and waits as `wait` says."""
 
     def __init__(
-        self, inner: _Port[Req, Ans], shown: Callable[[], None], before: Callable[[Req], None] = lambda _: None
+        self,
+        inner: _Port[Req, Ans],
+        shown: Callable[[], None],
+        before: Callable[[Req], None] = lambda _: None,
+        wait: bool = True,
     ) -> None:
-        self._inner, self._shown, self._before = inner, shown, before
+        self._inner, self._shown, self._before, self._wait = inner, shown, before, wait
 
     async def present(self, request: Req) -> None:
         """Show the request on the page."""
@@ -217,5 +239,55 @@ class _Shown[Req, Ans]:
         self._shown()
 
     async def answer(self, request_id: str, *, wait: bool) -> Ans | None:
-        """The page's answer, as the page port gives it."""
+        """The page's answer, asked with the process wait mode (the engine's `wait` is always false, spec 4.4.5)."""
+        return await self._inner.answer(request_id, wait=self._wait)
+
+
+type FileAnswers = Callable[[str], Mapping[str, JsonValue] | None]
+"""The object of the `--answers` file that answers the request with this id, or `None`."""
+
+
+class _FromFile[Ans]:
+    """A page `InputPort` that answers a data request from the answers file instead of the page, once (spec 4.2.1).
+
+    What the file may answer is decided by `accept` (`pages.accept_answers_file`); a request it refuses, and every
+    request `pick` has no object for, goes to the page port unchanged. With `once` only the first request is answered.
+    """
+
+    def __init__(
+        self,
+        inner: _Port[InputRequest, Ans],
+        accept: Callable[[InputRequest, Mapping[str, JsonValue], str], Ans],
+        by: str,
+        pick: FileAnswers,
+        *,
+        once: bool,
+    ) -> None:
+        self._inner, self._accept, self._by, self._pick, self._once = inner, accept, by, pick, once
+        self._given: dict[str, Ans] = {}
+        self._done: set[str] = set()
+
+    @property
+    def used(self) -> bool:
+        """True when the file answered a request."""
+        return bool(self._done)
+
+    async def present(self, request: InputRequest) -> None:
+        """Take the answer from the file, or show the request on the page."""
+        rid = request.request_id
+        payload = None if rid in self._done or (self._once and self._done) else self._pick(rid)
+        if payload is not None:
+            try:
+                self._given[rid] = self._accept(request, payload, self._by)
+            except ContractError:  # not a data request: it is answered on the page
+                payload = None
+        if payload is None:
+            await self._inner.present(request)
+        else:
+            self._done.add(rid)
+
+    async def answer(self, request_id: str, *, wait: bool) -> Ans | None:
+        """The file's answer, once; else the page's."""
+        if request_id in self._given:
+            return self._given.pop(request_id)
         return await self._inner.answer(request_id, wait=wait)
