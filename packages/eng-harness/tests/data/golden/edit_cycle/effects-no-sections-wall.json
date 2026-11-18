@@ -1,0 +1,172 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (absent model.sections/1, amendment B-543), AC39, synthetic fixture",
+  "method_ref": "§4.4.2 wall_section on a section the state holds, and a new one",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. The read set has no model.sections/1 record, so no wall section is known to the state and none is known to be absent (spec 0007 4.4.2: without it a wall_section is projected as on a section the state holds). b1 redefines W200 with material C35 and thickness 0.25 m: 0.25 m x 1000 mm/m = 250 mm (0.25 is exact in binary); two `set` effects on model.sections/1 under [area_sections, W200], /material then /thickness_mm by pointer order: b1/1 and b1/2. b2 defines W300 with material C30 and thickness from the basis field geometry.wall_thickness_mm = 300 mm: the same two `set` effects, never an `add` of the row, because the state cannot say the section is new: b2/1 (/material C30) and b2/2 (/thickness_mm 300 mm). W200 sorts before W300. The model is that of the load set and restraint records (one model and revision).",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "b1",
+          "kind": "wall_section",
+          "targets": [
+            "W200"
+          ],
+          "values": [
+            {
+              "pointer": "/thickness_mm",
+              "ref": "res_00000000000000000000000002#/fields/change_set/value/items/0/thickness",
+              "unit": "mm"
+            }
+          ]
+        },
+        {
+          "item_id": "b2",
+          "kind": "wall_section",
+          "targets": [
+            "W300"
+          ],
+          "values": [
+            {
+              "pointer": "/thickness_mm",
+              "ref": "res_00000000000000000000000006#/fields/geometry.wall_thickness_mm",
+              "unit": "mm"
+            }
+          ]
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "b1",
+      "b2"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "b1",
+          "kind": "wall_section",
+          "name": "W200",
+          "material": "C35",
+          "thickness": {
+            "source": "input",
+            "value": 0.25,
+            "unit": "m"
+          },
+          "shell_type": "ShellThick"
+        },
+        {
+          "id": "b2",
+          "kind": "wall_section",
+          "name": "W300",
+          "material": "C30",
+          "thickness": {
+            "source": "basis",
+            "path": "geometry.wall_thickness_mm"
+          },
+          "shell_type": "ShellThin"
+        }
+      ]
+    },
+    "loads": {
+      "patterns": [],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "geometry.wall_thickness_mm": {
+          "value": 300.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "b1/1",
+        "section": "model.sections/1",
+        "key": [
+          "area_sections",
+          "W200"
+        ],
+        "op": "set",
+        "pointer": "/material",
+        "value": "C35",
+        "unit": null
+      },
+      {
+        "item_id": "b1/2",
+        "section": "model.sections/1",
+        "key": [
+          "area_sections",
+          "W200"
+        ],
+        "op": "set",
+        "pointer": "/thickness_mm",
+        "value": 250.0,
+        "unit": "mm"
+      },
+      {
+        "item_id": "b2/1",
+        "section": "model.sections/1",
+        "key": [
+          "area_sections",
+          "W300"
+        ],
+        "op": "set",
+        "pointer": "/material",
+        "value": "C30",
+        "unit": null
+      },
+      {
+        "item_id": "b2/2",
+        "section": "model.sections/1",
+        "key": [
+          "area_sections",
+          "W300"
+        ],
+        "op": "set",
+        "pointer": "/thickness_mm",
+        "value": 300.0,
+        "unit": "mm"
+      }
+    ]
+  }
+}
