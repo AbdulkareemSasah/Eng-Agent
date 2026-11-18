@@ -8,6 +8,7 @@ import pytest
 from eng_contract.envelope import FailureEnvelope, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
+from eng_contract.kinds.basis import BasisField, DesignBasis
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from pydantic import JsonValue
 
@@ -100,7 +101,6 @@ def test_columns_counted_are_those_with_a_named_lower_joint() -> None:
     ("field", "code"),
     [
         ({"confirmed": False}, ErrorCode.INVALID_ARGUMENT),
-        ({"unit": "mm"}, ErrorCode.UNIT_MISMATCH),
         ({"value": "1"}, ErrorCode.INVALID_ARGUMENT),
         ({"value": True}, ErrorCode.INVALID_ARGUMENT),
         ({"value": -0.5}, ErrorCode.OUT_OF_RANGE),
@@ -111,6 +111,21 @@ def test_basis_field_is_checked(field: dict[str, Any], code: ErrorCode) -> None:
         _run(load_cases("subjects")["subjects-basic"], basis=_basis(**field))
     assert caught.value.detail.code is code
     assert caught.value.detail.field == "basis"
+
+
+def test_a_unit_other_than_deg_is_refused_by_the_calc_itself() -> None:
+    # DesignBasis refuses a unit that contradicts the suffix at validation (B-464), so the calc's own check
+    # (spec 0003 4.4: unit deg) is reached only with a basis built without validation.
+    case = load_cases("subjects")["subjects-basic"]
+    wrong = BasisField(**_basis(unit="mm")["fields"]["compare.angle_deg"])
+    basis = DesignBasis.model_construct(template=None, fields={"compare.angle_deg": wrong})
+    inp = SubjectsInput.model_validate(copy.deepcopy(case.input)).model_copy(update={"basis": basis})
+    with pytest.raises(ContractError) as caught:
+        footing_subjects(inp, input_meta(case.refs, KINDS), TraceBuilder())
+    assert caught.value.detail.code is ErrorCode.UNIT_MISMATCH
+    assert caught.value.detail.field == "basis"
+    assert caught.value.detail.expected == {"unit": "deg"}
+    assert caught.value.detail.received == "mm"
 
 
 def test_missing_basis_field_is_refused() -> None:
