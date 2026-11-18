@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0010 section 4.4.3, synthetic fixture",
   "method_ref": "\u00a74.4.3 L1 L2 L3 L4 L5",
   "synthetic": true,
-  "derivation": "Basis: db = 16 mm, bottom_layer = x_bottom, c = 50 mm, reaction_point = top_of_footing. 2c + db = 116. J1 (Lx = 316, Ly = 200, h = 300, s = 200): span_x = 200 - 116 = 84 (0 < span_x < s), ceil(84/200) = 1 -> n_x = 2, s_x = 84/1 = 84.0, As_x = 128*pi = 402.1238596594935; span_y = 316 - 116 = 200 (span_y == s), ceil(200/200) = 1 -> n_y = 2, s_y = 200/1 = 200.0, As_y = 128*pi = 402.1238596594935; d_x = 300 - 50 - 8 = 242.0, d_y = 300 - 50 - 24 = 226.0, d = 234.0. J2 (Lx = 517, Ly = 317, h = 300, s = 200): span_x = 317 - 116 = 201 (just above s), ceil(201/200) = 2 -> n_x = 3, s_x = 201/2 = 100.5, As_x = 192*pi = 603.1857894892403; span_y = 517 - 116 = 401 (just above 2*s), ceil(401/200) = 3 -> n_y = 4, s_y = 401/3 = 133.66666666666666, As_y = 256*pi = 804.247719318987.",
+  "derivation": "Basis: db = 16 mm, bottom_layer = x_bottom, c = 50 mm, reaction_point = top_of_footing. 2c + db = 116. J1 (Lx = 316, Ly = 200, h = 300, s = 200): span_x = 200 - 116 = 84 (0 < span_x < s), ceil(84/200) = 1 -> n_x = 2, s_x = 84/1 = 84.0, As_x = 2*pi*16^2/4 = 128*pi; span_y = 316 - 116 = 200 (span_y == s), ceil(200/200) = 1 -> n_y = 2, s_y = 200/1 = 200.0, As_y = 128*pi; d_x = 300 - 50 - 8 = 242.0, d_y = 300 - 50 - 24 = 226.0, d = 234.0. J2 (Lx = 517, Ly = 317, h = 300, s = 200): span_x = 317 - 116 = 201 (just above s), ceil(201/200) = 2 -> n_x = 3, s_x = 201/2 = 100.5, As_x = 3*64*pi = 192*pi; span_y = 517 - 116 = 401 (just above 2*s), ceil(401/200) = 3 -> n_y = 4, s_y = 401/3 = 133.66666666666666, As_y = 4*64*pi = 256*pi.",
   "input": {
     "dims": {
       "footings": [
@@ -115,8 +115,8 @@
         "n_y": 2,
         "s_x_mm": 84.0,
         "s_y_mm": 200.0,
-        "As_x_mm2": 402.1238596594935,
-        "As_y_mm2": 402.1238596594935,
+        "As_x_pi_coeff": 128,
+        "As_y_pi_coeff": 128,
         "d_x_mm": 242.0,
         "d_y_mm": 226.0,
         "d_mm": 234.0,
@@ -141,8 +141,8 @@
         "n_y": 4,
         "s_x_mm": 100.5,
         "s_y_mm": 133.66666666666666,
-        "As_x_mm2": 603.1857894892403,
-        "As_y_mm2": 804.247719318987,
+        "As_x_pi_coeff": 192,
+        "As_y_pi_coeff": 256,
         "d_x_mm": 242.0,
         "d_y_mm": 226.0,
         "d_mm": 234.0,

@@ -2,6 +2,7 @@
 
 import copy
 import math
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,12 @@ STEMS = [
 ]
 DIGEST = "ab" * 32
 _SRC = "engineer:synthetic@2026-01-01T00:00:00.000Z"
+# L2 binary64 roundoff bound: As = n * pi * db^2 / 4 = coeff * pi.
+# In IEEE 754 binary64 (unit roundoff u = 2^-53 = sys.float_info.epsilon / 2), math.pi approximates pi to within u,
+# and evaluating coeff * pi adds at most 3u more relative error across float operations (1u for single final float).
+# Bound 4u = 2 * sys.float_info.epsilon = 2^-51 covers both true value and any conforming binary64 evaluation order.
+_AREA_REL_TOL = 2.0 * sys.float_info.epsilon
+_AREA_KEYS = (("As_x_mm2", "As_x_pi_coeff"), ("As_y_mm2", "As_y_pi_coeff"))
 
 
 def _calc_meta(calc_id: str) -> dict[str, Any]:
@@ -102,6 +109,28 @@ def _basis(overrides: Mapping[str, Mapping[str, Any]] | None = None) -> dict[str
     return {"template": None, "fields": fields}
 
 
+def _row_mismatch(actual_row: Mapping[str, Any], expected_row: Mapping[str, Any]) -> dict[str, Any] | None:
+    area_out_keys = {out_k for out_k, _ in _AREA_KEYS}
+    coeff_keys = {coeff_k for _, coeff_k in _AREA_KEYS}
+    actual_rest = {k: v for k, v in actual_row.items() if k not in area_out_keys}
+    expected_rest = {k: v for k, v in expected_row.items() if k not in coeff_keys}
+    if actual_rest != expected_rest:
+        return {"actual": dict(actual_row), "expected": dict(expected_row)}
+    for out_key, coeff_key in _AREA_KEYS:
+        if out_key not in actual_row or coeff_key not in expected_row:
+            return {"actual": dict(actual_row), "expected": dict(expected_row)}
+        actual_area = actual_row[out_key]
+        coeff = expected_row[coeff_key]
+        if coeff == 0:
+            if actual_area != 0.0:
+                return {"field": out_key, "actual": actual_area, "expected": 0.0}
+        else:
+            ref_area = coeff * math.pi
+            if abs(actual_area - ref_area) > _AREA_REL_TOL * ref_area:
+                return {"field": out_key, "actual": actual_area, "expected_pi_coeff": coeff}
+    return None
+
+
 def test_golden_cases() -> None:
     """AC8 and plan T5: golden cases for both layers, both reaction points, exact multiple, below s, <= 0, and L3."""
     cases = load_cases("layout")
@@ -118,8 +147,15 @@ def test_golden_cases() -> None:
                 failures[stem] = (caught.value.detail.code.value, caught.value.detail.field)
         else:
             actual = _run(case)
-            if actual != case.expected:
+            actual_rows = actual.get("footings", [])
+            expected_rows = case.expected["footings"]
+            if set(actual) != set(case.expected) or len(actual_rows) != len(expected_rows):
                 failures[stem] = actual
+            elif row_diffs := [
+                diff for act_row, exp_row in zip(actual_rows, expected_rows, strict=True)
+                if (diff := _row_mismatch(act_row, exp_row)) is not None
+            ]:
+                failures[stem] = row_diffs
     assert failures == {}
 
 
@@ -225,7 +261,7 @@ def test_missing_basis_field_is_refused(missing: str) -> None:
 def test_zero_cover_is_accepted() -> None:
     case = load_cases("layout")["layout-span-below-and-multiple"]
     dims = copy.deepcopy(case.input["dims"])
-    # J1: Lx=316, Ly=200, h=300, s=200; with c=0, db=16 -> span_x = 184 (n_x=2, s_x=184), span_y = 300 (n_y=2, s_y=150)
+    # J1: Lx=316, Ly=200, h=300, s=200; with c=0, db=16 -> span_x = 184 (n_x=2, s_x=184), span_y = 300 (n_y=ceil(300/200)+1=3, s_y=150)
     dims["footings"] = [dims["footings"][0]]
     out = _run(case, dims=dims, basis=_basis({"durability.cover_footing_mm": {"value": 0.0}}))
     row = out["footings"][0]

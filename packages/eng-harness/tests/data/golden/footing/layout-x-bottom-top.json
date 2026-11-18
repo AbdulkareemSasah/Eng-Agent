@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0010 section 4.4.3, synthetic fixture",
   "method_ref": "\u00a74.4.3 L1 L2 L3 L4 L5",
   "synthetic": true,
-  "derivation": "Basis: db = 16 mm, bottom_layer = x_bottom, c = 75 mm, reaction_point = top_of_footing. J1 (Lx = 2166, Ly = 2566, h = 500, s = 200): 2c + db = 166; span_x = 2566 - 166 = 2400 (exact multiple 12*200), n_x = ceil(2400/200) + 1 = 13, s_x = 2400/12 = 200.0, As_x = 13*pi*16^2/4 = 832*pi = 2613.805087786708; span_y = 2166 - 166 = 2000 (exact multiple 10*200), n_y = 11, s_y = 2000/10 = 200.0, As_y = 704*pi = 2211.681228127214; x_bottom gives d_x = 500 - 75 - 8 = 417.0, d_y = 500 - 75 - 24 = 401.0, d = (417 + 401)/2 = 409.0; cover = end_cover = 75.0; top_of_footing gives reaction_height = 500.0. J2 (Lx = 1966, Ly = 1766, h = 400, s = 250, status LIMIT_REACHED): span_x = 1766 - 166 = 1600, 1600/250 = 6.4 -> n_x = ceil(6.4) + 1 = 8, s_x = 1600/7 = 228.57142857142858, As_x = 512*pi = 1608.495438637974; span_y = 1966 - 166 = 1800, 1800/250 = 7.2 -> n_y = 9, s_y = 1800/8 = 225.0, As_y = 576*pi = 1809.5573684677208; d_x = 400 - 75 - 8 = 317.0, d_y = 400 - 75 - 24 = 301.0, d = 309.0; reaction_height = 400.0; LIMIT_REACHED preserved.",
+  "derivation": "Basis: db = 16 mm, bottom_layer = x_bottom, c = 75 mm, reaction_point = top_of_footing. J1 (Lx = 2166, Ly = 2566, h = 500, s = 200): 2c + db = 166; span_x = 2566 - 166 = 2400 (exact multiple 12*200), n_x = ceil(2400/200) + 1 = 13, s_x = 2400/12 = 200.0, As_x = 13*pi*16^2/4 = 832*pi; span_y = 2166 - 166 = 2000 (exact multiple 10*200), n_y = 11, s_y = 2000/10 = 200.0, As_y = 11*pi*16^2/4 = 704*pi; x_bottom gives d_x = 500 - 75 - 8 = 417.0, d_y = 500 - 75 - 24 = 401.0, d = (417 + 401)/2 = 409.0; cover = end_cover = 75.0; top_of_footing gives reaction_height = 500.0. J2 (Lx = 1966, Ly = 1766, h = 400, s = 250, status LIMIT_REACHED): span_x = 1766 - 166 = 1600, 1600/250 = 6.4 -> n_x = ceil(6.4) + 1 = 8, s_x = 1600/7 = 228.57142857142858, As_x = 8*pi*16^2/4 = 512*pi; span_y = 1966 - 166 = 1800, 1800/250 = 7.2 -> n_y = 9, s_y = 1800/8 = 225.0, As_y = 9*pi*16^2/4 = 576*pi; d_x = 400 - 75 - 8 = 317.0, d_y = 400 - 75 - 24 = 301.0, d = 309.0; reaction_height = 400.0; LIMIT_REACHED preserved.",
   "input": {
     "dims": {
       "footings": [
@@ -115,8 +115,8 @@
         "n_y": 11,
         "s_x_mm": 200.0,
         "s_y_mm": 200.0,
-        "As_x_mm2": 2613.805087786708,
-        "As_y_mm2": 2211.681228127214,
+        "As_x_pi_coeff": 832,
+        "As_y_pi_coeff": 704,
         "d_x_mm": 417.0,
         "d_y_mm": 401.0,
         "d_mm": 409.0,
@@ -141,8 +141,8 @@
         "n_y": 9,
         "s_x_mm": 228.57142857142858,
         "s_y_mm": 225.0,
-        "As_x_mm2": 1608.495438637974,
-        "As_y_mm2": 1809.5573684677208,
+        "As_x_pi_coeff": 512,
+        "As_y_pi_coeff": 576,
         "d_x_mm": 317.0,
         "d_y_mm": 301.0,
         "d_mm": 309.0,
