@@ -1,0 +1,431 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.2, synthetic engineer inputs",
+  "method_ref": "\u00a74.4.2 P0-P6",
+  "synthetic": true,
+  "derivation": "P2: w = (500/1000)*24 + (1000/1000)*18 + 10 = 12 + 18 + 10 = 40 kPa; q_net = 200 - 40 = 160 kPa. P1/P3: use service FZ only, ignore the factored row and the moments. F1: max(576,400)/160 = 3.6 m2; 1.8^2 = 3.24 < 3.6 < 4 = 2.0^2, so 2000 mm. F2: 640/160 = 4 = 2.0^2, so 2000 mm exactly. F3: 64/160 = 0.4 m2; 0.6^2 = 0.36 < 0.4 < 0.64 = 0.8^2, but 800 < 900 mm, so round the minimum to 1000 mm. F4: 1600/160 = 10 m2; 3.0^2 = 9 < 10 < 10.24 = 3.2^2; 3200 > 2450 mm, so floor(2450/200)*200 = 12*200 = 2400 mm, LIMIT_REACHED, plan_at_max true. F5 and F7: a service row is zero and negative respectively, hence UPLIFT even with a positive envelope row at F5. F6: only a factored row, hence NO_SERVICE_LOAD. P6: ceil(900/200)*200 = 5*200 = 1000 mm. h = 500 mm and s = 200 mm are the basis values. P5 is the only bound flag set by these cases. Sizes are square, source calc, and successful rows have no reason.",
+  "input": {
+    "subjects": {
+      "subjects": [
+        {
+          "id": "F1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F2",
+          "joint": "J2",
+          "column": "C2",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F3",
+          "joint": "J3",
+          "column": "C3",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F4",
+          "joint": "J4",
+          "column": "C4",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F5",
+          "joint": "J5",
+          "column": "C5",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F6",
+          "joint": "J6",
+          "column": "C6",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        },
+        {
+          "id": "F7",
+          "joint": "J7",
+          "column": "C7",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        }
+      ],
+      "excluded": [],
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "reactions": {
+      "axes": "global",
+      "rows": [
+        {
+          "joint": "J1",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 576,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J1",
+          "case": {
+            "case": "S2",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 400,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J1",
+          "case": {
+            "case": "FACTORED",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 3000,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J2",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 640,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J3",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 64,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J4",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 1600,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J5",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": "Max"
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 640,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J5",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": "Min"
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 0,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J6",
+          "case": {
+            "case": "FACTORED",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 640,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        },
+        {
+          "joint": "J7",
+          "case": {
+            "case": "S2",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": -1,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        }
+      ]
+    },
+    "service_cases": [
+      "S1",
+      "S2"
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.allowable_bearing_pressure_kPa": {
+          "value": 200,
+          "unit": "kPa",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.allowable_bearing_kind": {
+          "value": "gross",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.soil_unit_weight_kN_m3": {
+          "value": 18,
+          "unit": "kN/m3",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.soil_depth_above_footing_mm": {
+          "value": 1000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.surcharge_kPa": {
+          "value": 10,
+          "unit": "kPa",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "materials.concrete_unit_weight_kN_m3": {
+          "value": 24,
+          "unit": "kN/m3",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_depth_mm": {
+          "value": 500,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_plan_dimension_mm": {
+          "value": 900,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_plan_dimension_mm": {
+          "value": 2450,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.plan_increment_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.plan_shape": {
+          "value": "square",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.max_spacing_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "subjects": "res_00000000000000000000000001",
+    "reactions": "res_00000000000000000000000002",
+    "service_cases": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "footings": [
+      {
+        "id": "F1",
+        "Lx_mm": 2000,
+        "Ly_mm": 2000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OK",
+        "reason": null
+      },
+      {
+        "id": "F2",
+        "Lx_mm": 2000,
+        "Ly_mm": 2000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OK",
+        "reason": null
+      },
+      {
+        "id": "F3",
+        "Lx_mm": 1000,
+        "Ly_mm": 1000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OK",
+        "reason": null
+      },
+      {
+        "id": "F4",
+        "Lx_mm": 2400,
+        "Ly_mm": 2400,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": true,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "LIMIT_REACHED",
+        "reason": null
+      },
+      {
+        "id": "F5",
+        "Lx_mm": 1000,
+        "Ly_mm": 1000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "NEEDS_ENGINEER",
+        "reason": "UPLIFT"
+      },
+      {
+        "id": "F6",
+        "Lx_mm": 1000,
+        "Ly_mm": 1000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "NEEDS_ENGINEER",
+        "reason": "NO_SERVICE_LOAD"
+      },
+      {
+        "id": "F7",
+        "Lx_mm": 1000,
+        "Ly_mm": 1000,
+        "h_mm": 500,
+        "s_mm": 200,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "NEEDS_ENGINEER",
+        "reason": "UPLIFT"
+      }
+    ]
+  }
+}
