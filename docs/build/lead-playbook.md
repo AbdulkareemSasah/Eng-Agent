@@ -377,3 +377,11 @@ lanes started with lane script version 3 (`<lead>/build-lane-v3.workflow.js`).
    the lead creates `<lead>/locks/pause.lane`. Every writer, reviewer, verifier and gate runner of lane script
    version 3.4 checks it first and returns BLOCKED with "PAUSED by the lead" at once, so that no lane starts new work;
    integrators already running finish their sequence. The lead removes the file when the owner says to continue.
+
+## 9. Cost and speed measures (owner decision of 2026-11-18, «طبق الاقتراحات»)
+1. Reviewer model: Sonnet by default. Opus only for engineering calcs and checks (with the Opus verifiers) and the core wiring tasks (S.T19a, W.T8 to W.T9c, I.T16b, I.T18a, I.T18b).
+2. One review round: reviewers return CHANGES only for findings that must be fixed before merge; minor points go to lead findings. Round cap 2 (engineering 3). Lane script v3.6.
+3. Writer effort medium, high only for the core tasks.
+4. No documents audits or walk-throughs before the first live run.
+5. No per-task mutation run in the lane (Gate phase only when a task sets mutation: true); the periodic full mutation every ten merges stays.
+6. Collateral edits (ADR-0036): a test file or the package CHANGELOG.md outside a task's files may be edited and listed under "Collateral edits"; gate GC008 becomes a notice for them B-566 merged #426 (2026-11-18): start every new lane with collateral: true. max_sessions is an estimate: never a stop.

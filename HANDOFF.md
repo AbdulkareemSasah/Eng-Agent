@@ -10,7 +10,7 @@ owner's request. Read this file, then [BUILD-STATUS.md](BUILD-STATUS.md), then `
 - Remaining work, machine-readable: [ops/remaining-tasks.json](ops/remaining-tasks.json) (one entry per unmerged work item).
 - Local CI (the definition of done while GitHub Actions is unavailable, D-23): [ops/localci.py](ops/localci.py), described in [ops/README.md](ops/README.md).
 
-**Latest checkpoint: [docs/build/HANDOFF.md](docs/build/HANDOFF.md) (integration update of 2026-11-17, 230 of 354 plan tasks; 183 registry entries). Read its first section first; it supersedes sections 1, 3 and 4 below.**
+**Latest checkpoint: [docs/build/HANDOFF.md](docs/build/HANDOFF.md) (hand-over of 2026-11-18, 238 of 355 plan tasks). Read its first section first; it supersedes sections 1, 3 and 4 below.**
 
 ## 0. Resume prompt for a cloud agent (2026-11-11, second pause)
 

@@ -1,9 +1,3 @@
-# Current pause checkpoint of 2026-11-18
-
-The owner paused the build. Use the [current resume checklist](PAUSE-2026-11-18.md) and [authoritative handoff](../HANDOFF.md) for the next session. The records below preserve earlier lane history.
-
----
-
 # Resume note: all lanes stopped by the owner at 20:38 UTC, 2026-11-12 (he needs the usage allowance)
 
 Owner instruction: launch no new workflow and resume nothing until he says to continue.
@@ -143,7 +137,7 @@ in a second run. Still held: adr-accept, tasklog-docs, amendments-zt5-gt2.
 - State checkpoint pushed as b8d4f99 on 2026-11-16 03:08 UTC.
 - OWNER DECISIONS of 2026-11-16 (his words: «نعم موافق على الثلاثة، طبّق وكمل»): (1) spec 0007 Q19 option (a); (2) the protected gate change W.T15 approved; (3) batch merge approved.
 - gate-t15 (lane script version 3.1): run `wf_6731de83-ac5`, B-524 (W.T15, gate member eng-dev-gate). owner-q19 (version 3.1, documents, Opus writer and reviewer): run `wf_d78d9a30-706`, B-538. A first combined lane `wf_114e97fc-fb1` was stopped by the lead seconds after its start (two tasks must not wait for each other).
-- local-ci-batch: run `wf_59599f59-a6f` (script <session-dir>/workflows/scripts/local-ci-batch-wf_59599f59-a6f.js; work item B-539): Opus writer changes ops/localci.py in worktree wt/b539 (branch chore/b539-local-ci-batch), adversarial review, isolated dry runs with LOCALCI_HOME under <lead>/dryrun/. Nothing is pushed by it. WHEN IT RETURNS READY_FOR_THE_LEAD: the lead reads the diff, pushes the commits to build/v1 right after a merge (watcher), updates the reference checkout, then switches the integration script to batch mode (create <lead>/BATCH_MODE; integrate.sh take_lock and have_lock return at once when that file exists: TO BE WRITTEN by the lead before switching) and tells new integrators to retry a merge call that fails because the base moved.
+- local-ci-batch: run `wf_59599f59-a6f` (script <session-dir> work item B-539): Opus writer changes ops/localci.py in worktree wt/b539 (branch chore/b539-local-ci-batch), adversarial review, isolated dry runs with LOCALCI_HOME under <lead>/dryrun/. Nothing is pushed by it. WHEN IT RETURNS READY_FOR_THE_LEAD: the lead reads the diff, pushes the commits to build/v1 right after a merge (watcher), updates the reference checkout, then switches the integration script to batch mode (create <lead>/BATCH_MODE; integrate.sh take_lock and have_lock return at once when that file exists: TO BE WRITTEN by the lead before switching) and tells new integrators to retry a merge call that fails because the base moved.
 - editcycle-8 `wf_2c765302-d8c` finished (B-200 merged #383).
 - tail-174 `wf_a64d5645-1d1`, tail-204 `wf_a9bcc582-719`, tail-229 `wf_43624b59-6bd` (tail script): integrate B-174, B-204, B-229 after the lead's script fault. decisions-2, editcycle-9 and providers-1 finished BLOCKED at integration for that reason. After B-204 merges: launch B-534 (W.T10b) on lane script version 3.2 (args as in the editcycle-9 call of the transcript).
 - tail-519 `wf_a50c3e5d-b34` (tail script): B-519 repair of the body risk line after B-537 merged (#384), then integration (pull request 381). Holds on b519 and b532 removed. tail-174 finished: B-174 merged #385.
@@ -195,3 +189,23 @@ in a second run. Still held: adr-accept, tasklog-docs, amendments-zt5-gt2.
 - 2026-11-17 08:15 UTC: B-546 merged (#406). Launched servers-6 wf_044c2b2e-a70 (B-550 S.T23, then B-138 S.T19a with needs B-550; Opus reviewers; risk r1, r2, r3) and engine-t23 wf_4bd7f62e-dad (B-551 E.T23, Opus reviewer). Still running: gaps3-model-2 wf_acb650a8-51e (B-544), small-fixes-1 wf_2fa461b8-afd (B-549, B-547). Next after B-547: W.T17 (plan 0007 T17, engineering, needs adversarial verification). W.T8 waits for E.T23 (B-551) and S.T19a (B-138).
 - 08:50 owner decision: line limit removed; workflow wf_2646d880-f07 (B-552, B-553, B-554, hub ADR). servers-6 ended: B-550 NEEDS_PLAN_AMENDMENT (77/60 + collateral test), B-138 skipped. Resume both after B-553 and B-554 merge, with v3.5.
 - build-lane-v35.workflow.js ready (no budget stops); use it only after B-553 merges.
+- 09:35 hand-over checkpoint pushed to build/v1 as 7a4cbc3 (owner: no new workflows; let the running ones finish; a new lead on another machine continues). Running: gaps3-model-2 (B-544), small-fixes-1 (B-547), engine-t23 (B-551), remove-line-limit (hub review, B-552, B-553, B-554). Push a short update of docs/build/HANDOFF.md section B when they finish.
+- B-551 NEEDS_PLAN_AMENDMENT (collateral test test_ctx_basis.py:120), head 2361039; recorded in hand-over.
+- B-544 merged #408; registry B-556..B-559 pushed.
+- line-limit workflow done: hub 83264cc+49f43e0 (ADR-0035), B-552 pushed 48420c1 (needs review/PR), B-553 not started, B-554 merged #409. Hand-over updated.
+- B-547 merged #410; all lanes finished; hand-over final at 2a2171e.
+
+## 2026-11-18 04:10 UTC: this session resumes as the only lead
+- The second lead paused at the owner's request (checkpoint 48bf09a: 233 of 354; B-556 #417 and B-562 #418 merged). The owner told this session «شيك الحين وكمل».
+- The lead tooling was refreshed from the tracked copies (v3.5 lane script, integrate.sh, playbook, findings, priority).
+- Lanes: servers-7 wf_a59e4019-095 (B-563, then B-138 writer session 4 of 4, Opus writer and reviewer); editcycle-calcs-1 wf_258268b6-d0e (B-555, then B-557, engineering); templates-b164 wf_c106f3da-998 (B-164 rebuild on the -r2 branch).
+- Next periodic mutation: after five more PR merges, base d9c19fb.
+- B-164 merged #421 (rebuild); PR 323 closed with a pointer to #421.
+- interface-7 wf_8d41a436-e8d launched: B-559, B-188, B-528, B-353, B-190, B-189, B-430 (needs chain; Opus reviewers). Args: resume/interface-7.args.json.
+- editcycle-calcs-1 done: B-555 #420 merged; B-557 stopped (file list). editcycle-calcs-2 wf_5edd5142-be9: B-564 docs then B-557.
+- 2026-11-18: owner said «لا تعدل شي» to the cost proposals (Sonnet reviewers, single review round, collateral test edits, max_sessions informational, no per-task mutation). Nothing changed; process stays as v3.5.
+- 2026-11-18: owner approved the cost and speed proposals («طبق الاقتراحات»). Lane script v3.6 (Sonnet reviewers by default, one blocking-only review round, no per-task mutation, collateral flag). Hub ADR-0036 pushed (d777ffe, 69e4f49). Lane gate-collateral wf_4669f451-988: B-565 docs then B-566 gate GC008 notice. After B-566 merges, start lanes with collateral: true.
+- 2026-11-18 06:09 UTC: container restart. Stopped: servers-7, interface-7, editcycle-calcs-2, gate-collateral. Merged before it: B-563 #419, B-564 #422. Local CI run pr423 (B-565) was interrupted (dead pid; localci restarts it). Resumed all four with resumeFromRunId and their original arguments (make-resume.py now replaces every `args.`): servers-7 wf_a59e4019-095, interface-7 wf_8d41a436-e8d, editcycle-calcs-2 wf_5edd5142-be9, gate-collateral wf_4669f451-988. ci-priority helper restarted.
+- editcycle-calcs-2 done: B-557 #424 merged. W.T8 now waits only for B-138.
+- gate-collateral done: B-565 #423, B-566 #426 merged. collateral: true for new lanes.
+- 07:40 owner: let current tasks finish, start nothing new (tokens). pause.lane created; B-138 and B-188 were at the gate step (integrators carry no pause rule, so they finish; next writers return PAUSED).
