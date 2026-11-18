@@ -3,10 +3,13 @@
 Every recording runs through the adapter (parse, map, envelope, kinds, the model-state read) and the synthetic fake
 answers the recorded requests with the same reply shape and error codes (fake fidelity, process/05 section 4).
 The recordings are the folders under `acceptance/recordings/` that hold a manifest (the owner commits them, spec
-section 4.8.1), and one recording of the synthetic fake itself, made here through record mode. That one keeps both
-checks, and record mode with them, running until the owner has committed the first real recording, instead of
-skipping them. A real recording whose reply field names differ from what the mappers read fails here, which is where
-the field names that local-testing item 5c lists get pinned (OQ-G10).
+section 4.8.1), and one recording of the synthetic fake itself, made here through record mode. That one keeps the
+code of both checks and of record mode exercised, but it is true by construction (the synthetic fake replays its own
+replies), so it is NOT evidence for AC34: until the owner has committed the first real recording these tests have
+only the `synthetic` case and no real reply has been checked. The tests cannot skip with a reason in that state (spec
+0002 AC34 asks for it): a skip fails the ratchet (RT001 to RT003) and the test-first check (TF005, none skipped).
+A real recording whose reply field names differ from what the mappers read fails here, which is where the field names
+that local-testing item 5c lists get pinned (OQ-G10).
 """
 
 import hashlib
