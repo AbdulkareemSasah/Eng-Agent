@@ -1,10 +1,12 @@
-"""Configuration discovery and sections (spec 0006 AC4, section 4.2.4)."""
+"""Configuration discovery and sections (spec 0006 AC4, AC70, section 4.2.4)."""
 
+import io
+from argparse import Namespace
 from pathlib import Path
 
 import pytest
 
-from eng_harness.cli import ConfigError, HarnessConfig
+from eng_harness.cli import CliDeps, ConfigError, HarnessConfig, main
 from eng_harness.cli._config import load_config, resolve_config_path
 
 
@@ -75,3 +77,62 @@ def test_missing_explicit_file_is_an_error(tmp_path: Path) -> None:
         resolve_config_path(tmp_path / "none.toml", {}, None)
     with pytest.raises(ConfigError):
         resolve_config_path(None, {"ENG_HARNESS_CONFIG": str(tmp_path / "none.toml")}, None)
+
+
+def test_default_workspace_and_option_reach_lookup(tmp_path: Path) -> None:
+    # 1. Default workspace `%LOCALAPPDATA%/eng/workspaces/default` is resolved for config lookup; BOM is accepted.
+    local = tmp_path / "local"
+    default_ws = local / "eng" / "workspaces" / "default"
+    default_ws.mkdir(parents=True)
+    (default_ws / "harness.toml").write_text("[page]\nmax_body_bytes = 4096\n", encoding="utf-8-sig")
+
+    seen: list[tuple[HarnessConfig, Path | None, dict[str, str]]] = []
+
+    def handler(args: Namespace, deps: CliDeps) -> int:
+        seen.append((args.config_data, args.config_path, dict(deps.environ)))
+        return 0
+
+    env_default = {"LOCALAPPDATA": str(local)}
+    assert (
+        main(
+            ["status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ=env_default, handlers={"status": handler}),
+        )
+        == 0
+    )
+    assert seen[-1][0].page.max_body_bytes == 4096
+    assert seen[-1][1] == default_ws / "harness.toml"
+    assert seen[-1][2] == env_default
+
+    # 2. `--workspace DIR` overrides `ENG_WORKSPACE` for lookup and is passed on in `deps.environ`.
+    explicit_ws = tmp_path / "explicit"
+    explicit_ws.mkdir()
+    (explicit_ws / "harness.toml").write_text("[page]\nmax_body_bytes = 8192\n", encoding="utf-8-sig")
+    other_ws = tmp_path / "other"
+    caller_env = {"LOCALAPPDATA": str(local), "ENG_WORKSPACE": str(other_ws)}
+    assert (
+        main(
+            ["--workspace", str(explicit_ws), "status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ=caller_env, handlers={"status": handler}),
+        )
+        == 0
+    )
+    assert seen[-1][0].page.max_body_bytes == 8192
+    assert seen[-1][1] == explicit_ws / "harness.toml"
+    assert seen[-1][2]["ENG_WORKSPACE"] == str(explicit_ws)
+    assert caller_env["ENG_WORKSPACE"] == str(other_ws)  # caller's mapping is never mutated
+
+    # 3. With no workspace configured, `main` still calls the handler with default config and `config_path=None`.
+    assert (
+        main(
+            ["status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ={}, handlers={"status": handler}),
+        )
+        == 0
+    )
+    no_ws_cfg, no_ws_path, _ = seen[-1]
+    assert no_ws_cfg == HarnessConfig()
+    assert no_ws_path is None
+
+    # 4. `load_config` directly accepts a UTF-8 byte-order mark.
+    assert load_config(default_ws / "harness.toml").page.max_body_bytes == 4096

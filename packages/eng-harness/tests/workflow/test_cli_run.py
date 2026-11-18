@@ -308,3 +308,75 @@ def test_port_builder_gap_exits_2(tmp_path: Path) -> None:
     assert paused.main("resume", run_id, "--no-report") == ExitCode.USAGE
     assert f"eng-harness: {message}\n" in paused.err.getvalue()
     assert _events(paused, run_id) == before  # nothing was journaled
+
+
+def test_run_header_records_decision_runtime(tmp_path: Path) -> None:
+    """AC63: `run_started.decision_runtime` and `run_resumed.decision_runtime` track the assembled summary."""
+    from eng_harness.providers import assemble_decision_runtime
+
+    def write_cfg(rig: Rig, version: str) -> None:
+        rig.workspace.mkdir(parents=True, exist_ok=True)
+        (rig.workspace / "harness.toml").write_text(
+            "[providers.decision]\n"
+            'base_url = "https://endpoint-host.example.test/v1"\n'
+            'model = "m"\n'
+            f'model_version = "{version}"\n'
+            'key_ref = "ref-secret-name"\n'
+            "request_timeout_ms = 1500\n"
+            '[decisions.shadow_released.pick_action]\npoint_version = 1\nbasis = "owner"\nrecord = "owner-rec"\n',
+            encoding="utf-8",
+        )
+
+    rig = Rig(tmp_path, script=approves(wait=False))
+    write_cfg(rig, "v1")
+    assert (
+        rig.main(
+            "run",
+            WORKFLOW,
+            "--no-wait",
+            "--no-report",
+            "--progress",
+            "off",
+            decision_assembler=assemble_decision_runtime,
+        )
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [run_id] = rig.run_ids()
+    reader = JournalReader(rig.runs / run_id)
+    try:
+        header = reader.header()
+    finally:
+        reader.close()
+    assert header.decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v1", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    write_cfg(rig, "v2")
+    rig.script = approves(wait=True)
+    rig.open_with = approving_opener(rig)
+    assert rig.main("resume", run_id, "--no-report", "--progress", "off") == ExitCode.OK
+    resumes = [e.payload for e in _events(rig, run_id) if isinstance(e.payload, ev.RunResumed)]
+    assert len(resumes) == 1
+    assert resumes[0].decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v2", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    all_bytes = b"".join(p.read_bytes() for p in (rig.runs / run_id).rglob("*") if p.is_file())
+    streams = (rig.out.getvalue() + rig.err.getvalue()).encode("utf-8")
+    for secret in (b"endpoint-host", b"ref-secret-name", b"base_url", b"key_ref"):
+        assert secret not in all_bytes
+        assert secret not in streams
