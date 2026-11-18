@@ -71,6 +71,7 @@ EXPECTED = BuildExpectation(
     also_tested_commits=(OTHER_COMMIT,),
     tool_fingerprint=tool_list_fingerprint(SCHEMAS),
     tool_names=frozenset(SCHEMAS),
+    product="ETABS",
 )
 
 
@@ -89,7 +90,7 @@ def _tools_with(**extra: Any) -> dict[str, Any]:
 
 
 def test_matching_build_is_ok() -> None:
-    check = check_build("csi", PIN, EXPECTED, _observed(), COMMIT)
+    check = check_build("csi", PIN, EXPECTED, _observed(), COMMIT, product="ETABS")
     assert check.ok is True
     assert check.reason is None
     assert check.server == "csi"
@@ -99,11 +100,11 @@ def test_matching_build_is_ok() -> None:
 
 
 def test_other_tested_commit_satisfies_the_minimum() -> None:
-    assert check_build("csi", PIN, EXPECTED, _observed(), OTHER_COMMIT).ok is True
+    assert check_build("csi", PIN, EXPECTED, _observed(), OTHER_COMMIT, product="ETABS").ok is True
 
 
 def test_no_minimum_is_not_checked() -> None:
-    assert check_build("csi", PIN, EXPECTED, _observed()).ok is True
+    assert check_build("csi", PIN, EXPECTED, _observed(), product="ETABS").ok is True
 
 
 @pytest.mark.parametrize(
@@ -153,7 +154,7 @@ def test_each_mismatch(what: str, keyword: str) -> None:
             observed = _observed(status={"read_only": False, "script_enabled": True})
         case "script_unreported":
             observed = _observed(status={"read_only": False})
-    check = check_build("csi", pin, EXPECTED, observed, minimum)
+    check = check_build("csi", pin, EXPECTED, observed, minimum, product="ETABS")
     assert check.ok is False
     assert check.reason is not None
     assert keyword in check.reason.lower()
@@ -161,7 +162,7 @@ def test_each_mismatch(what: str, keyword: str) -> None:
 
 def test_db_tables_apply_is_tolerated_when_listed() -> None:
     observed = _observed(tools=_tools_with(csi_db_tables_apply={"type": "object"}))
-    assert check_build("csi", PIN, EXPECTED, observed, COMMIT).ok is True
+    assert check_build("csi", PIN, EXPECTED, observed, COMMIT, product="ETABS").ok is True
 
 
 def test_fingerprint_per_product() -> None:

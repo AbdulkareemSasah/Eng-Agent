@@ -25,6 +25,7 @@ max_restarts_per_run = 2
 shutdown_grace_s = 7
 build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}", server_info_version = "1.2" }}
 host_key = "csi"
+product = "ETABS"
 mcp_mode = "legacy"
 audit_log = false
 
@@ -65,6 +66,7 @@ args = [{extra_args}]
 client_grace_s = 5
 build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}" }}
 host_key = "csi"
+product = "ETABS"
 {extra}
 [servers.csi.roles.main]
 classes = ["call"]

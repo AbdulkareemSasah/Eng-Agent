@@ -24,8 +24,9 @@ class BuildExpectation:
 
     sasaah_commit: str
     also_tested_commits: tuple[str, ...]
-    tool_fingerprint: str
-    tool_names: frozenset[str]  # every allowlisted tool, whatever its route
+    tool_fingerprint: str  # over the tools that list `product` (spec 0008 4.1)
+    tool_names: frozenset[str]  # every allowlisted tool of `product`, whatever its route
+    product: str  # the product the allowlist was loaded for
 
 
 @dataclass(frozen=True)
@@ -56,11 +57,14 @@ def tool_list_fingerprint(schemas: Mapping[str, Any]) -> str:
     return payload_sha256([{"name": n, "input_schema": _strip(schemas[n])} for n in sorted(schemas)])
 
 
-def check_build(server: str, pin: BuildPin, want: BuildExpectation, seen: Observed, minimum: str = "") -> ServerCheck:
+def check_build(
+    server: str, pin: BuildPin, want: BuildExpectation, seen: Observed, minimum: str = "", *, product: str
+) -> ServerCheck:
     """Compare a started server with the build its adapter was tested with (spec 4.3.4 items 1 to 5).
 
-    `minimum` is the workflow's minimum Sasaah commit ("" for none), met by the allowlist's or a tested commit. The
-    result is `ok`, or not `ok` with the first reason.
+    `minimum` is the workflow's minimum Sasaah commit ("" for none), met by the allowlist's or a tested commit.
+    `product` is the server's product: the expectation must have been loaded for it (a SAFE server is never checked
+    against the ETABS fingerprint). The result is `ok`, or not `ok` with the first reason.
     """
     fingerprint = tool_list_fingerprint({n: s for n, s in seen.tools.items() if n in want.tool_names})
     version = seen.server_info.version if seen.server_info else None
@@ -69,6 +73,7 @@ def check_build(server: str, pin: BuildPin, want: BuildExpectation, seen: Observ
     tested = (want.sasaah_commit, *want.also_tested_commits)
     flags = [f for f in ("read_only", "script_enabled") if seen.status.get(f) is not False]
     failures = [
+        (want.product != product, f"the allowlist is for {want.product}, the server's product is {product}"),
         (seen.exe_sha256 != pin.exe_sha256, "executable SHA-256 differs from the pinned build"),
         (pin.server_info_version not in (None, version), "serverInfo version is not the pinned one"),
         (pin.sasaah_commit != want.sasaah_commit, "the pinned Sasaah commit is not the allowlist's commit"),
