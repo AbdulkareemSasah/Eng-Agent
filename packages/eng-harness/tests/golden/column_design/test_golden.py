@@ -1,6 +1,7 @@
 """Golden cases of the column-workflow calcs (plan 0013 T2; spec 0013 AC4): one test per file of the data folder."""
 
 import copy
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -102,6 +103,9 @@ def test_trace_records_inputs_and_counts() -> None:
     trace = TraceBuilder()
     _select(trace=trace)
     built = trace.build(REGISTRY["harness.column_select"], "ab" * 32)
+    assert [(c.name, c.cited.value, c.cited.unit, c.cited.source) for c in built.constants] == [
+        ("radix", 2, "1", "IEEE 754 binary64 radix for even-power-of-two scaling before sqrt")
+    ]
     refs = load_case(FILES[SELECT]).refs
     inputs = {i.name: (i.value, i.unit, i.ref) for i in built.inputs}
     assert inputs == {
@@ -201,6 +205,46 @@ def test_extreme_representable_lengths_do_not_overflow_or_underflow(dz: float) -
     body = _select(BOUNDARY, scope=_scope(frames=["C_ext"]), frames={"frames": frames})
     assert body["status"] == "PASS"
     assert body["columns"][0]["length_mm"] == dz
+
+
+def test_maximum_finite_length_succeeds() -> None:
+    max_dz = sys.float_info.max
+    frames = [
+        {
+            "id": "C_max",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": max_dz},
+            "story": "L1",
+            "rotation_deg": 0,
+        }
+    ]
+    body = _select(BOUNDARY, scope=_scope(frames=["C_max"]), frames={"frames": frames})
+    assert body["status"] == "PASS"
+    assert body["columns"][0]["length_mm"] == max_dz
+
+
+def test_near_overflow_unrepresentable_length_is_refused_on_frames() -> None:
+    # A vertical frame from zi = -5 * 2^968 to zj = 2^1024 - 2^971 has exact length 2^1024 - 3 * 2^968 mm,
+    # which exceeds the maximum finite binary64 value (and the round-to-nearest overflow midpoint).
+    zi = float(-5 * (2**968))
+    zj = sys.float_info.max
+    frames = [
+        {
+            "id": "C_over_midpoint",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": zi},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": zj},
+            "story": "L1",
+            "rotation_deg": 0,
+        }
+    ]
+    with pytest.raises(ContractError) as caught:
+        _select(BOUNDARY, scope=_scope(frames=["C_over_midpoint"]), frames={"frames": frames})
+    detail = caught.value.detail
+    assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, "frames")
 
 
 def test_unrepresentable_length_is_refused_on_frames() -> None:
