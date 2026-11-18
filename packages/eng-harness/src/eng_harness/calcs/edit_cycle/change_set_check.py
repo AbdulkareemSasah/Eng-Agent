@@ -40,12 +40,6 @@ BOUNDS: tuple[tuple[str, str, str], ...] = (
     ("dimensionless", "bounds.ratio_min_ratio", "bounds.ratio_max_ratio"),
 )
 """Spec 0007 4.8 and K4: the quantity kind of a value and the basis paths of its lower and upper bound."""
-_NUMBER = {
-    quantity: f"value{kind.suffix}"
-    for quantity, low, _ in BOUNDS
-    if (kind := kind_for_field(low.rpartition(".")[2])) is not None
-}
-"""The key under which an input value holds its number in the canonical unit of its quantity kind (spec 0007 4.3.1)."""
 BASIS_FIELDS = tuple(path for _, low, high in BOUNDS for path in (low, high))
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
 ANSWER_FIELD = "fields/change_set/value"
@@ -74,6 +68,15 @@ Bounds = dict[str, tuple[Fraction, Fraction, str]]
 
 def _is_page_token(text: str) -> bool:
     return 0 < len(text) <= 57 and all(char in _ID_CHARS for char in text)  # K3: 64 less the 7 of the prefix
+
+
+def _number_key(quantity: str) -> str:
+    """The key under which an input value of this quantity kind holds its canonical number (spec 0007 4.3.1)."""
+    return next(
+        f"value{kind.suffix}"
+        for name, low, _ in BOUNDS
+        if name == quantity and (kind := kind_for_field(low.rpartition(".")[2])) is not None
+    )
 
 
 def _ref(kind: str, default: Any = ...) -> Any:
@@ -202,7 +205,7 @@ class _Check:
         else:
             shown, ref = (
                 f"{value.value} {value.unit}",
-                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}/{_NUMBER[quantity]}",
+                f"{self.refs['change_set']}#/{ANSWER_FIELD}/items/{index}/{field}/{_number_key(quantity)}",
             )
             exact = Fraction(value.value) * unit(value.unit).factor / unit(canonical).factor  # no offset, no pi
         if exact is not None and not low <= exact <= high:
