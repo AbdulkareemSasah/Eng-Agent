@@ -416,3 +416,18 @@ def test_product_with_routes() -> None:
     etabs = load_allowlist(text, "test.toml", route="native", product="ETABS")
     assert [tool.name for tool in etabs.tools] == ["read_native"]
     assert etabs.tool_names == frozenset({"read_native", "read_rest", "etabs_rest"})
+
+
+def test_attended_class_and_deny_names() -> None:
+    tool = _load(_tool(timeout_class="attended", confirm="host_dialog")).tools[0]
+    assert (tool.timeout_class, tool.confirm) == ("attended", "host_dialog")
+    names = (
+        "send_code_to_revit", "compile_and_run", "dev_hot_run", "dev_hot_unload", "dev_hot_sessions",
+        "run_baked_tool", "list_baked_tools", "list_bake_suggestions", "accept_bake_suggestion",
+        "dismiss_bake_suggestion", "batch_execute", "run_synapse_command", "shutdown_bridge", "authenticate",
+        "prepare_destructive", "switch_target", "get_change_records", "record_change",
+    )
+    for name in names:
+        for prefix in ("", "revit_"):
+            with pytest.raises(AllowlistError, match=prefix + name):
+                _load(_tool(name=prefix + name))

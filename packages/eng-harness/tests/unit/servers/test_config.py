@@ -324,3 +324,53 @@ def test_product_and_host_key_rules(tmp_path: Path, text: str, key: str) -> None
     with pytest.raises(ConfigError) as error:
         load_servers_config(_write(tmp_path, text))
     assert error.value.key == key
+
+
+def _revit() -> str:
+    return f"""
+[servers.revit]
+adapter = "sasaah-revit-mcp"
+command = "/opt/revit/server"
+pipe_name = "bridge"
+product = "Revit"
+client_grace_s = 5
+host_key = "revit"
+build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{SHA}", addin_sha256 = ["{SHA}"], addin_paths = ["/opt/revit/addin.dll"] }}
+[servers.revit.roles.read]
+classes = ["session", "call"]
+call_timeout_s = 10
+[servers.revit.roles.write]
+classes = ["attended"]
+call_timeout_s = 90
+"""
+
+
+def test_revit_server_section(tmp_path: Path) -> None:
+    server = load_servers_config(_write(tmp_path, _revit())).servers["revit"]
+    assert server.pipe_name == "bridge"
+    assert server.build.addin_paths == ("/opt/revit/addin.dll",)
+    assert server.build.addin_sha256 == (SHA,)
+    assert server.roles["write"].classes == ("attended",)
+    for before, after in (
+        ('pipe_name = "bridge"', ""),
+        ('addin_paths = ["/opt/revit/addin.dll"]', 'addin_paths = ["relative"]'),
+        ('addin_sha256 = ["' + SHA + '"]', 'addin_sha256 = []'),
+        ('classes = ["attended"]', 'classes = ["call"]'),
+        ('call_timeout_s = 90', ""),
+    ):
+        with pytest.raises(ConfigError):
+            load_servers_config(_write(tmp_path, _revit().replace(before, after)))
+
+
+def test_revit_forbidden_options(tmp_path: Path) -> None:
+    load_servers_config(_write(tmp_path, _revit()))
+    for extra in (
+        'args = ["--enable-send-code"]',
+        'args = ["--enable-adaptive-bake"]',
+        'args = ["--cache-send-code-bodies"]',
+        'args = ["--toolsets=all"]',
+        'args = ["--read-only"]',
+        'env = { SASAAH_MCP_TEST = "1" }',
+    ):
+        with pytest.raises(ConfigError):
+            load_servers_config(_write(tmp_path, _revit().replace('host_key = "revit"', 'host_key = "revit"\n' + extra)))
