@@ -477,7 +477,7 @@
         "values": [
           {
             "pointer": "/self_weight_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/6/self_weight",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/6/self_weight/value_ratio",
             "unit": "1"
           }
         ]

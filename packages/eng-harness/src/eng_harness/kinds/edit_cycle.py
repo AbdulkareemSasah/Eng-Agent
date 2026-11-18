@@ -7,12 +7,14 @@ Units: drift ratios are dimensionless; resolved values name their unit.
 Errors: `pydantic.ValidationError` for every violated rule.
 """
 
+import math
 from collections.abc import Iterable
 from typing import Annotated, Any, Literal, Self
 
 from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.refs import RefString
 from eng_contract.trace import Trace
+from eng_contract.units import QUANTITY_KINDS, UNITS, convert
 from eng_contract.verdicts import Verdict, VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
 
@@ -27,6 +29,7 @@ __all__ = [
     "CsiNameLists",
     "HostDesignVerdicts",
     "Label",
+    "canonical_number",
 ]
 
 NONEMPTY = 1
@@ -40,6 +43,21 @@ _Str = Label
 _Ptr = Annotated[str, StringConstraints(pattern=r"^(/([^~/]|~[01])*)*$")]
 _Count = Annotated[int, Field(ge=0)]
 _Code = Annotated[str, StringConstraints(pattern=r"^[A-Z][A-Z_]*$")]
+
+
+def canonical_number(number: Any, symbol: Any, quantity: str) -> float | None:
+    """The literal `number` in unit `symbol` converted to the canonical unit of `quantity` (spec 0007 4.3.1).
+
+    Conversion is `eng_contract.units.convert`, never by hand. None when the literal is not a finite number (a boolean
+    is not one) with a known unit of the dimension of `quantity`: the field validators of the caller name that fault.
+    """
+    kind = QUANTITY_KINDS[quantity]
+    known = UNITS.get(symbol) if isinstance(symbol, str) else None
+    if isinstance(number, bool) or not isinstance(number, int | float) or not math.isfinite(number):
+        return None
+    if known is None or known.dimension != kind.dimension:
+        return None
+    return convert(number, str(symbol), kind.canonical_unit)
 
 
 class _P(BaseModel):

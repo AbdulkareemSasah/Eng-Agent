@@ -442,7 +442,7 @@
         "values": [
           {
             "pointer": "/items/0/scale_ratio",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/items/0/scale",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/items/0/scale/value_ratio",
             "unit": "1"
           }
         ]
@@ -464,7 +464,7 @@
         "values": [
           {
             "pointer": "/w_kN_m",
-            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/w",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/4/w/value_kN_m",
             "unit": "kN/m"
           }
         ]
