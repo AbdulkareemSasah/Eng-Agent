@@ -184,6 +184,7 @@ def build_ports(
         wrote=host.wrote,
         revisions=_RunRevisions(run_dir / "copies", run_dir / "adapter/revisions.json"),
         reopened=host.reopened,
+        saved=host.tool_saved,
         opener=host.open_original,
         record_pre_image=True,
         open_model_bound=host.open_model_bound,
