@@ -181,7 +181,7 @@ def _edit(name: str, args: dict[str, Any], units: str) -> bool:
         _find("points", a["name"])
         table = "Joint Loads Assignments - Force"
         keys = ("UniqueName", "LoadPattern")
-        old = next(
+        old: dict[str, Any] = next(
             (
                 r
                 for r in STATE.model["tables"].get(table, [])
@@ -189,9 +189,10 @@ def _edit(name: str, args: dict[str, Any], units: str) -> bool:
             ),
             {},
         )
-        row = {k: old[k] for k in ("XDim", "YDim") if k in old}
+        row: dict[str, Any] = {k: old[k] for k in ("XDim", "YDim") if k in old}
         row.update(UniqueName=a["name"], LoadPattern=a["load_pattern"])
-        row.update(zip(("FX", "FY", "FZ", "MX", "MY", "MZ"), [*a["force"], *a["moment"]], strict=True))
+        moments = [value * LENGTH_M[units] / LENGTH_M[STATE.resting] for value in a["moment"]]
+        row.update(zip(("FX", "FY", "FZ", "MX", "MY", "MZ"), [*a["force"], *moments], strict=True))
         rows = STATE.model["tables"].setdefault(table, [])
         rows[:] = [r for r in rows if any(r.get(k) != row[k] for k in keys)]
         if any([*a["force"], *a["moment"]]):
@@ -262,7 +263,7 @@ def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
         return {"cases": [{"case": row["name"], "status_code": code} for row in model["load_cases"]]}
     if name in RESULTS:
         rows = model.get("results", {}).get(name, [])
-        limit = int(args.get("limit") or DEFAULT_LIMIT)
+        limit = int(model.get("result_limits", {}).get(name, args.get("limit") or DEFAULT_LIMIT))
         return {"items": rows[:limit], "count": min(len(rows), limit), "truncated": len(rows) > limit, "units": units}
     kind = args.get("kind")
     if name == "csi_design_run":
@@ -301,8 +302,17 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
         return _list(name[len("csi_list_") :], args, units)
     if name == "csi_db_table_read":
-        rows = model["tables"].get(args.get("table"), [])
-        limit = int(args.get("row_limit") or DEFAULT_LIMIT)
+        table = args.get("table")
+        rows = model["tables"].get(table, [])
+        if (group := args.get("group")) and any("Group" in r or "groups" in r for r in rows):
+            rows = [r for r in rows if r.get("Group") == group or group in r.get("groups", ())]
+        configured = model.get("result_limits", {}).get(table)
+        requested = args.get("row_limit")
+        limit = (
+            min(int(requested or DEFAULT_LIMIT), int(configured))
+            if configured is not None
+            else int(requested or DEFAULT_LIMIT)
+        )
         return {"rows": rows[:limit], "truncated": len(rows) > limit}
     adds = {"csi_add_point": "points", "csi_add_frame_by_coord": "frames", "csi_add_area_by_coord": "areas"}
     adds.update(csi_add_load_pattern="load_patterns", csi_add_load_combo="load_combos")

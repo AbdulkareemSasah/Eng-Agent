@@ -330,8 +330,13 @@ def test_safe_mode_seed_loads_results_and_faults(control: Path) -> None:
                         "Joint Loads Assignments - Force": [
                             {"UniqueName": "P1", "LoadPattern": "D", "XDim": 2, "YDim": 3}
                         ],
+                        "Soil Pressures": [
+                            {"UniqueName": "A1", "Group": "F1", "Pressure": -10},
+                            {"UniqueName": "A2", "Group": "F2", "Pressure": -20},
+                        ],
                     },
                     "results": {"csi_results_base_reactions": [{"case": "D"}, {"case": "U"}]},
+                    "result_limits": {"csi_results_base_reactions": 1, "Soil Pressures": 1},
                 },
             }
         )
@@ -366,13 +371,25 @@ def test_safe_mode_seed_loads_results_and_faults(control: Path) -> None:
                 "MZ": 6,
             }
         ]
-        result = client.call("csi_results_base_reactions", limit=1)[1]
+        result = client.call("csi_results_base_reactions")[1]
         assert result["count"] == 1
         assert result["truncated"] is True
+        pressures = client.call("csi_db_table_read", table="Soil Pressures")[1]
+        assert len(pressures["rows"]) == 1
+        assert pressures["truncated"] is True
+        grouped = client.call("csi_db_table_read", table="Soil Pressures", group="F2")[1]
+        assert grouped["rows"] == [{"UniqueName": "A2", "Group": "F2", "Pressure": -20}]
+        assert grouped["truncated"] is False
         _fault(control, "present_units_mm", tool="csi_model_info")
         assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
         assert client.call("csi_list_points", units="kN_m_C")[1]["units"] == "kN_m_C"
         assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
+        assert not client.call(
+            "csi_set_point_load", name="P1", load_pattern="D", force=[1, 2, 3], moment=[4, 5, 6], units="kN_m_C"
+        )[0]
+        row = client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"][0]
+        assert row["MX"] == 4000
+        assert row["FX"] == 1
     finally:
         client.close()
 
