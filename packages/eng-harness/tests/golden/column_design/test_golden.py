@@ -161,6 +161,66 @@ def test_fractional_tolerance_is_compared_exactly() -> None:
     assert _ids(_select(BOUNDARY, basis=_basis(value=5.0))["columns"]) == ["C_at", "C_in", "C_neg"]
 
 
+def test_exact_verticality_distinguishes_sub_ulp_offset() -> None:
+    # Binary64 rounds 5.0^2 + (2^-26)^2 to 25.0 <= 5.0^2; exact Fraction has d^2 = 25 + 2^-52 > 25 (0013 L2, 0003 P2).
+    dx, dy = 5.0, 2.0**-26
+    assert dx * dx + dy * dy == 25.0
+    frames = [
+        {
+            "id": "C_sub",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": dx, "y_mm": dy, "z_mm": 3000},
+            "story": "L1",
+            "rotation_deg": 0,
+        }
+    ]
+    body = _select(BOUNDARY, scope=_scope(frames=["C_sub"]), frames={"frames": frames}, basis=_basis(value=5.0))
+    assert body == {
+        "status": "FAIL",
+        "columns": [],
+        "excluded": [{"frame_id": "C_sub", "reason": "NOT_VERTICAL"}],
+        "issues": [],
+    }
+
+
+@pytest.mark.parametrize("dz", [1e155, 1e-200])
+def test_extreme_representable_lengths_do_not_overflow_or_underflow(dz: float) -> None:
+    frames = [
+        {
+            "id": "C_ext",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": 0},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": dz},
+            "story": "L1",
+            "rotation_deg": 0,
+        }
+    ]
+    body = _select(BOUNDARY, scope=_scope(frames=["C_ext"]), frames={"frames": frames})
+    assert body["status"] == "PASS"
+    assert body["columns"][0]["length_mm"] == dz
+
+
+def test_unrepresentable_length_is_refused_on_frames() -> None:
+    frames = [
+        {
+            "id": "C_over",
+            "kind": "other",
+            "section": "C40",
+            "i": {"x_mm": 0, "y_mm": 0, "z_mm": -1e308},
+            "j": {"x_mm": 0, "y_mm": 0, "z_mm": 1e308},
+            "story": "L1",
+            "rotation_deg": 0,
+        }
+    ]
+    with pytest.raises(ContractError) as caught:
+        _select(BOUNDARY, scope=_scope(frames=["C_over"]), frames={"frames": frames})
+    detail = caught.value.detail
+    assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, "frames")
+
+
 def test_all_excluded_is_a_failed_selection_without_issue() -> None:
     body = _select(scope=_scope(frames=["B1"]))
     assert body == {

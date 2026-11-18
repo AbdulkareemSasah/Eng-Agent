@@ -7,8 +7,10 @@ from eng_contract.canonical import payload_sha256
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from eng_harness.calc import CalcInput, InputMeta, RefMeta, TraceBuilder
+from eng_harness.calc import CalcInput, CalcStatus, InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.kinds.calcs import CalcMeta
+from eng_harness.kinds.column_design import ColumnSelection
 
 CALC_ID = "harness.column_select"
 KINDS = {
@@ -48,6 +50,12 @@ SECTIONS = [
     {"name": "C50", "material": "C35", "shape": {"type": "circular", "D_mm": 500}},
     {"name": "W1", "material": "S355", "shape": {"type": "other", "host_shape": "SD Section"}},
 ]
+AREA_SECTIONS = [
+    {"name": "S200", "material": "C30", "kind": "slab", "thickness_mm": 200},
+    {"name": "W250", "material": "C30", "kind": "wall", "thickness_mm": 250},
+    {"name": "D150", "material": "S355", "kind": "deck", "thickness_mm": 150},
+]
+COMBINATIONS = ["ULS1", "ULS2", "SLS1", "EQX"]
 STORIES = ["L1", "L2", "L3"]
 NAMES = st.lists(st.sampled_from([f"F{n}" for n in range(8)]), min_size=1, max_size=8, unique=True)
 
@@ -77,21 +85,41 @@ def inputs(draw: st.DrawFn) -> dict[str, Any]:
         stories = draw(st.none() | st.lists(st.sampled_from([*STORIES, "L9"]), min_size=1, unique=True))
         sections = draw(st.lists(st.sampled_from(["C40", "C50", "W1", "NOPE"]), min_size=1, unique=True))
         scope = {"select": {"stories": stories, "sections": sections}}
-    scope |= {"combinations": ["ULS1"], "special_seismic": False}
+    combinations = draw(st.lists(st.sampled_from(COMBINATIONS), min_size=2, max_size=len(COMBINATIONS), unique=True))
+    scope |= {"combinations": combinations, "special_seismic": False}
+    area_sections = copy.deepcopy(
+        draw(
+            st.lists(
+                st.sampled_from(AREA_SECTIONS),
+                min_size=2,
+                max_size=len(AREA_SECTIONS),
+                unique_by=lambda s: s["name"],
+            )
+        )
+    )
     return {
         "scope": scope,
         "frames": {"frames": frames},
-        "sections": {"frame_sections": copy.deepcopy(SECTIONS), "area_sections": []},
+        "sections": {"frame_sections": copy.deepcopy(SECTIONS), "area_sections": area_sections},
         "basis": BASIS,
     }
 
 
-def _run(fields: dict[str, Any]) -> tuple[dict[str, Any], str, Any]:
+def _run(fields: dict[str, Any]) -> tuple[dict[str, Any], str]:
     definition = REGISTRY[CALC_ID]
+    digest = REGISTRY.content_hash(CALC_ID)
     input_type = cast(type[CalcInput], definition.input_type)
     trace = TraceBuilder()
     body = definition(input_type.model_validate(fields), META, trace).model_dump(mode="json")
-    return body, payload_sha256(body), trace.build(definition, "ab" * 32).model_dump(mode="json")
+    payload = body | {
+        "calc": CalcMeta(
+            id=CALC_ID, version=definition.version, content_sha256=digest, status=CalcStatus.DRAFT
+        ).model_dump(mode="json"),
+        "draft": True,
+        "trace": trace.build(definition, digest).model_dump(mode="json"),
+    }
+    ColumnSelection.model_validate(payload)
+    return payload, payload_sha256(payload)
 
 
 @settings(derandomize=True, max_examples=60, deadline=None)
@@ -100,7 +128,9 @@ def test_permutation_invariant(fields: dict[str, Any], data: st.DataObject) -> N
     mixed = copy.deepcopy(fields)
     mixed["frames"]["frames"] = data.draw(st.permutations(mixed["frames"]["frames"]))
     mixed["sections"]["frame_sections"] = data.draw(st.permutations(mixed["sections"]["frame_sections"]))
+    mixed["sections"]["area_sections"] = data.draw(st.permutations(mixed["sections"]["area_sections"]))
     scope = mixed["scope"]
+    scope["combinations"] = data.draw(st.permutations(scope["combinations"]))
     if "frames" in scope:
         scope["frames"] = data.draw(st.permutations(scope["frames"]))
     else:
