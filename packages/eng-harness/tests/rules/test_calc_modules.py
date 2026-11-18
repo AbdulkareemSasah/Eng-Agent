@@ -74,6 +74,9 @@ ALLOWED_MODULES = (
     "operator",
     "__future__",
     "eng_harness.kinds.footing",
+    "eng_harness.kinds.edit_cycle",
+    "eng_harness.kinds.csi",
+    "eng_harness.workflows.model_edit_cycle._change_set",
 )
 ALLOWED_NAMES = {
     "eng_contract.units": {"kind_for_field", "unit"},
@@ -220,6 +223,7 @@ VIOLATIONS = {
     "import os": "import",
     "import eng_harness.servers": "import",
     "from eng_contract.units import convert": "import",
+    "from eng_harness.workflows.model_edit_cycle import ChangeSetDraft": "import",
     "from . import _state": "import",
     "def f():\n    import math\n": "inside",
     "def f():\n    return open('x')\n": "open",
@@ -249,6 +253,9 @@ ALLOWED = [
     "REGISTRY = Registry(kinds)",
     "from eng_contract.params import eng_param",
     "from eng_harness.kinds.footing import X",
+    "from eng_harness.kinds.edit_cycle import X",
+    "from eng_harness.kinds.csi import X",
+    "from eng_harness.workflows.model_edit_cycle._change_set import ChangeSetDraft",
     "from eng_harness.calc import calc\n@calc(version=1)\ndef f():\n    return None\n",
 ]
 

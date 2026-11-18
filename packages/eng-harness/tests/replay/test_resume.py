@@ -6,22 +6,24 @@ rig's call log shows which port calls it made; the fake host's ledger shows whic
 """
 
 import asyncio
+import hashlib
 from pathlib import Path
 from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
 from fakes.ports import failure
+from pydantic import BaseModel
 from workflows.chain import ChainOutput, chain
-from workflows.ctx_flows import answer, flow, need_approval
-from workflows.rig import Rig, hold_lock, make_rig, request, steps, watch_closing
+from workflows.ctx_flows import answer, change_set, flow, need_approval, reply, request_id
+from workflows.rig import Rig, asking, hold_lock, make_rig, request, steps, watch_closing
 
 from eng_harness.engine import RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, JournalIntegrityError, RunLocked
 from eng_harness.journal import EventType, JournalReader, JournalWriter, StepView, is_locked
 from eng_harness.journal import _events as ev
-from eng_harness.ports import HostInstance
+from eng_harness.ports import HostInstance, InputAnswer
 
 T = EventType
 AT = "2026-01-01T00:10:00.000Z"
@@ -313,3 +315,52 @@ def test_close_started_after_resume(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     again = asyncio.run(rig.engine(workflow).resume(run_id))  # a terminal run closes them again
     assert again == done
     assert rig.host.closed == [rig_instance, CSI_ONE] * 2
+
+
+class Size(BaseModel):
+    """The fields of the ask in `test_pending_requests_represented`."""
+
+    width: str
+
+
+def test_pending_requests_represented(tmp_path: Path) -> None:
+    """AC36: a pending approval and a pending input are presented again with the same id; an answer is used once."""
+    rig = make_rig(tmp_path)
+    shown = change_set(rig, "i1")
+
+    async def body(ctx: Any) -> list[str]:
+        await ctx.approve("Apply", shown)
+        return [(await ctx.ask(Size, title="Size")).ref.ref]
+
+    engine = rig.engine(flow(body))
+    run_id = asyncio.run(engine.start(asking())).run_id
+    apr = request_id(run_id, "0")
+    ask = "ask_" + hashlib.sha256(f"{run_id}\n1".encode()).hexdigest()[:32]
+    first = rig.approvals.presented[-1]
+    for n in (2, 3):  # a resume with no answer asks the port again and presents the same request
+        paused = asyncio.run(engine.resume(run_id))
+        assert (paused.status, paused.pending) == (RunStatus.PAUSED, (apr,))
+        assert len(rig.approvals.presented) == n
+        assert rig.approvals.presented[-1] == first
+    assert [e.type for e in rig.events(run_id)].count(T.APPROVAL_REQUESTED) == 1  # journaled when first asked
+
+    rig.approvals.script(apr, reply(rig))
+    paused = asyncio.run(engine.resume(run_id))  # the stored answer is consumed; the ask is presented
+    assert (paused.status, paused.pending) == (RunStatus.PAUSED, (ask,))
+    asked = rig.inputs.presented[-1]
+    paused = asyncio.run(engine.resume(run_id))  # the input is presented again with the same id
+    assert (paused.status, paused.pending) == (RunStatus.PAUSED, (ask,))
+    assert len(rig.inputs.presented) == 2
+    assert rig.inputs.presented[-1] == asked
+    assert len(rig.approvals.presented) == 4  # the answered approval is not presented again
+
+    rig.approvals.script(apr, reply(rig, rid=apr, decision="reject"))  # a stale second answer for the approval
+    rig.inputs.script(
+        ask, InputAnswer(request_id=ask, shown_sha256=asked.fields_schema_sha256, values={"width": "3"}, by="ada")
+    )
+    done = asyncio.run(engine.resume(run_id))
+    assert done.status is RunStatus.COMPLETED
+    kinds = [e.type for e in rig.events(run_id)]
+    assert (kinds.count(T.APPROVAL_RESOLVED), kinds.count(T.INPUT_PROVIDED)) == (1, 1)  # each answer used once
+    assert len(rig.approvals.answers[apr]) == 1  # the stale answer was never read
+    assert len(rig.inputs.answers[ask]) == 0

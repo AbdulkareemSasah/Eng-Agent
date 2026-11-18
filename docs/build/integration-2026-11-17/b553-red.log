@@ -1,0 +1,157 @@
+FFFFFF                                                                   [100%]
+=================================== FAILURES ===================================
+_______________ test_counted_lines_above_estimate_is_a_notice[0] _______________
+
+repo = <support.repo.Repo object at 0x7f61b834f4d0>, lines = 0
+
+    @pytest.mark.parametrize("lines", [0, 9, 10, 11])
+    def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+        """AC11: GC009 always reports the count and estimate, including an overestimate diff."""
+        base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+        repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+        result, errors = gate_check(repo, write_event(repo, base, BODY))
+        assert (result.code, errors) == (0, {})
+        findings = json.loads(result.out)["steps"][0]["findings"]
+        counted = [f for f in findings if f["code"] == "GC009"]
+>       assert len(counted) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tools/eng-dev-gate/tests/integration/test_gate_check.py:254: AssertionError
+_______________ test_counted_lines_above_estimate_is_a_notice[9] _______________
+
+repo = <support.repo.Repo object at 0x7f61b831fc50>, lines = 9
+
+    @pytest.mark.parametrize("lines", [0, 9, 10, 11])
+    def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+        """AC11: GC009 always reports the count and estimate, including an overestimate diff."""
+        base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+        repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+        result, errors = gate_check(repo, write_event(repo, base, BODY))
+        assert (result.code, errors) == (0, {})
+        findings = json.loads(result.out)["steps"][0]["findings"]
+        counted = [f for f in findings if f["code"] == "GC009"]
+>       assert len(counted) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tools/eng-dev-gate/tests/integration/test_gate_check.py:254: AssertionError
+______________ test_counted_lines_above_estimate_is_a_notice[10] _______________
+
+repo = <support.repo.Repo object at 0x7f61b831fb10>, lines = 10
+
+    @pytest.mark.parametrize("lines", [0, 9, 10, 11])
+    def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+        """AC11: GC009 always reports the count and estimate, including an overestimate diff."""
+        base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+        repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+        result, errors = gate_check(repo, write_event(repo, base, BODY))
+        assert (result.code, errors) == (0, {})
+        findings = json.loads(result.out)["steps"][0]["findings"]
+        counted = [f for f in findings if f["code"] == "GC009"]
+>       assert len(counted) == 1
+E       assert 0 == 1
+E        +  where 0 = len([])
+
+tools/eng-dev-gate/tests/integration/test_gate_check.py:254: AssertionError
+______________ test_counted_lines_above_estimate_is_a_notice[11] _______________
+
+repo = <support.repo.Repo object at 0x7f61b83c16e0>, lines = 11
+
+    @pytest.mark.parametrize("lines", [0, 9, 10, 11])
+    def test_counted_lines_above_estimate_is_a_notice(repo: Repo, lines: int) -> None:
+        """AC11: GC009 always reports the count and estimate, including an overestimate diff."""
+        base = make_gate_repo(repo, plan=plan_text(max_changed_lines=10))
+        repo.commit({"pkg/src/new.py": _lines(lines)}, "feat: counted lines")
+        result, errors = gate_check(repo, write_event(repo, base, BODY))
+>       assert (result.code, errors) == (0, {})
+E       AssertionError: assert (1, {'GC009':...w.py (11)\n'}) == (0, {})
+E
+E         At index 0 diff: 1 != 0
+E         Use -v to get more diff
+
+tools/eng-dev-gate/tests/integration/test_gate_check.py:251: AssertionError
+___________________ test_task_estimate_above_400_parses[401] ___________________
+
+estimate = 401
+
+    @pytest.mark.parametrize("estimate", [401, 10000])
+    def test_task_estimate_above_400_parses(estimate: int) -> None:
+        """AC13: positive line estimates have no upper cap."""
+>       assert parse_plan(plan_text(max_changed_lines=estimate), CAP).tasks[0].max_changed_lines == estimate
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tools/eng-dev-gate/tests/unit/test_frontmatter.py:134:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+text = '---\nid: plan-1\nissue: B-001\nspec: pkg/docs/specs/0001-x.md\nstatus: approved\nsize: small\nrisk: r1\ntasks:\n  - i...g/other/**"]\n    max_changed_lines: 50\n    max_sessions: 1\n    covers: [AC1]\n    depends_on: [T1]\n---\n\n# Plan\n'
+max_task_lines = 400
+
+    def parse_plan(text: str, max_task_lines: int) -> Plan:
+        """Parse a plan and apply AC13: unique task ids, known and acyclic ``depends_on``, tasks within the cap.
+
+        Args:
+            text: the plan file.
+            max_task_lines: the cap on ``max_changed_lines`` of one task (``limits.max_task_lines``, lines).
+
+        Raises:
+            FrontMatterError: any rule above is broken, or the front matter is invalid (see :func:`parse_spec`).
+        """
+        plan = _validate(Plan, _front_matter(text))
+        ids = [task.id for task in plan.tasks]
+        if repeated := sorted({i for i in ids if ids.count(i) > 1}):
+            raise FrontMatterError(f"task ids repeat: {', '.join(repeated)}")
+        problems = [f"task {t.id} depends on unknown task {d}" for t in plan.tasks for d in t.depends_on if d not in ids]
+        problems += [f"task {t.id}: max_changed_lines {t.max_changed_lines} exceeds {max_task_lines}" for t in plan.tasks
+                     if t.max_changed_lines > max_task_lines]  # fmt: skip
+        if problems:
+>           raise FrontMatterError("; ".join(problems))
+E           eng_dev_gate.frontmatter.FrontMatterError: task T1: max_changed_lines 401 exceeds 400
+
+tools/eng-dev-gate/src/eng_dev_gate/frontmatter.py:136: FrontMatterError
+__________________ test_task_estimate_above_400_parses[10000] __________________
+
+estimate = 10000
+
+    @pytest.mark.parametrize("estimate", [401, 10000])
+    def test_task_estimate_above_400_parses(estimate: int) -> None:
+        """AC13: positive line estimates have no upper cap."""
+>       assert parse_plan(plan_text(max_changed_lines=estimate), CAP).tasks[0].max_changed_lines == estimate
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tools/eng-dev-gate/tests/unit/test_frontmatter.py:134:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+text = '---\nid: plan-1\nissue: B-001\nspec: pkg/docs/specs/0001-x.md\nstatus: approved\nsize: small\nrisk: r1\ntasks:\n  - i...g/other/**"]\n    max_changed_lines: 50\n    max_sessions: 1\n    covers: [AC1]\n    depends_on: [T1]\n---\n\n# Plan\n'
+max_task_lines = 400
+
+    def parse_plan(text: str, max_task_lines: int) -> Plan:
+        """Parse a plan and apply AC13: unique task ids, known and acyclic ``depends_on``, tasks within the cap.
+
+        Args:
+            text: the plan file.
+            max_task_lines: the cap on ``max_changed_lines`` of one task (``limits.max_task_lines``, lines).
+
+        Raises:
+            FrontMatterError: any rule above is broken, or the front matter is invalid (see :func:`parse_spec`).
+        """
+        plan = _validate(Plan, _front_matter(text))
+        ids = [task.id for task in plan.tasks]
+        if repeated := sorted({i for i in ids if ids.count(i) > 1}):
+            raise FrontMatterError(f"task ids repeat: {', '.join(repeated)}")
+        problems = [f"task {t.id} depends on unknown task {d}" for t in plan.tasks for d in t.depends_on if d not in ids]
+        problems += [f"task {t.id}: max_changed_lines {t.max_changed_lines} exceeds {max_task_lines}" for t in plan.tasks
+                     if t.max_changed_lines > max_task_lines]  # fmt: skip
+        if problems:
+>           raise FrontMatterError("; ".join(problems))
+E           eng_dev_gate.frontmatter.FrontMatterError: task T1: max_changed_lines 10000 exceeds 400
+
+tools/eng-dev-gate/src/eng_dev_gate/frontmatter.py:136: FrontMatterError
+=========================== short test summary info ============================
+FAILED tools/eng-dev-gate/tests/integration/test_gate_check.py::test_counted_lines_above_estimate_is_a_notice[0]
+FAILED tools/eng-dev-gate/tests/integration/test_gate_check.py::test_counted_lines_above_estimate_is_a_notice[9]
+FAILED tools/eng-dev-gate/tests/integration/test_gate_check.py::test_counted_lines_above_estimate_is_a_notice[10]
+FAILED tools/eng-dev-gate/tests/integration/test_gate_check.py::test_counted_lines_above_estimate_is_a_notice[11]
+FAILED tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_task_estimate_above_400_parses[401]
+FAILED tools/eng-dev-gate/tests/unit/test_frontmatter.py::test_task_estimate_above_400_parses[10000]
+6 failed in 1.23s

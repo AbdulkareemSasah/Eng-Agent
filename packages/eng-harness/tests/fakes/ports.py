@@ -17,6 +17,7 @@ from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock, IdSource, new_model_id, new_result_id
 from pydantic import JsonValue
 
+from eng_harness.ctx import Preview
 from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
 from eng_harness.journal import Event
 from eng_harness.ports import (
@@ -82,6 +83,7 @@ class FakeHost:
         self.units: dict[str, UnitsState] = {}
         self.instances: dict[str, list[HostInstance]] = defaultdict(list)
         self.saved: list[SavedModel] = []
+        self.previews: dict[str, Preview] = {}
         self.closed: list[HostInstance] = []
         self._succeeded: set[str] = set()
 
@@ -161,6 +163,11 @@ class FakeHost:
         """The fake host has no read-back helpers."""
         return None
 
+    async def preview(self, tool: str, args: Mapping[str, JsonValue]) -> Preview:
+        """The scripted preview of `tool`, or an empty one: the fake host changes nothing."""
+        await self.describe(tool)
+        return self.previews.get(tool, Preview(items=(), diff_ref=None, models=()))
+
     # HostPort
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
         """One passing check per minimum build."""
@@ -200,7 +207,8 @@ class FakeHost:
 
     async def check_model(self, model_key: str) -> ENVELOPE:
         """A success envelope standing for `issues.model_check/1`."""
-        return self._success("check_model")
+        clean = {"errors": 0, "warnings": 0, "infos": 0, "clean": True}
+        return self._success("check_model").model_copy(update={"summary": clean})
 
     async def save(self, model_key: str, role: str) -> SavedModel:
         """Save the model at its current revision."""
@@ -355,13 +363,16 @@ class FakeInputPort(_Scripted[InputRequest, InputAnswer]):
 class FakeDecisionPort:
     """A DecisionPort whose `handler` answers each call (by default: the first option, decided by `rule:fake`).
 
-    `calls` holds every call that reached the port, in order, and `batches` the size of each `decide_many`.
+    `calls` holds every call that reached the port, in order, and `batches` the size of each `decide_many`;
+    `runtime` is what `runtime_summary()` returns and `summaries` counts its calls.
     """
 
     def __init__(self, handler: Callable[[DecisionCall], DecisionAnswer | PendingAnswer] | None = None) -> None:
         self.handler = handler or self._first
         self.calls: list[DecisionCall] = []
         self.batches: list[int] = []
+        self.runtime: dict[str, JsonValue] = {}
+        self.summaries = 0
 
     @staticmethod
     def _first(call: DecisionCall) -> DecisionAnswer:
@@ -381,6 +392,11 @@ class FakeDecisionPort:
         self.calls.extend(calls)
         self.batches.append(len(calls))
         return [self.handler(call) for call in calls]
+
+    def runtime_summary(self) -> dict[str, JsonValue]:
+        """Count the call and return `runtime`."""
+        self.summaries += 1
+        return dict(self.runtime)
 
 
 @dataclass

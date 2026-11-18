@@ -193,8 +193,9 @@ def test_answer_outside_the_references(tmp_path: Path) -> None:
         port = FakeDecisionPort(answer)
         caught: list[str] = []
 
-        async def body(ctx: Any, caught: list[str] = caught, rig: Rig = rig) -> list[str]:
-            first = _stored(rig, 0)
+        first = _stored(rig, 0)  # stored outside block code: the store writes files
+
+        async def body(ctx: Any, caught: list[str] = caught, first: Ref = first) -> list[str]:
             state = Members(members=("column c1", "column c2"), result=first)
             try:
                 await ctx.decide("pick_member", [first, first], state, [], DecisionPolicy())
@@ -247,12 +248,13 @@ def test_references_as_options(tmp_path: Path) -> None:
     """References are answered by index and the block receives the reference; the port gets their strings."""
     rig, port = make_rig(tmp_path), FakeDecisionPort(lambda call: _decided(call, "1", "rule:fake"))
 
+    stored = [_stored(rig, 0), _stored(rig, 1)]  # stored outside block code: the store writes files
+
     async def body(ctx: Any) -> list[str]:
-        first, second = _stored(rig, 0), _stored(rig, 1)
-        state = Members(members=("column c1", "column c2"), result=first)
-        decision = await ctx.decide("pick_member", [first, second], state, [], DecisionPolicy())
+        state = Members(members=("column c1", "column c2"), result=stored[0])
+        decision = await ctx.decide("pick_member", stored, state, [], DecisionPolicy())
         assert isinstance(decision.choice, Ref)
-        return [decision.choice.ref, first.ref, second.ref]
+        return [decision.choice.ref, stored[0].ref, stored[1].ref]
 
     outcome = _run(rig, flow(body), port)
     chosen, first, second = _refs(outcome)

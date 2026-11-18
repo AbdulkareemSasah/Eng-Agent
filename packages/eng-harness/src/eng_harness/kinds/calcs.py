@@ -233,6 +233,9 @@ class ExpectedEffects(_P):
     change_set: RefString
     model_id: ModelId
     effects: list[Effect]
+    calc: CalcMeta | None = None
+    draft: StrictBool | None = None
+    trace: Trace | None = None
 
     @model_validator(mode="after")
     def _check(self) -> Self:

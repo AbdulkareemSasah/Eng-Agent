@@ -1,0 +1,602 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.1 (rules K1 to K7), synthetic fixture",
+  "method_ref": "§4.4.1 K2 K7",
+  "synthetic": true,
+  "derivation": "Synthetic state (every case): frames B1 (beam, R300x600, story L1, joints J1-J2), B2 (beam, R300x600, L2, J3-J4), C1 (column, C400, L1, J0-J1); areas F1 (slab, S150, L1, joints J1 J2 J5), F2 (slab, S150, L2), W1 (wall, W200, L1); area sections S150 slab, W200 wall; restraint row J0; name lists: frame sections C400 R300x600, area sections S150 W200, material C30, patterns DEAD LIVE, combination COMB1. Synthetic bounds: thickness 100 to 1000 mm, line load 0 to 100 kN/m, area load 0 to 50 kPa, ratio 0 to 10. Basis loads.sdl_kPa 1.5 kPa confirmed, loads.partition_kN_m 2 kN/m unconfirmed, geometry.offset_mm 50 mm. a1: frame B9 and frame section R999 are not in the state or the name lists (B1 is). a2: joint J7 is no frame end, area joint or restraint row (J0 is a restraint row and the end of C1). a3: material C99 is not in the list; 300 mm is inside the thickness bounds. a4: pattern WIND is not in the list. a5: area F9 does not exist. a6: combination COMB9 does not exist. a7: pattern LATE is added only by a8, which comes later, so it is unknown for a7 (K2: added earlier). Issues follow item order, names in the order given (joints sorted). FAIL.",
+  "input": {
+    "change_set": {
+      "items": [
+        {
+          "id": "a1",
+          "kind": "frame_section",
+          "frames": [
+            "B1",
+            "B9"
+          ],
+          "section": "R999"
+        },
+        {
+          "id": "a2",
+          "kind": "joint_restraints",
+          "joints": [
+            "J7",
+            "J0"
+          ],
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        },
+        {
+          "id": "a3",
+          "kind": "wall_section",
+          "name": "W300",
+          "material": "C99",
+          "thickness": {
+            "source": "input",
+            "value": 300.0,
+            "unit": "mm"
+          },
+          "shell_type": "ShellThin"
+        },
+        {
+          "id": "a4",
+          "kind": "frame_uniform_load",
+          "frames": [
+            "B2"
+          ],
+          "pattern": "WIND",
+          "direction": "gravity",
+          "w": {
+            "source": "input",
+            "value": 1.0,
+            "unit": "kN/m"
+          }
+        },
+        {
+          "id": "a5",
+          "kind": "area_section",
+          "areas": [
+            "F9"
+          ],
+          "section": "S150"
+        },
+        {
+          "id": "a6",
+          "kind": "load_combination_delete",
+          "name": "COMB9"
+        },
+        {
+          "id": "a7",
+          "kind": "area_uniform_load",
+          "areas": [
+            "F1"
+          ],
+          "pattern": "LATE",
+          "direction": "gravity",
+          "q": {
+            "source": "input",
+            "value": 1.0,
+            "unit": "kPa"
+          }
+        },
+        {
+          "id": "a8",
+          "kind": "load_pattern_add",
+          "name": "LATE",
+          "type": "live",
+          "self_weight": {
+            "source": "input",
+            "value": 0.0,
+            "unit": "1"
+          }
+        }
+      ]
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "B1",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J1",
+          "j_joint": "J2",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "B2",
+          "kind": "beam",
+          "section": "R300x600",
+          "i_joint": "J3",
+          "j_joint": "J4",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "j": {
+            "x_mm": 6000.0,
+            "y_mm": 0.0,
+            "z_mm": 6000.0
+          },
+          "story": "L2",
+          "rotation_deg": 0.0
+        },
+        {
+          "id": "C1",
+          "kind": "column",
+          "section": "C400",
+          "i_joint": "J0",
+          "j_joint": "J1",
+          "i": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 0.0
+          },
+          "j": {
+            "x_mm": 0.0,
+            "y_mm": 0.0,
+            "z_mm": 3000.0
+          },
+          "story": "L1",
+          "rotation_deg": 0.0
+        }
+      ]
+    },
+    "areas": {
+      "areas": [
+        {
+          "id": "F1",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": [
+            "J1",
+            "J2",
+            "J5"
+          ],
+          "story": "L1"
+        },
+        {
+          "id": "F2",
+          "kind": "slab",
+          "section": "S150",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L2"
+        },
+        {
+          "id": "W1",
+          "kind": "wall",
+          "section": "W200",
+          "points": [
+            {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            {
+              "x_mm": 6000.0,
+              "y_mm": 6000.0,
+              "z_mm": 3000.0
+            }
+          ],
+          "joints": null,
+          "story": "L1"
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C400",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400.0,
+            "h_mm": 400.0
+          }
+        },
+        {
+          "name": "R300x600",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300.0,
+            "h_mm": 600.0
+          }
+        }
+      ],
+      "area_sections": [
+        {
+          "name": "S150",
+          "material": "C30",
+          "kind": "slab",
+          "thickness_mm": 150.0
+        },
+        {
+          "name": "W200",
+          "material": "C30",
+          "kind": "wall",
+          "thickness_mm": 200.0
+        }
+      ]
+    },
+    "restraints": {
+      "joints": [
+        {
+          "joint": "J0",
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": true,
+          "ry": true,
+          "rz": true
+        }
+      ]
+    },
+    "names": {
+      "frame_sections": [
+        "C400",
+        "R300x600"
+      ],
+      "area_sections": [
+        "S150",
+        "W200"
+      ],
+      "materials": [
+        "C30"
+      ],
+      "patterns": [
+        "DEAD",
+        "LIVE"
+      ],
+      "combinations": [
+        "COMB1"
+      ]
+    },
+    "diff": {
+      "calc": {
+        "id": "harness.model_diff",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.model_diff",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "before": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000001",
+        "model_revision": 1,
+        "covered": [
+          "model.area_placements/1",
+          "model.frame_placements/1",
+          "model.joint_restraints/1",
+          "model.load_set/1",
+          "model.sections/1"
+        ]
+      },
+      "tolerances": {},
+      "changes": [],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {},
+      "identical": true,
+      "complete": true
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "bounds.thickness_min_mm": {
+          "value": 100.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.thickness_max_mm": {
+          "value": 1000.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_min_kN_m": {
+          "value": 0.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.line_load_max_kN_m": {
+          "value": 100.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_min_kPa": {
+          "value": 0.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.area_load_max_kPa": {
+          "value": 50.0,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_min_ratio": {
+          "value": 0.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "bounds.ratio_max_ratio": {
+          "value": 10.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.sdl_kPa": {
+          "value": 1.5,
+          "unit": "kPa",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "loads.partition_kN_m": {
+          "value": 2.0,
+          "unit": "kN/m",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": false,
+          "citation": null
+        },
+        "geometry.offset_mm": {
+          "value": 50.0,
+          "unit": "mm",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "change_set": "res_00000000000000000000000001",
+    "frames": "res_00000000000000000000000002",
+    "areas": "res_00000000000000000000000003",
+    "sections": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "names": "res_00000000000000000000000006",
+    "diff": "res_00000000000000000000000007",
+    "basis": "res_00000000000000000000000008"
+  },
+  "expected": {
+    "status": "FAIL",
+    "resolved": [
+      {
+        "item_id": "a1",
+        "kind": "frame_section",
+        "targets": [
+          "B1",
+          "B9"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a2",
+        "kind": "joint_restraints",
+        "targets": [
+          "J0",
+          "J7"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a3",
+        "kind": "wall_section",
+        "targets": [
+          "W300"
+        ],
+        "values": [
+          {
+            "pointer": "/thickness_mm",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/2/thickness/value_mm",
+            "unit": "mm"
+          }
+        ]
+      },
+      {
+        "item_id": "a4",
+        "kind": "frame_uniform_load",
+        "targets": [
+          "B2"
+        ],
+        "values": [
+          {
+            "pointer": "/w_kN_m",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/3/w/value_kN_m",
+            "unit": "kN/m"
+          }
+        ]
+      },
+      {
+        "item_id": "a5",
+        "kind": "area_section",
+        "targets": [
+          "F9"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a6",
+        "kind": "load_combination_delete",
+        "targets": [
+          "COMB9"
+        ],
+        "values": []
+      },
+      {
+        "item_id": "a7",
+        "kind": "area_uniform_load",
+        "targets": [
+          "F1"
+        ],
+        "values": [
+          {
+            "pointer": "/q_kPa",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/6/q/value_kPa",
+            "unit": "kPa"
+          }
+        ]
+      },
+      {
+        "item_id": "a8",
+        "kind": "load_pattern_add",
+        "targets": [
+          "LATE"
+        ],
+        "values": [
+          {
+            "pointer": "/self_weight_ratio",
+            "ref": "res_00000000000000000000000001#/fields/change_set/value/items/7/self_weight/value_ratio",
+            "unit": "1"
+          }
+        ]
+      }
+    ],
+    "issues": [
+      {
+        "item_id": "a1",
+        "severity": "error",
+        "code": "UNKNOWN_FRAME",
+        "detail": "frame B9 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a1",
+        "severity": "error",
+        "code": "UNKNOWN_SECTION",
+        "detail": "frame section R999 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a2",
+        "severity": "error",
+        "code": "UNKNOWN_JOINT",
+        "detail": "joint J7 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a3",
+        "severity": "error",
+        "code": "UNKNOWN_MATERIAL",
+        "detail": "material C99 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a4",
+        "severity": "error",
+        "code": "UNKNOWN_PATTERN",
+        "detail": "pattern WIND is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a5",
+        "severity": "error",
+        "code": "UNKNOWN_AREA",
+        "detail": "area F9 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a6",
+        "severity": "error",
+        "code": "UNKNOWN_COMBINATION",
+        "detail": "combination COMB9 is not in the model",
+        "gap": null
+      },
+      {
+        "item_id": "a7",
+        "severity": "error",
+        "code": "UNKNOWN_PATTERN",
+        "detail": "pattern LATE is not in the model",
+        "gap": null
+      }
+    ],
+    "complete": true
+  }
+}

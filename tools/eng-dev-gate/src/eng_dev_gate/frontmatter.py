@@ -53,7 +53,7 @@ def safe_relative_path(path: str) -> bool:
 
 
 class Task(_Model):
-    """One plan task: ``files`` are globs, ``max_changed_lines`` counts lines, ``max_sessions`` counts sessions."""
+    """Task globs, ``max_changed_lines`` (estimated lines) and ``max_sessions`` (session budget)."""
 
     id: TaskId
     title: Name
@@ -115,12 +115,11 @@ def parse_spec(text: str) -> Spec:
     return _validate(Spec, _front_matter(text))
 
 
-def parse_plan(text: str, max_task_lines: int) -> Plan:
-    """Parse a plan and apply AC13: unique task ids, known and acyclic ``depends_on``, tasks within the cap.
+def parse_plan(text: str) -> Plan:
+    """Parse a plan and apply AC13: unique task ids, known and acyclic ``depends_on``.
 
     Args:
         text: the plan file.
-        max_task_lines: the cap on ``max_changed_lines`` of one task (``limits.max_task_lines``, lines).
 
     Raises:
         FrontMatterError: any rule above is broken, or the front matter is invalid (see :func:`parse_spec`).
@@ -130,8 +129,6 @@ def parse_plan(text: str, max_task_lines: int) -> Plan:
     if repeated := sorted({i for i in ids if ids.count(i) > 1}):
         raise FrontMatterError(f"task ids repeat: {', '.join(repeated)}")
     problems = [f"task {t.id} depends on unknown task {d}" for t in plan.tasks for d in t.depends_on if d not in ids]
-    problems += [f"task {t.id}: max_changed_lines {t.max_changed_lines} exceeds {max_task_lines}" for t in plan.tasks
-                 if t.max_changed_lines > max_task_lines]  # fmt: skip
     if problems:
         raise FrontMatterError("; ".join(problems))
     try:

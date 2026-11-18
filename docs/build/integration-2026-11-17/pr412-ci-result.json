@@ -1,0 +1,76 @@
+{
+  "base": "3cb4563f2593d0f64db910ddc0d3c8c3317a8417",
+  "batch": {
+    "base": "3cb4563f2593d0f64db910ddc0d3c8c3317a8417",
+    "commit": "76661c4395fe0fce9b8fad2cdad4cc1596c720ba",
+    "heads": {
+      "412": "a6fbe29e0fafcf17514a4cccf3d12176d8c12104",
+      "413": "6308ed80bb1f0050ce01192a2f8dd4ce497a1395"
+    },
+    "leader": 412,
+    "members": [
+      412,
+      413
+    ],
+    "tree": "b7648fbd2140d36cd87a00c1246bbabf36b3007b"
+  },
+  "failing": [],
+  "finished_at": "2026-11-17T11:06:15Z",
+  "head": "a6fbe29e0fafcf17514a4cccf3d12176d8c12104",
+  "jobs": {
+    "agents-drift": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "build": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "ci-review": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "gate": {
+      "exit": 0,
+      "seconds": 712,
+      "tail": ""
+    },
+    "gate-check": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "merged": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": "",
+      "tested": "92e16b657616a775929ba5be9b06eff94e9e1cf3"
+    },
+    "risk-floor": {
+      "exit": 0,
+      "seconds": 1,
+      "tail": ""
+    },
+    "security": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "setup": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    },
+    "test-first": {
+      "exit": 0,
+      "seconds": 0,
+      "tail": ""
+    }
+  },
+  "mode": "pull_request",
+  "started_at": "2026-11-17T10:54:10Z",
+  "verdict": "PASS"
+}

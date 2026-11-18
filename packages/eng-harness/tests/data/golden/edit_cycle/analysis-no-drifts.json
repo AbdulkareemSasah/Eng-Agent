@@ -1,0 +1,46 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.4 (analysis summary), gap EC-G3, synthetic fixture",
+  "method_ref": "\u00a74.4.4 no drift row gives no governing drift",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. No message and no drift row (the host reported none): no governing entry, no exceeding story, every count 0. Nothing is unclassified, no error and nothing exceeds, so the status is PASS (the calc does not judge a missing result; spec 0007 4.5 step 13 reads it).",
+  "input": {
+    "messages": {
+      "rows": []
+    },
+    "drifts": {
+      "rows": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.drift_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "messages": "res_00000000000000000000000001",
+    "drifts": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "status": "PASS",
+    "counts": {
+      "error": 0,
+      "warning": 0,
+      "info": 0,
+      "unclassified": 0
+    },
+    "has_errors": false,
+    "has_unclassified": false,
+    "limit_ratio": 0.01,
+    "limit_ref": "res_00000000000000000000000003#/fields/limits.drift_ratio",
+    "governing_drift": {},
+    "exceeding": []
+  }
+}

@@ -1,4 +1,4 @@
-"""``gate-check`` (spec 4.5): body parsing, plan and task, file scope and diff budget.
+"""``gate-check`` (spec 4.5): body parsing, plan and task, file scope and the counted-lines notice.
 
 Part 2 is in ``gate_check_docs`` and ``codeowners``. The pull-request title and body are data, never executed.
 """
@@ -187,6 +187,19 @@ def _test_markers(changes: list[Change], member_dirs: Sequence[str], git: Git, h
     return markers
 
 
+def _holders(plan_path: str, member_dirs: Sequence[str]) -> list[str]:
+    """The workspace members' directories and the plan's package folder (the holders of ``CHANGELOG.md``)."""
+    plan = PurePosixPath(plan_path)
+    return [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
+
+
+def _collateral(path: str, holders: Sequence[str]) -> bool:
+    """A test path (a ``tests`` directory segment) or the ``CHANGELOG.md`` of a holder is a collateral edit (AC10d)."""
+    if "tests" in PurePosixPath(path).parent.parts:
+        return True
+    return any(path == ("CHANGELOG.md" if d == "." else f"{d}/CHANGELOG.md") for d in holders)
+
+
 def accepted_paths(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
 ) -> tuple[list[str], set[str]]:
@@ -194,14 +207,13 @@ def accepted_paths(
 
     The ``CHANGELOG.md`` and ``docs/local-testing.md`` of a workspace member or of the plan's package folder are in
     scope when another changed file under that directory matches a glob of the task (AC10a); so is the ratchet
-    baseline when it changes only counts of packages with such a file (AC10b).
+    baseline when it changes only counts of packages with such a file (AC10b). A collateral edit (AC10d) is not in
+    scope here; ``_scope`` reports it as a notice.
     """
     paths = dict.fromkeys(p for change in changes for p in change.paths)
     inside = {p for p in paths if matches_any(p, task.files)}
     anchors = set(inside)
-    plan = PurePosixPath(plan_path)
-    holders = [*member_dirs, *([plan.parents[2].as_posix()] if plan.parent.parts[-2:] == ("docs", "plans") else [])]
-    for directory in holders:
+    for directory in _holders(plan_path, member_dirs):
         prefix = "" if directory == "." else f"{directory}/"
         inside |= {
             f
@@ -217,35 +229,50 @@ def accepted_paths(
 def _scope(
     changes: list[Change], task: Task, plan_path: str, member_dirs: Sequence[str], git: Git, base: str, head: str
 ) -> list[Finding]:
-    """GC008 for each changed path outside the task's globs."""
+    """GC008 for each changed path outside the task's globs: a notice for a collateral edit, else an error."""
     paths, inside = accepted_paths(changes, task, plan_path, member_dirs, git, base, head)
-    return [_error("GC008", f"{p} matches no file glob of task {task.id}", p) for p in paths if p not in inside]
+    holders = _holders(plan_path, member_dirs)
+    findings: list[Finding] = []
+    for p in (p for p in paths if p not in inside):
+        message = f"{p} matches no file glob of task {task.id}"
+        if _collateral(p, holders):
+            findings.append(
+                Finding(
+                    code="GC008",
+                    severity=Severity.NOTICE,
+                    path=p,
+                    message=f"{message}: collateral edit (list it under Collateral edits in the pull request)",
+                )
+            )
+        else:
+            findings.append(_error("GC008", message, p))
+    return findings
 
 
-def _budget(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
-    """GC009 when added plus deleted lines exceed the task limit; tests, generated and spike files are not counted."""
+def _counted(entries: list[NumstatEntry], task: Task, config: GateConfig) -> list[Finding]:
+    """GC009 reports the counted lines; tests, generated and spike files are not counted."""
     counted = counted_lines(entries, config)
     findings = [
         Finding(
             code="GC009",
             severity=Severity.NOTICE,
             path=e.path,
-            message="notice, not a budget failure: binary file counts zero",
+            message="binary file counts zero",
         )
         for e in counted
         if e.binary
     ]
     total = sum(e.added + e.deleted for e in counted)
-    if total > task.max_changed_lines:
-        largest = sorted(counted, key=lambda e: e.added + e.deleted, reverse=True)[:LARGEST_FILES_SHOWN]
-        names = ", ".join(f"{e.path} ({e.added + e.deleted})" for e in largest)
-        findings.append(
-            _error(
-                "GC009",
-                f"{total} changed lines exceed max_changed_lines {task.max_changed_lines} of task {task.id} "
-                f"(BLOCKED: propose a plan change); largest: {names}",
-            )
+    largest = sorted(counted, key=lambda e: e.added + e.deleted, reverse=True)[:LARGEST_FILES_SHOWN]
+    names = ", ".join(f"{e.path} ({e.added + e.deleted})" for e in largest)
+    findings.append(
+        Finding(
+            code="GC009",
+            severity=Severity.NOTICE,
+            message=f"{total} counted lines (estimate max_changed_lines {task.max_changed_lines} of task {task.id}); "
+            f"largest: {names}",
         )
+    )
     return findings
 
 
@@ -253,7 +280,7 @@ def _judge(
     pr: PullRequest, config: GateConfig, git: Git, gate_ref: str, member_dirs: Sequence[str], base: str,
     changes: list[Change], approvals: Approvals | None, risks: set[str],
 ) -> list[Finding]:  # fmt: skip
-    """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and budget (steps 3 to 8)."""
+    """Body, ``none`` reasons, spec and plan pull requests, plan, task, scope and counted lines (steps 3 to 8)."""
     fields = parse_body(pr.body)
     findings = _work_item(fields, config)
     target = _plan_task(fields, config)
@@ -269,7 +296,7 @@ def _judge(
         paths = [p for c in changes for p in c.paths]
         return [*findings, *none_findings(target, paths, entries, config)]
     plan_path, task_id = target
-    plan = _read(git, gate_ref, plan_path, lambda text: parse_plan(text, config.limits.max_task_lines))
+    plan = _read(git, gate_ref, plan_path, parse_plan)
     if isinstance(plan, Finding):
         return [*findings, plan]
     risks.update(plan.risk)
@@ -288,7 +315,7 @@ def _judge(
     return [
         *findings,
         *_scope(changes, task, plan_path, member_dirs, git, base, pr.head_sha),
-        *_budget(entries, task, config),
+        *_counted(entries, task, config),
     ]
 
 

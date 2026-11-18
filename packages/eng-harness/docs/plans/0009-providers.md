@@ -200,6 +200,12 @@ tasks:
     # Amendment (B-475, documents only): T10 split into T10a and T10b (shorter first-live-run path, lead decision D-32).
     # T10a is the phase-1 assemble_decision_runtime of spec AC49, with the fixed signature of spec 4.1 (B-471); it needs
     # neither the factory (T7) nor verify_releases (T9). External: plan 0005 T10, engine plan 0001 T14b. Budget an estimate.
+    # Amendment (B-495, documents only): owner answer of 2026-11-14 (spec Q14): the dropped releases are journaled as
+    # the summary's (point, reason) entries, which run_started.decision_runtime records as given (engine AC69, merged);
+    # no new event. Re-estimated: about 100 lines (_runtime.py about 85 with DecisionRuntime, the provider entries, the
+    # warnings and the drop entries; __init__.py 3, pyproject.toml 1, CHANGELOG.md 3; an estimate); budget 150 stays.
+    # Amendment (B-531, documents only): DecisionRuntime has the fields of spec 4.1 (model, llm, releases, warnings,
+    # summary); no file or budget change.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.providers (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -331,7 +337,8 @@ without `verify_releases`: no `[providers.*]` table gives a runtime with no prov
 provider is not built and gets a summary entry with `status` `not_implemented` and a build warning naming PR-G1; every
 `shadow_released` entry is dropped with a build warning, a plain string naming the point and PR-G1 (not the
 `ReleaseFinding` of T9, which only `verify_releases` returns), and the summary records each drop as AC29 does, its
-`point` with the `reason` `PR-G1`; `point_policies` is read by nothing, so the empty mapping
+`point` with the `reason` `PR-G1`, so each drop is journaled in `run_started.decision_runtime`, not only printed (owner
+answer of 2026-11-14, amendment B-495, spec Q14); `point_policies` is read by nothing, so the empty mapping
 that plan 0006 T18a binds (spec 0006 Q16 (d)) gives the same runtime as any other; the run-header test runs the real
 engine and cascade. Waits for plan 0005 T10 and engine plan T14b, not for T4, T6, T7 or T9.
 
@@ -366,8 +373,9 @@ modules it requires exist at T10b's base.
   needs T6; T10a needs T10 there, and T10b T9 there); engine plan T1, T2 and T6, and T14b for the header fields of AC48 and AC49; spec 0006
   reads `[providers.*]` and calls `assemble_decision_runtime` (its amendment B-098, spec Q7). Amendment B-412: plan
   0006 T14b defines the injected `providers_loader` and `decision_assembler` fields of `CliDeps` and does not wait for
-  this plan (its tests use recorders); plan 0006 T18a (split from T18 by B-471) binds their defaults to `load_providers_config` and
-  `assemble_decision_runtime` once this plan's T1 and T10a have merged. No task of this plan touches plan 0006's `cli/__init__.py`; T18a there binds the defaults. Spike S-07 is not a dependency of this plan; it gates the later
+  this plan (its tests use recorders); plan 0006 T14b binds the `providers_loader` default to `load_providers_config` (T1 is
+  merged; amendment B-510) and plan 0006 T18a (split from T18 by B-471) binds the `decision_assembler` default to
+  `assemble_decision_runtime` once this plan's T10a has merged. No task of this plan touches plan 0006's `cli/__init__.py`; T14b and T18a there bind the defaults. Spike S-07 is not a dependency of this plan; it gates the later
   format task.
 - First live run (amendment B-475, lead decision D-32; phase 1 has no provider, spec 0005 AC17): T4, T6, T7 and T10b
   are off its path and are not weakened. They return with phase 2, before the first provider is configured (after spike

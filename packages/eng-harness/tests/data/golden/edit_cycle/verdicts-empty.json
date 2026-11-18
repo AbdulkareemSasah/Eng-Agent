@@ -1,0 +1,39 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.3 (host design verdicts), synthetic fixture",
+  "method_ref": "§4.4.3 one verdict per row: no row gives no verdict",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. A steel reply without a row: one verdict per row gives no verdict, traces is empty and every status count is 0. The calc does not turn missing results into a verdict: the design summary reports \"no design results\" (spec 0003 AC38).",
+  "input": {
+    "results": {
+      "rows": []
+    },
+    "kind": "steel",
+    "basis": {
+      "template": null,
+      "fields": {
+        "limits.ratio_limit_ratio": {
+          "value": 1.0,
+          "unit": "1",
+          "source": "engineer:test@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "results": "res_00000000000000000000000001",
+    "basis": "res_00000000000000000000000002"
+  },
+  "expected": {
+    "verdicts": [],
+    "traces": [],
+    "counts": {
+      "PASS": 0,
+      "FAIL": 0,
+      "NOT_APPLICABLE": 0,
+      "NEEDS_ENGINEER": 0,
+      "ERROR": 0
+    }
+  }
+}

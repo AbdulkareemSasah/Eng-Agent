@@ -49,6 +49,9 @@ tasks:
     # through COLUMN_DESIGN_CALCS and COLUMN_DESIGN_KINDS in calcs/column_design/__init__.py, as calcs/footing/__init__.py
     # does with FOOTING_CALCS and FOOTING_KINDS, so calcs/__init__.py is edited once here and the later calc tasks (T3,
     # T4, T5, T7, T8) add their calcs and kinds in calcs/column_design/__init__.py only.
+    # Amendment (B-462, documents only): the calc-module rules test allows kinds.column_design and kinds.edit_cycle
+    # (spec 0003 4.3), and T2 registers COLUMN_DESIGN_KINDS in HARNESS_KINDS (_kinds.py), which T1 left out; budget
+    # 345 kept (294 counted on the B-281 branch plus about 5 for the registration).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_select (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -57,6 +60,8 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/column_design/column_select.py"
       - "packages/eng-harness/src/eng_harness/calcs/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"  # COLUMN_DESIGN_KINDS in HARNESS_KINDS (amendment B-462)
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # allowed imports of spec 0003 4.3 (amendment B-462)
       - "packages/eng-harness/tests/golden/column_design/__init__.py"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-select-*.json"
@@ -259,7 +264,7 @@ tasks:
     depends_on: [T1]
   - id: T11
     title: Workflow column_design part 1 - definition, basis fields, scope, review cycle (steps 1 to 10 and 15)
-    # Amendment (B-417, documents only): registers column_design by adding its blocks to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2); T12's blocks reach it through the same column_design export.
+    # Amendment (B-417, documents only): registers column_design by adding its blocks to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9b, spec 0007 4.2); T12's blocks reach it through the same column_design export.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -308,7 +313,7 @@ tasks:
     depends_on: [T5, T11]
   - id: T13
     title: Workflow column_revit_update (steps R1 to R9)
-    # Amendment (B-417, documents only): adds column_revit_update to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9, spec 0007 4.2).
+    # Amendment (B-417, documents only): adds column_revit_update to the shipped-workflow tuple of workflows/__init__.py, which block.discover() reads (plan 0007 T9b, spec 0007 4.2).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.workflows, eng_harness.workflows.column_design (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -404,7 +409,9 @@ variants (`spiral`, `special_seismic: true`) parsed so the engineer sees a reaso
 B-447 (D-12): split from T1, whose explicit kinds alone measured 322 counted lines.
 
 **T2 `harness.column_select`** (spec §4.4.1). Name and story-section resolution, the exact verticality test against
-`compare.length_mm`, shape and material per column, issues, and the shared golden test module for the column calcs.
+`compare.length_mm`, shape and material per column, issues, and the shared golden test module for the column calcs. T2
+also registers `COLUMN_DESIGN_KINDS` in `HARNESS_KINDS` (`_kinds.py`), so the CalcPort can store column calc results.
+Amendment (B-462).
 
 **T3 `harness.column_demands`** (spec §4.4.2). Refusal unless `host_local/1`; rows per selected column and combination;
 `Pu_kN = −P_kN`; the axis rule for sections symmetric by geometry and layout only (`b_mm == h_mm` and `n_bars_b == n_bars_h`) and
@@ -452,7 +459,7 @@ layout requests, the cycle with selection, analysis and design through the edit 
 forces read, host verdicts, demands, the code checks through T6, the review, the engineer turn, and the finish. The
 CSI fake gains a column scenario (test data): frames, sections, combinations, frame forces and steel design ratios. Amendment
 (B-417): the task registers `column_design` by adding its blocks to the shipped-workflow tuple of
-`workflows/__init__.py`, which `block.discover()` reads (plan 0007 T9); `blocks.lock.json` is regenerated from it.
+`workflows/__init__.py`, which `block.discover()` reads (plan 0007 T9b); `blocks.lock.json` is regenerated from it.
 
 **T12 Proposal and apply** (WS steps 11 to 14). The proposal request, rounding per dimension, matching, `decide_many`,
 the generated change set, `apply_change_set`, and the design record after promotion.
@@ -460,7 +467,7 @@ the generated change set, `apply_change_set`, and the design record after promot
 **T13 Revit run** (WS steps R1 to R9). Mode refusal, the ETABS fingerprint gate, the Revit working copy and reads,
 the map and its decision, the update plan, the approval, the ordered writes with references, the read-back and its
 decision, sign-off; the Revit fake gains a column scenario with families, types and role parameters. Amendment (B-417):
-the task adds `column_revit_update` to the same tuple of `workflows/__init__.py` (plan 0007 T9).
+the task adds `column_revit_update` to the same tuple of `workflows/__init__.py` (plan 0007 T9b).
 
 **T14 Report and audits** (spec §4.10). Renderers for both runs (verdict sources, size chain, map, plan, read-back,
 unsaved-document notice, draft marks), `audit_verdict_sources`, and the column section of `docs/local-testing.md`
@@ -480,9 +487,9 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
   and mode usability), and plan 0004 T5 (the column checks registered); the documents pull request B-405 (spec 0013
   AC13 and §4.5 answer `NOT_FOUND`, spec 0010 C4), scheduled before this T6 and before footing T2 (amendment B-418).
 - Before T9: plan 0005 T4 and T9 (rules, `decide_many`).
-- Before T10: engine plan 0001 (`block.py`, `_runner.py`) and plan 0007 T8, T9 and T2 (the blocks and the check it
+- Before T10: engine plan 0001 (`block.py`, `_runner.py`) and plan 0007 T8, T9b and T2 (the blocks and the check it
   amends).
-- Before T11: plan 0007 T9 (the cycle blocks) and T4 (`harness.host_design_verdicts`); plan 0002 T4 (the CSI fake);
+- Before T11: plan 0007 T9b (the cycle blocks) and T4b (`harness.host_design_verdicts`; amendment B-511); plan 0002 T4 (the CSI fake);
   plan 0004 T5 (`FieldSpec`).
 - Before T13: plan 0011 T7 to T11 and T15 (reader, edits, attended writes, reconciliation, session, wiring) and T2 (the
   Revit fake).

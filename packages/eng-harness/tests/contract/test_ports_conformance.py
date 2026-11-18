@@ -27,7 +27,7 @@ from fakes.ports import (
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from eng_harness.calc import CalcStatus
-from eng_harness.ctx import BasisView
+from eng_harness.ctx import BasisView, Preview, PreviewItem
 from eng_harness.decisions._points import decision_point
 from eng_harness.decisions._policy import DecisionPolicy
 from eng_harness.decisions.interfaces import DecisionAnswer, DecisionScreen, PendingAnswer
@@ -101,6 +101,15 @@ def _check_tool_port(port: ToolPort, host: FakeHost) -> None:
     assert port.supports_reconcile("model/write")
     assert not port.supports_reconcile("model/read")
     assert asyncio.run(port.read_back("model/read", {})) is None
+    assert asyncio.run(port.preview("model/write", {"x": 1})) == Preview(
+        items=(), diff_ref=None, models=()
+    )  # no change
+    with pytest.raises(ContractError):  # a tool outside the allowlist has no preview either
+        asyncio.run(port.preview("csi_run_script", {}))
+    shown = Preview(items=(PreviewItem(id="a", label="A", refs=()),), diff_ref=None, models=())
+    host.previews["model/write"] = shown
+    assert asyncio.run(port.preview("model/write", {"x": 1})) == shown
+    assert len(host.ledger) == 0  # a preview is not a call
 
     # a success is recorded with its op_id; a write raises the revision and changes the fingerprint
     before = asyncio.run(host.model_state("m", "i1"))
@@ -270,6 +279,10 @@ def _check_decision_port() -> None:
     asked = PendingAnswer(request_id="dec_0", screen=DecisionScreen(items=()))
     fake.handler = lambda _call: asked
     assert asyncio.run(port.decide(calls[0])) is asked  # the handler may leave the call to the engineer
+    assert port.runtime_summary() == {}  # synchronous, and empty when the port has nothing to say
+    fake.runtime = {"providers": {"local": {"tier": "advisory"}}}
+    assert port.runtime_summary() == fake.runtime
+    assert fake.summaries == 2
 
 
 def _check_sink_and_control() -> None:

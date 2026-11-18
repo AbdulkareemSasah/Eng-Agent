@@ -18,9 +18,10 @@ from typing import Literal, Protocol
 
 from eng_contract.envelope import FailureEnvelope, HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
+from eng_contract.issues import CheckModelSummary
 from eng_contract.refs import Ref, RefRule, resolve_ref
 from eng_contract.store import ResultStore
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 
 from eng_harness import errors
 from eng_harness.ctx import CalcResult, ReadResult, ToolResult
@@ -28,7 +29,7 @@ from eng_harness.engine._replay import Recorded
 from eng_harness.engine._steps import inserted_path
 from eng_harness.journal import EventType, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import HostPort
+from eng_harness.ports import HostPort, ToolInfo
 
 _Obj = dict[str, JsonValue]
 _KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,200}$")  # spec 4.3.1 grammar of a path key
@@ -89,6 +90,15 @@ class SiblingBoard:
 def _stored(envelope: SuccessEnvelope) -> ev.StepResult:
     warned = [w.model_dump(mode="json") for w in envelope.warnings]
     return ev.StepResult(ref=envelope.result_id, summary=envelope.summary, warnings=warned, complete=envelope.complete)
+
+
+def _unclean(envelope: SuccessEnvelope) -> str | None:
+    """Why the summary is not a clean `issues.model_check/1` (another shape counts as not clean), None when clean."""
+    try:
+        summary = CheckModelSummary.model_validate(envelope.summary)
+    except ValidationError:
+        return "the summary is not a model check summary"
+    return None if summary.clean else f"the summary reports {summary.errors} errors"
 
 
 def _walk(value: object, path: str = "") -> Iterator[tuple[str, _REF]]:
@@ -204,6 +214,10 @@ class Guard:
         if isinstance(envelope, FailureEnvelope):
             self._failed(ctx, path, began, model, envelope.error.message)
             raise errors.ModelIntegrityError(f"the check of {model} failed: {envelope.error.message}")
+        unclean = _unclean(envelope)
+        if unclean is not None:  # spec 4.6 row 1: only a clean summary clears the flag
+            self._failed(ctx, path, began, model, unclean)
+            raise errors.ModelIntegrityError(f"the check of {model} failed: {unclean}", evidence=(envelope.result_id,))
         ctx._done(path, 1, began, _stored(envelope))
         self._enforced(path, 1, model, "pass")
         dirty_flags()[model] = False
@@ -233,6 +247,42 @@ class Guard:
         saved_body = {"model_key": model, "role": "pre_analysis", **saved.model_dump(mode="json")}
         self._writer.append(EventType.MODEL_SAVED, saved_body, path=path)
         self._enforced(path, 7, model, "pass")
+
+    async def revised(
+        self, path: str, key: str | None, info: ToolInfo, args: _Obj, envelope: SuccessEnvelope
+    ) -> ev.ModelSaved | None:
+        """After a tool save (action `save`, or a tool whose `saves_new_file(args)` is true): journal `model_saved` with
+        role `revision` at `path` and return it; `None` for any other step (spec 4.6 "Tool saves", EC2).
+
+        Raises:
+            ModelIntegrityError: the result has no `provenance.host`, a new-file save has no `saved_file` or its hash is
+                not the model's file hash, or the model has no open file after the save; nothing is journaled.
+        """
+        new = info.saves_new_file(args)
+        if key is None or (info.action != "save" and not new):
+            return None
+        host, found = envelope.provenance.host, envelope.summary.get("saved_file")
+        digest = found.get("sha256") if isinstance(found, Mapping) else None
+        if host is None or (new and digest is None):
+            raise errors.ModelIntegrityError(
+                f"the save at step {path} has no {'host record' if host is None else 'saved_file'}"
+            )
+        instance = await self._host.locate(key)
+        state = None if instance is None else await self._host.model_state(key, instance.instance_id)
+        files = self._host.model_files(key)
+        if state is None or not state.loaded or not files or (new and digest != state.file_sha256):
+            raise errors.ModelIntegrityError(f"the model {key} is not the file saved by step {path}")
+        body = {
+            "model_key": key,
+            "model_id": host.model_id,
+            "revision": host.model_revision,
+            "file_name": files[0].name,
+        }
+        saved = ev.ModelSaved.model_validate(
+            body | state.model_dump(include={"fingerprint", "file_sha256"}) | {"role": "revision"}
+        )
+        self._writer.append(EventType.MODEL_SAVED, saved, path=path)
+        return saved
 
     def _enforced(self, path: str, invariant: int, model: str, outcome: str) -> None:
         body = {"invariant": invariant, "model_key": model, "outcome": outcome}

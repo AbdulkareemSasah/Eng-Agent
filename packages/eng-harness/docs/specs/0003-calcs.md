@@ -211,7 +211,8 @@ proposed project value.
   the member's status is `FAIL` and its member ratio is the larger ratio (S5), both verdicts are kept in the verdict
   lists, and the member appears once in `members` and `failing_members`. Test:
   `test_calcs_golden.py::test_case[summary-member-worst]`.
-- AC38. Given an empty verdict set, then the status is `NEEDS_ENGINEER` with the message "no design results". Test:
+- AC38. Given an empty verdict set, then the status is `NEEDS_ENGINEER` with the message "no design results" (the
+  trace step `status_reasons`, §4.9 S6; amendment B-498). Test:
   `tests/unit/calcs/test_summary.py::test_empty`.
 
 ### 3.8 Section size rounding (§4.10)
@@ -312,9 +313,35 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
 `eng_contract.refs` (`RefString`, `JsonPointer`), `eng_contract.errors` (`ContractError`, `ErrorCode`),
 `eng_contract.kinds` and its submodules, `eng_contract.verdicts`, `pydantic`, `fractions`, `math`, `hashlib`,
 `enum`, `typing`, `collections.abc`, `itertools`, `functools`, `operator`, `__future__`, `eng_contract.params`
-(`eng_param`, for ref-capable inputs) and `eng_harness.kinds.footing` (footing calcs). `calcs/__init__.py` may import
+(`eng_param`, for ref-capable inputs), `eng_harness.kinds.footing` (footing calcs), `eng_harness.kinds.column_design`
+(column calcs), `eng_harness.kinds.edit_cycle` (column and edit-cycle calcs, amendments B-462 and B-493, and the
+design summary's input kind of §4.9, amendment B-538),
+`eng_harness.workflows.model_edit_cycle._change_set` (the change-set model of spec 0007 §4.3, input of the edit-cycle
+calcs, amendment B-493) and `eng_harness.kinds.csi` (the payload models of the CSI harness kinds, among them `CsiRows`
+of `harness.csi_design_results/1` and `harness.csi_analysis_messages/1`, inputs of the edit-cycle calcs of spec 0007
+§4.4.3 and §4.4.4, amendment B-503). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
+
+The change-set model is admitted by that module's own name only (amendment B-493). Its imports are limited to
+`typing`, `pydantic`, `eng_contract.kinds.basis`, `eng_contract.units` and `eng_harness.kinds.edit_cycle`: no engine,
+port, adapter or I/O. A new import in that module needs an amendment of this section first, as an import in a calc
+module does. Its package `__init__` holds the workflow definition (spec 0007 §4.1), so an import from
+`eng_harness.workflows.model_edit_cycle` itself stays refused. The module and the `eng_harness` modules it imports
+enter the calc's `modules` (§4.5), so a change to the change-set model changes the hash of each calc that imports it,
+which then needs verification again (process/10 §5). Importing the module first runs its parents
+`workflows/__init__.py` and `workflows/model_edit_cycle/__init__.py`, which from plan 0007 T9b import the shipped
+blocks and what those import (spec 0007 §4.1, §4.2) whenever `eng_harness.calcs` loads. The calc reaches none of that
+code (only its listed imports), and the two parents stay outside its `modules` (implicit parents, B-388). Therefore no
+module under `eng_harness.workflows`, nor any module it imports at load time, imports `eng_harness.calcs` at module
+level: that would be an import cycle (today only the `__main__` block of `_calc/_hash.py` imports it).
+
+`eng_harness.kinds.csi` is admitted by its own name (amendment B-503; spec 0002 §4.1, plan 0002 T21). It imports
+`pydantic` only: the adapter's reply mappers, which use `pathlib` and convert host replies, stay in
+`eng_harness.adapters.csi._replies`, which imports the models from it; an import from `eng_harness.adapters` stays
+refused. The module enters the `modules` (§4.5) of each calc that imports it, so a change to a CSI kind model changes
+those calcs' hashes, which then need verification again (process/10 §5); its parent `kinds/__init__.py` imports kind
+modules only.
 
 The rules test covers every module under `calcs/`, subpackages included (`calcs/footing/`), and mirrors FB005,
 including form A4 of amendment B-438 (an integer literal as the `version=` keyword of `calc(...)`). Amendment (B-437).
@@ -555,7 +582,10 @@ section-thickness change changes every area that uses the section (S-12 §2). Th
 effect on `model.sections/1`, never as per-area effects. The S-12 read-back gaps (frame distributed loads, pattern
 definitions, area-section thickness, restraints) give `not_read` until spec 0002 supplies typed table reads (S12-G8).
 Seismic parameters have no neutral kind and no tool (S12-G5), so there is no effect for them. A change set holding one
-is refused by spec 0007 (gap CG-1).
+is refused by spec 0007 (gap CG-1). A `remove` effect whose object is still present is `mismatch`. An effect under a
+key that occurs more than once on the after side is compared with every object under it and is `match` only when all
+match. The trace outputs are `identical` (named by the embedded difference report, R1) and `status` (amendment
+B-498).
 
 **Verification cases** (method source: this section; golden files `readback-*.json`): all effects matched (`PASS`); a
 load value read back beyond tolerance (`FAIL`, `mismatch`); a section change on a frame that no effect names
@@ -568,8 +598,17 @@ not read (`NEEDS_ENGINEER`); before and after given the same records (refused, R
 turn and the run report.
 
 **Input** `SummaryInput`: `verdicts` (reference to `verdicts.set/1` with `source: host` verdicts, as spec 0002 maps
-`csi_design_results`, Q7), optional `frames` (`model.frame_placements/1`), optional `previous`
-(`harness.design_summary/1`), `basis` (`report.top_n`).
+`csi_design_results`, Q7, or to `harness.host_design_verdicts/1`, the output of spec 0007 §4.4.3), optional `frames`
+(`model.frame_placements/1`), optional `previous` (`harness.design_summary/1`), `basis` (`report.top_n`).
+
+**Either verdicts kind** (amendment B-538; spec 0007 Q19, answered by the owner on 2026-11-16). `verdicts` is typed
+`VerdictSet | HostDesignVerdicts` (the model of `harness.host_design_verdicts/1` in `eng_harness.kinds.edit_cycle`) with
+`ref_kinds` `verdicts.set/1` and `harness.host_design_verdicts/1`; the referenced payload validates as the model of its
+kind (each model forbids the other's extra members). The summary reads only the member `verdicts`, the list of
+contract `Verdict`s that both kinds hold under that name; it reads none of `traces`, `counts`, `draft`, `calc` and
+`trace`. S1 to S6 apply to that list unchanged, so for a `verdicts.set/1` input the body and the trace's inputs, steps and
+outputs are the same as before; only the content hash in `calc` and `trace` changes. The new input schema and the import change the content hash of the draft calc (§4.5), and its
+verification record follows; the version stays 1 (§4.2: no output changes for an input it already took).
 
 **Output kind** `harness.design_summary/1`: `status`, `counts` (per `VerdictStatus`), `governing` (one verdict row:
 subject, check id, case, ratio, ratio limit, status), `governing_by_group` (per subject kind and check id),
@@ -605,8 +644,12 @@ the member key, both statuses and both member ratios; `appeared` and `disappeare
   | equal statuses | | not listed (a ratio change alone is not a status change) |
   | absent | present | `appeared` (only here, whatever its status) |
   | present | absent | `disappeared` (only here, whatever its status) |
+
+  Without `previous`, every list of `changes` is empty (amendment B-498).
 - S6. Status: `FAIL` if any `FAIL`. Otherwise `NEEDS_ENGINEER` if any `NEEDS_ENGINEER` or `ERROR`, any
-  `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`.
+  `not_designed`, no verdicts at all (message "no design results"), or an incomplete input. Otherwise `PASS`. The
+  payload has no message field: the messages are the value of the trace step `status_reasons`, the reasons of this
+  rule that hold, in this order, joined by `; `, or `none` (amendment B-498).
 
 **Edge cases.** Several verdicts per member (stations, cases) are all kept in `failing`, `attention` and `top`; member
 status and member ratio follow S5. Ties are broken by S2, never by input order. A `previous` without `members` (another
@@ -697,7 +740,10 @@ coincident frames (`ambiguous`).
 
 ### 4.12 CalcPort and the engine
 
-`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids)` implements engine §4.8 `CalcPort`:
+`HarnessCalcPort(registry, approvals, store, settings, run_class, clock, ids, *, basis_fields=None, code_packs=None)`
+implements engine §4.8 `CalcPort`. `basis_fields` maps a calc id to the basis paths it reads (`CalcInfo.basis_fields`,
+§4.4); the code that assembles the port supplies it when the port is constructed, since the calc declaration carries
+no such field, and a calc id it does not name (or `None`) describes no basis paths (amendment B-498):
 
 1. `describe` (AC13). `CalcInfo.ref_rules` is the only channel through which the engine learns each field's
    `RefRule`, `stale_ok` included.
@@ -760,7 +806,7 @@ these three calcs, and each payload records both revisions. This is raised as Q1
 | Read-set fields (§4.6) | `model.*` payloads | canonical | contract kinds | references only; `stale_ok` only as in §4.13 | Read tools, spec 0002 |
 | `basis` | `basis.design_basis/1` | per field (§4.4) | §4.4 | reference only | Spec 0004 |
 | `effects` | `harness.expected_effects/1` | canonical | §4.8 | reference only | Spec 0007 |
-| `verdicts` | `verdicts.set/1` (host) | — | contract §4.9.1 | reference only | Spec 0002 |
+| `verdicts` | `verdicts.set/1` (host) or `harness.host_design_verdicts/1` | — | contract §4.9.1 | reference only | Spec 0002; spec 0007 §4.4.3 |
 | `required` | length quantity | `mm` | > 0 | reference only | Calc output or engineer input |
 | `CalcSettings.max_items` | `int` | — | ≥ 1 | no | `harness.toml` (spec 0006) |
 | Outputs | the six `harness.*` kinds | canonical | §4.6 to §4.11 | stored results | this spec |
@@ -837,7 +883,7 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q4 | 06 §6 includes the file save time and only counts and names. This spec hashes full content (positions, ج9) and leaves out the save time (a save without changes is not a change) | Owner | Accept. Amend 06 §6 by a hub change after S-04 |
 | Q5 | Host object names compared exactly (D2). ETABS may treat names case-insensitively | Owner, local test | Exact for v1 (a case-only rename shows as removed plus added, which is safe). Revisit after the first local run |
 | Q6 | The projection from the change set to `harness.expected_effects/1` belongs to spec 0007 | Owner, B-066 | Make it a calc of spec 0007 (approved like these), so the expected effects are as rigorous as the check |
-| Q7 | The design summary assumes spec 0002 maps `csi_design_results` to host verdicts in `verdicts.set/1`, with `ratio_limit` from the basis | Owner, B-061 | Confirm in spec 0002 |
+| Q7 | The design summary assumes spec 0002 maps `csi_design_results` to host verdicts in `verdicts.set/1`, with `ratio_limit` from the basis | Owner, B-061 | Done by spec 0007 §4.4.3: `harness.host_design_verdicts` maps them to `harness.host_design_verdicts/1`, which §4.9 accepts (spec 0007 Q19, answered by the owner on 2026-11-16; amendment B-538) |
 | Q8 | The content hash covers `eng-contract`'s version but not third-party libraries (Pydantic) | Owner | Accept. Golden tests run on every dependency update. Including them would invalidate every approval on each patch release |
 | Q9 | `approvals.yaml` needs a YAML parser, which is a runtime dependency (ADR needed) | Owner | One package ADR for a safe YAML parser shared with plan 0004 (templates). Whichever task lands first writes it |
 | Q10 | All six calcs ship `draft`: `harness.model_fingerprint`, `harness.model_diff`, `harness.readback_check`, `harness.design_summary`, `harness.section_round`, `harness.placement_compare` | Owner | Review the verification records and approve by `approvals.yaml` entries after the local tests |
@@ -846,6 +892,9 @@ Part of `eng-harness` 0.1.0. Each calc starts at version 1. Each kind starts at 
 | Q13 | Conflict: 04 §3.4 ("a calculation never mixes revisions of one model") and 11 §6 invariant 3 allow no older-revision input to a calc, but the difference report, read-back check and placement comparison need one (§4.13) | Owner, hub | Accept §4.13: `stale_ok` only on the earlier-state fields, the later side always current, both revisions recorded. Amend 04 §3.4 and 11 §6 by a hub change: "a calc mixes revisions only through parameters declared `stale_ok` for an earlier state" |
 | Q14 | A required section size with float noise just above a multiple rounds to the next multiple (§4.10 N1). No source allows a rounding allowance, and a comparison tolerance is not one | Owner, spec 0004 | Keep no allowance in v1 (conservative). If the owner wants one, add a separate basis field (for example `modeling.section_rounding_allowance_mm`, `mm`, no default) and a new calc version |
 | Q15 | Spec 0010 Q10 and C2: the CalcPort serves code-pack checks through the one code-pack route of spec 0010 §4.3 and spec 0013 §4.5 (§4.12 item 4), with the run-class rule of §4.5 and §4.12; `NOT_FOUND` (§6) covers an id outside the route's allowlist | Owner | Accept (amendment B-405; draft until the owner approves) |
+| Q16 | Is an expected effect whose `unit` differs from the canonical unit of its field refused? Nothing reads `Effect.unit` today; values are compared unconverted (D6), so a wrong unit gives `mismatch` except by coincidence (amendment B-498) | Owner | Writer's recommendation: yes, `INVALID_ARGUMENT` naming the effect, in a new calc version; spec 0007 §4.4.2 already writes canonical values |
+| Q17 | Does the design summary refuse verdicts whose `source` is not `host` (Q7), or verdicts and frames of different models? §4.9 states neither (amendment B-498) | Owner | Writer's recommendation: refuse both with `INVALID_ARGUMENT` naming the field, as F5 refuses mixed models, in a new calc version |
+| Q18 | R0 admits an `after` model that is the `before` model's working copy, but `RefMeta` has no `derived_from`, so a working copy cannot be recognised and a different model id is refused (amendment B-498) | Owner | Writer's recommendation: keep the refusal (the safe side; the edit cycle reads the working copy on both sides, spec 0007 §4.5 step 9) and delete "(or its working copy)" from R0, unless a workflow needs it; then add `derived_from` to `RefMeta` first |
 | CG-1 | Seismic parameters: no neutral kind and no tool (S12-G5, OQ-G8). No read-back or diff | Owner | Gap. Spec 0007 refuses such edits until `harness.seismic_parameters/1` and a tool exist |
 | CG-2 | Rounding rules other than `up` | Owner | `NotImplementedGap` until the owner defines one |
 | CG-3 | Total weight, modal periods and reactions comparison (ب2) | Owner | A later calc with its own basis tolerances, after phase 1 |

@@ -1,0 +1,16 @@
+mode: bootstrap
+check: pass
+  lock: pass
+  config: pass
+  format: pass
+  lint: pass
+  types: pass
+  forbidden: pass
+  imports: pass
+  ratchet: pass
+    [notice] .gate/ratchet.json: RT001 tools/eng-dev-gate: noqa count fell from 19 to 18; run `ratchet --update`
+  secrets: pass
+  tests: pass
+  docs-fresh: pass
+  licenses: pass
+  workflows: pass

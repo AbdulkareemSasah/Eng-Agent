@@ -117,7 +117,7 @@ def test_preview_and_approval() -> None:
         Preview(items=(item, item), diff_ref=None, models=())
     handle = ModelHandle(model_key="m", model_id=MODEL, revision=2)
     preview = Preview(items=(item,), diff_ref=None, models=(handle,))
-    assert preview.models[0].revision == 2
+    assert preview.models == (handle,)  # the handle, revision 2, as given
     with pytest.raises(ValidationError):
         item.label = "x"
     approved = Approval(request_id="apr_1", approved=True, rejected_items=("b",), item_reasons={"b": "no"}, reason=None)

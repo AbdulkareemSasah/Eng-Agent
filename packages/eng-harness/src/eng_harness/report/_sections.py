@@ -48,6 +48,13 @@ class SourceBook:
         return found
 
 
+def _registry() -> dict[str, _Renderer]:
+    from eng_harness.report._edit_cycle import register  # lazy: _edit_cycle imports this module
+
+    register()
+    return _REGISTRY
+
+
 def register_renderer(kind: str, renderer: _Renderer) -> None:
     """Map a result kind to its section renderer (spec 0006 4.6.1). Later specs register theirs."""
     _REGISTRY[kind] = renderer
@@ -319,7 +326,7 @@ class _Page:
         for entry in self.model.results:
             blocks.append(el(Tag.H3, Text(entry.kind)))
             payload = self.store.payload(entry.result_id)
-            external = _REGISTRY.get(entry.kind)
+            external = _registry().get(entry.kind)
             if external is not None:
                 blocks.extend(external(payload, entry.result_id, self.book))
                 continue

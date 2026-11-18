@@ -15,6 +15,7 @@ Units are the Sasaah tokens of the S-12 report (section 4); the fake invents no 
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +34,7 @@ KINDS: dict[str, str] = {t["name"]: t["server_kind"] for t in SCHEMAS["tools"]} 
 WRITE_KINDS = {"Write", "Destructive"}  # S-12 report section 7: these raise model_locked while the model is locked
 LOCK_EXEMPT = {"csi_unlock_model", "csi_save_model", "csi_run_analysis", "csi_design_run"}  # S-12 report section 7
 LENGTH_M = {"kN_mm_C": 0.001, "kN_m_C": 1.0}  # metres per length unit of a token (S-12 report, section 4)
+RESULTS = ("csi_results_joint_reactions", "csi_results_frame_forces", "csi_results_story_drifts")
 COMBO_NAMES = ("Linear Add", "Envelope", "Absolute Add", "SRSS")  # the schema's combo_type codes 0 to 3
 NEEDS_LAUNCHED = {"csi_open_model", "csi_new_model", "csi_new_blank_model", "csi_exit"}
 COLLECTIONS = (
@@ -79,6 +81,28 @@ class State:
 STATE = State()
 
 
+def _flag(name: str) -> Any:
+    """A flag of the host program (`locked`, `analyzed`, `designed`): every server of a run sees the same one.
+
+    The host is one process, so the servers of its roles share these flags through the control file; without one the
+    flag is the in-memory value.
+    """
+    if CONTROL:
+        shared = json.loads(Path(CONTROL).read_text()).get("host", {})
+        if name in shared:
+            return shared[name]
+    return STATE.model.get(name)
+
+
+def _set_flag(name: str, value: Any) -> None:
+    STATE.model[name] = value
+    if CONTROL:
+        path = Path(CONTROL)
+        data = json.loads(path.read_text())
+        data.setdefault("host", {})[name] = value
+        path.write_text(json.dumps(data))
+
+
 def _timeout() -> SasaahError:
     STATE.session_valid = False  # the cached session is invalidated (S-12 section 5)
     return SasaahError("timeout", "The call timed out.")
@@ -91,6 +115,10 @@ def _launch_pid(*, fresh: bool) -> int:
     launch of the instance this server last started, takes the next pid so a restore can see a distinct instance.
     """
     global _NEXT_PID
+    if CONTROL:
+        data = json.loads(Path(CONTROL).read_text())
+        if data.get("persist_model"):
+            return int(max(data.get("launched", [PID - 1]))) + 1
     if not fresh and STATE.target is not None and STATE.target.get("pid") != _NEXT_PID - 1:
         return PID
     pid = _NEXT_PID
@@ -185,18 +213,53 @@ def _list(kind: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     return {"count": min(len(items), limit), "items": items[:limit], "truncated": len(items) > limit, "units": units}
 
 
+def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
+    """Analysis, design and results tools of spec 0002 section 4.6.1; the seed supplies every result row.
+
+    `csi_run_analysis` answers `{started: true}` only after it finished (S-12 section 5) and leaves the model locked.
+    `csi_analysis_status` answers raw per-case codes (the test values 1 and 4 mean nothing: the server does not decode
+    them). The results tools answer the seed's rows of the tool, `model["results"][tool]`, as seeded and not rescaled
+    (the reply's `units` names the call's token; a test seeds the rows in the units it calls with);
+    a design result needs a design run of its kind first (the tool's description).
+    """
+    model = STATE.model
+    if name == "csi_run_analysis":
+        _set_flag("locked", True)
+        _set_flag("analyzed", True)
+        return {"started": True}
+    if name == "csi_analysis_status":
+        code = 4 if _flag("analyzed") else 1
+        return {"cases": [{"case": row["name"], "status_code": code} for row in model["load_cases"]]}
+    if name in RESULTS:
+        rows = model.get("results", {}).get(name, [])
+        return {"items": rows, "count": len(rows), "truncated": False, "units": units}
+    kind = args.get("kind")
+    if name == "csi_design_run":
+        if kind in ("aluminum", "coldformed"):  # the tool's description: SAFEv1 and ETABSv1 have no such designers
+            raise SasaahError("unsupported_by_version", f"Design kind {kind} is not supported by this version.")
+        _set_flag("designed", sorted({*(_flag("designed") or []), *([kind] if kind else [])}))
+        return {"kind": kind, "completed": True}
+    if kind not in (_flag("designed") or []):
+        raise SasaahError("csi_error", f"No {kind} design results exist; run csi_design_run first.")
+    rows = [r for r in model.get("design_results", {}).get(kind, []) if args.get("name") in (None, r.get("frame"))]
+    limit = int(args.get("limit") or 500)
+    return {"items": rows[:limit], "count": min(len(rows), limit), "truncated": len(rows) > limit}
+
+
 def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     model = STATE.model
     if name == "csi_model_info":
         counts = {kind: len(model[kind]) for kind in COLLECTIONS}
         return {
             "units": model["units"],
-            "locked": model["locked"],
+            "locked": _flag("locked"),
             "model_path": model["model_path"],
             "object_counts": counts,
             "counts": counts,
             "program_version": "22.0.0",
         }
+    if name in ("csi_run_analysis", "csi_analysis_status", "csi_design_run", "csi_design_results") or name in RESULTS:
+        return _analysis(name, args, units)
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
         return _list(name[len("csi_list_") :], args, units)
     if name == "csi_db_table_read":
@@ -213,10 +276,8 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
         model["load_combos"] = [c for c in model["load_combos"] if c["name"] != args.get("name")]
         defs = model["tables"].get("Load Combination Definitions", [])
         model["tables"]["Load Combination Definitions"] = [r for r in defs if r["Name"] != args.get("name")]
-    elif name == "csi_run_analysis":
-        model["locked"] = True
     elif name == "csi_unlock_model":
-        model["locked"] = False
+        _set_flag("locked", False)
     elif name == "csi_open_model":
         model["model_path"] = args.get("path", model["model_path"])
     elif name == "csi_save_model":
@@ -249,7 +310,7 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         raise SasaahError("confirmation_required", f"{name} requires confirm=true.")
     if name in NEEDS_LAUNCHED and not STATE.target["launched"]:
         raise SasaahError("not_launched_by_server", "The instance was not launched by this server.")
-    if KINDS[name] in WRITE_KINDS and name not in LOCK_EXEMPT and STATE.model["locked"]:
+    if KINDS[name] in WRITE_KINDS and name not in LOCK_EXEMPT and _flag("locked"):
         raise SasaahError("model_locked", "The model is locked after analysis.")
     if STATE.pop_fault(name, {"timeout_before_apply"}):  # any call can time out, a read included (S-12 section 5)
         raise _timeout()
@@ -289,7 +350,9 @@ def _note(name: str, args: dict[str, Any]) -> None:
     if not isinstance(data, dict):
         return
     pid = STATE.target["pid"] if STATE.target is not None else None
-    entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path")}
+    audit = sys.argv[sys.argv.index("--audit-log") + 1] if "--audit-log" in sys.argv else ""
+    role = Path(audit).name.removesuffix("-audit.jsonl").rsplit("-", 1)[-1]
+    entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path"), "role": role}
     if name == "csi_launch" and isinstance(pid, int):
         entry["visible"] = bool(args.get("visible", False))
         launched = data.get("launched")
@@ -302,11 +365,21 @@ def _note(name: str, args: dict[str, Any]) -> None:
 async def on_call_tool(ctx: ServerRequestContext[Any], params: types.CallToolRequestParams) -> types.CallToolResult:
     """Run one tool and answer in the Sasaah reply shape."""
     args = dict(params.arguments or {})
+    if CONTROL:
+        data = json.loads(Path(CONTROL).read_text())
+        if data.get("persist_model") and "model" in data:
+            STATE.model = data["model"]
     try:
         return _reply(await _call(params.name, args), error=False)
     except SasaahError as error:
         return _reply({"code": error.code, "message": str(error), "data": error.data}, error=True)
     finally:
+        if CONTROL:
+            path = Path(CONTROL)
+            data = json.loads(path.read_text())
+            if data.get("persist_model"):
+                data["model"] = STATE.model
+                path.write_text(json.dumps(data))
         _note(params.name, args)  # os._exit on crash_during_call skips this, so that fault is not recorded as a call
 
 

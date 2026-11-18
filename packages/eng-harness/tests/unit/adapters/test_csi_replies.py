@@ -1,10 +1,13 @@
 """CSI reply mapping to neutral kinds (plan 0002 T11; spec 0002 AC27, section 4.6.4)."""
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
-from eng_contract.errors import ContractError
+from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds import NEUTRAL_KINDS
+from eng_contract.kinds.forces import JointReactions, MemberEnd, StoryDrifts
 from eng_contract.kinds.model import (
     AreaKind,
     AreaPlacements,
@@ -19,6 +22,7 @@ from eng_contract.kinds.model import (
     Stories,
 )
 
+from eng_harness.adapters.csi import _replies
 from eng_harness.adapters.csi._replies import (
     CsiModelStatus,
     area_section_kinds,
@@ -30,6 +34,7 @@ from eng_harness.adapters.csi._replies import (
     restraints,
     stories,
 )
+from eng_harness.adapters.csi.products import _etabs
 
 UNITS = "kN_m_C"  # present units token of the synthetic fake (S-12); length `m`, stress `kN/m2`, line load `kN/m`
 
@@ -172,3 +177,149 @@ def test_two_value_point_is_refused() -> None:
     with pytest.raises(ContractError) as refused:
         frames([row], UNITS)
     assert refused.value.detail.field == "point1"
+
+
+_POINT = {"point1": [0.0, 0.0, 0.0], "point2": [0.0, 0.0, 3.0]}
+_PATTERNS: list[dict[str, Any]] = [{"name": "DEAD", "type": "Dead", "self_weight": 1.0}]
+_DRIFT_Z = {"story": "S1", "case": "EQ", "direction": "Z", "drift": 0.1}
+_NO_TORSION = {"frame": "B1", "case": "D", "P": 1, "V2": 1, "V3": 1}
+_NOT_A_ROW: list[Any] = [1]  # a list entry that is no object: `.get` on it is an `AttributeError`
+
+
+def _combos(items: list[dict[str, Any]]) -> Callable[[], object]:
+    return lambda: load_set(_PATTERNS, [{"name": "C1", "type": 0, "items": items}], [], [], [], [], UNITS)
+
+
+@pytest.mark.parametrize(
+    ("call", "field", "text"),
+    [
+        (
+            lambda: stories([{"name": "S1", "height": 3.0}], UNITS),
+            "rows",
+            "stories: the host reply has no field elevation",
+        ),
+        (lambda: grids([{"type": "Cartesian"}], UNITS), "rows", "grids: the host reply has no field name"),
+        (lambda: frames([{"name": "B1", **_POINT}], UNITS), "rows", "no field section"),
+        (lambda: areas([{"name": "A1", "points": []}], UNITS, {}), "rows", "no field section"),
+        (_combos([{"name": "DEAD"}]), "rows", "no field factor"),
+        (_combos([{"name": "NOPE", "factor": 1.0}]), "rows", "load_set: a value"),  # a combination item naming nothing
+        (lambda: restraints(_NOT_A_ROW), "rows", "restraints: a value"),
+        (lambda: model_status({"object_counts": {"frames": "many"}}, None), "rows", "model_status: a value"),
+        (lambda: area_section_kinds([{"type": "slab"}]), "rows", "no field name"),
+        (lambda: _replies.analysis_run({}), "rows", "analysis_run: the host reply has no field started"),
+        (lambda: _replies.analysis_run({"started": "yes"}), "rows", "analysis_run: a value"),  # not a boolean: no guess
+        (lambda: _replies.analysis_status({"cases": 5}), "cases", "field cases"),
+        (lambda: _replies.analysis_status({"cases": [{"case": "DEAD"}]}), "rows", "no field status_code"),
+        (
+            lambda: _replies.analysis_status({"cases": [{"case": "DEAD", "status_code": 4.5}]}),
+            "rows",
+            "analysis_status",
+        ),
+        (lambda: _replies.design_results({"items": [1]}), "items", "field items"),
+        (lambda: _replies.design_results({}), "items", "field items"),
+        (lambda: _replies.analysis_messages({"rows": "none"}), "rows", "field rows"),
+        (lambda: _replies.joint_reactions({"items": [{"joint": "J1", "case": "DEAD"}]}, UNITS), "rows", "no field F1"),
+        (lambda: _replies.joint_reactions({"items": _NOT_A_ROW}, UNITS), "items", "field items"),
+        (lambda: _replies.member_forces({"items": [_NO_TORSION]}, UNITS), "rows", "no field T"),
+        (lambda: _replies.story_drifts({"items": [_DRIFT_Z]}, UNITS), "rows", "story_drifts: a value"),  # not X or Y
+    ],
+)
+def test_mappers_raise_unexpected_reply(call: Callable[[], object], field: str, text: str) -> None:
+    """A missing or unusable reply value is `HOST_ERROR` `UNEXPECTED_REPLY` that names it, from every mapper."""
+    with pytest.raises(ContractError) as refused:
+        call()
+    detail = refused.value.detail
+    assert (detail.code, detail.host_code, detail.retryable, detail.field) == (
+        ErrorCode.HOST_ERROR,
+        "UNEXPECTED_REPLY",
+        False,
+        field,
+    )
+    assert text in detail.message
+
+
+def test_combination_item_kinds() -> None:
+    """A combination item whose host `kind` is `combo` names a combination; `case` or no kind names a pattern."""
+    combos = [
+        {
+            "name": "C1", "type": 0,
+            "items": [{"name": "DEAD", "factor": 1.4, "kind": "case"}, {"name": "DEAD", "factor": 1.0}],
+        },
+        {"name": "C2", "type": 0, "items": [{"name": "C1", "factor": 1.0, "kind": "combo"}]},
+    ]  # fmt: skip
+    loads = load_set(_PATTERNS, combos, [], [], [], [], UNITS)
+    kinds = [[(i.case.case, i.case.case_type.value, i.scale_ratio) for i in c.items] for c in loads.combinations]
+    assert kinds == [[("DEAD", "load_pattern", 1.4), ("DEAD", "load_pattern", 1.0)], [("C1", "load_combination", 1.0)]]
+
+
+def test_force_mappers_convert_to_canonical() -> None:
+    """Forces in `kN_mm_C` are kN and moments kN.mm are x0.001 kN.m; `kN_m_C` lengths are x1000 mm."""
+    mm = "kN_mm_C"
+    row = {"joint": "J1", "case": "DEAD", "F1": 1.5, "F2": -2.0, "F3": 120.25, "M1": 500.0, "M2": -250.0, "M3": 0.0}
+    reactions = _replies.joint_reactions({"items": [row]}, mm)
+    assert isinstance(reactions, JointReactions)
+    assert reactions.axes == "global"
+    got = reactions.rows[0]
+    assert (got.joint, got.case.case, got.case.case_type.value, got.case.step) == ("J1", "DEAD", "load_case", None)
+    assert (got.FX_kN, got.FY_kN, got.FZ_kN) == (1.5, -2.0, 120.25)
+    assert (got.MX_kNm, got.MY_kNm, got.MZ_kNm) == (0.5, -0.25, 0.0)
+
+    frame = {
+        "frame": "B1", "case": "1.4D", "kind": "combo", "step": "Max", "end": "j", "station": 1250.0,
+        "P": -10.0, "V2": 4.5, "V3": 0.5, "T": 100.0, "M2": 200.0, "M3": -7750.0,
+    }  # fmt: skip
+    rows = [frame, {**frame, "end": "mid", "step": "", "kind": "case"}, {**frame, "end": "i", "step": None}]
+    forces = _replies.member_forces({"items": rows}, mm)
+    assert isinstance(forces, MemberEnd)
+    assert forces.sign_convention == "host_local/1"
+    first, second, third = forces.rows
+    assert (third.end, third.case.step) == ("i", None)
+    assert (first.member, first.end, first.station_mm) == ("B1", "j", 1250.0)
+    assert (first.case.case_type.value, first.case.step) == ("load_combination", "Max")
+    assert (first.P_kN, first.V2_kN, first.V3_kN) == (-10.0, 4.5, 0.5)
+    assert (first.T_kNm, first.M2_kNm, first.M3_kNm) == (0.1, 0.2, -7.75)
+    assert (second.end, second.case.case_type.value, second.case.step) == (None, "load_case", None)  # not i or j
+
+    metres = _replies.member_forces({"items": [{**frame, "station": 1.25}]}, "kN_m_C")
+    assert metres.rows[0].station_mm == 1250.0
+    assert metres.rows[0].M3_kNm == -7750.0  # kN.m stays kN.m
+
+    drift = {
+        "story": "S1",
+        "case": "EQX",
+        "direction": "X",
+        "drift": 0.0025,
+        "label": "J2",
+        "x": 5.0,
+        "y": 0.0,
+        "z": 3.0,
+    }
+    bare_row = {"story": "S2", "case": "EQX", "direction": "Y", "drift": 0.0}
+    drifts = _replies.story_drifts({"items": [drift, bare_row]}, "kN_m_C")
+    assert isinstance(drifts, StoryDrifts)
+    near, bare = drifts.rows
+    assert (near.drift_ratio, near.point, near.x_mm, near.y_mm, near.z_mm) == (0.0025, "J2", 5000.0, 0.0, 3000.0)
+    assert (bare.direction, bare.point, bare.x_mm, bare.y_mm, bare.z_mm) == ("Y", None, None, None, None)
+
+
+def test_raw_host_output_is_kept() -> None:
+    """Status codes, design rows and analysis messages are stored as the host gave them: not decoded, not judged."""
+    status = _replies.analysis_status(
+        {"cases": [{"case": "DEAD", "status_code": 4}, {"case": "LIVE", "status_code": 0}]}
+    )
+    assert [(c.case, c.status_code) for c in status.cases] == [("DEAD", 4), ("LIVE", 0)]
+    assert _replies.analysis_run({"started": True}).started is True
+    assert _replies.design_run({"kind": "steel", "completed": True}).reply == {"kind": "steel", "completed": True}
+    row = {"frame": "B1", "ratio": 0.75, "combo": "1.4D"}
+    assert _replies.design_results({"items": [row], "truncated": False}).rows == [row]
+    message = {"Message": "Joint J1 is unrestrained", "Type": "Warning"}
+    assert _replies.analysis_messages({"rows": [message], "truncated": False}).rows == [message]
+    assert _etabs.ANALYSIS_MESSAGES == "Analysis Messages"
+    assert set(_replies.CSI_KINDS) == {
+        "harness.csi_model_status/1",
+        "harness.csi_analysis_run/1",
+        "harness.csi_analysis_status/1",
+        "harness.csi_design_run/1",
+        "harness.csi_design_results/1",
+        "harness.csi_analysis_messages/1",
+    }

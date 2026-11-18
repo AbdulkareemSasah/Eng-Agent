@@ -60,7 +60,7 @@ class PageApp(Protocol):
     (else None), the `report` document, and `submit` with an answer's form fields (CSRF field removed)."""
 
     def index(self) -> Response: ...
-    def screen(self, kind: Kind, subject_id: str) -> Screen | None: ...
+    def screen(self, kind: Kind, subject_id: str, *, answering: bool = False) -> Screen | None: ...
     def report(self) -> str: ...
     def submit(self, kind: Kind, subject_id: str, form: Mapping[str, str]) -> Response: ...
 
@@ -107,7 +107,7 @@ class Router:
             raise RefusalError(HTTPStatus.METHOD_NOT_ALLOWED)
         if kind is None:
             return self._fixed(url.path, url.query)
-        screen = self._app.screen(kind, subject_id)
+        screen = self._app.screen(kind, subject_id, answering=method == "POST")
         if screen is None:
             raise RefusalError(HTTPStatus.NOT_FOUND)
         if method == "GET":

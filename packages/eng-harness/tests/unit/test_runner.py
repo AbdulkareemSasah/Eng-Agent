@@ -17,14 +17,14 @@ import pytest
 from eng_contract import CONTRACT_VERSION
 from eng_contract.canonical import payload_sha256
 from eng_contract.errors import ContractError, ErrorCode, ErrorDetail
-from fakes.ports import failure
+from fakes.ports import FakeBasisPort, FakeCalcPort, FakeDecisionPort, failure
 from pydantic import JsonValue, ValidationError
 from workflows.chain import ChainInput, ChainOutput, bad_output, chain
 from workflows.rig import BASIS_REF, make_rig, request, steps
 
 from eng_harness import __version__
-from eng_harness.block import workflow
-from eng_harness.engine import EngineSettings, PermissionMode, RunRequest, RunStatus
+from eng_harness.block import Registry, workflow
+from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunRequest, RunStatus
 from eng_harness.engine._steps import op_id
 from eng_harness.errors import HarnessCode, RunRefused
 from eng_harness.journal import EventType, JournalReader
@@ -122,9 +122,47 @@ def test_unreleased_tools_recorded(tmp_path: Path) -> None:
     reader.close()
 
 
+def test_decision_runtime_recorded(tmp_path: Path) -> None:
+    """AC69: the port's summary is in `run_started`, and in `run_resumed` only when it differs from the last record."""
+    rig, port = make_rig(tmp_path), FakeDecisionPort()
+    ports = EnginePorts(
+        tool=rig.host, host=rig.host, calc=FakeCalcPort(rig.run_class, rig.calc_infos),
+        basis=FakeBasisPort(rig.bases), approvals=rig.approvals, inputs=rig.inputs, decision=port,
+    )  # fmt: skip
+    registry = Registry([chain(steps("read_a", "read_c"))])
+    engine = Engine(rig.workspace, registry, ports, rig.store, EngineSettings(), rig.clock, rig.ids)
+    port.runtime = {"providers": {"local": {"model": "m1", "tier": "advisory"}}, "points": {}}
+    rig.host.script("read_c", *[failure(ErrorCode.HOST_BUSY)] * 4)  # the run and three resumes stop at the second step
+    run_id = asyncio.run(engine.start(request())).run_id
+    assert rig.header(run_id).decision_runtime == port.runtime
+    assert port.summaries == 1
+    asyncio.run(engine.resume(run_id))  # the same object: nothing is recorded
+    port.runtime = {"providers": {}, "points": {"pick_action": 1}}
+    asyncio.run(engine.resume(run_id))  # another object: recorded
+    asyncio.run(engine.resume(run_id))  # the same as the last recorded one: nothing is recorded
+    assert port.summaries == 4  # once at the start and once per resume
+    assert asyncio.run(engine.resume(run_id)).status is RunStatus.COMPLETED
+    assert port.summaries == 5
+    resumes = [e.payload for e in rig.events(run_id) if isinstance(e.payload, ev.RunResumed)]
+    assert [r.decision_runtime for r in resumes] == [None, port.runtime, None, None]
+    reader = JournalReader(rig.run_dir(run_id))
+    assert dict(reader.run().decision_runtime) == port.runtime  # the last recorded object
+    reader.close()
+    bare = make_rig(tmp_path / "bare")  # no port, or a port with nothing to say: the record is empty
+    done = asyncio.run(bare.engine(chain(steps("read_a"))).start(request()))
+    assert bare.header(done.run_id).decision_runtime == {}
+    quiet = FakeDecisionPort()
+    ports = EnginePorts(
+        tool=bare.host, host=bare.host, calc=FakeCalcPort(bare.run_class, bare.calc_infos),
+        basis=FakeBasisPort(bare.bases), approvals=bare.approvals, inputs=bare.inputs, decision=quiet,
+    )  # fmt: skip
+    engine = Engine(bare.workspace, registry, ports, bare.store, EngineSettings(), bare.clock, bare.ids)
+    assert bare.header(asyncio.run(engine.start(request())).run_id).decision_runtime == {}
+
+
 def test_start_journals_header_and_output(tmp_path: Path) -> None:
     rig = make_rig(tmp_path)
-    workflow_def = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"})], always_ask=("write_b",))
+    workflow_def = chain([("read_a", {"n": 0}), ("write_b", {"n": 1, "model": "m1"})], always_ask=("unlock_b",))
     settings = EngineSettings(step_retry_limit=3)
     given: dict[str, JsonValue] = {"label": "a", "count": 2}
     asked = request(values=given, mode=PermissionMode.AUTONOMOUS_LOGGED)
@@ -159,7 +197,7 @@ def test_start_journals_header_and_output(tmp_path: Path) -> None:
     assert (head.engine_version, head.contract_version) == (__version__, CONTRACT_VERSION)
     assert head.settings_sha256 == payload_sha256(settings.model_dump(mode="json"))
     assert head.settings_sha256 != payload_sha256(EngineSettings().model_dump(mode="json"))
-    assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["write_b"], {}, {})
+    assert (head.servers, head.always_ask, head.unreleased_tools, head.decision_runtime) == ([], ["unlock_b"], {}, {})
     assert rig.store.payload(head.input_ref) == {"value": given}  # the input is stored, not copied into the journal
     assert head.input_sha256 == payload_sha256(given)
     read, read_done, bind, units, _units_done, units_enforced = events[1:7]
@@ -280,8 +318,11 @@ async def _checked(ctx: Any, inp: ChainInput) -> ChainOutput:
 
 
 def _meta_run_id(run_dir: Path) -> str:
-    with sqlite3.connect(run_dir / "journal.sqlite") as db:
+    db = sqlite3.connect(run_dir / "journal.sqlite")
+    try:
         return str(db.execute("SELECT value FROM meta WHERE key = 'run_id'").fetchone()[0])
+    finally:
+        db.close()
 
 
 def _tree(root: Path) -> list[str]:

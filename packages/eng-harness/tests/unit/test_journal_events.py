@@ -300,3 +300,37 @@ def test_bounded_fields() -> None:
         PAYLOAD_MODELS[EventType.HOST_STARTED].model_validate({**SAMPLES["host_started"], "pid": 0})
     with pytest.raises(ValidationError):
         PAYLOAD_MODELS[EventType.RUN_STARTED].model_validate({**SAMPLES["run_started"], "input_sha256": "xyz"})
+
+
+OPEN = {**SAMPLES["step_started"], "kind": "tool", "effect": "write", "action": "open"}
+
+
+def test_open_capability_is_a_strict_optional_marker() -> None:  # B-562, spec 4.4.2
+    assert StepStarted.model_validate({**OPEN, "opens_model_without_writing": True}).opens_model_without_writing
+    for unset in ({}, {"opens_model_without_writing": None}):
+        payload = StepStarted.model_validate({**OPEN, **unset})
+        assert payload.opens_model_without_writing is None
+        assert "opens_model_without_writing" not in payload.model_dump(mode="json")  # earlier payloads keep their form
+    kept = StepStarted.model_validate({**OPEN, "opens_model_without_writing": False})
+    assert kept.model_dump(mode="json")["opens_model_without_writing"] is False
+    for loose in (1, "true", 0):
+        with pytest.raises(ValidationError):
+            StepStarted.model_validate({**OPEN, "opens_model_without_writing": loose})
+
+
+@pytest.mark.parametrize(
+    "change", [{"kind": "promote"}, {"effect": "read"}, {"action": "save"}, {"action": None}]
+)  # fmt: skip
+def test_open_capability_only_on_a_tool_write_open(change: dict[str, Any]) -> None:  # B-562, spec 4.4.2
+    with pytest.raises(ValidationError, match="only on a tool write with action open"):
+        StepStarted.model_validate({**OPEN, **change, "opens_model_without_writing": True})
+    assert StepStarted.model_validate({**OPEN, **change, "opens_model_without_writing": False})
+
+
+def test_a_legacy_step_started_payload_is_unchanged() -> None:  # B-562, spec 4.4.2 and 10
+    legacy = StepStarted.model_validate(SAMPLES["step_started"]).model_dump(mode="json")
+    assert StepStarted.model_validate(legacy).model_dump(mode="json") == legacy
+    assert "opens_model_without_writing" not in legacy
+    assert set(legacy) == {*SAMPLES["step_started"], "args_ref", "action", "op_id", "host_key", "model_key"} | {
+        "under", "item", "child",
+    }  # fmt: skip

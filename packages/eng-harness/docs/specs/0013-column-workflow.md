@@ -42,7 +42,7 @@ how the accepted ETABS sections reach Revit by reference, with read-back, under 
 |---|---|---|
 | Edit cycle (EC §4.5) | Read, difference report, approval, revision save, writes, read-back, analysis, design, engineer turn, promotion, sign-off | Reused as child blocks `read_state`, `apply_change_set`, `run_and_summarize` and `_finish` (Q3) |
 | `harness.section_round` (0003 §4.10) | Smallest basis multiple not below a required size | Used for every proposed dimension; no rounding here |
-| `harness.design_summary` (0003 §4.9) | Summary of one `verdicts.set/1`; traces are local to a payload, so sets cannot be merged | Its member method S5 is cited by `harness.column_review` (§4.4.3), which reads several sets by reference without copying verdicts |
+| `harness.design_summary` (0003 §4.9) | Summary of one verdict set (`verdicts.set/1` or `harness.host_design_verdicts/1`, 0003 §4.9); traces are local to a payload, so sets cannot be merged | Its member method S5 is cited by `harness.column_review` (§4.4.3), which reads several sets by reference without copying verdicts |
 | `harness.host_design_verdicts` (EC §4.4.3) | Steel ratio per frame; concrete `NEEDS_ENGINEER` | Used unchanged; concrete columns have no host verdict (CW-G1) |
 | `harness.frame_element_map` (RV §4.11) | Exact geometric pairing, links as hints | Used unchanged |
 | Code checks `aci318_14.22_4_2_1.max_axial_strength`, `aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits` (CK §1) | Draft, pure, `evaluate_batch` (CF §4) | Called through the CalcPort code-pack route (§4.5, C2) |
@@ -295,7 +295,7 @@ E5 as steps. Each code-check input is passed as a reference into this result.
 
 #### 4.4.3 `harness.column_review` v1
 
-Input: `selection`, `host` (`verdicts.set/1` from `harness.host_design_verdicts`), `code` (the three code-check
+Input: `selection`, `host` (`harness.host_design_verdicts/1`, the output of `harness.host_design_verdicts`), `code` (the three code-check
 `verdicts.set/1` results), `items` (for `not_checked`), optional `previous` (`harness.column_review/1`), `basis`
 (`report.top_n`). Method: R1 only verdicts whose subject is a selected column (`frame`, id) are read. R2 members and
 member status per 0003 §4.9 S5 (key: column, source, check id); a column's `status` is the worst of its members, and
@@ -549,7 +549,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
 | Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
-| C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa`; the clause specs keep the unsuffixed names until the owner renames them |
+| C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |
 | C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |
 | C4 | 19 §1 names one workflow; this spec has two runs (Q1) | Owner | As Q1 |

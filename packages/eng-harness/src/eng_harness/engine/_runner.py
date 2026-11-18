@@ -8,7 +8,7 @@ block ends the run as `NEEDS_ENGINEER` or `PAUSED` and is not raised.
 """
 
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
@@ -28,12 +28,24 @@ from eng_harness import __version__, errors
 from eng_harness._runlock import RunLock
 from eng_harness.block import Registry, WorkflowDef
 from eng_harness.ctx import BasisView
-from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight
+from eng_harness.engine import _decide, _hostsafety, _hoststate, _inflight, _resources
 from eng_harness.engine._ctx_impl import AttemptsExhausted, Ctx
+from eng_harness.engine._guard import block_code
 from eng_harness.engine._steps import root_scope
 from eng_harness.journal import Event, EventType, JournalReader, JournalWriter
 from eng_harness.journal import _events as ev
-from eng_harness.ports import ApprovalPort, BasisPort, CalcPort, DecisionPort, HostPort, InputPort, RunClass, ToolPort
+from eng_harness.ports import (
+    ApprovalPort,
+    BasisPort,
+    CalcPort,
+    DecisionPort,
+    HostPort,
+    InputPort,
+    ProgressSink,
+    RunClass,
+    RunControlPort,
+    ToolPort,
+)
 
 _RUN_ID = re.compile(r"^run_[0-7][0-9A-HJKMNP-TV-Z]{25}$")
 _TERMINAL = (EventType.RUN_COMPLETED, EventType.RUN_FAILED)
@@ -85,6 +97,16 @@ class RunRequest(BaseModel):
     run_id: str | None = None
 
 
+def _lazy_basis(port: BasisPort, basis_ref: str, declared: tuple[str, ...]) -> Callable[[], BasisView]:
+    """The loader of `ctx.basis` and of decisions: the stored basis is read when first asked for, never earlier."""
+
+    def load() -> BasisView:
+        loaded = port.load(basis_ref)
+        return BasisView(loaded.result_id, loaded.basis, declared)
+
+    return load
+
+
 @dataclass(frozen=True)
 class RunOutcome:
     """How a run ended: its output when completed, its open request ids when paused, its escalation when stopped."""
@@ -98,9 +120,11 @@ class RunOutcome:
 
 @dataclass(frozen=True)
 class EnginePorts:
-    """The ports an engine works through (spec 4.8); the progress and run-control ports follow.
+    """The ports an engine works through (spec 4.8).
 
     `decision` is `None` when no cascade is wired: a `decide` or `decide_many` call is then an internal error.
+    `progress` gets every event after its commit (AC58); `run_control` is asked before each step whether the engineer
+    wants the run to stop, and a true answer pauses it (`run_paused`, reason `stop_requested`); both are optional.
     """
 
     tool: ToolPort
@@ -110,6 +134,8 @@ class EnginePorts:
     approvals: ApprovalPort
     inputs: InputPort
     decision: DecisionPort | None = None
+    progress: ProgressSink | None = None
+    run_control: RunControlPort | None = None
 
 
 @contextmanager
@@ -193,8 +219,9 @@ class Engine:
                 "contract_version": CONTRACT_VERSION, "settings_sha256": self._settings_sha256,
                 "servers": [c.model_dump(mode="json") for c in checks],
                 "always_ask": list(workflow.always_ask), "unreleased_tools": dict(self._ports.tool.unreleased_tools()),
+                "decision_runtime": self._runtime(),
             }  # fmt: skip
-            with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
+            with closing(JournalWriter(run_dir, self._store, self._clock, self._ids, on_commit=self._hook())) as writer:
                 writer.append(EventType.RUN_STARTED, header)
                 rt, leases = self._hosts(run_id, writer, 0)
                 try:
@@ -229,7 +256,7 @@ class Engine:
             if (ended := next((e for e in events if e.type in _TERMINAL), None)) is not None:
                 return await self._ended(run_id, head, events, ended.payload)
             self._check_class(head.run_class)  # step 3
-            with closing(JournalWriter(run_dir, self._store, self._clock, self._ids)) as writer:
+            with closing(JournalWriter(run_dir, self._store, self._clock, self._ids, on_commit=self._hook())) as writer:
                 try:
                     workflow, inp = self._admit(head)
                 except errors.ReplayDivergence as stop:
@@ -274,9 +301,23 @@ class Engine:
         changed = workflow.code_sha256 != head.block.code_sha256  # a warning, not a divergence (AC29)
         number = max((p.resume_no for p in seen), default=0) + 1  # a restore adds a second event with the same number
         now: dict[str, JsonValue] = dict(self._ports.tool.unreleased_tools())
+        last_runtime = [head.decision_runtime, *(p.decision_runtime for p in seen if p.decision_runtime is not None)][
+            -1
+        ]
+        runtime = self._runtime()
         return ev.RunResumed(
-            resume_no=number, code_hash_changed=changed, servers=[], unreleased_tools=now if now != last else None
-        )
+            resume_no=number, code_hash_changed=changed, servers=[], unreleased_tools=now if now != last else None,
+            decision_runtime=runtime if runtime != last_runtime else None,
+        )  # fmt: skip
+
+    def _hook(self) -> Callable[[Event], None] | None:
+        """The journal's `on_commit` hook that delivers events to the progress sink, if there is one (spec 4.10)."""
+        return _resources.commit_hook(self._ports.progress)
+
+    def _runtime(self) -> dict[str, JsonValue]:
+        """The decision runtime for the run header, as the port gives it (AC69); empty with no port."""
+        port = self._ports.decision
+        return dict(port.runtime_summary()) if port is not None else {}
 
     async def _ended(self, run_id: str, head: ev.RunHeader, events: list[Event], last: object) -> RunOutcome:
         """The recorded outcome of an ended run, after `close_started` for its journaled host instances (AC35)."""
@@ -315,28 +356,35 @@ class Engine:
         """Run the root block and journal how it ends: `run_completed`, `run_paused` or `run_escalated`."""
         ports, run_id, writer = self._ports, rt.run_id, rt.writer
 
-        def view() -> BasisView:  # loaded when the first decision needs it
-            loaded = ports.basis.load(basis_ref)
-            return BasisView(loaded.result_id, loaded.basis, workflow.required_basis)
-
+        view = _lazy_basis(ports.basis, basis_ref, workflow.required_basis)
         decider = _decide.Decider(
             ports.decision, ports.inputs, view, rt.events, writer, self._clock, self._ids, run_id, events
         )
+        head = next(
+            e.payload for e in rt.events() if isinstance(e.payload, ev.RunHeader)
+        )  # the mode and always-ask list
+        limits = _resources.Limits(self._settings, ports.run_control, run_id)
         ctx = Ctx(
             ports.tool, ports.calc, ports.host, self._store, self._settings, self._clock, self._producer, run_id,
             writer, events, _hostsafety.Pending(rt), leases, decider,
+            ports.approvals, head.mode, head.always_ask, rt.run_dir, limits, view, workflow.copy_on_open,
         )  # fmt: skip
         ctx.index = _inflight.ResumeIndex(events)
         try:
             with root_scope():
-                out = await workflow.fn(ctx, inp)
+                with block_code():  # the root block is block code, spec 4.3.4
+                    out = await workflow.fn(ctx, inp)
                 await ctx.finish()  # ~end checks for models the root block left dirty (spec 4.6 #1)
             if not isinstance(out, workflow.output_model):
                 wanted = workflow.output_model.__name__
                 raise errors.BlockRuleViolation(f"{workflow.name} returned a {type(out).__name__}, not a {wanted}")
             ctx.index.finish()
         except errors.Pause as pause:  # the request ids are the evidence
-            reason = "awaiting_input" if isinstance(pause, _decide.AwaitingInput) else "awaiting_approval"
+            reason = "awaiting_approval"
+            if isinstance(pause, _resources.StopRequested):
+                reason = "stop_requested"
+            elif isinstance(pause, _decide.AwaitingInput):
+                reason = "awaiting_input"
             writer.append(EventType.RUN_PAUSED, {"reason": reason, "request_ids": list(pause.evidence)})
             return RunOutcome(run_id, RunStatus.PAUSED, pending=pause.evidence)
         except _inflight.Stopped as stop:  # a write of unknown outcome: escalated for the engineer, or abandoned

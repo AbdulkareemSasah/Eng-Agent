@@ -27,7 +27,7 @@ BODY = (
     "spec_globs: ['**/docs/specs/*.md']\nplan_globs: ['**/docs/plans/*.md']\n"
     "test_globs: ['**/tests/**']\ngenerated_globs: ['uv.lock']\nspike_globs: ['spikes/**']\n"
     "agents:\n  unmanaged_ok: ['design/**']\n"
-    "limits:\n  diff_lines: 200\n  max_task_lines: 400\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
+    "limits:\n  diff_lines: 200\n  test_run_seconds: 600\n  max_file_bytes: 1048576\n"
     "  mutation_run_seconds: 7200\n"
 )
 
@@ -117,7 +117,9 @@ def test_normal_mode_never_awaits_in_gate_check(tmp_path: Path, monkeypatch: pyt
     event = write_event(repo, base, f"Closes #1\n{PLAN_TASK}\n", base_ref="main")
     result, errors = gate_check(repo, event, gate=gate)
     data = json.loads(result.out)
-    assert {f["severity"] for step in data["steps"] for f in step["findings"]} == {"error"}
+    findings = [f for step in data["steps"] for f in step["findings"]]
+    assert {f["severity"] for f in findings} == {"error", "notice"}
+    assert [f["code"] for f in findings if f["severity"] == "notice"] == ["GC009"]
     assert (result.code, data["status"]) == (1, "fail")
     assert {"GC006", "GC015"} <= set(errors)
     assert "not implemented" not in errors["GC015"]  # verified through the port, not failed closed

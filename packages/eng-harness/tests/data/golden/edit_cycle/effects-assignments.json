@@ -1,0 +1,156 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 section assignments, effect ids and order",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. Accepted: a1 assigns frame section R400x700 to frames B1 and B2 (the check resolved the targets sorted: B1, B2); a2 assigns area section S200 to area F1. Item a3 (area F2 to S200) is not accepted, so it gives no effect. Section assignments are `set` effects per target at /section (spec 0007 4.4.2), on the reported key of spec 0003 4.7 D2: [list name, id]. a1 gives two effects, so its ids are a1/1 and a1/2 by position in the sorted order; a2 gives one effect and keeps its own id. Sorted by section, key and pointer: the section model.area_placements/1 sorts before model.frame_placements/1, so a2 comes first, then B1 (a1/1), then B2 (a1/2). The state holds no section row of these names because assignments need none (K2 checked the names). No value has a unit: the section is a name.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "a1",
+          "kind": "frame_section",
+          "targets": [
+            "B1",
+            "B2"
+          ],
+          "values": []
+        },
+        {
+          "item_id": "a2",
+          "kind": "area_section",
+          "targets": [
+            "F1"
+          ],
+          "values": []
+        },
+        {
+          "item_id": "a3",
+          "kind": "area_section",
+          "targets": [
+            "F2"
+          ],
+          "values": []
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "a2",
+      "a1"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "a1",
+          "kind": "frame_section",
+          "frames": [
+            "B2",
+            "B1"
+          ],
+          "section": "R400x700"
+        },
+        {
+          "id": "a2",
+          "kind": "area_section",
+          "areas": [
+            "F1"
+          ],
+          "section": "S200"
+        },
+        {
+          "id": "a3",
+          "kind": "area_section",
+          "areas": [
+            "F2"
+          ],
+          "section": "S200"
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {}
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "a2",
+        "section": "model.area_placements/1",
+        "key": [
+          "areas",
+          "F1"
+        ],
+        "op": "set",
+        "pointer": "/section",
+        "value": "S200",
+        "unit": null
+      },
+      {
+        "item_id": "a1/1",
+        "section": "model.frame_placements/1",
+        "key": [
+          "frames",
+          "B1"
+        ],
+        "op": "set",
+        "pointer": "/section",
+        "value": "R400x700",
+        "unit": null
+      },
+      {
+        "item_id": "a1/2",
+        "section": "model.frame_placements/1",
+        "key": [
+          "frames",
+          "B2"
+        ],
+        "op": "set",
+        "pointer": "/section",
+        "value": "R400x700",
+        "unit": null
+      }
+    ]
+  }
+}
