@@ -310,9 +310,27 @@ def test_port_builder_gap_exits_2(tmp_path: Path) -> None:
     assert _events(paused, run_id) == before  # nothing was journaled
 
 
-def test_run_header_records_decision_runtime(tmp_path: Path) -> None:
+def test_run_header_records_decision_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """AC63: `run_started.decision_runtime` and `run_resumed.decision_runtime` track the assembled summary."""
-    from eng_harness.providers import assemble_decision_runtime
+    import keyring
+    from fakes.credential_stores import MemoryKeyringBackend, backend_path
+
+    import eng_harness.providers._credentials as credentials_mod
+    from eng_harness.providers import KeyringCredentialStore, assemble_decision_runtime
+    from eng_harness.providers._credentials import SERVICE_NAME
+
+    fake_key = "-".join(("distinctive", "test", "credential", "9f4b2a"))
+    memory = MemoryKeyringBackend()
+    memory.set_password(SERVICE_NAME, "ref-secret-name", fake_key)
+    monkeypatch.setattr(keyring, "get_keyring", lambda: memory)
+    monkeypatch.setattr(
+        credentials_mod,
+        "DEFAULT_ALLOWED_BACKENDS",
+        credentials_mod.DEFAULT_ALLOWED_BACKENDS | {backend_path(memory)},
+    )
+    stored_secret = KeyringCredentialStore().get("ref-secret-name")
+    assert stored_secret is not None
+    assert stored_secret.get_secret_value() == fake_key
 
     def write_cfg(rig: Rig, version: str) -> None:
         rig.workspace.mkdir(parents=True, exist_ok=True)
@@ -375,8 +393,11 @@ def test_run_header_records_decision_runtime(tmp_path: Path) -> None:
         "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
     }  # fmt: skip
 
+    assert (rig.runs / run_id / "journal.sqlite").is_file()
     all_bytes = b"".join(p.read_bytes() for p in (rig.runs / run_id).rglob("*") if p.is_file())
-    streams = (rig.out.getvalue() + rig.err.getvalue()).encode("utf-8")
-    for secret in (b"endpoint-host", b"ref-secret-name", b"base_url", b"key_ref"):
+    stdout_bytes = rig.out.getvalue().encode("utf-8")
+    stderr_bytes = rig.err.getvalue().encode("utf-8")
+    for secret in (b"endpoint-host", b"ref-secret-name", b"base_url", b"key_ref", fake_key.encode("utf-8")):
         assert secret not in all_bytes
-        assert secret not in streams
+        assert secret not in stdout_bytes
+        assert secret not in stderr_bytes

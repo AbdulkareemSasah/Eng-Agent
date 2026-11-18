@@ -136,3 +136,64 @@ def test_default_workspace_and_option_reach_lookup(tmp_path: Path) -> None:
 
     # 4. `load_config` directly accepts a UTF-8 byte-order mark.
     assert load_config(default_ws / "harness.toml").page.max_body_bytes == 4096
+
+
+def test_local_workspace_error_skips_workspace_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from eng_contract.store import FakeLocationProbe, LocationClass
+
+    import eng_harness.cli as cli_mod
+
+    non_local_ws = tmp_path / "network_ws"
+    non_local_ws.mkdir()
+    _write(non_local_ws / "harness.toml", "[page]\nmax_body_bytes = 9999\n")
+
+    explicit = _write(tmp_path / "explicit.toml", "[page]\nmax_body_bytes = 2048\n")
+    from_env = _write(tmp_path / "env.toml", "[page]\nmax_body_bytes = 4096\n")
+
+    monkeypatch.setattr(cli_mod, "default_location_probe", lambda: FakeLocationProbe(default=LocationClass.NETWORK))
+
+    seen: list[tuple[HarnessConfig, Path | None, dict[str, str]]] = []
+
+    def handler(args: Namespace, deps: CliDeps) -> int:
+        seen.append((args.config_data, args.config_path, dict(deps.environ)))
+        return 0
+
+    # 1. Resolver raises LocalWorkspaceError: workspace harness.toml is not read; handler runs with defaults.
+    env_ws = {"ENG_WORKSPACE": str(non_local_ws)}
+    assert (
+        main(
+            ["status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ=env_ws, handlers={"status": handler}),
+        )
+        == 0
+    )
+    assert len(seen) == 1
+    assert seen[0][0] == HarnessConfig()
+    assert seen[0][1] is None
+    assert seen[0][2] == env_ws
+
+    # 2. Explicitly configured `--config` remains eligible when workspace resolution fails.
+    assert (
+        main(
+            ["--config", str(explicit), "status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ=env_ws, handlers={"status": handler}),
+        )
+        == 0
+    )
+    assert len(seen) == 2
+    assert seen[1][0].page.max_body_bytes == 2048
+    assert seen[1][1] == explicit
+
+    # 3. `ENG_HARNESS_CONFIG` remains eligible when `ENG_WORKSPACE` forces a relative-path LocalWorkspaceError.
+    env_both = {"ENG_WORKSPACE": "relative/ws", "ENG_HARNESS_CONFIG": str(from_env)}
+    assert (
+        main(
+            ["status"],
+            deps=CliDeps(stdout=io.StringIO(), stderr=io.StringIO(), environ=env_both, handlers={"status": handler}),
+        )
+        == 0
+    )
+    assert len(seen) == 3
+    assert seen[2][0].page.max_body_bytes == 4096
+    assert seen[2][1] == from_env
+    assert seen[2][2] == env_both
