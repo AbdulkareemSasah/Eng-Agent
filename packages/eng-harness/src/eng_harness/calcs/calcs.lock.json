@@ -1,22 +1,22 @@
 {
   "calcs": [
     {
-      "content_sha256": "e40ccb4d714afe0c301b0a1d995545e8c20bbaf67d4209fa49ad584a448d8a0b",
+      "content_sha256": "0066788c1525a1d0e3b271c48a0e098b84a3f1905c921d47063ea64add19304a",
       "id": "harness.analysis_summary",
       "version": 1
     },
     {
-      "content_sha256": "234564f2cbf4d9745b28a96946e3219e228524536a72bd91d1b052237c3cfa3c",
+      "content_sha256": "10b2e956e8facd699a1dca4b0b84aa3662a36f38affa5365f144d507b857e4f6",
       "id": "harness.change_set_check",
       "version": 1
     },
     {
-      "content_sha256": "1b93811f8ab8eb623f777a80ce8fa367d94464bd4ffec19724172ea2fd419ffb",
+      "content_sha256": "0b56412219fbf2d02e0c5d777f26e37326519ebb571979eba511b9153500e7ca",
       "id": "harness.design_summary",
       "version": 1
     },
     {
-      "content_sha256": "9f80c3db607ce86a456e5b5085fc847fe916aa49ae3aa1c1e7aaf9dcf9c004ac",
+      "content_sha256": "52379aa811fb041751761ac72dba266e505a8b4426ea4efb475c444b72ddb734",
       "id": "harness.expected_effects",
       "version": 1
     },

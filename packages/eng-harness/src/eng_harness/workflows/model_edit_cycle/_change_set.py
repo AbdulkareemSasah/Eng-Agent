@@ -10,14 +10,13 @@ Errors: `pydantic.ValidationError` for every violated rule, naming the field (en
 """
 # ruff: noqa: N815  # B-557: field names are fixed by the contract's unit suffixes (EC §4.7.2), e.g. value_kN_m
 
-import math
 from typing import Annotated, Any, ClassVar, Literal, Self
 
 from eng_contract.kinds.basis import BasisPath
-from eng_contract.units import QUANTITY_KINDS, UNITS, convert
+from eng_contract.units import QUANTITY_KINDS, UNITS
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
-from eng_harness.kinds.edit_cycle import NONEMPTY, Label
+from eng_harness.kinds.edit_cycle import NONEMPTY, Label, canonical_number
 
 __all__ = [
     "REFUSED_KIND_GAPS",
@@ -89,22 +88,17 @@ class _CanonicalInput(_InputValue):
     @model_validator(mode="before")
     @classmethod
     def _canonical(cls, data: Any) -> Any:
-        number, symbol = (data.get("value"), data.get("unit")) if isinstance(data, dict) else (None, None)
-        known = UNITS.get(symbol) if isinstance(symbol, str) else None
-        kind = QUANTITY_KINDS[cls.quantity]
-        if (
-            not isinstance(number, int | float)
-            or isinstance(number, bool)
-            or not math.isfinite(number)
-            or known is None
-            or known.dimension != kind.dimension
-        ):
+        given: dict[str, Any] = data if isinstance(data, dict) else {}
+        exact = canonical_number(given.get("value"), given.get("unit"), cls.quantity)
+        if exact is None:
             return data  # the field validators name the fault
-        name, exact = f"value{kind.suffix}", convert(number, str(symbol), kind.canonical_unit)
-        if data.get(name) is None:
-            return {**data, name: exact}
-        if data[name] != exact:
-            raise ValueError(f"{name} {data[name]!r} is not {number} {symbol} in {kind.canonical_unit} ({exact})")
+        name = f"value{QUANTITY_KINDS[cls.quantity].suffix}"
+        if given.get(name) is None:
+            return {**given, name: exact}
+        if given[name] != exact:
+            raise ValueError(
+                f"{name} {given[name]!r} is not {given['value']} {given['unit']} in the canonical unit ({exact})"
+            )
         return data
 
 
