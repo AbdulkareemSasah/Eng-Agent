@@ -59,6 +59,7 @@ def test_every_outcome_is_mapped() -> None:
         ("CALC_NOT_APPROVED", 3),
         ("CALC_WITHDRAWN", 3),
         ("RUN_LOCKED", 4),
+        ("HOST_LOCKED", 4),
         ("JOURNAL_INTEGRITY", 5),
         ("REF_NOT_FOUND", 6),
     ],
