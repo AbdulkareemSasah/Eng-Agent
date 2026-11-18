@@ -2,8 +2,9 @@
 
 Purpose: one `sys.addaudithook` hook per process refuses file, process, socket, SQLite, `ctypes` and `import` events
 while the context variable `in_block_code` is true. It is true whenever control is in block or rule code and false only
-while the engine does its own step work, so each ctx call is wrapped in `engine_work`, and the places that hand control
-back to block code (the root block, a child block's function, a child of `ctx.parallel`, `rule_guard()`) set it true.
+while the engine does its own step work, so each async ctx call is wrapped in `engine_work`, a synchronous port call
+such as the first `ctx.basis` load runs in `engine_section`, and the places that hand control back to block code (the
+root block, a child block's function, a child of `ctx.parallel`, `rule_guard()`) set it true.
 Units: none. Errors: `BlockRuleViolation` from the hook; the operation does not happen.
 """
 
@@ -15,7 +16,15 @@ from contextvars import ContextVar
 
 from eng_harness import errors
 
-__all__ = ["block_code", "blocked", "engine_work", "enter_block_code", "in_block_code", "rule_guard"]
+__all__ = [
+    "block_code",
+    "blocked",
+    "engine_section",
+    "engine_work",
+    "enter_block_code",
+    "in_block_code",
+    "rule_guard",
+]
 
 _IN_BLOCK_CODE: ContextVar[bool] = ContextVar("eng_harness_in_block_code", default=False)
 _EVENTS = frozenset(
@@ -68,6 +77,16 @@ def block_code() -> Iterator[None]:
 def rule_guard() -> AbstractContextManager[None]:
     """The context manager the decision layer runs rules in: it installs the hook if needed and guards the body."""
     return block_code()
+
+
+@contextmanager
+def engine_section() -> Iterator[None]:
+    """Run a synchronous engine section (the first `ctx.basis` port load) with the guard off and restore it."""
+    token = _IN_BLOCK_CODE.set(False)
+    try:
+        yield
+    finally:
+        _IN_BLOCK_CODE.reset(token)
 
 
 def engine_work[**P, T](call: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:

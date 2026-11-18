@@ -715,6 +715,21 @@ Every reply is parsed with `eng_contract.mcp.extract_raw_reply` (the Sasaah serv
 - provenance: `tool = "<adapter>/<tool>"` (for example `sasaah-csi-mcp/csi_assign_frame_section`), `tool_version`
   the build string (§4.3.4), `host` (`program`, `version` from `csi_model_info.program_version`, `model_id`,
   `model_revision`), `files` for file inputs, `inputs` (references as references), `started_at`, `duration_ms`.
+  **[added: B-569]** For a tool whose descriptor has action `save`, or for which `saves_new_file(args)` is true (a
+  save to a new file, or an open of a new working file such as `csi_open_revision`, spec 0007 §4.10), `host` is the
+  model identity and revision after the step, not the binding read before the call: after a successful reply, and
+  before the result is stored, the tool port records the save on the host port (`IdentityStore.record_save` with the
+  model's file and fingerprint, as `HostPort.save` does, §4.5.8), takes that read as the new outside-edit baseline
+  (§4.6.4), and builds `provenance.host` from the binding read after that record. The stored result and the returned
+  envelope are the same record; an envelope is never re-provenanced after it is stored. A save the harness makes
+  through its own tool is therefore never `MODEL_CHANGED_OUTSIDE`, while a save made outside the harness still raises
+  the revision with that warning (§4.6.4). The engine takes the `model_saved` revision from this `host` (engine §4.6
+  "Tool saves", EC2, EC5), and the host-state check at a resume compares with it (engine §4.5.4). A crash between the
+  save reply and the record leaves the save unrecorded, so the next `model_state` reports it as an outside change for
+  the engineer, which is the honest outcome, since tool saves are not reconciled (§4.5.9). Decision (B-569): the
+  adapter records the save before it stores the result, because the stored producer `host` is what the approval
+  chain (engine §4.9) and the resume check read; correcting the envelope after storage would leave the stored record
+  stale.
 
 #### 4.5.4 Units handling
 
@@ -859,6 +874,18 @@ Model binder **[added: B-530]**: the host port is the CSI tool port's `ModelBind
 `Binding.host.version` is the program version of the last `model_state` read of that model key, and, when none was
 read since the model was bound, of one `csi_model_info` read on the bound instance (`""` when its reply has none, as
 the model-status mapping does); this reuses the reply the reader already maps and changes no outside-edit baseline.
+
+Tool saves **[added: B-569]** (§4.5.3 provenance). The generic tool port has one protected hook, called after a
+successful, non-error reply and before the envelope is made, that returns the binding the stored result's
+`provenance.host` is built from; by default it returns the binding read before the call, so a tool that saves nothing
+is unchanged. The CSI tool port overrides it: for `csi_save_model` (in place or `as_new_revision`) it calls the host
+port's tool-save record (`AdapterHostPort.tool_saved(model_key)`, a callback the CSI tool port takes like `wrote` and
+`reopened`; `build_ports` passes it), and for the open inside `csi_open_revision` it calls `reopened` there, before
+the result is stored, not after; then it reads the binding again. `AdapterHostPort.save` and the tool-save record share
+one recording (read the state for its fingerprint, `IdentityStore.record_save` with the model's file, that read as
+the outside-edit baseline). For `as_new_revision` the record happens after the in-place save and before the snapshot
+copy, so the snapshot's hash still equals the recorded file hash (spec 0007 §4.10). Built by plan 0007 T13b
+(criterion spec 0007 AC43).
 
 Opening the original **[added: B-543]** (spec 0007 §4.5 step 2, AC51). The CSI tool port answers `csi_open_model`
 with a model key and no `path` by calling its `opener` (a keyword like `reopened`; `build_ports` passes the host
@@ -1171,6 +1198,7 @@ minor release with a changelog entry, after the `eng-contract` minor that adds t
 | Q13 | **[added: B-503]** `AdapterHostPort.take_warnings()` drains the warnings of every model, so `check_model` of one model reports, and removes, the `MODEL_CHANGED_OUTSIDE` warnings that `model_state` found for another model (related to OQ-Q67, which asks which result reports them) | Owner | Writer's recommendation: keep the warnings per model key and let `check_model(model_key)` drain only that model's |
 | Q14 | **[added: B-503]** §4.7 and §6 name `BUILD_CHANGED` a harness code raised as `ToolFailed` (A1), but `HarnessCode` has no such member; the command-line adapter written for plan T16 (pull request 345) raises `HOST_ERROR` with `host_code` `BUILD_CHANGED`, and also a `host_code` `LAUNCH_FAILED` that this spec does not name | Owner | Writer's recommendation: amend §4.7, §6 and A1 to the contract code `HOST_ERROR` with the host codes `BUILD_CHANGED` and `LAUNCH_FAILED`, as A3 did for `OFFLINE_STUB` and `UNEXPECTED_REPLY`, rather than add a `HarnessCode` member |
 | Q15 | **[added: B-503]** §4.7 puts a command-line tool's attempt folder at `run_dir/tools/<step path>/<attempt>/`; the plan T16 adapter (pull request 345) uses `run_dir/tools/<op_id>`, where the engine's `op_id` already hashes the run, the step path and the attempt | Owner | Writer's recommendation: amend §4.7 to `run_dir/tools/<op_id>/`: one folder per attempt, and no step-path characters in a folder name |
+| Q16 | **[added: B-569]** B-202 F2: the CSI tool port stored a tool save's result with the binding read before the call and never recorded the save, so the next `model_state` resolved the new file hash as an outside save (revision + 1, `MODEL_CHANGED_OUTSIDE`): the first write after the edit cycle's step 7 save met `ApprovalVoid`, a resume after any tool save met `host_state_mismatch`, and `csi_open_revision` had the same lag because `reopened` ran after the result was stored | Owner | Decided (lead, B-569; engine spec 0001 §11 Q46): the tool port records the save on the host port before it stores the result, and `provenance.host` carries the revision after the step (§4.5.3, §4.5.9 "Tool saves"); the engine is unchanged; built by plan 0007 T13b (spec 0007 §4.10, AC43) |
 | H-G1 | `csi_define_area_section`, `csi_define_frame_section`, `csi_define_material` need CSi API `spec` keys not in the schema; slab thickness change is therefore not implemented | Owner | Confirm the keys locally and pin a method and key list (OQ-G11), or a Sasaah typed slab tool (the engine's `DefineSlabSection` exists unexposed); test `test_gaps_not_implemented` expects `NOT_IMPLEMENTED` |
 | H-G2 | Load directions other than `gravity` and frame point loads (S12-G9) | Owner | Local test of the direction codes, then a Sasaah fix |
 | H-G3 | Load pattern types `superimposed_dead`, `roof_live` and combination type `range` have no documented Sasaah value | Owner | Confirm the host names locally; until then refused |
