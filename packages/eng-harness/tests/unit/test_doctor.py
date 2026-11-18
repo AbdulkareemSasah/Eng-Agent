@@ -44,7 +44,7 @@ def _allowlist(entries: list[dict[str, object]], schemas: Mapping[str, Any]) -> 
         {
             "adapter": "sasaah-csi-mcp",
             "sasaah_commit": COMMIT,
-            "tool_fingerprint": tool_list_fingerprint(schemas),
+            "fingerprint": {"ETABS": tool_list_fingerprint(schemas)},
             "fingerprint_source": "s12-inventory",
             "tool": entries,
         }
@@ -70,6 +70,7 @@ def _write(
         "shutdown_grace_s = 1",
         f'build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{sha}" }}',
         'host_key = "csi"',
+        'product = "ETABS"',
         "",
     ]
     for name, classes, timeout in roles:
