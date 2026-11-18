@@ -200,9 +200,9 @@ def _scope_repo(repo: Repo, globs: tuple[str, ...] = ("pkg/src/**", "lib/src/**"
     return make_gate_repo(repo, base_files=WORKSPACE, plan=plan_text(files=globs))
 
 
-def _gc008_paths(out: str) -> list[str]:
+def _gc008_paths(out: str, severity: str = "error") -> list[str]:
     findings = json.loads(out)["steps"][0]["findings"]
-    return sorted(f["path"] for f in findings if f["code"] == "GC008")
+    return sorted(f["path"] for f in findings if f["code"] == "GC008" and f["severity"] == severity)
 
 
 def test_changelog_and_local_testing_in_scope(repo: Repo) -> None:
@@ -220,7 +220,7 @@ def test_changelog_and_local_testing_in_scope(repo: Repo) -> None:
 
 
 def test_changelog_and_local_testing_without_task_file_are_outside(repo: Repo) -> None:
-    """AC10a: without another changed file under the directory that matches a task glob, they are GC008."""
+    """AC10a, AC10d: without a task file beside them, local-testing.md is GC008 and a CHANGELOG.md is a notice."""
     base = _scope_repo(repo)
     files = {
         "pkg/CHANGELOG.md": NOTES,
@@ -230,7 +230,8 @@ def test_changelog_and_local_testing_without_task_file_are_outside(repo: Repo) -
     }
     result, errors = gate_check(repo, _change(repo, base, files=files))
     assert (result.code, set(errors)) == (1, {"GC008"})
-    assert _gc008_paths(result.out) == ["pkg/CHANGELOG.md", "pkg/docs/local-testing.md", "pkg/sub/CHANGELOG.md"]
+    assert _gc008_paths(result.out) == ["pkg/docs/local-testing.md", "pkg/sub/CHANGELOG.md"]
+    assert _gc008_paths(result.out, "notice") == ["pkg/CHANGELOG.md"]  # AC10d: a member's CHANGELOG.md is collateral
 
 
 def test_changelog_in_other_directory_is_outside(repo: Repo) -> None:
@@ -435,7 +436,7 @@ def test_plan_with_clause_spec_directory(repo: Repo) -> None:
 
 
 def test_empty_test_package_marker_in_scope(repo: Repo) -> None:
-    """AC10c: an empty ``__init__.py`` under a member's ``tests/`` is in scope beside an in-scope neighbour."""
+    """AC10c, AC10d: an empty ``__init__.py`` under ``tests/`` is in scope beside a neighbour; others are notices."""
     globs = ("pkg/tests/helpers/test_*.py", "pkg/tests/full/test_*.py", "pkg/other/tests/test_*.py", "pkg/src/**")
     base = _scope_repo(repo, globs)
     files = {
@@ -450,10 +451,89 @@ def test_empty_test_package_marker_in_scope(repo: Repo) -> None:
         "pkg/tests/helpers/sub/__init__.py": "",  # the neighbour is in another directory
     }
     result, errors = gate_check(repo, _change(repo, base, files=files))
-    assert _gc008_paths(result.out) == [
+    assert _gc008_paths(result.out) == []
+    assert _gc008_paths(result.out, "notice") == [  # AC10d: a collateral test file is a notice, not an error
         "pkg/other/tests/__init__.py",
         "pkg/tests/full/__init__.py",
         "pkg/tests/helpers/sub/__init__.py",
         "pkg/tests/lone/__init__.py",
     ]
-    assert set(errors) == {"GC008"}
+    assert (result.code, errors) == (0, {})
+
+
+def _notices(out: str) -> dict[str, str]:
+    findings = json.loads(out)["steps"][0]["findings"]
+    return {f["path"]: f["message"] for f in findings if f["code"] == "GC008" and f["severity"] == "notice"}
+
+
+def test_collateral_test_and_changelog_edits_are_notices(repo: Repo) -> None:
+    """AC10d: a test file or a member or plan-package CHANGELOG.md outside the task globs is a GC008 notice."""
+    base = _scope_repo(repo, ("lib/src/**",))
+    files = {
+        "lib/src/a.py": "a = 1\n",  # the task's own file (anchors lib only)
+        "pkg/CHANGELOG.md": NOTES,  # the plan's package folder, no task file under it
+        "lib/tests/unit/test_a.py": "a = 1\n",  # a test file outside the globs
+        "tests/test_root.py": "r = 1\n",  # a root-level tests directory
+        "pkg/tests/support/helper.py": "h = 1\n",  # a helper under tests/ is a test path as well
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, errors) == (0, {})
+    notices = _notices(result.out)
+    assert sorted(notices) == [
+        "lib/tests/unit/test_a.py",
+        "pkg/CHANGELOG.md",
+        "pkg/tests/support/helper.py",
+        "tests/test_root.py",
+    ]
+    assert all("collateral edit" in message for message in notices.values())
+
+
+def test_non_test_source_outside_globs_stays_the_only_gc008_error(repo: Repo) -> None:
+    """AC10d: a non-test source file outside the globs (also a ``src/**/test_*.py`` module) stays a GC008 error."""
+    base = _scope_repo(repo, ("lib/src/**",))
+    files = {
+        "lib/src/a.py": "a = 1\n",
+        "pkg/src/test_helper.py": "h = 1\n",  # a source module named test_*: no tests/ directory segment
+        "pkg/src/mod.py": "m = 1\n",
+        "pkg/tests/test_x.py": "x = 1\n",
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == ["pkg/src/mod.py", "pkg/src/test_helper.py"]
+    assert sorted(_notices(result.out)) == ["pkg/tests/test_x.py"]
+
+
+def test_look_alikes_of_collateral_edits_stay_errors(repo: Repo) -> None:
+    """AC10d: only a ``tests`` directory segment or a holder's own ``CHANGELOG.md`` is collateral."""
+    base = _scope_repo(repo, ("lib/src/**",))
+    files = {
+        "lib/src/a.py": "a = 1\n",
+        "pkg/src/tests.py": "t = 1\n",  # a file named tests, no directory
+        "pkg/mytests/x.py": "x = 1\n",  # a directory whose name only ends in tests
+        "pkg/docs/CHANGELOG.md": NOTES,  # not the CHANGELOG.md at the holder's top
+        "pkg/CHANGELOG.md.bak": NOTES,
+        "other/CHANGELOG.md": NOTES,  # not a member and not the plan's package
+    }
+    result, errors = gate_check(repo, _change(repo, base, files=files))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == sorted(set(files) - {"lib/src/a.py"})
+    assert _notices(result.out) == {}
+
+
+def test_rename_into_tests_directory_is_a_notice_for_the_new_path_only(repo: Repo) -> None:
+    """AC10, AC10d: a rename counts both paths; the old non-test path stays an error, the new test path is a notice."""
+    base = make_gate_repo(repo, base_files={"pkg/other/old.py": "a = 1\nb = 2\nc = 3\nd = 4\n"})
+    repo.rename("pkg/other/old.py", "pkg/tests/moved.py")
+    result, errors = gate_check(repo, write_event(repo, base, BODY))
+    assert (result.code, set(errors)) == (1, {"GC008"})
+    assert _gc008_paths(result.out) == ["pkg/other/old.py"]
+    assert sorted(_notices(result.out)) == ["pkg/tests/moved.py"]
+
+
+def test_root_member_changelog_is_a_notice(repo: Repo) -> None:
+    """AC10d: when the workspace root is a member, its top-level CHANGELOG.md is a collateral edit."""
+    root = {"pyproject.toml": '[project]\nname = "root"\nversion = "0"\n[tool.uv.workspace]\nmembers = ["."]\n'}
+    base = make_gate_repo(repo, base_files=root, plan=plan_text(files=("pkg/src/**",)))
+    result, errors = gate_check(repo, _change(repo, base, files={"CHANGELOG.md": NOTES}))
+    assert (result.code, errors) == (0, {})
+    assert sorted(_notices(result.out)) == ["CHANGELOG.md"]

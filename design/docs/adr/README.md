@@ -41,4 +41,5 @@ An accepted ADR is never edited except to change its status; a new decision supe
 | [0032](0032-harness-side-model-identity.md) | A harness-side model identity in the workspace when the host cannot stamp one (amends 04 §3.3, 06 §6) | Proposed |
 | [0033](0033-desktop-products-in-sasaah.md) | The desktop products stay in Sasaah during v1; nothing is built under `products/` | Proposed |
 | [0034](0034-task-log-by-default.md) | Every owner task has a task log in the root folder `tasklog/`, pushed directly as log-only commits; recorded owner exceptions to A11, hub rule 6 and "never the owner's credentials" | Proposed |
-| [0035](0035-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted |
+| [0035](0035-no-changed-line-limit.md) | No changed-line limit per task; `max_changed_lines` is an estimate, file scope still enforced | Accepted; amended by ADR-0036 |
+| [0036](0036-collateral-test-edits-and-session-estimate.md) | Test files and the changelog may be collateral edits; `max_sessions` is an estimate | Accepted |
