@@ -34,6 +34,19 @@ CALCS = {
             "basis": "basis.design_basis/1",
         },
     ),
+    "column-review": (
+        "harness.column_review",
+        {
+            "selection": "harness.column_selection/1",
+            "host": "harness.host_design_verdicts/1",
+            "max_axial_strength": "verdicts.set/1",
+            "axial_flexure_uniaxial": "verdicts.set/1",
+            "longitudinal_reinforcement_limits": "verdicts.set/1",
+            "items": "harness.column_check_items/1",
+            "previous": "harness.column_review/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
 }
 """Per file prefix: the calc id and the record kind of each referenced input field."""
 FILES = golden_files()
