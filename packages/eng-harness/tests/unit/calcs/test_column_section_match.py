@@ -417,3 +417,192 @@ def test_trace_records_inputs_and_steps() -> None:
         "names": (1, "spec 0013 4.4.4 M2", ["candidates"]),
     }
     assert built.outputs == ["status", "section", "names"]
+
+def test_size_pointer_must_be_size(tmp_path: Path) -> None:
+    """B-580 / AC9: size_b, size_h and size_d must point at /size; #/required and #/increment are refused.
+
+    On a harness.section_size/1 record whose required differs from size, a reference to #/required (or
+    #/increment) would otherwise match on the unrounded dimension while a rebuilt trace pointed at #/size.
+    """
+    clock = FixedClock(1_767_225_600_000, 1)
+    ids = SeededIdSource(b"sizeptr", clock)
+    store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
+    producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0)
+    selection_payload: dict[str, JsonValue] = {
+        "status": "PASS",
+        "columns": [_column(), _column(frame_id="C2", shape="circular", material="C35")],
+        "excluded": [],
+        "issues": [],
+        "calc": {"id": "harness.column_select", "version": 1, "content_sha256": "b" * 64, "status": "draft"},
+        "draft": True,
+        "trace": {
+            "calc_id": "harness.column_select",
+            "calc_version": "1",
+            "content_sha256": "b" * 64,
+            "inputs": [],
+            "constants": [],
+            "steps": [
+                {
+                    "name": "status",
+                    "value": "PASS",
+                    "unit": None,
+                    "formula": "PASS",
+                    "source": "0013 4.4.1",
+                    "uses": [],
+                }
+            ],
+            "outputs": ["status"],
+        },
+    }
+    sel_id = store.put("harness.column_selection/1", selection_payload, producer).result_id
+    sec_id = store.put(
+        "model.sections/1",
+        _sections(
+            {"name": "C40x60", "material": "C30", "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}},
+            {"name": "C50", "material": "C35", "shape": {"type": "circular", "D_mm": 500}},
+        ),
+        producer,
+    ).result_id
+    basis_id = store.put("basis.design_basis/1", _basis(), producer).result_id
+    # required=375, size=400 (8 x 50); required differs from size so a wrong pointer changes the matched value.
+    size_b = store.put(
+        "harness.section_size/1",
+        {
+            "required": {"value": 375.0, "unit": "mm"},
+            "increment": {"value": 50.0, "unit": "mm"},
+            "multiple": 8,
+            "size": {"value": 400.0, "unit": "mm"},
+            "status": "PASS",
+            "calc": {"id": "harness.section_round", "version": 1, "content_sha256": "a" * 64, "status": "draft"},
+            "draft": True,
+            "trace": {
+                "calc_id": "harness.section_round",
+                "calc_version": "1",
+                "content_sha256": "a" * 64,
+                "inputs": [],
+                "constants": [],
+                "steps": [
+                    {
+                        "name": "size",
+                        "value": 400.0,
+                        "unit": "mm",
+                        "formula": "n x i",
+                        "source": "0003 4.10 N2",
+                        "uses": [],
+                    }
+                ],
+                "outputs": ["size"],
+            },
+        },
+        producer,
+    ).result_id
+    size_h = store.put(
+        "harness.section_size/1",
+        {
+            "required": {"value": 575.0, "unit": "mm"},
+            "increment": {"value": 50.0, "unit": "mm"},
+            "multiple": 12,
+            "size": {"value": 600.0, "unit": "mm"},
+            "status": "PASS",
+            "calc": {"id": "harness.section_round", "version": 1, "content_sha256": "a" * 64, "status": "draft"},
+            "draft": True,
+            "trace": {
+                "calc_id": "harness.section_round",
+                "calc_version": "1",
+                "content_sha256": "a" * 64,
+                "inputs": [],
+                "constants": [],
+                "steps": [
+                    {
+                        "name": "size",
+                        "value": 600.0,
+                        "unit": "mm",
+                        "formula": "n x i",
+                        "source": "0003 4.10 N2",
+                        "uses": [],
+                    }
+                ],
+                "outputs": ["size"],
+            },
+        },
+        producer,
+    ).result_id
+    size_d = store.put(
+        "harness.section_size/1",
+        {
+            "required": {"value": 475.0, "unit": "mm"},
+            "increment": {"value": 50.0, "unit": "mm"},
+            "multiple": 10,
+            "size": {"value": 500.0, "unit": "mm"},
+            "status": "PASS",
+            "calc": {"id": "harness.section_round", "version": 1, "content_sha256": "a" * 64, "status": "draft"},
+            "draft": True,
+            "trace": {
+                "calc_id": "harness.section_round",
+                "calc_version": "1",
+                "content_sha256": "a" * 64,
+                "inputs": [],
+                "constants": [],
+                "steps": [
+                    {
+                        "name": "size",
+                        "value": 500.0,
+                        "unit": "mm",
+                        "formula": "n x i",
+                        "source": "0003 4.10 N2",
+                        "uses": [],
+                    }
+                ],
+                "outputs": ["size"],
+            },
+        },
+        producer,
+    ).result_id
+    approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
+    port = HarnessCalcPort(
+        REGISTRY,
+        approvals,
+        store,
+        CalcSettings(max_items=1000),
+        RunClass.TRIAL,
+        clock,
+        ids,
+        basis_fields={"harness.column_section_match": ("compare.length_mm",)},
+    )
+    rect_ok: dict[str, JsonValue] = {
+        "column": {"$ref": f"{sel_id}#/columns/0"},
+        "size_b": {"$ref": f"{size_b}#/size"},
+        "size_h": {"$ref": f"{size_h}#/size"},
+        "sections": {"$ref": sec_id},
+        "basis": {"$ref": basis_id},
+    }
+    ok = port.run(CALC_ID, rect_ok)
+    assert isinstance(ok, SuccessEnvelope), ok
+    stored = ColumnMatch.model_validate(store.payload(ok.result_id))
+    assert (stored.status, stored.section) == ("matched", "C40x60")
+    assert {i.name: i.ref for i in stored.trace.inputs}["size_b_mm"] == f"{size_b}#/size"
+    assert {i.name: i.ref for i in stored.trace.inputs}["size_h_mm"] == f"{size_h}#/size"
+
+    for field, rid, pointer in (
+        ("size_b", size_b, "/required"),
+        ("size_b", size_b, "/increment"),
+        ("size_h", size_h, "/required"),
+        ("size_h", size_h, "/increment"),
+    ):
+        bad = port.run(CALC_ID, rect_ok | {field: {"$ref": f"{rid}#{pointer}"}})
+        assert isinstance(bad, FailureEnvelope), (field, pointer, bad)
+        assert (bad.error.code, bad.error.field) == (ErrorCode.INVALID_ARGUMENT, field)
+
+    circ_ok: dict[str, JsonValue] = {
+        "column": {"$ref": f"{sel_id}#/columns/1"},
+        "size_d": {"$ref": f"{size_d}#/size"},
+        "sections": {"$ref": sec_id},
+        "basis": {"$ref": basis_id},
+    }
+    circ = port.run(CALC_ID, circ_ok)
+    assert isinstance(circ, SuccessEnvelope), circ
+    assert ColumnMatch.model_validate(store.payload(circ.result_id)).section == "C50"
+    for pointer in ("/required", "/increment"):
+        bad_d = port.run(CALC_ID, circ_ok | {"size_d": {"$ref": f"{size_d}#{pointer}"}})
+        assert isinstance(bad_d, FailureEnvelope), pointer
+        assert (bad_d.error.code, bad_d.error.field) == (ErrorCode.INVALID_ARGUMENT, "size_d")
