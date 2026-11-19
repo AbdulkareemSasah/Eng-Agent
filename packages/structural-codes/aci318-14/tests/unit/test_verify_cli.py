@@ -18,10 +18,10 @@ def test_verify_reports_unverified() -> None:
     )
     assert (done.returncode, done.stderr) == (0, "")
     lines = done.stdout.splitlines()
-    assert len(lines) == 6
+    assert len(lines) == 9
     for line in lines:
         assert " not verified " in line
         assert "fail=0" in line
         assert "no passing worked_example" in line
     pending = [line for line in lines if not re.search(r"pending=0\b", line)]
-    assert len(pending) == 5  # every check but the development length has a program comparison
+    assert len(pending) == 8  # every check but the development length has a program comparison

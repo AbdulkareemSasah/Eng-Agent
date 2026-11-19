@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.servers import ConfigError
 
 PosInt = Annotated[int, Field(strict=True, ge=1)]
@@ -60,6 +61,7 @@ class HarnessConfig(_Model):
     engine: EngineSection = EngineSection()
     progress: ProgressSection = ProgressSection()
     page: PageSection = PageSection()
+    decisions: DecisionSettings = DecisionSettings()
     project_lane: Mapping[str, ProjectLaneTool] = Field(default_factory=dict)
     # servers, cli_tools, host_programs and providers belong to specs 0002 and 0009, which validate them.
     servers: Mapping[str, Any] = Field(default_factory=dict)
@@ -92,7 +94,7 @@ def load_config(path: Path | None) -> HarnessConfig:
     if path is None:
         return HarnessConfig()
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        data = tomllib.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise ConfigError(path.name, f"cannot read harness.toml: {error}") from error
     unknown = sorted(set(data) - set(HarnessConfig.model_fields))

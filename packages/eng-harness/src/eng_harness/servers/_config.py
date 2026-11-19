@@ -4,17 +4,36 @@ Spec 0006 owns where the file is found and its `[engine]` section; this module r
 `[cli_tools.*]` and `[host_programs.*]`. All timeouts are whole seconds and have no default (process 11 section 9).
 """
 
+import ipaddress
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Any, Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_validator
 
 _FORBIDDEN_ARGS = ("--enable-script", "--enable-generic-invoke", "--allow-attached-writes", "--read-only")
 _ADAPTER_ONLY_ARGS = ("--call-timeout-sec", "--audit-log")
 _ADAPTER_ONLY_ENV = "SASAAH_CSI_CALL_TIMEOUT_SEC"
 _CSI_ADAPTER = "sasaah-csi-mcp"
+_IDEA_ADAPTER = "sasaah-idea-mcp"  # spec 0014 section 4.2
+_IDEA_ROUTES = ("native", "rest")
+_IDEA_ARG = "--disable-script"  # the one argument the section may carry; the adapter adds the rest from the keys
+# The three aliases of each server option (E/IdeaModels.cs:441-452): the adapter sets options by argument only.
+_IDEA_ENV_PREFIXES = ("SASAAH_IDEA_", "SASAH_IDEA_", "IDEA_")
+_REVIT_ADAPTER = "sasaah-revit-mcp"  # spec 0011 section 4.2
+_REVIT_FORBIDDEN_ARGS = (
+    "--enable-send-code",
+    "--enable-adaptive-bake",
+    "--cache-send-code-bodies",
+    "--toolsets",
+    "--pipe-name",
+    "--bridge-timeout-ms",
+    "--disable-send-code",
+    "--disable-adaptive-bake",
+    "--no-cache-send-code-bodies",
+)
 # The CSI products a server section can name (spec 0008 4.1); the adapter's profile registry holds the same names.
 KNOWN_PRODUCTS = ("ETABS", "SAFE")
 # Substrings that mark an escape-hatch tool name (script, generic invoke, table write); the full deny list is the
@@ -37,6 +56,31 @@ class ConfigError(Exception):
 def _absolute(value: str) -> str:
     if not (PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()):
         raise ValueError("path must be absolute")
+    return value
+
+
+def _loopback_url(value: str) -> str:
+    """Return `value` when it is a plain http(s) URL without credentials whose host is loopback (spec 0014 AC1)."""
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname
+        _ = parts.port  # reading it validates the port: a ValueError is the refusal
+    except ValueError as error:
+        raise ValueError(f"service_url is not a valid URL: {error}") from error
+    if (
+        parts.scheme not in ("http", "https")
+        or host is None
+        or parts.username is not None
+        or parts.password is not None
+    ):
+        raise ValueError("service_url must be an http or https URL with a host and no credentials")
+    if host != "localhost":
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = False
+        if not loopback:
+            raise ValueError("service_url must point at a loopback host (127.0.0.1, ::1 or localhost)")
     return value
 
 
@@ -74,20 +118,17 @@ class BuildPin(_Model):
     exe_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     server_info_version: str | None = None
     addin_sha256: tuple[Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")], ...] = ()
-    addin_paths: tuple[str, ...] = ()
+    addin_paths: tuple[str, ...] = Field(default=(), validate_default=True)
 
     @field_validator("addin_paths")
     @classmethod
-    def _addin_paths_absolute(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def _addin_paths_check(cls, value: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
         for path in value:
             _absolute(path)
-        return value
-
-    @model_validator(mode="after")
-    def _addins(self) -> Self:
-        if len(self.addin_sha256) != len(self.addin_paths):
+        sha = info.data.get("addin_sha256", ())
+        if len(sha) != len(value):
             raise ValueError("addin_paths and addin_sha256 must have equal lengths")
-        return self
+        return value
 
 
 class RoleConfig(_Model):
@@ -110,17 +151,21 @@ class ServerConfig(_Model):
     shutdown_grace_s: Seconds = 10  # software setting, s
     build: BuildPin
     host_key: str
-    pipe_name: str | None = None
-    product: str  # the host product this server serves (spec 0008 4.1); required, one server section per product
+    pipe_name: str | None = Field(default=None, validate_default=True)
+    # The host product this server serves (spec 0008 4.1): required for CSI, defaults to IDEA for sasaah-idea-mcp, Revit for sasaah-revit-mcp.
+    product: str = Field(default="", validate_default=True)
     mcp_mode: str = "legacy"  # spec section 11 Q3
-    audit_log: bool = Field(default=True, strict=True)  # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError
-    route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), not this loader
+    # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError; validated when absent too (the IDEA rule below)
+    audit_log: bool = Field(default=True, strict=True, validate_default=True)
+    route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), IDEA's values here
     roles: Mapping[str, RoleConfig] = Field(min_length=1)
+    service_url: str | None = None  # spec 0014 section 4.2: IDEA only, loopback, passed as --service-url
+    idea_dir: str | None = None  # spec 0014 section 4.2: IDEA only, absolute, passed as --idea-dir
 
     @model_validator(mode="before")
     @classmethod
     def _revit_product(cls, data: object) -> object:
-        if isinstance(data, dict) and data.get("adapter") == "sasaah-revit-mcp" and "product" not in data:
+        if isinstance(data, dict) and data.get("adapter") == _REVIT_ADAPTER and "product" not in data:
             return {**data, "product": "Revit"}
         return data
 
@@ -129,25 +174,61 @@ class ServerConfig(_Model):
     def _command_absolute(cls, value: str) -> str:
         return _absolute(value)
 
+    @field_validator("pipe_name")
+    @classmethod
+    def _pipe_name_revit(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("adapter") == _REVIT_ADAPTER:
+            if not value or not value.strip():
+                raise ValueError("pipe_name is required for Revit")
+        return value
+
     @field_validator("product")
     @classmethod
-    def _product_known(cls, value: str) -> str:
-        if value not in (*KNOWN_PRODUCTS, "Revit"):
+    def _product_known(cls, value: str, info: ValidationInfo) -> str:
+        adapter = info.data.get("adapter")
+        if adapter == _IDEA_ADAPTER:
+            if value and value != "IDEA":
+                raise ValueError(f"unknown product {value!r} for {_IDEA_ADAPTER}; omit product or use 'IDEA'")
+            return "IDEA"
+        if adapter == _REVIT_ADAPTER:
+            if value != "Revit":
+                raise ValueError(f"product must be 'Revit', not {value!r}")
+            return "Revit"
+        if not value:
+            raise ValueError("product is required")
+        if value not in KNOWN_PRODUCTS:
             raise ValueError(f"unknown product {value!r}; one of {', '.join(KNOWN_PRODUCTS)}")
+        return value
+
+    @field_validator("build")
+    @classmethod
+    def _build_revit(cls, value: BuildPin, info: ValidationInfo) -> BuildPin:
+        if info.data.get("adapter") == _REVIT_ADAPTER:
+            if not value.addin_paths or not value.addin_sha256:
+                raise ValueError("build.addin_paths and build.addin_sha256 are required for Revit")
         return value
 
     @field_validator("args")
     @classmethod
-    def _args_allowed(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def _args_allowed(cls, value: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
+        adapter = info.data.get("adapter")
         for arg in value:
             name = arg.split("=", 1)[0]
             if name in _FORBIDDEN_ARGS or name in _ADAPTER_ONLY_ARGS:
                 raise ValueError(f"argument {name} is forbidden (set by the adapter only or enables an escape hatch)")
+            # The IDEA server ignores unknown arguments with only a warning, so a typo would pass silently (4.2 rule 4).
+            if adapter == _IDEA_ADAPTER and arg != _IDEA_ARG:
+                raise ValueError(
+                    f"argument {arg} is not permitted for {_IDEA_ADAPTER}: only {_IDEA_ARG}; "
+                    "the folder and the service URL come from the idea_dir and service_url keys"
+                )
+            if adapter == _REVIT_ADAPTER and name in _REVIT_FORBIDDEN_ARGS:
+                raise ValueError(f"argument {name} is forbidden (adapter-only or enables an escape hatch)")
         return value
 
     @field_validator("env")
     @classmethod
-    def _env_allowed(cls, value: Mapping[str, str]) -> Mapping[str, str]:
+    def _env_allowed(cls, value: Mapping[str, str], info: ValidationInfo) -> Mapping[str, str]:
         names = {key.upper(): item for key, item in value.items()}  # Windows env names are case-insensitive
         if len(names) != len(value):
             raise ValueError("env names that differ only in case collide on Windows (SASAAH_CSI_DISABLE_SCRIPT check)")
@@ -157,54 +238,93 @@ class ServerConfig(_Model):
             raise ValueError("SASAAH_CSI_DISABLE_SCRIPT must be true")
         if _ADAPTER_ONLY_ENV in names:
             raise ValueError(f"{_ADAPTER_ONLY_ENV} is set by the adapter only")
+        adapter = info.data.get("adapter")
+        if adapter == _IDEA_ADAPTER:
+            for name in names:
+                if name.startswith(_IDEA_ENV_PREFIXES):
+                    raise ValueError(f"{name} is forbidden for {_IDEA_ADAPTER} (an alias of a server option)")
+        if adapter == _REVIT_ADAPTER:
+            for name in names:
+                if name.startswith("SASAAH_MCP_"):
+                    raise ValueError(f"{name} is forbidden for {_REVIT_ADAPTER} (adapter-only)")
         return value
 
     @field_validator("toolsets")
     @classmethod
-    def _toolsets_allowed(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def _toolsets_allowed(cls, value: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
         for name in value:
             if any(marker in name.lower() for marker in _ESCAPE_MARKERS):
                 raise ValueError(f"toolset {name} includes an escape hatch")
+        if info.data.get("adapter") == _REVIT_ADAPTER and value:
+            raise ValueError("toolsets is forbidden for Revit (the allowlist is the filter)")
         return value
+
+    @field_validator("audit_log")
+    @classmethod
+    def _idea_has_no_audit_log(cls, value: bool, info: ValidationInfo) -> bool:
+        if value and info.data.get("adapter") == _IDEA_ADAPTER:
+            raise ValueError(f"audit_log must be false for {_IDEA_ADAPTER}: the server has no --audit-log option")
+        return value
+
+    @field_validator("route")
+    @classmethod
+    def _idea_route(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("adapter") == _IDEA_ADAPTER and value not in _IDEA_ROUTES:
+            raise ValueError(f"route must be one of {', '.join(_IDEA_ROUTES)} for {_IDEA_ADAPTER}")
+        return value
+
+    @field_validator("roles")
+    @classmethod
+    def _roles_check(
+        cls, value: Mapping[str, RoleConfig], info: ValidationInfo
+    ) -> Mapping[str, RoleConfig]:
+        adapter = info.data.get("adapter")
+        if adapter == _IDEA_ADAPTER and tuple(value) != ("main",):
+            raise ValueError(f"{_IDEA_ADAPTER} needs the single topology: exactly one role, named main")
+        if adapter == _REVIT_ADAPTER:
+            if set(value) != {"read", "write"}:
+                raise ValueError("Revit requires read and write roles")
+            if set(value["read"].classes) != {"session", "call"} or value["write"].classes != ("attended",):
+                raise ValueError("invalid Revit role classes")
+            classes = [item for role in value.values() for item in role.classes]
+            if len(classes) != len(set(classes)):
+                raise ValueError("a timeout class cannot be served twice")
+        return value
+
+    @field_validator("service_url")
+    @classmethod
+    def _service_url_loopback(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        if info.data.get("adapter") != _IDEA_ADAPTER:
+            raise ValueError(f"service_url is only for {_IDEA_ADAPTER}")
+        return _loopback_url(value)
+
+    @field_validator("idea_dir")
+    @classmethod
+    def _idea_dir_absolute(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        if info.data.get("adapter") != _IDEA_ADAPTER:
+            raise ValueError(f"idea_dir is only for {_IDEA_ADAPTER}")
+        return _absolute(value)
+
+    @model_validator(mode="after")
+    def _idea_section(self) -> Self:
+        if self.adapter != _IDEA_ADAPTER:
+            return self
+        if self.route is None:
+            raise ValueError(f"route is required for {_IDEA_ADAPTER}: one of {', '.join(_IDEA_ROUTES)}")
+        if self.route == "rest" and self.service_url is None:
+            raise ValueError("service_url is required for route rest")
+        if _IDEA_ARG not in self.args:
+            raise ValueError(f"args must contain {_IDEA_ARG}")
+        return self
 
     @model_validator(mode="after")
     def _csi_disables_scripts(self) -> Self:
-        if self.adapter == _CSI_ADAPTER:
-            if "--disable-script" not in self.args:
-                raise ValueError("args must contain --disable-script")
-            if self.product not in KNOWN_PRODUCTS:
-                raise ValueError(f"product: unknown CSI product {self.product!r}; one of {', '.join(KNOWN_PRODUCTS)}")
-        if self.adapter == "sasaah-revit-mcp":
-            if self.product != "Revit":
-                raise ValueError(f"product must be 'Revit', not {self.product!r}")
-            if not self.pipe_name or not self.pipe_name.strip():
-                raise ValueError("pipe_name is required for Revit")
-            if not self.build.addin_paths:
-                raise ValueError("build.addin_paths and build.addin_sha256 are required for Revit")
-            if set(self.roles) != {"read", "write"}:
-                raise ValueError("roles: Revit requires read and write roles")
-            if set(self.roles["read"].classes) != {"session", "call"} or self.roles["write"].classes != ("attended",):
-                raise ValueError("roles: invalid Revit role classes")
-            classes = [item for role in self.roles.values() for item in role.classes]
-            if len(classes) != len(set(classes)):
-                raise ValueError("roles: a timeout class cannot be served twice")
-            if self.toolsets:
-                raise ValueError("toolsets is forbidden for Revit (the allowlist is the filter)")
-            forbidden = {
-                "--enable-send-code",
-                "--enable-adaptive-bake",
-                "--cache-send-code-bodies",
-                "--toolsets",
-                "--pipe-name",
-                "--bridge-timeout-ms",
-                "--disable-send-code",
-                "--disable-adaptive-bake",
-                "--no-cache-send-code-bodies",
-            }
-            if any(arg.split("=", 1)[0] in forbidden for arg in self.args):
-                raise ValueError("args contain an adapter-only or forbidden Revit option")
-            if any(key.upper().startswith("SASAAH_MCP_") for key in self.env):
-                raise ValueError("env: SASAAH_MCP_ variables are adapter-only")
+        if self.adapter == _CSI_ADAPTER and "--disable-script" not in self.args:
+            raise ValueError("args must contain --disable-script")
         return self
 
 

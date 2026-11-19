@@ -308,3 +308,96 @@ def test_port_builder_gap_exits_2(tmp_path: Path) -> None:
     assert paused.main("resume", run_id, "--no-report") == ExitCode.USAGE
     assert f"eng-harness: {message}\n" in paused.err.getvalue()
     assert _events(paused, run_id) == before  # nothing was journaled
+
+
+def test_run_header_records_decision_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC63: `run_started.decision_runtime` and `run_resumed.decision_runtime` track the assembled summary."""
+    import keyring
+    from fakes.credential_stores import MemoryKeyringBackend, backend_path
+
+    import eng_harness.providers._credentials as credentials_mod
+    from eng_harness.providers import KeyringCredentialStore, assemble_decision_runtime
+    from eng_harness.providers._credentials import SERVICE_NAME
+
+    fake_key = "-".join(("distinctive", "test", "credential", "9f4b2a"))
+    memory = MemoryKeyringBackend()
+    memory.set_password(SERVICE_NAME, "ref-secret-name", fake_key)
+    monkeypatch.setattr(keyring, "get_keyring", lambda: memory)
+    monkeypatch.setattr(
+        credentials_mod,
+        "DEFAULT_ALLOWED_BACKENDS",
+        credentials_mod.DEFAULT_ALLOWED_BACKENDS | {backend_path(memory)},
+    )
+    stored_secret = KeyringCredentialStore().get("ref-secret-name")
+    assert stored_secret is not None
+    assert stored_secret.get_secret_value() == fake_key
+
+    def write_cfg(rig: Rig, version: str) -> None:
+        rig.workspace.mkdir(parents=True, exist_ok=True)
+        (rig.workspace / "harness.toml").write_text(
+            "[providers.decision]\n"
+            'base_url = "https://endpoint-host.example.test/v1"\n'
+            'model = "m"\n'
+            f'model_version = "{version}"\n'
+            'key_ref = "ref-secret-name"\n'
+            "request_timeout_ms = 1500\n"
+            '[decisions.shadow_released.pick_action]\npoint_version = 1\nbasis = "owner"\nrecord = "owner-rec"\n',
+            encoding="utf-8",
+        )
+
+    rig = Rig(tmp_path, script=approves(wait=False))
+    write_cfg(rig, "v1")
+    assert (
+        rig.main(
+            "run",
+            WORKFLOW,
+            "--no-wait",
+            "--no-report",
+            "--progress",
+            "off",
+            decision_assembler=assemble_decision_runtime,
+        )
+        == ExitCode.AWAITING_ENGINEER
+    )
+    [run_id] = rig.run_ids()
+    reader = JournalReader(rig.runs / run_id)
+    try:
+        header = reader.header()
+    finally:
+        reader.close()
+    assert header.decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v1", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    write_cfg(rig, "v2")
+    rig.script = approves(wait=True)
+    rig.open_with = approving_opener(rig)
+    assert rig.main("resume", run_id, "--no-report", "--progress", "off") == ExitCode.OK
+    resumes = [e.payload for e in _events(rig, run_id) if isinstance(e.payload, ev.RunResumed)]
+    assert len(resumes) == 1
+    assert resumes[0].decision_runtime == {
+        "providers": [
+            {
+                "name": "openrouter", "model": "m", "version": "v2", "is_local": False, "tier": 2,
+                "status": "not_implemented",
+            }
+        ],
+        "released": {},
+        "dropped_releases": [{"point": "pick_action", "reason": "PR-G1"}],
+    }  # fmt: skip
+
+    assert (rig.runs / run_id / "journal.sqlite").is_file()
+    all_bytes = b"".join(p.read_bytes() for p in (rig.runs / run_id).rglob("*") if p.is_file())
+    stdout_bytes = rig.out.getvalue().encode("utf-8")
+    stderr_bytes = rig.err.getvalue().encode("utf-8")
+    for secret in (b"endpoint-host", b"ref-secret-name", b"base_url", b"key_ref", fake_key.encode("utf-8")):
+        assert secret not in all_bytes
+        assert secret not in stdout_bytes
+        assert secret not in stderr_bytes
