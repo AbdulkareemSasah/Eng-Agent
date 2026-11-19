@@ -39,16 +39,22 @@ __all__ = [
 _SLAB_TYPES = frozenset({"slab", "drop", "stiff", "mat", "footing"})
 
 
+def _as_float(value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise TypeError(f"numeric table cell expected, got {type(value).__name__}")
+    return float(value)
+
+
 def _length_mm(value: object, units: str) -> float:
-    return convert(float(value), csi_unit_system(units).length, "mm")
+    return convert(_as_float(value), csi_unit_system(units).length, "mm")
 
 
 def _stress_mpa(value: object, units: str) -> float:
-    return convert(float(value), csi_unit_system(units).stress, "MPa")
+    return convert(_as_float(value), csi_unit_system(units).stress, "MPa")
 
 
 def _unit_weight(value: object, units: str) -> float:
-    return convert(float(value), csi_unit_system(units).unit_weight, "kN/m3")
+    return convert(_as_float(value), csi_unit_system(units).unit_weight, "kN/m3")
 
 
 def _mapped(table: str, rows: Sequence[Mapping[str, Any]]) -> tuple[dict[str, Any], ...]:
