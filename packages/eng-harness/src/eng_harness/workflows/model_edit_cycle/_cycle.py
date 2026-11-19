@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict
 
 from eng_harness.block import block
 from eng_harness.ctx import ApprovalKind, Preview, PreviewItem
-from eng_harness.errors import ApprovalVoid, ModelIntegrityError
+from eng_harness.errors import ApprovalVoid
 from eng_harness.rules import edit_cycle as edit_rules
 from eng_harness.workflows.model_edit_cycle._change_set import ChangeSetDraft
 from eng_harness.workflows.model_edit_cycle._points import (
@@ -367,13 +367,7 @@ async def apply_change_set(ctx: Any, inp: ApplyInput) -> ApplyOutput:
             ctx, VerdictStatus.NEEDS_ENGINEER, _NO_FINDINGS, ReadbackReason.MODEL_CHANGED_DURING_APPLY, (effects,)
         )
         return await _after(ctx, inp.model, done.model_copy(update={"route": route}))
-    try:
-        after = _state(await ctx.tool("csi_read_model_state", {"model": inp.model}))
-    except ModelIntegrityError:  # invariant 1's check before the read is not clean (spec 0007 4.6, Q14)
-        route = await _decide(
-            ctx, VerdictStatus.NEEDS_ENGINEER, _NO_FINDINGS, ReadbackReason.CHECK_MODEL_FAILED, (effects,)
-        )
-        return await _after(ctx, inp.model, done.model_copy(update={"route": route}))
+    after = _state(await ctx.tool("csi_read_model_state", {"model": inp.model}))
     readback = await ctx.calc(
         "harness.readback_check",
         {"effects": effects, **_sides("before", inp.state), **_sides("after", after), "basis": ctx.basis.record_ref()},
