@@ -24,9 +24,19 @@ from eng_contract.store import ResultStore, Workspace
 from pydantic import BaseModel, JsonValue, ValidationError
 
 from eng_harness import __version__, errors
+from eng_harness import templates as templates_pkg
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness._text import sanitize_terminal
-from eng_harness.basis import StoreBasisPort
+from eng_harness.basis import (
+    BasisIncomplete,
+    BasisNotConfirmed,
+    EngineerValues,
+    StoreBasisPort,
+    build_draft,
+    build_setup_view,
+    check_declaration,
+    freeze,
+)
 from eng_harness.block import Registry, WorkflowDef
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl, remove_stop
@@ -51,6 +61,8 @@ from eng_harness.ports import DecisionPort, RunClass
 from eng_harness.progress import ExpectedTimes, Mode, ProgressRenderer, TerminalProgress
 from eng_harness.report import ReportError, build_report, write_report
 from eng_harness.servers import ConfigError
+from eng_harness.templates import ResolvedTemplate, TemplateRepository, TemplateSource, resolve
+from eng_harness.templates._yaml import load_strict
 
 if TYPE_CHECKING:
     from eng_harness.cli import CliDeps, RunCalcPort, RunPorts
@@ -79,7 +91,8 @@ class _Plan:
 
     workflow: str
     run_class: RunClass
-    call: Callable[[EngineLike], Awaitable[RunOutcome]]
+    call: Callable[[EngineLike, str], Awaitable[RunOutcome]]
+    workflow_def: WorkflowDef[Any, Any] | None = None
     run_id: str | None = None
     files: Mapping[str, Path] = field(default_factory=dict)
     visible: bool = False
@@ -127,7 +140,7 @@ def _command(args: Namespace, deps: CliDeps, *, resume: bool) -> int:
     try:
         with install_interrupt_handler(cell, deps.clock, deps.stdout, deps.stderr):
             providers = deps.providers_loader(config.providers)
-            plan = _resume_plan(args, workspace, registry, store) if resume else _run_plan(args, registry, config)
+            plan = _resume_plan(args, workspace, registry, store) if resume else _run_plan(args, deps, registry, config)
             answers = _answers(args, config, plan, resume=resume)
             try:
                 built = port_builder(
@@ -135,27 +148,33 @@ def _command(args: Namespace, deps: CliDeps, *, resume: bool) -> int:
                 )
             except errors.NotImplementedGap as gap:  # gap H-G8: the usage exit is returned here (spec 4.2.2 step 2)
                 raise _RefusedError(ExitCode.USAGE, gap.message) from gap
-            calc = calc_factory(config, workspace, store, plan.run_class, deps.clock, deps.ids)
-            # The workflow declares no calcs, so nothing is listed until it does; `run` refuses an unapproved calc at
-            # its step all the same (spec 0003 AC11).
-            refusals = calc.preflight(()) if not resume and plan.run_class is RunClass.PRODUCTION else []
-            if refusals:
-                lines = [f"{item.calc_id} is {item.status.value} ({item.code.value})" for item in refusals]
-                raise _RefusedError(ExitCode.REFUSED, "calcs refused for a production run: " + "; ".join(lines))
-            runtime = assembler(providers, config.decisions, workspace, policies)
-            for warning in runtime.warnings:
-                _say(deps, warning)
-            decision = decision_factory(runtime, config, workspace, deps.clock, deps.ids)
             page = PageSession(
                 config=config, store=store, runs_dir=workspace.root / "runs", cell=cell, clock=deps.clock,
                 wait_timeout_s=args.wait_timeout, no_wait=args.no_wait, no_browser=args.no_browser,
                 opener=deps.opener, stderr=deps.stderr, answers=answers, answers_once=not resume,
-                terminal_writer=deps.terminal_writer,
+                terminal_writer=deps.terminal_writer, setups_dir=workspace.root / "setups",
             )  # fmt: skip
-            progress = _progress(args, deps, config, workspace, plan.workflow)
+            progress: TerminalProgress | None = None
             try:
+                basis_ref = (
+                    _NO_BASIS
+                    if resume or plan.workflow_def is None
+                    else _basis_step(args, deps, plan.workflow_def, page, store)
+                )
+                calc = calc_factory(config, workspace, store, plan.run_class, deps.clock, deps.ids)
+                # The workflow declares no calcs, so nothing is listed until it does; `run` refuses an unapproved calc
+                # at its step all the same (spec 0003 AC11).
+                refusals = calc.preflight(()) if not resume and plan.run_class is RunClass.PRODUCTION else []
+                if refusals:
+                    lines = [f"{item.calc_id} is {item.status.value} ({item.code.value})" for item in refusals]
+                    raise _RefusedError(ExitCode.REFUSED, "calcs refused for a production run: " + "; ".join(lines))
+                runtime = assembler(providers, config.decisions, workspace, policies)
+                for warning in runtime.warnings:
+                    _say(deps, warning)
+                decision = decision_factory(runtime, config, workspace, deps.clock, deps.ids)
+                progress = _progress(args, deps, config, workspace, plan.workflow)
                 parts = _PortParts(calc, page, progress, decision)
-                outcome = asyncio.run(_drive(deps, built, registry, config, workspace, store, parts, plan))
+                outcome = asyncio.run(_drive(deps, built, registry, config, workspace, store, parts, plan, basis_ref))
             finally:
                 page.close()
                 if progress is not None:
@@ -180,20 +199,73 @@ class _PortParts:
     decision: DecisionPort
 
 
-def _run_plan(args: Namespace, registry: Registry, config: HarnessConfig) -> _Plan:
+def _run_plan(args: Namespace, deps: CliDeps, registry: Registry, config: HarnessConfig) -> _Plan:
     """Steps 1 and 2 of `run`: the workflow, the input and the options; nothing is created."""
     workflow = next((b for b in registry.blocks if isinstance(b, WorkflowDef) and b.name == args.workflow), None)
     if workflow is None:
         raise _RefusedError(ExitCode.REFUSED, f"workflow {args.workflow!r} is not registered")
-    if workflow.required_basis:  # step 3 arrives with plan 0006 T15
+    if workflow.required_basis and deps.basis_fields_of is None:
         raise _RefusedError(ExitCode.USAGE, "a workflow with required basis fields is not available in this build")
     data, model = _load_input(args, workflow)
     files, visible = _model_files(model, check=True)
-    request = RunRequest(
-        workflow=workflow.name, input=data, basis_ref=_NO_BASIS,
-        mode=PermissionMode(args.mode or config.engine.default_mode), run_class=RunClass(args.run_class),
-    )  # fmt: skip
-    return _Plan(workflow.name, request.run_class, lambda engine: engine.start(request), None, files, visible)
+    mode = PermissionMode(args.mode or config.engine.default_mode)
+    run_class = RunClass(args.run_class)
+
+    def start(engine: EngineLike, basis_ref: str) -> Awaitable[RunOutcome]:
+        return engine.start(
+            RunRequest(workflow=workflow.name, input=data, basis_ref=basis_ref, mode=mode, run_class=run_class)
+        )
+
+    return _Plan(workflow.name, run_class, start, workflow, None, files, visible)
+
+
+def _template(spec: str | None) -> tuple[ResolvedTemplate | None, TemplateSource | None]:
+    if spec is None:
+        return None, None
+    name, sep, version = spec.partition("@")
+    if not (name and sep and version):
+        raise _RefusedError(ExitCode.USAGE, f"template {spec!r} must have the form NAME@VERSION")
+    base = Path(templates_pkg.__file__).resolve()
+    repo = TemplateRepository(base.parent / "shipped", base / "user")  # spec Q22 interim: shipped templates only
+    return resolve(repo.get(name, version), repo), repo
+
+
+def _engineer_values(path: Path | None) -> EngineerValues | None:
+    if path is None:
+        return None
+    try:
+        return EngineerValues.model_validate(load_strict(path))
+    except (ContractError, OSError) as error:
+        raise _RefusedError(ExitCode.USAGE, f"cannot read the basis file {path.name}: {error}") from error
+
+
+def _basis_step(
+    args: Namespace, deps: CliDeps, workflow: WorkflowDef[Any, Any], page: PageSession, store: ResultStore
+) -> str:
+    """Step 3 of `run`: template and values file to draft, page confirmation and freeze (spec 4.2.2, 4.4.7)."""
+    if not workflow.required_basis:
+        return _NO_BASIS
+    if deps.basis_fields_of is None:
+        raise _RefusedError(ExitCode.USAGE, "a workflow with required basis fields is not available in this build")
+    if args.no_wait:
+        raise _RefusedError(
+            ExitCode.AWAITING_ENGINEER, "the basis is confirmed only by a `run` started without `--no-wait`"
+        )
+    fields = deps.basis_fields_of(workflow)
+    check_declaration(fields, workflow.required_basis)
+    resolved, source = _template(args.template)
+    draft = build_draft(fields, resolved, _engineer_values(args.basis), (), source=source)
+    if draft.pending:
+        raise _RefusedError(ExitCode.REFUSED, f"missing required basis fields: {', '.join(draft.pending)}")
+    view = build_setup_view(draft, workflow=workflow.name, setup_id=deps.ids.new_ulid())
+    page.setup.present(view)
+    answer = page.setup.answer(view.setup_id, wait=True)
+    if answer is None:
+        raise _RefusedError(ExitCode.AWAITING_ENGINEER, "basis confirmation did not complete before waiting ended")
+    try:
+        return freeze(draft, answer, store, deps.clock).ref
+    except (BasisNotConfirmed, BasisIncomplete) as error:
+        raise _RefusedError(ExitCode.REFUSED, str(error)) from error
 
 
 def _load_input(args: Namespace, workflow: WorkflowDef[Any, Any]) -> tuple[dict[str, JsonValue], BaseModel]:
@@ -261,8 +333,8 @@ def _resume_plan(args: Namespace, workspace: Workspace, registry: Registry, stor
         raise _RefusedError(
             ExitCode.REFUSED, f"the stored input of run {args.run_id} no longer fits the workflow"
         ) from error
-    run_class, call = RunClass(header.run_class), lambda engine: engine.resume(args.run_id)
-    return _Plan(header.workflow, run_class, call, args.run_id, files, visible, asked)
+    run_class, call = RunClass(header.run_class), lambda engine, _basis_ref: engine.resume(args.run_id)
+    return _Plan(header.workflow, run_class, call, None, args.run_id, files, visible, asked)
 
 
 def _answers(args: Namespace, config: HarnessConfig, plan: _Plan, *, resume: bool) -> FileAnswers | None:
@@ -315,7 +387,7 @@ def _progress(
 
 async def _drive(
     deps: CliDeps, built: RunPorts, registry: Registry, config: HarnessConfig, workspace: Workspace,
-    store: ResultStore, parts: _PortParts, plan: _Plan,
+    store: ResultStore, parts: _PortParts, plan: _Plan, basis_ref: str,
 ) -> RunOutcome:  # fmt: skip
     """Enter the ports, run the engine and leave the ports when it returns or raises (spec 4.2.2 step 5, AC71)."""
     async with built as hosted:
@@ -325,7 +397,7 @@ async def _drive(
             progress=parts.progress, run_control=FileRunControl(workspace.root / "runs"),
         )  # fmt: skip
         engine = deps.engine_factory(workspace, registry, ports, store, engine_settings(config), deps.clock, deps.ids)
-        return await plan.call(engine)
+        return await plan.call(engine, basis_ref)
 
 
 def _finish(
