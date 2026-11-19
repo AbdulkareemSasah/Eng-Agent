@@ -656,8 +656,7 @@ def test_column_review_through_calc_port(tmp_path: Path) -> None:
     case = load_case(FILES[REVIEW])
     kinds = CALCS["column-review"][1]
     args: dict[str, JsonValue] = {
-        name: {"$ref": store.put(kinds[name], payload, producer).result_id}
-        for name, payload in case.input.items()
+        name: {"$ref": store.put(kinds[name], payload, producer).result_id} for name, payload in case.input.items()
     }
     approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
     port = HarnessCalcPort(

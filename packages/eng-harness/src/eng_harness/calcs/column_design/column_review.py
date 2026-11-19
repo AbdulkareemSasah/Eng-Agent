@@ -138,16 +138,12 @@ def _member_key(member: ColumnMember) -> _MemberKey:
     return member.frame_id, member.source.value, member.check_id
 
 
-def _collect_verdicts(
-    inp: ReviewInput, refs: dict[str, str], selected_ids: set[str]
-) -> list[tuple[Verdict, str, int]]:
+def _collect_verdicts(inp: ReviewInput, refs: dict[str, str], selected_ids: set[str]) -> list[tuple[Verdict, str, int]]:
     """R1: validate verdict sources/check ids and keep only verdicts on selected `(frame, id)` columns."""
     kept: list[tuple[Verdict, str, int]] = []
     for index, verdict in enumerate(inp.host.verdicts):
         if verdict.source is not VerdictSource.HOST:
-            raise ContractError(
-                ErrorCode.INVALID_ARGUMENT, f"host verdict {index} must have source host", field="host"
-            )
+            raise ContractError(ErrorCode.INVALID_ARGUMENT, f"host verdict {index} must have source host", field="host")
         if verdict.subject.kind is SubjectKind.FRAME and verdict.subject.id in selected_ids:
             kept.append((verdict, refs["host"], index))
     for field_name, check_id in CODE_CHECKS:

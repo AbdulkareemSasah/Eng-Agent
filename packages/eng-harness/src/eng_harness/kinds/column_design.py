@@ -144,9 +144,7 @@ class ColumnReviewChanges(_P):
             any(c.status is not fail or c.previous_status is fail for c in self.newly_failing),
             any(c.status is not ok or c.previous_status is not fail for c in self.newly_passing),
             any(
-                c.status is c.previous_status
-                or c.status is fail
-                or (c.previous_status is fail and c.status is ok)
+                c.status is c.previous_status or c.status is fail or (c.previous_status is fail and c.status is ok)
                 for c in self.other_changes
             ),
         )

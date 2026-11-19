@@ -160,10 +160,7 @@ def _review_inputs(draw: st.DrawFn) -> tuple[dict[str, Any], dict[str, str]]:
         }
         for fid in selected
     ]
-    host_verdicts = [
-        draw(_host_verdict(draw(st.sampled_from(all_frames))))
-        for _ in range(draw(st.integers(0, 5)))
-    ]
+    host_verdicts = [draw(_host_verdict(draw(st.sampled_from(all_frames)))) for _ in range(draw(st.integers(0, 5)))]
     fields: dict[str, Any] = {
         "selection": _calc_header("harness.column_select")
         | {"status": "PASS", "columns": columns, "excluded": [], "issues": []},
@@ -173,9 +170,7 @@ def _review_inputs(draw: st.DrawFn) -> tuple[dict[str, Any], dict[str, str]]:
         | {
             "items": {check_id: [] for _, check_id, *_ in CODE_CHECKS},
             "not_checked": [
-                {"frame_id": fid, "code": "AXES_UNDECLARED", "gap": "CW-G9"}
-                for fid in selected
-                if draw(st.booleans())
+                {"frame_id": fid, "code": "AXES_UNDECLARED", "gap": "CW-G9"} for fid in selected if draw(st.booleans())
             ],
         },
         "basis": {
@@ -273,9 +268,7 @@ def test_ratios_are_referenced_not_computed(case: tuple[dict[str, Any], dict[str
     }
     ColumnReview.model_validate(payload)
     verdict_sets: dict[str, list[dict[str, Any]]] = {
-        refs[name]: fields[name]["verdicts"]
-        for name in ("host", *(n for n, *_ in CODE_CHECKS))
-        if name in fields
+        refs[name]: fields[name]["verdicts"] for name in ("host", *(n for n, *_ in CODE_CHECKS)) if name in fields
     }
     selected_ids = {c["frame_id"] for c in fields["selection"]["columns"]}
     selected_verdicts = [
@@ -316,9 +309,7 @@ def test_ratios_are_referenced_not_computed(case: tuple[dict[str, Any], dict[str
         ]
         assert member["ratio"] == (max(matching_ratios) if matching_ratios else None)
     if "previous" in fields:
-        prev_by_key = {
-            (m["frame_id"], m["source"], m["check_id"]): m for m in fields["previous"]["members"]
-        }
+        prev_by_key = {(m["frame_id"], m["source"], m["check_id"]): m for m in fields["previous"]["members"]}
         curr_by_key = {(m["frame_id"], m["source"], m["check_id"]): m for m in payload["members"]}
         changes = payload["changes"]
         for change in [*changes["newly_failing"], *changes["newly_passing"], *changes["other_changes"]]:
