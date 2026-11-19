@@ -7,7 +7,7 @@ from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import InputPolicy, validate_input
 from eng_contract.records import ResultRecord
 
-from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
+from eng_harness.calc import CalcInput, InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
 
 CALC_ID = "harness.column_section_match"
@@ -88,6 +88,13 @@ def _meta() -> InputMeta:
     )
 
 
+def _input_type() -> type[CalcInput]:
+    input_type = REGISTRY[CALC_ID].input_type
+    assert isinstance(input_type, type)
+    assert issubclass(input_type, CalcInput)
+    return input_type
+
+
 def _run(**changes: Any) -> dict[str, Any]:
     raw: dict[str, Any] = {
         "column": _column(),
@@ -98,17 +105,11 @@ def _run(**changes: Any) -> dict[str, Any]:
         "basis": _basis(),
     }
     raw.update(changes)
-    definition = REGISTRY[CALC_ID]
-    input_type = definition.input_type
-    assert isinstance(input_type, type)
-    return definition(input_type.model_validate(raw), _meta(), TraceBuilder()).model_dump(mode="json")
+    return REGISTRY[CALC_ID](_input_type().model_validate(raw), _meta(), TraceBuilder()).model_dump(mode="json")
 
 
 def test_size_must_be_rounding_result() -> None:
     """AC9: a literal length is not a harness.section_size/1 result (INVALID_ARGUMENT)."""
-    definition = REGISTRY[CALC_ID]
-    input_type = definition.input_type
-    assert isinstance(input_type, type)
     raw = {
         "column": _column(),
         "sizes": {
@@ -122,7 +123,7 @@ def test_size_must_be_rounding_result() -> None:
     }
     with pytest.raises(ContractError) as caught:
         validate_input(
-            input_type,
+            _input_type(),
             raw,
             source=_NoStore(),
             current_revision=lambda _: None,
@@ -161,9 +162,6 @@ def test_other_shape_column_has_no_candidates() -> None:
 
 
 def test_missing_record_refs_are_refused() -> None:
-    definition = REGISTRY[CALC_ID]
-    input_type = definition.input_type
-    assert isinstance(input_type, type)
     raw = {
         "column": _column(),
         "sizes": {"b": _size(400.0, 8), "h": _size(600.0, 12)},
@@ -173,5 +171,5 @@ def test_missing_record_refs_are_refused() -> None:
         "basis": _basis(),
     }
     with pytest.raises(ContractError) as caught:
-        definition(input_type.model_validate(raw), InputMeta(refs={}), TraceBuilder())
+        REGISTRY[CALC_ID](_input_type().model_validate(raw), InputMeta(refs={}), TraceBuilder())
     assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "column")

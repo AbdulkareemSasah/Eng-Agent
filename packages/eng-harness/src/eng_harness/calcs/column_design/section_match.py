@@ -91,9 +91,7 @@ class MatchSizes(_M):
 class MatchInput(CalcInput):
     """The column row, rounded sizes, model sections and the design basis."""
 
-    column: ColumnRow = eng_param(
-        ref_capable=True, ref_kinds={"harness.column_selection/1"}, engineering_quantity=True
-    )
+    column: ColumnRow = eng_param(ref_capable=True, ref_kinds={"harness.column_selection/1"}, engineering_quantity=True)
     sizes: MatchSizes
     sections: Sections = eng_param(ref_capable=True, ref_kinds={"model.sections/1"}, engineering_quantity=True)
     basis: DesignBasis = eng_param(ref_capable=True, ref_kinds={"basis.design_basis/1"}, engineering_quantity=True)
@@ -180,9 +178,15 @@ def column_section_match(inp: MatchInput, meta: InputMeta, trace: TraceBuilder) 
     if inp.sizes.D is not None:
         trace.input("size_D_mm", inp.sizes.D.size.value, unit="mm")
     else:
-        assert inp.sizes.b is not None and inp.sizes.h is not None
-        trace.input("size_b_mm", inp.sizes.b.size.value, unit="mm")
-        trace.input("size_h_mm", inp.sizes.h.size.value, unit="mm")
+        size_b, size_h = inp.sizes.b, inp.sizes.h
+        if size_b is None or size_h is None:
+            raise ContractError(
+                ErrorCode.INVALID_ARGUMENT,
+                "sizes must give b and h, or D",
+                field="sizes",
+            )
+        trace.input("size_b_mm", size_b.size.value, unit="mm")
+        trace.input("size_h_mm", size_h.size.value, unit="mm")
     names = _candidates(inp, tolerance)
     if len(names) == 1:
         status: _Status = "matched"
@@ -192,8 +196,12 @@ def column_section_match(inp: MatchInput, meta: InputMeta, trace: TraceBuilder) 
     else:
         status, section = "ambiguous", None
     rule = "spec 0013 4.4.4"
-    trace.step("candidates", len(names), formula="same shape and material within compare.length_mm", source=f"{rule} M1")
-    trace.step("status", status, formula="one matched, none no_section_in_model, several ambiguous", source=f"{rule} M2")
+    trace.step(
+        "candidates", len(names), formula="same shape and material within compare.length_mm", source=f"{rule} M1"
+    )
+    trace.step(
+        "status", status, formula="one matched, none no_section_in_model, several ambiguous", source=f"{rule} M2"
+    )
     trace.step(
         "section",
         section or "",
