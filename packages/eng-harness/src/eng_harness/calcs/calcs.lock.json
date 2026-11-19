@@ -41,6 +41,11 @@
       "version": 1
     },
     {
+      "content_sha256": "7c03eb50054234b562490b6317530893fbad9b272c29ee1a65a7ae9350b82efd",
+      "id": "harness.footing_resize",
+      "version": 1
+    },
+    {
       "content_sha256": "23fa251acf8db7eb33bb8df973c131311f352c8642ee23fdf3e8adcca3cccb92",
       "id": "harness.footing_schedule",
       "version": 1

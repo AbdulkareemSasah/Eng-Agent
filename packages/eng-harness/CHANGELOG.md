@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Calc `harness.footing_resize` v1 (draft) applies one resize step per footing (`enlarge_plan`, `increase_depth`, `reduce_bar_spacing`, `engineer_set`, or `none`) with exact-fraction bounds, `LIMIT_REACHED` flags, and engineer `OUTSIDE_BASIS_BOUNDS` / `OFF_INCREMENT` status (plan 0010 T4b, B-575; spec 0010 AC9, §4.4.4 R1–R4, amendment B-567 / OQ-Q64).
 - Calc `harness.footing_plan_size` v1 (draft) sizes trial square footings from selected service reactions and gross allowable bearing pressure, using exact grid rounding and the confirmed basis limits (plan 0010 T4, B-395; spec 0010 AC7, §4.4.2 P0–P6).
 - Calc 6, element count and position comparison: `harness.placement_compare` v1 (draft) in `calcs/placement_compare.py` (`PlacementInput`: `a_frames` / `b_frames` and/or `a_areas` / `b_areas`, same sections on both sides, and `basis` with `compare.length_mm` >= 0; `a_*` `stale_ok`; `PlacementBody`, `BASIS_FIELDS`; P1 counts per type and story as `b − a`; P2 exact squared distances; P3 frames same/reversed/moved; P4 areas same/reversed/reshaped/moved; P5 renamed vs ambiguous; P6 equal), its lock entry and verification record, four golden cases and its `stale_ok` row (plan 0003 T12, B-151; spec 0003 AC42 to AC45).
 - Revit framework groundwork: attended descriptors and host-dialog confirmation, optional host PID, Revit server configuration and add-in hash verification, and refusal of Revit escape-hatch names (plan 0011 T1, B-230; spec 0011 AC1 to AC3).
