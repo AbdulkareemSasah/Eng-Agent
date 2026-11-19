@@ -1,9 +1,11 @@
 """`report` command: atomic write, `--out`/`--force`, integrity and cycle timings (AC12, AC69, AC71; plan T16)."""
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 
+import pytest
 from eng_contract.envelope import Provenance
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
@@ -15,27 +17,23 @@ from eng_harness.journal import EventType, JournalReader, JournalWriter
 
 SHA = "a" * 64
 
-
 PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
 
 
-def test_report_atomic_replacement(tmp_path: Path, monkeypatch) -> None:
+def test_report_atomic_replacement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """`report --force` keeps the destination intact when rename fails, then replaces through the same path."""
-    import pytest
-    from eng_harness.report import _write
-
     rig = Rig(tmp_path / "ws_atomic", script=completes)
     assert rig.main("run", WORKFLOW, "--no-report", "--progress", "off") == ExitCode.OK
     [run_id] = rig.run_ids()
     target = tmp_path / "existing.html"
     target.write_text("original", encoding="utf-8")
 
-    def interrupted(source, destination):
+    def interrupted(source: str | os.PathLike[str], destination: str | os.PathLike[str]) -> None:
         assert Path(destination).read_text(encoding="utf-8") == "original"
         assert Path(source).read_text(encoding="utf-8").startswith("<!doctype html>")
         raise OSError("interrupted")
 
-    monkeypatch.setattr(_write.os, "replace", interrupted)
+    monkeypatch.setattr(os, "replace", interrupted)
     with pytest.raises(OSError, match="interrupted"):
         Rig(tmp_path / "ws_atomic").main("report", run_id, "--out", str(target), "--force")
     assert target.read_text(encoding="utf-8") == "original"
