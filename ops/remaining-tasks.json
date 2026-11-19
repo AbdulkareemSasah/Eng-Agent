@@ -1866,7 +1866,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 453
   },
   {
    "id": "B-396",
@@ -3844,9 +3845,7 @@
    "branch": "feat/b575-harness-xt4b-footing-resize",
    "prTitle": "feat(eng-harness): calc harness.footing_resize (B-575)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T4"
-   ],
+   "pending_deps": [],
    "writer": "agy hydrogen high",
    "reviewer": "codex sol + verifier lenses",
    "verifier_lenses": [
