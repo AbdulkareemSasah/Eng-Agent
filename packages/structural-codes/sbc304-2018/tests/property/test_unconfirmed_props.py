@@ -4,7 +4,6 @@ from math import ceil, floor
 from typing import Any, cast
 
 import pytest
-from aci318_14 import PACK
 from eng_contract.params import ParamSpec
 from eng_contract.verdicts import Subject, VerdictStatus
 from hypothesis import given, settings
@@ -17,6 +16,8 @@ from structural_codes.pack import Pack, Registry
 
 from sbc304_2018._overlay import build_overlay
 from sbc304_2018.clause_map import CLAUSE_MAP
+
+_BASE_PACK = next(pack for pack in Registry.discover().packs if pack.name == "aci318_14")
 
 
 def _parameters(model: type[CheckInputs]) -> st.SearchStrategy[dict[str, Any]]:
@@ -51,16 +52,18 @@ def _parameters(model: type[CheckInputs]) -> st.SearchStrategy[dict[str, Any]]:
     return st.fixed_dictionaries(fields)
 
 
-@pytest.mark.parametrize("base", PACK.checks, ids=lambda check: check.meta.check_id)
+@pytest.mark.parametrize("base", _BASE_PACK.checks, ids=lambda check: check.meta.check_id)
 @settings(derandomize=True, deadline=None, max_examples=16)
 @given(data=st.data())
 def test_never_pass_or_fail(base: Check, data: st.DataObject) -> None:
     row = next(row for row in CLAUSE_MAP if row.base_check_id == base.meta.check_id)
-    base_pack = Pack(PACK.name, PACK.code, PACK.edition, PACK.version, (base,), PACK.approvals)
+    base_pack = Pack(
+        _BASE_PACK.name, _BASE_PACK.code, _BASE_PACK.edition, _BASE_PACK.version, (base,), _BASE_PACK.approvals
+    )
     checks, overlay = build_overlay((row,), base_pack)
     (entry,) = overlay.entries
     assert isinstance(entry, Overridden)
-    pack = Pack("sbc304_2018", "SBC 304-2018", "2018", "0.1.0.dev0", checks, "approvals.yaml", PACK.name, overlay)
+    pack = Pack("sbc304_2018", "SBC 304-2018", "2018", "0.1.0.dev0", checks, "approvals.yaml", _BASE_PACK.name, overlay)
     registry = Registry.of((base_pack, pack))
     assert issubclass(base.inputs, CheckInputs)
     inputs = data.draw(_parameters(base.inputs))

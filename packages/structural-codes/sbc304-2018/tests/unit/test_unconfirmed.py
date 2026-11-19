@@ -4,7 +4,6 @@ import re
 from typing import Any
 
 import pytest
-from aci318_14 import PACK
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import ParamSpec
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
@@ -18,6 +17,8 @@ from structural_codes.pack import Pack, Registry
 
 from sbc304_2018._overlay import build_overlay
 from sbc304_2018.clause_map import CLAUSE_MAP
+
+_BASE_PACK = next(pack for pack in Registry.discover().packs if pack.name == "aci318_14")
 
 # Inputs only, transcribed from the first hand-check case (HC-1) of each matching ACI clause spec §8 and
 # aci318-14/tests/data/golden/verification/<check_id>.yaml. No SBC numeric result is expected.
@@ -163,14 +164,14 @@ _CASES: dict[str, tuple[str, dict[str, Any]]] = {
 
 @pytest.fixture(scope="module")
 def overlay_pack() -> tuple[Registry, dict[str, Check]]:
-    checks, overlay = build_overlay(CLAUSE_MAP, PACK)
-    pack = Pack("sbc304_2018", "SBC 304-2018", "2018", "0.1.0.dev0", checks, "approvals.yaml", PACK.name, overlay)
-    return Registry.of((PACK, pack)), {
+    checks, overlay = build_overlay(CLAUSE_MAP, _BASE_PACK)
+    pack = Pack("sbc304_2018", "SBC 304-2018", "2018", "0.1.0.dev0", checks, "approvals.yaml", _BASE_PACK.name, overlay)
+    return Registry.of((_BASE_PACK, pack)), {
         entry.base_check_id: entry.check for entry in overlay.entries if isinstance(entry, Overridden)
     }
 
 
-@pytest.mark.parametrize("base", PACK.checks, ids=lambda check: check.meta.check_id)
+@pytest.mark.parametrize("base", _BASE_PACK.checks, ids=lambda check: check.meta.check_id)
 def test_needs_engineer_with_gap(base: Check, overlay_pack: tuple[Registry, dict[str, Check]]) -> None:
     registry, by_base = overlay_pack
     base_id = base.meta.check_id
@@ -218,7 +219,7 @@ def test_needs_engineer_with_gap(base: Check, overlay_pack: tuple[Registry, dict
         check.body(None, None)
 
 
-@pytest.mark.parametrize("base", PACK.checks, ids=lambda check: check.meta.check_id)
+@pytest.mark.parametrize("base", _BASE_PACK.checks, ids=lambda check: check.meta.check_id)
 def test_member_scope_copied(base: Check, overlay_pack: tuple[Registry, dict[str, Check]]) -> None:
     registry, by_base = overlay_pack
     check = by_base[base.meta.check_id]
@@ -234,7 +235,7 @@ def test_member_scope_copied(base: Check, overlay_pack: tuple[Registry, dict[str
     assert re.search(r"\bSBC_(CLAUSE_UNCONFIRMED|ROW_MISSING)\b", "\n".join(trace.messages)) is None
 
 
-@pytest.mark.parametrize("base", PACK.checks, ids=lambda check: check.meta.check_id)
+@pytest.mark.parametrize("base", _BASE_PACK.checks, ids=lambda check: check.meta.check_id)
 def test_inputs_match_base(base: Check, overlay_pack: tuple[Registry, dict[str, Check]]) -> None:
     registry, by_base = overlay_pack
     check = by_base[base.meta.check_id]
