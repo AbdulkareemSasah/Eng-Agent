@@ -1,0 +1,67 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.4 (M1, M2 for circular D); synthetic data, no project value",
+  "method_ref": "§4.4.4 M2",
+  "synthetic": true,
+  "derivation": "Tolerance t = 5 mm. Column C2 is circular, material C35. Rounded size D = 500 mm (required 500, increment 50, multiple 10, 10 x 50 = 500). M1 candidates: circular C35 sections with |D_mm - 500| <= 5. C50 has D_mm = 500, material C35: |500 - 500| = 0 <= 5. C40x60 is rectangular. C55 has D_mm = 550, |550 - 500| = 50 > 5. M2: one candidate => matched, section C50, names [C50].",
+  "input": {
+    "column": {
+      "frame_id": "C2",
+      "section": "C40",
+      "shape": "circular",
+      "material": "C35",
+      "story": "L1",
+      "length_mm": 3000.0
+    },
+    "sizes": {
+      "D": {
+        "required": {"value": 500.0, "unit": "mm"},
+        "increment": {"value": 50.0, "unit": "mm"},
+        "multiple": 10,
+        "size": {"value": 500.0, "unit": "mm"},
+        "status": "PASS"
+      }
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40x60",
+          "material": "C35",
+          "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+        },
+        {
+          "name": "C50",
+          "material": "C35",
+          "shape": {"type": "circular", "D_mm": 500}
+        },
+        {
+          "name": "C55",
+          "material": "C35",
+          "shape": {"type": "circular", "D_mm": 550}
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "column": "res_01KCC000000000000000000051",
+    "sections": "res_01KCC000000000000000000052",
+    "basis": "res_01KCC000000000000000000053"
+  },
+  "expected": {
+    "status": "matched",
+    "section": "C50",
+    "names": ["C50"]
+  }
+}

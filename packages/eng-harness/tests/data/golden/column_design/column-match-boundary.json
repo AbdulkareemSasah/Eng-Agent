@@ -1,0 +1,69 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.4 (M1 inclusive bound at compare.length_mm) and spec 0003 section 4.11 P2; synthetic data, no project value",
+  "method_ref": "§4.4.4 M1",
+  "synthetic": true,
+  "derivation": "Tolerance t = 5 mm. Column C1 rectangular, material C30. Rounded sizes b = 400 mm, h = 600 mm. Section C405x600 has b_mm = 405, h_mm = 600, material C30. Exact differences: |405 - 400| = 5 <= 5 and |600 - 600| = 0 <= 5 (Fraction comparison, inclusive). One candidate. M2: matched, section C405x600. A section at b_mm = 406 would give |406 - 400| = 6 > 5 and would not be a candidate.",
+  "input": {
+    "column": {
+      "frame_id": "C1",
+      "section": "C30x30",
+      "shape": "rectangular",
+      "material": "C30",
+      "story": "L1",
+      "length_mm": 3000.0
+    },
+    "sizes": {
+      "b": {
+        "required": {"value": 400.0, "unit": "mm"},
+        "increment": {"value": 50.0, "unit": "mm"},
+        "multiple": 8,
+        "size": {"value": 400.0, "unit": "mm"},
+        "status": "PASS"
+      },
+      "h": {
+        "required": {"value": 600.0, "unit": "mm"},
+        "increment": {"value": 50.0, "unit": "mm"},
+        "multiple": 12,
+        "size": {"value": 600.0, "unit": "mm"},
+        "status": "PASS"
+      }
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C405x600",
+          "material": "C30",
+          "shape": {"type": "rectangular", "b_mm": 405, "h_mm": 600}
+        },
+        {
+          "name": "C406x600",
+          "material": "C30",
+          "shape": {"type": "rectangular", "b_mm": 406, "h_mm": 600}
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "column": "res_01KCC000000000000000000041",
+    "sections": "res_01KCC000000000000000000042",
+    "basis": "res_01KCC000000000000000000043"
+  },
+  "expected": {
+    "status": "matched",
+    "section": "C405x600",
+    "names": ["C405x600"]
+  }
+}

@@ -34,6 +34,14 @@ CALCS = {
             "basis": "basis.design_basis/1",
         },
     ),
+    "column-match": (
+        "harness.column_section_match",
+        {
+            "column": "harness.column_selection/1",
+            "sections": "model.sections/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
 }
 """Per file prefix: the calc id and the record kind of each referenced input field."""
 FILES = golden_files()
