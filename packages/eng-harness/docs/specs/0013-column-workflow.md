@@ -83,7 +83,8 @@ values are synthetic and say so.
 - AC5. Given any permutation of the frames, sections or scope lists, when `harness.column_select` runs, then the output
   and its content hash are equal. Test: `tests/property/test_column_select.py::test_permutation_invariant`.
 - AC6. Given the golden cases of §4.4.2 (compression and tension rows, one moment zero, both moments non-zero, a square
-  section, a layout missing, a circular and an `other` section, the bar area from the basis, a square section with
+  section, a layout missing, a circular and an `other` section, the bar area copied from the layout answer as a literal
+  `A_bar_mm2` (`column-demands-layout-bar-area`; never a basis reference), a square section with
   `n_bars_b ≠ n_bars_h`, the one-per-column `longitudinal_reinforcement_limits` item with `Ag_mm2` and `case: null`), when
   `harness.column_demands` runs, then the items per check, their converted values and units, `not_checked` and the
   trace equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-demands-*]`.
@@ -125,11 +126,12 @@ values are synthetic and say so.
 
 - AC13. Given the code-pack route (§4.5) and the three check ids, when the workflow calls `ctx.calc` with a reference
   to an item list of `harness.column_check_items/1`, then `structural_codes.evaluate_batch` runs in mode `trial`, the
-  stored `verdicts.set/1` has one trace per item in item order and `draft: true`; with a real `harness.column_check_items/1`
-  record and the three real ACI 318-14 checks, `verdicts.set/1` `parents` are `[items result, basis result]` for the two
-  checks with basis inputs (`max_axial_strength`, `axial_flexure_uniaxial`) and `[items result]` for
-  `longitudinal_reinforcement_limits`, `batch`, `fc_MPa`, `fy_MPa` and `k_factor` are `RefInput`s, and every other input is
-  a `LiteralInput` equal to the stored value. With either a bare `RefString` item input or a literal `fc_MPa` in a
+  stored `verdicts.set/1` has one trace per item in item order and `draft: true`. With a real `harness.column_check_items/1`
+  record and the three real ACI 318-14 checks, each `verdicts.set/1` has `parents` exactly `[items result, basis result]`
+  (every check carries a basis `ratio_limit` reference; the two strength checks also carry `fc_MPa`, `fy_MPa` and
+  `k_factor`); `batch` is a `RefInput` for every check; `ratio_limit` is a `RefInput` for every check; `fc_MPa`, `fy_MPa`
+  and `k_factor` are `RefInput`s for the two strength checks; every other input is a `LiteralInput` equal to the stored
+  value (amendment B-578; owner answer 2026-11-19). With either a bare `RefString` item input or a literal `fc_MPa` in a
   permissive stored-list fixture, the route returns `INVALID_ARGUMENT` and stores no verdict (amendment B-578).
   In run class `production`, the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
   then `ContractError` `NOT_FOUND` before any evaluation (calcs §6; amendment B-405, spec 0010 C4).
@@ -308,9 +310,13 @@ and inside each item (amendment B-578):
   `d_prime_mm`, `A_bar_mm2`, `n_bars_b`, `n_bars_h`, with `n_bars_b` and `n_bars_h` integers) are literal JSON values
   under the clause-spec names and units, each equal to an E3 to E5 trace step;
 - `transverse_kind` is the literal `"tied"` (spirals are `NOT_IMPLEMENTED`, §6);
-- `fc_MPa`, `fy_MPa` and `k_factor` are `{"$ref": "res_<basis id>#/fields/<path>/value"}` references to the confirmed
-  basis fields `materials.concrete_fc_MPa`, `materials.rebar_fy_MPa` and `columns.effective_length_factor_ratio` (the calc
-  verifies presence and confirmation before emitting any reference);
+- `fc_MPa`, `fy_MPa`, `k_factor` and `ratio_limit` are `{"$ref": "res_<basis id>#/fields/<path>/value"}` references to
+  the confirmed basis fields `materials.concrete_fc_MPa`, `materials.rebar_fy_MPa`,
+  `columns.effective_length_factor_ratio` and `limits.ratio_limit_ratio` (the calc verifies presence and confirmation
+  before emitting any reference). Every ACI 318-14 column check input model inherits `ratio_limit` from
+  `CheckInputs` (`structural_codes/inputs.py`), so each of the three checks carries this fourth reference-object field
+  beside `fc_MPa`, `fy_MPa` and `k_factor` for the two strength checks (owner answer 2026-11-19; amendment B-578; same
+  basis path the footing workflow uses);
 - a bare reference string (`RefString`) is never an input value; a calc cannot reference its own result, and under
   `require_refs` only `engineering_quantity` fields must be references (architecture [04](../../../../design/docs/architecture/04-tool-contract.md) §3.5).
 
@@ -581,7 +587,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q9 | SAP2000 as the frame model | Owner | Not in v1: concrete column results (SP-3) and design orientation (SP-5) are missing |
 | Q10 | Update in Revit every matched pair whose size differs (including differences older than this design), or only the columns changed in this design | Owner | Every differing pair, each item marked `preexisting` or `changed_in_design` in the preview so the engineer can reject single items |
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
-| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The eng-harness package maintainer owns the ADR as a separate documents follow-up (plan §3, amendment B-578). |
+| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The lead owns the ADR as a separate documents follow-up (plan §3, amendment B-578; lead decision D-19). |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
 | Q14 | **[added]** Whether the ACI 318-14 column demand fields (`MaxAxialInputs.Pu_kN`, `AxialFlexureInputs.Pu_kN`, `Mu_kNm`, `Mu_other_kNm`) should be `ref_capable` and `engineering_quantity` per CF §4.3 (`MaxAxialInputs.Pu_kN` and `AxialFlexureInputs.Mu_kNm` have neither flag; `AxialFlexureInputs.Pu_kN` and `Mu_other_kNm` have `ref_capable` only); non-blocking for v1 (amendment B-578) | Owner | v1 goes ahead with literal demands inside the referenced `harness.column_check_items/1` record; making them `ref_capable` and `engineering_quantity` later requires a structural-codes plan 0004 amendment paired with a follow-up code-pack route task (the kind stays unchanged) |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |

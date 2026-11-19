@@ -87,6 +87,9 @@ tasks:
     # member snapshot in T4. column_demands.py types forces with forces.member_end/1 (refusal at input validation,
     # ContractError INVALID_ARGUMENT) and validates basis fields before emitting references; the changed-line estimate
     # rises from 340 to 400 (B-552).
+    # Owner answer (2026-11-19): each check whose input model has ratio_limit emits it as
+    # {"$ref": "res_<basis id>#/fields/limits.ratio_limit_ratio/value"} (fourth reference-object field beside
+    # fc_MPa, fy_MPa and k_factor; all three ACI 318-14 column checks inherit it from CheckInputs).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_demands (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -111,7 +114,7 @@ tasks:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-reinforcement-limits-per-column]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-biaxial]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-not-checked]"
-      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-bar-area-from-basis]"
+      - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-demands-layout-bar-area]"
       - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_refusals"
       - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_axes_undeclared"
       - "packages/eng-harness/tests/unit/calcs/test_column_demands.py::test_items_validate_against_checks"
@@ -186,8 +189,8 @@ tasks:
     # an id outside the allowlist gives ContractError NOT_FOUND, spec 0010 C4) has merged; see section 3
     # Amendment (B-578, documents only): the code-pack route (_code_packs.py, _port.py, _calc/__init__.py,
     # pyproject.toml, uv.lock) already landed in B-393 (plan 0010 T2) and the three column checks in B-334;
-    # B-393 also shipped the column allowlist and batch argument. The eng-harness package maintainer owns the
-    # package ADR required by spec Q12 as a separate documents follow-up (see section 3). T6 is a test-only
+    # B-393 also shipped the column allowlist and batch argument. The lead owns the package ADR required by
+    # spec Q12 as a separate documents follow-up (see section 3; lead decision D-19). T6 is a test-only
     # pull request (title type test, test files only, no failing-first run under gate spec 4.7). The changed-line
     # estimate becomes 60 and max_sessions becomes 1. The companion tests in test_code_pack_route.py are expected
     # to pass at T6's base (merged B-393 + B-334 + T3), so tests_first is empty under TF004 and B-482.
@@ -420,8 +423,9 @@ holds the `tests_first` tests (and, for calc tasks, golden files with hand-deriv
 field). Those tests fail on the task's base before implementation. T6 is a test-only PR and is exempt from the
 failing-first rule under gate §4.7. Its companion tests pass on its base, so `tests_first: []` follows the B-482
 precedent and TF004 (amendment B-578). `max_changed_lines` estimates counted non-test lines (B-552).
-Several tasks edit `CHANGELOG.md`, `calcs.lock.json`, `blocks.lock.json` or the shared golden test module.
-`depends_on` gives their merge order. Nothing in this plan needs a host program in CI.
+Several tasks edit `CHANGELOG.md`, `calcs.lock.json`, `blocks.lock.json` or the shared golden test module,
+so they merge one after another; the registry serializes T3, T4 and T5 (each depends only on T2, so
+`depends_on` alone does not order them). Nothing in this plan needs a host program in CI.
 
 R1 content in bootstrap mode ([ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md) §4): calcs and
 rules are registered `draft` and no approval is added; `src/eng_harness/calcs/`, `src/eng_harness/rules/` and
@@ -447,10 +451,11 @@ Amendment (B-462).
 **T3 `harness.column_demands`** (spec §4.4.2; amendment B-578). Updates `ColumnCheckItems` in `kinds/column_design.py`
 with field-aware validation of `_Item.inputs`. For each supplied field, require a strict JSON integer for
 `n_bars_b` and `n_bars_h`, exactly `"tied"` for `transverse_kind`, and a `{"$ref": "..."}` object validated by
-`eng_contract.refs.Ref` for `fc_MPa`, `fy_MPa` and `k_factor`. Require a strict JSON integer or finite float for
-each remaining numeric input. Exclude booleans and coercion. The check-model test below verifies the exact input
-names and required fields for each check. Keep the `harness.column_check_items/1` id. Amendment B-577 covers
-`ColumnReview`'s member snapshot.
+`eng_contract.refs.Ref` for `fc_MPa`, `fy_MPa`, `k_factor` and `ratio_limit` (owner answer 2026-11-19). Require a
+strict JSON integer or finite float for each remaining numeric input. Exclude booleans and coercion. The
+check-model test below verifies that every required field of the check's input model is present, every emitted
+name is a field of that model, and the emitted names equal the §4.4.2 list for that check (`ratio_limit`
+included). Keep the `harness.column_check_items/1` id. Amendment B-577 covers `ColumnReview`'s member snapshot.
 
 Update `tests/data/kinds/column_design/column_check_items*.json` and `tests/contract/test_column_design_kinds.py`.
 The valid fixture round-trips literal values and basis reference objects with the `$ref` alias.
@@ -466,7 +471,7 @@ stored). Rows per selected column and combination; `Pu_kN = −P_kN`; the axis r
 and layout only (`b_mm == h_mm` and `n_bars_b == n_bars_h`) and `AXES_UNDECLARED` otherwise; `Ag_mm2 = b_mm·h_mm` and
 one reinforcement-limits item per column with `case: null`; `lu_mm` from the frame length; `Ast_mm2` from the layout;
 emits literal JSON values (equal to E3–E5 trace steps), `"tied"`, and `{"$ref": "res_<basis id>#/fields/<path>/value"}`
-for `fc_MPa`, `fy_MPa` and `k_factor` per spec §4.4.2; `not_checked` reasons; the trace steps E3 to E5. `test_column_demands.py::test_items_validate_against_checks` validates every emitted item against its real `aci318_14` check input model under `InputPolicy(require_refs=True)` and checks exact input field-name parity; the golden harness uses a fixed result-id source so basis references are deterministic. The verification record names each conversion as a C item for the owner (contract G-3, CW-G9 to CW-G11).
+for `fc_MPa`, `fy_MPa`, `k_factor` and `ratio_limit` per spec §4.4.2 (`ratio_limit` → `limits.ratio_limit_ratio`; owner answer 2026-11-19); `not_checked` reasons; the trace steps E3 to E5. `test_column_demands.py::test_items_validate_against_checks` validates every emitted item against its real `aci318_14` check input model under `InputPolicy(require_refs=True)` and checks that every required field of the check's input model is present, every emitted name is a field of that model, and the emitted names equal the §4.4.2 list for that check (`ratio_limit` included); the golden harness uses a fixed result-id source so basis references are deterministic. The verification record names each conversion as a C item for the owner (contract G-3, CW-G9 to CW-G11).
 
 **T4 `harness.column_review`** (spec §4.4.3). Reads the host and code verdict sets by reference (separate named
 top-level reference fields for the three code checks), filters to the selected columns, members per 0003 S5, governing
@@ -488,7 +493,8 @@ three column checks merged in B-334 (structural-codes plan 0004 T5). T6 is there
 kind, adding companion coverage in `tests/unit/calcs/test_code_pack_route.py`:
 `test_batch_through_calcport` (real `aci318_14` registry through `HarnessCalcPort.run` in `trial` mode on a conforming
 `harness.column_check_items/1` and `basis.design_basis/1`, asserting one trace per item in order, `draft: true`, exact
-`parents`, `RefInput`/`LiteralInput` split and stored-value equality). For `test_ref_strings_refused` and
+`parents` `[items, basis]` for every check, `RefInput`/`LiteralInput` split including `ratio_limit` as a `RefInput`,
+and stored-value equality). For `test_ref_strings_refused` and
 `test_literal_fc_refused`, use a permissive stored-list fixture that accepts raw item inputs. Resolve the list
 through `batch` and assert that the route returns `INVALID_ARGUMENT` with no verdict stored, for a bare
 `RefString` (`field = items[0].<name>`) and for a literal `fc_MPa` under `require_refs`, respectively.
@@ -554,12 +560,13 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
   Revit fake).
 - Before T14: plan 0007 T10 (`audit_value_sources` and the report sections).
 - B-484 settled spec C1. T3 uses the merged §4.7 Table A paths `materials.concrete_fc_MPa`,
-  `materials.rebar_fy_MPa` and `columns.effective_length_factor_ratio` (amendment B-578).
+  `materials.rebar_fy_MPa`, `columns.effective_length_factor_ratio` and `limits.ratio_limit_ratio`
+  (amendment B-578; owner answer 2026-11-19 for `ratio_limit`).
 - Owner decisions that do not block T1 to T15: the spec's Q1 to Q11 (the recommendations are implemented).
-- Documents follow-up for spec Q12 (amendment B-578). The eng-harness package maintainer owns
-  a separate documents task to write the short workspace code-packs ADR under `docs/adr/`. The ADR records the
-  workspace dependencies on `structural-codes` and `aci318-14` under rule A10 and their impact after the
-  repository split (ADR-0028).
+- Documents follow-up for spec Q12 (amendment B-578). The lead owns a separate documents task to write the
+  short workspace code-packs ADR under `docs/adr/` (recommendation adopted by lead decision D-19). The ADR
+  records the workspace dependencies on `structural-codes` and `aci318-14` under rule A10 and their impact after
+  the repository split (ADR-0028).
 
 ## 4. Verification
 
