@@ -14,6 +14,28 @@ from eng_harness.cli import ExitCode
 from eng_harness.journal import EventType, JournalReader, JournalWriter
 
 SHA = "a" * 64
+
+
+def test_report_atomic_replacement(tmp_path: Path, monkeypatch) -> None:
+    import pytest
+    from eng_harness.report import _write
+
+    target = tmp_path / "report.html"
+    target.write_text("original", encoding="utf-8")
+    replace = _write.os.replace
+
+    def interrupted(source, destination):
+        assert Path(source).read_text(encoding="utf-8") == "replacement"
+        assert Path(destination).read_text(encoding="utf-8") == "original"
+        raise OSError("interrupted")
+
+    monkeypatch.setattr(_write.os, "replace", interrupted)
+    with pytest.raises(OSError, match="interrupted"):
+        _write.write_report("replacement", target)
+    assert target.read_text(encoding="utf-8") == "original"
+    monkeypatch.setattr(_write.os, "replace", replace)
+    _write.write_report("replacement", target)
+    assert target.read_text(encoding="utf-8") == "replacement"
 PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
 
 

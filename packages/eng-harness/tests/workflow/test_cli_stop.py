@@ -14,6 +14,41 @@ from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
 
 
+def test_stop_wait_blocks_until_lock_released(tmp_path: Path) -> None:
+    import time
+
+    rig = Rig(tmp_path / "wait", script=completes)
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "off") == ExitCode.OK
+    [run_id] = rig.run_ids()
+    run_dir = rig.runs / run_id
+    lock = RunLock(run_dir)
+    lock.acquire()
+    result: list[int] = []
+    finished = threading.Event()
+    stop_rig = Rig(tmp_path / "wait")
+
+    def stop() -> None:
+        try:
+            result.append(stop_rig.main("stop", run_id, "--wait", "5", clock=FixedClock(START_MS, 1)))
+        finally:
+            finished.set()
+
+    thread = threading.Thread(target=stop, daemon=True)
+    try:
+        thread.start()
+        deadline = time.monotonic() + 3
+        while not (run_dir / STOP_FILE).exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert (run_dir / STOP_FILE).exists()
+        assert not finished.wait(timeout=0.2)
+    finally:
+        lock.release()
+        thread.join(timeout=5)
+    assert finished.is_set()
+    assert result == [ExitCode.OK]
+    assert "stopped" in stop_rig.out.getvalue().lower()
+
+
 def test_stop_pauses_at_safe_point(tmp_path: Path) -> None:
     # 1. Live run holding its run lock pauses at the next safe point when `stop <run_id>` is called.
     rig = Rig(tmp_path / "live")
