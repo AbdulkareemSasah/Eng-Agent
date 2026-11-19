@@ -259,15 +259,21 @@ def _note(name: str, args: dict[str, Any]) -> None:
 
 
 def _element(element_id: int) -> dict[str, Any]:
-    for row in STATE.model["elements"]:
-        if row["element_id"] == element_id:
+    elements = STATE.model.get("elements", [])
+    if not isinstance(elements, list):
+        raise BridgeError("invalid_request", f"Element {element_id} was not found.")
+    for row in elements:
+        if isinstance(row, dict) and row.get("element_id") == element_id:
             return row
     raise BridgeError("invalid_request", f"Element {element_id} was not found.")
 
 
 def _type(type_id: int) -> dict[str, Any]:
-    for row in STATE.model["types"]:
-        if int(row["type_id"]) == int(type_id):
+    types_list = STATE.model.get("types", [])
+    if not isinstance(types_list, list):
+        raise BridgeError("invalid_request", f"Type {type_id} was not found.")
+    for row in types_list:
+        if isinstance(row, dict) and int(row.get("type_id", -1)) == int(type_id):
             return row
     raise BridgeError("invalid_request", f"Type {type_id} was not found.")
 

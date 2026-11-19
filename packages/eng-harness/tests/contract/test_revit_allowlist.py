@@ -1,11 +1,10 @@
 """Contract tests of the Revit fake schemas (plan 0011 T2; spec 0011 AC30)."""
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-import pytest
+from helpers import load_json_dict, load_repo_json
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
@@ -40,13 +39,6 @@ ALLOWLISTED_TOOLS = frozenset(
 )
 
 
-def _load(path: Path) -> dict[str, Any]:
-    with path.open("rb") as handle:
-        data = json.load(handle)
-    assert isinstance(data, dict)
-    return data
-
-
 def _mcp_name(tool: dict[str, Any]) -> str:
     """The MCP tool name the server lists (inventory `mcp_name`, else `name`)."""
     name = tool.get("mcp_name") or tool["name"]
@@ -55,23 +47,17 @@ def _mcp_name(tool: dict[str, Any]) -> str:
 
 
 def _inventory() -> dict[str, Any]:
-    """The S-12 inventory at the repository root, outside this package.
-
-    The gate's mutation step runs the tests in a copy of the package only, where the inventory does not exist; mutmut
-    sets ``MUTANT_UNDER_TEST`` in every one of its runs, and only there a missing inventory skips. In every other run a
-    missing inventory fails (B-369).
-    """
-    if not INVENTORY.is_file() and "MUTANT_UNDER_TEST" in os.environ:
-        pytest.skip(
-            "the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31"
-        )
-    return _load(INVENTORY)
+    """The S-12 inventory at the repository root, outside this package."""
+    return load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
 
 
 def test_fake_schemas_match_inventory() -> None:
     """AC30: the fake's tools equal the inventory schemas for every allowlisted tool."""
     inventory = _inventory()
-    fake = _load(SCHEMAS)
+    fake = load_json_dict(SCHEMAS)
     expected_schemas = {
         _mcp_name(tool): tool["input_schema"] for tool in inventory["tools"] if _mcp_name(tool) in ALLOWLISTED_TOOLS
     }
