@@ -38,6 +38,7 @@ def meta_for(refs: dict[str, str]) -> InputMeta:
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=KINDS[name],
                 complete=True,
                 model_id=None,

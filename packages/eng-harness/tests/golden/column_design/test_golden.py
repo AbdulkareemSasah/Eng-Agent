@@ -18,6 +18,7 @@ from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.column_design import COLUMN_DESIGN_CALCS, COLUMN_DESIGN_KINDS
+from eng_harness.calcs.column_design.change_set import column_change_set
 from eng_harness.calcs.column_design.column_review import (
     BASIS_FIELDS as REVIEW_BASIS_FIELDS,
 )
@@ -27,6 +28,7 @@ from eng_harness.calcs.column_design.column_review import (
     column_review,
 )
 from eng_harness.calcs.column_design.column_select import BASIS_FIELDS, ColumnScope, SelectInput, column_select
+from eng_harness.calcs.column_design.section_match import column_section_match
 from eng_harness.kinds.column_design import ColumnReview, ColumnSelection
 from eng_harness.ports import RunClass
 
@@ -133,7 +135,7 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert review.method_source == "eng-harness spec 0013 §4.4.3 (R1 to R4); eng-harness spec 0003 §4.9 (S2, S5)"
-    assert (column_select, column_review) == COLUMN_DESIGN_CALCS
+    assert (column_select, column_review, column_section_match, column_change_set) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
     assert REVIEW_BASIS_FIELDS == ("report.top_n",)
