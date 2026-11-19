@@ -16,27 +16,33 @@ from eng_harness.journal import EventType, JournalReader, JournalWriter
 SHA = "a" * 64
 
 
+PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
+
+
 def test_report_atomic_replacement(tmp_path: Path, monkeypatch) -> None:
+    """`report --force` keeps the destination intact when rename fails, then replaces through the same path."""
     import pytest
     from eng_harness.report import _write
 
-    target = tmp_path / "report.html"
+    rig = Rig(tmp_path / "ws_atomic", script=completes)
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "off") == ExitCode.OK
+    [run_id] = rig.run_ids()
+    target = tmp_path / "existing.html"
     target.write_text("original", encoding="utf-8")
-    replace = _write.os.replace
 
     def interrupted(source, destination):
-        assert Path(source).read_text(encoding="utf-8") == "replacement"
         assert Path(destination).read_text(encoding="utf-8") == "original"
+        assert Path(source).read_text(encoding="utf-8").startswith("<!doctype html>")
         raise OSError("interrupted")
 
     monkeypatch.setattr(_write.os, "replace", interrupted)
     with pytest.raises(OSError, match="interrupted"):
-        _write.write_report("replacement", target)
+        Rig(tmp_path / "ws_atomic").main("report", run_id, "--out", str(target), "--force")
     assert target.read_text(encoding="utf-8") == "original"
-    monkeypatch.setattr(_write.os, "replace", replace)
-    _write.write_report("replacement", target)
-    assert target.read_text(encoding="utf-8") == "replacement"
-PRODUCER = Provenance(tool="harness", tool_version="1", inputs={}, started_at="2026-01-01T00:00:00.000Z", duration_ms=0)
+
+    monkeypatch.undo()
+    assert Rig(tmp_path / "ws_atomic").main("report", run_id, "--out", str(target), "--force") == ExitCode.OK
+    assert target.read_text(encoding="utf-8").startswith("<!doctype html>")
 
 
 def test_output_rules(tmp_path: Path) -> None:
