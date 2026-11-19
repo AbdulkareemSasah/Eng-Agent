@@ -10,6 +10,7 @@ from eng_harness.calcs.footing import FOOTING_CALCS, FOOTING_KINDS
 from eng_harness.calcs.model_diff import model_diff
 from eng_harness.calcs.model_fingerprint import StateMatch, model_fingerprint, same_state
 from eng_harness.calcs.readback_check import readback_check
+from eng_harness.calcs.section_round import section_round
 from eng_harness.kinds.calcs import CALC_KINDS
 
 REGISTRY = CalcRegistry(
@@ -19,6 +20,7 @@ REGISTRY = CalcRegistry(
         model_diff,
         readback_check,
         design_summary,
+        section_round,
         *FOOTING_CALCS,
         *EDIT_CYCLE_CALCS,
         *COLUMN_DESIGN_CALCS,

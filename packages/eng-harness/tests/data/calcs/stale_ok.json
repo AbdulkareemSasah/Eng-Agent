@@ -4,6 +4,7 @@
   "calcs": {
     "harness.model_fingerprint": [],
     "harness.design_summary": [],
+    "harness.section_round": [],
     "harness.model_diff": [
       "before_areas",
       "before_frames",

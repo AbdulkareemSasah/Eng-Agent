@@ -4,17 +4,24 @@ Spec 0006 owns where the file is found and its `[engine]` section; this module r
 `[cli_tools.*]` and `[host_programs.*]`. All timeouts are whole seconds and have no default (process 11 section 9).
 """
 
+import ipaddress
 import tomllib
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Annotated, Any, Literal, Self
+from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_validator
 
 _FORBIDDEN_ARGS = ("--enable-script", "--enable-generic-invoke", "--allow-attached-writes", "--read-only")
 _ADAPTER_ONLY_ARGS = ("--call-timeout-sec", "--audit-log")
 _ADAPTER_ONLY_ENV = "SASAAH_CSI_CALL_TIMEOUT_SEC"
 _CSI_ADAPTER = "sasaah-csi-mcp"
+_IDEA_ADAPTER = "sasaah-idea-mcp"  # spec 0014 section 4.2
+_IDEA_ROUTES = ("native", "rest")
+_IDEA_ARG = "--disable-script"  # the one argument the section may carry; the adapter adds the rest from the keys
+# The three aliases of each server option (E/IdeaModels.cs:441-452): the adapter sets options by argument only.
+_IDEA_ENV_PREFIXES = ("SASAAH_IDEA_", "SASAH_IDEA_", "IDEA_")
 # The CSI products a server section can name (spec 0008 4.1); the adapter's profile registry holds the same names.
 KNOWN_PRODUCTS = ("ETABS", "SAFE")
 # Substrings that mark an escape-hatch tool name (script, generic invoke, table write); the full deny list is the
@@ -37,6 +44,31 @@ class ConfigError(Exception):
 def _absolute(value: str) -> str:
     if not (PurePosixPath(value).is_absolute() or PureWindowsPath(value).is_absolute()):
         raise ValueError("path must be absolute")
+    return value
+
+
+def _loopback_url(value: str) -> str:
+    """Return `value` when it is a plain http(s) URL without credentials whose host is loopback (spec 0014 AC1)."""
+    try:
+        parts = urlsplit(value)
+        host = parts.hostname
+        _ = parts.port  # reading it validates the port: a ValueError is the refusal
+    except ValueError as error:
+        raise ValueError(f"service_url is not a valid URL: {error}") from error
+    if (
+        parts.scheme not in ("http", "https")
+        or host is None
+        or parts.username is not None
+        or parts.password is not None
+    ):
+        raise ValueError("service_url must be an http or https URL with a host and no credentials")
+    if host != "localhost":
+        try:
+            loopback = ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            loopback = False
+        if not loopback:
+            raise ValueError("service_url must point at a loopback host (127.0.0.1, ::1 or localhost)")
     return value
 
 
@@ -95,11 +127,15 @@ class ServerConfig(_Model):
     shutdown_grace_s: Seconds = 10  # software setting, s
     build: BuildPin
     host_key: str
-    product: str  # the host product this server serves (spec 0008 4.1); required, one server section per product
+    # The host product this server serves (spec 0008 4.1): required for CSI, defaults to IDEA for sasaah-idea-mcp.
+    product: str = Field(default="", validate_default=True)
     mcp_mode: str = "legacy"  # spec section 11 Q3
-    audit_log: bool = Field(default=True, strict=True)  # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError
-    route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), not this loader
+    # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError; validated when absent too (the IDEA rule below)
+    audit_log: bool = Field(default=True, strict=True, validate_default=True)
+    route: str | None = None  # spec 0002 section 4.2 rule 5; the allowlist load checks it (AC41), IDEA's values here
     roles: Mapping[str, RoleConfig] = Field(min_length=1)
+    service_url: str | None = None  # spec 0014 section 4.2: IDEA only, loopback, passed as --service-url
+    idea_dir: str | None = None  # spec 0014 section 4.2: IDEA only, absolute, passed as --idea-dir
 
     @field_validator("command")
     @classmethod
@@ -108,23 +144,35 @@ class ServerConfig(_Model):
 
     @field_validator("product")
     @classmethod
-    def _product_known(cls, value: str) -> str:
+    def _product_known(cls, value: str, info: ValidationInfo) -> str:
+        if info.data.get("adapter") == _IDEA_ADAPTER:
+            if value and value != "IDEA":
+                raise ValueError(f"unknown product {value!r} for {_IDEA_ADAPTER}; omit product or use 'IDEA'")
+            return "IDEA"
+        if not value:
+            raise ValueError("product is required")
         if value not in KNOWN_PRODUCTS:
             raise ValueError(f"unknown product {value!r}; one of {', '.join(KNOWN_PRODUCTS)}")
         return value
 
     @field_validator("args")
     @classmethod
-    def _args_allowed(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def _args_allowed(cls, value: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
         for arg in value:
             name = arg.split("=", 1)[0]
             if name in _FORBIDDEN_ARGS or name in _ADAPTER_ONLY_ARGS:
                 raise ValueError(f"argument {name} is forbidden (set by the adapter only or enables an escape hatch)")
+            # The IDEA server ignores unknown arguments with only a warning, so a typo would pass silently (4.2 rule 4).
+            if info.data.get("adapter") == _IDEA_ADAPTER and arg != _IDEA_ARG:
+                raise ValueError(
+                    f"argument {arg} is not permitted for {_IDEA_ADAPTER}: only {_IDEA_ARG}; "
+                    "the folder and the service URL come from the idea_dir and service_url keys"
+                )
         return value
 
     @field_validator("env")
     @classmethod
-    def _env_allowed(cls, value: Mapping[str, str]) -> Mapping[str, str]:
+    def _env_allowed(cls, value: Mapping[str, str], info: ValidationInfo) -> Mapping[str, str]:
         names = {key.upper(): item for key, item in value.items()}  # Windows env names are case-insensitive
         if len(names) != len(value):
             raise ValueError("env names that differ only in case collide on Windows (SASAAH_CSI_DISABLE_SCRIPT check)")
@@ -134,6 +182,10 @@ class ServerConfig(_Model):
             raise ValueError("SASAAH_CSI_DISABLE_SCRIPT must be true")
         if _ADAPTER_ONLY_ENV in names:
             raise ValueError(f"{_ADAPTER_ONLY_ENV} is set by the adapter only")
+        if info.data.get("adapter") == _IDEA_ADAPTER:
+            for name in names:
+                if name.startswith(_IDEA_ENV_PREFIXES):
+                    raise ValueError(f"{name} is forbidden for {_IDEA_ADAPTER} (an alias of a server option)")
         return value
 
     @field_validator("toolsets")
@@ -143,6 +195,57 @@ class ServerConfig(_Model):
             if any(marker in name.lower() for marker in _ESCAPE_MARKERS):
                 raise ValueError(f"toolset {name} includes an escape hatch")
         return value
+
+    @field_validator("audit_log")
+    @classmethod
+    def _idea_has_no_audit_log(cls, value: bool, info: ValidationInfo) -> bool:
+        if value and info.data.get("adapter") == _IDEA_ADAPTER:
+            raise ValueError(f"audit_log must be false for {_IDEA_ADAPTER}: the server has no --audit-log option")
+        return value
+
+    @field_validator("route")
+    @classmethod
+    def _idea_route(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if info.data.get("adapter") == _IDEA_ADAPTER and value not in _IDEA_ROUTES:
+            raise ValueError(f"route must be one of {', '.join(_IDEA_ROUTES)} for {_IDEA_ADAPTER}")
+        return value
+
+    @field_validator("roles")
+    @classmethod
+    def _idea_single_role(cls, value: Mapping[str, RoleConfig], info: ValidationInfo) -> Mapping[str, RoleConfig]:
+        if info.data.get("adapter") == _IDEA_ADAPTER and tuple(value) != ("main",):
+            raise ValueError(f"{_IDEA_ADAPTER} needs the single topology: exactly one role, named main")
+        return value
+
+    @field_validator("service_url")
+    @classmethod
+    def _service_url_loopback(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        if info.data.get("adapter") != _IDEA_ADAPTER:
+            raise ValueError(f"service_url is only for {_IDEA_ADAPTER}")
+        return _loopback_url(value)
+
+    @field_validator("idea_dir")
+    @classmethod
+    def _idea_dir_absolute(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        if info.data.get("adapter") != _IDEA_ADAPTER:
+            raise ValueError(f"idea_dir is only for {_IDEA_ADAPTER}")
+        return _absolute(value)
+
+    @model_validator(mode="after")
+    def _idea_section(self) -> Self:
+        if self.adapter != _IDEA_ADAPTER:
+            return self
+        if self.route is None:
+            raise ValueError(f"route is required for {_IDEA_ADAPTER}: one of {', '.join(_IDEA_ROUTES)}")
+        if self.route == "rest" and self.service_url is None:
+            raise ValueError("service_url is required for route rest")
+        if _IDEA_ARG not in self.args:
+            raise ValueError(f"args must contain {_IDEA_ARG}")
+        return self
 
     @model_validator(mode="after")
     def _csi_disables_scripts(self) -> Self:
