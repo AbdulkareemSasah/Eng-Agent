@@ -477,7 +477,7 @@ class Rig:
             "ids": SeededIdSource(b"cli", clock), "engine_factory": self._engine, "workflow_registry": REGISTRY,
             "port_builder": self._port_builder, "calc_port_factory": self._calc,
             "decision_assembler": assemble_decision_runtime, "point_policies": {},
-            "decision_port_factory": self._decision_port,
+            "decision_port_factory": self._decision_port, "basis_fields_of": lambda w: w.basis_fields,
         }  # fmt: skip
         return CliDeps(**(fields | replace))
 

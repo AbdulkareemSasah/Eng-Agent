@@ -18,13 +18,14 @@ from eng_contract.store import ResultStore, Workspace, default_location_probe, r
 from pydantic import JsonValue
 
 from eng_harness import __version__
+from eng_harness.basis import BasisSetupPort
 from eng_harness.block import Registry
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl
 from eng_harness.cli._opener import write_to_terminal
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest
 from eng_harness.journal import JournalReader
-from eng_harness.pages import PageApprovalPort, PageInputPort, PageServer, accept_answers_file
+from eng_harness.pages import PageApprovalPort, PageBasisSetupPort, PageInputPort, PageServer, accept_answers_file
 from eng_harness.pages._ports import _NO_REPORT
 from eng_harness.pages._screens_approval import approval_screens, sign_off_screens
 from eng_harness.pages._screens_choice import choice_screens
@@ -144,7 +145,7 @@ class PageSession:
         self, *, config: HarnessConfig, store: ResultStore, runs_dir: Path, cell: RunIdCell, clock: Clock,
         wait_timeout_s: int | None, no_wait: bool, no_browser: bool, opener: Callable[[str], bool], stderr: TextIO,
         answers: FileAnswers | None = None, answers_once: bool = False,
-        terminal_writer: Callable[[str], bool] = write_to_terminal,
+        terminal_writer: Callable[[str], bool] = write_to_terminal, setups_dir: Path | None = None,
     ) -> None:  # fmt: skip
         marks, control = release_marks(config), FileRunControl(runs_dir)
 
@@ -180,6 +181,11 @@ class PageSession:
         self.approvals: ApprovalPort = _Shown(self._page, self._shown, lambda request: cell.fill(request.run_id), wait)
         self._file: _FromFile[Any] | None = None
         self.inputs: InputPort = _Shown(PageInputPort(self._page), self._shown, wait=wait)
+        self.setup: BasisSetupPort = _ShownSync(
+            PageBasisSetupPort(self._page, setups_dir=setups_dir or runs_dir.parent / "setups", clock=clock),
+            self._shown,
+            wait=wait,
+        )
         if answers is not None:
             self._file = _FromFile(
                 self.inputs, accept_answers_file, config.engine.engineer or "", answers, once=answers_once
@@ -243,6 +249,34 @@ class _Shown[Req, Ans]:
     async def answer(self, request_id: str, *, wait: bool) -> Ans | None:
         """The page's answer, asked with the process wait mode (the engine's `wait` is always false, spec 4.4.5)."""
         return await self._inner.answer(request_id, wait=self._wait)
+
+
+class _SyncPort[Req, Ans](Protocol):
+    """A synchronous page port, whatever it answers with (spec 0006 AC2)."""
+
+    def present(self, view: Req, /) -> None:
+        """Show the view."""
+        ...
+
+    def answer(self, setup_id: str, *, wait: bool) -> Ans | None:
+        """The answer, or `None`."""
+        ...
+
+
+class _ShownSync[Req, Ans]:
+    """A synchronous page port that starts the page server on `present` and applies the process wait mode."""
+
+    def __init__(self, inner: _SyncPort[Req, Ans], shown: Callable[[], None], *, wait: bool = True) -> None:
+        self._inner, self._shown, self._wait = inner, shown, wait
+
+    def present(self, view: Req) -> None:
+        """Show the view on the page."""
+        self._inner.present(view)
+        self._shown()
+
+    def answer(self, setup_id: str, *, wait: bool) -> Ans | None:
+        """The page's answer, asked with the process wait mode."""
+        return self._inner.answer(setup_id, wait=self._wait)
 
 
 type FileAnswers = Callable[[str], Mapping[str, JsonValue] | None]
