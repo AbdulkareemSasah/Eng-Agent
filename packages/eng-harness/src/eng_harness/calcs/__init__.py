@@ -9,8 +9,8 @@ from eng_harness.calcs.edit_cycle import EDIT_CYCLE_CALCS, EDIT_CYCLE_KINDS
 from eng_harness.calcs.footing import FOOTING_CALCS, FOOTING_KINDS
 from eng_harness.calcs.model_diff import model_diff
 from eng_harness.calcs.model_fingerprint import StateMatch, model_fingerprint, same_state
-from eng_harness.calcs.readback_check import readback_check
 from eng_harness.calcs.placement_compare import placement_compare
+from eng_harness.calcs.readback_check import readback_check
 from eng_harness.calcs.section_round import section_round
 from eng_harness.kinds.calcs import CALC_KINDS
 

@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
+from pydantic import ValidationError
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
@@ -88,12 +89,15 @@ def _input_type() -> type[CalcInput]:
 def _run(fields: dict[str, Any], refs: dict[str, Any], trace: TraceBuilder | None = None) -> dict[str, Any]:
     inp = _input_type().model_validate(fields)
     meta = InputMeta.model_validate({"refs": refs})
-    return REGISTRY[CALC_ID](inp, meta, trace or TraceBuilder()).model_dump(mode="json")
+    dumped: Any = REGISTRY[CALC_ID](inp, meta, trace or TraceBuilder()).model_dump(mode="json")
+    assert isinstance(dumped, dict)
+    return dumped
 
 
 def _by_id(out: dict[str, Any], element: str, item_id: str) -> dict[str, Any]:
     for row in out["by_id"]:
         if row["element"] == element and row["id"] == item_id:
+            assert isinstance(row, dict)
             return row
     raise AssertionError((element, item_id, out["by_id"]))
 
@@ -101,6 +105,7 @@ def _by_id(out: dict[str, Any], element: str, item_id: str) -> dict[str, Any]:
 def _count(out: dict[str, Any], element: str, by: str, name: str) -> dict[str, Any]:
     for row in out["counts"]:
         if (row["element"], row["by"], row["name"]) == (element, by, name):
+            assert isinstance(row, dict)
             return row
     raise AssertionError((element, by, name, out["counts"]))
 
@@ -246,9 +251,7 @@ def test_counts_frames_areas_renames() -> None:
         },
     )
     assert renames["renamed"] == [{"element": "frame", "a_id": "F_old", "b_id": "F_new"}]
-    assert renames["ambiguous"] == [
-        {"element": "frame", "side": "a", "id": "F5", "candidates": ["F6", "F7"]}
-    ]
+    assert renames["ambiguous"] == [{"element": "frame", "side": "a", "id": "F5", "candidates": ["F6", "F7"]}]
     assert {row["id"] for row in renames["only_in_b"]} == {"F6", "F7"}
     assert _by_id(renames, "frame", "F_keep")["result"] == "same"
 
@@ -285,18 +288,22 @@ def test_basis_refused() -> None:
     missing = _basis(1.0)
     missing["fields"] = {}
     detail = _refusal({**fields, "basis": missing}, refs).detail
-    assert (detail.code, detail.message) == (ErrorCode.INVALID_ARGUMENT, f"basis field {LENGTH} is missing (no default)")
+    assert (detail.code, detail.message) == (
+        ErrorCode.INVALID_ARGUMENT,
+        f"basis field {LENGTH} is missing (no default)",
+    )
     unconfirmed = _basis(1.0)
     unconfirmed["fields"][LENGTH] = _field(1.0, confirmed=False)
     detail = _refusal({**fields, "basis": unconfirmed}, refs).detail
     assert detail.message == f"basis field {LENGTH} is not confirmed"
     from eng_contract.kinds.basis import BasisField, DesignBasis
     from eng_contract.kinds.model import FramePlacements
+
     from eng_harness.calcs.placement_compare import PlacementInput, placement_compare
 
     wrong_unit = _basis(1.0)
     wrong_unit["fields"][LENGTH] = _field(1.0, "deg")
-    with pytest.raises(Exception, match="unit of .compare.length_mm."):
+    with pytest.raises(ValidationError, match=r"unit of 'compare\.length_mm'"):
         _input_type().model_validate({**fields, "basis": wrong_unit})
     # Calc also checks the unit for a basis built past the contract check (B-464).
     constructed = PlacementInput.model_construct(
@@ -380,9 +387,9 @@ def test_sides_must_match_and_be_records() -> None:
     """Each side needs the same sections; a placement without a record reference is refused."""
     frames = _frames(_frame("F1"))
     areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]))
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match="frames must be present on both sides"):
         _input_type().model_validate({"a_frames": frames, "basis": _basis(1.0)})
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match=r"frames must be present on both sides|areas must be present"):
         _input_type().model_validate({"a_frames": frames, "b_areas": areas, "basis": _basis(1.0)})
     detail = _refusal(
         {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},

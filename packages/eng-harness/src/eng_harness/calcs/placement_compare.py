@@ -44,6 +44,7 @@ FRAME_TYPES: tuple[str, ...] = ("beam", "brace", "column", "other")
 AREA_TYPES: tuple[str, ...] = ("deck", "other", "slab", "wall")
 _MATCH = frozenset({"same", "reversed"})
 ElementName = Literal["frame", "area"]
+GeomResult = Literal["same", "reversed", "moved", "reshaped"]
 
 
 class PlacementInput(CalcInput):
@@ -142,7 +143,7 @@ def _max_sq(first: Fraction, second: Fraction) -> Fraction:
     return first if first >= second else second
 
 
-def _frame_result(a: Frame, b: Frame, tolerance_sq: Fraction) -> tuple[str, float]:
+def _frame_result(a: Frame, b: Frame, tolerance_sq: Fraction) -> tuple[GeomResult, float]:
     """P3: same, reversed or moved for a common frame id."""
     same_i, same_j = _squared(a.i, b.i), _squared(a.j, b.j)
     if _within(same_i, tolerance_sq) and _within(same_j, tolerance_sq):
@@ -164,7 +165,7 @@ def _shift_distance(a_points: Sequence[Any], b_points: Sequence[Any], shift: int
     return largest
 
 
-def _area_result(a: Area, b: Area, tolerance_sq: Fraction) -> tuple[str, float | None]:
+def _area_result(a: Area, b: Area, tolerance_sq: Fraction) -> tuple[GeomResult, float | None]:
     """P4: same, reversed, reshaped or moved for a common area id."""
     if len(a.points) != len(b.points):
         return "reshaped", None
@@ -218,10 +219,11 @@ def _pair_geometry(
     def partners(left: Any, rights: Mapping[str, Any]) -> list[str]:
         found: list[str] = []
         for other_id, other in rights.items():
-            if element == "frame":
-                result, _distance = _frame_result(left, other, tolerance_sq)
-            else:
-                result, _distance = _area_result(left, other, tolerance_sq)
+            result: GeomResult = (
+                _frame_result(left, other, tolerance_sq)[0]
+                if element == "frame"
+                else _area_result(left, other, tolerance_sq)[0]
+            )
             if result in _MATCH:
                 found.append(other_id)
         return sorted(found)
@@ -294,16 +296,16 @@ def placement_compare(inp: PlacementInput, meta: InputMeta, trace: TraceBuilder)
         complete = complete and a_ref.complete and b_ref.complete
         trace.input("a_frames", len(inp.a_frames.frames), ref=a_ref.result_id)
         trace.input("b_frames", len(inp.b_frames.frames), ref=b_ref.result_id)
-        a_map = {frame.id: frame for frame in inp.a_frames.frames}
-        b_map = {frame.id: frame for frame in inp.b_frames.frames}
+        frames_a = {frame.id: frame for frame in inp.a_frames.frames}
+        frames_b = {frame.id: frame for frame in inp.b_frames.frames}
         counts += _count_rows("frame", FRAME_TYPES, inp.a_frames.frames, inp.b_frames.frames)
-        for item_id in sorted(set(a_map) & set(b_map)):
-            result, distance = _frame_result(a_map[item_id], b_map[item_id], tolerance_sq)
+        for item_id in sorted(set(frames_a) & set(frames_b)):
+            result, distance = _frame_result(frames_a[item_id], frames_b[item_id], tolerance_sq)
             by_id.append(ByIdRow(element="frame", id=item_id, result=result, distance_mm=distance))
-        a_only = {item_id: a_map[item_id] for item_id in a_map if item_id not in b_map}
-        b_only = {item_id: b_map[item_id] for item_id in b_map if item_id not in a_map}
+        frame_only_a_map = {item_id: frames_a[item_id] for item_id in frames_a if item_id not in frames_b}
+        frame_only_b_map = {item_id: frames_b[item_id] for item_id in frames_b if item_id not in frames_a}
         frame_renamed, frame_ambiguous, frame_only_a, frame_only_b = _pair_geometry(
-            "frame", a_only, b_only, tolerance_sq
+            "frame", frame_only_a_map, frame_only_b_map, tolerance_sq
         )
         renamed += frame_renamed
         ambiguous += frame_ambiguous
@@ -315,15 +317,17 @@ def placement_compare(inp: PlacementInput, meta: InputMeta, trace: TraceBuilder)
         complete = complete and a_ref.complete and b_ref.complete
         trace.input("a_areas", len(inp.a_areas.areas), ref=a_ref.result_id)
         trace.input("b_areas", len(inp.b_areas.areas), ref=b_ref.result_id)
-        a_map = {area.id: area for area in inp.a_areas.areas}
-        b_map = {area.id: area for area in inp.b_areas.areas}
+        areas_a = {area.id: area for area in inp.a_areas.areas}
+        areas_b = {area.id: area for area in inp.b_areas.areas}
         counts += _count_rows("area", AREA_TYPES, inp.a_areas.areas, inp.b_areas.areas)
-        for item_id in sorted(set(a_map) & set(b_map)):
-            result, distance = _area_result(a_map[item_id], b_map[item_id], tolerance_sq)
-            by_id.append(ByIdRow(element="area", id=item_id, result=result, distance_mm=distance))
-        a_only = {item_id: a_map[item_id] for item_id in a_map if item_id not in b_map}
-        b_only = {item_id: b_map[item_id] for item_id in b_map if item_id not in a_map}
-        area_renamed, area_ambiguous, area_only_a, area_only_b = _pair_geometry("area", a_only, b_only, tolerance_sq)
+        for item_id in sorted(set(areas_a) & set(areas_b)):
+            area_result, area_distance = _area_result(areas_a[item_id], areas_b[item_id], tolerance_sq)
+            by_id.append(ByIdRow(element="area", id=item_id, result=area_result, distance_mm=area_distance))
+        area_only_a_map = {item_id: areas_a[item_id] for item_id in areas_a if item_id not in areas_b}
+        area_only_b_map = {item_id: areas_b[item_id] for item_id in areas_b if item_id not in areas_a}
+        area_renamed, area_ambiguous, area_only_a, area_only_b = _pair_geometry(
+            "area", area_only_a_map, area_only_b_map, tolerance_sq
+        )
         renamed += area_renamed
         ambiguous += area_ambiguous
         only_in_a += area_only_a
