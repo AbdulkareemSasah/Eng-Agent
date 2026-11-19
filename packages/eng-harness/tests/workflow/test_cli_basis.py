@@ -2,6 +2,7 @@
 
 import contextlib
 import json
+import os
 import re
 import threading
 import time
@@ -509,6 +510,48 @@ def test_setup_log_appends_atomically_and_rejects_bad_inputs(tmp_path: Path) -> 
     bad_file.write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError, match="JSON array"):
         append_setup_log(tmp_path, good.model_copy(update={"setup_id": bad_file.stem}), "2026-01-01T00:00:01.000Z")
+
+def test_setup_log_atomicity_on_replacement_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Interrupted or failed replacement keeps an existing log intact and exposes no partial target."""
+    setup_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+    first = BasisSetupAnswer(
+        setup_id=setup_id,
+        draft_sha256="a" * 64,
+        confirmed_sections=("materials",),
+        by="Ada",
+        at="2026-01-01T00:00:00.000Z",
+    )
+    target = append_setup_log(tmp_path, first, "2026-01-01T00:00:00.000Z")
+    original_bytes = target.read_bytes()
+    assert target.is_file()
+
+    def fail_replace(src: Any, dst: Any) -> None:
+        raise OSError("simulated atomic rename failure")
+
+    monkeypatch.setattr(os, "replace", fail_replace)
+
+    second = BasisSetupAnswer(
+        setup_id=setup_id,
+        draft_sha256="b" * 64,
+        confirmed_sections=("materials", "geometry"),
+        by="Grace",
+        at="2026-01-01T00:00:05.000Z",
+    )
+    with pytest.raises(OSError, match="simulated atomic rename failure"):
+        append_setup_log(tmp_path, second, "2026-01-01T00:00:05.000Z")
+
+    # Existing log remains completely intact
+    assert target.read_bytes() == original_bytes
+    entries = json.loads(target.read_text(encoding="utf-8"))
+    assert len(entries) == 1
+    assert entries[0]["by"] == "Ada"
+
+    # When creating a new log, replacement failure exposes no partial target file
+    fresh_dir = tmp_path / "fresh"
+    fresh_target = fresh_dir / f"{setup_id}.json"
+    with pytest.raises(OSError, match="simulated atomic rename failure"):
+        append_setup_log(fresh_dir, first, "2026-01-01T00:00:00.000Z")
+    assert not fresh_target.exists()
 
 
 def test_page_basis_setup_port_standalone_and_wait_paths(tmp_path: Path) -> None:
