@@ -298,6 +298,10 @@ tasks:
     # also switches _model_files to PurePath identity match and updates test_model_files_reach_the_port_builder
     # (changed test; spec 0006 4.2.2 step 2, AC67); src/eng_harness/cli/_run.py and tests/workflow/test_cli_run.py added;
     # budget 415 -> 425 (about 10 lines, an estimate).
+    # Amendment (B-576, documents only): test_model_file_is_pure leaves tests_first (B-569 added it after T8's first
+    # test commit, 62bcebf7, so it triggers TF008); it stays in files as companion regression coverage written with the
+    # implementation (the B-482 precedent). B-574's test_model_files_reach_the_port_builder is also absent from that
+    # commit, but is only in files, not tests_first, so it does not trigger TF008.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.templates, eng_harness.templates.shipped, eng_harness.workflows and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -313,7 +317,7 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_change_set_step.py"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py"
       - "packages/eng-harness/src/eng_harness/block.py"  # ModelFile (amendment B-569)
-      - "packages/eng-harness/tests/unit/test_block.py"  # test_model_file_is_pure (amendment B-569)
+      - "packages/eng-harness/tests/unit/test_block.py"  # test_model_file_is_pure companion coverage (amendments B-569, B-576)
       - "packages/eng-harness/src/eng_harness/cli/_run.py"  # PurePath identity match in _model_files (amendment B-574)
       - "packages/eng-harness/tests/workflow/test_cli_run.py"  # test_model_files_reach_the_port_builder (amendment B-574)
     # Amendment (B-544, documents only): EditCycleOutput.summaries is the ordered tuple of spec 4.2; step 8 passes the resolved references unchanged, which T16b makes valid write arguments; waits for T7b and T16b; no line added, files and budget unchanged.
@@ -327,7 +331,6 @@ tasks:
       - "packages/eng-harness/tests/workflow/edit_cycle/test_apply.py::test_readback_failure_routes"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_change_set_step.py::test_invalid_change_set_asked_again"
       - "packages/eng-harness/tests/workflow/edit_cycle/test_engineer_changes.py::test_edit_during_approval_wait"
-      - "packages/eng-harness/tests/unit/test_block.py::test_model_file_is_pure"  # amendment B-569
     covers: [AC1, AC2, AC10, AC11, AC13, AC17, AC24]
     depends_on: [T2, T3, T5, T6, T7, T7b, T13b, T16b, T17]  # T17 and external plan 0001 T23 by amendment B-543 (section 3); T7b and T16b by amendment B-544; T13b and external plan 0001 T24 by amendment B-569
   - id: T8b
@@ -946,6 +949,10 @@ match that plan 0006 T14c's B-569 comment describes. That means: unwrap `X | Non
 never `issubclass`; turn each value into a `Path` in the command line for the run-time checks; resume unchanged. T8
 also updates `tests/workflow/test_cli_run.py::test_model_files_reach_the_port_builder` (changed test) to use a
 `ModelFile` field and a `ModelFile | None` field, and asserts that a plain `Path` field is not picked up.
+Amendment (B-576, documents only): `tests/unit/test_block.py::test_model_file_is_pure` leaves `tests_first` (it was
+added by amendment B-569 after T8's first `test:` commit `62bcebf7` was published, triggering TF008; that commit cannot
+be rewritten). It stays in `files` as companion regression coverage written with the implementation (the B-482
+precedent).
 
 **T8b Sanctioned result accessors** (amendment B-569; engine spec 0001 §4.3.2, AC12, AC61, AC19, §11 Q48; covers
 spec AC2). `ctx.py` gains two read-only properties, additive only (the fields, the codec and the stored forms do not
