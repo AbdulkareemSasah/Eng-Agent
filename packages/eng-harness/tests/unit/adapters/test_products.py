@@ -172,7 +172,12 @@ def test_registry_matches_the_configurable_products() -> None:
     assert [products.profile(name).name for name in KNOWN_PRODUCTS] == list(KNOWN_PRODUCTS)
     with pytest.raises(KeyError):
         products.profile("STAAD")
-    assert products.profile("ETABS").companion_globs == products.profile("SAFE").companion_globs == products.profile("SAP2000").companion_globs == ()
+    assert (
+        products.profile("ETABS").companion_globs
+        == products.profile("SAFE").companion_globs
+        == products.profile("SAP2000").companion_globs
+        == ()
+    )
 
 
 def test_product_by_extension_three_products() -> None:

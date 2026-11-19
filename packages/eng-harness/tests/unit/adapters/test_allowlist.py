@@ -605,6 +605,7 @@ def test_ports_revit_extensions() -> None:
     with pytest.raises(ValidationError):
         HostInstance(instance_id="pipe", pid=0, process_started_at=ts, program="revit")
 
+
 _SAP2000_SPEC = Path(__file__).resolve().parents[3] / "docs" / "specs" / "0012-sap2000-adapter.md"
 # Spec 0012 section 4.1: serve and serve-diff are on the allowlist; gap and not served are refused.
 _ETABS_FINGERPRINT = "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"

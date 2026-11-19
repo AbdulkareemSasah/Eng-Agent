@@ -216,7 +216,7 @@ def test_addin_hashes(tmp_path: Any) -> None:
 
 
 def test_fingerprint_three_products() -> None:
-    """AC3: each of ETABS, SAFE and SAP2000 is checked against its own tool fingerprint; a wrong product never passes."""
+    """AC3: each of ETABS, SAFE and SAP2000 is checked against its own fingerprint; a wrong product never passes."""
     from eng_harness.adapters.csi import csi_allowlist
 
     # The packaged allowlist must pin three distinct product fingerprints (fails until SAP2000 is added).
