@@ -11,7 +11,12 @@
       "version": 1
     },
     {
-      "content_sha256": "315fa23a3038a1c4ef3f54ff3b7f60ef3fc53520079a9499c785bb9ddd5721cc",
+      "content_sha256": "67d6c6254f0058e0eda88958a2f59ea8763714d1e8f8d9347cd1b061e467206e",
+      "id": "harness.column_demands",
+      "version": 1
+    },
+    {
+      "content_sha256": "105717e265fbf90ab205fcc31022f1bc88786d230d7a5b63870129c10bb25af5",
       "id": "harness.column_review",
       "version": 1
     },

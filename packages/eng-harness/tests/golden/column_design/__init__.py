@@ -31,6 +31,8 @@ class ColumnGoldenCase(BaseModel):
     input: dict[str, Any]
     refs: dict[str, str]
     expected: dict[str, Any]
+    expected_trace: dict[str, Any] | None = None
+    """Optional hand-derived E3-E5 trace steps for column-demands cases (spec 0013 AC6)."""
 
 
 def golden_files(directory: Path = GOLDEN_DIR) -> dict[str, Path]:

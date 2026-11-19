@@ -354,7 +354,8 @@ T2 is merged; they may run in parallel.
 
 **T9 Assembly.** `PACK = Pack("aci318_14", "ACI 318-14", "2014", __version__, checks=(...), approvals=...)` and the
 entry point `[project.entry-points."structural_codes.packs"] aci318_14 = "aci318_14:PACK"`; README usage of
-`structural_codes.evaluate` with the bearing check; changelog entry for 0.1.0.
+`structural_codes.evaluate` with the bearing check; changelog entry for 0.1.0. Plan 0003 T3 may also edit
+`pyproject.toml` and `CHANGELOG.md` only to declare `public_modules = ["aci318_14"]` (external amendment B-583).
 
 ## 3. Pack-level acceptance criteria
 
@@ -423,6 +424,10 @@ to B-075.
 
 - Runtime: `structural-codes-core`, `eng-contract` (workspace). No new third-party dependency.
 - Development: the root dependency group (`pytest`, `hypothesis`, `ruff`, `mypy`, `pytest-cov`).
+- External amendment (B-583, from plan 0003 T3 / the B-327 writer): plan 0003 T3 amends
+  `packages/structural-codes/aci318-14/pyproject.toml` (and `CHANGELOG.md`) only to add
+  `public_modules = ["aci318_14"]` so the SBC overlay can import `PACK` across the member boundary (IM002);
+  importlib.metadata is forbidden in the pack content-hash closure. Recorded in this plan's T9 prose above.
 - Rollback: each task is one squash-merged pull request on `build/v1`; the checks have no consumer until B-075, so a
   task is reverted by reverting its commit (with T9 if registered). After B-075 uses them, a defect is fixed forward
   with a regression case; any output change carries a golden diff report and is a major version of the pack
