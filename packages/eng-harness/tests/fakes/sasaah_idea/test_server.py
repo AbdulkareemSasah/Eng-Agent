@@ -1,6 +1,7 @@
 """Behaviors and faults of the synthetic Sasaah IDEA fake server (spec 0014 section 4.12), run as a real process."""
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -51,9 +52,9 @@ class Rpc:
 
     def readline(self) -> str:
         assert self.proc.stdout is not None
-        return self.loop.run_until_complete(
-            asyncio.wait_for(self.proc.stdout.readline(), self.read_timeout)
-        ).decode("utf-8")
+        return self.loop.run_until_complete(asyncio.wait_for(self.proc.stdout.readline(), self.read_timeout)).decode(
+            "utf-8"
+        )
 
     def wait(self) -> int:
         return self.loop.run_until_complete(asyncio.wait_for(self.proc.wait(), 10))
@@ -80,10 +81,8 @@ class Rpc:
     def close(self) -> None:
         if self.proc.returncode is None:
             self.proc.kill()
-            try:
+            with contextlib.suppress(TimeoutError):
                 self.wait()
-            except TimeoutError:
-                pass
         if not self.loop.is_closed():
             self.loop.close()
 
@@ -375,9 +374,7 @@ def test_faults_license_timeouts_and_reply_anomalies(rpc: Rpc, control: Path, tm
         (True, True),
     ],
 )
-def test_timeout_set_loads_loses_reply(
-    control: Path, tmp_path: Path, applied: bool, mismatch: bool
-) -> None:
+def test_timeout_set_loads_loses_reply(control: Path, tmp_path: Path, applied: bool, mismatch: bool) -> None:
     """Spec 0014 §4.12: timeout_set_loads withholds the reply; the file may or may not be written."""
     client = Rpc(control)
     try:
