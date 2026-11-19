@@ -1,0 +1,826 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.5, synthetic fixture",
+  "method_ref": "\u00a74.4.5 governing ratio",
+  "synthetic": true,
+  "derivation": "The displayed ratio of a family is the raw ratio of the footing's verdict that carries governing in that set. J1 bearing over three cases: ratios 0.3, 0.8 and 0.6, all PASS (limit 1.0); the governing one is 0.8, so PASS with 0.8. J2 bearing with ratio limit 0.9: 0.85 is PASS (0.85 <= 0.9) and 0.95 is FAIL (0.95 > 0.9); the governing verdict is the larger ratio 0.95, so FAIL with 0.95 (the ratio is shown as reported, never divided by its limit). The other families hold one PASS verdict of ratio 0.4 each.",
+  "input": {
+    "subjects": {
+      "subjects": [
+        {
+          "id": "J1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J2",
+          "joint": "J2",
+          "column": "C2",
+          "x_mm": 3000.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        }
+      ],
+      "excluded": [],
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "design": {
+      "footings": [
+        {
+          "id": "J1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        {
+          "id": "J2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        }
+      ],
+      "calc": {
+        "id": "harness.footing_design",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_design",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "bearing": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.bearing",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.85,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.85,
+          "ratio_limit": 0.9,
+          "status": "PASS",
+          "governing": false,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.bearing",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.3,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.3,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": false,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.bearing",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S2"
+          },
+          "demand": {
+            "value": 0.8,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.8,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/2",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.bearing",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S2"
+          },
+          "demand": {
+            "value": 0.95,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.95,
+          "ratio_limit": 0.9,
+          "status": "FAIL",
+          "governing": true,
+          "trace_ref": "#/traces/3",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.bearing",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S3"
+          },
+          "demand": {
+            "value": 0.6,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.6,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": false,
+          "trace_ref": "#/traces/4",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.bearing",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.bearing",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.bearing",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.bearing",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.bearing",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 4,
+        "FAIL": 1,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "one_way_shear": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.one_way_shear",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.one_way_shear",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.one_way_shear",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.one_way_shear",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 2,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "punching": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.punching",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.punching",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.punching",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.punching",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 2,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "flexure": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.flexure",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.flexure",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.flexure",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.flexure",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 2,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "min_steel": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.min_steel",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.min_steel",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.min_steel",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.min_steel",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 2,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "development": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.development",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J1",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.footing.development",
+          "code": "SYNTHETIC",
+          "clause": "synthetic clause",
+          "subject": {
+            "kind": "footing",
+            "id": "J2",
+            "station_mm": null,
+            "case": "S1"
+          },
+          "demand": {
+            "value": 0.4,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 1.0,
+            "unit": "kN"
+          },
+          "ratio": 0.4,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.footing.development",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.footing.development",
+          "calc_version": "1",
+          "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 2,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    }
+  },
+  "refs": {
+    "subjects": "res_00000000000000000000000001",
+    "design": "res_00000000000000000000000002",
+    "bearing": "res_00000000000000000000000011",
+    "one_way_shear": "res_00000000000000000000000012",
+    "punching": "res_00000000000000000000000013",
+    "flexure": "res_00000000000000000000000014",
+    "min_steel": "res_00000000000000000000000015",
+    "development": "res_00000000000000000000000016"
+  },
+  "expected": {
+    "footings": [
+      {
+        "id": "J1",
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.8
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.4
+          }
+        },
+        "closure": "passed",
+        "state": {
+          "bearing": "PASS",
+          "one_way_shear": "PASS",
+          "punching": "PASS",
+          "flexure": "PASS",
+          "min_steel": "PASS",
+          "development": "PASS",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "engineer_sized": false
+        }
+      },
+      {
+        "id": "J2",
+        "families": {
+          "bearing": {
+            "status": "FAIL",
+            "ratio": 0.95
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.4
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.4
+          }
+        },
+        "closure": "failing",
+        "state": {
+          "bearing": "FAIL",
+          "one_way_shear": "PASS",
+          "punching": "PASS",
+          "flexure": "PASS",
+          "min_steel": "PASS",
+          "development": "PASS",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "engineer_sized": false
+        }
+      }
+    ]
+  }
+}

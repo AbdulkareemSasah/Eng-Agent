@@ -6,14 +6,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
+from eng_contract.envelope import Envelope
 from eng_contract.ids import Clock, IdSource
 from eng_contract.store import ModelStateStore, ResultStore, Workspace
+from pydantic import JsonValue
 
+from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.adapters._allowlist import Allowlist, AllowlistError, load_allowlist
 from eng_harness.adapters._descriptors import ToolDescriptor
 from eng_harness.adapters._hostport import AdapterHostPort
 from eng_harness.adapters._identity import IdentityStore
 from eng_harness.adapters._ledger import WriteLedger
+from eng_harness.adapters.cli import CLI_KINDS, CliToolPort
 from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.adapters.csi._checks import ReadBack, WrittenItems
 from eng_harness.adapters.csi._errors import CsiErrorMapper
@@ -21,9 +25,10 @@ from eng_harness.adapters.csi._reconcile import CsiReconciler
 from eng_harness.adapters.csi._revisions import Revisions
 from eng_harness.adapters.csi._tools import CsiToolPort
 from eng_harness.basis import BasisInvalid, StoreBasisPort
-from eng_harness.errors import JournalIntegrityError, NotImplementedGap
+from eng_harness.ctx import Preview, PreviewItem
+from eng_harness.errors import JournalIntegrityError
 from eng_harness.journal import JournalReader
-from eng_harness.ports import HostPort, ServerCheck, ToolPort
+from eng_harness.ports import HostPort, Reconciliation, ServerCheck, ToolInfo, ToolPort
 from eng_harness.servers import ConfigError, ServerManager, ServersConfig, platform_inspector, platform_launcher
 from eng_harness.servers._guard import ProcessGuard
 from eng_harness.servers._hostlock import HostLocks, default_lock_dir
@@ -45,6 +50,45 @@ class AdapterPorts:
 
     async def __aexit__(self, *exc: Any) -> None:
         await self.servers.__aexit__(*exc)
+
+
+class _RoutedTools:
+    """The tool port of a run with `[cli_tools.*]` entries: each tool goes to the adapter that serves it (AC43)."""
+
+    def __init__(self, csi: CsiToolPort, cli: CliToolPort, cli_tools: frozenset[str]) -> None:
+        self._csi, self._cli, self._cli_tools = csi, cli, cli_tools
+
+    def _serving(self, tool: str) -> CsiToolPort | CliToolPort:
+        return self._cli if tool in self._cli_tools else self._csi
+
+    async def describe(self, tool: str) -> ToolInfo:
+        return await self._serving(tool).describe(tool)
+
+    def unreleased_tools(self) -> dict[str, str]:
+        return self._csi.unreleased_tools() | self._cli.unreleased_tools()
+
+    async def call(self, tool: str, args: Mapping[str, JsonValue], *, op_id: str, model: str | None) -> Envelope:
+        return await self._serving(tool).call(tool, args, op_id=op_id, model=model)
+
+    def supports_reconcile(self, tool: str) -> bool:
+        return self._serving(tool).supports_reconcile(tool)
+
+    async def reconcile(self, tool: str, args: Mapping[str, JsonValue], op_id: str) -> Reconciliation:
+        return await self._serving(tool).reconcile(tool, args, op_id)
+
+    async def read_back(self, tool: str, args: Mapping[str, JsonValue]) -> Envelope | None:
+        return await self._serving(tool).read_back(tool, args)
+
+    async def preview(self, tool: str, args: Mapping[str, JsonValue]) -> Preview:
+        """A CSI tool's preview as the CSI port gives it. A command-line tool changes no model of the run (the build
+        tool writes only into its attempt folder and its own hidden host, spec 4.7) and its adapter stores no
+        canonical arguments: its preview is one item that names the tool, with no reference, model or diff."""
+        if tool not in self._cli_tools:
+            return await self._csi.preview(tool, args)
+        await self._cli.describe(tool)
+        return Preview(
+            items=(PreviewItem(id=tool, label=f"{tool}: command-line tool", refs=()),), diff_ref=None, models=()
+        )
 
 
 class _RunRevisions(Revisions):
@@ -81,6 +125,31 @@ class _FrozenTolerance:
         return self._value
 
 
+def _cli_port(
+    config: ServersConfig,
+    workspace: Workspace,
+    run_dir: Path,
+    clock: Clock,
+    ids: IdSource,
+    launcher: ProcessLauncher,
+    inspector: ProcessInspector,
+) -> CliToolPort | None:
+    """The port of the `[cli_tools.*]` entries, `None` without any; `ConfigError` for an entry it cannot serve.
+
+    Its `harness.cli_run/1` results go through a store over the run's workspace whose registry holds that kind, which
+    `HARNESS_KINDS` does not register (spec 0002 A1 lists it, `_kinds.py` is outside plan task T19b; see the CHANGELOG).
+    """
+    if not config.cli_tools:
+        return None
+    store = ResultStore(workspace, HARNESS_KINDS.extend(CLI_KINDS), ids, clock)
+    try:
+        return CliToolPort(
+            config=config, store=store, launcher=launcher, run_dir=run_dir, clock=clock, inspector=inspector
+        )
+    except ValueError as error:
+        raise ConfigError("cli_tools", str(error)) from error
+
+
 def build_ports(
     config: ServersConfig,
     workspace: Workspace,
@@ -97,13 +166,12 @@ def build_ports(
     allowlists: Mapping[str, Callable[[str | None], Allowlist]] | None = None,
     visible: bool = False,
 ) -> AdapterPorts:
-    """Wire the CSI ports of one run, for the product of its server (spec 0002 4.1, AC41, AC43 to AC45, spec 0008 4.1).
+    """Wire CSI ports for the server product and command-line tools (spec 0002 4.1, AC41, AC43 to AC45; spec 0008 4.1).
 
-    Enter the result around Engine.start/resume. No process starts here. CLI tools are the explicit H-G8 gap;
-    unsupported server adapters/configurations raise ConfigError rather than silently losing a capability.
+    Enter the result around Engine.start/resume. No process starts here. Each `[cli_tools.*]` entry is served by the
+    command-line tool adapter beside the CSI tools (AC43); unsupported server adapters/configurations and a
+    command-line tool the adapter has no argument model for raise ConfigError rather than silently losing a capability.
     """
-    if config.cli_tools:
-        raise NotImplementedGap("H-G8: CLI tools are not wired: " + ", ".join(sorted(config.cli_tools)))
     loaders = {"sasaah-csi-mcp": csi_allowlist, **(allowlists or {})}
     loaded: dict[str, Allowlist] = {}
     for name, section in config.servers.items():
@@ -119,6 +187,7 @@ def build_ports(
     program = config.host_program(product)
     inspector = inspector if inspector is not None else platform_inspector()
     launcher = launcher if launcher is not None else platform_launcher(inspector)
+    cli = _cli_port(config, workspace, run_dir, clock, ids, launcher, inspector)
     engine = inspector.identity(os.getpid())
     if engine is None:
         raise ConfigError("servers", "the engine process identity cannot be read")
@@ -189,7 +258,7 @@ def build_ports(
         record_pre_image=True,
         open_model_bound=host.open_model_bound,
     )
-    return AdapterPorts(tool, host, servers)
+    return AdapterPorts(tool if cli is None else _RoutedTools(tool, cli, frozenset(config.cli_tools)), host, servers)
 
 
 __all__ = ["AdapterPorts", "Allowlist", "AllowlistError", "ToolDescriptor", "build_ports", "load_allowlist"]
