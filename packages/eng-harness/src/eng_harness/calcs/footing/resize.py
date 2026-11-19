@@ -47,7 +47,8 @@ _QUANTITIES = (
 BASIS_FIELDS = tuple(path for path, _ in _QUANTITIES)
 """The nine design-basis paths of spec 0010 §4.4.4 (amendment B-567, OQ-Q64)."""
 
-ZERO = Cited(value=0, unit="1", source="Spec 0010 §4.4.4: plans counted from zero; exclusive lower bound of lengths")
+ZERO = Cited(value=0, unit="1", source="Spec 0010 §4.4.4: lengths are positive; plans are counted from zero")
+ONE = Cited(value=1, unit="1", source="Spec 0010 §4.4.4 R1: next plan multiple is (floor(L/i) + 1)·i")
 VERSION = Cited(value=1, unit="1", source="Calc version 1 of spec 0010 §4.4.4; a change of method is a new version")
 # Status strings of §4.4.4 / Q13 / Q17 (not Cited: Cited holds numbers only).
 _STATUS_OK = "OK"
@@ -192,7 +193,7 @@ def _enlarge_plan(row: DimRow, quantities: dict[str, Fraction], trace: TraceBuil
     spacing = _fraction_mm(row.s_mm, row.id, "s_mm")
     increment = quantities["plan_increment_mm"]
     maximum = quantities["max_plan_dimension_mm"]
-    nxt = (plan // increment + 1) * increment
+    nxt = (plan // increment + ONE.value) * increment
     trace.step(
         f"{prefix}_next_plan_mm",
         str(nxt),
@@ -494,7 +495,7 @@ def _apply(
 
 @calc(
     id="harness.footing_resize",
-    version=1,
+    version=int(VERSION.value),
     output_kind="harness.footing_dims/1",
     title="One resize step for square isolated footings",
     method_source=f"{_METHOD} (R1 to R4)",
@@ -512,6 +513,7 @@ def footing_resize(inp: ResizeInput, meta: InputMeta, trace: TraceBuilder) -> Re
     basis_ref = meta.refs["basis"].result_id
     quantities = _read_quantities(inp.basis, basis_ref, trace)
     trace.constant("zero", ZERO)
+    trace.constant("one", ONE)
     plan = as_fraction(inp.engineer_plan.value)
     depth = as_fraction(inp.engineer_depth.value)
     spacing = as_fraction(inp.engineer_spacing.value)

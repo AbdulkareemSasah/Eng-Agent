@@ -2,12 +2,12 @@
 
 - Calc id: `harness.footing_resize`
 - Version: 1
-- Content hash: `7c03eb50054234b562490b6317530893fbad9b272c29ee1a65a7ae9350b82efd`
+- Content hash: `a1bad0870cca02c15d229968730f826471395b40e1908c0ec9720ef0aa485ccf`
 - Status: draft under ADR-0028 §4. Independent verification and owner approval are pending.
 - Method: [spec 0010 §4.4.4](../../specs/0010-design-isolated-footing.md), R1–R4 and AC9, as amended by B-567 (OQ-Q64).
-- Constants: zero from the plan-from-zero counting rule; status strings `OK`, `LIMIT_REACHED`, `OUTSIDE_BASIS_BOUNDS`,
-  `OFF_INCREMENT` and source `engineer` from §4.4.4 / Q13 / Q17; version 1. Increments and bounds come from the nine
-  confirmed basis fields.
+- Constants: zero from the plan-from-zero counting rule; one from the R1 next-multiple step; status strings `OK`,
+  `LIMIT_REACHED`, `OUTSIDE_BASIS_BOUNDS`, `OFF_INCREMENT` and source `engineer` from §4.4.4 / Q13 / Q17; version 1.
+  Increments and bounds come from the nine confirmed basis fields.
 
 ## Hand checks
 
@@ -28,7 +28,7 @@ basis of the action and limit cases is `plan_increment = 200 mm`, `depth_increme
 | `resize-limits` F4 | R1 from `2800`: `L' = (⌊2800/200⌋ + 1)·200 = 3000 ≤ 3000`, status `OK`. |
 | `resize-engineer-ok` | R4: `L = 2000`, `h = 500`, `s = 200` inside bounds and on the plan grid; `source = engineer`, status `OK`. |
 | `resize-engineer-off-increment` | R4: `L = 2100` inside bounds, not a multiple of `200`; status `OFF_INCREMENT`. |
-| `resize-engineer-outside-plan-high/low` | R4: `L = 3500 > 3000` and `L = 800 < 1000`; status `OUTSIDE_BASIS_BOUNDS` (each side). |
+| `resize-engineer-outside-plan-high/low` | R4: `L = 3600 (=18·200) > 3000` and `L = 800 < 1000`; status `OUTSIDE_BASIS_BOUNDS` (each side). |
 | `resize-engineer-outside-depth-high/low` | R4: `h = 900 > 800` and `h = 300 < 400`; status `OUTSIDE_BASIS_BOUNDS`. |
 | `resize-engineer-outside-spacing-high/low` | R4: `s = 350 > 300` and `s = 50 < 100`; status `OUTSIDE_BASIS_BOUNDS`. |
 | `resize-engineer-outside-and-off` | R4: `L = 3500` outside and off-grid (`17·200 = 3400`, `18·200 = 3600`); status `OUTSIDE_BASIS_BOUNDS`, reason `OFF_INCREMENT`. |
