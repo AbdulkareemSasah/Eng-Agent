@@ -5,7 +5,9 @@ The change sets and the model are synthetic. Expected model values are derived b
 
 import copy
 import json
+import sys
 from collections.abc import Callable
+from types import FrameType
 from typing import Any, cast
 
 from pydantic import JsonValue
@@ -127,9 +129,11 @@ def test_readback_failure_routes(stand: Stand) -> None:
     assert outcome.status is RunStatus.COMPLETED, outcome
     decisions = [r for r in stand.inputs.presented if r.kind == "engine.decision"]
     assert decisions
-    first, *_ = stand.results("harness.readback_check")
+    first, second = stand.results("harness.readback_check")
     assert first["status"] == "FAIL"
     assert first["unexpected"]  # the area load that the fake changed and no effect explains
+    assert second["status"] == "PASS"
+    assert second["unexpected"] == []
     saved = [s for s in stand.steps("tool") if s.name == "csi_save_model" and (s.args or {}).get("as_new_revision")]
     revisions = [e.payload for e in stand.events() if getattr(e.payload, "role", None) == "revision"]
     assert saved
@@ -138,3 +142,68 @@ def test_readback_failure_routes(stand: Stand) -> None:
     assert len(restored) == 1
     assert (restored[0].args or {})["revision"].startswith("original.rev")
     assert "csi_run_analysis" not in [c["tool"] for c in stand.calls()]
+
+
+def test_empty_change_set_records_revision(stand: Stand) -> None:
+    """An empty change set (ask=False) records the model state as a revision snapshot without an
+    approval, writes nothing, skips read-back, and saves in place at step 10."""
+    outcome = stand.play(stand.flow(ask=False), _responder())
+    assert outcome.status is RunStatus.COMPLETED, outcome
+    assert [c.route for c in cast(Any, outcome.output).cycles] == ["done"]
+    assert _written(stand) == []
+    saves = [s for s in stand.steps("tool") if s.name == "csi_save_model"]
+    assert len(saves) == 2  # step 7 revision save (as_new_revision) and step 10 save
+    assert (saves[0].args or {}).get("as_new_revision") is True
+    assert saves[0].under is None  # empty set saves without an approval
+    assert (saves[1].args or {}).get("as_new_revision") is not True
+    revisions = [e.payload for e in stand.events() if getattr(e.payload, "role", None) == "revision"]
+    assert len(revisions) == 2  # revision save and step 10 save
+    assert revisions[0].role == revisions[1].role == "revision"
+    assert stand.results("harness.change_set_check") == []
+    assert stand.results("harness.expected_effects") == []
+    assert stand.results("harness.readback_check") == []
+
+
+def test_model_changed_during_apply_routes_to_decision(stand: Stand) -> None:
+    """AC13/spec 0007 4.5.1: an edit after a write voids the approval during apply and opens D-2
+    with reason `model_changed_during_apply`."""
+
+    changed: list[bool] = []
+
+    def hook(ports: Any) -> None:
+        call = ports.tool_port.call
+        model_state = ports.host_port.model_state
+
+        async def after(tool: str, *args: Any, **kwargs: Any) -> Any:
+            result = await call(tool, *args, **kwargs)
+            if tool == "csi_assign_frame_section" and not changed:
+                changed.append(True)
+            return result
+
+        async def state_after_write(model_key: str, instance_id: str) -> Any:
+            state = await model_state(model_key, instance_id)
+            restored = [s for s in stand.steps("tool") if s.name == "csi_open_revision"]
+            frame: FrameType | None = sys._getframe(1)
+            while frame is not None and frame.f_code.co_name != "_recheck":
+                frame = frame.f_back
+            if changed and not restored and frame is not None:
+                return state.model_copy(update={"revision": state.revision + 1})
+            return state
+
+        ports.tool_port.call = after
+        ports.host_port.model_state = state_after_write
+
+    outcome = stand.play(stand.flow(), _responder(option="restore_previous"), cycles_hook=hook)
+    assert outcome.status is RunStatus.COMPLETED, outcome
+    decisions = [r for r in stand.inputs.presented if r.kind == "engine.decision"]
+    assert len({d.request_id for d in decisions}) == 1
+    assert "model_changed_during_apply" in json.dumps(decisions[0].fields_schema)
+    restored = [s for s in stand.steps("tool") if s.name == "csi_open_revision"]
+    assert len(restored) == 1
+    assert (restored[0].args or {})["revision"].startswith("original.rev")
+    steps = stand.steps("tool")
+    assert any(s.name.startswith("csi_assign") for s in steps[: steps.index(restored[0])])
+    effects = stand.results("harness.expected_effects")
+    assert len(effects) == 2
+    (readback,) = stand.results("harness.readback_check")
+    assert readback["status"] == "PASS"
