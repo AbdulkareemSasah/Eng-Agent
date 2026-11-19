@@ -426,7 +426,7 @@ def test_launch_arguments_without_audit_log(
 
 def _checks(*, wrong_fingerprint: bool = False) -> dict[str, BuildExpectation]:
     """The build check of the CSI allowlist for server `csi`; the fingerprint can be made wrong on purpose."""
-    expected = csi_allowlist().build_expectation()
+    expected = csi_allowlist().for_product("ETABS").build_expectation()
     return {"csi": replace(expected, tool_fingerprint="0" * 64) if wrong_fingerprint else expected}
 
 
@@ -488,7 +488,7 @@ def test_preflight_over_the_csi_fake(tmp_path: Path, make_config: ConfigFactory,
         assert check.reason is None
         assert check.ok is True
         assert (check.server, check.build, check.min_build) == ("csi", f"{commit[:12]}+{exe[:12]}", commit)
-        assert check.fingerprint == check.expected_fingerprint == csi_allowlist().tool_fingerprint
+        assert check.fingerprint == check.expected_fingerprint == csi_allowlist().for_product("ETABS").tool_fingerprint
 
     _run(tmp_path, config, launcher, body, _checks())
 
@@ -617,3 +617,96 @@ def test_idea_launcher_receives_no_audit_log(tmp_path: Path, launcher: Recording
     assert launcher.specs[0].argv == [str(wrapper), *expected]
     assert not any("audit" in item for item in launcher.specs[0].argv)
     assert not (tmp_path / "run" / "servers" / "idea-main-audit.jsonl").exists()
+
+
+def test_safe_build_mismatch_stops_run(tmp_path: Path) -> None:
+    """Spec 0008 AC4: a SAFE build/fingerprint mismatch stops the run before journaling or any model open."""
+    from fakes.ports import FakeApprovalPort, FakeCalcPort, FakeInputPort
+    from fakes.sasaah_csi.wiring import config, pause, rig
+
+    from eng_harness.basis import StoreBasisPort
+    from eng_harness.block import Registry
+    from eng_harness.engine import Engine, EnginePorts, EngineSettings
+    from eng_harness.errors import HarnessCode, RunRefused
+    from eng_harness.ports import RunClass
+    from eng_harness.servers import HostProgramConfig
+
+    r = rig(tmp_path)
+    r.control.write_text(json.dumps({"faults": [], "seed": {}, "product": "SAFE"}))
+    schemas_path = Path(__file__).resolve().parents[2] / "fakes" / "sasaah_csi" / "schemas.json"
+    bad_server = tmp_path / "bad_safe_server.py"
+    bad_server.write_text(
+        "\n".join(
+            [
+                "import json",
+                "from pathlib import Path",
+                "import anyio",
+                "from mcp import types",
+                "from mcp.server import Server",
+                "from mcp.server.stdio import stdio_server",
+                f"TOOLS = json.loads(Path({str(schemas_path)!r}).read_text())['tools']",
+                "async def on_list(ctx, params):",
+                "    items = [",
+                "        types.Tool(",
+                "            name=t['name'],",
+                "            input_schema={'type': 'object', 'properties': {'tampered': {'type': 'string'}}}",
+                "            if t['name'] == 'csi_results_base_reactions' else t['input_schema'],",
+                "        )",
+                "        for t in TOOLS",
+                "    ]",
+                "    return types.ListToolsResult(tools=items)",
+                "async def on_call(ctx, params):",
+                "    body = {'read_only': False, 'script_enabled': False, 'instances': [], 'current_target': None}",
+                "    return types.CallToolResult(content=[types.TextContent(type='text', text=json.dumps(body))])",
+                "async def main():",
+                "    server = Server('sasaah-csi-fake', on_list_tools=on_list, on_call_tool=on_call)",
+                "    async with stdio_server() as (rd, wr):",
+                "        await server.run(rd, wr, server.create_initialization_options())",
+                "anyio.run(main)",
+            ]
+        )
+    )
+    cfg = config(r.control)
+    base = cfg.servers["csi"]
+    safe_section = base.model_copy(
+        update={
+            "product": "SAFE",
+            "host_key": "csi_safe",
+            "args": (str(bad_server), "--disable-script"),
+        }
+    )
+    cfg = cfg.model_copy(
+        update={
+            "servers": {"csi_safe": safe_section},
+            "host_programs": {"safe": HostProgramConfig(executables=("SAFE.exe",))},
+        }
+    )
+    flow = replace(pause, min_server_builds={"csi_safe": csi_allowlist().sasaah_commit}, copy_on_open=True)
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            engine = Engine(
+                r.workspace,
+                Registry([flow]),
+                EnginePorts(
+                    tool=p.tool_port,
+                    host=p.host_port,
+                    calc=FakeCalcPort(RunClass.TRIAL, []),
+                    basis=StoreBasisPort(r.store),
+                    approvals=FakeApprovalPort(),
+                    inputs=FakeInputPort(),
+                ),
+                r.store,
+                EngineSettings(),
+                r.clock,
+                r.ids,
+            )
+            with pytest.raises(RunRefused) as refused:
+                await engine.start(r.request())
+            assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
+            assert refused.value.evidence == ("csi_safe",)
+            assert "fingerprint" in refused.value.message
+            assert not (r.run_dir / "journal.sqlite").exists()
+            assert r.calls("csi_open_model") == []
+
+    anyio.run(body)

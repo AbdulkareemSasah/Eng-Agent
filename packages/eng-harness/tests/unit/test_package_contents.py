@@ -37,11 +37,7 @@ def test_fakes_not_shipped(tmp_path: Path) -> None:
     assert not [n for n in names if {"tests", "fakes", "sasaah_csi"} & set(n.split("/"))]
 
 
-def test_revit_fake_not_shipped(tmp_path: Path) -> None:
-    """AC30: the synthetic Revit fake under tests/ is never part of the built wheel."""
-    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_revit"
-    assert (fake / "server.py").is_file()
-    assert (fake / "schemas.json").is_file()
+def _built_wheel_names(tmp_path: Path) -> list[str]:
     uv = shutil.which("uv")
     assert uv is not None
     assert asyncio.run(_build_wheel(uv, tmp_path)) == 0
@@ -50,4 +46,21 @@ def test_revit_fake_not_shipped(tmp_path: Path) -> None:
     with zipfile.ZipFile(wheels[0]) as wheel:
         names = wheel.namelist()
     assert any(n.startswith("eng_harness/") for n in names)
+    return names
+
+
+def test_revit_fake_not_shipped(tmp_path: Path) -> None:
+    """AC30: the synthetic Revit fake under tests/ is never part of the built wheel."""
+    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_revit"
+    assert (fake / "server.py").is_file()
+    assert (fake / "schemas.json").is_file()
+    names = _built_wheel_names(tmp_path)
     assert not [n for n in names if {"tests", "fakes", "sasaah_revit"} & set(n.split("/"))]
+
+
+def test_idea_fake_not_shipped(tmp_path: Path) -> None:
+    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_idea"
+    assert (fake / "server.py").is_file()
+    assert (fake / "schemas.json").is_file()
+    names = _built_wheel_names(tmp_path)
+    assert not [n for n in names if {"tests", "fakes", "sasaah_idea"} & set(n.split("/"))]
