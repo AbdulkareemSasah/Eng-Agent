@@ -17,7 +17,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from importlib.machinery import SourceFileLoader
 from itertools import pairwise
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
@@ -30,6 +30,7 @@ __all__ = [
     "BlockDef",
     "FieldSpec",
     "LockFinding",
+    "ModelFile",
     "Registry",
     "RegistryError",
     "WorkflowDef",
@@ -41,6 +42,9 @@ __all__ = [
     "workflow",
     "write_lock",
 ]
+
+ModelFile = PurePath
+"""The absolute path of a model file (passed to the host port under its base name); a pure path with no I/O method."""
 
 LOCK_PATH = Path(__file__).resolve().parent / "blocks.lock.json"
 _NAME = re.compile(r"^[a-z][a-z0-9_]*$")

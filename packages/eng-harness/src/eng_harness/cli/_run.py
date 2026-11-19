@@ -15,8 +15,8 @@ from argparse import Namespace
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import closing
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast, get_args
+from pathlib import Path, PurePath
+from typing import TYPE_CHECKING, Any, cast
 
 from eng_contract.canonical import canonical_json
 from eng_contract.errors import ContractError
@@ -41,7 +41,7 @@ from eng_harness.block import Registry, WorkflowDef
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl, remove_stop
 from eng_harness.cli._exit import ExitCode, Outcome, exit_code_for, exit_code_for_error
-from eng_harness.cli._options import parse_options
+from eng_harness.cli._options import _unwrap, parse_options
 from eng_harness.cli._parser import UsageError
 from eng_harness.cli._signals import install_interrupt_handler
 from eng_harness.cli._wiring import (
@@ -290,15 +290,18 @@ def _load_input(args: Namespace, workflow: WorkflowDef[Any, Any]) -> tuple[dict[
 def _model_files(model: BaseModel, *, check: bool) -> tuple[dict[str, Path], bool]:
     """The model files of the input (base name to path) and its `visible_host` (spec 4.2.2 step 2).
 
-    A model file is the value of a top-level `Path` (or `Path | None`) field. `check` is true at `run`: the path must be
-    absolute, name an existing file and not share its base name with another field's.
+    A model file is the value of a top-level `PurePath` (or `PurePath | None`) field, converted to a `Path`.
+    At `run`, the path must be absolute, name an existing file and have a unique base name.
     """
     files: dict[str, Path] = {}
     owner: dict[str, str] = {}
     for name, info in type(model).model_fields.items():
-        value = getattr(model, name)
-        if value is None or not (info.annotation is Path or Path in get_args(info.annotation)):
+        if _unwrap(info.annotation) is not PurePath:
             continue
+        model_file = getattr(model, name)
+        if model_file is None:
+            continue
+        value = Path(model_file)
         if check and not value.is_absolute():
             raise _RefusedError(ExitCode.USAGE, f"{value} is not an absolute path (input field {name})")
         if check and not value.is_file():
