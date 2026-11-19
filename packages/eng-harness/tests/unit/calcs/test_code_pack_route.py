@@ -280,7 +280,7 @@ def test_arguments_and_item_limit(pack_module: ModuleType, tmp_path: Path) -> No
 
 def test_allowlist_holds_the_footing_and_column_ids() -> None:
     registered = {c.meta.check_id for c in Registry.discover().checks if c.meta.pack == "aci318_14"}
-    assert set(FOOTING_CHECK_IDS) == registered  # the six ACI footing checks, one each
+    assert registered == set(FOOTING_CHECK_IDS) | set(COLUMN_CHECK_IDS)
     assert len(FOOTING_CHECK_IDS) == 6
     assert COLUMN_CHECK_IDS == (
         "aci318_14.22_4_2_1.max_axial_strength",
