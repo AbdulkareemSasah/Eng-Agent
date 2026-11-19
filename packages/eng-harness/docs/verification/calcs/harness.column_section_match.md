@@ -1,0 +1,15 @@
+# harness.column_section_match
+
+- Calc id, version and content hash: `harness.column_section_match` v1; the hash is the entry in `src/eng_harness/calcs/calcs.lock.json`
+- Status: draft (bootstrap mode, ADR-0028 section 4; owner approval awaited, spec 0013 CW-G12)
+- Method source: spec 0013 section 4.4.4, rules M1 and M2; spec 0003 section 4.11 P2 for the exact length comparison. Input: one column row of `harness.column_selection/1` (by reference, typically a pointer into the selection), `sizes` (one `harness.section_size/1` body per dimension: `b` and `h`, or `D`, each the output of `harness.section_round`), `model.sections/1`, and `compare.length_mm`. M1: candidates are frame sections of the column's shape type and material whose every dimension differs from the rounded size by at most `compare.length_mm` (exact `Fraction`, inclusive). M2: one candidate is `matched` with its name; none is `no_section_in_model` (CW-G3, H-G1); several are `ambiguous` with all names sorted. A literal length in place of a section-size body is `INVALID_ARGUMENT` on `sizes`. The calc holds no engineering constant.
+- Golden cases (`tests/data/golden/column_design/`; each derived by hand in its `derivation` field, synthetic data):
+  - `column-match-one.json` (§4.4.4 M2): one rectangular C30 section at exactly 400 x 600 mm. Result: matched.
+  - `column-match-none.json` (§4.4.4 M2): rounded 500 x 500 mm with no candidate. Result: no_section_in_model.
+  - `column-match-ambiguous.json` (§4.4.4 M2): two equal C30 sections; a third beyond 5 mm. Result: ambiguous, names sorted.
+  - `column-match-other-material.json` (§4.4.4 M1): same size, material C35 while the column is C30. Result: no_section_in_model.
+  - `column-match-boundary.json` (§4.4.4 M1): section b = 405 mm against size 400 mm with t = 5 mm (inclusive); 406 mm excluded. Result: matched.
+  - `column-match-circular.json` (§4.4.4 M2): circular D = 500 mm, one matching C35 section. Result: matched.
+- Boundary and contract tests: `tests/unit/calcs/test_column_section_match.py::test_size_must_be_rounding_result` (AC9: a Quantity is not a `harness.section_size/1` body)
+- Reviewer and date: awaiting review
+- Findings and open gaps: a column of shape `other` has no candidates (M1 names no host shape). Orientation swap of `b_mm` and `h_mm` is not tried (spec 0013 CW-G9).

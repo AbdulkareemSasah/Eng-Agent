@@ -2,6 +2,9 @@
 
 from typing import Any
 
+import pytest
+from eng_contract.errors import ContractError, ErrorCode
+
 from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
 
@@ -31,21 +34,25 @@ def _match(frame_id: str, status: str, section: str | None = None, names: list[s
     return {"frame_id": frame_id, "status": status, "section": None, "names": names or []}
 
 
-def test_items_and_refusals() -> None:
-    """AC10: matched accepted frames become frame_section items sorted by id; others are CW-G3 issues."""
+def _run(matches: list[dict[str, Any]], accepted: list[str]) -> dict[str, Any]:
     definition = REGISTRY[CALC_ID]
     input_type = definition.input_type
     assert isinstance(input_type, type)
-    raw = {
-        "matches": [
+    raw = {"matches": matches, "accepted": accepted}
+    return definition(input_type.model_validate(raw), _meta(), TraceBuilder()).model_dump(mode="json")
+
+
+def test_items_and_refusals() -> None:
+    """AC10: matched accepted frames become frame_section items sorted by id; others are CW-G3 issues."""
+    body = _run(
+        [
             _match("C2", "matched", "C60"),
             _match("C1", "matched", "C50"),
             _match("C3", "no_section_in_model"),
             _match("C4", "ambiguous", names=["A", "B"]),
         ],
-        "accepted": ["C3", "C2", "C1", "C4"],
-    }
-    body = definition(input_type.model_validate(raw), _meta(), TraceBuilder()).model_dump(mode="json")
+        ["C3", "C2", "C1", "C4"],
+    )
     assert body["source"] == "harness.column_change_set"
     assert body["items"] == [
         {"id": "C1", "kind": "frame_section", "frames": ["C1"], "section": "C50"},
@@ -55,3 +62,28 @@ def test_items_and_refusals() -> None:
         {"frame_id": "C3", "code": "NOT_IMPLEMENTED", "gap": "CW-G3"},
         {"frame_id": "C4", "code": "NOT_IMPLEMENTED", "gap": "CW-G3"},
     ]
+
+
+def test_accepted_without_match_entry_is_cw_g3() -> None:
+    body = _run([_match("C1", "matched", "C50")], ["C1", "C9"])
+    assert body["items"] == [{"id": "C1", "kind": "frame_section", "frames": ["C1"], "section": "C50"}]
+    assert body["issues"] == [{"frame_id": "C9", "code": "NOT_IMPLEMENTED", "gap": "CW-G3"}]
+
+
+def test_repeated_accepted_ids_count_once() -> None:
+    body = _run([_match("C1", "matched", "C50")], ["C1", "C1"])
+    assert len(body["items"]) == 1
+    assert body["issues"] == []
+
+
+def test_duplicate_match_frame_is_refused() -> None:
+    definition = REGISTRY[CALC_ID]
+    input_type = definition.input_type
+    assert isinstance(input_type, type)
+    raw = {
+        "matches": [_match("C1", "matched", "C50"), _match("C1", "matched", "C60")],
+        "accepted": ["C1"],
+    }
+    with pytest.raises(ContractError) as caught:
+        definition(input_type.model_validate(raw), _meta(), TraceBuilder())
+    assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "matches")

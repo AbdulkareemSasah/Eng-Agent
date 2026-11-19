@@ -7,6 +7,7 @@ from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import InputPolicy, validate_input
 from eng_contract.records import ResultRecord
 
+from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
 
 CALC_ID = "harness.column_section_match"
@@ -23,12 +24,12 @@ class _NoStore:
         raise AssertionError(result_id)
 
 
-def _basis() -> dict[str, Any]:
+def _basis(value: float = 5) -> dict[str, Any]:
     return {
         "template": None,
         "fields": {
             "compare.length_mm": {
-                "value": 5,
+                "value": value,
                 "unit": "mm",
                 "source": SRC,
                 "confirmed": True,
@@ -38,28 +39,69 @@ def _basis() -> dict[str, Any]:
     }
 
 
-def _column() -> dict[str, Any]:
+def _column(*, shape: str = "rectangular", material: str = "C30") -> dict[str, Any]:
     return {
         "frame_id": "C1",
         "section": "C30x30",
-        "shape": "rectangular",
-        "material": "C30",
+        "shape": shape,
+        "material": material,
         "story": "L1",
         "length_mm": 3000.0,
     }
 
 
-def _sections() -> dict[str, Any]:
+def _size(value: float, multiple: int) -> dict[str, Any]:
     return {
-        "frame_sections": [
-            {
-                "name": "C40x60",
-                "material": "C30",
-                "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600},
-            }
-        ],
-        "area_sections": [],
+        "required": {"value": value, "unit": "mm"},
+        "increment": {"value": 50.0, "unit": "mm"},
+        "multiple": multiple,
+        "size": {"value": value, "unit": "mm"},
+        "status": "PASS",
     }
+
+
+def _sections(*rows: dict[str, Any]) -> dict[str, Any]:
+    return {"frame_sections": list(rows), "area_sections": []}
+
+
+def _meta() -> InputMeta:
+    return InputMeta(
+        refs={
+            name: RefMeta(
+                result_id=f"res_01KCC00000000000000000000{i}",
+                kind=kind,
+                complete=True,
+                model_id=None,
+                model_revision=None,
+                parents=(),
+                producer_tool="fixture_tool",
+            )
+            for i, (name, kind) in enumerate(
+                (
+                    ("column", "harness.column_selection/1"),
+                    ("sections", "model.sections/1"),
+                    ("basis", "basis.design_basis/1"),
+                ),
+                start=1,
+            )
+        }
+    )
+
+
+def _run(**changes: Any) -> dict[str, Any]:
+    raw: dict[str, Any] = {
+        "column": _column(),
+        "sizes": {"b": _size(400.0, 8), "h": _size(600.0, 12)},
+        "sections": _sections(
+            {"name": "C40x60", "material": "C30", "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}}
+        ),
+        "basis": _basis(),
+    }
+    raw.update(changes)
+    definition = REGISTRY[CALC_ID]
+    input_type = definition.input_type
+    assert isinstance(input_type, type)
+    return definition(input_type.model_validate(raw), _meta(), TraceBuilder()).model_dump(mode="json")
 
 
 def test_size_must_be_rounding_result() -> None:
@@ -73,7 +115,9 @@ def test_size_must_be_rounding_result() -> None:
             "b": {"value": 400.0, "unit": "mm"},
             "h": {"value": 600.0, "unit": "mm"},
         },
-        "sections": _sections(),
+        "sections": _sections(
+            {"name": "C40x60", "material": "C30", "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}}
+        ),
         "basis": _basis(),
     }
     with pytest.raises(ContractError) as caught:
@@ -87,3 +131,47 @@ def test_size_must_be_rounding_result() -> None:
     detail = caught.value.detail
     assert detail.code is ErrorCode.INVALID_ARGUMENT
     assert detail.field is not None and detail.field.startswith("sizes")
+
+
+def test_just_beyond_tolerance_is_not_a_candidate() -> None:
+    """M1 exclusive of differences above compare.length_mm: |406 - 400| = 6 > 5."""
+    body = _run(
+        sections=_sections(
+            {"name": "C406x600", "material": "C30", "shape": {"type": "rectangular", "b_mm": 406, "h_mm": 600}}
+        )
+    )
+    assert body == {"status": "no_section_in_model", "section": None, "names": []}
+
+
+def test_zero_tolerance_requires_exact_dimensions() -> None:
+    body = _run(
+        basis=_basis(0),
+        sections=_sections(
+            {"name": "C405x600", "material": "C30", "shape": {"type": "rectangular", "b_mm": 405, "h_mm": 600}},
+            {"name": "C40x60", "material": "C30", "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}},
+        ),
+    )
+    assert body == {"status": "matched", "section": "C40x60", "names": ["C40x60"]}
+
+
+def test_other_shape_column_has_no_candidates() -> None:
+    body = _run(column=_column(shape="other"))
+    assert body["status"] == "no_section_in_model"
+    assert body["names"] == []
+
+
+def test_missing_record_refs_are_refused() -> None:
+    definition = REGISTRY[CALC_ID]
+    input_type = definition.input_type
+    assert isinstance(input_type, type)
+    raw = {
+        "column": _column(),
+        "sizes": {"b": _size(400.0, 8), "h": _size(600.0, 12)},
+        "sections": _sections(
+            {"name": "C40x60", "material": "C30", "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}}
+        ),
+        "basis": _basis(),
+    }
+    with pytest.raises(ContractError) as caught:
+        definition(input_type.model_validate(raw), InputMeta(refs={}), TraceBuilder())
+    assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "column")
