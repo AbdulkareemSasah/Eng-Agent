@@ -1,11 +1,11 @@
 """Contract tests of the CSI allowlist side (plan 0002 T4; spec 0002 AC35)."""
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-import pytest
+from helpers import load_json_dict as _load
+from helpers import load_repo_json
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = PACKAGE_ROOT.parents[1]
@@ -13,25 +13,12 @@ INVENTORY = REPO_ROOT / "spikes" / "S-12-sasaah-tool-inventory" / "inventory" / 
 SCHEMAS = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_csi" / "schemas.json"
 
 
-def _load(path: Path) -> dict[str, Any]:
-    with path.open("rb") as handle:
-        data = json.load(handle)
-    assert isinstance(data, dict)
-    return data
-
-
 def _inventory() -> dict[str, Any]:
-    """The S-12 inventory at the repository root, outside this package.
-
-    The gate's mutation step runs the tests in a copy of the package only, where the inventory does not exist; mutmut
-    sets ``MUTANT_UNDER_TEST`` in every one of its runs, and only there a missing inventory skips. In every other run a
-    missing inventory fails (B-369).
-    """
-    if not INVENTORY.is_file() and "MUTANT_UNDER_TEST" in os.environ:
-        pytest.skip(
-            "the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31"
-        )
-    return _load(INVENTORY)
+    """The S-12 inventory at the repository root, outside this package."""
+    return load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
 
 
 def test_fake_schemas_match_inventory() -> None:
