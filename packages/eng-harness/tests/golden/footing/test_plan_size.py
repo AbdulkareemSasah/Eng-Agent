@@ -23,7 +23,8 @@ KINDS = {
 def run_case(case: FootingGoldenCase, trace: TraceBuilder | None = None) -> BaseModel:
     definition = REGISTRY[CALC_ID]
     input_type = definition.input_type
-    assert isinstance(input_type, type) and issubclass(input_type, CalcInput)
+    assert isinstance(input_type, type)
+    assert issubclass(input_type, CalcInput)
     return definition(
         input_type.model_validate(case.input),
         input_meta(case.refs, KINDS),
