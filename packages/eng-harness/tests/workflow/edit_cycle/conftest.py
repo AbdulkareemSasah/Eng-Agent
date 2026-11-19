@@ -31,7 +31,10 @@ from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.basis import StoreBasisPort
 from eng_harness.block import Registry, workflow
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.design_summary import BASIS_FIELDS as DESIGN_FIELDS
+from eng_harness.calcs.edit_cycle.analysis_summary import BASIS_FIELDS as ANALYSIS_FIELDS
 from eng_harness.calcs.edit_cycle.change_set_check import BASIS_FIELDS as CHECK_FIELDS
+from eng_harness.calcs.edit_cycle.host_design_verdicts import BASIS_FIELDS as VERDICT_FIELDS
 from eng_harness.calcs.model_diff import BASIS_FIELDS as DIFF_FIELDS
 from eng_harness.decisions import Cascade, LabelStore
 from eng_harness.decisions._points import discover
@@ -144,30 +147,44 @@ class Stand:
         """The folder of the run."""
         return self.workspace.root / "runs" / self.run_id
 
-    def flow(self, cycles: int = 1, *, ask: bool = True) -> Any:
-        """The test workflow: open the model, then `cycles` cycles of the real `edit_cycle_once`.
+    def flow(
+        self, cycles: int = 1, *, ask: bool = True, summarize: bool = False, min_build: str | None = None
+    ) -> Any:
+        """The test workflow: open the model, then `cycles` of `edit_cycle_once` (and `run_and_summarize` when asked).
 
         The workflow code is imported here, so that a missing module fails the test and not the collection.
+        `min_build` overrides the workflow minimum Sasaah commit (the stale-build test).
         """
         from eng_harness.rules import edit_cycle as edit_rules
         from eng_harness.workflows import model_edit_cycle
         from eng_harness.workflows.model_edit_cycle import BASIS_FIELDS, EditCycleInput
-        from eng_harness.workflows.model_edit_cycle._cycle import CycleInput, CycleOutput, edit_cycle_once
+        from eng_harness.workflows.model_edit_cycle._cycle import (
+            CycleInput,
+            CycleOutput,
+            Route,
+            SummarizeInput,
+            SummarizeOutput,
+            edit_cycle_once,
+            run_and_summarize,
+        )
+        from eng_harness.workflows.model_edit_cycle._points import TurnAction
 
         _warm_coverage_multiline_maps(
             Path(model_edit_cycle.__file__).resolve().parent, Path(edit_rules.__file__).resolve()
         )
+        build = csi_allowlist().sasaah_commit if min_build is None else min_build
 
         class FlowOutput(BaseModel):
-            """What the test workflow returns: the output of each cycle."""
+            """What the test workflow returns: each cycle and, when asked, each summarize step."""
 
             cycles: list[CycleOutput]
+            summaries: list[SummarizeOutput] = []
 
         @workflow(
             name="edit_cycle_test",
             version=1,
             description="Runs the real cycle blocks of the edit cycle under its real definition.",
-            min_server_builds={"csi": csi_allowlist().sasaah_commit},
+            min_server_builds={"csi": build},
             always_ask=("csi_unlock_model",),
             basis_fields=BASIS_FIELDS,
             copy_on_open=True,
@@ -175,12 +192,32 @@ class Stand:
         async def run(ctx: Any, inp: EditCycleInput) -> FlowOutput:
             await ctx.tool("csi_open_model", {"model": MODEL_KEY})
             done: list[CycleOutput] = []
+            summarized: list[SummarizeOutput] = []
             previous = None
+            designs: dict[str, Any] = {}
+            ask_next = ask
             for _ in range(cycles):
-                out = await ctx.block(edit_cycle_once, CycleInput(model=MODEL_KEY, previous=previous, ask=ask))
+                out = await ctx.block(edit_cycle_once, CycleInput(model=MODEL_KEY, previous=previous, ask=ask_next))
                 previous = out.state
                 done.append(out)
-            return FlowOutput(cycles=done)
+                if not summarize or out.route is not Route.DONE:
+                    continue
+                summary = await ctx.block(
+                    run_and_summarize,
+                    SummarizeInput(
+                        model=MODEL_KEY,
+                        state=out.state,
+                        diff=out.diff,
+                        readback=out.readback,
+                        previous_designs=designs,
+                    ),
+                )
+                summarized.append(summary)
+                designs = {kind: ref for kind, ref in summary.designs}
+                if summary.turn is TurnAction.ACCEPT:
+                    break
+                ask_next = summary.turn is TurnAction.MORE_EDITS
+            return FlowOutput(cycles=done, summaries=summarized)
 
         return run
 
@@ -198,6 +235,9 @@ class Stand:
                 "harness.model_diff": DIFF_FIELDS,
                 "harness.readback_check": DIFF_FIELDS,
                 "harness.change_set_check": CHECK_FIELDS,
+                "harness.analysis_summary": ANALYSIS_FIELDS,
+                "harness.host_design_verdicts": VERDICT_FIELDS,
+                "harness.design_summary": DESIGN_FIELDS,
             },
         )
         settings = DecisionSettings()
@@ -223,7 +263,14 @@ class Stand:
             run_id=self.run_id,
         )
 
-    def play(self, flow: Any, responder: Callable[[Any, Any], Any], *, cycles_hook: Any = None) -> RunOutcome:
+    def play(
+        self,
+        flow: Any,
+        responder: Callable[[Any, Any], Any],
+        *,
+        cycles_hook: Any = None,
+        mode: PermissionMode = PermissionMode.WORK_ON_COPY,
+    ) -> RunOutcome:
         """Start the run and answer every pause with `responder(stand, request)` until it ends or stops."""
 
         async def body() -> RunOutcome:
@@ -231,7 +278,7 @@ class Stand:
                 engine = self.engine(ports, flow)
                 if cycles_hook is not None:
                     cycles_hook(ports)
-                outcome = await engine.start(self.request())
+                outcome = await engine.start(self.request(mode=mode))
                 for _ in range(40):  # a bound, never reached by a run that behaves
                     if outcome.status is not RunStatus.PAUSED:
                         return outcome
@@ -334,10 +381,40 @@ class Stand:
         return [dict(self.store.payload(r.ref)) for r in done if r is not None]
 
 
-@pytest.fixture
-def stand(tmp_path: Path) -> Stand:
+
+
+def seed_results(
+    stand: Stand,
+    *,
+    drifts: list[dict[str, Any]] | None = None,
+    design: dict[str, list[dict[str, Any]]] | None = None,
+    messages: list[dict[str, Any]] | None = None,
+) -> None:
+    """Put synthetic analysis results, design rows and optional analysis messages into the fake control file."""
+    data = json.loads(stand.control.read_text())
+    seed = data.setdefault("seed", {})
+    results = seed.setdefault("results", {})
+    if drifts is not None:
+        results["csi_results_story_drifts"] = drifts
+    if design is not None:
+        seed["design_results"] = design
+    if messages is not None:
+        tables = seed.setdefault("tables", {})
+        tables["Analysis Messages"] = messages
+    stand.control.write_text(json.dumps(data))
+
+
+def arm_fault(stand: Stand, fault: str, tool: str) -> None:
+    """Arm a one-shot fake fault on `tool` (removed when it fires)."""
+    data = json.loads(stand.control.read_text())
+    data.setdefault("faults", []).append({"fault": fault, "tool": tool})
+    stand.control.write_text(json.dumps(data))
+
+
+def build_stand(root: Path, *, values: Mapping[str, tuple[Any, str | None]] | None = None) -> Stand:
     """A stand over a fake model with one frame, one area, a frame load and the synthetic basis of `VALUES`."""
-    control = tmp_path / "control.json"
+    root.mkdir(parents=True, exist_ok=True)
+    control = root / "control.json"
     _seeded(control)
     data = json.loads(control.read_text())
     data["persist_model"] = True
@@ -346,14 +423,21 @@ def stand(tmp_path: Path) -> Stand:
     control.write_text(json.dumps(data))
     clock = FixedClock(1_700_000_000_000, 1)
     ids = SeededIdSource(b"b202-stand", clock)
-    workspace = Workspace(root=tmp_path / "workspace", classification=LocationClass.LOCAL)
+    workspace = Workspace(root=root / "workspace", classification=LocationClass.LOCAL)
     store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
+    used = VALUES if values is None else values
     fields: dict[str, JsonValue] = {
         path: {"value": value, "unit": unit, "source": SOURCE, "confirmed": True, "citation": None}
-        for path, (value, unit) in VALUES.items()
+        for path, (value, unit) in used.items()
     }
     producer = Provenance(tool="test/stand", tool_version="1", inputs={}, started_at=clock.now(), duration_ms=0)
     basis = store.put("basis.design_basis/1", {"template": None, "fields": fields}, producer)
-    original = tmp_path / "original.EDB"
+    original = root / "original.EDB"
     original.write_bytes(b"synthetic model")
-    return Stand(tmp_path, control, workspace, store, clock, ids, basis.result_id, original, f"run_{ids.new_ulid()}")
+    return Stand(root, control, workspace, store, clock, ids, basis.result_id, original, f"run_{ids.new_ulid()}")
+
+
+@pytest.fixture
+def stand(tmp_path: Path) -> Stand:
+    """A stand over a fake model with one frame, one area, a frame load and the synthetic basis of `VALUES`."""
+    return build_stand(tmp_path)
