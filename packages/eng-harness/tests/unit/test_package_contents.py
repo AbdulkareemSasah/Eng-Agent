@@ -35,3 +35,23 @@ def test_fakes_not_shipped(tmp_path: Path) -> None:
         names = wheel.namelist()
     assert any(n.startswith("eng_harness/") for n in names)
     assert not [n for n in names if {"tests", "fakes", "sasaah_csi"} & set(n.split("/"))]
+
+
+def _built_wheel_names(tmp_path: Path) -> list[str]:
+    uv = shutil.which("uv")
+    assert uv is not None
+    assert asyncio.run(_build_wheel(uv, tmp_path)) == 0
+    wheels = list(tmp_path.glob("eng_harness-*.whl"))
+    assert len(wheels) == 1
+    with zipfile.ZipFile(wheels[0]) as wheel:
+        names = wheel.namelist()
+    assert any(n.startswith("eng_harness/") for n in names)
+    return names
+
+
+def test_idea_fake_not_shipped(tmp_path: Path) -> None:
+    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_idea"
+    assert (fake / "server.py").is_file()
+    assert (fake / "schemas.json").is_file()
+    names = _built_wheel_names(tmp_path)
+    assert not [n for n in names if {"tests", "fakes", "sasaah_idea"} & set(n.split("/"))]

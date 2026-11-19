@@ -28,5 +28,30 @@
     "id": "edit_cycle_readback_result.pass",
     "version": 2,
     "code_sha256": "977dd002b83bf608e92281107ed0206fd68cc669d9bf321d9ce609e6c68339f9"
+  },
+  {
+    "id": "footing_fix_strategy.bearing_only",
+    "version": 1,
+    "code_sha256": "49988aec153b2e9295a4256add37508e2d0fb230d30d2787e517a3d1407df678"
+  },
+  {
+    "id": "footing_fix_strategy.development_only",
+    "version": 1,
+    "code_sha256": "49988aec153b2e9295a4256add37508e2d0fb230d30d2787e517a3d1407df678"
+  },
+  {
+    "id": "footing_fix_strategy.limits_reached",
+    "version": 1,
+    "code_sha256": "49988aec153b2e9295a4256add37508e2d0fb230d30d2787e517a3d1407df678"
+  },
+  {
+    "id": "footing_fix_strategy.shear_only",
+    "version": 1,
+    "code_sha256": "49988aec153b2e9295a4256add37508e2d0fb230d30d2787e517a3d1407df678"
+  },
+  {
+    "id": "footing_fix_strategy.steel_only",
+    "version": 1,
+    "code_sha256": "49988aec153b2e9295a4256add37508e2d0fb230d30d2787e517a3d1407df678"
   }
 ]

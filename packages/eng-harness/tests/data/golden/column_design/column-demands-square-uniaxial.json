@@ -1,0 +1,455 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.2 (rules E3 to E5); synthetic data, no project value",
+  "method_ref": "\u00a74.4.2 E3",
+  "synthetic": true,
+  "derivation": "Square symmetric column C1: section C40 (b = 400 mm, h = 400 mm, length_mm = 3500.0 mm), layout n_bars_b = 4, n_bars_h = 4, A_bar = 314.0 mm2, d_prime = 50.0 mm. Ag_mm2 = 400 * 400 = 160000.0. Bar count = 2*4 + 2*4 - 4 = 12, so Ast_mm2 = 314.0 * 12 = 3768.0. Since b_mm == h_mm and n_bars_b == n_bars_h, axial_flexure_uniaxial items take Mu_kNm = |M3_kNm| and Mu_other_kNm = |M2_kNm|: at station 0.0, P = -800, M2 = 0, M3 = -60 gives Pu = 800.0, Mu = 60.0, Mu_other = 0.0; at station 3500.0, P = -800, M2 = -15, M3 = 0 gives Pu = 800.0, Mu = 0.0, Mu_other = 15.0.",
+  "input": {
+    "selection": {
+      "calc": {
+        "id": "harness.column_select",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.column_select",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "columns": [
+        {
+          "frame_id": "C1",
+          "section": "C40",
+          "shape": "rectangular",
+          "material": "C30",
+          "story": "L1",
+          "length_mm": 3500.0
+        }
+      ],
+      "excluded": [],
+      "issues": []
+    },
+    "forces": {
+      "sign_convention": "host_local/1",
+      "rows": [
+        {
+          "member": "C1",
+          "case": {
+            "case": "ULS1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "end": "i",
+          "station_mm": 0.0,
+          "P_kN": -800.0,
+          "V2_kN": 0.0,
+          "V3_kN": 0.0,
+          "T_kNm": 0.0,
+          "M2_kNm": 0.0,
+          "M3_kNm": -60.0
+        },
+        {
+          "member": "C1",
+          "case": {
+            "case": "ULS1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "end": "j",
+          "station_mm": 3500.0,
+          "P_kN": -800.0,
+          "V2_kN": 0.0,
+          "V3_kN": 0.0,
+          "T_kNm": 0.0,
+          "M2_kNm": -15.0,
+          "M3_kNm": 0.0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "C40",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400.0,
+            "h_mm": 400.0
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "layouts": {
+      "sections": [
+        {
+          "section": "C40",
+          "transverse_kind": "tied",
+          "n_bars_b": 4,
+          "n_bars_h": 4,
+          "A_bar": {
+            "source": "input",
+            "value": 314.0,
+            "unit": "mm2"
+          },
+          "d_prime": {
+            "source": "input",
+            "value": 50.0,
+            "unit": "mm"
+          }
+        }
+      ]
+    },
+    "combinations": [
+      "ULS1"
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "materials.concrete_fc_MPa": {
+          "value": 30.0,
+          "unit": "MPa",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "materials.rebar_fy_MPa": {
+          "value": 420.0,
+          "unit": "MPa",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "columns.effective_length_factor_ratio": {
+          "value": 1.0,
+          "unit": "1",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "limits.ratio_limit_ratio": {
+          "value": 1.0,
+          "unit": "1",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "selection": "res_01KCD000000000000000000001",
+    "forces": "res_01KCD000000000000000000002",
+    "sections": "res_01KCD000000000000000000003",
+    "layouts": "res_01KCD000000000000000000004",
+    "combinations": "res_01KCD000000000000000000005",
+    "basis": "res_01KCD000000000000000000006"
+  },
+  "expected": {
+    "items": {
+      "aci318_14.22_4_2_1.max_axial_strength": [
+        {
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 0.0,
+            "case": "ULS1"
+          },
+          "inputs": {
+            "Pu_kN": 800.0,
+            "b_mm": 400.0,
+            "h_mm": 400.0,
+            "Ast_mm2": 3768.0,
+            "fc_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.concrete_fc_MPa/value"
+            },
+            "fy_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.rebar_fy_MPa/value"
+            },
+            "transverse_kind": "tied",
+            "k_factor": {
+              "$ref": "res_01KCD000000000000000000006#/fields/columns.effective_length_factor_ratio/value"
+            },
+            "lu_mm": 3500.0,
+            "ratio_limit": {
+              "$ref": "res_01KCD000000000000000000006#/fields/limits.ratio_limit_ratio/value"
+            }
+          }
+        },
+        {
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 3500.0,
+            "case": "ULS1"
+          },
+          "inputs": {
+            "Pu_kN": 800.0,
+            "b_mm": 400.0,
+            "h_mm": 400.0,
+            "Ast_mm2": 3768.0,
+            "fc_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.concrete_fc_MPa/value"
+            },
+            "fy_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.rebar_fy_MPa/value"
+            },
+            "transverse_kind": "tied",
+            "k_factor": {
+              "$ref": "res_01KCD000000000000000000006#/fields/columns.effective_length_factor_ratio/value"
+            },
+            "lu_mm": 3500.0,
+            "ratio_limit": {
+              "$ref": "res_01KCD000000000000000000006#/fields/limits.ratio_limit_ratio/value"
+            }
+          }
+        }
+      ],
+      "aci318_14.22_4_1_1.axial_flexure_uniaxial": [
+        {
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 0.0,
+            "case": "ULS1"
+          },
+          "inputs": {
+            "Pu_kN": 800.0,
+            "Mu_kNm": 60.0,
+            "Mu_other_kNm": 0.0,
+            "b_mm": 400.0,
+            "h_mm": 400.0,
+            "d_prime_mm": 50.0,
+            "n_bars_b": 4,
+            "n_bars_h": 4,
+            "A_bar_mm2": 314.0,
+            "fc_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.concrete_fc_MPa/value"
+            },
+            "fy_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.rebar_fy_MPa/value"
+            },
+            "transverse_kind": "tied",
+            "k_factor": {
+              "$ref": "res_01KCD000000000000000000006#/fields/columns.effective_length_factor_ratio/value"
+            },
+            "lu_mm": 3500.0,
+            "ratio_limit": {
+              "$ref": "res_01KCD000000000000000000006#/fields/limits.ratio_limit_ratio/value"
+            }
+          }
+        },
+        {
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 3500.0,
+            "case": "ULS1"
+          },
+          "inputs": {
+            "Pu_kN": 800.0,
+            "Mu_kNm": 0.0,
+            "Mu_other_kNm": 15.0,
+            "b_mm": 400.0,
+            "h_mm": 400.0,
+            "d_prime_mm": 50.0,
+            "n_bars_b": 4,
+            "n_bars_h": 4,
+            "A_bar_mm2": 314.0,
+            "fc_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.concrete_fc_MPa/value"
+            },
+            "fy_MPa": {
+              "$ref": "res_01KCD000000000000000000006#/fields/materials.rebar_fy_MPa/value"
+            },
+            "transverse_kind": "tied",
+            "k_factor": {
+              "$ref": "res_01KCD000000000000000000006#/fields/columns.effective_length_factor_ratio/value"
+            },
+            "lu_mm": 3500.0,
+            "ratio_limit": {
+              "$ref": "res_01KCD000000000000000000006#/fields/limits.ratio_limit_ratio/value"
+            }
+          }
+        }
+      ],
+      "aci318_14.10_6_1_1.longitudinal_reinforcement_limits": [
+        {
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": null,
+            "case": null
+          },
+          "inputs": {
+            "Ag_mm2": 160000.0,
+            "Ast_mm2": 3768.0,
+            "ratio_limit": {
+              "$ref": "res_01KCD000000000000000000006#/fields/limits.ratio_limit_ratio/value"
+            }
+          }
+        }
+      ]
+    },
+    "not_checked": []
+  },
+  "expected_trace": {
+    "e3_e5_steps": {
+      "col_0_b_mm": {
+        "value": 400.0,
+        "unit": "mm",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "sections"
+        ],
+        "formula": "section.shape.b_mm"
+      },
+      "col_0_h_mm": {
+        "value": 400.0,
+        "unit": "mm",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "sections"
+        ],
+        "formula": "section.shape.h_mm"
+      },
+      "col_0_Ag_mm2": {
+        "value": 160000.0,
+        "unit": "mm2",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "col_0_b_mm",
+          "col_0_h_mm"
+        ],
+        "formula": "b_mm * h_mm"
+      },
+      "col_0_n_bars_b": {
+        "value": 4,
+        "unit": "1",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "layouts"
+        ],
+        "formula": "layout.n_bars_b"
+      },
+      "col_0_n_bars_h": {
+        "value": 4,
+        "unit": "1",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "layouts"
+        ],
+        "formula": "layout.n_bars_h"
+      },
+      "col_0_A_bar_mm2": {
+        "value": 314.0,
+        "unit": "mm2",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "layouts"
+        ],
+        "formula": "layout A_bar converted to mm2"
+      },
+      "col_0_d_prime_mm": {
+        "value": 50.0,
+        "unit": "mm",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "layouts"
+        ],
+        "formula": "layout d_prime converted to mm"
+      },
+      "col_0_Ast_mm2": {
+        "value": 3768.0,
+        "unit": "mm2",
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "col_0_A_bar_mm2",
+          "col_0_n_bars_b",
+          "col_0_n_bars_h",
+          "c_half",
+          "c_corner"
+        ],
+        "formula": "A_bar_mm2 * (c_half * n_bars_b + c_half * n_bars_h - c_corner)"
+      },
+      "col_0_lu_mm": {
+        "value": 3500.0,
+        "unit": "mm",
+        "source": "spec 0013 4.4.2 E4",
+        "uses": [
+          "selection"
+        ],
+        "formula": "selection.length_mm"
+      },
+      "col_0_transverse_kind": {
+        "value": "tied",
+        "unit": null,
+        "source": "spec 0013 4.4.2 E5",
+        "uses": [
+          "layouts"
+        ],
+        "formula": "tied (spirals NOT_IMPLEMENTED, spec 0013 \u00a76)"
+      },
+      "col_0_row_0_Pu_kN": {
+        "value": 800.0,
+        "unit": "kN",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "-P_kN (host_local/1: host axial tension positive; check axial compression positive)"
+      },
+      "col_0_row_0_Mu_kNm": {
+        "value": 60.0,
+        "unit": "kN.m",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "|M3_kNm|"
+      },
+      "col_0_row_0_Mu_other_kNm": {
+        "value": 0.0,
+        "unit": "kN.m",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "|M2_kNm|"
+      },
+      "col_0_row_1_Pu_kN": {
+        "value": 800.0,
+        "unit": "kN",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "-P_kN (host_local/1: host axial tension positive; check axial compression positive)"
+      },
+      "col_0_row_1_Mu_kNm": {
+        "value": 0.0,
+        "unit": "kN.m",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "|M3_kNm|"
+      },
+      "col_0_row_1_Mu_other_kNm": {
+        "value": 15.0,
+        "unit": "kN.m",
+        "source": "spec 0013 4.4.2 E3",
+        "uses": [
+          "forces"
+        ],
+        "formula": "|M2_kNm|"
+      }
+    }
+  }
+}
