@@ -42,3 +42,39 @@ def test_fake_schemas_match_inventory() -> None:
     assert set(actual_schemas) == expected_names
     assert actual_schemas == expected_schemas
     assert actual_kinds == expected_kinds
+
+
+def test_fake_process_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC21: the running IDEA fake process serves the exact inventory schemas with or without --disable-script."""
+    import json
+
+    from fakes.sasaah_idea.test_server import Rpc
+
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    by_name = {t["name"]: t["input_schema"] for t in inventory["tools"]}
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"faults": [], "seed": {}}), encoding="utf-8")
+
+    disabled = Rpc(control, args=("--disable-script", "--call-timeout-sec", "30"))
+    try:
+        listed = disabled.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        assert len(listed) == len(actual)
+        assert set(actual) == SERVED_TOOLS
+        assert actual == {name: by_name[name] for name in SERVED_TOOLS}
+    finally:
+        disabled.close()
+
+    enabled = Rpc(control, args=("--call-timeout-sec", "30"))
+    try:
+        listed = enabled.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected_names = SERVED_TOOLS | {SCRIPT_TOOL}
+        assert len(listed) == len(actual)
+        assert set(actual) == expected_names
+        assert actual == {name: by_name[name] for name in expected_names}
+    finally:
+        enabled.close()
