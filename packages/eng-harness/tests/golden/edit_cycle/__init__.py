@@ -1,4 +1,3 @@
-from eng_contract.refs import parse_ref
 """Golden cases of the edit-cycle calcs (plan 0007 T2; spec 0007 section 3.2): loader and runner, test support.
 
 A case file holds one hand-derived case of a calc of spec 0007 section 4.4: the input as the resolved payloads, the
@@ -11,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_harness.calc import InputMeta, RefMeta, TraceBuilder

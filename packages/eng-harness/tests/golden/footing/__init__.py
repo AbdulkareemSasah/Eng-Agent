@@ -1,4 +1,3 @@
-from eng_contract.refs import parse_ref
 """Golden cases of the footing calcs (plan 0010 T3; spec 0010 section 3.3): loader and lint, test support.
 
 A case file holds one hand-derived case of a calc of spec 0010 section 4.4: the input as the resolved payloads, the
@@ -10,6 +9,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_harness.calc import InputMeta, RefMeta

@@ -1,4 +1,3 @@
-from eng_contract.refs import parse_ref
 """Golden cases of the column-workflow calcs (plan 0013 T2; spec 0013 section 3.2): loader, test support.
 
 A case file `<prefix>-<name>.json` holds one hand-derived case of a calc of spec 0013 section 4.4: the input as the
@@ -11,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_harness.calc import InputMeta, RefMeta
