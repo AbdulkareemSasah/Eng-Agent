@@ -546,9 +546,7 @@
    "branch": "feat/b189-harness-it15-basis-confirmation-screen-setup",
    "prTitle": "feat(eng-harness): basis confirmation screen, setup log and its place in run (B-189)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
@@ -565,9 +563,7 @@
    "branch": "feat/b190-harness-it16-commands-status-stop-report",
    "prTitle": "feat(eng-harness): commands status, stop, report and doctor (B-190)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
@@ -610,7 +606,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 441
   },
   {
    "id": "B-429",
@@ -641,7 +638,6 @@
    "prTitle": "feat(eng-harness): production wiring: the decision, progress and run-control ports reach the real engine (B-430)",
    "risk": "r3",
    "pending_deps": [
-    "I.T14b",
     "I.T16"
    ],
    "writer": "sonnet, high",
@@ -701,7 +697,6 @@
    "prTitle": "feat(eng-harness): bind the CliDeps defaults to the merged real implementations, except the port builder (B-433)",
    "risk": "r3",
    "pending_deps": [
-    "I.T14b",
     "I.T15",
     "I.T16",
     "I.T16b",
@@ -1166,7 +1161,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 445
   },
   {
    "id": "B-282",
@@ -1178,9 +1174,7 @@
    "branch": "feat/b282-harness-gt3-calc-harness-column-demands",
    "prTitle": "feat(eng-harness): calc harness.column_demands (sign, axes, length, layout, not-checked reasons) (B-282)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T2"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1197,9 +1191,7 @@
    "branch": "feat/b283-harness-gt4-calc-harness-column-review",
    "prTitle": "feat(eng-harness): calc harness.column_review (members, governing references, changes) (B-283)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T2"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1217,8 +1209,7 @@
    "prTitle": "feat(eng-harness): calcs harness.column_section_match and harness.column_change_set (B-284)",
    "risk": "r1, r3",
    "pending_deps": [
-    "C.T11",
-    "G.T2"
+    "C.T11"
    ],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
@@ -1236,9 +1227,7 @@
    "branch": "feat/b285-harness-gt6-code-pack-route-in",
    "prTitle": "feat(eng-harness): code-pack route in the CalcPort for the three ACI 318-14 column checks (B-285)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "Z.T5"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1256,7 +1245,6 @@
    "prTitle": "feat(eng-harness): calc harness.revit_column_update (plan of Revit type changes by reference) (B-286)",
    "risk": "r1, r3",
    "pending_deps": [
-    "G.T2",
     "R.T12",
     "R.T6"
    ],
@@ -1464,9 +1452,7 @@
    "branch": "feat/b326-codes-yt2-clause-map-module-footing",
    "prTitle": "feat(structural-codes): clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check (B-326)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "Z.T5"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1603,7 +1589,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 331
   },
   {
    "id": "B-196",
@@ -3056,7 +3043,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-487: second half of the T19 split of amendment B-475 (budget 120, two sessions); off the first-live-run path; plan 0008 T1 also edits build_ports after T19a: whichever of the two lands second adapts to the other"
-   ]
+   ],
+   "merged_pr": 438
   },
   {
    "id": "B-491",

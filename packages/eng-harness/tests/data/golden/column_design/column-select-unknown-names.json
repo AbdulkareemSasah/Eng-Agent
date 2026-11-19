@@ -1,0 +1,138 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.1 (rules L1 to L3) and spec 0003 section 4.11 P2; synthetic data, no project value",
+  "method_ref": "§4.4.1 L1",
+  "synthetic": true,
+  "derivation": "t = 5 mm. L1 by names [C9, C1, B9]: C1 is a frame; C9 and B9 are not, each an error issue UNKNOWN_FRAME, sorted by code then name (B9, C9). L2: C1 plan d^2 = 0: column; L3 C40 rectangular C30, L1, length 3000.0. An error issue makes status FAIL although one column is selected.",
+  "input": {
+    "scope": {
+      "frames": [
+        "C9",
+        "C1",
+        "B9"
+      ],
+      "combinations": [
+        "ULS1"
+      ],
+      "special_seismic": false
+    },
+    "frames": {
+      "frames": [
+        {
+          "id": "C1",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 0,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        },
+        {
+          "id": "C2",
+          "kind": "other",
+          "section": "C40",
+          "i": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 0
+          },
+          "j": {
+            "x_mm": 6000,
+            "y_mm": 0,
+            "z_mm": 3000
+          },
+          "story": "L1",
+          "rotation_deg": 0
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [
+        {
+          "name": "B30",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 300,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C40",
+          "material": "C30",
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
+        },
+        {
+          "name": "C50",
+          "material": "C35",
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
+        },
+        {
+          "name": "W1",
+          "material": "S355",
+          "shape": {
+            "type": "other",
+            "host_shape": "SD Section"
+          }
+        }
+      ],
+      "area_sections": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 5,
+          "unit": "mm",
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "scope": "res_01KCC000000000000000000001",
+    "frames": "res_01KCC000000000000000000002",
+    "sections": "res_01KCC000000000000000000003",
+    "basis": "res_01KCC000000000000000000004"
+  },
+  "expected": {
+    "status": "FAIL",
+    "columns": [
+      {
+        "frame_id": "C1",
+        "section": "C40",
+        "shape": "rectangular",
+        "material": "C30",
+        "story": "L1",
+        "length_mm": 3000.0
+      }
+    ],
+    "excluded": [],
+    "issues": [
+      {
+        "code": "UNKNOWN_FRAME",
+        "name": "B9"
+      },
+      {
+        "code": "UNKNOWN_FRAME",
+        "name": "C9"
+      }
+    ]
+  }
+}

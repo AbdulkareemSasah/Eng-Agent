@@ -11,6 +11,11 @@
       "version": 1
     },
     {
+      "content_sha256": "251dc3fd5b87383bab01df5f82e64586364f345077738f07e1df693bd29a0466",
+      "id": "harness.column_select",
+      "version": 1
+    },
+    {
       "content_sha256": "0b56412219fbf2d02e0c5d777f26e37326519ebb571979eba511b9153500e7ca",
       "id": "harness.design_summary",
       "version": 1
@@ -18,6 +23,16 @@
     {
       "content_sha256": "52379aa811fb041751761ac72dba266e505a8b4426ea4efb475c444b72ddb734",
       "id": "harness.expected_effects",
+      "version": 1
+    },
+    {
+      "content_sha256": "23fa251acf8db7eb33bb8df973c131311f352c8642ee23fdf3e8adcca3cccb92",
+      "id": "harness.footing_schedule",
+      "version": 1
+    },
+    {
+      "content_sha256": "8a519748016162426331a534329e7445e2653cc3ccf5703aefea704f160a78e5",
+      "id": "harness.footing_status",
       "version": 1
     },
     {
@@ -43,6 +58,11 @@
     {
       "content_sha256": "772886bb74582a826c25e48d528aa8687abdcedfbdbc07912ca9eabfec097c2b",
       "id": "harness.readback_check",
+      "version": 1
+    },
+    {
+      "content_sha256": "d9bc4cd342568f17a6e0822a1e9eeddfabc8a34722fa733985d6a177cd917425",
+      "id": "harness.section_round",
       "version": 1
     }
   ],
