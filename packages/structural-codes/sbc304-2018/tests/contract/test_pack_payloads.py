@@ -1,11 +1,12 @@
 """Contract test: every SBC check returns only NEEDS_ENGINEER draft verdicts (plan 0003 T3; AC15)."""
 
-from typing import Any
+from typing import Any, cast
 
 from eng_contract.canonical import canonical_json
 from eng_contract.kinds.verdicts import VerdictSet
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
 from structural_codes import evaluate
+from structural_codes.overlay import Inherited, Overlay, Overridden
 from structural_codes.pack import Registry
 
 from sbc304_2018 import PACK, check_id_for
@@ -155,7 +156,9 @@ _CASES: dict[str, tuple[str, dict[str, Any]]] = {
 def test_needs_engineer_payloads() -> None:
     """Each check's payload validates as verdicts.set/1, is draft and holds only NEEDS_ENGINEER (AC15)."""
     registry = Registry.of([next(p for p in Registry.discover().packs if p.name == "aci318_14"), PACK])
-    assert set(_CASES) == {entry.base_check_id for entry in PACK.overlay.entries}  # type: ignore[union-attr]
+    overlay = cast("Overlay", PACK.overlay)
+    base_ids = {entry.base_check_id for entry in overlay.entries if isinstance(entry, Inherited | Overridden)}
+    assert set(_CASES) == base_ids
     for base_id, (kind, inputs) in sorted(_CASES.items()):
         check_id = check_id_for(base_id)
         payload = evaluate(
