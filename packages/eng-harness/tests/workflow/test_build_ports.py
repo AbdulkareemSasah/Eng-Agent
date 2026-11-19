@@ -1,6 +1,10 @@
 """Production CSI wiring contracts (plan 0002 T19a; AC41, AC43 to AC45)."""
 
+import hashlib
 import json
+import shutil
+import stat
+import sys
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -10,18 +14,49 @@ import pytest
 from eng_contract.envelope import SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode, Precondition, WarningCode
 from eng_contract.refs import RefRule, resolve_ref
-from fakes.sasaah_csi.wiring import config, rig
+from fakes.sasaah_csi.wiring import Rig, config, rig
 
 from eng_harness.adapters import AllowlistError, load_allowlist
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.csi import csi_allowlist
-from eng_harness.errors import NotImplementedGap
-from eng_harness.servers import CallEffect
+from eng_harness.engine import RunStatus
+from eng_harness.journal import _events as ev
+from eng_harness.servers import CallEffect, ConfigError, ServersConfig
+
+CLI_FAKES = Path(__file__).resolve().parents[1] / "fakes" / "sasaah_cli"
+CLI_OP = "op_0123456789abcdef0123456789abcdef"
 
 
 async def opened(r: Any, p: Any) -> None:
     result = await p.tool_port.call("csi_open_model", {"model": "m"}, op_id="open", model="m")
     assert isinstance(result, SuccessEnvelope), result
+
+
+def with_cli_tools(r: Rig, root: Path, **release: Any) -> ServersConfig:
+    """The CSI configuration of `r` plus three `[cli_tools.*]` entries over the Python stand-ins of the scripts."""
+    tools = root / "cli-tools"
+    shutil.copytree(CLI_FAKES, tools)
+    shell = root / "pwsh"  # takes the PowerShell switches and runs the script in Python
+    shell.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{tools / "pwsh.py"}" "$@"\n')
+    shell.chmod(shell.stat().st_mode | stat.S_IXUSR)
+    artifact = root / "prep.exe"
+    artifact.write_bytes(b"cached-cli-v1")
+    pin = {"path": str(artifact), "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()}
+
+    def entry(script: str, output: str) -> dict[str, Any]:
+        return {
+            "shell": str(shell), "script": str(tools / script), "outputs": [output], "timeout_s": 20,
+            "build_artifacts": [pin],
+        }  # fmt: skip
+
+    entries = {
+        "dxf-prep/prepare": entry("run_prepare.py", "prepared.json"),
+        "dxf-prep/inspect": entry("run_inspect.py", "inspection.json"),
+        "etabs-model/build": entry("run_build.py", "model.json") | release,
+    }
+    return config(r.control).model_copy(
+        update={"cli_tools": ServersConfig.model_validate({"cli_tools": entries}).cli_tools}
+    )
 
 
 def test_allowlist_loaded_for_route(tmp_path: Path) -> None:
@@ -65,15 +100,30 @@ def test_allowlist_loaded_for_the_servers_product(tmp_path: Path) -> None:
     assert (want.product, want.tool_fingerprint, want.tool_names) == ("SAFE", "c" * 64, frozenset({"csi_status"}))
 
 
-def test_cli_tools_not_wired_gap(tmp_path: Path) -> None:
+def test_cli_tool_routed_through_build_ports(tmp_path: Path) -> None:
+    """AC43: a `[cli_tools.*]` entry is served by the command-line adapter, a CSI tool still by the CSI one."""
     r = rig(tmp_path)
-    cfg = config(r.control).model_copy(update={"cli_tools": {"prepare": object(), "build": object()}})
-    with pytest.raises(NotImplementedGap) as error:
-        r.ports(config=cfg)
-    assert error.value.code.value == "NOT_IMPLEMENTED"
-    assert all(word in str(error.value) for word in ("H-G8", "prepare", "build"))
-    assert not r.run_dir.exists()
-    assert r.calls("csi_launch") == []
+    cfg = with_cli_tools(r, tmp_path)
+    dxf = tmp_path / "plan.dxf"
+    dxf.write_bytes(b"0\nSECTION\n")
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            prepare = await p.tool_port.describe("dxf-prep/prepare")
+            assert (prepare.effect, prepare.action, prepare.host_key) == ("read", "plain", "dxf-prep")
+            assert prepare.engineering_params == ("SnapTol_mm", "BeamSpacing_mm", "ColumnGrow_mm")
+            build = await p.tool_port.describe("etabs-model/build")
+            assert (build.effect, build.host_key) == ("write", "etabs-model")
+            assert (await p.tool_port.describe("csi_open_model")).host_key == "csi"
+            args = {"dxf": str(dxf), "SnapTol_mm": r.value("SnapTol_mm", 5.0)}
+            done = await p.tool_port.call("dxf-prep/prepare", args, op_id=CLI_OP, model=None)
+            assert isinstance(done, SuccessEnvelope), done
+            assert done.kind == "harness.cli_run/1"
+            echoed = json.loads((r.run_dir / "tools" / CLI_OP / "prepared.json").read_text())["args"]
+            assert echoed == {"OutDir": str(r.run_dir / "tools" / CLI_OP), "Dxf": str(dxf), "SnapTol": "0.005"}
+            await opened(r, p)  # the CSI tools are served as before
+
+    anyio.run(body)
 
 
 def test_binder_from_host_port(tmp_path: Path) -> None:
@@ -433,3 +483,85 @@ def test_platform_defaults_and_host_metadata(tmp_path: Path, monkeypatch: pytest
     cfg = config(r.control).model_copy(update={"host_programs": {}})
     with pytest.raises(ConfigError, match=r"host_programs\.etabs"):
         adapters.build_ports(cfg, r.workspace, r.store, r.run_dir, r.clock, r.ids)
+
+
+def test_routed_port_methods(tmp_path: Path) -> None:
+    """AC43: every `ToolPort` method of a command-line tool reaches the command-line adapter, the rest the CSI one."""
+    r = rig(tmp_path)
+    record = "docs/gaps/cli-gap.md"
+    cfg = with_cli_tools(r, tmp_path, release="unreleased", release_record=record)
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            tools = p.tool_port
+            assert tools.unreleased_tools() == {"etabs-model/build": record}
+            assert tools.supports_reconcile("etabs-model/build") is True  # reconciled by its completion record
+            assert tools.supports_reconcile("dxf-prep/prepare") is False  # it writes nothing
+            assert tools.supports_reconcile("csi_assign_frame_section") is True
+            args = {"config": str(tmp_path / "build.json")}
+            assert (await tools.reconcile("etabs-model/build", args, CLI_OP)).outcome == "not_applied"
+            (r.run_dir / "tools" / CLI_OP).mkdir(parents=True)
+            (r.run_dir / "tools" / CLI_OP / "complete.json").write_text('{"exit_code": 0}')
+            assert (await tools.reconcile("etabs-model/build", args, CLI_OP)).outcome == "applied"
+            assert await tools.read_back("etabs-model/build", args) is None
+            shown = await tools.preview("etabs-model/build", args)
+            assert [(i.id, i.label, i.refs) for i in shown.items] == [
+                ("etabs-model/build", "etabs-model/build: command-line tool", ())
+            ]
+            assert (shown.models, shown.diff_ref) == ((), None)
+            await opened(r, p)
+            edit = {"model": "m", "frame": "F1", "section": "C40"}
+            assert len((await tools.preview("csi_assign_frame_section", edit)).items[0].refs) == 2
+            with pytest.raises(ContractError) as unknown:
+                await tools.describe("dxf-prep/other")
+            assert unknown.value.detail.code is ErrorCode.INVALID_ARGUMENT
+            assert r.calls("csi_assign_frame_section") == []  # the preview sent no write
+
+    anyio.run(body)
+
+
+def test_cli_tool_without_adapter_is_config_error(tmp_path: Path) -> None:
+    """A `[cli_tools.*]` entry the adapter has no argument model for is refused, never dropped."""
+    r = rig(tmp_path)
+    cfg = with_cli_tools(r, tmp_path)
+    cfg = cfg.model_copy(update={"cli_tools": {**cfg.cli_tools, "dxf-prep/other": cfg.cli_tools["dxf-prep/inspect"]}})
+    with pytest.raises(ConfigError, match="cli_tools: no command-line adapter for dxf-prep/other") as error:
+        r.ports(config=cfg)
+    assert error.value.key == "cli_tools"
+    assert not r.run_dir.exists()
+    assert r.calls("csi_launch") == []
+
+
+def test_no_cli_tools_keeps_csi_port(tmp_path: Path) -> None:
+    """Without `[cli_tools.*]` entries the tool port is the CSI port itself."""
+    r = rig(tmp_path)
+    assert type(r.ports().tool_port).__name__ == "CsiToolPort"
+    assert type(r.ports(config=with_cli_tools(r, tmp_path)).tool_port).__name__ == "_RoutedTools"
+
+
+def test_cli_tools_in_engine_run(tmp_path: Path) -> None:
+    """A run's steps on a command-line tool go through the engine to the adapter, journaled as tool steps."""
+    r = rig(tmp_path)
+    cfg = with_cli_tools(r, tmp_path)
+    folder = tmp_path / "inputs"
+    folder.mkdir()
+    (folder / "plan.dxf").write_bytes(b"dxf")
+    (folder / "build.json").write_text(json.dumps({"dxf": "plan.dxf"}))
+    steps = [
+        ("dxf-prep/inspect", {"dxf": str(folder / "plan.dxf")}),
+        ("etabs-model/build", {"config": str(folder / "build.json")}),
+    ]
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            result = await r.engine(p, steps).start(r.request())
+            assert result.status is RunStatus.COMPLETED, result
+            started = [e.payload.name for e in r.events() if isinstance(e.payload, ev.StepStarted)]
+            assert [name for name in started if "/" in name] == [name for name, _ in steps]
+            run = r.run_dir / "tools"
+            assert sorted(f.name for d in run.iterdir() for f in d.iterdir() if f.name.endswith(".json")) == [
+                "build.json", "complete.json", "inspection.json", "model.json",
+            ]  # fmt: skip
+            assert r.calls("csi_launch") == []
+
+    anyio.run(body)

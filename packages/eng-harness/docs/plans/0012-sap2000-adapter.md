@@ -190,9 +190,11 @@ typed read-back, the table-read-back edits as gap SP-4, reconcile by geometry.
 **T6 Analysis, results, design** (AC14 to AC16). Long-role analysis after save, the result kinds, steel and concrete
 design runs, steel results, concrete non-beam results as SP-3, `aluminum` and `coldformed` refused before any call.
 
-**T7 End to end** (AC18, AC19). Cycle block, crash matrix, recorded-reply contract tests (skipped with a reason until
-the owner commits SAP2000 recordings), the SAP2000 part of `docs/local-testing.md` (spec §12 L1 to L8). If plan 0008 T8
-has not created that file, T7 creates it with the SAP2000 part only.
+**T7 End to end** (AC18, AC19). Cycle block, crash matrix, recorded-reply contract tests (run on every applicable
+committed recording under `acceptance/recordings` and on the synthetic recording produced by record mode for that
+adapter; verified against the real server only once the owner commits SAP2000 recordings, spec §12 item L9; amendment
+B-573), the SAP2000 part of `docs/local-testing.md` (spec §12 L1 to L9; amendment B-573). If plan 0008 T8 has not
+created that file, T7 creates it with the SAP2000 part only.
 
 **T8 Tables and loads (blocked, not in the front matter).** Starts only after the owner has run L4 and committed
 recordings, and decided Q3 and Q5. Then: table entries `unknown` to `reference` or `candidate`, the load and
