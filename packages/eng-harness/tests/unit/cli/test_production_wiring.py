@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,6 +12,7 @@ import pytest
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from helpers.cli_deps import WORKFLOW, FakeCalc, FakeInput, FakeOutput, Placeholder, Rig, completes
+from pydantic import JsonValue
 from workflows.rig import Host
 
 from eng_harness._kinds import HARNESS_KINDS
@@ -20,11 +21,12 @@ from eng_harness.block import Registry, workflow
 from eng_harness.cli import ExitCode
 from eng_harness.cli._control import FileRunControl
 from eng_harness.cli._wiring import IsolatingFanOut, RunIdCell, RunPortSet, default_engine_factory, heartbeat_run_dir
+from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
 from eng_harness.engine import EngineSettings
 from eng_harness.journal import Event, EventType
 from eng_harness.journal import _events as ev
 from eng_harness.pages import PageApprovalPort
-from eng_harness.ports import ApprovalPort, ApprovalRequest, CalcPort, InputPort, RunClass
+from eng_harness.ports import ApprovalPort, ApprovalRequest, CalcPort, DecisionPort, InputPort, RunClass
 from eng_harness.progress import ExpectedTimes, Heartbeat, ProgressRenderer, TerminalProgress
 
 SHA = "a" * 64
@@ -33,17 +35,19 @@ RUN_ID = "run_" + "0" * 26
 
 
 class _FakeDecisionPort:
-    def __init__(self, summary: dict[str, object] | None = None) -> None:
-        self._summary = summary or {"providers": ["ok"]}
+    """A DecisionPort that only supplies `runtime_summary` for production-wiring checks."""
 
-    async def decide(self, call: object) -> object:
+    def __init__(self, summary: Mapping[str, JsonValue]) -> None:
+        self._summary = dict(summary)
+
+    async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
         raise AssertionError("not called")
 
-    async def decide_many(self, calls: Sequence[object]) -> list[object]:
+    async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
         raise AssertionError("not called")
 
-    def runtime_summary(self) -> dict[str, object]:
-        return dict(self._summary)
+    def runtime_summary(self) -> Mapping[str, JsonValue]:
+        return self._summary
 
 
 class _Recording:
@@ -117,7 +121,7 @@ def test_engine_ports_carry_stop_progress_and_cascade(tmp_path: Path) -> None:
     page = PageApprovalPort(engineer="ada", stop_requested=lambda: False)
     progress = IsolatingFanOut([terminal, page.hub], cell=cell)
     control = FileRunControl(runs)
-    decision = _FakeDecisionPort({"providers": ["cascade"]})
+    decision: DecisionPort = _FakeDecisionPort({"providers": ["cascade"]})
 
     @workflow(name="noop_pw", version=1, description="Empty typed flow.")
     async def noop_pw(ctx: Any, inp: FakeInput) -> FakeOutput:
@@ -130,7 +134,7 @@ def test_engine_ports_carry_stop_progress_and_cascade(tmp_path: Path) -> None:
         basis=StoreBasisPort(store),
         approvals=cast(ApprovalPort, Placeholder()),
         inputs=cast(InputPort, Placeholder()),
-        decision=cast(Any, decision),
+        decision=decision,
         progress=progress,
         run_control=control,
     )
@@ -141,7 +145,8 @@ def test_engine_ports_carry_stop_progress_and_cascade(tmp_path: Path) -> None:
     assert held.decision is decision
     assert isinstance(held.run_control, FileRunControl)
 
-    assert cell.run_id is None
+    before = cell.run_id
+    assert before is None
     progress.emit(_header("run_" + "a" * 26))
     assert cell.run_id == "run_" + "a" * 26
     assert terminal.events[0].type is EventType.RUN_STARTED
