@@ -15,7 +15,8 @@ from eng_contract.ids import Clock, IdSource, SystemClock, SystemIdSource
 from eng_contract.store import ResultStore, Workspace, default_location_probe, resolve_workspace
 
 from eng_harness._calc._port import CalcRefusal
-from eng_harness.block import Registry
+from eng_harness.basis import FieldSpec
+from eng_harness.block import Registry, WorkflowDef
 from eng_harness.cli._config import HarnessConfig, load_config, resolve_config_path
 from eng_harness.cli._encoding import configure_streams
 from eng_harness.cli._exit import ExitCode
@@ -88,6 +89,7 @@ type DecisionAssembler = Callable[
     [ProvidersConfig, DecisionSettings, Workspace, Mapping[str, DecisionPolicy]], DecisionRuntime
 ]
 type DecisionPortFactory = Callable[[DecisionRuntime, HarnessConfig, Workspace, Clock, IdSource], DecisionPort]
+type BasisFieldsOf = Callable[[WorkflowDef[Any, Any]], Sequence[FieldSpec]]
 
 
 class DoctorRunner(Protocol):
@@ -130,6 +132,8 @@ class CliDeps:
         decision_assembler: Assembles the decision runtime in step 5 (plan 0006 T18a); `None` likewise.
         point_policies: Maps each decision point name to its `DecisionPolicy` (plan 0006 T18a); `None` likewise.
         decision_port_factory: Builds the `DecisionPort` from the assembled runtime (plan 0006 T18a); `None` likewise.
+        basis_fields_of: Returns the workflow's `FieldSpec` sequence for step 3 (plan 0006 T18a); `None` keeps a
+            workflow with required basis fields unavailable in this build.
         doctor: Runs `eng-harness doctor`; defaults to `eng_harness.doctor.run`.
     """
 
@@ -158,6 +162,7 @@ class CliDeps:
     decision_assembler: DecisionAssembler | None = None
     point_policies: Mapping[str, DecisionPolicy] | None = None
     decision_port_factory: DecisionPortFactory | None = None
+    basis_fields_of: BasisFieldsOf | None = None
     doctor: DoctorRunner = doctor_run
 
 
@@ -203,6 +208,7 @@ def main(argv: Sequence[str] | None = None, *, deps: CliDeps | None = None) -> i
 
 
 __all__ = [
-    "CalcPortFactory", "CliDeps", "ConfigError", "DecisionAssembler", "DecisionPortFactory", "DoctorRunner",
-    "ExitCode", "HarnessConfig", "HostedPorts", "PortBuilder", "ProvidersLoader", "RunCalcPort", "RunPorts", "main",
+    "BasisFieldsOf", "CalcPortFactory", "CliDeps", "ConfigError", "DecisionAssembler", "DecisionPortFactory",
+    "DoctorRunner", "ExitCode", "HarnessConfig", "HostedPorts", "PortBuilder", "ProvidersLoader", "RunCalcPort",
+    "RunPorts", "main",
 ]  # fmt: skip
