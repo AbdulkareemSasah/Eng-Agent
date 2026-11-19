@@ -213,3 +213,50 @@ def test_addin_hashes(tmp_path: Any) -> None:
     assert not missing.ok
     assert missing.reason is not None
     assert "add-in" in missing.reason
+
+
+def test_idea_status_flags() -> None:
+    """AC3: IDEA build check requires idea_status.read_only and script_enabled false; idea_run_script listed fails."""
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    want = allowlist.build_expectation()
+    assert want.product == "IDEA"
+    assert want.status_tool == "idea_status"
+    schemas = {name: {"type": "object"} for name in want.tool_names}
+    # Matching fingerprint over the served names with empty schemas would not equal the pinned one; use the live pin.
+    want = BuildExpectation(
+        sasaah_commit=want.sasaah_commit,
+        also_tested_commits=want.also_tested_commits,
+        tool_fingerprint=tool_list_fingerprint(schemas),
+        tool_names=want.tool_names,
+        product="IDEA",
+        status_tool="idea_status",
+    )
+    pin = BuildPin(sasaah_commit=want.sasaah_commit, exe_sha256=EXE)
+    ok = Observed(
+        exe_sha256=EXE,
+        server_info=types.Implementation(name="idea", version="0.1.0"),
+        tools=schemas,
+        status={"read_only": False, "script_enabled": False},
+    )
+    assert check_build("idea", pin, want, ok, product="IDEA").ok is True
+
+    script_on = replace(ok, status={"read_only": False, "script_enabled": True})
+    failed = check_build("idea", pin, want, script_on, product="IDEA")
+    assert failed.ok is False
+    assert failed.reason is not None
+    assert "script_enabled" in failed.reason
+    assert "idea_status" in failed.reason
+
+    read_only = replace(ok, status={"read_only": True, "script_enabled": False})
+    failed_ro = check_build("idea", pin, want, read_only, product="IDEA")
+    assert failed_ro.ok is False
+    assert failed_ro.reason is not None
+    assert "read_only" in failed_ro.reason
+
+    with_script = replace(ok, tools={**schemas, "idea_run_script": {"type": "object"}})
+    failed_hatch = check_build("idea", pin, want, with_script, product="IDEA")
+    assert failed_hatch.ok is False
+    assert failed_hatch.reason is not None
+    assert "idea_run_script" in failed_hatch.reason
