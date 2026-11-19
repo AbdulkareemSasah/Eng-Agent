@@ -260,14 +260,27 @@ def test_model_files_reach_the_port_builder(tmp_path: Path) -> None:
     model = tmp_path / "models" / "plan.edb"
     model.parent.mkdir()
     model.write_bytes(b"x")
-    given = rig.input_file(json.dumps({"model_file": str(model), "visible_host": True}))
+    second_model = model.with_name("second.edb")
+    second_model.write_bytes(b"y")
+    given = rig.input_file(
+        json.dumps(
+            {
+                "model_file": str(model),
+                "other_file": str(second_model),
+                "ordinary_path": "notes.txt",
+                "visible_host": True,
+            }
+        )
+    )
+    expected_files = {"plan.edb": model, "second.edb": second_model}
     argv = ["--no-wait", "--no-report", "--progress", "off"]
-    assert rig.main("run", FILE_FLOW, "--input", given, *argv) == ExitCode.AWAITING_ENGINEER
-    assert rig.models == [({"plan.edb": model}, True)]  # the base name maps to the field's value; `visible_host` too
+    assert rig.main("run", FILE_FLOW, "--input", given, *argv) == ExitCode.AWAITING_ENGINEER, rig.err.getvalue()
+    assert rig.models == [(expected_files, True)]  # includes both model files and excludes the ordinary path
+    assert all(isinstance(path, Path) for path in rig.models[0][0].values())
     [run_id] = rig.run_ids()
     model.unlink()  # a moved original is passed on unchecked at resume (spec 4.2.2 step 2)
     assert rig.main("resume", run_id, *argv) == ExitCode.AWAITING_ENGINEER
-    assert rig.models[1] == ({"plan.edb": model}, True)  # from the run's stored input
+    assert rig.models[1] == (expected_files, True)  # from the run's stored input
     plain = Rig(tmp_path / "plain")
     assert plain.main("run", WORKFLOW, *argv) == ExitCode.OK
     assert plain.models == [({}, False)]  # no model file and no `visible_host` field
