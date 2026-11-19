@@ -1,4 +1,4 @@
-"""Production wiring of progress, run-control and the heartbeat (plan 0006 T16b; spec 0006 AC9, AC18, AC19, AC37, AC62)."""
+"""Production wiring of progress, run-control and the heartbeat (plan 0006 T16b; AC9, AC18, AC19, AC37, AC62)."""
 
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ from typing import Any, cast
 import pytest
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
-from helpers.cli_deps import FakeCalc, FakeInput, FakeOutput, Placeholder
+from helpers.cli_deps import WORKFLOW, FakeCalc, FakeInput, FakeOutput, Placeholder, Rig, completes
 from workflows.rig import Host
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.basis import StoreBasisPort
 from eng_harness.block import Registry, workflow
+from eng_harness.cli import ExitCode
 from eng_harness.cli._control import FileRunControl
 from eng_harness.cli._wiring import IsolatingFanOut, RunIdCell, RunPortSet, default_engine_factory, heartbeat_run_dir
 from eng_harness.engine import EngineSettings
@@ -209,3 +210,49 @@ def test_heartbeat_follows_run_id_cell(tmp_path: Path) -> None:
     assert path.is_file()
     assert "heartbeat:" in out.getvalue()
 
+
+def test_drive_starts_heartbeat_beside_the_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`run` starts the heartbeat task with the cell's folder callable and cancels it when the engine returns."""
+    seen: list[Any] = []
+
+    class _Spy(Heartbeat):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            seen.append(kwargs)
+            super().__init__(*args, **kwargs)
+
+        async def run(self) -> None:
+            self.beat()
+            await asyncio.Event().wait()
+
+    monkeypatch.setattr("eng_harness.cli._run.Heartbeat", _Spy)
+    rig = Rig(tmp_path / "hb", script=completes)
+    rig.workspace.mkdir(parents=True)
+    (rig.workspace / "harness.toml").write_text("[progress]\nheartbeat_s = 1\n", encoding="utf-8")
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "plain") == ExitCode.OK
+    assert len(seen) == 1
+    assert seen[0]["interval_s"] == 1
+    assert callable(seen[0]["run_dir"])
+    [run_id] = rig.run_ids()
+    assert (rig.runs / run_id).is_dir()
+
+
+def test_run_installs_fan_out_and_file_run_control(tmp_path: Path) -> None:
+    """`run` hands the isolating fan-out and FileRunControl to the engine factory (AC9, AC37)."""
+    held: list[Any] = []
+
+    async def capture(session: Any) -> Any:
+        held.append(session.ports)
+        assert session.ports.run_control is not None
+        assert session.ports.run_control.stop_requested(session.run_id) is False
+        assert isinstance(session.ports.progress, IsolatingFanOut)
+        assert session.ports.decision is not None
+        return session.completed()
+
+    rig = Rig(tmp_path / "ports", script=capture)
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "plain") == ExitCode.OK
+    assert len(held) == 1
+    assert isinstance(held[0].run_control, FileRunControl)
+    assert held[0].progress is not None
+    [run_id] = rig.run_ids()
+    assert held[0].progress._cell is not None
+    assert held[0].progress._cell.run_id == run_id
