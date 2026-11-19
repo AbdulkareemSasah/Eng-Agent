@@ -11,12 +11,13 @@ import pytest
 from eng_contract.envelope import FailureEnvelope, Provenance, RefInput, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode, WarningCode
 from eng_contract.ids import FixedClock, SeededIdSource
-from eng_contract.store import ResultStore
+from eng_contract.store import LocationClass, ResultStore, Workspace
 from pydantic import JsonValue
 
 from eng_harness import __version__
 from eng_harness._calc._approvals import ApprovalsFile
 from eng_harness._calc._port import CalcSettings, HarnessCalcPort
+from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcRegistry, CalcStatus, NotImplementedGap
 from eng_harness.errors import CalcRefused, HarnessCode
 from eng_harness.ports import RunClass
@@ -375,3 +376,104 @@ def test_unexpected_exception_is_internal(fx: ModuleType, tmp_path: Path) -> Non
     assert isinstance(out, FailureEnvelope)
     assert out.error.code is ErrorCode.INTERNAL
     assert out.error.incident_id is not None
+
+
+def test_ref_meta_preserves_pointer(tmp_path: Path) -> None:
+    """B-580 / plan 0013 T5: RefMeta.ref keeps the original input reference including its JSON pointer.
+
+    On a harness.section_size/1 record whose required differs from size, sibling pointers #/required and
+    #/increment must survive into RefMeta (and therefore into the calc trace) instead of being dropped to the
+    bare result id.
+    """
+    from eng_contract.params import eng_param
+    from eng_contract.quantity import Quantity
+    from pydantic import BaseModel, ConfigDict
+
+    from eng_harness.calc import CalcInput, CalcRegistry, InputMeta, TraceBuilder, calc
+    from eng_harness.kinds.calcs import CalcPayload
+
+    out_kind = "harness.port_size_echo/1"
+
+    class EchoBody(BaseModel):
+        model_config = ConfigDict(frozen=True, extra="forbid")
+
+        value: float
+
+    class EchoOut(CalcPayload, EchoBody):
+        pass
+
+    class EchoIn(CalcInput):
+        dim: Quantity = eng_param(
+            unit="mm",
+            ref_capable=True,
+            ref_kinds={"harness.section_size/1"},
+            engineering_quantity=True,
+        )
+
+    @calc(
+        id="harness.port_size_echo",
+        version=1,
+        output_kind=out_kind,
+        title="Echo a section_size dimension reference",
+        method_source="Test double for RefMeta.ref pointer preservation (B-580)",
+    )
+    def port_size_echo(inp: EchoIn, meta: InputMeta, trace: TraceBuilder) -> EchoBody:
+        seen = meta.refs["dim"].ref
+        trace.input("dim", inp.dim.value, unit="mm", ref=seen)
+        trace.step("value", float(inp.dim.value), formula="echo", source="B-580 fixture", uses=["dim"], unit="mm")
+        trace.output("value")
+        return EchoBody(value=float(inp.dim.value))
+
+    clock = FixedClock(1_767_225_600_000, 1)
+    ids = SeededIdSource(b"portref", clock)
+    kinds = HARNESS_KINDS.extend({out_kind: EchoOut})
+    store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), kinds, ids, clock)
+    producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0)
+    # required=375 mm, size=400 mm (multiple 8 x increment 50); required differs from size (spec 0003 N2 bounds).
+    size_payload: dict[str, JsonValue] = {
+        "required": {"value": 375.0, "unit": "mm"},
+        "increment": {"value": 50.0, "unit": "mm"},
+        "multiple": 8,
+        "size": {"value": 400.0, "unit": "mm"},
+        "status": "PASS",
+        "calc": {"id": "harness.section_round", "version": 1, "content_sha256": "a" * 64, "status": "draft"},
+        "draft": True,
+        "trace": {
+            "calc_id": "harness.section_round",
+            "calc_version": "1",
+            "content_sha256": "a" * 64,
+            "inputs": [],
+            "constants": [],
+            "steps": [
+                {
+                    "name": "size",
+                    "value": 400.0,
+                    "unit": "mm",
+                    "formula": "n x i",
+                    "source": "0003 4.10 N2",
+                    "uses": [],
+                }
+            ],
+            "outputs": ["size"],
+        },
+    }
+    size_id = store.put("harness.section_size/1", size_payload, producer).result_id
+    registry = CalcRegistry(kinds, [port_size_echo], hasher=lambda _: "ab" * 32)
+    approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
+    port = HarnessCalcPort(
+        registry,
+        approvals,
+        store,
+        CalcSettings(max_items=1000),
+        RunClass.TRIAL,
+        clock,
+        ids,
+    )
+    for pointer, expected_value in (("/required", 375.0), ("/increment", 50.0)):
+        ref = f"{size_id}#{pointer}"
+        out = port.run("harness.port_size_echo", {"dim": {"$ref": ref}})
+        assert isinstance(out, SuccessEnvelope), out
+        payload = store.payload(out.result_id)
+        assert payload["value"] == pytest.approx(expected_value)
+        inputs = {row["name"]: row["ref"] for row in payload["trace"]["inputs"]}
+        assert inputs["dim"] == ref

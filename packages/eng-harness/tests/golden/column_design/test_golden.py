@@ -42,6 +42,17 @@ CALCS = {
             "basis": "basis.design_basis/1",
         },
     ),
+    "column-match": (
+        "harness.column_section_match",
+        {
+            "column": "harness.column_selection/1",
+            "size_b": "harness.section_size/1",
+            "size_h": "harness.section_size/1",
+            "size_d": "harness.section_size/1",
+            "sections": "model.sections/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
     "column-review": (
         "harness.column_review",
         {
