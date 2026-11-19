@@ -570,9 +570,10 @@ def test_layout_basis_values_conversion_and_errors() -> None:
     assert type(af_inputs["A_bar_mm2"]) is float
     assert out["items"][MAX_AXIAL_ID][0]["inputs"]["Ast_mm2"] == 3600.0
     built = trace.build(REGISTRY[CALC_ID], _DIGEST)
-    assert [i.name for i in built.inputs].count("basis_in_rebar_bar_area_cm2") == 1
+    # Injective encoding: `_` -> `_u`, then `.` -> `_d` (review r2; `rebar.bar_area_cm2`).
+    assert [i.name for i in built.inputs].count("basis_in_rebar_dbar_uarea_ucm2") == 1
     a_bar_step = next(s for s in built.steps if s.name == "col_0_A_bar_mm2")
-    assert list(a_bar_step.uses) == ["basis_in_rebar_bar_area_cm2"]
+    assert list(a_bar_step.uses) == ["basis_in_rebar_dbar_uarea_ucm2"]
 
     # Missing/unconfirmed, wrong unit, non-numeric, and non-positive basis values in layout.
     missing = copy.deepcopy(data)
@@ -802,11 +803,78 @@ def test_layout_basis_path_does_not_collide_with_trace_step(tmp_path: Path) -> N
     trace = cast(dict[str, Any], payload["trace"])
     input_names = {row["name"] for row in cast(list[dict[str, Any]], trace["inputs"])}
     step_names = {row["name"] for row in cast(list[dict[str, Any]], trace["steps"])}
-    assert "basis_in_col_0_d_prime_mm" in input_names
+    # Injective encoding of `col_0.d_prime_mm`: `_` -> `_u`, then `.` -> `_d`.
+    assert "basis_in_col_u0_dd_uprime_umm" in input_names
     assert "col_0_d_prime_mm" in step_names
-    basis_in = next(row for row in cast(list[dict[str, Any]], trace["inputs"]) if row["name"] == "basis_in_col_0_d_prime_mm")
+    basis_in = next(
+        row for row in cast(list[dict[str, Any]], trace["inputs"]) if row["name"] == "basis_in_col_u0_dd_uprime_umm"
+    )
     assert basis_in["ref"] == f"{basis_id}#/fields/col_0.d_prime_mm"
     assert basis_in["value"] == 50.0
     step = next(row for row in cast(list[dict[str, Any]], trace["steps"]) if row["name"] == "col_0_d_prime_mm")
     assert step["value"] == 50.0
-    assert "basis_in_col_0_d_prime_mm" in step["uses"]
+    assert "basis_in_col_u0_dd_uprime_umm" in step["uses"]
+
+
+def test_layout_basis_paths_with_underscore_and_dot_do_not_collide(tmp_path: Path) -> None:
+    """`layout.values.bar` and `layout_values.bar` keep distinct basis_in_* names (injective `_u` then `_d`)."""
+    data = _base_inputs()
+    data["selection"]["columns"] = [data["selection"]["columns"][0]]
+    data["forces"]["rows"] = [data["forces"]["rows"][0]]
+    data["layouts"]["sections"] = [
+        {
+            "section": "C40",
+            "transverse_kind": "tied",
+            "n_bars_b": 3,
+            "n_bars_h": 3,
+            "A_bar": {"source": "basis", "path": "layout.values.bar"},
+            "d_prime": {"source": "basis", "path": "layout_values.bar"},
+        }
+    ]
+    data["basis"] = _basis(
+        **{
+            "layout.values.bar": {
+                "value": 500.0,
+                "unit": "mm2",
+                "source": _SRC,
+                "confirmed": True,
+                "citation": None,
+            },
+            "layout_values.bar": {
+                "value": 50.0,
+                "unit": "mm",
+                "source": _SRC,
+                "confirmed": True,
+                "citation": None,
+            },
+        }
+    )
+    port, store, args, basis_id = _setup_port(tmp_path, data)
+    out = port.run(CALC_ID, args)
+    assert isinstance(out, SuccessEnvelope), out
+    payload = store.payload(out.result_id)
+    af_inputs = cast(dict[str, list[dict[str, Any]]], payload["items"])[AXIAL_FLEXURE_ID][0]["inputs"]
+    # Hand: A_bar already in mm2; d_prime already in mm (no unit scale).
+    assert af_inputs["A_bar_mm2"] == 500.0
+    assert af_inputs["d_prime_mm"] == 50.0
+
+    trace = cast(dict[str, Any], payload["trace"])
+    inputs_by_name = {row["name"]: row for row in cast(list[dict[str, Any]], trace["inputs"])}
+    # layout.values.bar -> basis_in_layout_dvalues_dbar; layout_values.bar -> basis_in_layout_uvalues_dbar.
+    bar_name = "basis_in_layout_dvalues_dbar"
+    cover_name = "basis_in_layout_uvalues_dbar"
+    assert bar_name in inputs_by_name
+    assert cover_name in inputs_by_name
+    assert bar_name != cover_name
+    assert inputs_by_name[bar_name]["ref"] == f"{basis_id}#/fields/layout.values.bar"
+    assert inputs_by_name[bar_name]["value"] == 500.0
+    assert inputs_by_name[cover_name]["ref"] == f"{basis_id}#/fields/layout_values.bar"
+    assert inputs_by_name[cover_name]["value"] == 50.0
+
+    steps_by_name = {row["name"]: row for row in cast(list[dict[str, Any]], trace["steps"])}
+    a_bar_step = steps_by_name["col_0_A_bar_mm2"]
+    d_prime_step = steps_by_name["col_0_d_prime_mm"]
+    assert a_bar_step["value"] == 500.0
+    assert list(a_bar_step["uses"]) == [bar_name]
+    assert d_prime_step["value"] == 50.0
+    assert list(d_prime_step["uses"]) == [cover_name]
