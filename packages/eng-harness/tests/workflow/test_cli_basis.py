@@ -511,6 +511,7 @@ def test_setup_log_appends_atomically_and_rejects_bad_inputs(tmp_path: Path) -> 
     with pytest.raises(ValueError, match="JSON array"):
         append_setup_log(tmp_path, good.model_copy(update={"setup_id": bad_file.stem}), "2026-01-01T00:00:01.000Z")
 
+
 def test_setup_log_atomicity_on_replacement_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Interrupted or failed replacement keeps an existing log intact and exposes no partial target."""
     setup_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
