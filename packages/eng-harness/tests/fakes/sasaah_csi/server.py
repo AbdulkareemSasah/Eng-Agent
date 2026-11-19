@@ -138,14 +138,20 @@ def _session(name: str, args: dict[str, Any], *, fresh: bool = False) -> dict[st
         return {"read_only": False, "script_enabled": False, "instances": [], "current_target": STATE.target}
     if name == "csi_launch":
         STATE.target = {
-            "product": args.get("product", STATE.product),
+            "product": args.get("product") or STATE.product,
             "pid": _launch_pid(fresh=fresh),
             "launched": True,
         }
         STATE.session_valid = True
         return dict(STATE.target)
     if name == "csi_attach":
-        STATE.target = {"product": args.get("product", STATE.product), "pid": args.get("pid", PID), "launched": False}
+        override = args.get("target")
+        target = override if isinstance(override, dict) else {}
+        STATE.target = {
+            "product": target.get("product") or args.get("product") or STATE.product,
+            "pid": target.get("pid") or args.get("pid") or PID,
+            "launched": False,
+        }
         STATE.session_valid = True
         return dict(STATE.target)
     if name == "csi_detach":
@@ -278,9 +284,16 @@ def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     return {"items": rows[:limit], "count": min(len(rows), limit), "truncated": len(rows) > limit}
 
 
-def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
+def _in_group(row: dict[str, Any], group: str) -> bool:
+    if row.get("Group") == group:
+        return True
+    groups = row.get("groups")
+    return isinstance(groups, list | tuple | set) and group in groups
+
+
+def _apply(name: str, args: dict[str, Any], units: str, product: str) -> dict[str, Any]:
     model = STATE.model
-    if name == "csi_new_model" and STATE.product == "SAFE":
+    if name == "csi_new_model" and product == "SAFE":
         raise SasaahError("unsupported_by_version", "Creating a model is not supported by this version.")
     if name == "csi_db_table_fields":
         table = args.get("table")
@@ -304,8 +317,8 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     if name == "csi_db_table_read":
         table = args.get("table")
         rows = model["tables"].get(table, [])
-        if (group := args.get("group")) and any("Group" in r or "groups" in r for r in rows):
-            rows = [r for r in rows if r.get("Group") == group or group in r.get("groups", ())]
+        if group := args.get("group"):
+            rows = [r for r in rows if _in_group(r, group)]
         configured = model.get("result_limits", {}).get(table)
         requested = args.get("row_limit")
         limit = (
@@ -364,6 +377,10 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         raise _timeout()
     if name == "csi_run_analysis" and (slow := STATE.pop_fault(name, {"slow_analysis"})):
         await asyncio.sleep(float(slow.get("seconds", 1.0)))
+    override = args.get("target")
+    product = (override.get("product") if "target" in props and isinstance(override, dict) else None) or STATE.target[
+        "product"
+    ]
     if STATE.pop_fault(name, {"present_units_mm"}):
         STATE.model["units"] = "kN_mm_C"
     previous = STATE.model["units"]
@@ -372,9 +389,15 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
     leave = bool(requested) and STATE.pop_fault(name, {"units_left_changed"}) is not None
     if requested:
         STATE.model["units"] = requested
-    result = _session(name, args, fresh=fresh) if name == "csi_exit" else _apply(name, args, STATE.model["units"])
-    if requested and not leave:
-        STATE.model["units"] = previous
+    try:
+        result = (
+            _session(name, args, fresh=fresh)
+            if name == "csi_exit"
+            else _apply(name, args, STATE.model["units"], product)
+        )
+    finally:
+        if requested and not leave:
+            STATE.model["units"] = previous
     if STATE.pop_fault(name, {"timeout_after_apply"}):
         raise _timeout()
     return result
