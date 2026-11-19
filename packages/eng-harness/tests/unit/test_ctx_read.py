@@ -1,18 +1,21 @@
 """`ctx.read`: a value of a stored result at a pointer (plan 0001 T10; spec 0001 AC12, contract REF_* codes)."""
 
 import asyncio
+import inspect
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import pytest
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ErrorCode
 from eng_contract.quantity import Quantity
 from eng_contract.refs import Ref
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 from workflows.ctx_flows import flow
 from workflows.rig import Rig, make_rig, request
 
-from eng_harness.ctx import ToolResult
+from eng_harness.ctx import ReadResult, ToolResult
 from eng_harness.engine import RunStatus
 from eng_harness.errors import Pause, ToolFailed
 from eng_harness.journal import EventType
@@ -63,6 +66,19 @@ def test_read(tmp_path: Path) -> None:
     assert (live[0].kind, live[0].ref.ref) == ("harness.run_output/1", f"{result_id}#/value/load")
     assert live[1].value == 2
     assert live[2].value == live[0].value
+    assert live[0].data == Quantity(2.5, "kN")
+    assert isinstance(live[0].data, Quantity)
+    assert live[1].data == 2
+    assert live[2].data == live[0].data
+    nested = ReadResult(ref=live[0].ref, kind=live[0].kind, value={"load": live[0].value})
+    assert isinstance(nested.data, Mapping)
+    assert isinstance(nested.data["load"], Quantity)
+    assert nested.data["load"] == Quantity(2.5, "kN")
+    prop = inspect.getattr_static(ReadResult, "data")
+    assert isinstance(prop, property)
+    assert prop.fset is None
+    with pytest.raises(ValidationError):
+        live[0].data = None
     codes = [f.code for f in failures]
     assert codes == [ErrorCode.REF_POINTER_INVALID, ErrorCode.REF_NOT_FOUND] * 2  # live, then replayed from the journal
     assert [f.detail for f in failures[:2]] == [f.detail for f in failures[2:]]

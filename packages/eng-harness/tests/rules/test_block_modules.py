@@ -136,6 +136,12 @@ def run(ctx, quantity):
         pass
     except (ValueError, BaseException):
         pass
+    _ = getattr(quantity, "value")
+    _ = quantity.__dict__
+    _ = vars(quantity)
+    _ = quantity.model_dump()["value"]
+    _ = quantity.model_dump_json()["value"]
+    _ = quantity.parser
     return total - ratio, total % 2, total ** 2, total // 2, total * 2, total @ 2
 """
 CLEAN = """\
@@ -156,7 +162,11 @@ from eng_harness.workflows.model_edit_cycle._change_set import BasisValue
 from pydantic import BaseModel
 
 
-def run(items: Sequence[Quantity] | None, mapping: dict[str, Any]) -> list[int]:
+def run(items: Sequence[Quantity] | None, mapping: dict[str, Any], item: Any) -> list[int]:
+    _ = mapping["value"]
+    _ = item.model_dump(mode="json")["section"]
+    _ = item.model_dump_json(indent=2)["section"]
+    _ = getattr(item, "section")
     try:
         return [index for index, _ in enumerate(items or [])]
     except ToolFailed:
@@ -180,14 +190,23 @@ def test_rules_detect_violations() -> None:
         "15: while loop",
         "19: bare except or except BaseException",
         "23: bare except or except BaseException",
-        "25: arithmetic operator FloorDiv",
-        "25: arithmetic operator MatMult",
-        "25: arithmetic operator Mod",
-        "25: arithmetic operator Mult",
-        "25: arithmetic operator Pow",
-        "25: arithmetic operator Sub",
+        "25: getattr for value",
+        "26: read of the attribute __dict__",
+        "27: call of vars",
+        '28: subscript ["value"] on model_dump',
+        '29: subscript ["value"] on model_dump_json',
+        "30: read of the attribute parser",
+        "31: arithmetic operator FloorDiv",
+        "31: arithmetic operator MatMult",
+        "31: arithmetic operator Mod",
+        "31: arithmetic operator Mult",
+        "31: arithmetic operator Pow",
+        "31: arithmetic operator Sub",
     ]  # line 3 passes: `import eng_harness.ctx` is allowed; line 23 names BaseException in a tuple
     assert check_source(CLEAN) == []  # the `|` of a union is not arithmetic; allowed names and modules pass
+    assert check_source('x = item.model_dump(mode="json")["value"]\n') == ['1: subscript ["value"] on model_dump']
+    assert check_source('x = getattr(item, "value", None)\n') == ["1: getattr for value"]
+    assert check_source("x = vars()\n") == ["1: call of vars"]
 
 
 def test_mutation_runner_import_is_judged_only_under_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
