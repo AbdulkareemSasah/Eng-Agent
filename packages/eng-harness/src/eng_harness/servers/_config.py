@@ -202,9 +202,8 @@ class ServerConfig(_Model):
     @field_validator("build")
     @classmethod
     def _build_revit(cls, value: BuildPin, info: ValidationInfo) -> BuildPin:
-        if info.data.get("adapter") == _REVIT_ADAPTER:
-            if not value.addin_paths or not value.addin_sha256:
-                raise ValueError("build.addin_paths and build.addin_sha256 are required for Revit")
+        if info.data.get("adapter") == _REVIT_ADAPTER and (not value.addin_paths or not value.addin_sha256):
+            raise ValueError("build.addin_paths and build.addin_sha256 are required for Revit")
         return value
 
     @field_validator("args")
