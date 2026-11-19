@@ -11,6 +11,11 @@
       "version": 1
     },
     {
+      "content_sha256": "315fa23a3038a1c4ef3f54ff3b7f60ef3fc53520079a9499c785bb9ddd5721cc",
+      "id": "harness.column_review",
+      "version": 1
+    },
+    {
       "content_sha256": "251dc3fd5b87383bab01df5f82e64586364f345077738f07e1df693bd29a0466",
       "id": "harness.column_select",
       "version": 1
