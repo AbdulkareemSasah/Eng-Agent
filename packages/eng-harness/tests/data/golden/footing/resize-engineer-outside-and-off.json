@@ -1,0 +1,132 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.4, synthetic fixture",
+  "method_ref": "§4.4.4 R4",
+  "synthetic": true,
+  "derivation": "R4: L=3500 > max_plan=3000 and L is not a multiple of i=200 (17*200=3400, 18*200=3600). Outside-bounds takes the status OUTSIDE_BASIS_BOUNDS; the off-increment condition is recorded in reason OFF_INCREMENT.",
+  "input": {
+    "dims": {
+      "footings": [
+        {
+          "id": "F1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        }
+      ]
+    },
+    "actions": {
+      "F1": "engineer_set"
+    },
+    "engineer_plan": {
+      "value": 3500.0,
+      "unit": "mm"
+    },
+    "engineer_depth": {
+      "value": 500.0,
+      "unit": "mm"
+    },
+    "engineer_spacing": {
+      "value": 200.0,
+      "unit": "mm"
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.plan_increment_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_plan_dimension_mm": {
+          "value": 1000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_plan_dimension_mm": {
+          "value": 3000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.depth_increment_mm": {
+          "value": 50,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_depth_mm": {
+          "value": 400,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_depth_mm": {
+          "value": 800,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.spacing_increment_mm": {
+          "value": 25,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.min_spacing_mm": {
+          "value": 100,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.max_spacing_mm": {
+          "value": 300,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "dims": "res_00000000000000000000000001",
+    "basis": "res_00000000000000000000000002",
+    "engineer_plan": "res_00000000000000000000000003",
+    "engineer_depth": "res_00000000000000000000000003",
+    "engineer_spacing": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "footings": [
+      {
+        "id": "F1",
+        "Lx_mm": 3500.0,
+        "Ly_mm": 3500.0,
+        "h_mm": 500.0,
+        "s_mm": 200.0,
+        "source": "engineer",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OUTSIDE_BASIS_BOUNDS",
+        "reason": "OFF_INCREMENT"
+      }
+    ]
+  }
+}
