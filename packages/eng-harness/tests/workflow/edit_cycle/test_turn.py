@@ -4,9 +4,10 @@ Synthetic model and basis values only. Drift ratios are synthetic host rows comp
 basis field `limits.drift_ratio` (0.01 in the stand), never chosen here.
 """
 
+import json
 from math import nextafter
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import JsonValue
 
@@ -40,10 +41,18 @@ def _seed_clean(stand: Stand, *, above: bool = False) -> None:
     seed_results(stand, drifts=[_drift("S1", 0.004), _drift("S2", high)], design={"steel": STEEL}, messages=[])
 
 
+def _unlock(stand: Stand) -> None:
+    """Clear the fake's post-analysis lock, as the engineer would unlock in ETABS before the next cycle (spec 4.5)."""
+    data = json.loads(stand.control.read_text())
+    data.setdefault("host", {})["locked"] = False
+    stand.control.write_text(json.dumps(data))
+
+
 def _options(shown: InputRequest) -> set[str]:
+    props: dict[str, Any] = cast(dict[str, Any], shown.fields_schema.get("properties", {}))
     found: set[str] = set()
-    for prop in shown.fields_schema.get("properties", {}).values():
-        found.update(prop.get("enum") or ())
+    for prop in props.values():
+        found.update(cast(list[str], prop.get("enum") or ()))
     return found
 
 
@@ -91,7 +100,7 @@ def test_engineer_turn_branches(tmp_path: Path) -> None:
     assert turns, [r.kind for r in accept.inputs.presented]
     assert _options(turns[0]) == {"accept", "more_edits", "hand_edit"}
     assert outcome.output is not None
-    assert [s.turn for s in outcome.output.summaries] == ["accept"]  # type: ignore[attr-defined]
+    assert [s.turn for s in cast(Any, outcome.output).summaries] == ["accept"]
 
     # more_edits: a second cycle opens a new change-set data request
     more = build_stand(tmp_path / "more")
@@ -106,7 +115,10 @@ def test_engineer_turn_branches(tmp_path: Path) -> None:
             asked.append(shown.request_id)
             return stand_i.give(shown, THREE)
         if _is_turn(shown):
-            return stand_i.choose(shown, "more_edits" if len(asked) == 1 else "accept")
+            if len(asked) == 1:
+                _unlock(stand_i)
+                return stand_i.choose(shown, "more_edits")
+            return stand_i.choose(shown, "accept")
         if _is_d3(shown):
             return stand_i.choose(shown, "continue")
         return stand_i.choose(shown, "accept")
@@ -130,17 +142,24 @@ def test_engineer_turn_branches(tmp_path: Path) -> None:
             return stand_i.give(shown, THREE)
         if _is_turn(shown):
             turn_n["n"] += 1
-            return stand_i.choose(shown, "hand_edit" if turn_n["n"] == 1 else "accept")
+            if turn_n["n"] == 1:
+                _unlock(stand_i)
+                return stand_i.choose(shown, "hand_edit")
+            return stand_i.choose(shown, "accept")
         if _is_d3(shown):
             return stand_i.choose(shown, "continue")
         return stand_i.choose(shown, "accept")
 
     out_hand = hand.play(hand.flow(cycles=2, summarize=True), hand_respond)
     assert out_hand.status is RunStatus.COMPLETED, out_hand
-    assert len(data_asks) == 1
-    assert len([a for a in hand.approvals.presented if a.kind == "change_set"]) == 1
-    saves = [s for s in hand.steps("tool") if s.name == "csi_save_model"]
-    assert any((s.args or {}).get("as_new_revision") for s in saves)
+    assert len(data_asks) == 1  # second cycle (hand_edit) asked for no change set
+    assert len(cast(Any, out_hand.output).summaries) == 2
+    assert [s.turn for s in cast(Any, out_hand.output).summaries] == ["hand_edit", "accept"]
+    # second cycle: empty change set records a revision without a step 6 approval (under=None)
+    revision_saves = [
+        s for s in hand.steps("tool") if s.name == "csi_save_model" and (s.args or {}).get("as_new_revision")
+    ]
+    assert any(s.under is None for s in revision_saves), revision_saves
 
 
 def test_drift_at_d3(tmp_path: Path) -> None:

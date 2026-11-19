@@ -147,9 +147,7 @@ class Stand:
         """The folder of the run."""
         return self.workspace.root / "runs" / self.run_id
 
-    def flow(
-        self, cycles: int = 1, *, ask: bool = True, summarize: bool = False, min_build: str | None = None
-    ) -> Any:
+    def flow(self, cycles: int = 1, *, ask: bool = True, summarize: bool = False, min_build: str | None = None) -> Any:
         """The test workflow: open the model, then `cycles` of `edit_cycle_once` (and `run_and_summarize` when asked).
 
         The workflow code is imported here, so that a missing module fails the test and not the collection.
@@ -200,7 +198,7 @@ class Stand:
                 out = await ctx.block(edit_cycle_once, CycleInput(model=MODEL_KEY, previous=previous, ask=ask_next))
                 previous = out.state
                 done.append(out)
-                if not summarize or out.route is not Route.DONE:
+                if not summarize or out.route != Route.DONE:
                     continue
                 summary = await ctx.block(
                     run_and_summarize,
@@ -209,14 +207,14 @@ class Stand:
                         state=out.state,
                         diff=out.diff,
                         readback=out.readback,
-                        previous_designs=designs,
+                        previous_designs=tuple(designs.items()),
                     ),
                 )
                 summarized.append(summary)
-                designs = {kind: ref for kind, ref in summary.designs}
-                if summary.turn is TurnAction.ACCEPT:
+                designs = dict(summary.designs)
+                if summary.turn == TurnAction.ACCEPT:
                     break
-                ask_next = summary.turn is TurnAction.MORE_EDITS
+                ask_next = summary.turn == TurnAction.MORE_EDITS
             return FlowOutput(cycles=done, summaries=summarized)
 
         return run
@@ -381,8 +379,6 @@ class Stand:
         return [dict(self.store.payload(r.ref)) for r in done if r is not None]
 
 
-
-
 def seed_results(
     stand: Stand,
     *,
@@ -422,7 +418,7 @@ def build_stand(root: Path, *, values: Mapping[str, tuple[Any, str | None]] | No
     data["seed"]["area_sections"] = [{"name": "SL", "type": "slab"}, {"name": "SL20", "type": "slab"}]
     control.write_text(json.dumps(data))
     clock = FixedClock(1_700_000_000_000, 1)
-    ids = SeededIdSource(b"b202-stand", clock)
+    ids = SeededIdSource(b"b526-" + root.name.encode(), clock)
     workspace = Workspace(root=root / "workspace", classification=LocationClass.LOCAL)
     store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
     used = VALUES if values is None else values
