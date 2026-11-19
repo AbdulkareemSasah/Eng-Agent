@@ -14,9 +14,9 @@ from eng_contract.issues import Severity
 from eng_contract.kinds.model import AreaSectionKind, MaterialType, Sections
 from eng_contract.verdicts import SubjectKind
 
+from eng_harness._kinds import SafeSoilSupports
 from eng_harness.adapters.csi import _tables
 from eng_harness.adapters.csi.products import _safe_state
-from eng_harness.adapters.csi.products._safe_state import SafeSoilSupports
 from eng_harness.errors import HarnessCode, NotImplementedGap
 
 UNITS = "kN_m_C"  # present units of the synthetic CSI fake (S-12); length m, stress kN/m2, unit weight kN/m3
@@ -71,7 +71,7 @@ def _spring_tables() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
 
 
 def test_sections_and_materials() -> None:
-    """AC11: slab PropTypes map to kind slab; Ribbed/Waffle become SECTION_TYPE_NOT_MAPPED; concrete carries fc and gamma."""
+    """AC11: mapped PropTypes are kind slab; Ribbed/Waffle get SECTION_TYPE_NOT_MAPPED; concrete has fc and gamma."""
     sections, issues = _safe_state.sections_from_rows(_slab_rows(), UNITS)
     assert isinstance(sections, Sections)
     by_name = {row.name: row for row in sections.area_sections}
