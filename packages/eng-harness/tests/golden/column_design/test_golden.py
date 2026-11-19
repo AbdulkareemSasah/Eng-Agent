@@ -18,6 +18,7 @@ from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.column_design import COLUMN_DESIGN_CALCS, COLUMN_DESIGN_KINDS
+from eng_harness.calcs.column_design.column_demands import column_demands
 from eng_harness.calcs.column_design.column_review import (
     BASIS_FIELDS as REVIEW_BASIS_FIELDS,
 )
@@ -39,6 +40,17 @@ CALCS = {
             "scope": "basis.engineer_input/1",
             "frames": "model.frame_placements/1",
             "sections": "model.sections/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
+    "column-demands": (
+        "harness.column_demands",
+        {
+            "selection": "harness.column_selection/1",
+            "forces": "forces.member_end/1",
+            "sections": "model.sections/1",
+            "layouts": "basis.engineer_input/1",
+            "combinations": "basis.engineer_input/1",
             "basis": "basis.design_basis/1",
         },
     ),
@@ -72,8 +84,19 @@ def test_case(stem: str) -> None:
     input_type = definition.input_type
     assert isinstance(input_type, type)
     assert issubclass(input_type, CalcInput)
-    result = definition(input_type.model_validate(case.input), input_meta(case.refs, kinds), TraceBuilder())
+    trace = TraceBuilder()
+    result = definition(input_type.model_validate(case.input), input_meta(case.refs, kinds), trace)
     assert result.model_dump(mode="json") == case.expected
+    # AC6: column-demands goldens also pin hand-derived E3-E5 trace steps (values, units, source, uses, formula).
+    if stem.startswith("column-demands-"):
+        assert case.expected_trace is not None
+        built = trace.build(definition, "ab" * 32)
+        got = {
+            s.name: {"value": s.value, "unit": s.unit, "source": s.source, "uses": list(s.uses), "formula": s.formula}
+            for s in built.steps
+            if s.source.endswith(" E3") or s.source.endswith(" E4") or s.source.endswith(" E5")
+        }
+        assert got == case.expected_trace["e3_e5_steps"]
 
 
 # Contract and boundary tests of harness.column_select (spec 0013 4.4.1, AC4; spec 0003 4.2, 4.4).
@@ -122,7 +145,7 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert review.method_source == "eng-harness spec 0013 §4.4.3 (R1 to R4); eng-harness spec 0003 §4.9 (S2, S5)"
-    assert (column_select, column_review) == COLUMN_DESIGN_CALCS
+    assert (column_select, column_demands, column_review) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
     assert REVIEW_BASIS_FIELDS == ("report.top_n",)

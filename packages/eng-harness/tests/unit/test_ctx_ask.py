@@ -6,15 +6,17 @@ test scripts. The block is a plain test body wrapped as a workflow.
 
 import asyncio
 import hashlib
+import inspect
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from workflows.ctx_flows import flow
 from workflows.rig import Rig, make_rig, request
 
+from eng_harness.ctx import Answered
 from eng_harness.engine import RunStatus
 from eng_harness.engine._inputs import MARKER, Kind, build_request, data_schema
 from eng_harness.journal import EventType
@@ -75,6 +77,15 @@ def test_ask_stores_engineer_input(tmp_path: Path) -> None:
     assert done.status is RunStatus.COMPLETED
     assert [r.request_id for r in rig.inputs.presented][-1] == second  # the answered first ask was not shown again
     assert seen[0].value == Section(width="300", count=4)
+    assert seen[0].answer == Section(width="300", count=4)
+    assert seen[0].answer is seen[0].value
+    assert isinstance(seen[0].answer, Section)
+    assert seen[1].answer == Section(width="250", count=2)
+    prop = inspect.getattr_static(Answered, "answer")
+    assert isinstance(prop, property)
+    assert prop.fset is None
+    with pytest.raises(ValidationError):
+        seen[0].answer = seen[1].value
     provided = [e.payload for e in rig.events(done.run_id) if isinstance(e.payload, ev.InputProvided)]
     assert [(p.request_id, p.by) for p in provided] == [(first, "engineer:ada"), (second, "engineer:ada")]
     stored = cast(dict[str, Any], rig.store.payload(provided[0].answer_ref))
