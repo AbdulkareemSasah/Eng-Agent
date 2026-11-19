@@ -87,15 +87,21 @@ def test_allowlist_loaded_for_the_servers_product(tmp_path: Path) -> None:
     text = Path(__file__).parents[2].joinpath("src/eng_harness/adapters/csi/_allowlist.toml").read_text()
     status = '{ name = "csi_status"'
     entries = [
-        line.replace('"ETABS"]', '"ETABS", "SAFE"]') if line.lstrip().startswith(status) else line
+        line
         for line in text.splitlines()
+        if not line.lstrip().startswith("{ name = ") or line.lstrip().startswith(status)
     ]
-    two = "\n".join(entries).replace("fingerprint = { ETABS", f'fingerprint = {{ SAFE = "{"c" * 64}", ETABS')
+    replaced = "\n".join(
+        f'fingerprint = {{ SAFE = "{"c" * 64}", ETABS = "{"b" * 64}" }}' if line.startswith("fingerprint = ") else line
+        for line in entries
+    )
     cfg = config(r.control)
     section = cfg.servers["csi"].model_copy(update={"product": "SAFE"})
     program = cfg.host_programs["etabs"].model_copy(update={"executables": ("SAFE.exe",)})
     cfg = cfg.model_copy(update={"servers": {"csi": section}, "host_programs": {"safe": program}})
-    p = r.ports(config=cfg, allowlists={"sasaah-csi-mcp": lambda route: load_allowlist(two, "synthetic", route=route)})
+    p = r.ports(
+        config=cfg, allowlists={"sasaah-csi-mcp": lambda route: load_allowlist(replaced, "synthetic", route=route)}
+    )
     want = p.servers._check["csi"]
     assert (want.product, want.tool_fingerprint, want.tool_names) == ("SAFE", "c" * 64, frozenset({"csi_status"}))
 
