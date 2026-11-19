@@ -213,3 +213,44 @@ def test_addin_hashes(tmp_path: Any) -> None:
     assert not missing.ok
     assert missing.reason is not None
     assert "add-in" in missing.reason
+
+
+def test_fingerprint_three_products() -> None:
+    """AC3: each of ETABS, SAFE and SAP2000 is checked against its own tool fingerprint; a wrong product never passes."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    # The packaged allowlist must pin three distinct product fingerprints (fails until SAP2000 is added).
+    pinned = csi_allowlist().fingerprint
+    assert set(pinned) == {"ETABS", "SAFE", "SAP2000"}
+    assert pinned["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+    assert pinned["SAFE"] == "ccdab3c9461b60387569af2ec7acc214c0803bd7953a5d66ca380e1c87c38025"
+    assert len(set(pinned.values())) == 3
+
+    etabs = BuildExpectation(
+        sasaah_commit=COMMIT,
+        also_tested_commits=(),
+        tool_fingerprint=tool_list_fingerprint({"csi_alpha": SCHEMAS["csi_alpha"]}),
+        tool_names=frozenset({"csi_alpha"}),
+        product="ETABS",
+    )
+    safe = replace(
+        etabs, tool_fingerprint=tool_list_fingerprint(SCHEMAS), tool_names=frozenset(SCHEMAS), product="SAFE"
+    )
+    sap = replace(
+        etabs,
+        tool_fingerprint=tool_list_fingerprint({"csi_beta": SCHEMAS["csi_beta"]}),
+        tool_names=frozenset({"csi_beta"}),
+        product="SAP2000",
+    )
+    assert len({etabs.tool_fingerprint, safe.tool_fingerprint, sap.tool_fingerprint}) == 3
+    for want, server in ((etabs, "csi"), (safe, "csi_safe"), (sap, "csi_sap2000")):
+        check = check_build(server, PIN, want, _observed(), product=want.product)
+        assert (check.ok, check.reason) == (True, None)
+        assert check.fingerprint == check.expected_fingerprint == want.tool_fingerprint
+    grown = _observed(tools={**_observed().tools, "csi_sap2000_only": {"type": "object"}})
+    assert check_build("csi", PIN, etabs, grown, product="ETABS").ok is True
+    wrong = check_build("csi_sap2000", PIN, etabs, _observed(), product="SAP2000")
+    assert wrong.ok is False
+    assert wrong.reason is not None
+    assert "ETABS" in wrong.reason
+    assert "SAP2000" in wrong.reason

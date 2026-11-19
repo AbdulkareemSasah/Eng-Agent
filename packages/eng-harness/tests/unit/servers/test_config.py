@@ -568,3 +568,32 @@ def test_idea_env_keys_refused(tmp_path: Path, name: str) -> None:
     assert set(load_servers_config(_write(tmp_path, other)).servers["idea"].env) == {"IDEAL_X", "MY_IDEA_X", "IDEAS"}
     csi = _minimal(extra=f'env = {{ {name} = "1" }}')
     assert name in load_servers_config(_write(tmp_path, csi)).servers["csi"].env
+
+
+SAP2000_PROGRAM = '\n[host_programs.sap2000]\nexecutables = ["SAP2000.exe"]\n'
+
+
+def test_sap2000_server_section(tmp_path: Path) -> None:
+    """AC1: `[servers.csi_sap2000]` runs the same executable with its own product, host key, roles and timeouts."""
+    sap = _server("csi_sap2000", product="SAP2000", host_key="csi_sap2000").replace(
+        "call_timeout_s = 10", "call_timeout_s = 88"
+    )
+    text = (
+        _server("csi", product="ETABS", host_key="csi")
+        + _server("csi_safe", product="SAFE", host_key="csi_safe")
+        + sap
+        + SAFE_PROGRAM
+        + SAP2000_PROGRAM
+    )
+    config = load_servers_config(_write(tmp_path, text))
+    assert set(config.servers) == {"csi", "csi_safe", "csi_sap2000"}
+    etabs, safe_server, sap_server = (
+        config.servers["csi"],
+        config.servers["csi_safe"],
+        config.servers["csi_sap2000"],
+    )
+    assert (etabs.product, safe_server.product, sap_server.product) == ("ETABS", "SAFE", "SAP2000")
+    assert (etabs.host_key, safe_server.host_key, sap_server.host_key) == ("csi", "csi_safe", "csi_sap2000")
+    assert etabs.command == safe_server.command == sap_server.command
+    assert (etabs.roles["main"].call_timeout_s, sap_server.roles["main"].call_timeout_s) == (10, 88)
+    assert config.host_program("SAP2000").executables == ("SAP2000.exe",)

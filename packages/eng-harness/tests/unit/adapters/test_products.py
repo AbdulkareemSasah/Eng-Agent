@@ -173,3 +173,25 @@ def test_registry_matches_the_configurable_products() -> None:
     with pytest.raises(KeyError):
         products.profile("STAAD")
     assert products.profile("ETABS").companion_globs == products.profile("SAFE").companion_globs == ()
+
+
+def test_product_by_extension_three_products() -> None:
+    """AC1: `.SDB` is SAP2000, `.EDB` is ETABS and `.FDB` is SAFE; a mismatched server product is refused."""
+    cases = (
+        ("frame.SDB", "SAP2000", (".SDB",)),
+        ("frame.sdb", "SAP2000", (".SDB",)),
+        ("C:\\Projects\\Tower\\model.Sdb", "SAP2000", (".SDB",)),
+        ("model.EDB", "ETABS", (".EDB",)),
+        ("footing.FDB", "SAFE", (".FDB",)),
+    )
+    for model, product, extensions in cases:
+        found = products.product_of_model(model)
+        assert found.name == product
+        assert found is products.profile(product)
+        assert found.model_extensions == extensions
+        assert products.product_of_model(model, product) is found
+    with pytest.raises(ContractError) as error:
+        products.product_of_model("frame.SDB", "ETABS")
+    assert error.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    assert error.value.detail.field == "model"
+    assert "SAP2000" in error.value.detail.message
