@@ -25,9 +25,9 @@ from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 from workflows.rig import Host
 
 from eng_harness import __version__
-from eng_harness.block import Registry, workflow
+from eng_harness.block import ModelFile, Registry, workflow
 from eng_harness.calc import CalcStatus
-from eng_harness.cli import CliDeps, main
+from eng_harness.cli import CliDeps, DoctorRunner, main
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._wiring import RunPortSet, default_engine_factory
 from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
@@ -94,12 +94,13 @@ FILE_FLOW = "file_flow"
 
 
 class FileInput(BaseModel):
-    """The input of the workflow with model files: two `Path` fields and the `visible_host` flag (spec 0006 AC67)."""
+    """Model files, an ordinary path and the visibility flag (spec 0006 AC67)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    model_file: Path
-    other_file: Path | None = None
+    model_file: ModelFile
+    other_file: ModelFile | None = None
+    ordinary_path: Path = Path("notes.txt")
     visible_host: bool = False
 
 
@@ -409,6 +410,7 @@ class Rig:
     real_engine: bool = False  # the merged `Engine` over a fake host, the page ports seen through `shown`
     shown: list[ApprovalRequest] = field(default_factory=list)  # the approvals the real engine presented
     models: list[tuple[Mapping[str, Path], bool]] = field(default_factory=list)  # `files`, `visible` of each build
+    doctor: DoctorRunner | None = None
 
     @property
     def workspace(self) -> Path:
@@ -478,6 +480,8 @@ class Rig:
             "decision_assembler": assemble_decision_runtime, "point_policies": {},
             "decision_port_factory": self._decision_port, "basis_fields_of": lambda w: w.basis_fields,
         }  # fmt: skip
+        if self.doctor is not None:
+            fields["doctor"] = self.doctor
         return CliDeps(**(fields | replace))
 
     def main(self, *argv: str, **replace: Any) -> int:
