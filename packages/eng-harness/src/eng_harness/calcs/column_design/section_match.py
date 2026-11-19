@@ -1,30 +1,31 @@
 """Calc `harness.column_section_match` v1: match rounded sizes to a model section (spec 0013 4.4.4, M1, M2).
 
-Purpose: given one selected column row, the rounded sizes from `harness.section_round` (`harness.section_size/1` body
-per dimension: `b` and `h`, or `D`), the model sections and `compare.length_mm`, find frame sections of the column's
-shape and material whose every dimension differs from the rounded size by at most the tolerance (exact `Fraction`).
-One candidate is `matched`; none is `no_section_in_model` (CW-G3, H-G1); several are `ambiguous` with all names sorted.
+Purpose: given one selected column row, the rounded sizes as `harness.section_size/1` references (`size_b` and
+`size_h`, or `size_d`, pointing to `#/size` of `harness.section_round` results), the model sections and
+`compare.length_mm`, find frame sections of the column's shape and material whose every dimension differs from the
+rounded size by at most the tolerance (exact `Fraction`). One candidate is `matched`; none is `no_section_in_model`
+(CW-G3, H-G1); several are `ambiguous` with all names sorted.
 Units: lengths in mm. Errors: `ContractError` `INVALID_ARGUMENT` for a basis field that is missing, unconfirmed, not a
-number or negative, for sizes that do not name `b` and `h` or `D`, for sizes that disagree with the column shape, and
-for a non-reference `column`, `sections` or `basis`.
+number or negative, for missing or conflicting size parameters (`size_b`+`size_h` vs `size_d`), for size dimensions
+that disagree with the column shape, and for a non-reference `column`, `size_b`, `size_h`, `size_d`, `sections` or
+`basis`.
 """
 
 from fractions import Fraction
-from typing import Annotated, Literal, Self
+from typing import Any, Literal, Self
 
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.kinds.model import Circular, Rectangular, Sections
 from eng_contract.params import eng_param
 from eng_contract.quantity import Quantity
-from eng_contract.verdicts import VerdictStatus
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.calcs.column_design.column_select import read_tolerance
 from eng_harness.kinds.edit_cycle import Label
 
-__all__ = ["BASIS_FIELDS", "ColumnRow", "MatchBody", "MatchInput", "MatchSizes", "SizeBody", "column_section_match"]
+__all__ = ["BASIS_FIELDS", "ColumnRow", "MatchBody", "MatchInput", "column_section_match"]
 
 _LENGTH = "compare.length_mm"
 BASIS_FIELDS = (_LENGTH,)
@@ -48,53 +49,27 @@ class ColumnRow(_M):
     length_mm: float
 
 
-class SizeBody(_M):
-    """The body of `harness.section_size/1` without `calc`, `draft` and `trace` (spec 0003 4.10)."""
-
-    required: Quantity
-    increment: Quantity
-    multiple: Annotated[int, Field(ge=1)]
-    size: Quantity
-    status: Literal[VerdictStatus.PASS]
-
-    @model_validator(mode="after")
-    def _mm_and_round(self) -> Self:
-        if {self.required.unit, self.increment.unit, self.size.unit} != {"mm"}:
-            raise ValueError("required, increment and size must be in mm")
-        required, increment = Fraction(self.required.value), Fraction(self.increment.value)
-        exact = self.multiple * increment
-        if self.size.value != float(exact):
-            raise ValueError("size must be multiple times increment, converted to float once (N2)")
-        if exact < required:
-            raise ValueError("size must be at least required (N2)")
-        if exact - required >= increment:
-            raise ValueError("size must be less than required plus increment (N2)")
-        return self
-
-
-class MatchSizes(_M):
-    """One `harness.section_size/1` body per dimension: `b` and `h`, or `D` (spec 0013 4.4.4)."""
-
-    b: SizeBody | None = None
-    h: SizeBody | None = None
-    D: SizeBody | None = None
-
-    @model_validator(mode="after")
-    def _b_h_or_d(self) -> Self:
-        rectangular = self.b is not None and self.h is not None and self.D is None
-        circular = self.D is not None and self.b is None and self.h is None
-        if not (rectangular or circular):
-            raise ValueError("sizes must give b and h, or D")
-        return self
+def _size_param() -> Any:
+    return eng_param(None, unit="mm", ref_capable=True, ref_kinds={"harness.section_size/1"}, engineering_quantity=True)
 
 
 class MatchInput(CalcInput):
-    """The column row, rounded sizes, model sections and the design basis."""
+    """The column row, rounded size references (`harness.section_size/1`), model sections and the design basis."""
 
     column: ColumnRow = eng_param(ref_capable=True, ref_kinds={"harness.column_selection/1"}, engineering_quantity=True)
-    sizes: MatchSizes
+    size_b: Quantity | None = _size_param()
+    size_h: Quantity | None = _size_param()
+    size_d: Quantity | None = _size_param()
     sections: Sections = eng_param(ref_capable=True, ref_kinds={"model.sections/1"}, engineering_quantity=True)
     basis: DesignBasis = eng_param(ref_capable=True, ref_kinds={"basis.design_basis/1"}, engineering_quantity=True)
+
+    @model_validator(mode="after")
+    def _b_h_or_d(self) -> Self:
+        rectangular = self.size_b is not None and self.size_h is not None and self.size_d is None
+        circular = self.size_d is not None and self.size_b is None and self.size_h is None
+        if not (rectangular or circular):
+            raise ValueError("give size_b and size_h, or size_d")
+        return self
 
 
 class MatchBody(_M):
@@ -105,9 +80,9 @@ class MatchBody(_M):
     names: list[str]
 
 
-def _require_refs(meta: InputMeta) -> dict[str, str]:
+def _require_refs(meta: InputMeta, *names: str) -> dict[str, str]:
     refs: dict[str, str] = {}
-    for name in ("column", "sections", "basis"):
+    for name in names:
         ref = meta.refs.get(name)
         if ref is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"{name} must be a record reference", field=name)
@@ -122,15 +97,15 @@ def _within(actual: float, target: Fraction, tolerance: Fraction) -> bool:
 
 def _candidates(inp: MatchInput, tolerance: Fraction) -> list[str]:
     """M1: names of frame sections of the column's shape and material within the tolerance on every dimension."""
-    column, sizes = inp.column, inp.sizes
+    column = inp.column
     if column.shape == "rectangular":
-        if sizes.b is None or sizes.h is None:
+        if inp.size_b is None or inp.size_h is None:
             raise ContractError(
                 ErrorCode.INVALID_ARGUMENT,
-                "rectangular column needs sizes b and h",
-                field="sizes",
+                "rectangular column needs size_b and size_h",
+                field="size_b",
             )
-        b_mm, h_mm = Fraction(sizes.b.size.value), Fraction(sizes.h.size.value)
+        b_mm, h_mm = Fraction(inp.size_b.value), Fraction(inp.size_h.value)
         names: list[str] = []
         for row in inp.sections.frame_sections:
             if row.material != column.material or not isinstance(row.shape, Rectangular):
@@ -139,13 +114,13 @@ def _candidates(inp: MatchInput, tolerance: Fraction) -> list[str]:
                 names.append(row.name)
         return sorted(names)
     if column.shape == "circular":
-        if sizes.D is None:
+        if inp.size_d is None:
             raise ContractError(
                 ErrorCode.INVALID_ARGUMENT,
-                "circular column needs size D",
-                field="sizes",
+                "circular column needs size_d",
+                field="size_d",
             )
-        d_mm = Fraction(sizes.D.size.value)
+        d_mm = Fraction(inp.size_d.value)
         names = []
         for row in inp.sections.frame_sections:
             if row.material != column.material or not isinstance(row.shape, Circular):
@@ -170,23 +145,24 @@ def column_section_match(inp: MatchInput, meta: InputMeta, trace: TraceBuilder) 
     Raises:
         ContractError: see the module docstring.
     """
-    refs = _require_refs(meta)
+    size_names = ("size_d",) if inp.size_d is not None else ("size_b", "size_h")
+    refs = _require_refs(meta, "column", "sections", "basis", *size_names)
     tolerance = read_tolerance(inp.basis)
     trace.input("column", inp.column.frame_id, ref=refs["column"])
     trace.input("frame_sections", len(inp.sections.frame_sections), ref=refs["sections"])
     trace.input("compare_length_mm", float(tolerance), unit="mm", ref=f"{refs['basis']}#/fields/{_LENGTH}")
-    if inp.sizes.D is not None:
-        trace.input("size_D_mm", inp.sizes.D.size.value, unit="mm")
+    if inp.size_d is not None:
+        trace.input("size_D_mm", inp.size_d.value, unit="mm", ref=f"{refs['size_d']}#/size")
     else:
-        size_b, size_h = inp.sizes.b, inp.sizes.h
+        size_b, size_h = inp.size_b, inp.size_h
         if size_b is None or size_h is None:
             raise ContractError(
                 ErrorCode.INVALID_ARGUMENT,
-                "sizes must give b and h, or D",
-                field="sizes",
+                "give size_b and size_h, or size_d",
+                field="size_b",
             )
-        trace.input("size_b_mm", size_b.size.value, unit="mm")
-        trace.input("size_h_mm", size_h.size.value, unit="mm")
+        trace.input("size_b_mm", size_b.value, unit="mm", ref=f"{refs['size_b']}#/size")
+        trace.input("size_h_mm", size_h.value, unit="mm", ref=f"{refs['size_h']}#/size")
     names = _candidates(inp, tolerance)
     if len(names) == 1:
         status: _Status = "matched"

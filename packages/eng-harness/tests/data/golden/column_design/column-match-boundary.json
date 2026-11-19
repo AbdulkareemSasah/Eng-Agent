@@ -12,22 +12,8 @@
       "story": "L1",
       "length_mm": 3000.0
     },
-    "sizes": {
-      "b": {
-        "required": {"value": 400.0, "unit": "mm"},
-        "increment": {"value": 50.0, "unit": "mm"},
-        "multiple": 8,
-        "size": {"value": 400.0, "unit": "mm"},
-        "status": "PASS"
-      },
-      "h": {
-        "required": {"value": 600.0, "unit": "mm"},
-        "increment": {"value": 50.0, "unit": "mm"},
-        "multiple": 12,
-        "size": {"value": 600.0, "unit": "mm"},
-        "status": "PASS"
-      }
-    },
+    "size_b": {"value": 400.0, "unit": "mm"},
+    "size_h": {"value": 600.0, "unit": "mm"},
     "sections": {
       "frame_sections": [
         {
@@ -58,6 +44,8 @@
   },
   "refs": {
     "column": "res_01KCC000000000000000000041",
+    "size_b": "res_01KCC000000000000000000044",
+    "size_h": "res_01KCC000000000000000000045",
     "sections": "res_01KCC000000000000000000042",
     "basis": "res_01KCC000000000000000000043"
   },

@@ -12,15 +12,7 @@
       "story": "L1",
       "length_mm": 3000.0
     },
-    "sizes": {
-      "D": {
-        "required": {"value": 500.0, "unit": "mm"},
-        "increment": {"value": 50.0, "unit": "mm"},
-        "multiple": 10,
-        "size": {"value": 500.0, "unit": "mm"},
-        "status": "PASS"
-      }
-    },
+    "size_d": {"value": 500.0, "unit": "mm"},
     "sections": {
       "frame_sections": [
         {
@@ -56,6 +48,7 @@
   },
   "refs": {
     "column": "res_01KCC000000000000000000051",
+    "size_d": "res_01KCC000000000000000000054",
     "sections": "res_01KCC000000000000000000052",
     "basis": "res_01KCC000000000000000000053"
   },
