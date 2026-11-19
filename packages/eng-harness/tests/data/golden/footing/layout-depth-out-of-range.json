@@ -1,0 +1,81 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.3, synthetic fixture",
+  "method_ref": "\u00a74.4.3 L3",
+  "synthetic": true,
+  "derivation": "Basis: db = 20 mm, bottom_layer = x_bottom, c = 75 mm, reaction_point = top_of_footing. Upper layer effective depth boundary: c + 3*db/2 = 75 + 30 = 105 mm. Footing J1 has h = 105 mm, so d_upper = 105 - 75 - 30 = 0 <= 0, leaving no room for both bottom layers. Spec section 4.4.3 L3 and section 6 refuse this with OUT_OF_RANGE, field dims.",
+  "input": {
+    "dims": {
+      "footings": [
+        {
+          "id": "J1",
+          "Lx_mm": 1000.0,
+          "Ly_mm": 1000.0,
+          "h_mm": 105.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        }
+      ]
+    },
+    "subjects": {
+      "subjects": [
+        {
+          "id": "J1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "cx_mm": 300.0,
+          "cy_mm": 300.0
+        }
+      ],
+      "excluded": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "reinforcement.bar_diameter_mm": {
+          "value": 20.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.bottom_layer": {
+          "value": "x_bottom",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "durability.cover_footing_mm": {
+          "value": 75.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.reaction_point": {
+          "value": "top_of_footing",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "dims": "res_00000000000000000000000001",
+    "subjects": "res_00000000000000000000000002",
+    "basis": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "error_code": "OUT_OF_RANGE",
+    "field": "dims"
+  }
+}

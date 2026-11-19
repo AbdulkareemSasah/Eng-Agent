@@ -19,25 +19,28 @@ from typing import Any, cast
 from eng_contract.canonical import payload_sha256
 from eng_contract.envelope import Provenance
 from eng_contract.errors import ContractError
-from eng_contract.ids import FixedClock, IdSource, SeededIdSource
+from eng_contract.ids import Clock, FixedClock, IdSource, SeededIdSource
 from eng_contract.store import ResultStore, Workspace
 from pydantic import BaseModel, ConfigDict, JsonValue, ValidationError
 from workflows.rig import Host
 
 from eng_harness import __version__
-from eng_harness.block import Registry, workflow
+from eng_harness.block import ModelFile, Registry, workflow
 from eng_harness.calc import CalcStatus
-from eng_harness.cli import CliDeps, main
+from eng_harness.cli import CliDeps, DoctorRunner, main
 from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._wiring import RunPortSet, default_engine_factory
+from eng_harness.decisions.interfaces import DecisionAnswer, DecisionCall, PendingAnswer
 from eng_harness.engine import EngineSettings, RunOutcome, RunRequest, RunStatus
 from eng_harness.engine._inputs import build_request, check_answer, data_schema
 from eng_harness.errors import HarnessCode
-from eng_harness.journal import EventType, JournalWriter
+from eng_harness.journal import EventType, JournalReader, JournalWriter
+from eng_harness.journal import _events as ev
 from eng_harness.pages import PageServer
 from eng_harness.pages._answers import bound_sha256
 from eng_harness.pages._security import CSRF_FIELD
-from eng_harness.ports import ApprovalRequest, HostPort, InputAnswer, InputRequest, RunClass, ToolPort
+from eng_harness.ports import ApprovalRequest, DecisionPort, HostPort, InputAnswer, InputRequest, RunClass, ToolPort
+from eng_harness.providers import DecisionRuntime, assemble_decision_runtime
 from helpers.page_client import PageClient
 
 START_MS = 1_767_225_600_000  # 2026-01-01T00:00:00.000Z
@@ -91,12 +94,13 @@ FILE_FLOW = "file_flow"
 
 
 class FileInput(BaseModel):
-    """The input of the workflow with model files: two `Path` fields and the `visible_host` flag (spec 0006 AC67)."""
+    """Model files, an ordinary path and the visibility flag (spec 0006 AC67)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    model_file: Path
-    other_file: Path | None = None
+    model_file: ModelFile
+    other_file: ModelFile | None = None
+    ordinary_path: Path = Path("notes.txt")
     visible_host: bool = False
 
 
@@ -290,6 +294,7 @@ class FakeEngine:
         run_dir.mkdir(parents=True)
         base = self.store.put("harness.journal_blob/1", {"value": 0}, PRODUCER).result_id
         stored = self.store.put("harness.run_input/1", {"value": request.input}, PRODUCER)
+        decision_runtime = dict(self.ports.decision.runtime_summary()) if self.ports.decision is not None else {}
         header = {
             "run_id": run_id, "workflow": request.workflow,
             "block": {"name": request.workflow, "version": "1", "code_sha256": SHA},
@@ -297,6 +302,7 @@ class FakeEngine:
             "basis_ref": request.basis_ref if self._keep_basis_ref else base,
             "mode": request.mode.value, "run_class": request.run_class.value, "engine_version": __version__,
             "contract_version": "eng-contract/1", "settings_sha256": SHA, "servers": [], "always_ask": [],
+            "decision_runtime": decision_runtime,
         }  # fmt: skip
         writer = self._writer(run_dir)
         try:
@@ -308,9 +314,24 @@ class FakeEngine:
     async def resume(self, run_id: str) -> RunOutcome:
         """Journal `run_resumed` and run the script again."""
         self._log.append("resume")
-        writer = self._writer(self.workspace.root / "runs" / run_id)
+        run_dir = self.workspace.root / "runs" / run_id
+        with contextlib.closing(JournalReader(run_dir)) as reader:
+            events = reader.events()
+        head = next(e.payload for e in events if isinstance(e.payload, ev.RunHeader))
+        seen = [e.payload for e in events if isinstance(e.payload, ev.RunResumed)]
+        last_runtime = [head.decision_runtime, *(p.decision_runtime for p in seen if p.decision_runtime is not None)][
+            -1
+        ]
+        runtime = dict(self.ports.decision.runtime_summary()) if self.ports.decision is not None else {}
+        resumed: dict[str, JsonValue] = {
+            "resume_no": max((p.resume_no for p in seen), default=0) + 1,
+            "code_hash_changed": False,
+            "servers": [],
+            "decision_runtime": runtime if runtime != last_runtime else None,
+        }
+        writer = self._writer(run_dir)
         try:
-            writer.append(EventType.RUN_RESUMED, {"resume_no": 1, "code_hash_changed": False, "servers": []})
+            writer.append(EventType.RUN_RESUMED, resumed)
             return await self._script(Session(self, run_id, True, writer, self.ports))
         finally:
             writer.close()
@@ -352,6 +373,22 @@ def client_for(address: str) -> PageClient:
     return PageClient(cast(PageServer, SimpleNamespace(port=port, launch_address=address)))
 
 
+class _FakeDecisionPort:
+    """A `DecisionPort` over the assembled runtime summary for command-line tests."""
+
+    def __init__(self, summary: Mapping[str, JsonValue]) -> None:
+        self._summary = dict(summary)
+
+    async def decide(self, call: DecisionCall) -> DecisionAnswer | PendingAnswer:
+        raise AssertionError("the fake decision port is not called in CLI wiring tests")
+
+    async def decide_many(self, calls: Sequence[DecisionCall]) -> list[DecisionAnswer | PendingAnswer]:
+        raise AssertionError("the fake decision port is not called in CLI wiring tests")
+
+    def runtime_summary(self) -> Mapping[str, JsonValue]:
+        return self._summary
+
+
 @dataclass
 class Rig:
     """One command-line environment in `root`: the deps, the fakes' log and the captured streams."""
@@ -364,6 +401,7 @@ class Rig:
     built: list[tuple[Any, ...]] = field(default_factory=list)
     on_build: Callable[[Path], None] | None = None
     open_with: Callable[[str], bool] | None = None
+    terminal_writer: Callable[[str], bool] | None = None
     out: io.StringIO = field(default_factory=io.StringIO)
     err: io.StringIO = field(default_factory=io.StringIO)
     engines: list[FakeEngine] = field(default_factory=list)
@@ -372,6 +410,7 @@ class Rig:
     real_engine: bool = False  # the merged `Engine` over a fake host, the page ports seen through `shown`
     shown: list[ApprovalRequest] = field(default_factory=list)  # the approvals the real engine presented
     models: list[tuple[Mapping[str, Path], bool]] = field(default_factory=list)  # `files`, `visible` of each build
+    doctor: DoctorRunner | None = None
 
     @property
     def workspace(self) -> Path:
@@ -390,6 +429,14 @@ class Rig:
     def _opener(self, address: str) -> bool:
         self.opened.append(address)
         return True if self.open_with is None else self.open_with(address)
+
+    def _terminal(self, text: str) -> bool:
+        return False if self.terminal_writer is None else self.terminal_writer(text)
+
+    def _decision_port(
+        self, runtime: DecisionRuntime, config: HarnessConfig, workspace: Workspace, clock: Clock, ids: IdSource
+    ) -> DecisionPort:
+        return _FakeDecisionPort(runtime.summary)
 
     def _engine(
         self, workspace: Workspace, registry: Registry, ports: RunPortSet, store: ResultStore, settings: EngineSettings,
@@ -427,10 +474,14 @@ class Rig:
         clock = FixedClock(START_MS, 1)
         fields: dict[str, Any] = {
             "stdout": self.out, "stderr": self.err, "environ": {"ENG_WORKSPACE": str(self.workspace)},
-            "opener": self._opener, "clock": clock, "ids": SeededIdSource(b"cli", clock),
-            "engine_factory": self._engine, "workflow_registry": REGISTRY, "port_builder": self._port_builder,
-            "calc_port_factory": self._calc,
+            "opener": self._opener, "terminal_writer": self._terminal, "clock": clock,
+            "ids": SeededIdSource(b"cli", clock), "engine_factory": self._engine, "workflow_registry": REGISTRY,
+            "port_builder": self._port_builder, "calc_port_factory": self._calc,
+            "decision_assembler": assemble_decision_runtime, "point_policies": {},
+            "decision_port_factory": self._decision_port, "basis_fields_of": lambda w: w.basis_fields,
         }  # fmt: skip
+        if self.doctor is not None:
+            fields["doctor"] = self.doctor
         return CliDeps(**(fields | replace))
 
     def main(self, *argv: str, **replace: Any) -> int:

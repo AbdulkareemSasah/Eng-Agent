@@ -1,5 +1,25 @@
 [
   {
+    "name": "column_design_engineer_turn",
+    "version": 1,
+    "schema_sha256": "5962ec415df10613c18e9e246cc59041f1cadfba6f85e99c1b1263d0a7429883"
+  },
+  {
+    "name": "column_design_member_action",
+    "version": 1,
+    "schema_sha256": "15d95f2176fd5006cc0bc3cd5e3033067285b79ad78b8a7b8b09b9e9246d3827"
+  },
+  {
+    "name": "column_revit_map_result",
+    "version": 1,
+    "schema_sha256": "6ce4ab2cabf4358e677c37e15d9f6ea4c33deda271980898947377dc536c2945"
+  },
+  {
+    "name": "column_revit_readback_result",
+    "version": 1,
+    "schema_sha256": "16e2d5b486b815818733704b93bee36de36fa33db8bb0766a13e1a9837111533"
+  },
+  {
     "name": "edit_cycle_analysis_messages",
     "version": 1,
     "schema_sha256": "de2e7d03ab64e162e3709d06b29acc402f1a89d9e4f0cf447d07ed57b92f40d5"

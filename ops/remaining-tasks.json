@@ -1,6 +1,6 @@
 {
  "generated_from": "lead task registry, build/v1 at 4f8a2f1; checkpoint B-473 of 2026-11-12 added B-456, B-460, B-464, B-466, B-470 and B-472 and fixed the dependencies after the splits; checkpoint B-487 of 2026-11-14 (build/v1 at beccdb9) renamed B-433, B-138 and B-229 to the split tasks I.T18a, S.T19a and P.T10a, added B-485, B-486, B-488, B-489, B-490 and B-491, and fixed the dependencies on S.T19 and P.T10. Entries of merged work items stay in the file. Checkpoint of 2026-11-16 (build/v1 at 4c4be4d) added B-518 to B-528 and B-534, applied the registry changes of amendments B-510, B-511, B-513 and B-533, and removed merged dependencies. Checkpoint of 2026-11-17 (build/v1 at d5ea640) added B-546 to B-554, set merged_pr on every merged entry, fixed B-138 (risk r1, r2, r3; waits only for S.T23) and removed merged dependencies. Resume update on 2026-11-17 at 2a2171ea: added B-560, corrected B-554 merged_pr #409 and branch_pushed, recorded resumed B-550/B-552 branch states and reviews, and added B-560 as B-551 dependency. Current integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412, B-560/#413 merged; B-550 adds one merged plan task, B-552 adds plan T40; cleared B-138 S.T23, B-551 DOC.B560 and B-553 DOC.B552 dependencies. Integration checkpoint 2026-11-17 at d9c19fb: B-550/#411, B-552/#412 and B-560/#413 merged; fulfilled dependencies S.T23, DOC.B552 and DOC.B560 cleared. Current continuation checkpoint 2026-11-17: registered B-561/DOC.B561 for B-553 RF001 risk amendment; B-553 depended on DOC.B561 until B-561 merged as PR #414. Integrated B-551/#415 and B-553/#416 in the batch; cleared DOC.B561 from B-553 and recorded B-553 risk r2, r3, and cleared B-559 I.T9b after B-518/#378 merged. Owner-approved contract checkpoint 2026-11-17: registered DOC.B562 as the explicit conservative original-open capability and scope prerequisite of B-138; plan progress remains 232/354, registry has 184 entries. Owner pause checkpoint 2026-11-18 at integration head 686578fe: B-556/#417 and B-562/#418 merged; cleared W.T7b and DOC.B562. B-138 WIP pushed at 0a407606 with 3 of 3 sessions used; registered DOC.B563 as its only pending prerequisite. B-202 records both W.T17 and W.T16b. Plan progress 233/354; registry 185 entries. Checkpoint of 2026-11-18 (hand-over 2): merged_pr refreshed, B-564 to B-566 added, B-138 integration-only.",
- "count": 191,
+ "count": 192,
  "tasks": [
   {
    "id": "B-437",
@@ -359,7 +359,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 448
   },
   {
    "id": "B-137",
@@ -546,14 +547,13 @@
    "branch": "feat/b189-harness-it15-basis-confirmation-screen-setup",
    "prTitle": "feat(eng-harness): basis confirmation screen, setup log and its place in run (B-189)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 454
   },
   {
    "id": "B-190",
@@ -565,9 +565,7 @@
    "branch": "feat/b190-harness-it16-commands-status-stop-report",
    "prTitle": "feat(eng-harness): commands status, stop, report and doctor (B-190)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T14b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, low",
    "verifier_lenses": [],
@@ -585,7 +583,6 @@
    "prTitle": "feat(eng-harness): end-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule (B-191)",
    "risk": "r3",
    "pending_deps": [
-    "I.T15",
     "I.T16",
     "I.T16b"
    ],
@@ -610,7 +607,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 441
   },
   {
    "id": "B-429",
@@ -641,7 +639,6 @@
    "prTitle": "feat(eng-harness): production wiring: the decision, progress and run-control ports reach the real engine (B-430)",
    "risk": "r3",
    "pending_deps": [
-    "I.T14b",
     "I.T16"
    ],
    "writer": "sonnet, high",
@@ -680,7 +677,6 @@
    "prTitle": "test(eng-harness): real-engine re-checks of the screens and the run and resume commands (B-432)",
    "risk": "r3",
    "pending_deps": [
-    "I.T15",
     "I.T16",
     "I.T16b"
    ],
@@ -701,8 +697,6 @@
    "prTitle": "feat(eng-harness): bind the CliDeps defaults to the merged real implementations, except the port builder (B-433)",
    "risk": "r3",
    "pending_deps": [
-    "I.T14b",
-    "I.T15",
     "I.T16",
     "I.T16b",
     "W.T9"
@@ -825,7 +819,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 434
   },
   {
    "id": "B-151",
@@ -837,9 +832,7 @@
    "branch": "feat/b151-harness-ct12-calc-6-element-count",
    "prTitle": "feat(eng-harness): calc 6, element count and position comparison (B-151)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T11"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1166,7 +1159,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 445
   },
   {
    "id": "B-282",
@@ -1178,9 +1172,7 @@
    "branch": "feat/b282-harness-gt3-calc-harness-column-demands",
    "prTitle": "feat(eng-harness): calc harness.column_demands (sign, axes, length, layout, not-checked reasons) (B-282)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T2"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1197,9 +1189,7 @@
    "branch": "feat/b283-harness-gt4-calc-harness-column-review",
    "prTitle": "feat(eng-harness): calc harness.column_review (members, governing references, changes) (B-283)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T2"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1216,10 +1206,7 @@
    "branch": "feat/b284-harness-gt5-calcs-harness-column-section",
    "prTitle": "feat(eng-harness): calcs harness.column_section_match and harness.column_change_set (B-284)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "C.T11",
-    "G.T2"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1237,7 +1224,7 @@
    "prTitle": "feat(eng-harness): code-pack route in the CalcPort for the three ACI 318-14 column checks (B-285)",
    "risk": "r1, r3",
    "pending_deps": [
-    "Z.T5"
+    "G.T3"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1256,7 +1243,6 @@
    "prTitle": "feat(eng-harness): calc harness.revit_column_update (plan of Revit type changes by reference) (B-286)",
    "risk": "r1, r3",
    "pending_deps": [
-    "G.T2",
     "R.T12",
     "R.T6"
    ],
@@ -1302,7 +1288,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 447
   },
   {
    "id": "B-289",
@@ -1315,7 +1302,6 @@
    "prTitle": "feat(eng-harness): engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets) (B-289)",
    "risk": "r1, r3",
    "pending_deps": [
-    "W.T8",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -1339,7 +1325,6 @@
     "G.T3",
     "G.T4",
     "G.T6",
-    "G.T9",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -1464,9 +1449,7 @@
    "branch": "feat/b326-codes-yt2-clause-map-module-footing",
    "prTitle": "feat(structural-codes): clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check (B-326)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "Z.T5"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1603,7 +1586,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 331
   },
   {
    "id": "B-196",
@@ -1732,14 +1716,13 @@
    "branch": "feat/b202-harness-wt8-workflow-part-1-definition",
    "prTitle": "feat(eng-harness): workflow part 1 - definition, basis fields, steps 1 to 10 (read, differences, change set, approval, apply, read back) (B-202)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T13b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 450
   },
   {
    "id": "B-203",
@@ -1752,7 +1735,7 @@
    "prTitle": "feat(eng-harness): workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop (B-203)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T8"
+    "superseded"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -1760,7 +1743,8 @@
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "Replaced by B-526 (T9a) and B-527 (T9b) after amendment B-511."
+    "Replaced by B-526 (T9a) and B-527 (T9b) after amendment B-511.",
+    "superseded: plan 0007 T9 was split into T9a (B-526), T9b (B-527) and T9c (B-558); no work item left under T9"
    ]
   },
   {
@@ -1870,9 +1854,9 @@
    "plan": "packages/eng-harness/docs/plans/0010-design-isolated-footing.md",
    "planTask": "T4",
    "kind": "impl",
-   "title": "Calcs harness.footing_plan_size and harness.footing_resize",
+   "title": "Calc harness.footing_plan_size (T4 after the B-567 split)",
    "branch": "feat/b395-harness-xt4-footing-plan-size-and-resize",
-   "prTitle": "feat(eng-harness): calcs harness.footing_plan_size and harness.footing_resize (B-395)",
+   "prTitle": "feat(eng-harness): calc harness.footing_plan_size (B-395)",
    "risk": "r1, r2, r3",
    "pending_deps": [],
    "writer": "sonnet, high",
@@ -1902,7 +1886,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 444
   },
   {
    "id": "B-397",
@@ -1922,7 +1907,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 435
   },
   {
    "id": "B-398",
@@ -1953,9 +1939,8 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "X.T4",
-    "X.T5",
-    "X.T6",
-    "X.T7"
+    "X.T7",
+    "X.T4b"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -2081,7 +2066,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 437
   },
   {
    "id": "B-211",
@@ -2093,14 +2079,13 @@
    "branch": "feat/b211-harness-ft2-synthetic-safe-mode-of",
    "prTitle": "feat(eng-harness): synthetic SAFE mode of the CSI fake and its schema check (B-211)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 452
   },
   {
    "id": "B-212",
@@ -2112,10 +2097,7 @@
    "branch": "feat/b212-harness-ft3-safe-allowlist-entries-pinned",
    "prTitle": "feat(eng-harness): sAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries (B-212)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T1",
-    "F.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2209,8 +2191,7 @@
    "prTitle": "feat(eng-harness): recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list (B-217)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T7",
-    "S.T17"
+    "F.T7"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2228,9 +2209,7 @@
    "branch": "feat/b230-harness-rt1-framework-extensions-attended-class",
    "prTitle": "feat(eng-harness): framework extensions (attended class, host_dialog confirm, optional pid, deny-list names) and the Revit server section (B-230)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2287,7 +2266,6 @@
    "prTitle": "feat(eng-harness): revit build check (excluded tools, toolset reason, catalog version), role start options and the pinned pipe (B-233)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T1",
     "R.T3"
    ],
    "writer": "sonnet, medium",
@@ -2460,8 +2438,7 @@
    "prTitle": "feat(eng-harness): record mode scenario for Revit, sanitizer rules, recordings contract tests and the record script (B-242)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T11",
-    "S.T17"
+    "R.T11"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2522,10 +2499,7 @@
    "prTitle": "feat(eng-harness): sAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint (B-245)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T1",
-    "F.T2",
-    "F.T3",
-    "S.T17"
+    "F.T3"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2544,8 +2518,7 @@
    "prTitle": "feat(eng-harness): synthetic SAP2000 mode of the CSI fake and its schema check (B-246)",
    "risk": "r1, r3",
    "pending_deps": [
-    "A.T1",
-    "F.T2"
+    "A.T1"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2646,8 +2619,7 @@
    "pending_deps": [
     "A.T5",
     "A.T6",
-    "F.T8",
-    "S.T17"
+    "F.T8"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2670,7 +2642,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 440
   },
   {
    "id": "B-301",
@@ -2682,9 +2655,7 @@
    "branch": "feat/b301-harness-ht2-synthetic-idea-fake-server",
    "prTitle": "feat(eng-harness): synthetic IDEA fake server (test-only), its faults and its schema check (B-301)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2702,7 +2673,6 @@
    "prTitle": "feat(eng-harness): iDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header (B-302)",
    "risk": "r1, r3",
    "pending_deps": [
-    "H.T1",
     "H.T2"
    ],
    "writer": "sonnet, medium",
@@ -2977,7 +2947,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "new plan task from B-484 (budget 40, one session); edits tests/data/golden/footing/subjects-*.json, a CODEOWNERS test-oracle path, so owner review notices are expected (AW02, GC015); regenerates its calcs.lock.json entry with the lock writer, never by hand, and whichever of T3b and another calc task merges second regenerates its own entry; keeps version 1 (the calc is draft and was never approved: OQ-Q90); tests_first lines were reasoned, not run: verify red at the base first; deferred set"
-   ]
+   ],
+   "merged_pr": 442
   },
   {
    "id": "B-486",
@@ -3062,7 +3033,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "B-487: second half of the T19 split of amendment B-475 (budget 120, two sessions); off the first-live-run path; plan 0008 T1 also edits build_ports after T19a: whichever of the two lands second adapts to the other"
-   ]
+   ],
+   "merged_pr": 438
   },
   {
    "id": "B-491",
@@ -3250,7 +3222,6 @@
    "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T8",
     "W.T8b"
    ],
    "writer": "sonnet, medium",
@@ -3840,7 +3811,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
-   ]
+   ],
+   "merged_pr": 433
   },
   {
    "id": "B-572",
@@ -3852,9 +3824,7 @@
    "branch": "feat/b572-harness-wt8b-result-accessors",
    "prTitle": "feat(eng-harness): sanctioned result accessors for block code (B-572)",
    "risk": "r3",
-   "pending_deps": [
-    "W.T8"
-   ],
+   "pending_deps": [],
    "writer": "agy hydrogen medium",
    "reviewer": "codex terra",
    "verifier_lenses": [],
@@ -3862,6 +3832,31 @@
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
+   ]
+  },
+  {
+   "id": "B-575",
+   "task": "X.T4b",
+   "plan": "packages/eng-harness/docs/plans/0010-design-isolated-footing.md",
+   "planTask": "T4b",
+   "kind": "impl",
+   "title": "Calc harness.footing_resize (split from T4 by amendment B-567)",
+   "branch": "feat/b575-harness-xt4b-footing-resize",
+   "prTitle": "feat(eng-harness): calc harness.footing_resize (B-575)",
+   "risk": "r1, r2, r3",
+   "pending_deps": [
+    "X.T4"
+   ],
+   "writer": "agy hydrogen high",
+   "reviewer": "codex sol + verifier lenses",
+   "verifier_lenses": [
+    "source",
+    "oracle"
+   ],
+   "open_pr": null,
+   "branch_pushed": false,
+   "lead_notes": [
+    "registered after B-567 (#439) split plan 0010 T4 into T4 and T4b"
    ]
   }
  ]

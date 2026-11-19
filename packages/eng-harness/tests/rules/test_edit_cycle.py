@@ -19,7 +19,7 @@ from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs.edit_cycle.analysis_summary import SummaryBody, SummaryInput, analysis_summary
 from eng_harness.ctx import BasisView
 from eng_harness.decisions import _points, _rules
-from eng_harness.decisions._points import DecisionPoint
+from eng_harness.decisions._points import DecisionPoint, PointRegistry
 from eng_harness.decisions._rules import RuleRegistry
 from eng_harness.decisions.types import Pick, RuleBasis
 from eng_harness.rules.edit_cycle import analysis_messages_clean, readback_result_pass
@@ -156,22 +156,22 @@ def _values(point: DecisionPoint) -> list[str]:
 def test_discovery_finds_the_points_and_rules() -> None:
     points, rules = _points.discover(), _rules.discover()
     # Other workflows ship their own points and rules; this test judges those of the edit cycle.
-    cycle_points = [p for p in points.points if p.name.startswith("edit_cycle_")]
-    cycle_rules = [r for r in rules.rules if r.point.startswith("edit_cycle_")]
-    assert [p.name for p in cycle_points] == [
+    RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
+    points = PointRegistry([p for p in points.points if p.name.startswith("edit_cycle_")])
+    rules = RuleRegistry([r for r in rules.rules if r.id.startswith("edit_cycle_")], points)
+    assert [p.name for p in points.points] == [
         "edit_cycle_analysis_messages",
         "edit_cycle_engineer_turn",
         "edit_cycle_readback_result",
     ]
-    assert [r.id for r in cycle_rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
-    RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
-    assert {p.name: _values(p) for p in cycle_points} == {
+    assert [r.id for r in rules.rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
+    assert {p.name: _values(p) for p in points.points} == {
         "edit_cycle_analysis_messages": ["continue", "stop_cycle"],
         "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
         "edit_cycle_readback_result": ["continue", "restore_previous", "stop_cycle"],
     }
-    assert all(r.thresholds == () and r.version == 2 for r in cycle_rules)
-    assert {p.name: p.version for p in cycle_points} == {
+    assert all(r.thresholds == () and r.version == 2 for r in rules.rules)
+    assert {p.name: p.version for p in points.points} == {
         "edit_cycle_analysis_messages": 1,
         "edit_cycle_engineer_turn": 1,
         "edit_cycle_readback_result": 2,

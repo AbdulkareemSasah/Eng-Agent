@@ -4,6 +4,7 @@
   "calcs": {
     "harness.model_fingerprint": [],
     "harness.design_summary": [],
+    "harness.section_round": [],
     "harness.model_diff": [
       "before_areas",
       "before_frames",
@@ -23,7 +24,19 @@
       "before_restraints",
       "before_sections",
       "before_stories"
+    ],
+    "harness.placement_compare": [
+      "a_areas",
+      "a_frames"
     ]
   },
-  "never": ["basis", "effects", "after", "b", "verdicts", "frames", "required"]
+  "never": [
+    "basis",
+    "effects",
+    "after",
+    "b",
+    "verdicts",
+    "frames",
+    "required"
+  ]
 }

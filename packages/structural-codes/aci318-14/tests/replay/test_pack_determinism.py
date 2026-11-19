@@ -32,7 +32,7 @@ def _run(seed: str) -> bytes:
 
 
 def test_identical_across_hash_seeds() -> None:
-    """Canonical JSON of all six payloads is byte-identical under PYTHONHASHSEED 0 and 1 (PK-AC7)."""
+    """Canonical JSON of all nine payloads is byte-identical under PYTHONHASHSEED 0 and 1 (PK-AC7)."""
     first = _run("0")
-    assert len(first.splitlines()) == 6
+    assert len(first.splitlines()) == 9
     assert first == _run("1")

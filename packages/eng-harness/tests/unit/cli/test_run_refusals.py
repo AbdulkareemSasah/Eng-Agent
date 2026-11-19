@@ -25,7 +25,6 @@ def test_refusals_create_no_run(tmp_path: Path) -> None:
         cases.append((name, Rig(tmp_path / name, **rig), argv, code, text))
 
     case("unknown", ["run", "nosuch"], ExitCode.REFUSED, "workflow 'nosuch' is not registered")
-    case("basis", ["run", NEEDS_BASIS], ExitCode.USAGE, "required basis fields is not available")
     case(
         "calcs",
         ["run", WORKFLOW],
@@ -43,6 +42,10 @@ def test_refusals_create_no_run(tmp_path: Path) -> None:
         assert rig.main(*argv) == code, name
         assert text in rig.err.getvalue(), (name, rig.err.getvalue())
         assert (rig.run_ids(), rig.engines, rig.out.getvalue()) == ([], [], ""), name
+    basis_rig = Rig(tmp_path / "basis")
+    assert basis_rig.main("run", NEEDS_BASIS, basis_fields_of=None) == ExitCode.USAGE
+    assert "required basis fields is not available" in basis_rig.err.getvalue()
+    assert (basis_rig.run_ids(), basis_rig.engines, basis_rig.out.getvalue()) == ([], [], "")
     # an input that cannot be read or does not fit the workflow's input model
     for name, text, where in [
         ("syntax", "{not json", "cannot read the input file"),
@@ -80,7 +83,7 @@ def test_run_is_unavailable_without_collaborators(tmp_path: Path) -> None:
         for missing in ("workflow_registry", "port_builder", "calc_port_factory"):
             assert rig.main(*argv, **{missing: None}) == ExitCode.USAGE
             assert f"command {argv[0]} is not available in this build" in rig.err.getvalue()
-        assert (rig.run_ids(), rig.engines, rig.built, rig.workspace.exists()) == ([], [], [], False)
+        assert (rig.run_ids(), rig.engines, rig.built, rig.runs.exists()) == ([], [], [], False)
 
 
 def test_arguments_no_command_knows_are_usage_errors(tmp_path: Path) -> None:

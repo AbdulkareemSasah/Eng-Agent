@@ -33,6 +33,7 @@ from structural_codes.content_hash import content_hash
 from structural_codes.errors import CheckDefinitionError, CheckNotUsable, NotImplementedGap, TraceValueError
 from structural_codes.inputs import CheckInputs
 from structural_codes.lifecycle import State, resolve_state
+from structural_codes.overlay import InheritedCheck
 from structural_codes.pack import Registry
 from structural_codes.trace import TraceRecorder
 
@@ -182,7 +183,13 @@ def _item(
         )
         return [framework], []
     names = [n for d in t.verdicts for n in (d.demand_name, d.capacity_name, d.ratio_name) if n is not None]
-    return [build_verdict(d, meta, subject, trace_index=k) for d in t.verdicts], list(dict.fromkeys(names))
+    body_meta = check.base.meta if isinstance(check, InheritedCheck) else meta
+    verdicts = [build_verdict(d, body_meta, subject, trace_index=k) for d in t.verdicts]
+    if isinstance(check, InheritedCheck):
+        # The base body names base clauses. Its validated verdicts carry the mapped overlay identity (AC18).
+        identity = {"check_id": meta.check_id, "code": meta.code, "clause": meta.clauses[0]}
+        verdicts = [verdict.model_copy(update=identity) for verdict in verdicts]
+    return verdicts, list(dict.fromkeys(names))
 
 
 def evaluate_batch(
