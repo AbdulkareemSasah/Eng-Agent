@@ -98,7 +98,11 @@ def test_no_engineering_numbers() -> None:
     for path in sorted(_SRC.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, int | float) and not isinstance(node.value, bool):
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, int | float)
+                and not isinstance(node.value, bool)
+            ):
                 pytest.fail(f"{path.relative_to(_SRC)}:{node.lineno}: numeric literal {node.value!r}")
             if isinstance(node, ast.Call):
                 name = node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", "")
