@@ -193,7 +193,7 @@ def _enlarge_plan(row: DimRow, quantities: dict[str, Fraction], trace: TraceBuil
     spacing = _fraction_mm(row.s_mm, row.id, "s_mm")
     increment = quantities["plan_increment_mm"]
     maximum = quantities["max_plan_dimension_mm"]
-    nxt = (plan // increment + ONE.value) * increment
+    nxt = (plan // increment + Fraction(ONE.value)) * increment
     trace.step(
         f"{prefix}_next_plan_mm",
         str(nxt),
