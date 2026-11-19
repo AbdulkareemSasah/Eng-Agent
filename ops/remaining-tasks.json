@@ -570,7 +570,8 @@
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 459
   },
   {
    "id": "B-191",
@@ -641,7 +642,7 @@
    "pending_deps": [
     "I.T16"
    ],
-   "writer": "sonnet, high",
+   "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
@@ -840,7 +841,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 461
   },
   {
    "id": "B-171",
@@ -1176,7 +1178,7 @@
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": null,
+   "open_pr": 463,
    "branch_pushed": false
   },
   {
@@ -1194,7 +1196,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 458
   },
   {
    "id": "B-284",
@@ -1457,7 +1460,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 460
   },
   {
    "id": "B-327",
@@ -1472,7 +1476,7 @@
    "pending_deps": [
     "Y.T2"
    ],
-   "writer": "opus, medium",
+   "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [
     "source",
@@ -1866,7 +1870,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 453
   },
   {
    "id": "B-396",
@@ -1925,7 +1930,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 436
   },
   {
    "id": "B-399",
@@ -2214,7 +2220,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 457
   },
   {
    "id": "B-231",
@@ -2229,7 +2236,7 @@
    "pending_deps": [
     "R.T1"
    ],
-   "writer": "sonnet, medium",
+   "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
@@ -3828,7 +3835,7 @@
    "writer": "agy hydrogen medium",
    "reviewer": "codex terra",
    "verifier_lenses": [],
-   "open_pr": null,
+   "open_pr": 464,
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
@@ -3844,9 +3851,7 @@
    "branch": "feat/b575-harness-xt4b-footing-resize",
    "prTitle": "feat(eng-harness): calc harness.footing_resize (B-575)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T4"
-   ],
+   "pending_deps": [],
    "writer": "agy hydrogen high",
    "reviewer": "codex sol + verifier lenses",
    "verifier_lenses": [

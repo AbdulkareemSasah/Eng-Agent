@@ -155,6 +155,8 @@ def _values(point: DecisionPoint) -> list[str]:
 
 def test_discovery_finds_the_points_and_rules() -> None:
     points, rules = _points.discover(), _rules.discover()
+    # Other workflows ship their own points and rules; this test judges those of the edit cycle.
+    RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
     points = PointRegistry([p for p in points.points if p.name.startswith("edit_cycle_")])
     rules = RuleRegistry([r for r in rules.rules if r.id.startswith("edit_cycle_")], points)
     assert [p.name for p in points.points] == [
@@ -163,7 +165,6 @@ def test_discovery_finds_the_points_and_rules() -> None:
         "edit_cycle_readback_result",
     ]
     assert [r.id for r in rules.rules] == ["edit_cycle_analysis_messages.clean", "edit_cycle_readback_result.pass"]
-    RuleRegistry(rules.rules, points)  # every rule names a point whose state model is its first parameter
     assert {p.name: _values(p) for p in points.points} == {
         "edit_cycle_analysis_messages": ["continue", "stop_cycle"],
         "edit_cycle_engineer_turn": ["accept", "more_edits", "hand_edit"],
