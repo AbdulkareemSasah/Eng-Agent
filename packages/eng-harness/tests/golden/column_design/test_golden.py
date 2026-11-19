@@ -19,9 +19,17 @@ from eng_harness.calc import CalcInput, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.column_design import COLUMN_DESIGN_CALCS, COLUMN_DESIGN_KINDS
 from eng_harness.calcs.column_design.change_set import column_change_set
+from eng_harness.calcs.column_design.column_review import (
+    BASIS_FIELDS as REVIEW_BASIS_FIELDS,
+)
+from eng_harness.calcs.column_design.column_review import (
+    CODE_CHECKS,
+    ReviewInput,
+    column_review,
+)
 from eng_harness.calcs.column_design.column_select import BASIS_FIELDS, ColumnScope, SelectInput, column_select
 from eng_harness.calcs.column_design.section_match import column_section_match
-from eng_harness.kinds.column_design import ColumnSelection
+from eng_harness.kinds.column_design import ColumnReview, ColumnSelection
 from eng_harness.ports import RunClass
 
 from . import golden_files, input_meta, load_case
@@ -44,6 +52,19 @@ CALCS = {
             "size_h": "harness.section_size/1",
             "size_d": "harness.section_size/1",
             "sections": "model.sections/1",
+            "basis": "basis.design_basis/1",
+        },
+    ),
+    "column-review": (
+        "harness.column_review",
+        {
+            "selection": "harness.column_selection/1",
+            "host": "harness.host_design_verdicts/1",
+            "max_axial_strength": "verdicts.set/1",
+            "axial_flexure_uniaxial": "verdicts.set/1",
+            "longitudinal_reinforcement_limits": "verdicts.set/1",
+            "items": "harness.column_check_items/1",
+            "previous": "harness.column_review/1",
             "basis": "basis.design_basis/1",
         },
     ),
@@ -107,9 +128,22 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert definition.method_source == "eng-harness spec 0013 §4.4.1 (L1 to L3); eng-harness spec 0003 §4.11 P2"
-    assert (column_select, column_section_match, column_change_set) == COLUMN_DESIGN_CALCS
+    review = REGISTRY["harness.column_review"]
+    assert (review.version, review.output_kind, review.verification) == (
+        1,
+        "harness.column_review/1",
+        "draft",
+    )
+    assert review.method_source == "eng-harness spec 0013 §4.4.3 (R1 to R4); eng-harness spec 0003 §4.9 (S2, S5)"
+    assert (column_select, column_review, column_section_match, column_change_set) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
+    assert REVIEW_BASIS_FIELDS == ("report.top_n",)
+    assert CODE_CHECKS == (
+        ("max_axial_strength", "aci318_14.22_4_2_1.max_axial_strength"),
+        ("axial_flexure_uniaxial", "aci318_14.22_4_1_1.axial_flexure_uniaxial"),
+        ("longitudinal_reinforcement_limits", "aci318_14.10_6_1_1.longitudinal_reinforcement_limits"),
+    )
 
 
 def test_trace_records_inputs_and_counts() -> None:
@@ -396,5 +430,275 @@ def test_run_through_the_calc_port(tmp_path: Path) -> None:
     assert stored.draft is True
     assert stored.model_dump(mode="json", include={"status", "columns", "excluded", "issues"}) == case.expected
     literal = port.run("harness.column_select", args | {"basis": case.input["basis"]})
+    assert isinstance(literal, FailureEnvelope)
+    assert literal.error.code is ErrorCode.INVALID_ARGUMENT
+
+
+# Contract and boundary tests of harness.column_review (spec 0013 4.4.3, AC8; spec 0003 4.4, 4.9).
+
+REVIEW = "column-review-sources"
+REVIEW_CHANGES = "column-review-changes"
+
+
+def _review(
+    stem: str = REVIEW,
+    trace: TraceBuilder | None = None,
+    meta_override: Any = None,
+    **changes: Any,
+) -> dict[str, Any]:
+    case = load_case(FILES[stem])
+    raw = copy.deepcopy(case.input) | changes
+    for key, val in changes.items():
+        if val is None:
+            raw.pop(key, None)
+    refs = {k: v for k, v in case.refs.items() if k in raw}
+    meta = meta_override if meta_override is not None else input_meta(refs, CALCS["column-review"][1])
+    return column_review(ReviewInput.model_validate(raw), meta, trace or TraceBuilder()).model_dump(mode="json")
+
+
+def _review_basis(**field: Any) -> dict[str, Any]:
+    base = {"value": 5, "unit": None, "source": "engineer:x@2026-01-01T00:00:00.000Z", "confirmed": True}
+    return {"template": None, "fields": {"report.top_n": base | {"citation": None} | field}}
+
+
+def test_column_review_trace_without_and_with_previous() -> None:
+    trace = TraceBuilder()
+    _review(REVIEW, trace=trace)
+    built = trace.build(REGISTRY["harness.column_review"], "ab" * 32)
+    assert built.constants == []
+    refs = load_case(FILES[REVIEW]).refs
+    inputs = {i.name: (i.value, i.unit, i.ref) for i in built.inputs}
+    assert inputs == {
+        "report_top_n": (5, None, f"{refs['basis']}#/fields/report.top_n"),
+        "selection": (2, None, refs["selection"]),
+        "host_verdicts": (2, None, refs["host"]),
+        "max_axial_strength": (1, None, refs["max_axial_strength"]),
+        "axial_flexure_uniaxial": (1, None, refs["axial_flexure_uniaxial"]),
+        "longitudinal_reinforcement_limits": (2, None, refs["longitudinal_reinforcement_limits"]),
+        "not_checked": (0, None, refs["items"]),
+    }
+    steps = {s.name: (s.value, s.source, s.uses) for s in built.steps}
+    assert steps == {
+        "selected_verdicts": (
+            5,
+            "spec 0013 4.4.3 R1",
+            [
+                "selection",
+                "host_verdicts",
+                "max_axial_strength",
+                "axial_flexure_uniaxial",
+                "longitudinal_reinforcement_limits",
+            ],
+        ),
+        "member_count": (4, "spec 0013 4.4.3 R2", ["selected_verdicts"]),
+        "failing_columns": (0, "spec 0013 4.4.3 R2", ["member_count", "not_checked"]),
+        "attention_columns": (0, "spec 0013 4.4.3 R2", ["member_count", "not_checked"]),
+        "top_rows": (5, "spec 0013 4.4.3 R3", ["report_top_n", "selected_verdicts"]),
+        "change_count": (0, "spec 0013 4.4.3 R4", ["member_count"]),
+    }
+    assert all(s.formula for s in built.steps)
+    assert built.outputs == ["failing_columns", "attention_columns", "top_rows"]
+
+    trace_prev = TraceBuilder()
+    _review(REVIEW_CHANGES, trace=trace_prev)
+    built_prev = trace_prev.build(REGISTRY["harness.column_review"], "ab" * 32)
+    prev_refs = load_case(FILES[REVIEW_CHANGES]).refs
+    prev_inputs = {i.name: (i.value, i.ref) for i in built_prev.inputs}
+    assert prev_inputs["previous_members"] == (5, prev_refs["previous"])
+    prev_steps = {s.name: (s.value, s.uses) for s in built_prev.steps}
+    assert prev_steps["change_count"] == (5, ["member_count", "previous_members"])
+    assert prev_steps["selected_verdicts"] == (
+        5,
+        ["selection", "host_verdicts", "max_axial_strength", "longitudinal_reinforcement_limits"],
+    )
+
+
+@pytest.mark.parametrize(
+    ("basis", "why"),
+    [
+        ({"template": None, "fields": {}}, "is missing (no default)"),
+        (_review_basis(confirmed=False), "is not confirmed"),
+        (_review_basis(unit="mm"), "must have no unit, not mm"),
+        (_review_basis(value=0), "must be an integer >= 1"),
+        (_review_basis(value=-2), "must be an integer >= 1"),
+        (_review_basis(value=True), "must be an integer >= 1"),
+        (_review_basis(value=1.5), "must be an integer >= 1"),
+        (_review_basis(value="3"), "must be an integer >= 1"),
+    ],
+)
+def test_column_review_basis_field_is_checked(basis: dict[str, Any], why: str) -> None:
+    with pytest.raises(ContractError) as caught:
+        _review(basis=basis)
+    detail = caught.value.detail
+    assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.report.top_n")
+    assert detail.message == f"basis field report.top_n {why}"
+    assert detail.hint == "set and confirm report.top_n in the design basis"
+
+
+@pytest.mark.parametrize(
+    ("stem", "missing_field"),
+    [
+        (REVIEW, "selection"),
+        (REVIEW, "host"),
+        (REVIEW, "items"),
+        (REVIEW, "basis"),
+        (REVIEW, "max_axial_strength"),
+        (REVIEW, "axial_flexure_uniaxial"),
+        (REVIEW, "longitudinal_reinforcement_limits"),
+        (REVIEW_CHANGES, "previous"),
+    ],
+)
+def test_column_review_requires_record_refs(stem: str, missing_field: str) -> None:
+    case = load_case(FILES[stem])
+    meta = input_meta({k: v for k, v in case.refs.items() if k != missing_field}, CALCS["column-review"][1])
+    with pytest.raises(ContractError) as caught:
+        _review(stem, meta_override=meta)
+    detail = caught.value.detail
+    assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, missing_field)
+    assert detail.message == f"{missing_field} must be a record reference"
+
+
+def test_column_review_input_validation_refusals() -> None:
+    case = load_case(FILES[REVIEW])
+    # Duplicate frame_id in selection
+    sel = copy.deepcopy(case.input["selection"])
+    sel["columns"].append(copy.deepcopy(sel["columns"][0]))
+    with pytest.raises(ContractError) as caught:
+        _review(selection=sel)
+    assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "selection")
+    assert caught.value.detail.message == "selection contains duplicate frame_id"
+
+    # Host verdict with non-host source
+    bad_host = copy.deepcopy(case.input["host"])
+    bad_host["verdicts"][0] = copy.deepcopy(case.input["max_axial_strength"]["verdicts"][0])
+    bad_host["traces"] = copy.deepcopy(case.input["max_axial_strength"]["traces"])
+    with pytest.raises(ContractError) as caught:
+        _review(host=bad_host)
+    assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "host")
+    assert caught.value.detail.message == "host verdict 0 must have source host"
+
+    # Code-check verdict set with wrong check_id or source
+    bad_axial = copy.deepcopy(case.input["axial_flexure_uniaxial"])
+    bad_axial["verdicts"][0] = copy.deepcopy(case.input["max_axial_strength"]["verdicts"][0])
+    with pytest.raises(ContractError) as caught:
+        _review(axial_flexure_uniaxial=bad_axial)
+    assert (caught.value.detail.code, caught.value.detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "axial_flexure_uniaxial",
+    )
+    assert (
+        caught.value.detail.message
+        == "axial_flexure_uniaxial verdict 0 must be code_pack for aci318_14.22_4_1_1.axial_flexure_uniaxial"
+    )
+
+    bad_source = copy.deepcopy(case.input["max_axial_strength"])
+    bad_source["verdicts"][0]["source"] = "host"
+    bad_source["verdicts"][0]["clause"] = None
+    with pytest.raises(ContractError) as caught:
+        _review(max_axial_strength=bad_source)
+    assert (caught.value.detail.code, caught.value.detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "max_axial_strength",
+    )
+
+
+def test_column_review_edge_cases_and_completeness() -> None:
+    case = load_case(FILES[REVIEW])
+    # Empty selection ignores all verdicts and produces empty columns, members, top
+    empty_sel = copy.deepcopy(case.input["selection"])
+    empty_sel["columns"] = []
+    empty_sel["status"] = "FAIL"
+    out_empty = _review(selection=empty_sel)
+    assert out_empty["columns"] == []
+    assert out_empty["members"] == []
+    assert out_empty["top"] == {"n": 0, "of_total": 0, "rows": [], "label": "top 0 of 0 by ratio"}
+
+    # Non-frame subject in host and unselected code_pack verdict are ignored by R1
+    host_area = copy.deepcopy(case.input["host"])
+    host_area["verdicts"][0]["subject"]["kind"] = "area"
+    axial_other = copy.deepcopy(case.input["max_axial_strength"])
+    axial_other["verdicts"][0]["subject"]["id"] = "C99"
+    out_filtered = _review(host=host_area, max_axial_strength=axial_other)
+    assert all(m["check_id"] != "aci318_14.22_4_2_1.max_axial_strength" for m in out_filtered["members"])
+
+    # Incomplete input ref makes complete=False
+    base_meta = input_meta({k: v for k, v in case.refs.items() if k in case.input}, CALCS["column-review"][1])
+    inc_refs = dict(base_meta.refs)
+    inc_refs["host"] = inc_refs["host"].model_copy(update={"complete": False})
+    assert _review(meta_override=base_meta.model_copy(update={"refs": inc_refs}))["complete"] is False
+
+    # FAIL member + not_checked keeps code_status=FAIL while status=NEEDS_ENGINEER (in attention, not failing)
+    fail_max = copy.deepcopy(case.input["max_axial_strength"])
+    fail_max["verdicts"][0]["demand"]["value"] = 2400.0
+    fail_max["verdicts"][0]["ratio"] = 1.2
+    fail_max["verdicts"][0]["status"] = "FAIL"
+    fail_max["counts"] = {"PASS": 0, "FAIL": 1, "NOT_APPLICABLE": 0, "NEEDS_ENGINEER": 0, "ERROR": 0}
+    items_nc = copy.deepcopy(case.input["items"])
+    items_nc["not_checked"] = [{"frame_id": "C1", "code": "AXES_UNDECLARED", "gap": "CW-G9"}]
+    out_nc_fail = _review(max_axial_strength=fail_max, items=items_nc)
+    c1 = next(row for row in out_nc_fail["columns"] if row["frame_id"] == "C1")
+    assert (c1["status"], c1["code_status"], c1["gaps"]) == ("NEEDS_ENGINEER", "FAIL", ["CW-G9"])
+    assert (out_nc_fail["failing"], out_nc_fail["attention"]) == ([], ["C1"])
+
+    # ERROR status and NOT_APPLICABLE-only status
+    err_host = copy.deepcopy(case.input["host"])
+    err_host["verdicts"][1]["status"] = "ERROR"
+    err_host["verdicts"][1]["ratio"] = None
+    err_host["counts"] = {"PASS": 1, "FAIL": 0, "NOT_APPLICABLE": 0, "NEEDS_ENGINEER": 0, "ERROR": 1}
+    na_max = copy.deepcopy(case.input["max_axial_strength"])
+    na_max["verdicts"][0]["status"] = "NOT_APPLICABLE"
+    na_max["verdicts"][0]["ratio"] = None
+    na_max["counts"] = {"PASS": 0, "FAIL": 0, "NOT_APPLICABLE": 1, "NEEDS_ENGINEER": 0, "ERROR": 0}
+    out_na = _review(
+        host=err_host,
+        max_axial_strength=na_max,
+        axial_flexure_uniaxial=None,
+        longitudinal_reinforcement_limits=None,
+    )
+    by_id = {row["frame_id"]: row for row in out_na["columns"]}
+    assert (by_id["C1"]["status"], by_id["C1"]["governing"]) == ("NOT_APPLICABLE", None)
+    assert (by_id["C2"]["status"], by_id["C2"]["governing"]) == ("ERROR", None)
+    assert out_na["attention"] == ["C2"]
+
+
+def test_column_review_through_calc_port(tmp_path: Path) -> None:
+    clock = FixedClock(1_767_225_600_000, 1)
+    ids = SeededIdSource(b"harness", clock)
+    store = ResultStore(Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL), HARNESS_KINDS, ids, clock)
+    producer = Provenance(tool="harness", tool_version="t", inputs={}, started_at=FixedClock(1, 1).now(), duration_ms=0)
+    case = load_case(FILES[REVIEW])
+    kinds = CALCS["column-review"][1]
+    args: dict[str, JsonValue] = {
+        name: {"$ref": store.put(kinds[name], payload, producer).result_id} for name, payload in case.input.items()
+    }
+    approvals = ApprovalsFile.model_validate({"schema": 1, "approvals": [], "withdrawn": []})
+    port = HarnessCalcPort(
+        REGISTRY,
+        approvals,
+        store,
+        CalcSettings(max_items=1000),
+        RunClass.TRIAL,
+        clock,
+        ids,
+        basis_fields={"harness.column_review": REVIEW_BASIS_FIELDS},
+    )
+    info = port.describe("harness.column_review")
+    assert info.basis_fields == REVIEW_BASIS_FIELDS
+    assert {name: sorted(rule.kinds) for name, rule in info.ref_rules.items()} == {n: [k] for n, k in kinds.items()}
+    out = port.run("harness.column_review", args)
+    assert isinstance(out, SuccessEnvelope), out
+    assert out.kind == "harness.column_review/1"
+    stored = ColumnReview.model_validate(store.payload(out.result_id))
+    assert stored.draft is True
+    # Normalize expected governing refs to the newly assigned store result ids for comparison
+    id_map = {case.refs[name]: ref["$ref"] for name, ref in args.items() if isinstance(ref, dict)}
+    dumped = stored.model_dump(mode="json", include=set(case.expected))
+    for col in dumped["columns"]:
+        if col["governing"] is not None:
+            rid, ptr = col["governing"]["ref"].split("#", 1)
+            assert rid in id_map.values()
+            col["governing"]["ref"] = next(k for k, v in id_map.items() if v == rid) + "#" + ptr
+    assert dumped == case.expected
+    literal = port.run("harness.column_review", args | {"basis": case.input["basis"]})
     assert isinstance(literal, FailureEnvelope)
     assert literal.error.code is ErrorCode.INVALID_ARGUMENT

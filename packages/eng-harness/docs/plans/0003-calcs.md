@@ -374,7 +374,8 @@ reused (reversed ends, rename pairing), without its code or tolerances.
 earlier), `CalcStatus` and `CalcRegistry`. It also adds `CalcRefused` and the codes `CALC_NOT_APPROVED` and
 `CALC_WITHDRAWN` to `errors.py` (spec Q11). `calcs/__init__.py` starts with an empty `REGISTRY`. Test calcs live in
 `tests/data/calcs/` (test doubles, never registered in `REGISTRY`). The content hash is a stub raising
-`NotImplementedError` until T2, and registration tests use the fixture hash.
+`NotImplementedError` until T2, and registration tests use the fixture hash. Amendment (B-580, external from plan
+0013 T5): `RefMeta` gains `ref`, the original input reference string including its JSON pointer.
 
 **T2 Content hash and lock** (spec §4.5). `_calc/_hash.py` builds the static import closure with `ast` and a
 file lookup under the `eng_harness` source root (no import executed; `find_spec` would run parent `__init__` modules,
@@ -402,7 +403,8 @@ lines for the former T4, above the 400-line task cap; T5 depends on T4b.
 function, adds `CalcMeta`, `draft` and the trace, stores the result and returns the envelope. It also implements
 `preflight` and the run class. `describe` builds `CalcInfo.ref_rules` (path to `RefRule`, `stale_ok` included) from
 the input model's `x-eng` metadata (spec AC13). The workflow test runs a test block through the real engine (engine plan T10) with the
-real CalcPort and a fixture calc.
+real CalcPort and a fixture calc. Amendment (B-580, external from plan 0013 T5): when building each `RefMeta`, the
+port preserves the original input reference with its pointer (not only the record id).
 
 **T6 Rules and golden harness** (spec AC3, AC46). The AST rules test covers every module under `calcs/`: allowed
 imports, top-level imports only, no I/O names, no `global`, no mutable module-level state, and FB005's literal rule,
@@ -441,6 +443,11 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
   `eng-contract` 0.1 is merged (B-010 to B-025). Spec 0002 (B-061) supplies the read set
   and host verdicts that the workflow passes. Spec 0007 (B-066) supplies `harness.expected_effects/1`. Neither blocks
   this plan: its tests use synthetic records of the neutral kinds.
+- External amendment (B-580, from plan 0013 T5 / the B-284 re-review): plan 0013 T5 amends
+  `packages/eng-harness/src/eng_harness/calc.py` (`RefMeta.ref` keeps the original input reference with its pointer),
+  `packages/eng-harness/src/eng_harness/_calc/_port.py` (the port writes that reference into `RefMeta`), and
+  `packages/eng-harness/tests/unit/calcs/test_port.py` (`test_ref_meta_preserves_pointer`: sibling pointers
+  `#/required` and `#/increment` on a `harness.section_size/1` record whose `required` differs from `size`).
 
 ## 4. Verification
 
