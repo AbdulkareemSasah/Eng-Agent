@@ -1,0 +1,71 @@
+{
+  "source": "eng-harness spec 0003 §4.10 (N1 to N4) and §4.4; synthetic required size and basis, no project value",
+  "method_ref": "§4.10 N1",
+  "synthetic": true,
+  "derivation": "Required r = 437.5 mm (exact in binary), increment i = 50 mm, rule up. N1: r / i = 437.5 / 50 = 8.75; n = ceil(8.75) = 9 (8 x 50 = 400 < 437.5 <= 450 = 9 x 50). N2: size = 9 x 50 = 450 mm, multiple 9; 450 >= 437.5 and 450 - 437.5 = 12.5 < 50. Status PASS. A size between two multiples rounds to the upper one (AC39).",
+  "inputs": {
+    "input": {
+      "required": {
+        "value": 437.5,
+        "unit": "mm"
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "modeling.section_increment_mm": {
+            "value": 50,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "modeling.section_rounding": {
+            "value": "up",
+            "unit": null,
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "required": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "basis.engineer_input/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "required": {
+      "value": 437.5,
+      "unit": "mm"
+    },
+    "increment": {
+      "value": 50.0,
+      "unit": "mm"
+    },
+    "multiple": 9,
+    "size": {
+      "value": 450.0,
+      "unit": "mm"
+    },
+    "status": "PASS"
+  }
+}
