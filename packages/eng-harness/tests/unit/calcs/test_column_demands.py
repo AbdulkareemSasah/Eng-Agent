@@ -739,3 +739,72 @@ def test_missing_refs_sections_spiral_sorting_and_zero_sign() -> None:
         "items": {MAX_AXIAL_ID: [], AXIAL_FLEXURE_ID: [], REINF_LIMITS_ID: []},
         "not_checked": [],
     }
+
+
+def test_ratio_limit_above_contract_default_is_refused(tmp_path: Path) -> None:
+    """limits.ratio_limit_ratio above Verdict.ratio_limit default is INVALID_ARGUMENT with zero writes."""
+    from eng_contract.verdicts import Verdict
+
+    ceiling = Verdict.model_fields["ratio_limit"].default
+    assert isinstance(ceiling, float)
+    above = ceiling + 0.0001
+    mutated = _base_inputs()
+    field = copy.deepcopy(mutated["basis"]["fields"]["limits.ratio_limit_ratio"])
+    field["value"] = above
+    mutated["basis"] = _basis(**{"limits.ratio_limit_ratio": field})
+
+    with pytest.raises(ContractError) as caught:
+        _run_direct(mutated)
+    detail = caught.value.detail
+    assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.limits.ratio_limit_ratio")
+    assert "must not exceed the contract default" in detail.message
+
+    port, store, args, _ = _setup_port(tmp_path, mutated)
+    out = port.run(CALC_ID, args)
+    assert isinstance(out, FailureEnvelope)
+    assert out.error.code is ErrorCode.INVALID_ARGUMENT
+    assert out.error.field == "basis.fields.limits.ratio_limit_ratio"
+    assert store.puts == 0
+
+
+def test_layout_basis_path_does_not_collide_with_trace_step(tmp_path: Path) -> None:
+    """A layout basis path such as col_0.d_prime_mm keeps a reserved input name and the conversion step."""
+    data = _base_inputs()
+    data["selection"]["columns"] = [data["selection"]["columns"][0]]
+    data["forces"]["rows"] = [data["forces"]["rows"][0]]
+    data["layouts"]["sections"] = [
+        {
+            "section": "C40",
+            "transverse_kind": "tied",
+            "n_bars_b": 3,
+            "n_bars_h": 3,
+            "A_bar": {"source": "input", "value": 500.0, "unit": "mm2"},
+            "d_prime": {"source": "basis", "path": "col_0.d_prime_mm"},
+        }
+    ]
+    data["basis"] = _basis(
+        **{
+            "col_0.d_prime_mm": {
+                "value": 50.0,
+                "unit": "mm",
+                "source": _SRC,
+                "confirmed": True,
+                "citation": None,
+            }
+        }
+    )
+    port, store, args, basis_id = _setup_port(tmp_path, data)
+    out = port.run(CALC_ID, args)
+    assert isinstance(out, SuccessEnvelope), out
+    payload = store.payload(out.result_id)
+    trace = cast(dict[str, Any], payload["trace"])
+    input_names = {row["name"] for row in cast(list[dict[str, Any]], trace["inputs"])}
+    step_names = {row["name"] for row in cast(list[dict[str, Any]], trace["steps"])}
+    assert "basis_in_col_0_d_prime_mm" in input_names
+    assert "col_0_d_prime_mm" in step_names
+    basis_in = next(row for row in cast(list[dict[str, Any]], trace["inputs"]) if row["name"] == "basis_in_col_0_d_prime_mm")
+    assert basis_in["ref"] == f"{basis_id}#/fields/col_0.d_prime_mm"
+    assert basis_in["value"] == 50.0
+    step = next(row for row in cast(list[dict[str, Any]], trace["steps"]) if row["name"] == "col_0_d_prime_mm")
+    assert step["value"] == 50.0
+    assert "basis_in_col_0_d_prime_mm" in step["uses"]
