@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0003 §4.11 (P2, P4) and §4.4; synthetic areas and compare.length_mm, no project value",
   "method_ref": "§4.11 P4",
   "synthetic": true,
-  "derivation": "Tolerance t = 1 mm. Triangle P0=(0,0,0), P1=(3000,0,0), P2=(0,4000,0). A_rot: a = [P0,P1,P2], b = [P1,P2,P0] (cyclic shift by one vertex). Shift 1 puts every point on the same point (d² = 0 <= 1), so result same, distance_mm = 0.0 at that shift. A_rev: a = [P0,P1,P2], b = [P0,P2,P1]. The reverse of a is [P2,P1,P0]; its cyclic shifts are [P2,P1,P0], [P1,P0,P2], [P0,P2,P1]. Shift of the reversed order that starts at P0 matches b with d² = 0, so result reversed, distance_mm = 0.0. A_shape: a has three points, b has four (adds (1500,2000,0)); different point counts give reshaped with distance_mm null.",
+  "derivation": "Tolerance t = 1 mm. Triangle P0=(0,0,0), P1=(3000,0,0), P2=(0,4000,0). A_rot: a = [P0,P1,P2], b = [P1,P2,P0] (cyclic rotation by one vertex). Reading b from index shift (b[(i + shift) mod 3] paired with a[i]), shift 2 pairs P0 with P0, P1 with P1 and P2 with P2 (d² = 0 <= 1), so result same, distance_mm = 0.0. A_rev: a = [P0,P1,P2], b = [P0,P2,P1]. Reversing b gives [P1,P2,P0], and reading it from shift 2 pairs every point on a with d² = 0 <= 1 (no forward shift of b matches), so result reversed, distance_mm = 0.0. A_shape: a has three points, b has four (adds (1500,2000,0)); different point counts give reshaped with distance_mm null.",
   "inputs": {
     "input": {
       "a_areas": {

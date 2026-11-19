@@ -33,13 +33,11 @@ BASIS_FIELDS = (LENGTH,)
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
 ZERO = Cited(value=0, unit="mm", source="eng-harness spec 0003 §4.4: compare.length_mm is >= 0")
 """Lower bound of `compare.length_mm` (inclusive)."""
-ONE = Cited(value=1, unit="1", source="eng-harness spec 0003 §4.11 P5: exactly one geometric partner each way")
-"""Cardinality one for a mutual unique rename pair (P5)."""
 VERSION = Cited(
     value=1, unit="1", source="Calc version 1 of eng-harness spec 0003 §4.11; a method change is a new version"
 )
 UNASSIGNED = "unassigned"
-"""Story name used when `story` is null (spec 0003 §4.11 counts)."""
+"""Story name used when `story` is null (spec 0003 §4.11 counts; a real story with this name shares the bucket)."""
 FRAME_TYPES: tuple[str, ...] = ("beam", "brace", "column", "other")
 AREA_TYPES: tuple[str, ...] = ("deck", "other", "slab", "wall")
 _MATCH = frozenset({"same", "reversed"})
@@ -156,7 +154,7 @@ def _frame_result(a: Frame, b: Frame, tolerance_sq: Fraction) -> tuple[GeomResul
 
 def _shift_distance(a_points: Sequence[Any], b_points: Sequence[Any], shift: int) -> Fraction:
     """Largest squared point distance when b is read from index `shift` in order."""
-    largest = Fraction(ZERO.value)
+    largest = Fraction()
     for index, point in enumerate(a_points):
         candidate = b_points[(index + shift) % len(b_points)]
         distance = _squared(point, candidate)
@@ -178,11 +176,12 @@ def _area_result(a: Area, b: Area, tolerance_sq: Fraction) -> tuple[GeomResult, 
         distance = _shift_distance(a.points, reversed_points, shift)
         if _within(distance, tolerance_sq):
             return "reversed", _display(distance)
-    zero_shift = int(ZERO.value)
-    return "moved", _display(_shift_distance(a.points, b.points, zero_shift))
+    moved_sq = max((_squared(p, q) for p, q in zip(a.points, b.points, strict=True)), default=Fraction())
+    return "moved", _display(moved_sq)
 
 
 def _story_name(story: str | None) -> str:
+    """Map null story to `unassigned` (a real story named 'unassigned' shares this bucket)."""
     return UNASSIGNED if story is None else story
 
 
@@ -194,16 +193,15 @@ def _count_rows(
 ) -> list[CountRow]:
     """P1: type rows for every kind of the element class, and story rows for names that appear plus unassigned."""
     rows: list[CountRow] = []
-    unit = int(ONE.value)
-    a_types = {name: sum(unit for item in a_items if item.kind.value == name) for name in types}
-    b_types = {name: sum(unit for item in b_items if item.kind.value == name) for name in types}
+    a_types = {name: len([item for item in a_items if item.kind.value == name]) for name in types}
+    b_types = {name: len([item for item in b_items if item.kind.value == name]) for name in types}
     for name in types:
         a_n, b_n = a_types[name], b_types[name]
         rows.append(CountRow(element=element, by="type", name=name, a=a_n, b=b_n, difference=b_n - a_n))
     stories = sorted({_story_name(item.story) for item in (*a_items, *b_items)} | {UNASSIGNED})
     for name in stories:
-        a_n = sum(unit for item in a_items if _story_name(item.story) == name)
-        b_n = sum(unit for item in b_items if _story_name(item.story) == name)
+        a_n = len([item for item in a_items if _story_name(item.story) == name])
+        b_n = len([item for item in b_items if _story_name(item.story) == name])
         rows.append(CountRow(element=element, by="story", name=name, a=a_n, b=b_n, difference=b_n - a_n))
     return rows
 
@@ -214,7 +212,7 @@ def _pair_geometry(
     b_only: Mapping[str, Any],
     tolerance_sq: Fraction,
 ) -> tuple[list[Renamed], list[Ambiguous], list[OneSided], list[OneSided]]:
-    """P5: rename mutual unique geometric partners; list ambiguous candidates; leave the rest one-sided."""
+    """P5: rename mutual unique geometric partners; list ambiguous candidates; only unmatched ids are one-sided."""
 
     def partners(left: Any, rights: Mapping[str, Any]) -> list[str]:
         found: list[str] = []
@@ -231,34 +229,30 @@ def _pair_geometry(
     a_to_b = {item_id: partners(item, b_only) for item_id, item in a_only.items()}
     b_to_a = {item_id: partners(item, a_only) for item_id, item in b_only.items()}
     renamed: list[Renamed] = []
-    used_a: set[str] = set()
-    used_b: set[str] = set()
-    one = int(ONE.value)
-    first = int(ZERO.value)
+    seen_a: set[str] = set()
+    seen_b: set[str] = set()
     for a_id, candidates in sorted(a_to_b.items()):
-        if len(candidates) != one:
+        if len(candidates) != 1:
             continue
-        b_id = candidates[first]
-        reverse = b_to_a.get(b_id, [])
-        if len(reverse) == one and reverse[first] == a_id:
+        b_id = candidates[0]
+        reverse = b_to_a[b_id]
+        if len(reverse) == 1 and reverse[0] == a_id:
             renamed.append(Renamed(element=element, a_id=a_id, b_id=b_id))
-            used_a.add(a_id)
-            used_b.add(b_id)
+            seen_a.add(a_id)
+            seen_b.add(b_id)
     ambiguous: list[Ambiguous] = []
     for a_id, candidates in sorted(a_to_b.items()):
-        if a_id in used_a:
-            continue
-        if len(candidates) > one:
+        if len(candidates) > 1:
             ambiguous.append(Ambiguous(element=element, side="a", id=a_id, candidates=candidates))
-            used_a.add(a_id)
+            seen_a.add(a_id)
+            seen_b.update(candidates)
     for b_id, candidates in sorted(b_to_a.items()):
-        if b_id in used_b:
-            continue
-        if len(candidates) > one:
+        if len(candidates) > 1:
             ambiguous.append(Ambiguous(element=element, side="b", id=b_id, candidates=candidates))
-            used_b.add(b_id)
-    only_a = [OneSided(element=element, id=item_id) for item_id in sorted(a_only) if item_id not in used_a]
-    only_b = [OneSided(element=element, id=item_id) for item_id in sorted(b_only) if item_id not in used_b]
+            seen_b.add(b_id)
+            seen_a.update(candidates)
+    only_a = [OneSided(element=element, id=item_id) for item_id in sorted(a_only) if item_id not in seen_a]
+    only_b = [OneSided(element=element, id=item_id) for item_id in sorted(b_only) if item_id not in seen_b]
     return renamed, ambiguous, only_a, only_b
 
 
@@ -340,7 +334,7 @@ def placement_compare(inp: PlacementInput, meta: InputMeta, trace: TraceBuilder)
     only_in_a = sorted(only_in_a, key=lambda row: (row.element, row.id))
     only_in_b = sorted(only_in_b, key=lambda row: (row.element, row.id))
     equal = (
-        all(row.difference == int(ZERO.value) for row in counts)
+        all(row.a == row.b for row in counts)
         and all(row.result == "same" for row in by_id)
         and not renamed
         and not ambiguous

@@ -252,7 +252,7 @@ def test_counts_frames_areas_renames() -> None:
     )
     assert renames["renamed"] == [{"element": "frame", "a_id": "F_old", "b_id": "F_new"}]
     assert renames["ambiguous"] == [{"element": "frame", "side": "a", "id": "F5", "candidates": ["F6", "F7"]}]
-    assert {row["id"] for row in renames["only_in_b"]} == {"F6", "F7"}
+    assert renames["only_in_b"] == []
     assert _by_id(renames, "frame", "F_keep")["result"] == "same"
 
     # Golden files of this task are present and match the hand-derived expectations above.
@@ -444,3 +444,195 @@ def test_reversed_area_not_same_orientation() -> None:
     row = _by_id(moved, "area", "A1")
     assert row["result"] == "moved"
     assert row["distance_mm"] == 10.0
+
+
+def test_side_b_ambiguous_and_candidates_not_one_sided() -> None:
+    """P5: side-b ambiguous loop and many-to-many clusters exclude all candidates from only_in_*."""
+    out = _run(
+        {
+            "a_frames": _frames(
+                _frame("Fa1", i=(0.0, 0.0, 0.0), j=(0.0, 0.0, 3000.0)),
+                _frame("Fa2", i=(0.0, 0.0, 0.0), j=(0.0, 0.0, 3000.0)),
+                _frame("Fa_only", i=(8000.0, 0.0, 0.0), j=(8000.0, 0.0, 3000.0)),
+                _frame("Ma1", i=(20000.0, 0.0, 0.0), j=(20000.0, 0.0, 3000.0)),
+                _frame("Ma2", i=(20000.0, 0.0, 0.0), j=(20000.0, 0.0, 3000.0)),
+            ),
+            "b_frames": _frames(
+                _frame("Fb1", i=(0.0, 0.0, 3000.0), j=(0.0, 0.0, 0.0)),
+                _frame("Fb_only", i=(12000.0, 0.0, 0.0), j=(12000.0, 0.0, 3000.0)),
+                _frame("Mb1", i=(20000.0, 0.0, 0.0), j=(20000.0, 0.0, 3000.0)),
+                _frame("Mb2", i=(20000.0, 0.0, 0.0), j=(20000.0, 0.0, 3000.0)),
+            ),
+            "basis": _basis(1.0),
+        },
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out["renamed"] == []
+    assert out["ambiguous"] == [
+        {"element": "frame", "side": "a", "id": "Ma1", "candidates": ["Mb1", "Mb2"]},
+        {"element": "frame", "side": "a", "id": "Ma2", "candidates": ["Mb1", "Mb2"]},
+        {"element": "frame", "side": "b", "id": "Fb1", "candidates": ["Fa1", "Fa2"]},
+        {"element": "frame", "side": "b", "id": "Mb1", "candidates": ["Ma1", "Ma2"]},
+        {"element": "frame", "side": "b", "id": "Mb2", "candidates": ["Ma1", "Ma2"]},
+    ]
+    assert out["only_in_a"] == [{"element": "frame", "id": "Fa_only"}]
+    assert out["only_in_b"] == [{"element": "frame", "id": "Fb_only"}]
+    assert out["equal"] is False
+
+
+def test_area_rename_and_ambiguous() -> None:
+    """P5 for areas: mutual unique rename, side-a ambiguous, side-b ambiguous and unmatched."""
+    t1 = [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]
+    t2 = [(10000.0, 0.0, 0.0), (13000.0, 0.0, 0.0), (10000.0, 4000.0, 0.0)]
+    t3 = [(20000.0, 0.0, 0.0), (23000.0, 0.0, 0.0), (20000.0, 4000.0, 0.0)]
+    t4 = [(30000.0, 0.0, 0.0), (33000.0, 0.0, 0.0), (30000.0, 4000.0, 0.0)]
+    t5 = [(40000.0, 0.0, 0.0), (43000.0, 0.0, 0.0), (40000.0, 4000.0, 0.0)]
+    out = _run(
+        {
+            "a_areas": _areas(
+                _area("A_old", t1),
+                _area("Aa", t2),
+                _area("Aa1", t3),
+                _area("Aa2", [t3[1], t3[2], t3[0]]),
+                _area("A_only_a", t4),
+            ),
+            "b_areas": _areas(
+                _area("A_new", [t1[1], t1[2], t1[0]]),
+                _area("Ab1", [t2[2], t2[0], t2[1]]),
+                _area("Ab2", [t2[0], t2[2], t2[1]]),
+                _area("Ab", t3),
+                _area("A_only_b", t5),
+            ),
+            "basis": _basis(1.0),
+        },
+        {
+            "a_areas": _ref(3, AP),
+            "b_areas": _ref(4, AP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out["renamed"] == [{"element": "area", "a_id": "A_old", "b_id": "A_new"}]
+    assert out["ambiguous"] == [
+        {"element": "area", "side": "a", "id": "Aa", "candidates": ["Ab1", "Ab2"]},
+        {"element": "area", "side": "b", "id": "Ab", "candidates": ["Aa1", "Aa2"]},
+    ]
+    assert out["only_in_a"] == [{"element": "area", "id": "A_only_a"}]
+    assert out["only_in_b"] == [{"element": "area", "id": "A_only_b"}]
+    assert out["equal"] is False
+
+
+def test_basis_and_area_incomplete_flags() -> None:
+    """basis.complete=false and incomplete b/area refs set complete=false."""
+    frames = _frames(_frame("F1"))
+    areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]))
+    out_basis = _run(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None, complete=False),
+        },
+    )
+    assert out_basis["complete"] is False
+
+    out_b_frame = _run(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4, complete=False),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out_b_frame["complete"] is False
+
+    out_area = _run(
+        {"a_areas": areas, "b_areas": areas, "basis": _basis(1.0)},
+        {
+            "a_areas": _ref(3, AP),
+            "b_areas": _ref(4, AP, revision=4, complete=False),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out_area["complete"] is False
+    assert out_area["equal"] is True
+
+
+def test_frame_345_offset_below_tolerance_is_moved() -> None:
+    """Spec 4.11: (3, 4, 0) offset against a tolerance slightly below 5 gives moved with distance 5.0."""
+    out = _run(
+        {
+            "a_frames": _frames(_frame("F1")),
+            "b_frames": _frames(_frame("F1", i=(3.0, 4.0, 0.0), j=(0.0, 0.0, 3000.0))),
+            "basis": _basis(4.999),
+        },
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert _by_id(out, "frame", "F1") == {
+        "element": "frame",
+        "id": "F1",
+        "result": "moved",
+        "distance_mm": 5.0,
+    }
+    assert out["equal"] is False
+
+
+def test_equal_true_with_frames_and_areas_and_unassigned_story() -> None:
+    """P6: identical frames and areas give equal=True; null story and 'unassigned' story count in unassigned."""
+    frames = _frames(
+        _frame("F1", story=None),
+        _frame("F2", i=(6000.0, 0.0, 0.0), j=(6000.0, 0.0, 3000.0), story="S1"),
+    )
+    areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]))
+    out = _run(
+        {"a_frames": frames, "b_frames": frames, "a_areas": areas, "b_areas": areas, "basis": _basis(1.0)},
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "a_areas": _ref(3, AP),
+            "b_areas": _ref(4, AP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out["equal"] is True
+    assert out["complete"] is True
+    assert _count(out, "frame", "story", "unassigned") == {
+        "element": "frame",
+        "by": "story",
+        "name": "unassigned",
+        "a": 1,
+        "b": 1,
+        "difference": 0,
+    }
+
+
+def test_missing_refs_and_empty_sides_refused() -> None:
+    """Empty sides fail input validation; missing b_frames / a_areas / b_areas refs fail with INVALID_ARGUMENT."""
+    frames = _frames(_frame("F1"))
+    areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]))
+    with pytest.raises(ValidationError, match="each side needs frames, areas or both"):
+        _input_type().model_validate({"basis": _basis(1.0)})
+    with pytest.raises(ValidationError, match="areas must be present on both sides"):
+        _input_type().model_validate({"a_areas": areas, "basis": _basis(1.0)})
+    detail_b = _refusal(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},
+        {"a_frames": _ref(1, FP), "basis": _ref(9, "basis.design_basis/1", revision=None)},
+    ).detail
+    assert (detail_b.message, detail_b.field) == ("a placement must be a record reference", "b_frames")
+    detail_a_area = _refusal(
+        {"a_areas": areas, "b_areas": areas, "basis": _basis(1.0)},
+        {"b_areas": _ref(4, AP, revision=4), "basis": _ref(9, "basis.design_basis/1", revision=None)},
+    ).detail
+    assert (detail_a_area.message, detail_a_area.field) == ("a placement must be a record reference", "a_areas")
+    detail_b_area = _refusal(
+        {"a_areas": areas, "b_areas": areas, "basis": _basis(1.0)},
+        {"a_areas": _ref(3, AP), "basis": _ref(9, "basis.design_basis/1", revision=None)},
+    ).detail
+    assert (detail_b_area.message, detail_b_area.field) == ("a placement must be a record reference", "b_areas")

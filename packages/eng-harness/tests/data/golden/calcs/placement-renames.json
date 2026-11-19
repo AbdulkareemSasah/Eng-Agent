@@ -2,7 +2,7 @@
   "source": "eng-harness spec 0003 §4.11 (P5) and §4.4; synthetic frames and compare.length_mm, no project value",
   "method_ref": "§4.11 P5",
   "synthetic": true,
-  "derivation": "Tolerance t = 1 mm. Renamed pair: a has F_old at (0,0,0)-(0,0,3000), b has F_new at the same ends (different id). Unmatched ids; each has exactly one geometric partner the other way whose P3 result would be same, so renamed (F_old, F_new). Ambiguous cluster: a has F5 at (10000,0,0)-(10000,0,3000); b has F6 and F7 at that same geometry (coincident). F5 has two candidates F6 and F7, so ambiguous on side a with both listed (never a silent choice). F6 and F7 each have only F5 as candidate, which is not a mutual unique pair, so they remain only_in_b. Shared F_keep is identical on both sides (by_id same).",
+  "derivation": "Tolerance t = 1 mm. Renamed pair: a has F_old at (0,0,0)-(0,0,3000), b has F_new at the same ends (different id). Unmatched ids; each has exactly one geometric partner the other way whose P3 result would be same, so renamed (F_old, F_new). Ambiguous cluster: a has F5 at (10000,0,0)-(10000,0,3000); b has F6 and F7 at that same geometry (coincident). F5 has two candidates F6 and F7, so ambiguous on side a with both listed (never a silent choice). F6 and F7 each appear as candidates of the ambiguous entry F5, so by the rule that an id listed as a candidate of an ambiguous entry is never one-sided (lead decision on spec 0003 §4.11 P5), only_in_b is empty. Shared F_keep is identical on both sides (by_id same).",
   "inputs": {
     "input": {
       "a_frames": {
@@ -132,10 +132,7 @@
       {"element": "frame", "side": "a", "id": "F5", "candidates": ["F6", "F7"]}
     ],
     "only_in_a": [],
-    "only_in_b": [
-      {"element": "frame", "id": "F6"},
-      {"element": "frame", "id": "F7"}
-    ],
+    "only_in_b": [],
     "equal": false,
     "complete": true
   }
