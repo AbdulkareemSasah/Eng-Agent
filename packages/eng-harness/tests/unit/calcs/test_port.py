@@ -475,5 +475,9 @@ def test_ref_meta_preserves_pointer(tmp_path: Path) -> None:
         assert isinstance(out, SuccessEnvelope), out
         payload = store.payload(out.result_id)
         assert payload["value"] == pytest.approx(expected_value)
-        inputs = {row["name"]: row["ref"] for row in payload["trace"]["inputs"]}
+        trace = payload["trace"]
+        assert isinstance(trace, dict)
+        rows = trace["inputs"]
+        assert isinstance(rows, list)
+        inputs = {row["name"]: row["ref"] for row in rows if isinstance(row, dict)}
         assert inputs["dim"] == ref

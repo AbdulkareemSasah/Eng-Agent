@@ -158,7 +158,13 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert review.method_source == "eng-harness spec 0013 §4.4.3 (R1 to R4); eng-harness spec 0003 §4.9 (S2, S5)"
-    assert (column_select, column_demands, column_review, column_section_match, column_change_set) == COLUMN_DESIGN_CALCS
+    assert (
+        column_select,
+        column_demands,
+        column_review,
+        column_section_match,
+        column_change_set,
+    ) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
     assert REVIEW_BASIS_FIELDS == ("report.top_n",)
