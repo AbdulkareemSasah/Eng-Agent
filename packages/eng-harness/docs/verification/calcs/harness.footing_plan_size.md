@@ -34,3 +34,13 @@ and references, basis error details, fractional grid spacing, and a trial side e
 
 The sizing step uses FZ only. Spec 0010 P3 assigns moment and full-contact checks to the bearing check. A P6
 dimension is carried with `NEEDS_ENGINEER` and closes at the block's first step as defined in §4.6.
+
+## Reviewer and date
+
+Owner review and date are pending. An independent review was conducted on 2026-11-19.
+
+## Findings and open gaps
+
+- N2: The specification does not explicitly list ZERO as a constant or state all basis positivity bounds; clarification is pending.
+- N3: The specification does not resolve minimum plan dimension exceeding the maximum; owner decision is pending.
+- N4: Reason precedence and the ordering of shape and kind checks are not fixed by the specification.
