@@ -13,8 +13,8 @@ from eng_harness._calc import _hash
 from eng_harness.calc import CalcStatus
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.footing import FOOTING_CALCS
-from eng_harness.calcs.footing import plan_size as plan_size_module
 from eng_harness.calcs.footing import layout as layout_module
+from eng_harness.calcs.footing import plan_size as plan_size_module
 from eng_harness.calcs.footing import schedule as schedule_module
 from eng_harness.calcs.footing import status as status_module
 from eng_harness.calcs.footing import subjects as subjects_module
