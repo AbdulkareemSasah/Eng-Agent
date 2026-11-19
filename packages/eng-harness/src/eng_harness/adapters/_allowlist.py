@@ -22,9 +22,11 @@ __all__ = ["Allowlist", "AllowlistError", "load_allowlist"]
 
 # Names refused outright (spec 0002 section 4.5.1), including those of later adapters.
 _DENY = re.compile(
-    r"csi_(run_script|db_tables_apply|invoke|object_(add|delete|set|get))|idea_run_script|compile_and_run"
-    r"|revit_send_code_to_revit|dev_hot_(run|unload)|run_baked_tool|batch_execute|run_synapse_command"
-    r"|revit_(accept|dismiss)_bake_suggestion|revit_list_bake_suggestions"
+    r"csi_(run_script|db_tables_apply|invoke|object_(add|delete|set|get))|idea_run_script"
+    r"|(?:revit_)?(?:send_code_to_revit|compile_and_run|dev_hot_run|dev_hot_unload|dev_hot_sessions"
+    r"|run_baked_tool|list_baked_tools|list_bake_suggestions|accept_bake_suggestion|dismiss_bake_suggestion"
+    r"|batch_execute|run_synapse_command|shutdown_bridge|authenticate|prepare_destructive|switch_target"
+    r"|get_change_records|record_change)"
 )
 _MARKERS = ("script", "invoke", "eval", "tables_apply")
 _Commit = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
