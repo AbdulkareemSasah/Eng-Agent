@@ -557,7 +557,7 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
   `materials.rebar_fy_MPa` and `columns.effective_length_factor_ratio` (amendment B-578).
 - Owner decisions that do not block T1 to T15: the spec's Q1 to Q11 (the recommendations are implemented).
 - Documents follow-up for spec Q12 (amendment B-578). The eng-harness package maintainer owns
-  `docs/adr/0004-workspace-code-packs.md` in a separate documents task. The short package ADR records the
+  a separate documents task to write the short workspace code-packs ADR under `docs/adr/`. The ADR records the
   workspace dependencies on `structural-codes` and `aci318-14` under rule A10 and their impact after the
   repository split (ADR-0028).
 
