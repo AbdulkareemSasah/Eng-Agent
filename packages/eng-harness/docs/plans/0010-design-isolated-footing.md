@@ -491,6 +491,16 @@ determinism. The non-test lines are at most a test-support helper.
 | T12 | plan 0006 T11 to T13 (report); plan 0007 T10 (audits); SC T13 (calculation notes) |
 | T13 | plan 0001 T19 (crash-matrix worker) |
 
+- External amendment (B-582, from plan 0013 T5 / the B-284 writer): plan 0013 T5 may refresh only the content-hash
+  line in `packages/eng-harness/docs/verification/calcs/harness.footing_layout.md`,
+  `packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md`,
+  `packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md`,
+  `packages/eng-harness/docs/verification/calcs/harness.footing_status.md`,
+  `packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md`, and
+  `packages/eng-harness/docs/verification/calcs/harness.footing_resize.md` once that record exists on build/v1
+  (nothing else in those records), because `RefMeta.ref` in `calc.py` moves every calc's `content_sha256` in
+  `calcs.lock.json` and those plan 0010 records embed the hashes compared by the footing registration test.
+
 ## 4. Verification
 
 - Local gate per task: `uv run eng-gate check` once `eng-dev-gate` exists; until then, from `packages/eng-harness/`,
