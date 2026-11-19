@@ -1,0 +1,314 @@
+{
+  "source": "eng-harness spec 0013 section 4.4.3 (rules R2, R3) and spec 0003 section 4.9 (S2, S5); synthetic data, no project value",
+  "method_ref": "§4.4.3 R2",
+  "synthetic": true,
+  "derivation": "C1 has two ends on max_axial_strength: station 0.0 mm gives 1200/2000 = 0.6 PASS and station 3000.0 mm gives 2500/2000 = 1.25 FAIL, plus longitudinal_reinforcement_limits 1600/3200 = 0.5 PASS (axial_flexure_uniaxial omitted). The (C1, code_pack, max_axial_strength) member aggregates both ends to worst status FAIL and largest ratio 1.25. C1 gets code_status FAIL, host_status NOT_APPLICABLE, status FAIL, failing [C1], and governing res_...13#/verdicts/1 (1.25). report.top_n = 2 truncates top to the first 2 of 3 verdicts (1.25 and 0.6).",
+  "input": {
+    "selection": {
+      "calc": {
+        "id": "harness.column_select",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.column_select",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "columns": [
+        {
+          "frame_id": "C1",
+          "section": "C40",
+          "shape": "rectangular",
+          "material": "C30",
+          "story": "L1",
+          "length_mm": 3000.0
+        }
+      ],
+      "excluded": [],
+      "issues": []
+    },
+    "host": {
+      "calc": {
+        "id": "harness.host_design_verdicts",
+        "version": 1,
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.host_design_verdicts",
+        "calc_version": "1",
+        "content_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "verdicts": [],
+      "traces": [],
+      "counts": {
+        "PASS": 0,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      }
+    },
+    "max_axial_strength": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "code": "ACI 318-14",
+          "clause": "22.4.2.1",
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 0.0,
+            "case": "ULS1"
+          },
+          "demand": {
+            "value": 1200.0,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 2000.0,
+            "unit": "kN"
+          },
+          "ratio": 0.6,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": false,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        },
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "code": "ACI 318-14",
+          "clause": "22.4.2.1",
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": 3000.0,
+            "case": "ULS1"
+          },
+          "demand": {
+            "value": 2500.0,
+            "unit": "kN"
+          },
+          "capacity": {
+            "value": 2000.0,
+            "unit": "kN"
+          },
+          "ratio": 1.25,
+          "ratio_limit": 1.0,
+          "status": "FAIL",
+          "governing": true,
+          "trace_ref": "#/traces/1",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "calc_version": "0.1.0",
+          "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        },
+        {
+          "calc_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "calc_version": "0.1.0",
+          "content_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 1,
+        "FAIL": 1,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "longitudinal_reinforcement_limits": {
+      "verdicts": [
+        {
+          "source": "code_pack",
+          "check_id": "aci318_14.10_6_1_1.longitudinal_reinforcement_limits",
+          "code": "ACI 318-14",
+          "clause": "10.6.1.1",
+          "subject": {
+            "kind": "frame",
+            "id": "C1",
+            "station_mm": null,
+            "case": null
+          },
+          "demand": {
+            "value": 1600.0,
+            "unit": "mm2"
+          },
+          "capacity": {
+            "value": 3200.0,
+            "unit": "mm2"
+          },
+          "ratio": 0.5,
+          "ratio_limit": 1.0,
+          "status": "PASS",
+          "governing": true,
+          "trace_ref": "#/traces/0",
+          "assumptions": []
+        }
+      ],
+      "traces": [
+        {
+          "calc_id": "aci318_14.10_6_1_1.longitudinal_reinforcement_limits",
+          "calc_version": "0.1.0",
+          "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "inputs": [],
+          "constants": [],
+          "steps": [],
+          "outputs": []
+        }
+      ],
+      "counts": {
+        "PASS": 1,
+        "FAIL": 0,
+        "NOT_APPLICABLE": 0,
+        "NEEDS_ENGINEER": 0,
+        "ERROR": 0
+      },
+      "draft": true
+    },
+    "items": {
+      "calc": {
+        "id": "harness.column_demands",
+        "version": 1,
+        "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.column_demands",
+        "calc_version": "1",
+        "content_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "items": {
+        "aci318_14.22_4_2_1.max_axial_strength": [],
+        "aci318_14.22_4_1_1.axial_flexure_uniaxial": [],
+        "aci318_14.10_6_1_1.longitudinal_reinforcement_limits": []
+      },
+      "not_checked": []
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "report.top_n": {
+          "value": 2,
+          "unit": null,
+          "source": "engineer:trial@2026-11-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "selection": "res_01KCR000000000000000000011",
+    "host": "res_01KCR000000000000000000012",
+    "max_axial_strength": "res_01KCR000000000000000000013",
+    "longitudinal_reinforcement_limits": "res_01KCR000000000000000000015",
+    "items": "res_01KCR000000000000000000016",
+    "basis": "res_01KCR000000000000000000017"
+  },
+  "expected": {
+    "columns": [
+      {
+        "frame_id": "C1",
+        "status": "FAIL",
+        "host_status": "NOT_APPLICABLE",
+        "code_status": "FAIL",
+        "governing": {
+          "ref": "res_01KCR000000000000000000013#/verdicts/1",
+          "ratio": 1.25
+        },
+        "not_checked": [],
+        "gaps": []
+      }
+    ],
+    "failing": [
+      "C1"
+    ],
+    "attention": [],
+    "top": {
+      "n": 2,
+      "of_total": 3,
+      "rows": [
+        {
+          "subject_kind": "frame",
+          "subject_id": "C1",
+          "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "case": "ULS1",
+          "station_mm": 3000.0,
+          "ratio": 1.25,
+          "ratio_limit": 1.0,
+          "status": "FAIL"
+        },
+        {
+          "subject_kind": "frame",
+          "subject_id": "C1",
+          "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+          "case": "ULS1",
+          "station_mm": 0.0,
+          "ratio": 0.6,
+          "ratio_limit": 1.0,
+          "status": "PASS"
+        }
+      ],
+      "label": "top 2 of 3 by ratio"
+    },
+    "members": [
+      {
+        "frame_id": "C1",
+        "source": "code_pack",
+        "check_id": "aci318_14.10_6_1_1.longitudinal_reinforcement_limits",
+        "status": "PASS",
+        "ratio": 0.5
+      },
+      {
+        "frame_id": "C1",
+        "source": "code_pack",
+        "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+        "status": "FAIL",
+        "ratio": 1.25
+      }
+    ],
+    "changes": {
+      "newly_failing": [],
+      "newly_passing": [],
+      "other_changes": [],
+      "appeared": [],
+      "disappeared": []
+    },
+    "complete": true
+  }
+}

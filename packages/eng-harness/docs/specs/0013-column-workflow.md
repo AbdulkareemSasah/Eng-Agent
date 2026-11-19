@@ -83,12 +83,15 @@ values are synthetic and say so.
 - AC5. Given any permutation of the frames, sections or scope lists, when `harness.column_select` runs, then the output
   and its content hash are equal. Test: `tests/property/test_column_select.py::test_permutation_invariant`.
 - AC6. Given the golden cases of §4.4.2 (compression and tension rows, one moment zero, both moments non-zero, a square
-  section, a layout missing, a circular and an `other` section, the bar area from the basis, a square section with
+  section, a layout missing, a circular and an `other` section, the bar area copied from the layout answer as a literal
+  `A_bar_mm2` (`column-demands-layout-bar-area`; never a basis reference), a square section with
   `n_bars_b ≠ n_bars_h`, the one-per-column `longitudinal_reinforcement_limits` item with `Ag_mm2` and `case: null`), when
   `harness.column_demands` runs, then the items per check, their converted values and units, `not_checked` and the
   trace equal the expected ones. Test: `tests/golden/column_design/test_golden.py::test_case[column-demands-*]`.
-- AC7. Given forces whose `sign_convention` is not `host_local/1`, or a basis without a confirmed field of §4.7 A it
-  reads, when `harness.column_demands` runs, then `CalcRefused` and nothing is stored; given a rectangular section that is
+- AC7. Given forces whose `sign_convention` is not `host_local/1` (enforced by the `forces.member_end/1` kind at input
+  validation), or a basis without a confirmed field of §4.7 A it reads, when `harness.column_demands` runs, then
+  `ContractError` `INVALID_ARGUMENT` (for the basis check, `field` is that basis path, `basis.fields.<path>`) and
+  nothing is stored (amendment B-578); given a rectangular section that is
   not symmetric (`b_mm ≠ h_mm`, or `b_mm == h_mm` with `n_bars_b ≠ n_bars_h`) and no axis declaration from the adapter
   (CW-G9), then no `axial_flexure_uniaxial` item is built for it
   (`not_checked` `AXES_UNDECLARED`) while its other two checks are. Tests:
@@ -123,11 +126,17 @@ values are synthetic and say so.
 
 - AC13. Given the code-pack route (§4.5) and the three check ids, when the workflow calls `ctx.calc` with a reference
   to an item list of `harness.column_check_items/1`, then `structural_codes.evaluate_batch` runs in mode `trial`, the
-  stored `verdicts.set/1` has one trace per item in item order and `draft: true`; given run class `production`, then
-  the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
+  stored `verdicts.set/1` has one trace per item in item order and `draft: true`. With a real `harness.column_check_items/1`
+  record and the three real ACI 318-14 checks, each `verdicts.set/1` has `parents` exactly `[items result, basis result]`
+  (every check carries a basis `ratio_limit` reference; the two strength checks also carry `fc_MPa`, `fy_MPa` and
+  `k_factor`); `batch` is a `RefInput` for every check; `ratio_limit` is a `RefInput` for every check; `fc_MPa`, `fy_MPa`
+  and `k_factor` are `RefInput`s for the two strength checks; every other input is a `LiteralInput` equal to the stored
+  value (amendment B-578; owner answer 2026-11-19). With either a bare `RefString` item input or a literal `fc_MPa` in a
+  permissive stored-list fixture, the route returns `INVALID_ARGUMENT` and stores no verdict (amendment B-578).
+  In run class `production`, the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
   then `ContractError` `NOT_FOUND` before any evaluation (calcs §6; amendment B-405, spec 0010 C4).
-  Tests: `tests/unit/calcs/test_code_pack_route.py::test_batch_through_calcport`, `::test_production_refused`,
-  `::test_only_listed_checks`.
+  Tests: `tests/unit/calcs/test_code_pack_route.py::test_batch_through_calcport`, `::test_ref_strings_refused`,
+  `::test_literal_fc_refused`, `::test_production_refused`, `::test_only_listed_checks`.
 - AC14. Given every state of the §4.8 tables, when the rules run, then the listed option or no decision (engineer)
   results (a `FAIL` or `NEEDS_ENGINEER` column with `proposal` `none` gets no decision and reaches the engineer), and the points and rules are in `decisions.lock.json`. Tests:
   `tests/unit/rules/test_column_design_rules.py::test_member_action_rules`, `::test_revit_rules`, `::test_lock`.
@@ -268,7 +277,9 @@ Input: `selection`, `forces` (`forces.member_end/1`), `sections`, `layouts` (ans
 scope answer), `basis` (`materials.concrete_fc_MPa`, `materials.rebar_fy_MPa`,
 `columns.effective_length_factor_ratio`). Method:
 
-- E1 `sign_convention` must be `host_local/1`, else `CalcRefused` (contract G-3).
+- E1 `sign_convention` must be `host_local/1`, enforced by the `forces.member_end/1` kind at input validation
+  (`ContractError` `INVALID_ARGUMENT`, nothing stored; contract G-3; amendment B-578). A missing or unconfirmed §4.7 A
+  basis field likewise gives `ContractError` `INVALID_ARGUMENT` (`field = basis.fields.<path>`), with nothing stored.
 - E2 rows: every row of a selected column whose `case` is a selected combination, sorted by member, case, station.
   A selected column without a row for a selected combination is `not_checked` `FORCES_MISSING`.
 - E3 `Pu_kN = −P_kN`: `host_local/1` reports axial tension positive (contract G-3, CSI convention; a C item for the
@@ -292,7 +303,22 @@ Output `harness.column_check_items/1`: per check id of §4.5 a list of `{subject
 inputs}` (input names and units of the clause specs' §3): for the two strength checks one item per E2 row; for
 `aci318_14.10_6_1_1.longitudinal_reinforcement_limits` one item per selected column with inputs `Ag_mm2` and `Ast_mm2`,
 no station and `case: null` (its clause spec §3: the limits do not depend on loads); `not_checked` (`frame_id`, `code`, `gap`), trace with E3 to
-E5 as steps. Each code-check input is passed as a reference into this result.
+E5 as steps. The item list for each check is passed as one `batch` reference to `/items/<check id>` of this result,
+and inside each item (amendment B-578):
+
+- values the calc converts or copies (`Pu_kN`, `Mu_kNm`, `Mu_other_kNm`, `Ag_mm2`, `Ast_mm2`, `b_mm`, `h_mm`, `lu_mm`,
+  `d_prime_mm`, `A_bar_mm2`, `n_bars_b`, `n_bars_h`, with `n_bars_b` and `n_bars_h` integers) are literal JSON values
+  under the clause-spec names and units, each equal to an E3 to E5 trace step;
+- `transverse_kind` is the literal `"tied"` (spirals are `NOT_IMPLEMENTED`, §6);
+- `fc_MPa`, `fy_MPa`, `k_factor` and `ratio_limit` are `{"$ref": "res_<basis id>#/fields/<path>/value"}` references to
+  the confirmed basis fields `materials.concrete_fc_MPa`, `materials.rebar_fy_MPa`,
+  `columns.effective_length_factor_ratio` and `limits.ratio_limit_ratio` (the calc verifies presence and confirmation
+  before emitting any reference). Every ACI 318-14 column check input model inherits `ratio_limit` from
+  `CheckInputs` (`structural_codes/inputs.py`), so each of the three checks carries this fourth reference-object field
+  beside `fc_MPa`, `fy_MPa` and `k_factor` for the two strength checks (owner answer 2026-11-19; amendment B-578; same
+  basis path the footing workflow uses);
+- a bare reference string (`RefString`) is never an input value; a calc cannot reference its own result, and under
+  `require_refs` only `engineering_quantity` fields must be references (architecture [04](../../../../design/docs/architecture/04-tool-contract.md) §3.5).
 
 #### 4.4.3 `harness.column_review` v1
 
@@ -372,20 +398,22 @@ The CalcPort serves the code packs through one route (engine §4.8, calcs §4.12
 settled). [Spec 0010](0010-design-isolated-footing.md) §4.3 describes the same route from the footing side, and the two
 descriptions are one route (spec 0010 C3). `_calc/_code_packs.py` (`CodePackRoute`, consulted by `HarnessCalcPort` for
 an id that does not start with `harness.`) runs a check id only from a fixed allowlist that holds both workflows' ids.
-This workflow adds the part it needs **[added]**: the three column ids (`aci318_14.22_4_2_1.max_axial_strength`,
+B-393 (plan 0010 T2) shipped the route, including the three column allowlist entries
+(`aci318_14.22_4_2_1.max_axial_strength`,
 `aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) and the `batch`
 argument. `describe` returns the check's `CheckMeta` as `CalcInfo` (`status` is the check's lifecycle state; `version`
 is the check's `CheckMeta.version`, spec 0010 Q20, see Q13), and `run(check_id, {"batch": <reference to an item
-list>})` resolves the list (the inline `items` argument of spec 0010 §4.3 is the other form of the same `run`), builds
-`BatchItem`s with references, refuses before any evaluation a `withdrawn` check in both run classes (`CalcRefused`
+list>})` resolves the list (the inline `items` argument of spec 0010 §4.3 is the other form of the same `run`), passes
+each stored item unchanged as a `BatchItem` (references and literals as stored; under `require_refs` only
+`engineering_quantity` fields must be references, architecture [04](../../../../design/docs/architecture/04-tool-contract.md) §3.5; amendment B-578), refuses before any evaluation a `withdrawn` check in both run classes (`CalcRefused`
 `CALC_WITHDRAWN`) and, in run class `production`, a check that is not `approved` (`CalcRefused` `CALC_NOT_APPROVED`;
 calcs §4.12 item 4; so the pack's `CheckNotUsable`, CF AC25, is never reached), calls
 `structural_codes.evaluate_batch(check_id, items, mode=<run class>, registry, source=store,
-policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with provenance `tool:
-"structural-codes"`. A check id outside the allowlist, or one the registry does not know, is `ContractError` `NOT_FOUND`
-before any evaluation, as an unknown calc id (calcs §6), never an exception of `structural_codes` raised to the block
-(spec 0010 C4, settled by B-405). Whichever of plan T6 and plan 0010 T2 merges first builds the route; the other adds
-its ids, its argument form and its tests.
+policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with the provenance tool
+`structural-codes/evaluate_batch`. A check id outside the allowlist or unknown to the registry returns
+`ContractError` `NOT_FOUND` before any evaluation, as an unknown calc id (calcs §6), never an exception of `structural_codes` raised to the block
+(spec 0010 C4, settled by B-405). Plan T6 adds test-only companion coverage for the shipped route through the
+three column checks (AC13, amendment B-578).
 
 ### 4.6 Steps as ctx calls
 
@@ -493,7 +521,7 @@ length is a reference to this run's ETABS `model.sections/1` field (U1), so a co
 | Invalid request answer | `INVALID_ARGUMENT` (asked again) | `field` |
 | Spiral, special seismic | `NOT_IMPLEMENTED` with gap | field |
 | Selection empty or unknown names | `harness.column_selection/1` `FAIL`, scope asked again | issues |
-| Forces not `host_local/1`, basis field missing | `CalcRefused` | field |
+| Forces not `host_local/1` (`forces.member_end/1`), basis field missing or unconfirmed (amendment B-578) | `ContractError` `INVALID_ARGUMENT` | field (`basis.fields.<path>` for basis) |
 | Production run with draft checks or calcs | `CalcRefused` (0003 §4.12) | calc id |
 | Check id outside the §4.5 allowlist, or unknown to the registry | `NOT_FOUND` (0003 §6; B-405) | `check_id` |
 | Mode not allowed (Revit run) | `RunRefused` `MODE_NOT_ALLOWED` **[added]** | mode |
@@ -559,8 +587,9 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q9 | SAP2000 as the frame model | Owner | Not in v1: concrete column results (SP-3) and design orientation (SP-5) are missing |
 | Q10 | Update in Revit every matched pair whose size differs (including differences older than this design), or only the columns changed in this design | Owner | Every differing pair, each item marked `preexisting` or `changed_in_design` in the preview so the engineer can reject single items |
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
-| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
+| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The lead owns the ADR as a separate documents follow-up (plan §3, amendment B-578; lead decision D-19). |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
+| Q14 | **[added]** Whether the ACI 318-14 column demand fields (`MaxAxialInputs.Pu_kN`, `AxialFlexureInputs.Pu_kN`, `Mu_kNm`, `Mu_other_kNm`) should be `ref_capable` and `engineering_quantity` per CF §4.3 (`MaxAxialInputs.Pu_kN` and `AxialFlexureInputs.Mu_kNm` have neither flag; `AxialFlexureInputs.Pu_kN` and `Mu_other_kNm` have `ref_capable` only); non-blocking for v1 (amendment B-578) | Owner | v1 goes ahead with literal demands inside the referenced `harness.column_check_items/1` record; making them `ref_capable` and `engineering_quantity` later requires a structural-codes plan 0004 amendment paired with a follow-up code-pack route task (the kind stays unchanged) |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |
 | C2 | CF §1 and engine §4.8 say code packs run through the CalcPort, but no merged harness spec defines that route | Owner | Settled by amendment B-405 (draft; the owner approves): engine §4.8 and calcs §4.12 item 4 name the one route; §4.5 here and spec 0010 §4.3 describe it; an id outside the allowlist is `NOT_FOUND` (spec 0010 C3, C4) |
 | C3 | CK Q1 says B-083 passes "frames of kind `column`", but the CSI reader gives `kind: other` (spec 0002 H-G5) | Owner | Columns are the `harness.column_select` result (§4.4.1); amend CK Q1's text |
