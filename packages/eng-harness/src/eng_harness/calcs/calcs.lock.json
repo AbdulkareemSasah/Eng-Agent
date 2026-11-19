@@ -64,6 +64,11 @@
       "content_sha256": "772886bb74582a826c25e48d528aa8687abdcedfbdbc07912ca9eabfec097c2b",
       "id": "harness.readback_check",
       "version": 1
+    },
+    {
+      "content_sha256": "d9bc4cd342568f17a6e0822a1e9eeddfabc8a34722fa733985d6a177cd917425",
+      "id": "harness.section_round",
+      "version": 1
     }
   ],
   "schema": 1
