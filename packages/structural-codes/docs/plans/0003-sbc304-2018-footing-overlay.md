@@ -51,6 +51,8 @@ tasks:
       - "packages/structural-codes/sbc304-2018/tests/unit/test_unconfirmed.py::test_member_scope_copied"
       - "packages/structural-codes/sbc304-2018/tests/unit/test_unconfirmed.py::test_inputs_match_base"
       - "packages/structural-codes/sbc304-2018/tests/property/test_unconfirmed_props.py::test_never_pass_or_fail"
+      # amendment B-579: core regression for inherited body verdicts with an explicit base clause (both cases in T2 prose)
+      - "packages/structural-codes/core/tests/unit/test_overlay.py::test_inherited_explicit_base_clause"
     covers: [AC1, AC2, AC3, AC4, AC5, AC6, AC7, AC8, AC10]  # and core spec 0001 AC18 (amendment B-579)
     depends_on: [T1]
   - id: T3
@@ -142,7 +144,9 @@ states no SBC clause number and no number at all. The row validation has no nume
 the core when the builder creates `CheckMeta` and `GapDecl` (CM §2), so T3's `test_no_engineering_numbers` holds.
 Amendment B-579: covers core spec 0001 AC18 (runner behavior for inherited verdicts). For inherited body verdicts,
 the runner validates explicit draft clauses against the base check metadata, then emits the inherited check's
-mapped clause, code and check id, and preserves the base trace citations.
+mapped clause, code and check id, and preserves the base trace citations. T2's `tests_first` includes the core
+regression `test_overlay.py::test_inherited_explicit_base_clause`: a valid explicit base clause produces the mapped
+overlay identity and retains base citations; an invalid explicit base clause raises `CheckDefinitionError`.
 
 **T3 Assembly.** `PACK` with `base="aci318_14"` and the built overlay, the entry point
 `[project.entry-points."structural_codes.packs"] sbc304_2018 = "sbc304_2018:PACK"`, `check_id_for`; one case file per
