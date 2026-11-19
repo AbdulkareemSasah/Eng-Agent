@@ -798,3 +798,8 @@ def test_basis_step_refusals_and_json_bom_values(tmp_path: Path) -> None:
         )
         == ExitCode.USAGE
     )
+
+
+def test_basis_confirmation_flow_real_engine(tmp_path: Path) -> None:
+    """AC47 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC47 not yet written")

@@ -414,3 +414,13 @@ def test_run_header_records_decision_runtime(tmp_path: Path, monkeypatch: pytest
         assert secret not in all_bytes
         assert secret not in stdout_bytes
         assert secret not in stderr_bytes
+
+
+def test_run_completes_and_writes_report_real_engine(tmp_path: Path) -> None:
+    """AC7 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC7 not yet written")
+
+
+def test_run_header_records_decision_runtime_real_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC63 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC63 not yet written")

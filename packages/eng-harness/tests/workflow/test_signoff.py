@@ -199,3 +199,8 @@ def test_signoff_reads_host_design_verdicts(tmp_path: Path) -> None:
         answer = future.result(timeout=5)
     assert answer is not None
     assert dict(answer.item_reasons) == {"exc_1": REASON, "exc_2": "second"}
+
+
+def test_signoff_rules_real_engine(tmp_path: Path) -> None:
+    """AC42 re-check with the real engine through the production page wiring (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC42 not yet written")

@@ -83,3 +83,8 @@ def test_stop_file_removed_on_return_and_before_resume(tmp_path: Path) -> None:
         reason="stop_requested", request_ids=[]
     )  # and the new one was seen
     assert not (run_dir / STOP_FILE).exists()  # removed when `Engine.resume` returned
+
+
+def test_no_wait_then_resume_real_engine(tmp_path: Path) -> None:
+    """AC8 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC8 not yet written")

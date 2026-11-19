@@ -126,3 +126,13 @@ def test_run_answers_first_data_request(tmp_path: Path) -> None:
         assert rig.main("run", WORKFLOW, "--answers", path, *QUIET) == ExitCode.USAGE, name
         assert text in rig.err.getvalue(), (name, rig.err.getvalue())
         assert (rig.run_ids(), rig.engines, rig.built) == ([], [], []), name
+
+
+def test_form_request_answers_file_real_engine(tmp_path: Path) -> None:
+    """AC46 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC46 not yet written")
+
+
+def test_run_answers_first_data_request_real_engine(tmp_path: Path) -> None:
+    """AC64 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC64 not yet written")

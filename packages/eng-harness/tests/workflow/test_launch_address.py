@@ -68,3 +68,8 @@ def test_address_never_on_stdout_or_stderr(tmp_path: Path) -> None:
     assert "approval page opened in your browser\n" in rig.err.getvalue()
     assert tty.read_text(encoding="utf-8") == ""
     assert rig.opened[0] not in rig.out.getvalue() + rig.err.getvalue()
+
+
+def test_address_never_on_stdout_or_stderr_real_engine(tmp_path: Path) -> None:
+    """AC61 re-check with the real engine (plan 0006 T17c)."""
+    raise AssertionError("T17c: real-engine re-check of AC61 not yet written")
