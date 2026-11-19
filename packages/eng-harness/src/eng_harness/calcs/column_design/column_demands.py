@@ -155,8 +155,12 @@ def _refuse_basis(code: ErrorCode, path: str, why: str, **extra: Any) -> Contrac
 
 
 def _layout_basis_input_name(path: str) -> str:
-    """Deterministic trace name for a layout basis path; `basis_in_` keeps it off the `col_*` step namespace."""
-    return f"basis_in_{path.replace('.', '_')}"
+    """Deterministic injective trace name for a layout basis path under the `basis_in_` prefix.
+
+    Encode `_` as `_u` before encoding `.` as `_d` so paths such as `layout.values.bar` and
+    `layout_values.bar` cannot collide (review r2). The prefix keeps names off the `col_*` step namespace.
+    """
+    return f"basis_in_{path.replace('_', '_u').replace('.', '_d')}"
 
 
 def _read_basis(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> dict[str, _RefDict]:
