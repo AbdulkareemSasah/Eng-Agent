@@ -12,7 +12,7 @@ from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.params import InputPolicy, ParamModel, validate_input
 from eng_contract.records import ResultRecord
 from eng_contract.store import LocationClass, ResultStore, Workspace
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 from structural_codes.pack import Registry
 
 from eng_harness._calc._approvals import ApprovalsFile
@@ -20,6 +20,8 @@ from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.calcs.column_design.column_demands import BASIS_FIELDS, ColumnLayout, DemandsInput, column_demands
+from eng_harness.errors import NotImplementedGap
 from eng_harness.ports import RunClass
 
 CALC_ID = "harness.column_demands"
@@ -430,3 +432,310 @@ def test_items_validate_against_checks(tmp_path: Path) -> None:
                     assert isinstance(prov, LiteralInput), (check_id, name)
 
 
+def test_registration_describe_and_trace(tmp_path: Path) -> None:
+    """Registration metadata, describe ref rules, and E3-E5 trace steps matching every emitted literal."""
+    definition = REGISTRY[CALC_ID]
+    assert definition is column_demands
+    assert (definition.version, definition.output_kind, definition.verification) == (
+        1,
+        "harness.column_check_items/1",
+        "draft",
+    )
+    assert definition.method_source == "eng-harness spec 0013 §4.4.2 (E1 to E6)"
+    assert BASIS_FIELDS == BASIS_PATHS
+
+    port, _, _, _ = _setup_port(tmp_path, _base_inputs())
+    info = port.describe(CALC_ID)
+    assert info.basis_fields == BASIS_PATHS
+    assert {name: sorted(rule.kinds) for name, rule in info.ref_rules.items()} == {
+        "selection": ["harness.column_selection/1"],
+        "forces": ["forces.member_end/1"],
+        "sections": ["model.sections/1"],
+        "layouts": ["basis.engineer_input/1"],
+        "combinations": ["basis.engineer_input/1"],
+        "basis": ["basis.design_basis/1"],
+    }
+
+    trace = TraceBuilder()
+    meta = _meta()
+    out = column_demands(DemandsInput.model_validate(_base_inputs()), meta, trace).model_dump(mode="json")
+    built = trace.build(definition, _DIGEST)
+    assert [(c.name, c.cited.value, c.cited.unit) for c in built.constants] == [
+        ("c_half", 2, "1"),
+        ("c_corner", 4, "1"),
+    ]
+    basis_id = meta.refs["basis"].result_id
+    inputs = {i.name: (i.value, i.unit, i.ref) for i in built.inputs}
+    assert inputs == {
+        "selection": (2, None, meta.refs["selection"].result_id),
+        "forces": (2, None, meta.refs["forces"].result_id),
+        "sections": (2, None, meta.refs["sections"].result_id),
+        "layouts": (2, None, meta.refs["layouts"].result_id),
+        "combinations": (1, None, meta.refs["combinations"].result_id),
+        "materials_concrete_fc_MPa": (30.0, "MPa", f"{basis_id}#/fields/materials.concrete_fc_MPa"),
+        "materials_rebar_fy_MPa": (420.0, "MPa", f"{basis_id}#/fields/materials.rebar_fy_MPa"),
+        "columns_effective_length_factor_ratio": (
+            1.0,
+            "1",
+            f"{basis_id}#/fields/columns.effective_length_factor_ratio",
+        ),
+        "limits_ratio_limit_ratio": (1.0, "1", f"{basis_id}#/fields/limits.ratio_limit_ratio"),
+    }
+    steps = {s.name: (s.value, s.unit, s.source) for s in built.steps}
+    assert steps["col_0_b_mm"] == (400.0, "mm", "spec 0013 4.4.2 E5")
+    assert steps["col_0_Ag_mm2"] == (160000.0, "mm2", "spec 0013 4.4.2 E5")
+    assert steps["col_0_Ast_mm2"] == (4000.0, "mm2", "spec 0013 4.4.2 E5")
+    assert steps["col_0_lu_mm"] == (3000.0, "mm", "spec 0013 4.4.2 E4")
+    assert steps["col_0_transverse_kind"] == ("tied", None, "spec 0013 4.4.2 E5")
+    assert steps["col_0_row_0_Pu_kN"] == (900.0, "kN", "spec 0013 4.4.2 E3")
+    assert steps["col_0_row_0_Mu_kNm"] == (40.0, "kN.m", "spec 0013 4.4.2 E3")
+    assert steps["col_0_row_0_Mu_other_kNm"] == (0.0, "kN.m", "spec 0013 4.4.2 E3")
+    assert steps["max_axial_strength_items"] == (2, None, "spec 0013 4.4.2 E2, E6")
+    assert steps["axial_flexure_uniaxial_items"] == (1, None, "spec 0013 4.4.2 E3, E6")
+    assert steps["longitudinal_reinforcement_limits_items"] == (2, None, "spec 0013 4.4.2 E5, E6")
+    assert steps["not_checked"] == (1, None, "spec 0013 4.4.2 E2, E3, E6")
+    assert built.outputs == [
+        "max_axial_strength_items",
+        "axial_flexure_uniaxial_items",
+        "longitudinal_reinforcement_limits_items",
+        "not_checked",
+    ]
+    step_values = {s.name: s.value for s in built.steps}
+    af_item = out["items"][AXIAL_FLEXURE_ID][0]["inputs"]
+    for key, val in af_item.items():
+        if not isinstance(val, dict):
+            col_step = step_values.get(f"col_0_{key}")
+            row_step = step_values.get(f"col_0_row_0_{key}")
+            assert val in (col_step, row_step), key
+
+
+@pytest.mark.parametrize(
+    ("bad_value", "fragment"),
+    [
+        ("30", "is not a finite number"),
+        (True, "is not a finite number"),
+        (0.0, "must be positive"),
+        (-5.0, "must be positive"),
+    ],
+)
+def test_basis_value_bounds_and_types(bad_value: Any, fragment: str) -> None:
+    """Every §4.7 A basis field refuses non-numeric, boolean, zero and negative values."""
+    for path in BASIS_PATHS:
+        mutated = _base_inputs()
+        field = copy.deepcopy(mutated["basis"]["fields"][path])
+        field["value"] = bad_value
+        mutated["basis"] = _basis(**{path: field})
+        with pytest.raises(ContractError) as caught:
+            _run_direct(mutated)
+        assert (caught.value.detail.code, caught.value.detail.field) == (
+            ErrorCode.INVALID_ARGUMENT,
+            f"basis.fields.{path}",
+        )
+        assert fragment in caught.value.detail.message
+
+
+def test_layout_basis_values_conversion_and_errors() -> None:
+    """Layout BasisValue fields resolve to literals (never $ref), trace once, and validate units/bounds."""
+    data = _base_inputs()
+    # Two columns sharing C40 layout with BasisValue A_bar (cm2) and d_prime (cm).
+    data["selection"]["columns"] = [
+        data["selection"]["columns"][0],
+        data["selection"]["columns"][0] | {"frame_id": "C3"},
+    ]
+    data["forces"]["rows"] = [
+        data["forces"]["rows"][0],
+        data["forces"]["rows"][0] | {"member": "C3"},
+    ]
+    data["layouts"]["sections"] = [
+        {
+            "section": "C40",
+            "transverse_kind": "tied",
+            "n_bars_b": 3,
+            "n_bars_h": 3,
+            "A_bar": {"source": "basis", "path": "rebar.bar_area_cm2"},
+            "d_prime": {"source": "basis", "path": "durability.cover_cm"},
+        }
+    ]
+    data["basis"] = _basis(
+        **{
+            "rebar.bar_area_cm2": {"value": 4.5, "unit": "cm2", "source": _SRC, "confirmed": True, "citation": None},
+            "durability.cover_cm": {"value": 5.0, "unit": "cm", "source": _SRC, "confirmed": True, "citation": None},
+        }
+    )
+    trace = TraceBuilder()
+    out = column_demands(DemandsInput.model_validate(data), _meta(), trace).model_dump(mode="json")
+    af_inputs = out["items"][AXIAL_FLEXURE_ID][0]["inputs"]
+    assert af_inputs["A_bar_mm2"] == 450.0
+    assert af_inputs["d_prime_mm"] == 50.0
+    assert type(af_inputs["A_bar_mm2"]) is float
+    assert out["items"][MAX_AXIAL_ID][0]["inputs"]["Ast_mm2"] == 3600.0
+    built = trace.build(REGISTRY[CALC_ID], _DIGEST)
+    assert [i.name for i in built.inputs].count("rebar_bar_area_cm2") == 1
+
+    # Missing/unconfirmed, wrong unit, non-numeric, and non-positive basis values in layout.
+    missing = copy.deepcopy(data)
+    missing["basis"] = _basis(
+        **{"durability.cover_cm": {"value": 5.0, "unit": "cm", "source": _SRC, "confirmed": True, "citation": None}}
+    )
+    with pytest.raises(ContractError) as err_miss:
+        _run_direct(missing)
+    assert (err_miss.value.detail.code, err_miss.value.detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "basis.fields.rebar.bar_area_cm2",
+    )
+
+    unconf = copy.deepcopy(data)
+    unconf["basis"]["fields"]["rebar.bar_area_cm2"]["confirmed"] = False
+    with pytest.raises(ContractError) as err_unconf:
+        _run_direct(unconf)
+    assert (err_unconf.value.detail.code, err_unconf.value.detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "basis.fields.rebar.bar_area_cm2",
+    )
+
+    wrong_unit = copy.deepcopy(data)
+    wrong_unit["basis"]["fields"]["rebar.bar_area_cm2"]["unit"] = "mm"
+    with pytest.raises(ContractError) as err_unit:
+        _run_direct(wrong_unit)
+    assert (err_unit.value.detail.code, err_unit.value.detail.field) == (
+        ErrorCode.UNIT_MISMATCH,
+        "basis.fields.rebar.bar_area_cm2",
+    )
+
+    non_num = copy.deepcopy(data)
+    non_num["basis"]["fields"]["rebar.bar_area_cm2"]["value"] = "4.5"
+    with pytest.raises(ContractError) as err_num:
+        _run_direct(non_num)
+    assert (err_num.value.detail.code, err_num.value.detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "basis.fields.rebar.bar_area_cm2",
+    )
+
+    non_pos = copy.deepcopy(data)
+    non_pos["basis"]["fields"]["rebar.bar_area_cm2"]["value"] = 0.0
+    with pytest.raises(ContractError) as err_pos:
+        _run_direct(non_pos)
+    assert (err_pos.value.detail.code, err_pos.value.detail.field) == (
+        ErrorCode.OUT_OF_RANGE,
+        "basis.fields.rebar.bar_area_cm2",
+    )
+
+
+def test_layout_input_bounds_overflow_and_duplicate_sections() -> None:
+    """Layout literal bounds, binary64 overflow/underflow, and duplicate sections are refused."""
+    for bad in (0.0, -10.0):
+        data = _base_inputs()
+        data["layouts"]["sections"][0]["A_bar"]["value"] = bad
+        with pytest.raises(ContractError) as caught:
+            _run_direct(data)
+        assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+        assert caught.value.detail.expected == {"exclusive_min": 0, "unit": "mm2"}
+
+    over = _base_inputs()
+    over["sections"]["frame_sections"][0]["shape"] = {"type": "rectangular", "b_mm": 1e308, "h_mm": 1e308}
+    with pytest.raises(ContractError) as err_over:
+        _run_direct(over)
+    assert (err_over.value.detail.code, err_over.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+
+    under = _base_inputs()
+    under["layouts"]["sections"][0]["A_bar"]["value"] = 1e-325
+    with pytest.raises(ContractError) as err_under:
+        _run_direct(under)
+    assert (err_under.value.detail.code, err_under.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+
+    dup = _base_inputs()
+    dup["layouts"]["sections"].append(copy.deepcopy(dup["layouts"]["sections"][0]))
+    with pytest.raises(ValidationError, match="duplicate section"):
+        ColumnLayout.model_validate(dup["layouts"])
+
+
+def test_missing_refs_sections_spiral_sorting_and_zero_sign() -> None:
+    """Missing refs, missing sections, spiral gap, -0.0 normalization, empty selection, and sorting."""
+    inp = DemandsInput.model_validate(_base_inputs())
+    full_meta = _meta()
+    for missing_name in ("selection", "forces", "sections", "layouts", "combinations", "basis"):
+        trimmed = InputMeta(refs={k: v for k, v in full_meta.refs.items() if k != missing_name})
+        with pytest.raises(ContractError) as caught:
+            column_demands(inp, trimmed, TraceBuilder())
+        assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, missing_name)
+        assert caught.value.detail.message == f"input {missing_name} must be a record reference"
+
+    no_sec = _base_inputs()
+    no_sec["sections"]["frame_sections"] = [no_sec["sections"]["frame_sections"][1]]
+    with pytest.raises(ContractError) as err_sec:
+        _run_direct(no_sec)
+    assert (err_sec.value.detail.code, err_sec.value.detail.field) == (ErrorCode.INVALID_ARGUMENT, "sections")
+
+    spiral = _base_inputs()
+    spiral["layouts"]["sections"][0]["transverse_kind"] = "spiral"
+    with pytest.raises(NotImplementedGap) as err_spiral:
+        _run_direct(spiral)
+    assert err_spiral.value.evidence == ("CK Q4",)
+
+    # Unsorted columns, -0.0 axial, multiple stations & envelope steps, plus both AXES_UNDECLARED and FORCES_MISSING.
+    combo = _base_inputs()
+    combo["combinations"] = ["ULS1", "ULS2"]
+    combo["selection"]["columns"] = list(reversed(combo["selection"]["columns"]))
+    combo["forces"]["rows"] = [
+        {
+            "member": "C1",
+            "case": {"case": "ULS1", "case_type": "load_combination", "step": "Min"},
+            "end": "j",
+            "station_mm": 3000.0,
+            "P_kN": -0.0,
+            "V2_kN": 0.0,
+            "V3_kN": 0.0,
+            "T_kNm": 0.0,
+            "M2_kNm": -0.0,
+            "M3_kNm": -0.0,
+        },
+        {
+            "member": "C1",
+            "case": {"case": "ULS1", "case_type": "load_combination", "step": "Max"},
+            "end": "j",
+            "station_mm": 3000.0,
+            "P_kN": -100.0,
+            "V2_kN": 0.0,
+            "V3_kN": 0.0,
+            "T_kNm": 0.0,
+            "M2_kNm": 0.0,
+            "M3_kNm": 10.0,
+        },
+        {
+            "member": "C1",
+            "case": {"case": "ULS2", "case_type": "load_combination", "step": None},
+            "end": "i",
+            "station_mm": 0.0,
+            "P_kN": -200.0,
+            "V2_kN": 0.0,
+            "V3_kN": 0.0,
+            "T_kNm": 0.0,
+            "M2_kNm": 0.0,
+            "M3_kNm": 15.0,
+        },
+    ]
+    out_combo = _run_direct(combo)
+    ma_items = out_combo["items"][MAX_AXIAL_ID]
+    got_ma = [
+        (i["subject"]["id"], i["subject"]["case"], i["subject"]["station_mm"], i["inputs"]["Pu_kN"]) for i in ma_items
+    ]
+    assert got_ma == [
+        ("C1", "ULS1", 3000.0, 100.0),
+        ("C1", "ULS1", 3000.0, 0.0),
+        ("C1", "ULS2", 0.0, 200.0),
+    ]
+    zero_pu = ma_items[1]["inputs"]["Pu_kN"]
+    assert math.copysign(1.0, zero_pu) == 1.0
+    assert out_combo["not_checked"] == [
+        {"frame_id": "C2", "code": "AXES_UNDECLARED", "gap": "CW-G9"},
+        {"frame_id": "C2", "code": "FORCES_MISSING", "gap": None},
+    ]
+
+    empty = _base_inputs()
+    empty["selection"] = _selection([])
+    empty["selection"]["status"] = "FAIL"
+    out_empty = _run_direct(empty)
+    assert out_empty == {
+        "items": {MAX_AXIAL_ID: [], AXIAL_FLEXURE_ID: [], REINF_LIMITS_ID: []},
+        "not_checked": [],
+    }

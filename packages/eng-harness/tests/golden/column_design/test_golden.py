@@ -18,6 +18,7 @@ from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.column_design import COLUMN_DESIGN_CALCS, COLUMN_DESIGN_KINDS
+from eng_harness.calcs.column_design.column_demands import column_demands
 from eng_harness.calcs.column_design.column_select import BASIS_FIELDS, ColumnScope, SelectInput, column_select
 from eng_harness.kinds.column_design import ColumnSelection
 from eng_harness.ports import RunClass
@@ -105,7 +106,7 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert definition.method_source == "eng-harness spec 0013 §4.4.1 (L1 to L3); eng-harness spec 0003 §4.11 P2"
-    assert (column_select,) == COLUMN_DESIGN_CALCS
+    assert (column_select, column_demands) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
 

@@ -2,9 +2,18 @@
 
 from typing import Annotated, Literal, Self
 
-from eng_contract.refs import RefString
+from eng_contract.refs import Ref, RefString
 from eng_contract.verdicts import VerdictStatus
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictFloat,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 
 from eng_harness.kinds.calcs import CalcPayload, SummaryChanges, Top
 from eng_harness.kinds.edit_cycle import Label
@@ -15,6 +24,11 @@ _Fingerprint = Annotated[str, StringConstraints(pattern=r"^fp1:[0-9a-f]{64}$")]
 _ColumnShape = Literal["rectangular", "circular", "other"]
 _MatchStatus = Literal["matched", "no_section_in_model", "ambiguous"]
 _PassFail = Literal["PASS", "FAIL"]
+_FiniteFloat = Annotated[StrictFloat, Field(allow_inf_nan=False)]
+_ItemInput = StrictInt | _FiniteFloat | Ref | Literal["tied"]
+_INT_INPUTS = frozenset(("n_bars_b", "n_bars_h"))
+_REF_INPUTS = frozenset(("fc_MPa", "fy_MPa", "k_factor", "ratio_limit"))
+_TIED_INPUT = "transverse_kind"
 _CheckIds = (
     "aci318_14.22_4_2_1.max_axial_strength",
     "aci318_14.22_4_1_1.axial_flexure_uniaxial",
@@ -55,7 +69,23 @@ class _Subject(_P):
 
 class _Item(_P):
     subject: _Subject
-    inputs: dict[str, RefString]
+    inputs: dict[str, _ItemInput]
+
+    @model_validator(mode="after")
+    def _field_shapes(self) -> Self:
+        for name, val in self.inputs.items():
+            if name in _INT_INPUTS:
+                if type(val) is not int:
+                    raise ValueError(f"{name} must be a strict integer")
+            elif name == _TIED_INPUT:
+                if val != "tied":
+                    raise ValueError(f"{name} must be 'tied'")
+            elif name in _REF_INPUTS:
+                if not isinstance(val, Ref):
+                    raise ValueError(f"{name} must be a $ref object")
+            elif type(val) not in (int, float):
+                raise ValueError(f"{name} must be a finite number")
+        return self
 
 
 class _Miss(_P):
