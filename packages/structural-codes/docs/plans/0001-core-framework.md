@@ -421,6 +421,12 @@ is refused with `CheckDefinitionError` (AC2a).
 - Workspace: eng-contract tasks B-010 to B-025 before T2 (see §1); eng-dev-gate `[tool.eng-gate]` keys and
   `agents render` before T1 if available, otherwise T1 writes the table as specified and renders `AGENTS.md` by hand from
   the template, to be checked once the gate exists.
+- External amendments of this plan's files by tasks of other plans (amendment B-579, from the B-326 findings): plan 0003
+  T2 ("Clause map module (footing rows), row validation and overlay builder with the unconfirmed gap check"; spec 0001
+  AC18, spec 0003 AC8) amends `packages/structural-codes/core/src/structural_codes/_runner.py` and
+  `packages/structural-codes/core/tests/unit/test_overlay.py` so that for inherited body verdicts, the runner validates
+  explicit draft clauses against the base check metadata, then emits the inherited check's mapped clause, code and check
+  id, and preserves the base trace citations.
 
 ## 4. Verification
 
