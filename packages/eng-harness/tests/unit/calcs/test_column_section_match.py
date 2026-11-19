@@ -423,6 +423,7 @@ def test_trace_records_inputs_and_steps() -> None:
     }
     assert built.outputs == ["status", "section", "names"]
 
+
 def test_size_pointer_must_be_size(tmp_path: Path) -> None:
     """B-580 / AC9: size_b, size_h and size_d must point at /size; #/required and #/increment are refused.
 

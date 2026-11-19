@@ -377,6 +377,7 @@ def test_unexpected_exception_is_internal(fx: ModuleType, tmp_path: Path) -> Non
     assert out.error.code is ErrorCode.INTERNAL
     assert out.error.incident_id is not None
 
+
 def test_ref_meta_preserves_pointer(tmp_path: Path) -> None:
     """B-580 / plan 0013 T5: RefMeta.ref keeps the original input reference including its JSON pointer.
 

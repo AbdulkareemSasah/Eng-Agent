@@ -15,11 +15,11 @@ from fractions import Fraction
 from typing import Any, Literal, Self
 
 from eng_contract.errors import ContractError, ErrorCode
-from eng_contract.refs import parse_ref
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.kinds.model import Circular, Rectangular, Sections
 from eng_contract.params import eng_param
 from eng_contract.quantity import Quantity
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
