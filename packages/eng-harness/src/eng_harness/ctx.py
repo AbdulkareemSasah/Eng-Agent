@@ -93,6 +93,11 @@ class ReadResult(_Frozen):
     kind: str
     value: SummaryValue
 
+    @property
+    def data(self) -> SummaryValue:
+        """The decoded value as block code reads it (every nested quantity stays a `Quantity`)."""
+        return self.value
+
 
 class CalcResult(_Frozen):
     """A calc's stored result; `draft` is true for a `draft` or `verified` calc."""
@@ -118,6 +123,11 @@ class Answered[M: BaseModel](_Frozen):
 
     value: M
     ref: Ref
+
+    @property
+    def answer(self) -> M:
+        """The validated model as block code reads it."""
+        return self.value
 
     def field_ref(self, name: str) -> Ref:
         """Reference to one answered field, `res_<id>#/fields/<name>/value`."""
