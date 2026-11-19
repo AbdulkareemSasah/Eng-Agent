@@ -104,9 +104,12 @@ class AdapterHostPort:
         await self._record_save(model_key, path, opened)
 
     async def _record_save(self, model_key: str, path: Path, opened: OpenedInstance) -> SavedModel:
-        read = await self._reader.read(opened.pid, path)  # B-451 L3: the saved state's own
-        s = self._identity.record_save(self._models[model_key], path, read.fingerprint)
-        self._reads[model_key] = read
+        fingerprint: str | None = None
+        if self._profile.tables:  # products without a table map yet (SAFE before T5) keep their prior fingerprint
+            read = await self._reader.read(opened.pid, path)  # B-451 L3: the saved state's own
+            self._reads[model_key] = read
+            fingerprint = read.fingerprint
+        s = self._identity.record_save(self._models[model_key], path, fingerprint)
         self._written.discard(model_key)
         digest = s.file_sha256
         if digest is None:
