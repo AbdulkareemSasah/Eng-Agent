@@ -181,8 +181,8 @@ def _ref(value: object) -> Ref:
 
 
 async def _data(ctx: Any, ref: Ref, pointer: str) -> Any:
-    """The value of a stored result at `pointer` as plain data (the dump, so that no attribute `value` is read)."""
-    return (await ctx.read(ref, pointer)).model_dump()["value"]
+    """The decoded value of a stored result at `pointer` (`ReadResult.data`, engine spec 4.3.2)."""
+    return (await ctx.read(ref, pointer)).data
 
 
 def _state(read: Any) -> StateRefs:
@@ -215,7 +215,7 @@ async def obtain_change_set(ctx: Any, inp: ChangeSetInput) -> ChangeSetOutput:
         if kept is None:
             asked = await ctx.ask(ChangeSetRequest, title=title)
             answered = asked.field_ref("change_set")
-            draft = ChangeSetRequest.model_validate(asked.model_dump()["value"]).change_set
+            draft = asked.answer.change_set
         else:
             answered, draft, kept = kept.answered, kept.draft, None
         check = await ctx.calc(

@@ -14,12 +14,14 @@ from eng_harness.calc import CalcStatus
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.footing import FOOTING_CALCS
 from eng_harness.calcs.footing import layout as layout_module
+from eng_harness.calcs.footing import plan_size as plan_size_module
 from eng_harness.calcs.footing import schedule as schedule_module
 from eng_harness.calcs.footing import status as status_module
 from eng_harness.calcs.footing import subjects as subjects_module
 
 ROOT = Path(__file__).resolve().parents[3]
 CALCS = {  # calc id -> (module, output kind, spec section naming its method)
+    "harness.footing_plan_size": (plan_size_module, "harness.footing_dims/1", "§4.4.2"),
     "harness.footing_subjects": (subjects_module, "harness.footing_subjects/1", "§4.4.1"),
     "harness.footing_layout": (layout_module, "harness.footing_design/1", "§4.4.3"),
     "harness.footing_status": (status_module, "harness.footing_status/1", "§4.4.5"),
@@ -69,7 +71,7 @@ def test_the_calcs_are_draft_in_the_shipped_approvals() -> None:
 
 
 def test_the_calc_modules_are_importable_by_their_public_names() -> None:
-    names = ("subjects", "layout", "status", "schedule")
+    names = ("subjects", "plan_size", "layout", "status", "schedule")
     modules: list[ModuleType] = [importlib.import_module(f"eng_harness.calcs.footing.{n}") for n in names]
     assert [m.__name__ for m in modules] == [f"eng_harness.calcs.footing.{n}" for n in names]
     public = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["eng-gate"]["public_modules"]
