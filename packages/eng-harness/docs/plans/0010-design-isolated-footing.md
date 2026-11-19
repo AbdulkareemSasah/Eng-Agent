@@ -495,10 +495,11 @@ determinism. The non-test lines are at most a test-support helper.
   line in `packages/eng-harness/docs/verification/calcs/harness.footing_layout.md`,
   `packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md`,
   `packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md`,
-  `packages/eng-harness/docs/verification/calcs/harness.footing_status.md`, and
-  `packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md` (nothing else in those records), because
-  `RefMeta.ref` in `calc.py` moves every calc's `content_sha256` in `calcs.lock.json` and those plan 0010 records
-  embed the hashes compared by the footing registration test.
+  `packages/eng-harness/docs/verification/calcs/harness.footing_status.md`,
+  `packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md`, and
+  `packages/eng-harness/docs/verification/calcs/harness.footing_resize.md` once that record exists on build/v1
+  (nothing else in those records), because `RefMeta.ref` in `calc.py` moves every calc's `content_sha256` in
+  `calcs.lock.json` and those plan 0010 records embed the hashes compared by the footing registration test.
 
 ## 4. Verification
 

@@ -171,9 +171,9 @@ tasks:
     # max_changed_lines from 300 to 400 for the shared metadata and port changes. External amendment recorded in
     # plan 0003 §3.
     # Amendment (B-582, documents only): RefMeta.ref in calc.py is in every calc's content-hash closure, so T5's
-    # calcs.lock.json rewrite moves every content_sha256; five footing verification records (plan 0010) embed those
-    # hashes and must refresh the content-hash line only (nothing else) in the same pull request. External amendment
-    # recorded in plan 0010 §3.
+    # calcs.lock.json rewrite moves every content_sha256; six footing verification records (plan 0010) embed those
+    # hashes and must refresh the content-hash line only (nothing else) in the same pull request (footing_resize once
+    # that record exists on build/v1). External amendment recorded in plan 0010 §3.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.change_set and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -190,6 +190,7 @@ tasks:
       - "packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md"  # content-hash line only; hash moved by RefMeta.ref in calc.py (amendment B-582)
       - "packages/eng-harness/docs/verification/calcs/harness.footing_status.md"  # content-hash line only; hash moved by RefMeta.ref in calc.py (amendment B-582)
       - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # content-hash line only; hash moved by RefMeta.ref in calc.py (amendment B-582)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"  # content-hash line only; hash moved by RefMeta.ref in calc.py (amendment B-582); once that record exists on build/v1
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-match-*.json"
       - "packages/eng-harness/tests/unit/calcs/test_port.py"  # RefMeta pointer preservation regressions (amendment B-580)
@@ -517,7 +518,7 @@ Amendment (B-580, documents only): the port preserves each input reference with 
 regression `test_port.py::test_ref_meta_preserves_pointer` covers `#/required` and `#/increment` on a record whose
 `required` differs from `size`, and `test_column_section_match.py::test_size_pointer_must_be_size` covers the calc
 refusal (both fail on T5's current base, so both are in `tests_first`).
-Amendment (B-582, documents only): T5 may refresh only the content-hash line in the five footing verification records (`harness.footing_layout`, `harness.footing_plan_size`, `harness.footing_schedule`, `harness.footing_status`, `harness.footing_subjects`) so each matches the lock after `RefMeta.ref` moves every calc's `content_sha256`; nothing else in those records.
+Amendment (B-582, documents only): T5 may refresh only the content-hash line in the six footing verification records (`harness.footing_layout`, `harness.footing_plan_size`, `harness.footing_schedule`, `harness.footing_status`, `harness.footing_subjects`, and `harness.footing_resize` once that record exists on build/v1) so each matches the lock after `RefMeta.ref` moves every calc's `content_sha256`; nothing else in those records.
 
 **T6 Code-pack route tests** (spec §4.5, AC13; amendment B-578). The route itself (`_calc/_code_packs.py`, `_port.py`,
 `COLUMN_CHECK_IDS`, `batch` argument, `pyproject.toml`, `uv.lock`) already merged in B-393 (plan 0010 T2), and the
