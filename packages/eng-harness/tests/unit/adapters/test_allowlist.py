@@ -523,7 +523,7 @@ def test_safe_entries_complete() -> None:
         "harness.base_reactions/1",
         "token",
         "never",
-        ("SAFE",),
+        ("SAFE", "SAP2000"),
     )
 
     load_cases = safe.descriptor("csi_list_load_cases")
@@ -532,7 +532,7 @@ def test_safe_entries_complete() -> None:
         "read",
         "ListLoadCasesArgs",
         "none",
-        ("SAFE",),
+        ("SAFE", "SAP2000"),
     )
     table_fields = safe.descriptor("csi_db_table_fields")
     assert (
@@ -541,7 +541,7 @@ def test_safe_entries_complete() -> None:
         table_fields.args_model,
         table_fields.units,
         table_fields.products,
-    ) == ("read", "read", "DbTableFieldsArgs", "none", ("SAFE",))
+    ) == ("read", "read", "DbTableFieldsArgs", "none", ("SAFE", "SAP2000"))
 
     assert etabs.tool_fingerprint == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
     for safe_only in ("csi_list_load_cases", "csi_db_table_fields", "csi_set_point_load", "csi_results_base_reactions"):

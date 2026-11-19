@@ -34,8 +34,8 @@ _REVIT_FORBIDDEN_ARGS = (
     "--disable-adaptive-bake",
     "--no-cache-send-code-bodies",
 )
-# The CSI products a server section can name (spec 0008 4.1); the adapter's profile registry holds the same names.
-KNOWN_PRODUCTS = ("ETABS", "SAFE")
+# The CSI products a server section can name (spec 0008 4.1, spec 0012 4.3); the adapter's profile registry holds the same names.
+KNOWN_PRODUCTS = ("ETABS", "SAFE", "SAP2000")
 # Substrings that mark an escape-hatch tool name (script, generic invoke, table write); the full deny list is the
 # allowlist's (spec 0002 section 4.5.1).
 _ESCAPE_MARKERS = ("script", "invoke", "tables_apply")

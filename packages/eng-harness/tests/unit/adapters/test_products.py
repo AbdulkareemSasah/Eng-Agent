@@ -10,8 +10,8 @@ from eng_harness.adapters.csi import products
 from eng_harness.servers._config import KNOWN_PRODUCTS
 
 SRC = Path(__file__).resolve().parents[3] / "src" / "eng_harness"
-_NAMES = frozenset({"ETABS", "SAFE"})  # the product names a shared module must not branch on
-_EXTENSIONS = frozenset({".EDB", ".FDB"})  # the model extensions that identify a product
+_NAMES = frozenset({"ETABS", "SAFE", "SAP2000"})  # the product names a shared module must not branch on
+_EXTENSIONS = frozenset({".EDB", ".FDB", ".SDB"})  # the model extensions that identify a product
 
 
 @pytest.mark.parametrize(
@@ -137,7 +137,7 @@ def test_scan_finds_a_branch(source: str) -> None:
 @pytest.mark.parametrize(
     "source",
     [
-        '"""A model of ETABS or SAFE, .EDB or .FDB."""',
+        '"""A model of ETABS, SAFE or SAP2000, .EDB, .FDB or .SDB."""',
         "if product == other:\n    pass",
         'tool = Descriptor(products=("ETABS",))',
         "def make(product, name='x'):\n    pass",
@@ -148,16 +148,16 @@ def test_scan_leaves_data_and_prose(source: str) -> None:
     assert branches(source) == []
 
 
-@pytest.mark.parametrize("model", ["model.SDB", "model.EDB.bak", "model", "", ".EDB", "model.edbx"])
+@pytest.mark.parametrize("model", ["model.XYZ", "model.EDB.bak", "model", "", ".EDB", "model.edbx"])
 def test_unknown_extension_is_invalid_argument(model: str) -> None:
     with pytest.raises(ContractError) as error:
         products.product_of_model(model)
     assert error.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert error.value.detail.field == "model"
-    assert ".EDB, .FDB" in error.value.detail.message
+    assert ".EDB, .FDB, .SDB" in error.value.detail.message
 
 
-@pytest.mark.parametrize(("model", "server"), [("model.EDB", "SAFE"), ("footing.FDB", "ETABS")])
+@pytest.mark.parametrize(("model", "server"), [("model.EDB", "SAFE"), ("footing.FDB", "ETABS"), ("frame.SDB", "SAFE")])
 def test_other_product_than_the_server_is_invalid_argument(model: str, server: str) -> None:
     with pytest.raises(ContractError) as error:
         products.product_of_model(model, server)
@@ -172,7 +172,7 @@ def test_registry_matches_the_configurable_products() -> None:
     assert [products.profile(name).name for name in KNOWN_PRODUCTS] == list(KNOWN_PRODUCTS)
     with pytest.raises(KeyError):
         products.profile("STAAD")
-    assert products.profile("ETABS").companion_globs == products.profile("SAFE").companion_globs == ()
+    assert products.profile("ETABS").companion_globs == products.profile("SAFE").companion_globs == products.profile("SAP2000").companion_globs == ()
 
 
 def test_product_by_extension_three_products() -> None:
