@@ -1,4 +1,4 @@
-"""IDEA argument models: confirm under approval and design code from the basis only (plan 0014 T3; spec 0014 AC4, AC15)."""
+"""IDEA argument models: confirm under approval; design code from the basis (plan 0014 T3; AC4, AC15)."""
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
@@ -6,8 +6,8 @@ from eng_contract.errors import ContractError, ErrorCode
 
 def test_confirm_only_under_approval() -> None:
     """AC4: confirm: true is set only under an approval for tools that require it; save stays false."""
-    from eng_harness.adapters.idea import idea_allowlist
     from eng_harness.adapters.idea import _tools as idea_tools
+    from eng_harness.adapters.idea import idea_allowlist
 
     allowlist = idea_allowlist()
     assert allowlist.descriptor("idea_calculate").confirm == "approved"

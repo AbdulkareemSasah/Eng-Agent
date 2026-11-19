@@ -135,8 +135,14 @@ class Allowlist(BaseModel):
 
     def build_expectation(self) -> BuildExpectation:
         """What the build check compares a started server with (spec 0002 section 4.3.4)."""
+        status_tool = "idea_status" if self.adapter == "sasaah-idea-mcp" else "csi_status"
         return BuildExpectation(
-            self.sasaah_commit, self.also_tested_commits, self.tool_fingerprint, self.tool_names, self.product
+            self.sasaah_commit,
+            self.also_tested_commits,
+            self.tool_fingerprint,
+            self.tool_names,
+            self.product,
+            status_tool=status_tool,
         )
 
     def unreleased_tools(self) -> dict[str, str]:

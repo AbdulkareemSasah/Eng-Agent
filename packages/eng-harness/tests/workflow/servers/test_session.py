@@ -712,7 +712,9 @@ def test_safe_build_mismatch_stops_run(tmp_path: Path) -> None:
     anyio.run(body)
 
 
-def _idea_server(tmp_path: Path, *, extra_args: tuple[str, ...] = (), control: Path | None = None) -> tuple[ServersConfig, Path]:
+def _idea_server(
+    tmp_path: Path, *, extra_args: tuple[str, ...] = (), control: Path | None = None
+) -> tuple[ServersConfig, Path]:
     """A harness.toml IDEA section that launches the synthetic fake as a real process."""
     from eng_harness.servers import ServerConfig
 
@@ -721,11 +723,7 @@ def _idea_server(tmp_path: Path, *, extra_args: tuple[str, ...] = (), control: P
     if not ctrl.exists():
         ctrl.write_text(json.dumps({"faults": [], "seed": {}}), encoding="utf-8")
     wrapper = tmp_path / "sasaah-idea-mcp"
-    wrapper.write_text(
-        "#!/bin/sh\n"
-        f'export SASAAH_IDEA_FAKE_CONTROL="{ctrl}"\n'
-        f'exec "{sys.executable}" "{fake}" "$@"\n'
-    )
+    wrapper.write_text(f'#!/bin/sh\nexport SASAAH_IDEA_FAKE_CONTROL="{ctrl}"\nexec "{sys.executable}" "{fake}" "$@"\n')
     wrapper.chmod(0o755)
     from eng_harness.adapters.idea import idea_allowlist
 

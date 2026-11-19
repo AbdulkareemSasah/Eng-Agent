@@ -82,9 +82,9 @@ def test_fake_process_schemas_match_inventory(tmp_path: Path) -> None:
 
 def test_against_inventory() -> None:
     """AC2: the four classes partition the 58 inventory names; served entries match the allowlist."""
-    from eng_harness.adapters.idea import idea_allowlist
-
     from helpers.idea_classification import EXCLUDED, GAP, NOT_SERVED, SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
 
     inventory = load_repo_json(
         INVENTORY,
@@ -92,7 +92,7 @@ def test_against_inventory() -> None:
     )
     names = {t["name"] for t in inventory["tools"]}
     assert len(names) == 58
-    assert SERVED | GAP | NOT_SERVED | EXCLUDED == names
+    assert names == SERVED | GAP | NOT_SERVED | EXCLUDED
     assert len(SERVED) + len(GAP) + len(NOT_SERVED) + len(EXCLUDED) == 58
 
     allowlist = idea_allowlist()

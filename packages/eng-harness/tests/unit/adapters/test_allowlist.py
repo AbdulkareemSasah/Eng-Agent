@@ -607,9 +607,9 @@ def test_ports_revit_extensions() -> None:
 
 def test_idea_entries_match_classification() -> None:
     """AC2: the packaged IDEA allowlist serves exactly the 9 tools of spec 0014 section 4.4 with their fields."""
-    from eng_harness.adapters.idea import idea_allowlist
-
     from helpers.idea_classification import SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
 
     allowlist = idea_allowlist()
     assert allowlist.adapter == "sasaah-idea-mcp"
@@ -620,7 +620,16 @@ def test_idea_entries_match_classification() -> None:
     assert len(allowlist.tools) == 9
 
     expected = {
-        "idea_status": ("session", "session", "read", "plain", "never", ("native", "rest"), "harness.idea_status/1", None),
+        "idea_status": (
+            "session",
+            "session",
+            "read",
+            "plain",
+            "never",
+            ("native", "rest"),
+            "harness.idea_status/1",
+            None,
+        ),
         "idea_open_project": (
             "session",
             "call",
@@ -718,9 +727,9 @@ def test_idea_entries_match_classification() -> None:
 
 def test_idea_gap_and_not_served_refused() -> None:
     """AC2: gap and not-served tools are absent from the allowlist (INVALID_ARGUMENT at the ToolPort)."""
-    from eng_harness.adapters.idea import idea_allowlist
-
     from helpers.idea_classification import GAP, NOT_SERVED, SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
 
     allowlist = idea_allowlist()
     assert set(allowlist.tool_names) == SERVED
@@ -747,7 +756,7 @@ def test_idea_run_script_refused() -> None:
         'routes = ["native", "rest"]\n'
     )
     entry = (
-        "tool = [{ name = \"idea_run_script\", kind = \"session\", timeout_class = \"session\", "
+        'tool = [{ name = "idea_run_script", kind = "session", timeout_class = "session", '
         'effect = "read", action = "plain", args_model = "ScriptArgs", units = "none", '
         'confirm = "never", products = ["IDEA"], routes = ["native"] }]\n'
     )
