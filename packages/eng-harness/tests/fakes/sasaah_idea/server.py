@@ -12,7 +12,8 @@ Calculations return synthetic checks from a deterministic **non-engineering** fo
 
 Faults come from the JSON control file named by ``SASAAH_IDEA_FAKE_CONTROL``:
 ``service_stopped``, ``live_create_fallback``, ``license_refused``, ``license_hang``, ``timeout_calculate``,
-``timeout_set_loads`` (``applied`` bool, default true; optional ``mismatch`` bool), ``unexpected_shape``,
+``timeout_set_loads`` (``applied`` bool, default true; optional ``mismatch`` bool; optional ``seconds`` delay
+before the reply is withheld forever, default 30), ``unexpected_shape``,
 ``errors_in_reply``, ``all_zero_loads``, ``passed_disagrees``, ``zero_utilization_true``, ``script_enabled``,
 ``read_only_listed_wrong``, ``zero_connections_calculated``, and ``crash_during_call``.
 """
@@ -489,17 +490,20 @@ async def _native_set_loads(args: dict[str, Any]) -> dict[str, Any]:
     if not kept:
         raise SasaahError("idea_error", "All load effects are zero; IDEA rejects loading with no non-zero effects.")
     timeout_fault = STATE.pop_fault("idea_native_set_loads", {"timeout_set_loads"})
-    if timeout_fault is not None and not timeout_fault.get("applied", True):
-        raise SasaahError("timeout", "The call timed out.")
-    if timeout_fault is not None and timeout_fault.get("mismatch"):
-        for seg in kept[0].get("forcesOnSegments") or []:
-            seg["n"] = float(seg.get("n", 0.0)) + 1.0
-            break
+    if timeout_fault is not None:
+        # Spec 0014 §4.12: file written or not, reply lost (no error reply).
+        if timeout_fault.get("applied", True):
+            if timeout_fault.get("mismatch"):
+                for seg in kept[0].get("forcesOnSegments") or []:
+                    seg["n"] = float(seg.get("n", 0.0)) + 1.0
+                    break
+            conn["loads"] = kept
+            _write_ideacon_atomic(str(args.get("out_path") or args["path"]), data)
+        await asyncio.sleep(float(timeout_fault.get("seconds", 30.0)))
+        await asyncio.Future()  # never completes; the client times out with no reply
     conn["loads"] = kept
     target_path = str(args.get("out_path") or args["path"])
     _write_ideacon_atomic(target_path, data)
-    if timeout_fault is not None:
-        raise SasaahError("timeout", "The call timed out.")
     if bad := _unexpected("idea_native_set_loads"):
         return bad
     return {
