@@ -105,9 +105,12 @@ values are synthetic and say so.
   `tests/property/test_column_review.py::test_ratios_are_referenced_not_computed`.
 - AC9. Given the golden cases of §4.4.4 (one matching section; none; two; same size other material; a dimension
   exactly at `compare.length_mm`; circular), when `harness.column_section_match` runs, then `status` and `section` equal
-  the expected ones; given a literal size instead of a `harness.section_size/1` reference, then `INVALID_ARGUMENT`.
-  Tests: `tests/golden/column_design/test_golden.py::test_case[column-match-*]`,
-  `tests/unit/calcs/test_column_section_match.py::test_size_must_be_rounding_result`.
+  the expected ones; given a literal size instead of a `harness.section_size/1` reference, or a `size_b`, `size_h` or
+  `size_d` reference whose pointer is not exactly `/size` (for example `#/required` or `#/increment`), then
+  `INVALID_ARGUMENT` (amendment B-580). Tests: `tests/golden/column_design/test_golden.py::test_case[column-match-*]`,
+  `tests/unit/calcs/test_column_section_match.py::test_size_must_be_rounding_result`,
+  `tests/unit/calcs/test_column_section_match.py::test_size_pointer_must_be_size`,
+  `tests/unit/calcs/test_port.py::test_ref_meta_preserves_pointer`.
 - AC10. Given matches and accepted frame ids, when `harness.column_change_set` runs, then it holds one `frame_section`
   item per accepted frame with status `matched`, sorted by frame id, and each accepted frame without a match is an
   issue `NOT_IMPLEMENTED` with gap CW-G3 and no item. Test: `tests/unit/calcs/test_column_change_set.py::test_items_and_refusals`.
@@ -345,11 +348,14 @@ and ratios on both sides), `complete`.
 
 #### 4.4.4 `harness.column_section_match` v1
 
-Input: `column` (a row reference into the selection), `sizes` (one `harness.section_size/1` reference per dimension:
-`b` and `h`, or `D`), `sections`, `basis` (`compare.length_mm`). Method: M1 candidates are frame sections with the
-column's shape type and material whose every dimension differs from the rounded size by at most `compare.length_mm`
-(exact). M2 one candidate is `matched` with its name; none is `no_section_in_model` (CW-G3, H-G1); several are
-`ambiguous` with all names. Output `harness.column_match/1`.
+Input: `column` (a row reference into the selection), top-level `size_b` and `size_h` (rectangular) or `size_d`
+(circular) — each a `harness.section_size/1` reference whose JSON pointer is exactly `/size` (not `#/required` or
+`#/increment`; amendment B-580; named as separate top-level fields so the CalcPort resolves one reference per
+dimension), `sections`, `basis` (`compare.length_mm`). Method: M1 candidates are frame sections with the column's
+shape type and material whose every dimension differs from the rounded size by at most `compare.length_mm` (exact).
+M2 one candidate is `matched` with its name; none is `no_section_in_model` (CW-G3, H-G1); several are `ambiguous`
+with all names. A size reference whose parsed pointer is not `/size` is `INVALID_ARGUMENT` on that field; the calc
+writes each validated size reference (pointer included) to the trace. Output `harness.column_match/1`.
 
 `harness.column_change_set` v1: input `matches` (references) and `accepted` (frame ids whose decision is
 `change_section`); output `harness.generated_change_set/1` with one `frame_section` item (`frames: [id]`, `section`)

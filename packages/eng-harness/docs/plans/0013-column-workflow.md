@@ -158,20 +158,35 @@ tasks:
     depends_on: [T2]
   - id: T5
     title: Calcs harness.column_section_match and harness.column_change_set
+    # Amendment (B-580, documents only): the B-284 re-review found that HarnessCalcPort drops the pointer when
+    # building RefMeta, and column_section_match appends #/size to the record id whatever field supplied the value,
+    # so a size_b / size_h / size_d reference to #/required or #/increment can match on an unrounded dimension while
+    # the trace points at #/size (R1 provenance break). T5 therefore also edits the plan 0003 modules
+    # packages/eng-harness/src/eng_harness/_calc/_port.py and packages/eng-harness/src/eng_harness/calc.py (RefMeta),
+    # plus packages/eng-harness/tests/unit/calcs/test_port.py: the port preserves each input reference with its
+    # pointer in RefMeta; column_section_match refuses a size reference whose parsed pointer is not exactly /size
+    # (INVALID_ARGUMENT, field size_b, size_h or size_d) and writes the validated reference to the trace; port-level
+    # regression cases cover both sibling fields on a harness.section_size/1 record whose required differs from size.
+    # Those port regressions fail on T5's current base (pointer dropped today), so they join tests_first. Raise
+    # max_changed_lines from 300 to 400 for the shared metadata and port changes. External amendment recorded in
+    # plan 0003 §3.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.change_set and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_section_match.md"
       - "packages/eng-harness/docs/verification/calcs/harness.column_change_set.md"
+      - "packages/eng-harness/src/eng_harness/calc.py"  # RefMeta keeps the original input reference with its pointer (amendment B-580)
+      - "packages/eng-harness/src/eng_harness/_calc/_port.py"  # HarnessCalcPort preserves that reference in RefMeta (amendment B-580)
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/section_match.py"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/change_set.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-match-*.json"
+      - "packages/eng-harness/tests/unit/calcs/test_port.py"  # RefMeta pointer preservation regressions (amendment B-580)
       - "packages/eng-harness/tests/unit/calcs/test_column_section_match.py"
       - "packages/eng-harness/tests/unit/calcs/test_column_change_set.py"
-    max_changed_lines: 300
+    max_changed_lines: 400
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-match-one]"
@@ -181,7 +196,9 @@ tasks:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-match-boundary]"
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-match-circular]"
       - "packages/eng-harness/tests/unit/calcs/test_column_section_match.py::test_size_must_be_rounding_result"
+      - "packages/eng-harness/tests/unit/calcs/test_column_section_match.py::test_size_pointer_must_be_size"
       - "packages/eng-harness/tests/unit/calcs/test_column_change_set.py::test_items_and_refusals"
+      - "packages/eng-harness/tests/unit/calcs/test_port.py::test_ref_meta_preserves_pointer"
     covers: [AC9, AC10]
     depends_on: [T2]
   - id: T6
@@ -482,9 +499,15 @@ ratio in the output equals the ratio of the verdict it references. Amendment (B-
 `test_column_design_kinds.py` are updated alongside it, and `calcs.lock.json` is regenerated (which also updates the
 entry of `harness.column_select`, whose hash closure includes `kinds/column_design.py`).
 
-**T5 Proposal calcs** (spec §4.4.4). `harness.column_section_match` (input sizes only as `harness.section_size/1`
-references; exact tolerance comparison; `matched`, `no_section_in_model`, `ambiguous`) and
-`harness.column_change_set` (names only; refusals with CW-G3).
+**T5 Proposal calcs** (spec §4.4.4). `harness.column_section_match` (top-level `size_b` and `size_h`, or
+`size_d`, each a `harness.section_size/1` reference whose pointer is exactly `/size`; exact tolerance comparison;
+`matched`, `no_section_in_model`, `ambiguous`) and `harness.column_change_set` (names only; refusals with CW-G3).
+Amendment (B-580, documents only): the port preserves each input reference with its pointer in `RefMeta`
+(`calc.py`, `_calc/_port.py`); the matcher refuses a size reference whose parsed pointer is not `/size`
+(`INVALID_ARGUMENT`, field `size_b`, `size_h` or `size_d`) and writes the validated reference to the trace; port-level
+regression `test_port.py::test_ref_meta_preserves_pointer` covers `#/required` and `#/increment` on a record whose
+`required` differs from `size`, and `test_column_section_match.py::test_size_pointer_must_be_size` covers the calc
+refusal (both fail on T5's current base, so both are in `tests_first`).
 
 **T6 Code-pack route tests** (spec §4.5, AC13; amendment B-578). The route itself (`_calc/_code_packs.py`, `_port.py`,
 `COLUMN_CHECK_IDS`, `batch` argument, `pyproject.toml`, `uv.lock`) already merged in B-393 (plan 0010 T2), and the
