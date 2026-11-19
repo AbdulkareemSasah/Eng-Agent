@@ -39,6 +39,22 @@
     "rows": [],
     "label": "top 0 of 0 by ratio"
   },
+  "members": [
+    {
+      "frame_id": "C1",
+      "source": "code_pack",
+      "check_id": "aci318_14.22_4_2_1.max_axial_strength",
+      "status": "PASS",
+      "ratio": 0.4
+    },
+    {
+      "frame_id": "C1",
+      "source": "host",
+      "check_id": "host.steel_design_ratio",
+      "status": "PASS",
+      "ratio": 0.3
+    }
+  ],
   "changes": {
     "newly_failing": [],
     "newly_passing": [],

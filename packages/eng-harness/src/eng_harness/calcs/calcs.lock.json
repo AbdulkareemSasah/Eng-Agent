@@ -16,6 +16,11 @@
       "version": 1
     },
     {
+      "content_sha256": "315fa23a3038a1c4ef3f54ff3b7f60ef3fc53520079a9499c785bb9ddd5721cc",
+      "id": "harness.column_review",
+      "version": 1
+    },
+    {
       "content_sha256": "251dc3fd5b87383bab01df5f82e64586364f345077738f07e1df693bd29a0466",
       "id": "harness.column_select",
       "version": 1
@@ -63,6 +68,11 @@
     {
       "content_sha256": "41a1fd1cd67fca8a6fcfdaee11761db4323f1de8c51d82f15c74f987e046df1f",
       "id": "harness.model_fingerprint",
+      "version": 1
+    },
+    {
+      "content_sha256": "375f7d784f8440b6d94c0e0060b9125171edba23b11407be46ab6822d3fb53e7",
+      "id": "harness.placement_compare",
       "version": 1
     },
     {

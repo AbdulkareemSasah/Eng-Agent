@@ -23,9 +23,12 @@ from eng_harness.cli._exit import ExitCode
 from eng_harness.cli._opener import open_address, write_to_terminal
 from eng_harness.cli._parser import UsageError, build_parser
 from eng_harness.cli._run import resume_command, run_command
+from eng_harness.cli._status import doctor_command, report_command, status_command
+from eng_harness.cli._stop import stop_command
 from eng_harness.cli._wiring import EngineFactory, default_engine_factory
 from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions.types import DecisionPolicy
+from eng_harness.doctor import run as doctor_run
 from eng_harness.ports import CalcPort, DecisionPort, HostPort, RunClass, ToolPort
 from eng_harness.providers import DecisionRuntime, ProvidersConfig, load_providers_config
 from eng_harness.servers import ConfigError
@@ -89,6 +92,22 @@ type DecisionPortFactory = Callable[[DecisionRuntime, HarnessConfig, Workspace, 
 type BasisFieldsOf = Callable[[WorkflowDef[Any, Any]], Sequence[FieldSpec]]
 
 
+class DoctorRunner(Protocol):
+    """Runs `eng-harness doctor` diagnostics (spec 0002 section 4.9, spec 0006 AC13)."""
+
+    def __call__(
+        self,
+        config_path: Path | None,
+        *,
+        json_output: bool,
+        show_paths: bool,
+        out: TextIO | None = None,
+        env: Mapping[str, str] | None = None,
+    ) -> int:
+        """Run the checks and return the exit code."""
+        ...
+
+
 @dataclass(frozen=True)
 class CliDeps:
     """Collaborators of `main`; later tasks bind the remaining defaults.
@@ -99,8 +118,8 @@ class CliDeps:
         environ: The environment.
         opener: Opens a launch address with `BROWSER` removed; returns False on failure (never `webbrowser`,
             spec 4.4.4). Defaults to the platform opener.
-        handlers: Command name to handler (`run` and `resume` by default); a command without one is reported as not
-            available.
+        handlers: Command name to handler (`run`, `resume`, `status`, `stop`, `report`, `doctor`); a command without
+            one is reported as not available.
         clock: The time source of runs and results.
         ids: The id source of runs and results.
         engine_factory: Builds the engine from the full port set; defaults to the merged `Engine`.
@@ -115,13 +134,23 @@ class CliDeps:
         decision_port_factory: Builds the `DecisionPort` from the assembled runtime (plan 0006 T18a); `None` likewise.
         basis_fields_of: Returns the workflow's `FieldSpec` sequence for step 3 (plan 0006 T18a); `None` keeps a
             workflow with required basis fields unavailable in this build.
+        doctor: Runs `eng-harness doctor`; defaults to `eng_harness.doctor.run`.
     """
 
     stdout: TextIO = field(default_factory=lambda: sys.stdout)
     stderr: TextIO = field(default_factory=lambda: sys.stderr)
     environ: Mapping[str, str] = field(default_factory=lambda: os.environ)
     opener: Callable[[str], bool] = open_address
-    handlers: Mapping[str, Handler] = field(default_factory=lambda: {"run": run_command, "resume": resume_command})
+    handlers: Mapping[str, Handler] = field(
+        default_factory=lambda: {
+            "run": run_command,
+            "resume": resume_command,
+            "status": status_command,
+            "stop": stop_command,
+            "report": report_command,
+            "doctor": doctor_command,
+        }
+    )
     clock: Clock = field(default_factory=SystemClock)
     ids: IdSource = field(default_factory=lambda: SystemIdSource(SystemClock()))
     engine_factory: EngineFactory = default_engine_factory
@@ -134,6 +163,7 @@ class CliDeps:
     point_policies: Mapping[str, DecisionPolicy] | None = None
     decision_port_factory: DecisionPortFactory | None = None
     basis_fields_of: BasisFieldsOf | None = None
+    doctor: DoctorRunner = doctor_run
 
 
 def main(argv: Sequence[str] | None = None, *, deps: CliDeps | None = None) -> int:
@@ -179,5 +209,6 @@ def main(argv: Sequence[str] | None = None, *, deps: CliDeps | None = None) -> i
 
 __all__ = [
     "BasisFieldsOf", "CalcPortFactory", "CliDeps", "ConfigError", "DecisionAssembler", "DecisionPortFactory",
-    "ExitCode", "HarnessConfig", "HostedPorts", "PortBuilder", "ProvidersLoader", "RunCalcPort", "RunPorts", "main",
+    "DoctorRunner", "ExitCode", "HarnessConfig", "HostedPorts", "PortBuilder", "ProvidersLoader", "RunCalcPort",
+    "RunPorts", "main",
 ]  # fmt: skip
