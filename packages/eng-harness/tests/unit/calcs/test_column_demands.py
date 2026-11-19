@@ -570,7 +570,9 @@ def test_layout_basis_values_conversion_and_errors() -> None:
     assert type(af_inputs["A_bar_mm2"]) is float
     assert out["items"][MAX_AXIAL_ID][0]["inputs"]["Ast_mm2"] == 3600.0
     built = trace.build(REGISTRY[CALC_ID], _DIGEST)
-    assert [i.name for i in built.inputs].count("rebar_bar_area_cm2") == 1
+    assert [i.name for i in built.inputs].count("basis_in_rebar_bar_area_cm2") == 1
+    a_bar_step = next(s for s in built.steps if s.name == "col_0_A_bar_mm2")
+    assert list(a_bar_step.uses) == ["basis_in_rebar_bar_area_cm2"]
 
     # Missing/unconfirmed, wrong unit, non-numeric, and non-positive basis values in layout.
     missing = copy.deepcopy(data)

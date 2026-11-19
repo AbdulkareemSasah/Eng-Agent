@@ -7,8 +7,9 @@ symmetric by geometry and layout: `b_mm == h_mm` and `n_bars_b == n_bars_h`, els
 steps; confirmed basis fields (`fc_MPa`, `fy_MPa`, `k_factor`, `ratio_limit`) are `{"$ref"}` references into `basis`.
 Units: mm, mm2, kN, kN.m, MPa.
 Errors: `ContractError` `INVALID_ARGUMENT` (forces `sign_convention` enforced by `forces.member_end/1`, missing or
-unconfirmed basis field with `field="basis.fields.<path>"`, missing record reference, unknown column section),
-`UNIT_MISMATCH` / `OUT_OF_RANGE` on basis/layout quantities, `NotImplementedGap` (`CK Q4`) for spiral reinforcement.
+unconfirmed basis field with `field="basis.fields.<path>"`, `limits.ratio_limit_ratio` above the contract
+`Verdict.ratio_limit` default, missing record reference, unknown column section), `UNIT_MISMATCH` / `OUT_OF_RANGE` on
+basis/layout quantities, `NotImplementedGap` (`CK Q4`) for spiral reinforcement.
 """
 
 import math
@@ -23,6 +24,7 @@ from eng_contract.kinds.model import Rectangular, Sections
 from eng_contract.params import eng_param
 from eng_contract.refs import RefString
 from eng_contract.units import unit
+from eng_contract.verdicts import Verdict
 from pydantic import Field, StrictFloat, StrictInt, model_validator
 
 from eng_harness.calc import CalcInput, InputMeta, NotImplementedGap, TraceBuilder, calc
@@ -48,6 +50,10 @@ _K = "columns.effective_length_factor_ratio"
 _RATIO_LIMIT = "limits.ratio_limit_ratio"
 BASIS_FIELDS: tuple[str, ...] = (_FC, _FY, _K, _RATIO_LIMIT)
 """The basis paths this calc reads (`CalcInfo.basis_fields`); the workflow declares them required."""
+
+# Ceiling of limits.ratio_limit_ratio: Verdict.ratio_limit default (04-tool-contract §5.1). Same source as
+# structural_codes.inputs CheckInputs.ratio_limit `le` bound; structural_codes is not an allowed calc import.
+_RATIO_LIMIT_MAX = Verdict.model_fields["ratio_limit"].default
 
 MAX_AXIAL_ID = "aci318_14.22_4_2_1.max_axial_strength"
 AXIAL_FLEXURE_ID = "aci318_14.22_4_1_1.axial_flexure_uniaxial"
@@ -148,6 +154,11 @@ def _refuse_basis(code: ErrorCode, path: str, why: str, **extra: Any) -> Contrac
     )
 
 
+def _layout_basis_input_name(path: str) -> str:
+    """Deterministic trace name for a layout basis path; `basis_in_` keeps it off the `col_*` step namespace."""
+    return f"basis_in_{path.replace('.', '_')}"
+
+
 def _read_basis(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> dict[str, _RefDict]:
     """E1: verify every §4.7 A basis field is present, confirmed and positive before emitting any reference."""
     refs: dict[str, _RefDict] = {}
@@ -161,6 +172,8 @@ def _read_basis(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> dict[
             raise _refuse_basis(ErrorCode.INVALID_ARGUMENT, path, "is not a finite number")
         if exact <= Fraction():
             raise _refuse_basis(ErrorCode.INVALID_ARGUMENT, path, "must be positive")
+        if path == _RATIO_LIMIT and exact > Fraction(str(_RATIO_LIMIT_MAX)):
+            raise _refuse_basis(ErrorCode.INVALID_ARGUMENT, path, "must not exceed the contract default")
         trace.input(path.replace(".", "_"), float(exact), unit=field.unit, ref=f"{basis_id}#/fields/{path}")
         refs[path] = {"$ref": f"{basis_id}#/fields/{path}/value"}
     return refs
@@ -173,8 +186,8 @@ def _resolve_quantity(
     basis_id: str,
     trace: TraceBuilder,
     traced_basis: set[str],
-) -> Fraction:
-    """Resolve an engineer input or basis value to an exact `Fraction` in `target_unit` (> 0)."""
+) -> tuple[Fraction, list[str]]:
+    """Resolve an engineer input or basis value to an exact `Fraction` in `target_unit` (> 0) and its trace uses."""
     if value.source == "input":
         exact = Fraction(value.value) * unit(value.unit).factor / unit(target_unit).factor
         if exact <= Fraction():
@@ -185,7 +198,7 @@ def _resolve_quantity(
                 expected={"exclusive_min": int(ZERO.value), "unit": target_unit},
                 received=value.value,
             )
-        return exact
+        return exact, ["layouts"]
     path = value.path
     field = basis.fields.get(path)
     if field is None or not field.confirmed:
@@ -202,10 +215,11 @@ def _resolve_quantity(
         raise _refuse_basis(ErrorCode.INVALID_ARGUMENT, path, "is not a finite number")
     if raw <= Fraction():
         raise _refuse_basis(ErrorCode.OUT_OF_RANGE, path, "must be positive", received=field.value)
+    input_name = _layout_basis_input_name(path)
     if path not in traced_basis:
         traced_basis.add(path)
-        trace.input(path.replace(".", "_"), float(raw), unit=field.unit, ref=f"{basis_id}#/fields/{path}")
-    return raw * unit(field.unit).factor / unit(target_unit).factor
+        trace.input(input_name, float(raw), unit=field.unit, ref=f"{basis_id}#/fields/{path}")
+    return raw * unit(field.unit).factor / unit(target_unit).factor, [input_name]
 
 
 def _to_finite_float(exact: Fraction, what: str) -> float:
@@ -296,6 +310,11 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
         fid = col.frame_id
         c_tag = f"col_{col_idx}"
         shape = sections[col.section].shape
+        # E2 before E6 (spec 0013 §4.4.2): missing combination rows are reported even when shape/layout exit.
+        col_rows = rows_by_col.get(fid, [])
+        seen_combos = {r.case.case for r in col_rows}
+        if wanted_combos - seen_combos:
+            not_checked.append(_NotChecked(frame_id=fid, code="FORCES_MISSING", gap=None))
         if not isinstance(shape, Rectangular):
             not_checked.append(_NotChecked(frame_id=fid, code="SHAPE_NOT_CHECKED", gap=None))
             continue
@@ -304,8 +323,10 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
             not_checked.append(_NotChecked(frame_id=fid, code="LAYOUT_MISSING", gap=None))
             continue
 
-        a_bar_exact = _resolve_quantity(layout.A_bar, _MM2, inp.basis, refs["basis"], trace, traced_basis)
-        d_prime_exact = _resolve_quantity(layout.d_prime, _MM, inp.basis, refs["basis"], trace, traced_basis)
+        a_bar_exact, a_bar_uses = _resolve_quantity(layout.A_bar, _MM2, inp.basis, refs["basis"], trace, traced_basis)
+        d_prime_exact, d_prime_uses = _resolve_quantity(
+            layout.d_prime, _MM, inp.basis, refs["basis"], trace, traced_basis
+        )
         b_exact, h_exact = Fraction(shape.b_mm), Fraction(shape.h_mm)
         b_mm, h_mm = float(b_exact), float(h_exact)
         ag_mm2 = _to_finite_float(b_exact * h_exact, f"gross area of {fid}")
@@ -351,7 +372,7 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
             unit=_MM2,
             formula="layout A_bar converted to mm2",
             source=f"{_RULE} E5",
-            uses=["layouts"],
+            uses=a_bar_uses,
         )
         trace.step(
             f"{c_tag}_d_prime_mm",
@@ -359,7 +380,7 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
             unit=_MM,
             formula="layout d_prime converted to mm",
             source=f"{_RULE} E5",
-            uses=["layouts"],
+            uses=d_prime_uses,
         )
         trace.step(
             f"{c_tag}_Ast_mm2",
@@ -388,11 +409,6 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
             )
         )
 
-        col_rows = rows_by_col.get(fid, [])
-        seen_combos = {r.case.case for r in col_rows}
-        if wanted_combos - seen_combos:
-            not_checked.append(_NotChecked(frame_id=fid, code="FORCES_MISSING", gap=None))
-
         symmetric = b_exact == h_exact and layout.n_bars_b == layout.n_bars_h
         if not symmetric:
             not_checked.append(_NotChecked(frame_id=fid, code="AXES_UNDECLARED", gap="CW-G9"))
@@ -404,7 +420,7 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
                 f"{r_tag}_Pu_kN",
                 pu_kn,
                 unit="kN",
-                formula="-P_kN (host_local/1 compression positive)",
+                formula="-P_kN (host_local/1: host axial tension positive; check axial compression positive)",
                 source=f"{_RULE} E3",
                 uses=["forces"],
             )
