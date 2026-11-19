@@ -5,7 +5,7 @@ import importlib.util
 import json
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 from types import ModuleType
 from typing import Any, cast
 
@@ -16,6 +16,7 @@ import eng_harness.block as block_module
 from eng_harness.block import (
     BlockDef,
     LockFinding,
+    ModelFile,
     Registry,
     RegistryError,
     WorkflowDef,
@@ -340,3 +341,12 @@ def test_unresolvable_annotations(tmp_path: Path) -> None:
     assert module.ok.name == "ok_ctx"
     with pytest.raises(RegistryError, match="input"):
         module.bad()
+
+
+def test_model_file_is_pure() -> None:
+    """`ModelFile` is `PurePath` and has no filesystem methods (spec 0001 4.1.2, amendment B-569)."""
+    assert "ModelFile" in block_module.__all__
+    assert ModelFile is PurePath
+    value = ModelFile("/nonexistent/dir/model.EDB")
+    for name in ("open", "read_text", "write_text", "stat", "exists", "unlink", "rmdir", "chmod", "symlink_to"):
+        assert not hasattr(value, name), name
