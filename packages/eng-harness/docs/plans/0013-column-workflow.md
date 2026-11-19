@@ -105,6 +105,16 @@ tasks:
     depends_on: [T2]
   - id: T4
     title: Calc harness.column_review (members, governing references, changes)
+    # Amendment (B-577, documents only): the B-283 writer measured that ColumnReview in kinds/column_design.py has no
+    # members field (rejecting members as extra_forbidden) and reuses SummaryChanges whose rows omit source, whereas R4
+    # needs every previous member keyed by frame id, source and check id (top is capped by report.top_n, governing holds
+    # at most one verdict per frame, and changes holds only deltas). Extend ColumnReview with the complete S5 member
+    # snapshot and column-specific change rows carrying the same key, update column_review.json and
+    # column_review.invalid.json (preserving the invalid fixture's not_checked status violation) and
+    # test_column_design_kinds.py, and regenerate calcs.lock.json (already in files; kinds/column_design.py is in the
+    # hash closure of harness.column_select as well as harness.column_review, and harness.column_select.md points to
+    # the lock with no literal hash). Raise max_changed_lines from 300 to 360 for the ColumnReview kind models,
+    # validators, and lock entry.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_review (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -112,10 +122,14 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/column_design/__init__.py"
       - "packages/eng-harness/src/eng_harness/calcs/column_design/column_review.py"
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
+      - "packages/eng-harness/src/eng_harness/kinds/column_design.py"  # ColumnReview member snapshot and keyed change rows (amendment B-577)
+      - "packages/eng-harness/tests/contract/test_column_design_kinds.py"  # kind contract tests for the extended ColumnReview (amendment B-577)
+      - "packages/eng-harness/tests/data/kinds/column_design/column_review.json"  # updated valid fixture (amendment B-577)
+      - "packages/eng-harness/tests/data/kinds/column_design/column_review.invalid.json"  # updated invalid fixture preserving not_checked status violation (amendment B-577)
       - "packages/eng-harness/tests/golden/column_design/test_golden.py"
       - "packages/eng-harness/tests/data/golden/column_design/column-review-*.json"
       - "packages/eng-harness/tests/property/test_column_review.py"
-    max_changed_lines: 300
+    max_changed_lines: 360
     max_sessions: 2
     tests_first:
       - "packages/eng-harness/tests/golden/column_design/test_golden.py::test_case[column-review-sources]"
@@ -421,9 +435,14 @@ Amendment (B-462).
 layout; `not_checked` reasons; the trace steps E3 to E5. The verification record names each conversion as a C item
 for the owner (contract G-3, CW-G9 to CW-G11).
 
-**T4 `harness.column_review`** (spec §4.4.3). Reads the host and code verdict sets by reference, filters to the
-selected columns, members per 0003 S5, governing references, `not_checked` as `NEEDS_ENGINEER`, changes from the
-previous review. The property test proves that every ratio in the output equals the ratio of the verdict it references.
+**T4 `harness.column_review`** (spec §4.4.3). Reads the host and code verdict sets by reference (separate named
+top-level reference fields for the three code checks), filters to the selected columns, members per 0003 S5, governing
+references, `not_checked` as `NEEDS_ENGINEER`, changes from the previous review. The property test proves that every
+ratio in the output equals the ratio of the verdict it references. Amendment (B-577, documents only): `ColumnReview` in
+`kinds/column_design.py` gains the complete `members` snapshot and column-specific `changes` rows keyed by frame id,
+`source` and check id; `column_review.json`, `column_review.invalid.json` (preserving its `not_checked` violation) and
+`test_column_design_kinds.py` are updated alongside it, and `calcs.lock.json` is regenerated (which also updates the
+entry of `harness.column_select`, whose hash closure includes `kinds/column_design.py`).
 
 **T5 Proposal calcs** (spec §4.4.4). `harness.column_section_match` (input sizes only as `harness.section_size/1`
 references; exact tolerance comparison; `matched`, `no_section_in_model`, `ambiguous`) and
