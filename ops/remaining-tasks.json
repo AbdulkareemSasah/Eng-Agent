@@ -1223,7 +1223,9 @@
    "branch": "feat/b285-harness-gt6-code-pack-route-in",
    "prTitle": "feat(eng-harness): code-pack route in the CalcPort for the three ACI 318-14 column checks (B-285)",
    "risk": "r1, r3",
-   "pending_deps": [],
+   "pending_deps": [
+    "G.T3"
+   ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1732,14 +1734,17 @@
    "branch": "feat/b203-harness-wt9-workflow-part-2-steps",
    "prTitle": "feat(eng-harness): workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop (B-203)",
    "risk": "r1, r2, r3",
-   "pending_deps": [],
+   "pending_deps": [
+    "superseded"
+   ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
-    "Replaced by B-526 (T9a) and B-527 (T9b) after amendment B-511."
+    "Replaced by B-526 (T9a) and B-527 (T9b) after amendment B-511.",
+    "superseded: plan 0007 T9 was split into T9a (B-526), T9b (B-527) and T9c (B-558); no work item left under T9"
    ]
   },
   {
@@ -1861,7 +1866,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 453
   },
   {
    "id": "B-396",
@@ -3839,9 +3845,7 @@
    "branch": "feat/b575-harness-xt4b-footing-resize",
    "prTitle": "feat(eng-harness): calc harness.footing_resize (B-575)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "X.T4"
-   ],
+   "pending_deps": [],
    "writer": "agy hydrogen high",
    "reviewer": "codex sol + verifier lenses",
    "verifier_lenses": [

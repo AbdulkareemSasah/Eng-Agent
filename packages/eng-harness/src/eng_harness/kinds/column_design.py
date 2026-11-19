@@ -1,16 +1,20 @@
 """Column-workflow kind payloads (spec 0013 sections 4.2 and 4.4). Errors: `pydantic.ValidationError`."""
 
-from typing import Annotated, Literal, Self
+import re
+from collections.abc import Iterable
+from typing import Annotated, Any, Literal, Self
 
 from eng_contract.refs import RefString
-from eng_contract.verdicts import VerdictStatus
+from eng_contract.verdicts import CODE_PACK_CHECK_ID, HOST_CHECK_ID, VerdictSource, VerdictStatus
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints, model_validator
 
-from eng_harness.kinds.calcs import CalcPayload, SummaryChanges, Top
+from eng_harness.kinds.calcs import CalcPayload, Top
 from eng_harness.kinds.edit_cycle import Label
 
 _Sha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 _Count = Annotated[int, Field(ge=0)]
+_Ratio = Annotated[float, Field(ge=0)] | None
+_CheckId = Annotated[str, StringConstraints(pattern=HOST_CHECK_ID, max_length=200)]
 _Fingerprint = Annotated[str, StringConstraints(pattern=r"^fp1:[0-9a-f]{64}$")]
 _ColumnShape = Literal["rectangular", "circular", "other"]
 _MatchStatus = Literal["matched", "no_section_in_model", "ambiguous"]
@@ -21,6 +25,12 @@ _CheckIds = (
     "aci318_14.10_6_1_1.longitudinal_reinforcement_limits",
 )
 _ReinforcementLimitsCheck = _CheckIds[2]
+
+
+def _ordered(items: Iterable[Any], what: str) -> None:
+    keys = list(items)
+    if keys != sorted(set(keys)):
+        raise ValueError(f"{what} must be sorted and unique")
 
 
 class _P(BaseModel):
@@ -64,17 +74,21 @@ class _Miss(_P):
     gap: Label | None = None
 
 
-class _Gov(_P):
+class ColumnGoverning(_P):
+    """Governing verdict reference and copied ratio of one reviewed column (spec 0013 section 4.4.3 R3)."""
+
     ref: RefString
-    ratio: float | None = None
+    ratio: _Ratio = None
 
 
-class _ReviewRow(_P):
+class ColumnReviewRow(_P):
+    """Review summary of one selected column (spec 0013 section 4.4.3)."""
+
     frame_id: Label
     status: VerdictStatus
     host_status: VerdictStatus
     code_status: VerdictStatus
-    governing: _Gov | None = None
+    governing: ColumnGoverning | None = None
     not_checked: list[Label]
     gaps: list[Label]
 
@@ -82,6 +96,64 @@ class _ReviewRow(_P):
     def _needs_engineer_when_not_checked(self) -> Self:
         if self.not_checked and self.status is not VerdictStatus.NEEDS_ENGINEER:
             raise ValueError("status is NEEDS_ENGINEER when not_checked is set")
+        return self
+
+
+class _ColumnMemberKey(_P):
+    frame_id: Label
+    source: VerdictSource
+    check_id: _CheckId
+
+    @model_validator(mode="after")
+    def _check_id_matches_source(self) -> Self:
+        pattern = CODE_PACK_CHECK_ID if self.source is VerdictSource.CODE_PACK else HOST_CHECK_ID
+        if not re.fullmatch(pattern, self.check_id):
+            raise ValueError(f"check_id {self.check_id!r} does not match the {self.source.value} pattern")
+        return self
+
+
+class ColumnMember(_ColumnMemberKey):
+    """A column member keyed by `(frame_id, source, check_id)` with its worst status and largest ratio (0003 S5)."""
+
+    status: VerdictStatus
+    ratio: _Ratio
+
+
+class ColumnMemberChange(_ColumnMemberKey):
+    """A column member whose status differs from the previous review (spec 0013 section 4.4.3 R4)."""
+
+    previous_status: VerdictStatus
+    status: VerdictStatus
+    previous_ratio: _Ratio
+    ratio: _Ratio
+
+
+class ColumnReviewChanges(_P):
+    """Status transitions and appeared/disappeared members against the previous column review (0003 S5 table)."""
+
+    newly_failing: list[ColumnMemberChange]
+    newly_passing: list[ColumnMemberChange]
+    other_changes: list[ColumnMemberChange]
+    appeared: list[ColumnMember]
+    disappeared: list[ColumnMember]
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        fail, ok = VerdictStatus.FAIL, VerdictStatus.PASS
+        bad = (
+            any(c.status is not fail or c.previous_status is fail for c in self.newly_failing),
+            any(c.status is not ok or c.previous_status is not fail for c in self.newly_passing),
+            any(
+                c.status is c.previous_status or c.status is fail or (c.previous_status is fail and c.status is ok)
+                for c in self.other_changes
+            ),
+        )
+        names = ("newly_failing", "newly_passing", "other_changes")
+        if wrong := [n for n, b in zip(names, bad, strict=True) if b]:
+            raise ValueError(f"a row of {wrong[0]} does not fit that list")
+        for field_name in ("newly_failing", "newly_passing", "other_changes", "appeared", "disappeared"):
+            rows = getattr(self, field_name)
+            _ordered([(r.frame_id, r.source.value, r.check_id) for r in rows], field_name)
         return self
 
 
@@ -212,12 +284,30 @@ class ColumnCheckItems(CalcPayload):
 class ColumnReview(CalcPayload):
     """`harness.column_review/1` (spec 0013 section 4.4.3)."""
 
-    columns: list[_ReviewRow]
+    columns: list[ColumnReviewRow]
     failing: list[Label]
     attention: list[Label]
     top: Top
-    changes: SummaryChanges
+    members: list[ColumnMember]
+    changes: ColumnReviewChanges
     complete: StrictBool
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        _ordered([row.frame_id for row in self.columns], "columns")
+        _ordered([(m.frame_id, m.source.value, m.check_id) for m in self.members], "members")
+        known = {row.frame_id for row in self.columns}
+        if unknown := sorted({m.frame_id for m in self.members} - known):
+            raise ValueError(f"members name unknown columns: {unknown}")
+        want_failing = [row.frame_id for row in self.columns if row.status is VerdictStatus.FAIL]
+        if self.failing != want_failing:
+            raise ValueError("failing must list the FAIL columns in frame_id order")
+        want_attention = [
+            row.frame_id for row in self.columns if row.status in (VerdictStatus.NEEDS_ENGINEER, VerdictStatus.ERROR)
+        ]
+        if self.attention != want_attention:
+            raise ValueError("attention must list the NEEDS_ENGINEER and ERROR columns in frame_id order")
+        return self
 
 
 class ColumnMatch(CalcPayload):

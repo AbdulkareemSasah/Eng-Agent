@@ -17,6 +17,7 @@ from structural_codes.content_hash import content_hash
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.overlay import Inherited, InheritedCheck, Overlay, Removed
 from structural_codes.pack import Pack, Registry
+from structural_codes.trace import TraceRecorder
 
 # B-264: the module names are split only because gate rule IM006 reports the fixture packs under tests/fixtures/*/src
 # as undeclared distributions (same workaround as tests/unit/test_registry.py, B-260); it hides no import.
@@ -238,3 +239,35 @@ def test_removed(packs: _Packs) -> None:
     assert kept.meta.pack == "synthbase"
     result = evaluate("synthbase.5_1.scoped", _inputs(), subject=_F1, registry=registry)
     assert result.payload.verdicts[0].status == VerdictStatus.PASS
+
+
+@pytest.mark.parametrize("clause", ["9.9", "S4.1"], ids=["declared-base-clause", "overlay-only-clause"])
+def test_inherited_explicit_base_clause(packs: _Packs, clause: str) -> None:
+    """An inherited body may name a secondary base clause, but may not name an undeclared one."""
+
+    def body(_inp: Any, t: TraceRecorder) -> None:
+        t.verdict(demand="demand_mm", capacity="capacity_mm", clause=clause)
+
+    checks = tuple(
+        replace(check, body=body) if check.meta.check_id == _TWO_PRE else check for check in packs.base.checks
+    )
+    registry = Registry.of([replace(packs.base, checks=checks), packs.over])
+    overlay_id = "synthover.s4_1.two_pre"
+    if clause == "S4.1":
+        with pytest.raises(CheckDefinitionError, match=r"synthbase\.4_1\.two_pre: clause 'S4\.1'"):
+            evaluate(overlay_id, _inputs(), subject=_S1, registry=registry)
+        return
+
+    result = evaluate(overlay_id, _inputs(), subject=_S1, registry=registry)
+    reference = evaluate(_TWO_PRE, _inputs(), subject=_S1, registry=registry)
+    (verdict,) = result.payload.verdicts
+    (base_verdict,) = reference.payload.verdicts
+    assert base_verdict.clause == "9.9"
+    assert (verdict.code, verdict.clause, verdict.check_id) == (_OVER_CODE, "S4.1", overlay_id)
+    assert verdict.status == VerdictStatus.PASS
+    assert verdict.ratio == 0.5  # Synthetic fixture: 50 / 100.
+    assert verdict.trace_ref == "#/traces/0"
+    (trace,) = result.payload.traces
+    (base_trace,) = reference.payload.traces
+    assert trace.constants == base_trace.constants
+    assert [c.cited.source for c in trace.constants] == ["synthetic test fixture, no engineering meaning"] * 2
