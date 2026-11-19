@@ -1,0 +1,704 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.6, synthetic fixture",
+  "method_ref": "\u00a74.4.6 assembled schedule",
+  "synthetic": true,
+  "derivation": "Clear distance 350, all 2000 by 2000, on one line y = 0: J1 at x = 2700, J2 at x = 5000, J3 at x = 7200, J4 at x = 40000. J1-J2: gx = 2300 - 2000 = 300, gy = 0 - 2000 = -2000: one negative, distance 300 < 350, conflict. J2-J3: gx = 2200 - 2000 = 200, distance 200 < 350, conflict. J1-J3: gx = 4500 - 2000 = 2500, no conflict. J4 is far from all (gx at least 30800). Neighbour: the conflicting neighbour with the smallest distance, so J1 names J2, J3 names J2, and J2 names J3 (200 before 300). J4 is unmarked. Reasons, in order and without repeats: the reason of the design row, then the closure reasons given, then CLEARANCE. J1: design reason LIMIT_REACHED, closure reason LIMIT_REACHED (repeat dropped), CLEARANCE: [LIMIT_REACHED, CLEARANCE]; its design status LIMIT_REACHED becomes NEEDS_ENGINEER with reason CLEARANCE because it is marked (the bound flag plan_at_max and the size source engineer are kept). J2: no design reason, no closure: [CLEARANCE], status OK becomes NEEDS_ENGINEER, reason CLEARANCE. J3: design already NEEDS_ENGINEER with reason WIDTH_TOO_SMALL stays unchanged; closure reasons COMBINE_REQUESTED twice give one entry: [WIDTH_TOO_SMALL, COMBINE_REQUESTED, CLEARANCE]. J4: no reasons, no neighbour, design unchanged. Family statuses, ratios and closures come from the status rows: J1 bearing FAIL 1.2 (failing), J2 all PASS (passed), J3 min_steel NOT_APPLICABLE (needs_engineer), J4 all PASS. Verdict-set and decision references are listed per footing in the order given, repeats dropped.",
+  "input": {
+    "subjects": {
+      "subjects": [
+        {
+          "id": "J1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 2700.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J2",
+          "joint": "J2",
+          "column": "C2",
+          "x_mm": 5000.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J3",
+          "joint": "J3",
+          "column": "C3",
+          "x_mm": 7200.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J4",
+          "joint": "J4",
+          "column": "C4",
+          "x_mm": 40000.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        }
+      ],
+      "excluded": [],
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "design": {
+      "footings": [
+        {
+          "id": "J1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "engineer",
+          "plan_at_max": true,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "LIMIT_REACHED",
+          "reason": "LIMIT_REACHED",
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        {
+          "id": "J2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        {
+          "id": "J3",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "NEEDS_ENGINEER",
+          "reason": "WIDTH_TOO_SMALL",
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        {
+          "id": "J4",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        }
+      ],
+      "calc": {
+        "id": "harness.footing_design",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_design",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "status": {
+      "footings": [
+        {
+          "id": "J1",
+          "families": {
+            "bearing": {
+              "status": "FAIL",
+              "ratio": 1.2
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "failing",
+          "state": {
+            "bearing": "FAIL",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "PASS",
+            "development": "PASS",
+            "plan_at_max": true,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": true
+          }
+        },
+        {
+          "id": "J2",
+          "families": {
+            "bearing": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "passed",
+          "state": {
+            "bearing": "PASS",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "PASS",
+            "development": "PASS",
+            "plan_at_max": false,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": false
+          }
+        },
+        {
+          "id": "J3",
+          "families": {
+            "bearing": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "NOT_APPLICABLE",
+              "ratio": null
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "needs_engineer",
+          "state": {
+            "bearing": "PASS",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "NOT_APPLICABLE",
+            "development": "PASS",
+            "plan_at_max": false,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": false
+          }
+        },
+        {
+          "id": "J4",
+          "families": {
+            "bearing": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "passed",
+          "state": {
+            "bearing": "PASS",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "PASS",
+            "development": "PASS",
+            "plan_at_max": false,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": false
+          }
+        }
+      ],
+      "calc": {
+        "id": "harness.footing_status",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_status",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "closures": [
+      {
+        "id": "J3",
+        "reason": "COMBINE_REQUESTED"
+      },
+      {
+        "id": "J1",
+        "reason": "LIMIT_REACHED"
+      },
+      {
+        "id": "J3",
+        "reason": "COMBINE_REQUESTED"
+      }
+    ],
+    "verdict_sets": [
+      {
+        "id": "J1",
+        "result": "res_00000000000000000000000021"
+      },
+      {
+        "id": "J2",
+        "result": "res_00000000000000000000000023"
+      },
+      {
+        "id": "J1",
+        "result": "res_00000000000000000000000022"
+      },
+      {
+        "id": "J1",
+        "result": "res_00000000000000000000000021"
+      }
+    ],
+    "decisions": [
+      {
+        "id": "J2",
+        "decision": "dec_B"
+      },
+      {
+        "id": "J1",
+        "decision": "dec_A"
+      },
+      {
+        "id": "J2",
+        "decision": "dec_C"
+      },
+      {
+        "id": "J2",
+        "decision": "dec_B"
+      }
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.min_clear_distance_mm": {
+          "value": 350.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "subjects": "res_00000000000000000000000001",
+    "design": "res_00000000000000000000000002",
+    "status": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "footings": [
+      {
+        "design": {
+          "id": "J1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "engineer",
+          "plan_at_max": true,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "NEEDS_ENGINEER",
+          "reason": "CLEARANCE",
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "FAIL",
+            "ratio": 1.2
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "failing",
+        "reasons": [
+          "LIMIT_REACHED",
+          "CLEARANCE"
+        ],
+        "verdict_sets": [
+          "res_00000000000000000000000021",
+          "res_00000000000000000000000022"
+        ],
+        "decisions": [
+          "dec_A"
+        ],
+        "neighbour": "J2"
+      },
+      {
+        "design": {
+          "id": "J2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "NEEDS_ENGINEER",
+          "reason": "CLEARANCE",
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "passed",
+        "reasons": [
+          "CLEARANCE"
+        ],
+        "verdict_sets": [
+          "res_00000000000000000000000023"
+        ],
+        "decisions": [
+          "dec_B",
+          "dec_C"
+        ],
+        "neighbour": "J3"
+      },
+      {
+        "design": {
+          "id": "J3",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "NEEDS_ENGINEER",
+          "reason": "WIDTH_TOO_SMALL",
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "NOT_APPLICABLE",
+            "ratio": null
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "needs_engineer",
+        "reasons": [
+          "WIDTH_TOO_SMALL",
+          "COMBINE_REQUESTED",
+          "CLEARANCE"
+        ],
+        "verdict_sets": [],
+        "decisions": [],
+        "neighbour": "J2"
+      },
+      {
+        "design": {
+          "id": "J4",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "passed",
+        "reasons": [],
+        "verdict_sets": [],
+        "decisions": [],
+        "neighbour": null
+      }
+    ]
+  }
+}

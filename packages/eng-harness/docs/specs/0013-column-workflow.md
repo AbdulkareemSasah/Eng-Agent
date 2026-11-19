@@ -95,8 +95,9 @@ values are synthetic and say so.
   `tests/unit/calcs/test_column_demands.py::test_refusals`, `::test_axes_undeclared`.
 - AC8. Given the golden cases of §4.4.3 (steel host-only, concrete code-only, a `PASS` and a `FAIL` at two ends, a
   `not_checked` column, a previous review with a newly failing, a newly passing and an appeared member), when
-  `harness.column_review` runs, then member statuses, governing references and changes equal the expected ones, and no
-  ratio in the output differs from the verdict it references. Tests:
+  `harness.column_review` runs, then the `members` snapshot (keyed by frame id, source and check id), column and member
+  statuses, governing references and changes (with the same key) equal the expected ones, and no ratio in the output
+  differs from the verdict it references (amendment B-577). Tests:
   `tests/golden/column_design/test_golden.py::test_case[column-review-*]`,
   `tests/property/test_column_review.py::test_ratios_are_referenced_not_computed`.
 - AC9. Given the golden cases of §4.4.4 (one matching section; none; two; same size other material; a dimension
@@ -295,15 +296,26 @@ E5 as steps. Each code-check input is passed as a reference into this result.
 
 #### 4.4.3 `harness.column_review` v1
 
-Input: `selection`, `host` (`harness.host_design_verdicts/1`, the output of `harness.host_design_verdicts`), `code` (the three code-check
-`verdicts.set/1` results), `items` (for `not_checked`), optional `previous` (`harness.column_review/1`), `basis`
-(`report.top_n`). Method: R1 only verdicts whose subject is a selected column (`frame`, id) are read. R2 members and
-member status per 0003 §4.9 S5 (key: column, source, check id); a column's `status` is the worst of its members, and
-`NEEDS_ENGINEER` when it has a `not_checked` entry or no verdict. R3 `governing` per column: the reference
-`<result>#/verdicts/<i>` of the verdict first by 0003 S2 order; its ratio is copied with the reference, never computed.
-R4 `changes` against `previous` per 0003 S5's table. Output `harness.column_review/1`: per column `status`,
-`host_status`, `code_status`, `governing`, `not_checked`, `gaps`; `failing`, `attention`, `top` (`report.top_n`),
-`changes`, `complete`.
+Input: `selection`, `host` (`harness.host_design_verdicts/1`, the output of `harness.host_design_verdicts`), the three
+code-check `verdicts.set/1` results bound to separate named top-level optional reference fields, one per check of §4.5 —
+`max_axial_strength` (`aci318_14.22_4_2_1.max_axial_strength`), `axial_flexure_uniaxial`
+(`aci318_14.22_4_1_1.axial_flexure_uniaxial`), and `longitudinal_reinforcement_limits`
+(`aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) — because the contract parameter pipeline resolves one
+reference per top-level field and the `CalcPort` derives result IDs and parents from those fields (amendment B-577;
+optional when §4.6 step 8 had no items for that check), `items` (for `not_checked`), optional `previous`
+(`harness.column_review/1`), `basis` (`report.top_n`). Method: R1 only verdicts whose subject is a selected column
+(`frame`, id) are read. R2 members and member status per 0003 §4.9 S5, keyed by `(frame_id, source, check_id)` (where
+`source` is `host` or `code_pack`); a column's `status` is the worst of its members, and `NEEDS_ENGINEER` when it has
+a `not_checked` entry or no verdict. R3 `governing` per column: the reference `<result>#/verdicts/<i>` of the verdict
+first by 0003 S2 order; its ratio is copied with the reference, never computed. R4 `changes` compares the complete
+`members` snapshot against `previous.members` by `(frame_id, source, check_id)` per 0003 S5's table (`top` is capped by
+`report.top_n`, `governing` retains at most one verdict per frame, and `changes` retains only deltas, while reused
+`SummaryChanges` omits `source`, so R4 requires every previous member keyed with `source`; keeping S5 status transitions
+and ratios on both sides; amendment B-577). Output `harness.column_review/1`: `columns` (per column `frame_id`, `status`,
+`host_status`, `code_status`, `governing`, `not_checked`, `gaps`), `failing`, `attention`, `top` (`report.top_n`),
+`members` (complete snapshot of every member keyed by `frame_id`, `source`, `check_id` with `status` and `ratio`),
+`changes` (column-specific change rows carrying the same `(frame_id, source, check_id)` key with S5 status transitions
+and ratios on both sides), `complete`.
 
 #### 4.4.4 `harness.column_section_match` v1
 
@@ -389,7 +401,7 @@ engine checks.
 | 4 | `ctx.calc("harness.column_select", ...)`; `FAIL` re-asks the scope |
 | 5, 6 | `ctx.block(run_and_summarize, ...)` (EC steps 11 to 14, including D-3; the engine saves first, invariant 7); then `ctx.tool("csi_results_frame_forces", {"model": m, ...})` for the selected columns and combinations (argument model of spec 0002) |
 | 7, 8 | `ctx.calc("harness.host_design_verdicts", ...)` (EC); `ctx.calc("harness.column_demands", ...)`; per check id of §4.5 with items, `ctx.calc(<check id>, {"batch": <ref>})` |
-| 9 | `ctx.calc("harness.column_review", {"previous": <cycle k−1>, ...})` |
+| 9 | `ctx.calc("harness.column_review", {"selection": ..., "host": ..., "max_axial_strength": ..., "axial_flexure_uniaxial": ..., "longitudinal_reinforcement_limits": ..., "items": ..., "previous": <cycle k−1>, "basis": ...})` (each code-check argument passed when step 8 produced a result for that check, §4.4.3; amendment B-577) |
 | 10 | `ctx.decide("column_design.engineer_turn", ...)` (engineer, always) |
 | 11 | `ctx.ask(ColumnProposalRequest)` |
 | 12 | per proposed dimension `ctx.calc("harness.section_round", {"required": <answer ref>, "basis": ...})`; per column `ctx.calc("harness.column_section_match", ...)` |

@@ -1,0 +1,366 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.6, synthetic fixture",
+  "method_ref": "\u00a74.4.6 corner distance",
+  "synthetic": true,
+  "derivation": "J1 at (0, 0) and J2 at (2300, 2400), both 2000 by 2000. gx = 2300 - 2000 = 300 and gy = 2400 - 2000 = 400, both positive, so the distance is sqrt(300^2 + 400^2) = 500 mm and its square is 90000 + 160000 = 250000. Clear distance 499: its square is 249001. The distance is above the clear distance, so there is no conflict (a distance equal to the clear distance is not below it).",
+  "input": {
+    "subjects": {
+      "subjects": [
+        {
+          "id": "J1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        },
+        {
+          "id": "J2",
+          "joint": "J2",
+          "column": "C2",
+          "x_mm": 2300.0,
+          "y_mm": 2400.0,
+          "cx_mm": 400.0,
+          "cy_mm": 400.0
+        }
+      ],
+      "excluded": [],
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "design": {
+      "footings": [
+        {
+          "id": "J1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        {
+          "id": "J2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        }
+      ],
+      "calc": {
+        "id": "harness.footing_design",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_design",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "status": {
+      "footings": [
+        {
+          "id": "J1",
+          "families": {
+            "bearing": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "passed",
+          "state": {
+            "bearing": "PASS",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "PASS",
+            "development": "PASS",
+            "plan_at_max": false,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": false
+          }
+        },
+        {
+          "id": "J2",
+          "families": {
+            "bearing": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "one_way_shear": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "punching": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "flexure": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "min_steel": {
+              "status": "PASS",
+              "ratio": 0.5
+            },
+            "development": {
+              "status": "PASS",
+              "ratio": 0.5
+            }
+          },
+          "closure": "passed",
+          "state": {
+            "bearing": "PASS",
+            "one_way_shear": "PASS",
+            "punching": "PASS",
+            "flexure": "PASS",
+            "min_steel": "PASS",
+            "development": "PASS",
+            "plan_at_max": false,
+            "depth_at_max": false,
+            "spacing_at_min": false,
+            "engineer_sized": false
+          }
+        }
+      ],
+      "calc": {
+        "id": "harness.footing_status",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_status",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "closures": [],
+    "verdict_sets": [],
+    "decisions": [],
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.min_clear_distance_mm": {
+          "value": 499.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "subjects": "res_00000000000000000000000001",
+    "design": "res_00000000000000000000000002",
+    "status": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "footings": [
+      {
+        "design": {
+          "id": "J1",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "passed",
+        "reasons": [],
+        "verdict_sets": [],
+        "decisions": [],
+        "neighbour": null
+      },
+      {
+        "design": {
+          "id": "J2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null,
+          "db_mm": 16.0,
+          "n_x": 10,
+          "n_y": 10,
+          "s_x_mm": 150.0,
+          "s_y_mm": 150.0,
+          "As_x_mm2": 2010.0,
+          "As_y_mm2": 2010.0,
+          "d_x_mm": 442.0,
+          "d_y_mm": 426.0,
+          "d_mm": 434.0,
+          "cover_mm": 50.0,
+          "end_cover_mm": 50.0,
+          "reaction_height_mm": 500.0
+        },
+        "families": {
+          "bearing": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "one_way_shear": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "punching": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "flexure": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "min_steel": {
+            "status": "PASS",
+            "ratio": 0.5
+          },
+          "development": {
+            "status": "PASS",
+            "ratio": 0.5
+          }
+        },
+        "closure": "passed",
+        "reasons": [],
+        "verdict_sets": [],
+        "decisions": [],
+        "neighbour": null
+      }
+    ]
+  }
+}
