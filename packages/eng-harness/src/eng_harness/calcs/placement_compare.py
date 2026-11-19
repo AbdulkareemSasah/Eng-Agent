@@ -5,7 +5,8 @@ Inputs: `a_frames` / `b_frames` (`model.frame_placements/1`) and/or `a_areas` / 
 same sections on both sides, and `basis` (`compare.length_mm`). `a_*` is `stale_ok` (section 4.13).
 Units: millimetres; distances compared as exact squared `Fraction`s (P2); `distance_mm` is `sqrt` of `d²` in float.
 Errors: `ContractError` `INVALID_ARGUMENT` for a basis given without a record, a basis field missing, unconfirmed,
-wrong unit or not a number >= 0, a placement without a record reference, or mismatched side sections.
+wrong unit or a non-numeric tolerance; `OUT_OF_RANGE` for a confirmed numeric `compare.length_mm` below 0
+(spec 0003 §4.4 inclusive lower bound, §6); `INVALID_ARGUMENT` for a placement without a record reference or mismatched side sections.
 """
 
 from __future__ import annotations
@@ -108,10 +109,13 @@ def _length(basis: DesignBasis, basis_id: str, trace: TraceBuilder) -> Fraction:
     if field.unit != ZERO.unit:
         raise _refuse(LENGTH, f"must be in {ZERO.unit}, not {field.unit}")
     value = as_fraction(field.value)
-    if value is None or value < Fraction(ZERO.value):
+    if value is None:
+        raise _refuse(LENGTH, "must be a number >= 0")
+    if value < Fraction(ZERO.value):
         raise _refuse(
             LENGTH,
             "must be a number >= 0",
+            ErrorCode.OUT_OF_RANGE,
             expected={"min": ZERO.value, "unit": ZERO.unit},
             received=field.value,
         )

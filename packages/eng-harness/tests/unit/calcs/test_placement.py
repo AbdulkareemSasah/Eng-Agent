@@ -320,11 +320,23 @@ def test_basis_refused() -> None:
         placement_compare(constructed, InputMeta.model_validate({"refs": refs}), TraceBuilder())
     assert caught.value.detail.message == f"basis field {LENGTH} must be in mm, not deg"
 
-    for bad in (-0.5, "1", True):
+    below = _basis(1.0)
+    below["fields"][LENGTH] = _field(-0.5)
+    detail = _refusal({**fields, "basis": below}, refs).detail
+    assert (detail.code, detail.message) == (
+        ErrorCode.OUT_OF_RANGE,
+        f"basis field {LENGTH} must be a number >= 0",
+    )
+    assert (detail.field, detail.received) == (f"basis.fields.{LENGTH}", -0.5)
+    assert detail.expected == {"min": 0, "unit": "mm"}
+    for bad in ("1", True):
         bad_basis = _basis(1.0)
         bad_basis["fields"][LENGTH] = _field(bad)
         detail = _refusal({**fields, "basis": bad_basis}, refs).detail
-        assert detail.message == f"basis field {LENGTH} must be a number >= 0"
+        assert (detail.code, detail.message) == (
+            ErrorCode.INVALID_ARGUMENT,
+            f"basis field {LENGTH} must be a number >= 0",
+        )
     no_basis_ref = {k: v for k, v in refs.items() if k != "basis"}
     detail = _refusal(fields, no_basis_ref).detail
     assert (detail.code, detail.message, detail.field) == (
@@ -585,10 +597,11 @@ def test_frame_345_offset_below_tolerance_is_moved() -> None:
 
 
 def test_equal_true_with_frames_and_areas_and_unassigned_story() -> None:
-    """P6: identical frames and areas give equal=True; null story and 'unassigned' story count in unassigned."""
+    """P6: identical frames and areas give equal=True; null story and literal 'unassigned' both count in unassigned."""
     frames = _frames(
         _frame("F1", story=None),
         _frame("F2", i=(6000.0, 0.0, 0.0), j=(6000.0, 0.0, 3000.0), story="S1"),
+        _frame("F3", i=(12000.0, 0.0, 0.0), j=(12000.0, 0.0, 3000.0), story="unassigned"),
     )
     areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]))
     out = _run(
@@ -607,8 +620,8 @@ def test_equal_true_with_frames_and_areas_and_unassigned_story() -> None:
         "element": "frame",
         "by": "story",
         "name": "unassigned",
-        "a": 1,
-        "b": 1,
+        "a": 2,
+        "b": 2,
         "difference": 0,
     }
 
