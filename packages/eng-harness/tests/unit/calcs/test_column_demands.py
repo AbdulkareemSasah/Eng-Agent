@@ -2,6 +2,7 @@
 
 import copy
 import math
+from fractions import Fraction
 from pathlib import Path
 from typing import Any, cast
 
@@ -20,7 +21,13 @@ from eng_harness._calc._port import CalcSettings, HarnessCalcPort
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, RefMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
-from eng_harness.calcs.column_design.column_demands import BASIS_FIELDS, ColumnLayout, DemandsInput, column_demands
+from eng_harness.calcs.column_design.column_demands import (
+    BASIS_FIELDS,
+    ColumnLayout,
+    DemandsInput,
+    _to_finite_float,
+    column_demands,
+)
 from eng_harness.errors import NotImplementedGap
 from eng_harness.ports import RunClass
 
@@ -357,10 +364,12 @@ def test_refusals(tmp_path: Path) -> None:
 
             with pytest.raises(ContractError) as caught:
                 _run_direct(mutated)
-            assert (caught.value.detail.code, caught.value.detail.field) == (
-                ErrorCode.INVALID_ARGUMENT,
-                f"basis.fields.{path}",
-            )
+            detail = caught.value.detail
+            why = "is missing (no default)" if mode == "missing" else "is not confirmed"
+            assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, f"basis.fields.{path}")
+            # Spec 0013 §4.4.2 / B-578: refuse missing or unconfirmed §4.7 A fields; exact why-text and hint.
+            assert detail.message == f"basis field {path} {why}"
+            assert detail.hint == f"set and confirm {path} in the design basis"
 
 
 def test_axes_undeclared() -> None:
@@ -527,11 +536,10 @@ def test_basis_value_bounds_and_types(bad_value: Any, fragment: str) -> None:
         mutated["basis"] = _basis(**{path: field})
         with pytest.raises(ContractError) as caught:
             _run_direct(mutated)
-        assert (caught.value.detail.code, caught.value.detail.field) == (
-            ErrorCode.INVALID_ARGUMENT,
-            f"basis.fields.{path}",
-        )
-        assert fragment in caught.value.detail.message
+        detail = caught.value.detail
+        assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, f"basis.fields.{path}")
+        assert detail.message == f"basis field {path} {fragment}"
+        assert detail.hint == f"set and confirm {path} in the design basis"
 
 
 def test_layout_basis_values_conversion_and_errors() -> None:
@@ -572,6 +580,10 @@ def test_layout_basis_values_conversion_and_errors() -> None:
     built = trace.build(REGISTRY[CALC_ID], _DIGEST)
     # Injective encoding: `_` -> `_u`, then `.` -> `_d` (review r2; `rebar.bar_area_cm2`).
     assert [i.name for i in built.inputs].count("basis_in_rebar_dbar_uarea_ucm2") == 1
+    a_bar_input = next(i for i in built.inputs if i.name == "basis_in_rebar_dbar_uarea_ucm2")
+    assert a_bar_input.unit == "cm2"
+    cover_input = next(i for i in built.inputs if i.name == "basis_in_durability_dcover_ucm")
+    assert cover_input.unit == "cm"
     a_bar_step = next(s for s in built.steps if s.name == "col_0_A_bar_mm2")
     assert list(a_bar_step.uses) == ["basis_in_rebar_dbar_uarea_ucm2"]
 
@@ -582,46 +594,49 @@ def test_layout_basis_values_conversion_and_errors() -> None:
     )
     with pytest.raises(ContractError) as err_miss:
         _run_direct(missing)
-    assert (err_miss.value.detail.code, err_miss.value.detail.field) == (
-        ErrorCode.INVALID_ARGUMENT,
-        "basis.fields.rebar.bar_area_cm2",
-    )
+    miss = err_miss.value.detail
+    assert (miss.code, miss.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.rebar.bar_area_cm2")
+    assert miss.message == "basis field rebar.bar_area_cm2 is missing or not confirmed"
+    assert miss.hint == "set and confirm rebar.bar_area_cm2 in the design basis"
 
     unconf = copy.deepcopy(data)
     unconf["basis"]["fields"]["rebar.bar_area_cm2"]["confirmed"] = False
     with pytest.raises(ContractError) as err_unconf:
         _run_direct(unconf)
-    assert (err_unconf.value.detail.code, err_unconf.value.detail.field) == (
-        ErrorCode.INVALID_ARGUMENT,
-        "basis.fields.rebar.bar_area_cm2",
-    )
+    un = err_unconf.value.detail
+    assert (un.code, un.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.rebar.bar_area_cm2")
+    assert un.message == "basis field rebar.bar_area_cm2 is missing or not confirmed"
+    assert un.hint == "set and confirm rebar.bar_area_cm2 in the design basis"
 
     wrong_unit = copy.deepcopy(data)
     wrong_unit["basis"]["fields"]["rebar.bar_area_cm2"]["unit"] = "mm"
     with pytest.raises(ContractError) as err_unit:
         _run_direct(wrong_unit)
-    assert (err_unit.value.detail.code, err_unit.value.detail.field) == (
-        ErrorCode.UNIT_MISMATCH,
-        "basis.fields.rebar.bar_area_cm2",
-    )
+    unit_err = err_unit.value.detail
+    assert (unit_err.code, unit_err.field) == (ErrorCode.UNIT_MISMATCH, "basis.fields.rebar.bar_area_cm2")
+    assert unit_err.message == "basis field rebar.bar_area_cm2 must convert to mm2"
+    assert unit_err.expected == {"unit": "mm2"}
+    assert unit_err.received == "mm"
+    assert unit_err.hint == "set and confirm rebar.bar_area_cm2 in the design basis"
 
     non_num = copy.deepcopy(data)
     non_num["basis"]["fields"]["rebar.bar_area_cm2"]["value"] = "4.5"
     with pytest.raises(ContractError) as err_num:
         _run_direct(non_num)
-    assert (err_num.value.detail.code, err_num.value.detail.field) == (
-        ErrorCode.INVALID_ARGUMENT,
-        "basis.fields.rebar.bar_area_cm2",
-    )
+    num = err_num.value.detail
+    assert (num.code, num.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.rebar.bar_area_cm2")
+    assert num.message == "basis field rebar.bar_area_cm2 is not a finite number"
+    assert num.hint == "set and confirm rebar.bar_area_cm2 in the design basis"
 
     non_pos = copy.deepcopy(data)
     non_pos["basis"]["fields"]["rebar.bar_area_cm2"]["value"] = 0.0
     with pytest.raises(ContractError) as err_pos:
         _run_direct(non_pos)
-    assert (err_pos.value.detail.code, err_pos.value.detail.field) == (
-        ErrorCode.OUT_OF_RANGE,
-        "basis.fields.rebar.bar_area_cm2",
-    )
+    pos = err_pos.value.detail
+    assert (pos.code, pos.field) == (ErrorCode.OUT_OF_RANGE, "basis.fields.rebar.bar_area_cm2")
+    assert pos.message == "basis field rebar.bar_area_cm2 must be positive"
+    assert pos.received == 0.0
+    assert pos.hint == "set and confirm rebar.bar_area_cm2 in the design basis"
 
 
 def test_layout_input_bounds_overflow_and_duplicate_sections() -> None:
@@ -631,25 +646,53 @@ def test_layout_input_bounds_overflow_and_duplicate_sections() -> None:
         data["layouts"]["sections"][0]["A_bar"]["value"] = bad
         with pytest.raises(ContractError) as caught:
             _run_direct(data)
-        assert (caught.value.detail.code, caught.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
-        assert caught.value.detail.expected == {"exclusive_min": 0, "unit": "mm2"}
+        detail = caught.value.detail
+        assert (detail.code, detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+        assert detail.message == "layout value must be positive"
+        assert detail.expected == {"exclusive_min": 0, "unit": "mm2"}
+        assert detail.received == bad
 
     over = _base_inputs()
     over["sections"]["frame_sections"][0]["shape"] = {"type": "rectangular", "b_mm": 1e308, "h_mm": 1e308}
     with pytest.raises(ContractError) as err_over:
         _run_direct(over)
-    assert (err_over.value.detail.code, err_over.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    over_detail = err_over.value.detail
+    assert (over_detail.code, over_detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    assert over_detail.message == "gross area of C1 exceeds binary64 range"
 
     under = _base_inputs()
     under["layouts"]["sections"][0]["A_bar"]["value"] = 1e-325
     with pytest.raises(ContractError) as err_under:
         _run_direct(under)
-    assert (err_under.value.detail.code, err_under.value.detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    under_detail = err_under.value.detail
+    assert (under_detail.code, under_detail.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    assert under_detail.message == "layout value must be positive"
 
     dup = _base_inputs()
     dup["layouts"]["sections"].append(copy.deepcopy(dup["layouts"]["sections"][0]))
     with pytest.raises(ValidationError, match="duplicate section"):
         ColumnLayout.model_validate(dup["layouts"])
+
+
+def test_to_finite_float_refuses_zero_underflow_and_overflow() -> None:
+    """§4.4.2 E5 layout quantities must be positive finite binary64 floats (helper of column_demands)."""
+    with pytest.raises(ContractError) as zero_err:
+        _to_finite_float(Fraction(0), "bar area of C1")
+    zero = zero_err.value.detail
+    assert (zero.code, zero.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    assert zero.message == "bar area of C1 cannot be represented as a positive float"
+
+    with pytest.raises(ContractError) as tiny_err:
+        _to_finite_float(Fraction(1, 10**400), "bar area of C1")
+    tiny = tiny_err.value.detail
+    assert (tiny.code, tiny.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    assert tiny.message == "bar area of C1 cannot be represented as a positive float"
+
+    with pytest.raises(ContractError) as huge_err:
+        _to_finite_float(Fraction(10**400), "gross area of C1")
+    huge = huge_err.value.detail
+    assert (huge.code, huge.field) == (ErrorCode.OUT_OF_RANGE, "layouts")
+    assert huge.message == "gross area of C1 exceeds binary64 range"
 
 
 def test_missing_refs_sections_spiral_sorting_and_zero_sign() -> None:
@@ -760,7 +803,8 @@ def test_ratio_limit_above_contract_default_is_refused(tmp_path: Path) -> None:
         _run_direct(mutated)
     detail = caught.value.detail
     assert (detail.code, detail.field) == (ErrorCode.INVALID_ARGUMENT, "basis.fields.limits.ratio_limit_ratio")
-    assert "must not exceed the contract default" in detail.message
+    assert detail.message == "basis field limits.ratio_limit_ratio must not exceed the contract default"
+    assert detail.hint == "set and confirm limits.ratio_limit_ratio in the design basis"
 
     port, store, args, _ = _setup_port(tmp_path, mutated)
     out = port.run(CALC_ID, args)
