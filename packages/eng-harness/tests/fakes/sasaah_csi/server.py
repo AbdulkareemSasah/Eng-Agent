@@ -34,7 +34,12 @@ KINDS: dict[str, str] = {t["name"]: t["server_kind"] for t in SCHEMAS["tools"]} 
 WRITE_KINDS = {"Write", "Destructive"}  # S-12 report section 7: these raise model_locked while the model is locked
 LOCK_EXEMPT = {"csi_unlock_model", "csi_save_model", "csi_run_analysis", "csi_design_run"}  # S-12 report section 7
 LENGTH_M = {"kN_mm_C": 0.001, "kN_m_C": 1.0}  # metres per length unit of a token (S-12 report, section 4)
-RESULTS = ("csi_results_joint_reactions", "csi_results_frame_forces", "csi_results_story_drifts")
+RESULTS = (
+    "csi_results_base_reactions",
+    "csi_results_joint_reactions",
+    "csi_results_frame_forces",
+    "csi_results_story_drifts",
+)
 COMBO_NAMES = ("Linear Add", "Envelope", "Absolute Add", "SRSS")  # the schema's combo_type codes 0 to 3
 NEEDS_LAUNCHED = {"csi_open_model", "csi_new_model", "csi_new_blank_model", "csi_exit"}
 COLLECTIONS = (
@@ -56,6 +61,8 @@ class State:
     """The in-memory model and session of the fake."""
 
     def __init__(self) -> None:
+        control = json.loads(Path(CONTROL).read_text()) if CONTROL else {}
+        self.product = control.get("product", "ETABS")
         self.model: dict[str, Any] = {c: [] for c in COLLECTIONS}
         self.model.update(units=DEFAULT_UNITS, locked=False, model_path=None, tables={})
         self.resting = DEFAULT_UNITS  # the units the model shows between calls: the tables are read in these
@@ -130,11 +137,21 @@ def _session(name: str, args: dict[str, Any], *, fresh: bool = False) -> dict[st
     if name == "csi_status":
         return {"read_only": False, "script_enabled": False, "instances": [], "current_target": STATE.target}
     if name == "csi_launch":
-        STATE.target = {"product": args.get("product", "ETABS"), "pid": _launch_pid(fresh=fresh), "launched": True}
+        STATE.target = {
+            "product": args.get("product") or STATE.product,
+            "pid": _launch_pid(fresh=fresh),
+            "launched": True,
+        }
         STATE.session_valid = True
         return dict(STATE.target)
     if name == "csi_attach":
-        STATE.target = {"product": args.get("product", "ETABS"), "pid": args.get("pid", PID), "launched": False}
+        override = args.get("target")
+        target = override if isinstance(override, dict) else {}
+        STATE.target = {
+            "product": target.get("product") or args.get("product") or STATE.product,
+            "pid": target.get("pid") or args.get("pid") or PID,
+            "launched": False,
+        }
         STATE.session_valid = True
         return dict(STATE.target)
     if name == "csi_detach":
@@ -166,7 +183,27 @@ def _find(kind: str, name: object) -> dict[str, Any]:
 def _edit(name: str, args: dict[str, Any], units: str) -> bool:
     """Apply an edit tool of spec 0002 section 4.6.2 to the model and its tables; False for any other tool."""
     a = args
-    if name == "csi_assign_frame_section":
+    if name == "csi_set_point_load":
+        _find("points", a["name"])
+        table = "Joint Loads Assignments - Force"
+        keys = ("UniqueName", "LoadPattern")
+        old: dict[str, Any] = next(
+            (
+                r
+                for r in STATE.model["tables"].get(table, [])
+                if r.get("UniqueName") == a["name"] and r.get("LoadPattern") == a["load_pattern"]
+            ),
+            {},
+        )
+        row: dict[str, Any] = {k: old[k] for k in ("XDim", "YDim") if k in old}
+        row.update(UniqueName=a["name"], LoadPattern=a["load_pattern"])
+        moments = [value * LENGTH_M[units] / LENGTH_M[STATE.resting] for value in a["moment"]]
+        row.update(zip(("FX", "FY", "FZ", "MX", "MY", "MZ"), [*a["force"], *moments], strict=True))
+        rows = STATE.model["tables"].setdefault(table, [])
+        rows[:] = [r for r in rows if any(r.get(k) != row[k] for k in keys)]
+        if any([*a["force"], *a["moment"]]):
+            rows.append(row)
+    elif name == "csi_assign_frame_section":
         _find("frames", a["name"])["section"] = a["section"]
     elif name == "csi_assign_area_section":
         _find("areas", a["name"])["section"] = a["section"]
@@ -232,7 +269,8 @@ def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
         return {"cases": [{"case": row["name"], "status_code": code} for row in model["load_cases"]]}
     if name in RESULTS:
         rows = model.get("results", {}).get(name, [])
-        return {"items": rows, "count": len(rows), "truncated": False, "units": units}
+        limit = int(model.get("result_limits", {}).get(name, args.get("limit") or DEFAULT_LIMIT))
+        return {"items": rows[:limit], "count": min(len(rows), limit), "truncated": len(rows) > limit, "units": units}
     kind = args.get("kind")
     if name == "csi_design_run":
         if kind in ("aluminum", "coldformed"):  # the tool's description: SAFEv1 and ETABSv1 have no such designers
@@ -246,8 +284,22 @@ def _analysis(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     return {"items": rows[:limit], "count": min(len(rows), limit), "truncated": len(rows) > limit}
 
 
-def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
+def _in_group(row: dict[str, Any], group: str) -> bool:
+    if row.get("Group") == group:
+        return True
+    groups = row.get("groups")
+    return isinstance(groups, list | tuple | set) and group in groups
+
+
+def _apply(name: str, args: dict[str, Any], units: str, product: str) -> dict[str, Any]:
     model = STATE.model
+    if name == "csi_new_model" and product == "SAFE":
+        raise SasaahError("unsupported_by_version", "Creating a model is not supported by this version.")
+    if name == "csi_db_table_fields":
+        table = args.get("table")
+        rows = model["tables"].get(table, [])
+        fields = model.get("table_fields", {}).get(table, list(rows[0]) if rows else [])
+        return {"fields": fields}
     if name == "csi_model_info":
         counts = {kind: len(model[kind]) for kind in COLLECTIONS}
         return {
@@ -263,8 +315,17 @@ def _apply(name: str, args: dict[str, Any], units: str) -> dict[str, Any]:
     if name.startswith("csi_list_") and name[len("csi_list_") :] in COLLECTIONS:
         return _list(name[len("csi_list_") :], args, units)
     if name == "csi_db_table_read":
-        rows = model["tables"].get(args.get("table"), [])
-        limit = int(args.get("row_limit") or DEFAULT_LIMIT)
+        table = args.get("table")
+        rows = model["tables"].get(table, [])
+        if group := args.get("group"):
+            rows = [r for r in rows if _in_group(r, group)]
+        configured = model.get("result_limits", {}).get(table)
+        requested = args.get("row_limit")
+        limit = (
+            min(int(requested or DEFAULT_LIMIT), int(configured))
+            if configured is not None
+            else int(requested or DEFAULT_LIMIT)
+        )
         return {"rows": rows[:limit], "truncated": len(rows) > limit}
     adds = {"csi_add_point": "points", "csi_add_frame_by_coord": "frames", "csi_add_area_by_coord": "areas"}
     adds.update(csi_add_load_pattern="load_patterns", csi_add_load_combo="load_combos")
@@ -316,15 +377,27 @@ async def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
         raise _timeout()
     if name == "csi_run_analysis" and (slow := STATE.pop_fault(name, {"slow_analysis"})):
         await asyncio.sleep(float(slow.get("seconds", 1.0)))
+    override = args.get("target")
+    product = (override.get("product") if "target" in props and isinstance(override, dict) else None) or STATE.target[
+        "product"
+    ]
+    if STATE.pop_fault(name, {"present_units_mm"}):
+        STATE.model["units"] = "kN_mm_C"
     previous = STATE.model["units"]
     STATE.resting = previous
     requested = args.get("units") if "units" in props else None
     leave = bool(requested) and STATE.pop_fault(name, {"units_left_changed"}) is not None
     if requested:
         STATE.model["units"] = requested
-    result = _session(name, args, fresh=fresh) if name == "csi_exit" else _apply(name, args, STATE.model["units"])
-    if requested and not leave:
-        STATE.model["units"] = previous
+    try:
+        result = (
+            _session(name, args, fresh=fresh)
+            if name == "csi_exit"
+            else _apply(name, args, STATE.model["units"], product)
+        )
+    finally:
+        if requested and not leave:
+            STATE.model["units"] = previous
     if STATE.pop_fault(name, {"timeout_after_apply"}):
         raise _timeout()
     return result
