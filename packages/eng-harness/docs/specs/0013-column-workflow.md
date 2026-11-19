@@ -129,9 +129,9 @@ values are synthetic and say so.
   record and the three real ACI 318-14 checks, `verdicts.set/1` `parents` are `[items result, basis result]` for the two
   checks with basis inputs (`max_axial_strength`, `axial_flexure_uniaxial`) and `[items result]` for
   `longitudinal_reinforcement_limits`, `batch`, `fc_MPa`, `fy_MPa` and `k_factor` are `RefInput`s, and every other input is
-  a `LiteralInput` equal to the stored value; bare `RefString` item inputs or a literal `fc_MPa` are refused with
-  `INVALID_ARGUMENT` and nothing is stored (amendment B-578). Given run class `production`, then
-  the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
+  a `LiteralInput` equal to the stored value. With either a bare `RefString` item input or a literal `fc_MPa` in a
+  permissive stored-list fixture, the route returns `INVALID_ARGUMENT` and stores no verdict (amendment B-578).
+  In run class `production`, the step is refused before any write (`CalcRefused`, CK-AC5); given a check id outside the route's allowlist (§4.5),
   then `ContractError` `NOT_FOUND` before any evaluation (calcs §6; amendment B-405, spec 0010 C4).
   Tests: `tests/unit/calcs/test_code_pack_route.py::test_batch_through_calcport`, `::test_ref_strings_refused`,
   `::test_literal_fc_refused`, `::test_production_refused`, `::test_only_listed_checks`.
@@ -392,7 +392,8 @@ The CalcPort serves the code packs through one route (engine §4.8, calcs §4.12
 settled). [Spec 0010](0010-design-isolated-footing.md) §4.3 describes the same route from the footing side, and the two
 descriptions are one route (spec 0010 C3). `_calc/_code_packs.py` (`CodePackRoute`, consulted by `HarnessCalcPort` for
 an id that does not start with `harness.`) runs a check id only from a fixed allowlist that holds both workflows' ids.
-This workflow adds the part it needs **[added]**: the three column ids (`aci318_14.22_4_2_1.max_axial_strength`,
+B-393 (plan 0010 T2) shipped the route, including the three column allowlist entries
+(`aci318_14.22_4_2_1.max_axial_strength`,
 `aci318_14.22_4_1_1.axial_flexure_uniaxial`, `aci318_14.10_6_1_1.longitudinal_reinforcement_limits`) and the `batch`
 argument. `describe` returns the check's `CheckMeta` as `CalcInfo` (`status` is the check's lifecycle state; `version`
 is the check's `CheckMeta.version`, spec 0010 Q20, see Q13), and `run(check_id, {"batch": <reference to an item
@@ -402,11 +403,11 @@ each stored item unchanged as a `BatchItem` (references and literals as stored; 
 `CALC_WITHDRAWN`) and, in run class `production`, a check that is not `approved` (`CalcRefused` `CALC_NOT_APPROVED`;
 calcs §4.12 item 4; so the pack's `CheckNotUsable`, CF AC25, is never reached), calls
 `structural_codes.evaluate_batch(check_id, items, mode=<run class>, registry, source=store,
-policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with provenance `tool:
-"structural-codes"`. A check id outside the allowlist, or one the registry does not know, is `ContractError` `NOT_FOUND`
-before any evaluation, as an unknown calc id (calcs §6), never an exception of `structural_codes` raised to the block
-(spec 0010 C4, settled by B-405). Whichever of plan T6 and plan 0010 T2 merges first builds the route; the other adds
-its ids, its argument form and its tests.
+policy=InputPolicy(require_refs=True))` and stores the `verdicts.set/1` payload with the provenance tool
+`structural-codes/evaluate_batch`. A check id outside the allowlist or unknown to the registry returns
+`ContractError` `NOT_FOUND` before any evaluation, as an unknown calc id (calcs §6), never an exception of `structural_codes` raised to the block
+(spec 0010 C4, settled by B-405). Plan T6 adds test-only companion coverage for the shipped route through the
+three column checks (AC13, amendment B-578).
 
 ### 4.6 Steps as ctx calls
 
@@ -580,7 +581,7 @@ EC and engine amendments of §11 (Q3, Q4) are additive.
 | Q9 | SAP2000 as the frame model | Owner | Not in v1: concrete column results (SP-3) and design orientation (SP-5) are missing |
 | Q10 | Update in Revit every matched pair whose size differs (including differences older than this design), or only the columns changed in this design | Owner | Every differing pair, each item marked `preexisting` or `changed_in_design` in the preview so the engineer can reject single items |
 | Q11 | A column-review benchmark like B-1 | Owner | The owner picks two or three past projects; CA8 is measured locally |
-| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR written by plan T6, since the split into repositories (ADR-0028) turns it into a real dependency |
+| Q12 | `eng-harness` depending on the workspace packages `structural-codes` and `aci318-14` (§4.5): does an internal dependency need a package ADR (rule A10)? | Owner | Yes, one short package ADR, since the split into repositories (ADR-0028) turns it into a real dependency. The eng-harness package maintainer owns the ADR as a separate documents follow-up (plan §3, amendment B-578). |
 | Q13 | **[added]** A code-pack check's `CalcInfo.version` (§4.5): `CalcInfo.version` is an integer of at least 1 and a merged check has only its pack's string version | Owner, lead | Decided as spec 0010 Q20 (draft, B-442; owner queue): `CalcInfo.version` is the check's `CheckMeta.version` (structural-codes core plan T15) |
 | Q14 | **[added]** Whether the ACI 318-14 column demand fields (`MaxAxialInputs.Pu_kN`, `AxialFlexureInputs.Pu_kN`, `Mu_kNm`, `Mu_other_kNm`) should be `ref_capable` and `engineering_quantity` per CF §4.3 (`MaxAxialInputs.Pu_kN` and `AxialFlexureInputs.Mu_kNm` have neither flag; `AxialFlexureInputs.Pu_kN` and `Mu_other_kNm` have `ref_capable` only); non-blocking for v1 (amendment B-578) | Owner | v1 goes ahead with literal demands inside the referenced `harness.column_check_items/1` record; making them `ref_capable` and `engineering_quantity` later requires a structural-codes plan 0004 amendment paired with a follow-up code-pack route task (the kind stays unchanged) |
 | C1 | Clause specs name `materials.concrete_fc` and `materials.rebar_fy`; spec 0004 AC21 requires a quantity field's unit to match its path suffix, and spec 0004 §4.2 shows paths such as `materials.concrete.<grade>.fc_MPa` (blocked by its Q1) | Owner | Done by amendment B-484 (owner decision OQ-Q44): Table A names `materials.concrete_fc_MPa` and `materials.rebar_fy_MPa` |

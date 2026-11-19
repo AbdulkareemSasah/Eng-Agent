@@ -80,13 +80,13 @@ tasks:
   - id: T3
     title: Calc harness.column_demands (sign, axes, length, layout, not-checked reasons)
     # Amendment (B-578, documents only): T3 produces harness.column_check_items/1, so it also updates ColumnCheckItems
-    # in kinds/column_design.py (_Item.inputs changes from dict[str, RefString] to literal values or {"$ref"} objects;
-    # the kind id harness.column_check_items/1 stays), its column_check_items*.json fixtures and its contract test,
+    # in kinds/column_design.py (field-aware validation of _Item.inputs; the kind id harness.column_check_items/1
+    # stays), its column_check_items*.json fixtures and its contract test,
     # and regenerates calcs.lock.json (already in files; kinds/column_design.py is in the hash closure of
     # harness.column_select as well as harness.column_demands). The separate amendment B-577 handles ColumnReview's
     # member snapshot in T4. column_demands.py types forces with forces.member_end/1 (refusal at input validation,
-    # ContractError INVALID_ARGUMENT) and validates basis fields before emitting references; budget 340 -> 400 (within
-    # the 400-line cap).
+    # ContractError INVALID_ARGUMENT) and validates basis fields before emitting references; the changed-line estimate
+    # rises from 340 to 400 (B-552).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.column_design, eng_harness.calcs.column_design.column_demands (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -186,12 +186,12 @@ tasks:
     # an id outside the allowlist gives ContractError NOT_FOUND, spec 0010 C4) has merged; see section 3
     # Amendment (B-578, documents only): the code-pack route (_code_packs.py, _port.py, _calc/__init__.py,
     # pyproject.toml, uv.lock) already landed in B-393 (plan 0010 T2) and the three column checks in B-334;
-    # docs/adr/0004-workspace-code-packs.md is not added. T6 is a test-only pull request (title type test, test files
-    # only, no failing-first run; gate spec 4.7, as plan 0001 T19 B-509 and plan 0007 T12 B-511), so CHANGELOG.md and
-    # the already-merged non-test files leave files, max_changed_lines becomes 60 and max_sessions becomes 1. Under
-    # TF004 and the B-482 precedent, test_batch_through_calcport, test_ref_strings_refused, test_literal_fc_refused,
-    # test_production_refused and test_only_listed_checks all pass at T6's base (merged B-393 + B-334 + T3), so they
-    # leave tests_first and stay as companion coverage in test_code_pack_route.py. depends_on becomes [T3] because
+    # B-393 also shipped the column allowlist and batch argument. The eng-harness package maintainer owns the
+    # package ADR required by spec Q12 as a separate documents follow-up (see section 3). T6 is a test-only
+    # pull request (title type test, test files only, no failing-first run under gate spec 4.7). The changed-line
+    # estimate becomes 60 and max_sessions becomes 1. The companion tests in test_code_pack_route.py are expected
+    # to pass at T6's base (merged B-393 + B-334 + T3), so tests_first is empty under TF004 and B-482.
+    # depends_on becomes [T3] because
     # test_batch_through_calcport stores a harness.column_check_items/1 record conforming to the T3-amended kind.
     title: Code-pack route tests for the three ACI 318-14 column checks
     files:
@@ -404,22 +404,24 @@ The workflow is composed from parts that other plans build: the edit cycle's chi
 ([plan 0003](0003-calcs.md)), the decision layer ([plan 0005](0005-decisions.md)), the Revit adapter and
 `harness.frame_element_map` ([plan 0011](0011-revit-adapter.md)), and the ACI 318-14 column checks
 ([structural-codes plan 0004](../../../structural-codes/docs/plans/0004-aci318-14-column-checks.md)). This plan adds the
-column-specific kinds, six calcs, a code-pack route, decision points, two blocks, the report parts and the tests.
+column-specific kinds, six calcs, decision points, two blocks, report parts and tests. B-393 shipped the shared
+code-pack route, including the column allowlist and the `batch` argument (amendment B-578).
 
 Risky parts first. The R1 calcs come before any workflow code, each with hand-derived golden cases: the selection
 (T2), the demands with their sign and axis rules (T3, the riskiest: a wrong sign or axis is a wrong verdict), the
-review (T4), the proposal path (T5), and the Revit plan and read-back (T7, T8). The code-pack route (T6) and the
-amendments to the engine and the edit cycle (T10) are small shared changes that land before the blocks, each with the
-regression proof that the existing suites (engine, edit cycle) pass unchanged. Then the blocks: the review cycle
+review (T4), the proposal path (T5), and the Revit plan and read-back (T7, T8). T6 adds companion tests for the merged
+code-pack route (amendment B-578). The engine and edit-cycle amendments (T10) land before the blocks and run the
+existing engine and edit-cycle suites for regression coverage. Then the blocks: the review cycle
 (T11), the proposal and apply path (T12), and the Revit run (T13). The report and audits (T14) and the crash matrix
 (T15) close the plan.
 
-Every task is test-first ([process/05](../../../../design/process/05-testing-and-verification.md) §9): its first commit
-holds the tests of `tests_first` (and, for calc tasks, the golden files with hand-derived expected values and a
-`derivation` field), and they fail on `build/v1`. `max_changed_lines` counts non-test code; a task that measures over
-is split by a plan amendment in its own reviewed pull request (decision D-12). Several tasks edit `CHANGELOG.md`,
-`calcs.lock.json`, `blocks.lock.json` or the shared golden test module, so they merge one after another;
-`depends_on` shows the needed order. Nothing in this plan needs a host program in CI.
+For test-first tasks ([process/05](../../../../design/process/05-testing-and-verification.md) §9), the first commit
+holds the `tests_first` tests (and, for calc tasks, golden files with hand-derived expected values and a `derivation`
+field). Those tests fail on the task's base before implementation. T6 is a test-only PR and is exempt from the
+failing-first rule under gate §4.7. Its companion tests pass on its base, so `tests_first: []` follows the B-482
+precedent and TF004 (amendment B-578). `max_changed_lines` estimates counted non-test lines (B-552).
+Several tasks edit `CHANGELOG.md`, `calcs.lock.json`, `blocks.lock.json` or the shared golden test module.
+`depends_on` gives their merge order. Nothing in this plan needs a host program in CI.
 
 R1 content in bootstrap mode ([ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md) §4): calcs and
 rules are registered `draft` and no approval is added; `src/eng_harness/calcs/`, `src/eng_harness/rules/` and
@@ -443,12 +445,21 @@ also registers `COLUMN_DESIGN_KINDS` in `HARNESS_KINDS` (`_kinds.py`), so the Ca
 Amendment (B-462).
 
 **T3 `harness.column_demands`** (spec §4.4.2; amendment B-578). Updates `ColumnCheckItems` in `kinds/column_design.py`
-so `_Item.inputs` is `dict[str, StrictInt | StrictFloat | Ref | Literal["tied"]]` (finite floats via `_P`, `bool`
-excluded, `eng_contract.refs.Ref` imported unchanged, `harness.column_check_items/1` id kept; the separate amendment
-B-577 handles `ColumnReview`'s member snapshot) together with `tests/data/kinds/column_design/column_check_items*.json`
-(valid literals plus `{"$ref"}` basis references; invalid bare `RefString` string, non-finite float, `bool`, float
-`n_bars_*`, `transverse_kind: "spiral"`) and `tests/contract/test_column_design_kinds.py`. Types the `forces` input
-with `forces.member_end/1` (`ref_kinds={"forces.member_end/1"}`), so non-`host_local/1` `sign_convention` fails at input
+with field-aware validation of `_Item.inputs`. For each supplied field, require a strict JSON integer for
+`n_bars_b` and `n_bars_h`, exactly `"tied"` for `transverse_kind`, and a `{"$ref": "..."}` object validated by
+`eng_contract.refs.Ref` for `fc_MPa`, `fy_MPa` and `k_factor`. Require a strict JSON integer or finite float for
+each remaining numeric input. Exclude booleans and coercion. The check-model test below verifies the exact input
+names and required fields for each check. Keep the `harness.column_check_items/1` id. Amendment B-577 covers
+`ColumnReview`'s member snapshot.
+
+Update `tests/data/kinds/column_design/column_check_items*.json` and `tests/contract/test_column_design_kinds.py`.
+The valid fixture round-trips literal values and basis reference objects with the `$ref` alias.
+`test_check_item_inputs_are_ref_objects_or_literals` exercises each invalid shape in a separate case by replacing
+one otherwise valid input: a bare `RefString`, a float in each bar-count field, `"spiral"`, a numeric literal in
+each basis-reference field, a malformed reference object, a reference object in a numeric-literal field, a
+numeric string, a boolean, and a non-finite float.
+
+T3 types the `forces` input with `forces.member_end/1` (`ref_kinds={"forces.member_end/1"}`), so non-`host_local/1` `sign_convention` fails at input
 validation (`ContractError` `INVALID_ARGUMENT`, nothing stored); checks presence and confirmation of the §4.7 A basis
 fields before emitting any reference (`ContractError` `INVALID_ARGUMENT`, `field = basis.fields.<path>`, nothing
 stored). Rows per selected column and combination; `Pu_kN = −P_kN`; the axis rule for sections symmetric by geometry
@@ -477,10 +488,12 @@ three column checks merged in B-334 (structural-codes plan 0004 T5). T6 is there
 kind, adding companion coverage in `tests/unit/calcs/test_code_pack_route.py`:
 `test_batch_through_calcport` (real `aci318_14` registry through `HarnessCalcPort.run` in `trial` mode on a conforming
 `harness.column_check_items/1` and `basis.design_basis/1`, asserting one trace per item in order, `draft: true`, exact
-`parents`, `RefInput`/`LiteralInput` split and stored-value equality), `test_ref_strings_refused` (a stored list with a
-bare `RefString` input gives `INVALID_ARGUMENT` with `field = items[0].<name>` and nothing stored),
-`test_literal_fc_refused` (`INVALID_ARGUMENT` under `require_refs`), `test_production_refused` and
-`test_only_listed_checks` with the column ids. T6 starts after B-405 (already merged) and structural-codes core plan T15 (`CheckMeta.version`, B-442, already merged).
+`parents`, `RefInput`/`LiteralInput` split and stored-value equality). For `test_ref_strings_refused` and
+`test_literal_fc_refused`, use a permissive stored-list fixture that accepts raw item inputs. Resolve the list
+through `batch` and assert that the route returns `INVALID_ARGUMENT` with no verdict stored, for a bare
+`RefString` (`field = items[0].<name>`) and for a literal `fc_MPa` under `require_refs`, respectively.
+Run `test_production_refused` and `test_only_listed_checks` with the column ids. T6 starts after B-405 (already merged)
+and structural-codes core plan T15 (`CheckMeta.version`, B-442, already merged).
 
 **T7 `harness.revit_column_update`** (spec §4.4.5). Targets by shape as references to ETABS `model.sections/1` fields,
 role statuses, `no_change`, reuse of an equal type, one new type per family and ETABS section, name clashes, the
@@ -540,8 +553,13 @@ unsaved-document notice, draft marks), `audit_verdict_sources`, and the column s
 - Before T13: plan 0011 T7 to T11 and T15 (reader, edits, attended writes, reconciliation, session, wiring) and T2 (the
   Revit fake).
 - Before T14: plan 0007 T10 (`audit_value_sources` and the report sections).
-- Owner decisions that do not block T1 to T15: the spec's Q1 to Q11 (the recommendations are implemented); C1 (basis
-  paths) must be settled by the lead before T3 merges, or T3 uses the clause specs' names as written.
+- B-484 settled spec C1. T3 uses the merged §4.7 Table A paths `materials.concrete_fc_MPa`,
+  `materials.rebar_fy_MPa` and `columns.effective_length_factor_ratio` (amendment B-578).
+- Owner decisions that do not block T1 to T15: the spec's Q1 to Q11 (the recommendations are implemented).
+- Documents follow-up for spec Q12 (amendment B-578). The eng-harness package maintainer owns
+  `docs/adr/0004-workspace-code-packs.md` in a separate documents task. The short package ADR records the
+  workspace dependencies on `structural-codes` and `aci318-14` under rule A10 and their impact after the
+  repository split (ADR-0028).
 
 ## 4. Verification
 
