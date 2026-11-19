@@ -171,6 +171,7 @@ def test_column_review_members_and_changes_rules() -> None:
     with pytest.raises(ValidationError, match="appeared must be sorted and unique"):
         ColumnReview.model_validate(bad_appeared)
 
+
 _AXIAL_FLEXURE_ID = "aci318_14.22_4_1_1.axial_flexure_uniaxial"
 _BARE_REF = "res_00000000000000000000000001#/fields/materials.concrete_fc_MPa/value"
 _VALID_REF = {"$ref": _BARE_REF}

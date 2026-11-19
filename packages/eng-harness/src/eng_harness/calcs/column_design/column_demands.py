@@ -61,9 +61,7 @@ REINF_LIMITS_ID = "aci318_14.10_6_1_1.longitudinal_reinforcement_limits"
 
 ZERO = Cited(value=0, unit="1", source="Geometry: a bar area or cover distance is positive")
 TWO = Cited(value=2, unit="1", source="Geometry: two opposite faces per direction (b and h), AF CS S1")
-FOUR = Cited(
-    value=4, unit="1", source="Geometry: four corner bars counted twice in 2*n_bars_b + 2*n_bars_h (AF CS S1)"
-)
+FOUR = Cited(value=4, unit="1", source="Geometry: four corner bars counted twice in 2*n_bars_b + 2*n_bars_h (AF CS S1)")
 VERSION = Cited(value=1, unit="1", source="Calc version 1 of spec 0013 §4.4.2; a change of method is a new version")
 
 _REFS = ("selection", "forces", "sections", "layouts", "combinations", "basis")
