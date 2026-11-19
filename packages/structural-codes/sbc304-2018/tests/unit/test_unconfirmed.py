@@ -8,8 +8,6 @@ from aci318_14 import PACK
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.params import ParamSpec
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
-from sbc304_2018._overlay import build_overlay
-from sbc304_2018.clause_map import CLAUSE_MAP
 from structural_codes import evaluate
 from structural_codes.applicability import Outcome
 from structural_codes.check import Check
@@ -17,6 +15,9 @@ from structural_codes.errors import CheckDefinitionError, NotImplementedGap
 from structural_codes.inputs import CheckInputs
 from structural_codes.overlay import Overridden
 from structural_codes.pack import Pack, Registry
+
+from sbc304_2018._overlay import build_overlay
+from sbc304_2018.clause_map import CLAUSE_MAP
 
 # Inputs only, transcribed from the first hand-check case (HC-1) of each matching ACI clause spec §8 and
 # aci318-14/tests/data/golden/verification/<check_id>.yaml. No SBC numeric result is expected.
@@ -187,10 +188,14 @@ def test_needs_engineer_with_gap(base: Check, overlay_pack: tuple[Registry, dict
     (verdict,) = result.payload.verdicts
     assert (verdict.check_id, verdict.code, verdict.clause) == (check_id, "SBC 304-2018", clause)
     assert verdict.status == VerdictStatus.NEEDS_ENGINEER
-    assert verdict.demand is verdict.capacity is verdict.ratio is None
+    assert verdict.demand is None
+    assert verdict.capacity is None
+    assert verdict.ratio is None
     (trace,) = result.payload.traces
     assert trace.messages[-1] == f"{row.gap_id} ({clause}): {expected_reason}"
-    assert trace.steps == trace.constants == trace.outputs == []
+    assert trace.steps == []
+    assert trace.constants == []
+    assert trace.outputs == []
 
     assert check.meta.pack == "sbc304_2018"
     assert check.meta.edition == "2018"

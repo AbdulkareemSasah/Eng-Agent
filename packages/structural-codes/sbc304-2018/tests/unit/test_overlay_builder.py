@@ -5,8 +5,6 @@ from dataclasses import replace
 import pytest
 from aci318_14 import PACK
 from eng_contract.verdicts import Subject, SubjectKind, VerdictStatus
-from sbc304_2018._overlay import MapRow, MapStatus, build_overlay
-from sbc304_2018.clause_map import CLAUSE_MAP
 from structural_codes import evaluate
 from structural_codes.check import Check
 from structural_codes.content_hash import content_hash
@@ -14,6 +12,9 @@ from structural_codes.errors import CheckNotUsable
 from structural_codes.meta import CheckMeta
 from structural_codes.overlay import Inherited, InheritedCheck, Overlay, Overridden
 from structural_codes.pack import Pack, Registry
+
+from sbc304_2018._overlay import MapRow, MapStatus, build_overlay
+from sbc304_2018.clause_map import CLAUSE_MAP
 
 _COLUMN_ID = "aci318_14.10_6_1_1.longitudinal_reinforcement_limits"
 _PROVISIONAL_ID = "sbc304_2018.unconfirmed_aci_318_14_10_6_1_1.longitudinal_reinforcement_limits"
@@ -49,14 +50,16 @@ def test_missing_row_default() -> None:
     assert overlay.clause_map == {
         f"unconfirmed (ACI 318-14 {base.meta.clauses[0]})": base.meta.clauses[0] for base in PACK.checks
     }
-    assert {entry.base_check_id for entry in overlay.entries} == {check.meta.check_id for check in PACK.checks}
     assert len(overlay.entries) == len(checks) == len(PACK.checks)
 
+    by_base = {}
     for entry in overlay.entries:
         assert isinstance(entry, Overridden)
+        by_base[entry.base_check_id] = entry
         expected = next((row.gap_id for row in rows[1:] if row.base_check_id == entry.base_check_id), "G-0")
         (gap,) = entry.check.meta.gaps
         assert gap.id == expected
+    assert set(by_base) == {check.meta.check_id for check in PACK.checks}
 
     expected_reason = (
         "SBC_ROW_MISSING: SBC 304-2018 clause not confirmed for "

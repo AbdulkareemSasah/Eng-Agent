@@ -1,7 +1,7 @@
 """In-scope subjects always reach the SBC gap for valid base inputs (spec 0003 AC5)."""
 
 from math import ceil, floor
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from aci318_14 import PACK
@@ -9,13 +9,14 @@ from eng_contract.params import ParamSpec
 from eng_contract.verdicts import Subject, VerdictStatus
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from sbc304_2018._overlay import build_overlay
-from sbc304_2018.clause_map import CLAUSE_MAP
 from structural_codes import evaluate
 from structural_codes.check import Check
 from structural_codes.inputs import CheckInputs
 from structural_codes.overlay import Overridden
 from structural_codes.pack import Pack, Registry
+
+from sbc304_2018._overlay import build_overlay
+from sbc304_2018.clause_map import CLAUSE_MAP
 
 
 def _parameters(model: type[CheckInputs]) -> st.SearchStrategy[dict[str, Any]]:
@@ -46,7 +47,7 @@ def _parameters(model: type[CheckInputs]) -> st.SearchStrategy[dict[str, Any]]:
             if kind == float | None:
                 fields[name] = st.none() | numbers
                 continue
-        fields[name] = st.from_type(kind)
+        fields[name] = st.from_type(cast(type[Any], kind))
     return st.fixed_dictionaries(fields)
 
 

@@ -8,10 +8,11 @@ from typing import Any
 
 import pytest
 from aci318_14 import PACK
-from sbc304_2018._overlay import MapRow, MapStatus, build_overlay
-from sbc304_2018.clause_map import CLAUSE_MAP
 from structural_codes.errors import CheckDefinitionError
 from structural_codes.overlay import Overridden
+
+from sbc304_2018._overlay import MapRow, MapStatus, build_overlay
+from sbc304_2018.clause_map import CLAUSE_MAP
 
 _DOC = Path(__file__).parents[3] / "docs" / "clauses" / "sbc304_2018" / "clause-map.md"
 _SYNTHETIC = "synthetic test fixture, no engineering meaning"
@@ -61,6 +62,15 @@ def test_column_rows_explicit() -> None:
             assert gap.id == columns[entry.base_check_id]
 
 
+_INVALID_INHERITED_ROWS: list[tuple[dict[str, str | None], str]] = [
+    ({"sbc_clause": ""}, "inherited rows require sbc_clause and sbc_source"),
+    ({"sbc_source": None}, "inherited rows require sbc_clause and sbc_source"),
+    ({"gap_id": ""}, "inherited rows cannot declare gap_id"),
+    ({"gap_id": "G-1"}, "inherited rows cannot declare gap_id"),
+    ({"confirm": ""}, "confirm must be non-empty"),
+]
+
+
 _INVALID_ROWS: list[tuple[dict[str, Any], str]] = [
     *[
         ({"status": status}, "status must be inherited or unconfirmed")
@@ -90,13 +100,7 @@ _INVALID_ROWS: list[tuple[dict[str, Any], str]] = [
             },
             problem,
         )
-        for bad_field, problem in [
-            ({"sbc_clause": ""}, "inherited rows require sbc_clause and sbc_source"),
-            ({"sbc_source": None}, "inherited rows require sbc_clause and sbc_source"),
-            ({"gap_id": ""}, "inherited rows cannot declare gap_id"),
-            ({"gap_id": "G-1"}, "inherited rows cannot declare gap_id"),
-            ({"confirm": ""}, "confirm must be non-empty"),
-        ]
+        for bad_field, problem in _INVALID_INHERITED_ROWS
     ],
 ]
 
