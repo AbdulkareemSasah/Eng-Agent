@@ -6,7 +6,8 @@ same sections on both sides, and `basis` (`compare.length_mm`). `a_*` is `stale_
 Units: millimetres; distances compared as exact squared `Fraction`s (P2); `distance_mm` is `sqrt` of `d²` in float.
 Errors: `ContractError` `INVALID_ARGUMENT` for a basis given without a record, a basis field missing, unconfirmed,
 wrong unit or a non-numeric tolerance; `OUT_OF_RANGE` for a confirmed numeric `compare.length_mm` below 0
-(spec 0003 §4.4 inclusive lower bound, §6); `INVALID_ARGUMENT` for a placement without a record reference or mismatched side sections.
+(spec 0003 §4.4 inclusive lower bound, §6); `INVALID_ARGUMENT` for a placement without a record
+reference or mismatched side sections.
 """
 
 from __future__ import annotations
