@@ -64,9 +64,14 @@ tasks:
     # plan 0002 T19 (B-413 had moved it there). Plan 0002 T19a adds build_ports first, so the stop fails at T3's base for
     # want of the SAFE entries and pinned SAFE fingerprint; T3 waits for 0002 T19a and engine plan 0001 T13, T15, T16, T16b (B-499), T19.
     # Its expected error is defined in plan 0002 section 2, T19b.
+    # Amendment (B-581, documents only): AC6 and AC7 need AdapterHostPort._record_save to skip the table read when
+    # profile.tables is empty (SAFE before T5), so the prior fingerprint is kept; measured by the B-212 writer on
+    # packages/eng-harness/src/eng_harness/adapters/_hostport.py (not previously in T3's files). Every other non-test
+    # file of that branch was already listed here.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # _record_save skips table read when profile.tables is empty (SAFE before T5); AC6, AC7 (amendment B-581)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_session_ops.py"
@@ -249,7 +254,8 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line. No
 public module is added (everything is internal), so `[tool.eng-gate] public_modules` is unchanged. Tasks that share a
 source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7),
-`_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9).
+`_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
+`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map).
 
 Reuse (spec §2): everything in plan 0002; the SAFE 22 table reference of the Sasaah repository only as a source of field
 keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
@@ -294,7 +300,9 @@ pinned SAFE fingerprint do not exist there; its expected error is the one plan 0
 `csi_add_load_combo`, `csi_delete_load_combo`, `csi_assign_area_section`, `csi_run_analysis`, `csi_analysis_status`,
 `csi_results_base_reactions`, `csi_results_joint_reactions`, `csi_unlock_model` once plan 0002 T15 has landed) each with
 kind, class, effect, action, units, args model, confirm and read-back helper; the SAFE fingerprint computed from the
-inventory and pinned; `working_copy` and `restore` for `.FDB` through the 0002 session operations; the gap registry in
+inventory and pinned; `working_copy` and `restore` for `.FDB` through the 0002 session operations; `AdapterHostPort._record_save`
+skips the table read when `profile.tables` is empty so SAFE keeps its prior fingerprint until T5 (AC6, AC7; amendment B-581);
+the gap registry in
 `_gaps.py` holds the SG-1 to SG-9 ids and messages (`NotImplementedGap`), and T3 wires only SG-1 (AC8) to a step.
 SG-7 and SG-8 are raised in T6 (AC16, AC15), SG-6 (`LIMIT_EXCEEDED`) in T7, and T7 wires SG-2, SG-3, SG-4, SG-5 and
 SG-9 to their steps (AC24, AC25); T3 does not wire those, so T7's first-commit tests fail at its base (amendment
