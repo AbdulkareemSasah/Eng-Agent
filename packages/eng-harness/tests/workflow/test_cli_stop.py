@@ -1,4 +1,4 @@
-"""`stop` command: live run pauses at safe point, idle run writes no file, missing/workspace refusals (spec 0006 AC9, AC71; plan T16)."""
+"""`stop` command: live run pauses at safe point, idle/missing/workspace cases (spec 0006 AC9, AC71; plan T16)."""
 
 import threading
 from pathlib import Path
@@ -82,3 +82,26 @@ def test_stop_pauses_at_safe_point(tmp_path: Path) -> None:
     assert stop_nows.main("stop", missing_id, environ={}) == ExitCode.USAGE
     assert "no workspace is configured (set ENG_WORKSPACE)" in stop_nows.err.getvalue()
     assert not stop_nows.workspace.exists()
+
+
+def test_stop_wait_timeout_and_negative_wait(tmp_path: Path) -> None:
+    rig = Rig(tmp_path / "held", script=completes)
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "off") == ExitCode.OK
+    [run_id] = rig.run_ids()
+    run_dir = rig.runs / run_id
+
+    # Negative --wait is a usage error.
+    neg = Rig(tmp_path / "held")
+    assert neg.main("stop", run_id, "--wait", "-1") == ExitCode.USAGE
+    assert "--wait" in neg.err.getvalue()
+
+    # --wait 0 while lock remains held writes stop.json and reports still stopping.
+    lock = RunLock(run_dir)
+    lock.acquire()
+    try:
+        wait_zero = Rig(tmp_path / "held")
+        assert wait_zero.main("stop", run_id, "--wait", "0", clock=FixedClock(START_MS, 1)) == ExitCode.OK
+        assert (run_dir / STOP_FILE).is_file()
+        assert "still stopping" in wait_zero.out.getvalue().lower()
+    finally:
+        lock.release()

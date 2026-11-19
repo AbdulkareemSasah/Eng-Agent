@@ -1,4 +1,4 @@
-"""`status` command: all run states, heartbeat liveness, integrity errors and read-only guarantee (spec 0006 AC11, AC18, AC71; plan T16)."""
+"""`status` command: run states, heartbeat liveness, integrity and read-only check (AC11, AC18, AC71; plan T16)."""
 
 import hashlib
 import json
@@ -206,7 +206,9 @@ def test_states_and_read_only(tmp_path: Path) -> None:
         assert expected_status in table
         assert expected_next in table
         assert "\x1b" not in table
-        assert "http" not in table and "launch" not in table.lower() and "token" not in table.lower()
+        assert "http" not in table
+        assert "launch" not in table.lower()
+        assert "token" not in table.lower()
 
         after_bytes, after_mtime, after_files = _snapshot(run_dir)
         assert hashlib.sha256(after_bytes).hexdigest() == before_hash
@@ -270,3 +272,71 @@ def test_states_and_read_only(tmp_path: Path) -> None:
     assert rig_nows.main("status", environ={}) == ExitCode.USAGE
     assert "no workspace is configured (set ENG_WORKSPACE)" in rig_nows.err.getvalue()
     assert not rig_nows.workspace.exists()
+
+
+def test_status_list_skips_non_runs_handles_tampered_and_boundary(tmp_path: Path) -> None:
+    clock = FixedClock(START_MS, 1_000)
+    ids = SeededIdSource(b"sb", clock)
+    ws_root = tmp_path / "ws"
+    ws_root.mkdir()
+    workspace = Workspace(root=ws_root, classification=LocationClass.LOCAL)
+    store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
+    runs_dir = ws_root / "runs"
+
+    # Empty workspace with `runs/` missing: human mode prints "no runs".
+    empty_rig = Rig(tmp_path / "empty")
+    empty_rig.workspace.mkdir(parents=True)
+    assert empty_rig.main("status") == ExitCode.OK
+    assert empty_rig.out.getvalue() == "no runs\n"
+
+    # Non-run entries in `runs/` are ignored; tampered run in list reports JOURNAL_INTEGRITY.
+    runs_dir.mkdir(parents=True)
+    (runs_dir / "stray.txt").write_text("x", encoding="utf-8")
+    (runs_dir / "not_a_run").mkdir()
+    bad_id = f"run_{ids.new_ulid()}"
+    bad_dir, bad_w, _ = _make_run(runs_dir, store, clock, ids, bad_id)
+    bad_w.close()
+    conn = sqlite3.connect(bad_dir / "journal.sqlite")
+    try:
+        conn.execute("DROP TRIGGER events_no_update")
+        conn.execute("UPDATE events SET chain_sha256 = ? WHERE seq = 1", ("f" * 64,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    live_id = f"run_{ids.new_ulid()}"
+    live_dir, live_w, _ = _make_run(runs_dir, store, clock, ids, live_id)
+    live_w.close()
+    lock = RunLock(live_dir)
+    lock.acquire()
+    try:
+        (live_dir / "heartbeat.json").write_text(
+            json.dumps(
+                {
+                    "pid": os.getpid(),
+                    "at": "2026-01-01T00:00:00.000Z",
+                    "step": None,
+                    "step_started_at": None,
+                    "seq": 1,
+                }
+            ),
+            encoding="utf-8",
+        )
+        # Exactly 30_000 ms (3 * 10 s) is still running; 30_001 ms is no_heartbeat.
+        rig_at = Rig(tmp_path)
+        assert rig_at.main("status", live_id, "--json", clock=FixedClock(START_MS + 30_000, 1)) == ExitCode.OK
+        assert json.loads(rig_at.out.getvalue())["heartbeat"]["state"] == "running"
+
+        rig_past = Rig(tmp_path)
+        assert rig_past.main("status", live_id, "--json", clock=FixedClock(START_MS + 30_001, 1)) == ExitCode.OK
+        assert json.loads(rig_past.out.getvalue())["heartbeat"]["state"] == "no_heartbeat"
+    finally:
+        lock.release()
+
+    rig_list = Rig(tmp_path)
+    assert rig_list.main("status", "--json") == ExitCode.OK
+    listed = json.loads(rig_list.out.getvalue())
+    by_id = {item["run_id"]: item for item in listed}
+    assert set(by_id) == {live_id, bad_id}
+    assert by_id[bad_id]["status"] == "JOURNAL_INTEGRITY"
+    assert "seq 1" in by_id[bad_id]["error"]

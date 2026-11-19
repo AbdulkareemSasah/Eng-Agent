@@ -79,10 +79,10 @@ def test_doctor_receives_config_path_and_environment(tmp_path: Path) -> None:
         )
         == ExitCode.OK
     )
-    assert seen[-1][0] == cfg
-    assert seen[-1][1] == {"FOO": "bar", "ENG_WORKSPACE": str(ws)}
+    assert seen == [(cfg, {"FOO": "bar", "ENG_WORKSPACE": str(ws)})]
 
     # 2. No `harness.toml` found -> `config_path` is `None`.
+    seen.clear()
     out, err = io.StringIO(), io.StringIO()
     assert (
         main(
@@ -91,8 +91,7 @@ def test_doctor_receives_config_path_and_environment(tmp_path: Path) -> None:
         )
         == ExitCode.OK
     )
-    assert seen[-1][0] is None
-    assert seen[-1][1] == {"BAR": "baz"}
+    assert seen == [(None, {"BAR": "baz"})]
 
     # 3. A `ConfigError` from `doctor` exits 2 naming the offending key.
     def failing(
@@ -108,3 +107,19 @@ def test_doctor_receives_config_path_and_environment(tmp_path: Path) -> None:
     out, err = io.StringIO(), io.StringIO()
     assert main(["doctor"], deps=CliDeps(stdout=out, stderr=err, environ={}, doctor=failing)) == ExitCode.USAGE
     assert "servers.csi" in err.getvalue()
+
+
+def test_doctor_end_to_end_with_real_doctor_run(tmp_path: Path) -> None:
+    import json
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    out, err = io.StringIO(), io.StringIO()
+    code = main(
+        ["--workspace", str(ws), "doctor", "--json"],
+        deps=CliDeps(stdout=out, stderr=err, environ={}),
+    )
+    assert code in (ExitCode.OK, ExitCode.RUN_FAILED)
+    payload = json.loads(out.getvalue())
+    assert "checks" in payload
+    assert any(c["name"] == "workspace" and c["status"] == "ok" for c in payload["checks"])

@@ -1,4 +1,4 @@
-"""`report` command: atomic write, `--out` and `--force` rules, integrity refusal and cycle timings JSON (spec 0006 AC12, AC69, AC71; plan T16)."""
+"""`report` command: atomic write, `--out`/`--force`, integrity and cycle timings (AC12, AC69, AC71; plan T16)."""
 
 import json
 import sqlite3
@@ -148,9 +148,7 @@ def test_cycle_timings_file(tmp_path: Path) -> None:
         write_cycle_timings(edit_cycle_timings(reader, store), expected_path)
     finally:
         reader.close()
-    assert json.loads(timings_path.read_text(encoding="utf-8")) == json.loads(
-        expected_path.read_text(encoding="utf-8")
-    )
+    assert json.loads(timings_path.read_text(encoding="utf-8")) == json.loads(expected_path.read_text(encoding="utf-8"))
 
     # 2. Run without an edit cycle writes no `cycle-timings.json`.
     plain = Rig(tmp_path / "plain", script=completes)
@@ -159,3 +157,21 @@ def test_cycle_timings_file(tmp_path: Path) -> None:
     assert plain.main("report", plain_id) == ExitCode.OK
     assert (plain.runs / plain_id / "report" / "report.html").is_file()
     assert not (plain.runs / plain_id / "report" / "cycle-timings.json").exists()
+
+
+def test_report_refuses_directory_target_and_missing_store_ref(tmp_path: Path) -> None:
+    rig = Rig(tmp_path / "edge", script=completes, keep_basis_ref=True)
+    assert rig.main("run", WORKFLOW, "--no-report", "--progress", "off") == ExitCode.OK
+    [run_id] = rig.run_ids()
+
+    # `--out` pointing to an existing directory is refused with USAGE.
+    out_dir = tmp_path / "existing_dir"
+    out_dir.mkdir()
+    bad_dir = Rig(tmp_path / "edge")
+    assert bad_dir.main("report", run_id, "--out", str(out_dir), "--force") == ExitCode.USAGE
+    assert "directory" in bad_dir.err.getvalue().lower()
+
+    # A journal whose `basis_ref` cannot be found in the store maps to NOT_FOUND.
+    missing_ref = Rig(tmp_path / "edge")
+    assert missing_ref.main("report", run_id) == ExitCode.NOT_FOUND
+    assert "REF_NOT_FOUND" in missing_ref.err.getvalue()
