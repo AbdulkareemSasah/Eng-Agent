@@ -23,6 +23,21 @@ from eng_harness.servers._procinfo import ProcessIdentity
 ConfigFactory = Callable[..., ServersConfig]
 FAKE_PID = 4242  # the pid the CSI fake gives every instance it launches
 ETABS = "ETABS.exe"
+PRODUCTS = [("ETABS", "ETABS.exe", "csi"), ("SAFE", "SAFE.exe", "csi_safe")]
+
+
+def _product_config(
+    make_config: ConfigFactory, product: str, server_name: str, control: Path | None = None
+) -> ServersConfig:
+    cfg = make_config()
+    if control is not None:
+        data = json.loads(control.read_text()) if control.is_file() else {}
+        data["product"] = product
+        control.write_text(json.dumps(data))
+    if product == "ETABS" and server_name == "csi":
+        return cfg
+    section = cfg.servers["csi"].model_copy(update={"product": product, "host_key": server_name})
+    return ServersConfig(servers={server_name: section})
 
 
 class FakeInspector:
@@ -90,10 +105,14 @@ def _arm(control: Path, *faults: dict[str, Any]) -> None:
 
 
 def _run(
-    tmp_path: Path, config: ServersConfig, body: Callable[[ServerManager, ProcessGuard, FakeInspector], Any]
+    tmp_path: Path,
+    config: ServersConfig,
+    body: Callable[[ServerManager, ProcessGuard, FakeInspector], Any],
+    *,
+    host_exe: str = ETABS,
 ) -> None:
     inspector = FakeInspector()
-    guard = ProcessGuard(inspector, tmp_path / "run", host_exes=[ETABS])
+    guard = ProcessGuard(inspector, tmp_path / "run", host_exes=[host_exe])
 
     async def scenario() -> None:
         async with ServerManager(config, tmp_path / "run", helpers=guard) as manager:
@@ -103,22 +122,36 @@ def _run(
 
 
 async def _launch(
-    manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector, *, visible: bool
+    manager: ServerManager,
+    guard: ProcessGuard,
+    inspector: FakeInspector,
+    *,
+    visible: bool,
+    product: str = "ETABS",
+    host_exe: str = ETABS,
+    server: str = "csi",
 ) -> StartedInstance:
     """`csi_launch` as the adapter does it: snapshot, call, identify, record the launching role's session."""
     before = guard.snapshot()
-    inspector.running[FAKE_PID] = ProcessIdentity(FAKE_PID, "t1", ETABS)
-    reply = await manager.call("csi", "main", "csi_launch", {"product": "ETABS", "visible": visible}, CallEffect.WRITE)
+    inspector.running[FAKE_PID] = ProcessIdentity(FAKE_PID, "t1", host_exe)
+    reply = await manager.call(server, "main", "csi_launch", {"product": product, "visible": visible}, CallEffect.WRITE)
     assert _body(reply)["pid"] == FAKE_PID
-    return guard.record_launch(manager, guard.identify_launch(before, named_pid=FAKE_PID), visible=visible)
+    return guard.record_launch(
+        manager, guard.identify_launch(before, named_pid=FAKE_PID), visible=visible, server=server
+    )
 
 
-def test_close_only_started(tmp_path: Path, make_config: ConfigFactory) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_close_only_started(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=False)
-        inspector.running[5000] = ProcessIdentity(5000, "t9", ETABS)  # an instance the run attached to: never passed
-        reused = StartedInstance(pid=777, started_at="old", program=ETABS, visible=False)
-        inspector.running[777] = ProcessIdentity(777, "new", ETABS)  # same pid, another process
+        started = await _launch(
+            manager, guard, inspector, visible=False, product=product, host_exe=host_exe, server=server
+        )
+        inspector.running[5000] = ProcessIdentity(5000, "t9", host_exe)  # an instance the run attached to: never passed
+        reused = StartedInstance(pid=777, started_at="old", program=host_exe, visible=False)
+        inspector.running[777] = ProcessIdentity(777, "new", host_exe)  # same pid, another process
         recording = Recording(manager)
 
         left = await guard.close_started(recording, [reused, started])
@@ -127,35 +160,45 @@ def test_close_only_started(tmp_path: Path, make_config: ConfigFactory) -> None:
         assert recording.tools == ["csi_status", "csi_exit"]  # the owned, current target is exited gracefully
         assert inspector.terminated == []
         assert set(inspector.running) == {FAKE_PID, 777, 5000}  # nothing else was touched; 777 did not match
-        status = await manager.call("csi", "main", "csi_status", {}, CallEffect.READ)
+        status = await manager.call(server, "main", "csi_status", {}, CallEffect.READ)
         assert _body(status)["current_target"] is None
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
-def test_close_after_timeout_falls_back(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_close_after_timeout_falls_back(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=False)
-        before = manager.role_session("csi", "main")
+        started = await _launch(
+            manager, guard, inspector, visible=False, product=product, host_exe=host_exe, server=server
+        )
+        before = manager.role_session(server, "main")
         _arm(control, {"fault": "timeout_before_apply", "tool": "csi_list_points"})
-        reply = await manager.call("csi", "main", "csi_list_points", {}, CallEffect.READ)  # a read times out
+        reply = await manager.call(server, "main", "csi_list_points", {}, CallEffect.READ)  # a read times out
         assert _body(reply)["code"] == "timeout"
-        assert manager.role_session("csi", "main") == before + 1
+        assert manager.role_session(server, "main") == before + 1
         recording = Recording(manager)
 
         left = await guard.close_started(recording, [started])
 
         assert left == []
         assert recording.tools == []  # launch ownership is lost: not even csi_status is sent
-        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", ETABS)]
+        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", host_exe)]
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
-def test_visible_instance_left_open(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_visible_instance_left_open(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=True)
-        manager.invalidate_session("csi", "main")  # a reconnect ends launch ownership too
+        started = await _launch(
+            manager, guard, inspector, visible=True, product=product, host_exe=host_exe, server=server
+        )
+        manager.invalidate_session(server, "main")  # a reconnect ends launch ownership too
         recording = Recording(manager)
 
         for _ in range(2):  # idempotent
@@ -164,57 +207,72 @@ def test_visible_instance_left_open(tmp_path: Path, make_config: ConfigFactory, 
         assert recording.tools == []
         assert inspector.terminated == []
         listed = json.loads((tmp_path / "run" / "hosts" / "left_open.json").read_text())
-        assert listed == [{"pid": FAKE_PID, "started_at": "t1", "program": ETABS}]
+        assert listed == [{"pid": FAKE_PID, "started_at": "t1", "program": host_exe}]
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
-def test_other_current_target_falls_back(tmp_path: Path, make_config: ConfigFactory) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_other_current_target_falls_back(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=False)
-        await manager.call("csi", "main", "csi_attach", {"pid": 9999, "product": "ETABS"}, CallEffect.WRITE)
+        started = await _launch(
+            manager, guard, inspector, visible=False, product=product, host_exe=host_exe, server=server
+        )
+        await manager.call(server, "main", "csi_attach", {"pid": 9999, "product": product}, CallEffect.WRITE)
         recording = Recording(manager)
 
         await guard.close_started(recording, [started])
         await guard.close_started(recording, [started])  # the instance is gone now: ignored
 
         assert recording.tools == ["csi_status"]  # the current target is another instance: no csi_exit
-        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", ETABS)]
+        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", host_exe)]
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
-def test_exit_refused_falls_back(tmp_path: Path, make_config: ConfigFactory) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_exit_refused_falls_back(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=False)
+        started = await _launch(
+            manager, guard, inspector, visible=False, product=product, host_exe=host_exe, server=server
+        )
         # A re-attachment the guard was not told about: the server answers not_launched_by_server to csi_exit.
-        await manager.call("csi", "main", "csi_attach", {"pid": FAKE_PID, "product": "ETABS"}, CallEffect.WRITE)
+        await manager.call(server, "main", "csi_attach", {"pid": FAKE_PID, "product": product}, CallEffect.WRITE)
         recording = Recording(manager)
 
         await guard.close_started(recording, [started])
 
         assert recording.tools == ["csi_status", "csi_exit"]
-        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", ETABS)]
+        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", host_exe)]
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
-def test_crash_ends_launch_ownership(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
+@pytest.mark.parametrize(("product", "host_exe", "server"), PRODUCTS)
+def test_crash_ends_launch_ownership(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, host_exe: str, server: str
+) -> None:
     async def body(manager: ServerManager, guard: ProcessGuard, inspector: FakeInspector) -> None:
-        started = await _launch(manager, guard, inspector, visible=False)
-        before = manager.role_session("csi", "main")
+        started = await _launch(
+            manager, guard, inspector, visible=False, product=product, host_exe=host_exe, server=server
+        )
+        before = manager.role_session(server, "main")
         _arm(control, {"fault": "crash_during_call", "tool": "csi_list_points"})
         with pytest.raises(ToolFailed):
-            await manager.call("csi", "main", "csi_list_points", {}, CallEffect.READ)
-        assert manager.role_session("csi", "main") == before + 1
+            await manager.call(server, "main", "csi_list_points", {}, CallEffect.READ)
+        assert manager.role_session(server, "main") == before + 1
         recording = Recording(manager)
 
         await guard.close_started(recording, [started])
 
         assert recording.tools == []
-        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", ETABS)]
+        assert inspector.terminated == [ProcessIdentity(FAKE_PID, "t1", host_exe)]
 
-    _run(tmp_path, make_config(), body)
+    _run(tmp_path, _product_config(make_config, product, server, control), body, host_exe=host_exe)
 
 
 def test_session_counter_is_per_role(tmp_path: Path, make_config: ConfigFactory) -> None:

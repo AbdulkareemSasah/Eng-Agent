@@ -1,0 +1,190 @@
+{
+ "sasaah_commit": "61da80f61a6562c8e3553168056bc107e3f93013",
+ "source": "spikes/S-12-sasaah-tool-inventory/inventory/sasaah-idea-mcp.json",
+ "tools": [
+  {
+   "name": "idea_status",
+   "server_kind": "Meta",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_open_project",
+   "server_kind": "Meta",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Project file path."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_close_project",
+   "server_kind": "Meta",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_list_connections",
+   "server_kind": "Read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2000,
+      "default": 500,
+      "description": "Maximum items to return."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_calculate",
+   "server_kind": "Destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "connection_ids": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      },
+      "description": "Connection ids. Defaults to all connections."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: calculation recomputes all results."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_get_check_results",
+   "server_kind": "Read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "connection_id": {
+      "type": "integer",
+      "description": "Connection id. Defaults to all calculated connections."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_native_get_loads",
+   "server_kind": "Read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Source .ideaCon file path."
+     },
+     "connection_id": {
+      "type": "string",
+      "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_native_set_loads",
+   "server_kind": "Destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Source .ideaCon file path."
+     },
+     "loads": {
+      "type": "array",
+      "description": "Loading JSON array (effects with forcesOnSegments).",
+      "items": {
+       "type": "object"
+      }
+     },
+     "connection_id": {
+      "type": "string",
+      "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+     },
+     "out_path": {
+      "type": "string",
+      "description": "Output .ideaCon path. Defaults to overwriting path."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true: the target file is overwritten."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_native_calculate",
+   "server_kind": "Read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Source .ideaCon file path."
+     },
+     "connection_id": {
+      "type": "string",
+      "description": "Connection identifier, numeric id or name. Defaults to all connections."
+     },
+     "save": {
+      "type": "boolean",
+      "default": false,
+      "description": "Save results into the output file (requires confirm:true)."
+     },
+     "out_path": {
+      "type": "string",
+      "description": "Output .ideaCon path when saving. Defaults to overwriting path."
+     },
+     "confirm": {
+      "type": "boolean",
+      "description": "Must be true when save is true."
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "idea_run_script",
+   "server_kind": "Code",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "source": {
+      "type": "string",
+      "description": "C# class source with the Run entry point."
+     },
+     "args": {
+      "type": "object",
+      "description": "JSON arguments available as ctx.Args."
+     }
+    },
+    "additionalProperties": false
+   }
+  }
+ ]
+}
