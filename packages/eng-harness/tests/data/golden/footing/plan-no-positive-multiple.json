@@ -1,0 +1,163 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.2, synthetic engineer inputs",
+  "method_ref": "\u00a74.4.2 P5",
+  "synthetic": true,
+  "derivation": "199 mm < 200 mm, so floor(199/200) = 0, and P5 refuses this basis.",
+  "input": {
+    "subjects": {
+      "subjects": [
+        {
+          "id": "F1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0,
+          "y_mm": 0,
+          "cx_mm": 400,
+          "cy_mm": 600
+        }
+      ],
+      "excluded": [],
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      }
+    },
+    "reactions": {
+      "axes": "global",
+      "rows": [
+        {
+          "joint": "J1",
+          "case": {
+            "case": "S1",
+            "case_type": "load_combination",
+            "step": null
+          },
+          "FX_kN": 60,
+          "FY_kN": -70,
+          "FZ_kN": 576,
+          "MX_kNm": 600,
+          "MY_kNm": -700,
+          "MZ_kNm": 80
+        }
+      ]
+    },
+    "service_cases": [
+      "S1",
+      "S2"
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.allowable_bearing_pressure_kPa": {
+          "value": 200,
+          "unit": "kPa",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.allowable_bearing_kind": {
+          "value": "gross",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.soil_unit_weight_kN_m3": {
+          "value": 18,
+          "unit": "kN/m3",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.soil_depth_above_footing_mm": {
+          "value": 1000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.surcharge_kPa": {
+          "value": 10,
+          "unit": "kPa",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "materials.concrete_unit_weight_kN_m3": {
+          "value": 24,
+          "unit": "kN/m3",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_depth_mm": {
+          "value": 500,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_plan_dimension_mm": {
+          "value": 900,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_plan_dimension_mm": {
+          "value": 199,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.plan_increment_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.plan_shape": {
+          "value": "square",
+          "unit": null,
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.max_spacing_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "subjects": "res_00000000000000000000000001",
+    "reactions": "res_00000000000000000000000002",
+    "service_cases": "res_00000000000000000000000003",
+    "basis": "res_00000000000000000000000004"
+  },
+  "expected": {
+    "error": "OUT_OF_RANGE",
+    "expected": {
+      "min": 200
+    },
+    "received": 199
+  }
+}
