@@ -161,6 +161,7 @@ async def _rig(
             key = await host.working_copy("m", tmp_path / "copies")
             held = await host.locate(key)
             assert held is not None
+            assert held.pid is not None
             pid = held.pid
         port = CsiToolPort(
             binder=Binder(pid), written=written, wrote=wrote, config=config, server="csi", caller=manager,

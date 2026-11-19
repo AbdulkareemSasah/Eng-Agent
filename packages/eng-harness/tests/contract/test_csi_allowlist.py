@@ -112,3 +112,25 @@ def test_pinned_fingerprint_from_inventory() -> None:
     schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in allowlist.tool_names}
     assert set(schemas) == {tool.name for tool in allowlist.tools}
     assert tool_list_fingerprint(schemas) == allowlist.fingerprint["ETABS"]
+
+
+def test_safe_fake_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC28: the SAFE-mode process serves the pinned inventory schemas."""
+    from fakes.sasaah_csi.test_server import Rpc
+
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"product": "SAFE"}))
+    rpc = Rpc(control)
+    try:
+        error, target = rpc.call("csi_launch")
+        assert not error
+        assert target["product"] == "SAFE"
+        listed = rpc.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected = {
+            tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]
+        }
+        assert len(listed) == len(actual)
+        assert actual == expected
+    finally:
+        rpc.close()

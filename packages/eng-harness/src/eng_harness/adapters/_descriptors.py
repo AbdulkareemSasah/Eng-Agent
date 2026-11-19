@@ -44,13 +44,13 @@ class ToolDescriptor(ReleaseMarked):
 
     name: str = Field(pattern=r"^[a-z][a-z0-9_]*$")
     kind: Literal["read", "write", "analysis", "design", "session"]  # S-12 classification, reviewed
-    timeout_class: Literal["session", "call", "long"]
+    timeout_class: Literal["session", "call", "long", "attended"]
     effect: Literal["read", "write"]
     action: Literal["plain", "open", "save", "analysis", "design", "delete", "unlock"]
     args_model: str = Field(pattern=r"^[A-Z][A-Za-z0-9]*$")  # canonical argument model in the adapter's code
     result_kind: str | None = None
     units: Literal["token", "none", "present", "declared_ignored"]
-    confirm: Literal["never", "approved", "owned"]
+    confirm: Literal["never", "approved", "owned", "host_dialog"]
     readback: str | None = Field(default=None, min_length=1)  # read-back helper name
     products: tuple[str, ...] = Field(min_length=1)
     routes: tuple[str, ...] | None = None  # required, and drawn from the header, when the header declares routes
