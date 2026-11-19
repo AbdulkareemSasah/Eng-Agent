@@ -3,9 +3,11 @@
 A mismatch is `ServerCheck(ok=False)` with the first reason, never an exception (the engine stops the run). No units.
 """
 
+import hashlib
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from eng_contract.canonical import payload_sha256
@@ -72,7 +74,12 @@ def check_build(
     hatch = sorted(n for n in seen.tools if _HATCH.fullmatch(n))
     tested = (want.sasaah_commit, *want.also_tested_commits)
     flags = [f for f in ("read_only", "script_enabled") if seen.status.get(f) is not False]
+    try:
+        addin_hashes = tuple(hashlib.sha256(Path(path).read_bytes()).hexdigest() for path in pin.addin_paths)
+    except OSError:
+        addin_hashes = ()
     failures = [
+        (addin_hashes != pin.addin_sha256, "add-in SHA-256 differs from the pinned build or cannot be read"),
         (want.product != product, f"the allowlist is for {want.product}, the server's product is {product}"),
         (seen.exe_sha256 != pin.exe_sha256, "executable SHA-256 differs from the pinned build"),
         (pin.server_info_version not in (None, version), "serverInfo version is not the pinned one"),

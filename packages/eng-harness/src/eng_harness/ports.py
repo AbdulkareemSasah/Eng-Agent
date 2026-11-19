@@ -58,6 +58,7 @@ class ToolInfo(_M):
     effect: Literal["read", "write"]
     action: Literal["plain", "open", "save", "analysis", "design", "delete", "unlock"]
     host_key: str
+    attended: bool = False
     model_param: str | None = None
     engineering_params: tuple[str, ...] = ()
 
@@ -152,7 +153,7 @@ class HostInstance(_M):
     """One running host program instance; `process_started_at` guards against pid reuse."""
 
     instance_id: str
-    pid: int = Field(ge=1)
+    pid: int | None = Field(default=None, ge=1)
     process_started_at: Timestamp
     program: str
 

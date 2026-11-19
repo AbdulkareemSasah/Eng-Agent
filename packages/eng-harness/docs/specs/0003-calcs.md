@@ -288,10 +288,11 @@ def model_diff(inp: DiffInput, meta: InputMeta, trace: TraceBuilder) -> ModelDif
   file (AC2).
 - **Pure functions.** Arguments: the validated input model (`CalcInput`, a contract `ParamModel`, frozen,
   `extra="forbid"`), `InputMeta` (per input field a `RefMeta`: `result_id`, `kind`, `complete`, `model_id`,
-  `model_revision`, `parents`, `producer_tool`; built by the CalcPort from the records, so the function never reads the
-  store) and the `TraceBuilder`. Return: the payload model without `calc`, `draft` and `trace`, which the framework
-  adds. No I/O, clock, randomness or global state. All arithmetic that decides a comparison is exact (`Fraction`). A
-  float is produced only for display values, and the payload says which fields those are.
+  `model_revision`, `parents`, `producer_tool`, and `ref` — the original input reference string including its JSON
+  pointer; amendment B-580; built by the CalcPort from the validated arguments and the records, so the function never
+  reads the store) and the `TraceBuilder`. Return: the payload model without `calc`, `draft` and `trace`, which the
+  framework adds. No I/O, clock, randomness or global state. All arithmetic that decides a comparison is exact
+  (`Fraction`). A float is produced only for display values, and the payload says which fields those are.
 - **Bounded inputs.** Kind payloads are bounded by the contract. In addition, the total of list items over all
   referenced records is at most `CalcSettings.max_items` (a resource limit in `harness.toml`, spec 0006; not
   engineering content), else `LIMIT_EXCEEDED` (AC15). Scalar inputs use Pydantic's constrained types
@@ -752,10 +753,10 @@ no such field, and a calc id it does not name (or `None`) describes no basis pat
    (engine invariant 3) with the `RefRule` it takes from `CalcInfo.ref_rules` for each argument path (§4.13), so the
    CalcPort does not repeat it with a partial revision map. An argument path missing from `ref_rules` is resolved by
    the engine with `stale_ok` false. Engine invariant 3 and `CalcInfo` change accordingly (Q11). Then the record metadata
-   (`InputMeta`), the item limit, the pure function, `CalcMeta` (`id`, `version`, `content_sha256`, `status`),
-   `draft`, and the trace. The result is stored with `ResultStore.put` (kind, parents, provenance `tool: "harness"`,
-   `tool_version` = the package version, `inputs` = references), and the return is `make_success` with a summary of
-   at most the counts and status.
+   (`InputMeta`: each `RefMeta` keeps the original input reference with its pointer, amendment B-580), the item limit,
+   the pure function, `CalcMeta` (`id`, `version`, `content_sha256`, `status`), `draft`, and the trace. The result is
+   stored with `ResultStore.put` (kind, parents, provenance `tool: "harness"`, `tool_version` = the package version,
+   `inputs` = references), and the return is `make_success` with a summary of at most the counts and status.
 3. Contract errors become failure envelopes. `NotImplementedGap` and `CalcRefused` propagate as `StepError`s (engine
    §6). Any other exception is `INTERNAL`.
 4. Code-pack checks (amendment B-405). The same port serves the checks of the `structural-codes` packs through one route
