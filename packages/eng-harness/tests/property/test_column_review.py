@@ -1,7 +1,9 @@
 """Property tests of `harness.column_review` (plan 0013 T4; spec 0013 AC8)."""
 
+import copy
 from typing import Any, cast
 
+from eng_contract.canonical import payload_sha256
 from eng_contract.verdicts import VerdictStatus
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -327,3 +329,47 @@ def test_ratios_are_referenced_not_computed(case: tuple[dict[str, Any], dict[str
             assert item["ratio"] == curr_by_key[(item["frame_id"], item["source"], item["check_id"])]["ratio"]
         for item in changes["disappeared"]:
             assert item["ratio"] == prev_by_key[(item["frame_id"], item["source"], item["check_id"])]["ratio"]
+
+
+@settings(derandomize=True, max_examples=40, deadline=None)
+@given(_review_inputs(), st.data())
+def test_permutation_invariant(case: tuple[dict[str, Any], dict[str, str]], data: st.DataObject) -> None:
+    """Permuting selection columns, not_checked rows and previous members keeps the complete payload identical."""
+    fields, refs = case
+    mixed = copy.deepcopy(fields)
+    mixed["selection"]["columns"] = data.draw(st.permutations(mixed["selection"]["columns"]))
+    mixed["items"]["not_checked"] = data.draw(st.permutations(mixed["items"]["not_checked"]))
+    if "previous" in mixed:
+        mixed["previous"]["members"] = data.draw(st.permutations(mixed["previous"]["members"]))
+
+    def run_one(inp_fields: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        definition = REGISTRY[CALC_ID]
+        digest = REGISTRY.content_hash(CALC_ID)
+        input_type = cast(type[CalcInput], definition.input_type)
+        meta = InputMeta(
+            refs={
+                name: RefMeta(
+                    result_id=result_id,
+                    kind=KINDS[name],
+                    complete=True,
+                    model_id=None,
+                    model_revision=None,
+                    parents=(),
+                    producer_tool="fixture_tool",
+                )
+                for name, result_id in refs.items()
+            }
+        )
+        trace = TraceBuilder()
+        body = definition(input_type.model_validate(inp_fields), meta, trace).model_dump(mode="json")
+        payload = body | {
+            "calc": CalcMeta(
+                id=CALC_ID, version=definition.version, content_sha256=digest, status=CalcStatus.DRAFT
+            ).model_dump(mode="json"),
+            "draft": True,
+            "trace": trace.build(definition, digest).model_dump(mode="json"),
+        }
+        ColumnReview.model_validate(payload)
+        return payload, payload_sha256(payload)
+
+    assert run_one(mixed) == run_one(fields)
