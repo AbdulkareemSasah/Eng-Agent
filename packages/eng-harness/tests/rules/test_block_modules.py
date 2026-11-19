@@ -41,6 +41,8 @@ ALLOWED_NAMES = {
     },
 }  # fmt: skip
 ARITHMETIC = (ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.MatMult)
+_FORBIDDEN_ATTRS = frozenset({"value", "parser", "__dict__"})
+_MODEL_DUMP_METHODS = frozenset({"model_dump", "model_dump_json"})
 
 
 def _mutation_import(node: ast.Import | ast.ImportFrom) -> bool:
@@ -77,6 +79,36 @@ def _catches_everything(handler: ast.ExceptHandler) -> bool:
     return any(ast.unparse(kind) in {"BaseException", "builtins.BaseException"} for kind in kinds)
 
 
+def _call_violation(node: ast.Call) -> str | None:
+    """Detect `vars(...)` and `getattr(..., "value" | "parser" | "__dict__")` calls."""
+    if not isinstance(node.func, ast.Name):
+        return None
+    if node.func.id == "vars":
+        return f"{node.lineno}: call of vars"
+    if (
+        node.func.id == "getattr"
+        and len(node.args) >= 2
+        and isinstance(node.args[1], ast.Constant)
+        and isinstance(node.args[1].value, str)
+        and node.args[1].value in _FORBIDDEN_ATTRS
+    ):
+        return f"{node.lineno}: getattr for {node.args[1].value}"
+    return None
+
+
+def _dump_value_subscript(node: ast.Subscript) -> str | None:
+    """Detect `["value"]` applied directly to a `model_dump(...)` or `model_dump_json(...)` call."""
+    if (
+        isinstance(node.value, ast.Call)
+        and isinstance(node.value.func, ast.Attribute)
+        and node.value.func.attr in _MODEL_DUMP_METHODS
+        and isinstance(node.slice, ast.Constant)
+        and node.slice.value == "value"
+    ):
+        return f'{node.lineno}: subscript ["value"] on {node.value.func.attr}'
+    return None
+
+
 def check_source(source: str) -> list[str]:
     """The rule violations of one block or rule module, as `<line>: <what>` in the order of the lines."""
     found: list[tuple[int, str]] = []
@@ -85,8 +117,12 @@ def check_source(source: str) -> list[str]:
             if _mutation_import(node):
                 continue
             found += [(int(p.partition(":")[0]), p) for p in _import_problems(node)]
-        elif isinstance(node, ast.Attribute) and node.attr == "value" and isinstance(node.ctx, ast.Load):
-            found.append((node.lineno, f"{node.lineno}: read of the attribute value"))
+        elif isinstance(node, ast.Attribute) and node.attr in _FORBIDDEN_ATTRS and isinstance(node.ctx, ast.Load):
+            found.append((node.lineno, f"{node.lineno}: read of the attribute {node.attr}"))
+        elif isinstance(node, ast.Call) and (call_msg := _call_violation(node)) is not None:
+            found.append((node.lineno, call_msg))
+        elif isinstance(node, ast.Subscript) and (sub_msg := _dump_value_subscript(node)) is not None:
+            found.append((node.lineno, sub_msg))
         elif isinstance(node, ast.BinOp | ast.AugAssign) and isinstance(node.op, ARITHMETIC):
             found.append((node.lineno, f"{node.lineno}: arithmetic operator {type(node.op).__name__}"))
         elif isinstance(node, ast.While):
