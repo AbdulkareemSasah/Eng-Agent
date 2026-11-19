@@ -7,14 +7,15 @@ rounded size by at most the tolerance (exact `Fraction`). One candidate is `matc
 (CW-G3, H-G1); several are `ambiguous` with all names sorted.
 Units: lengths in mm. Errors: `ContractError` `INVALID_ARGUMENT` for a basis field that is missing, unconfirmed, not a
 number or negative, for missing or conflicting size parameters (`size_b`+`size_h` vs `size_d`), for size dimensions
-that disagree with the column shape, and for a non-reference `column`, `size_b`, `size_h`, `size_d`, `sections` or
-`basis`.
+that disagree with the column shape, for a size reference whose JSON pointer is not exactly `/size`
+(amendment B-580), and for a non-reference `column`, `size_b`, `size_h`, `size_d`, `sections` or `basis`.
 """
 
 from fractions import Fraction
 from typing import Any, Literal, Self
 
 from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.refs import parse_ref
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.kinds.model import Circular, Rectangular, Sections
 from eng_contract.params import eng_param
@@ -80,14 +81,33 @@ class MatchBody(_M):
     names: list[str]
 
 
+_SIZE_POINTER = ("size",)
+"""The only accepted JSON pointer for size_b, size_h and size_d (spec 0013 §4.4.4; amendment B-580)."""
+
+
 def _require_refs(meta: InputMeta, *names: str) -> dict[str, str]:
     refs: dict[str, str] = {}
     for name in names:
-        ref = meta.refs.get(name)
-        if ref is None:
+        entry = meta.refs.get(name)
+        if entry is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, f"{name} must be a record reference", field=name)
-        refs[name] = ref.result_id
+        refs[name] = entry.result_id
     return refs
+
+
+def _require_size_ref(meta: InputMeta, name: str) -> str:
+    """Return the validated original size reference; its pointer must be exactly `/size`."""
+    entry = meta.refs.get(name)
+    if entry is None:
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, f"{name} must be a record reference", field=name)
+    _result_id, tokens = parse_ref(entry.ref, field=name)
+    if tokens != _SIZE_POINTER:
+        raise ContractError(
+            ErrorCode.INVALID_ARGUMENT,
+            f"{name} pointer must be /size",
+            field=name,
+        )
+    return entry.ref
 
 
 def _within(actual: float, target: Fraction, tolerance: Fraction) -> bool:
@@ -146,13 +166,14 @@ def column_section_match(inp: MatchInput, meta: InputMeta, trace: TraceBuilder) 
         ContractError: see the module docstring.
     """
     size_names = ("size_d",) if inp.size_d is not None else ("size_b", "size_h")
-    refs = _require_refs(meta, "column", "sections", "basis", *size_names)
+    refs = _require_refs(meta, "column", "sections", "basis")
+    size_refs = {name: _require_size_ref(meta, name) for name in size_names}
     tolerance = read_tolerance(inp.basis)
     trace.input("column", inp.column.frame_id, ref=refs["column"])
     trace.input("frame_sections", len(inp.sections.frame_sections), ref=refs["sections"])
     trace.input("compare_length_mm", float(tolerance), unit="mm", ref=f"{refs['basis']}#/fields/{_LENGTH}")
     if inp.size_d is not None:
-        trace.input("size_D_mm", inp.size_d.value, unit="mm", ref=f"{refs['size_d']}#/size")
+        trace.input("size_D_mm", inp.size_d.value, unit="mm", ref=size_refs["size_d"])
     else:
         size_b, size_h = inp.size_b, inp.size_h
         if size_b is None or size_h is None:
@@ -161,8 +182,8 @@ def column_section_match(inp: MatchInput, meta: InputMeta, trace: TraceBuilder) 
                 "give size_b and size_h, or size_d",
                 field="size_b",
             )
-        trace.input("size_b_mm", size_b.value, unit="mm", ref=f"{refs['size_b']}#/size")
-        trace.input("size_h_mm", size_h.value, unit="mm", ref=f"{refs['size_h']}#/size")
+        trace.input("size_b_mm", size_b.value, unit="mm", ref=size_refs["size_b"])
+        trace.input("size_h_mm", size_h.value, unit="mm", ref=size_refs["size_h"])
     names = _candidates(inp, tolerance)
     if len(names) == 1:
         status: _Status = "matched"

@@ -117,6 +117,11 @@ def _meta(*names: str) -> InputMeta:
         refs={
             name: RefMeta(
                 result_id=f"res_01KCC00000000000000000000{i}",
+                ref=(
+                    f"res_01KCC00000000000000000000{i}#/size"
+                    if name in {"size_b", "size_h", "size_d"}
+                    else f"res_01KCC00000000000000000000{i}"
+                ),
                 kind=kinds[name],
                 complete=True,
                 model_id=None,
@@ -406,8 +411,8 @@ def test_trace_records_inputs_and_steps() -> None:
         "column": ("C1", None, meta.refs["column"].result_id),
         "frame_sections": (1, None, meta.refs["sections"].result_id),
         "compare_length_mm": (5.0, "mm", f"{meta.refs['basis'].result_id}#/fields/compare.length_mm"),
-        "size_b_mm": (400.0, "mm", f"{meta.refs['size_b'].result_id}#/size"),
-        "size_h_mm": (600.0, "mm", f"{meta.refs['size_h'].result_id}#/size"),
+        "size_b_mm": (400.0, "mm", meta.refs["size_b"].ref),
+        "size_h_mm": (600.0, "mm", meta.refs["size_h"].ref),
     }
     steps = {s.name: (s.value, s.source, s.uses) for s in built.steps}
     assert steps == {

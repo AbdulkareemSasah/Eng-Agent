@@ -16,6 +16,7 @@ def _meta() -> InputMeta:
         refs={
             "matches": RefMeta(
                 result_id="res_01KCC000000000000000000061",
+                ref="res_01KCC000000000000000000061",
                 kind="harness.column_match/1",
                 complete=True,
                 model_id=None,

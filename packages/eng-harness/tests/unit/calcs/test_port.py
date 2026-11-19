@@ -384,7 +384,6 @@ def test_ref_meta_preserves_pointer(tmp_path: Path) -> None:
     #/increment must survive into RefMeta (and therefore into the calc trace) instead of being dropped to the
     bare result id.
     """
-    from eng_contract.kinds import KindRegistry
     from eng_contract.params import eng_param
     from eng_contract.quantity import Quantity
     from pydantic import BaseModel, ConfigDict
@@ -420,6 +419,7 @@ def test_ref_meta_preserves_pointer(tmp_path: Path) -> None:
     def port_size_echo(inp: EchoIn, meta: InputMeta, trace: TraceBuilder) -> EchoBody:
         seen = meta.refs["dim"].ref
         trace.input("dim", inp.dim.value, unit="mm", ref=seen)
+        trace.step("value", float(inp.dim.value), formula="echo", source="B-580 fixture", uses=["dim"], unit="mm")
         trace.output("value")
         return EchoBody(value=float(inp.dim.value))
 

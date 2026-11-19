@@ -1,3 +1,4 @@
+from eng_contract.refs import parse_ref
 """Golden cases of the column-workflow calcs (plan 0013 T2; spec 0013 section 3.2): loader, test support.
 
 A case file `<prefix>-<name>.json` holds one hand-derived case of a calc of spec 0013 section 4.4: the input as the
@@ -48,7 +49,8 @@ def input_meta(refs: Mapping[str, str], kinds: Mapping[str, str]) -> InputMeta:
     return InputMeta(
         refs={
             name: RefMeta(
-                result_id=result_id,
+                result_id=parse_ref(result_id)[0],
+                ref=result_id,
                 kind=kinds[name],
                 complete=True,
                 model_id=None,

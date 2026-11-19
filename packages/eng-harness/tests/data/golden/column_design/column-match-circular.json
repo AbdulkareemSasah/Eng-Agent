@@ -1,6 +1,6 @@
 {
   "source": "eng-harness spec 0013 section 4.4.4 (M1, M2 for circular D); synthetic data, no project value",
-  "method_ref": "§4.4.4 M2",
+  "method_ref": "\u00a74.4.4 M2",
   "synthetic": true,
   "derivation": "Tolerance t = 5 mm. Column C2 is circular, material C35. Rounded size D = 500 mm (required 500, increment 50, multiple 10, 10 x 50 = 500). M1 candidates: circular C35 sections with |D_mm - 500| <= 5. C50 has D_mm = 500, material C35: |500 - 500| = 0 <= 5. C40x60 is rectangular. C55 has D_mm = 550, |550 - 500| = 50 > 5. M2: one candidate => matched, section C50, names [C50].",
   "input": {
@@ -12,23 +12,36 @@
       "story": "L1",
       "length_mm": 3000.0
     },
-    "size_d": {"value": 500.0, "unit": "mm"},
+    "size_d": {
+      "value": 500.0,
+      "unit": "mm"
+    },
     "sections": {
       "frame_sections": [
         {
           "name": "C40x60",
           "material": "C35",
-          "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
         },
         {
           "name": "C50",
           "material": "C35",
-          "shape": {"type": "circular", "D_mm": 500}
+          "shape": {
+            "type": "circular",
+            "D_mm": 500
+          }
         },
         {
           "name": "C55",
           "material": "C35",
-          "shape": {"type": "circular", "D_mm": 550}
+          "shape": {
+            "type": "circular",
+            "D_mm": 550
+          }
         }
       ],
       "area_sections": []
@@ -48,13 +61,15 @@
   },
   "refs": {
     "column": "res_01KCC000000000000000000051",
-    "size_d": "res_01KCC000000000000000000054",
+    "size_d": "res_01KCC000000000000000000054#/size",
     "sections": "res_01KCC000000000000000000052",
     "basis": "res_01KCC000000000000000000053"
   },
   "expected": {
     "status": "matched",
     "section": "C50",
-    "names": ["C50"]
+    "names": [
+      "C50"
+    ]
   }
 }

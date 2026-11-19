@@ -202,6 +202,7 @@ class HarnessCalcPort:
             refs={
                 name: RefMeta(
                     result_id=r.result_id,
+                    ref=refs[name],
                     kind=r.kind,
                     complete=r.complete,
                     model_id=r.producer.host.model_id if r.producer.host else None,

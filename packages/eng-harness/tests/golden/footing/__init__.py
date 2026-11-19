@@ -1,3 +1,4 @@
+from eng_contract.refs import parse_ref
 """Golden cases of the footing calcs (plan 0010 T3; spec 0010 section 3.3): loader and lint, test support.
 
 A case file holds one hand-derived case of a calc of spec 0010 section 4.4: the input as the resolved payloads, the
@@ -45,7 +46,8 @@ def input_meta(refs: Mapping[str, str], kinds: Mapping[str, str]) -> InputMeta:
     return InputMeta(
         refs={
             name: RefMeta(
-                result_id=result_id,
+                result_id=parse_ref(result_id)[0],
+                ref=result_id,
                 kind=kinds[name],
                 complete=True,
                 model_id=None,

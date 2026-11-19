@@ -1,6 +1,6 @@
 {
   "source": "eng-harness spec 0013 section 4.4.4 (rule M1: same material); synthetic data, no project value",
-  "method_ref": "§4.4.4 M1",
+  "method_ref": "\u00a74.4.4 M1",
   "synthetic": true,
   "derivation": "Tolerance t = 5 mm. Column C1 rectangular, material C30. Rounded sizes b = 400 mm, h = 600 mm. Section C40x60 has b_mm = 400, h_mm = 600 but material C35 (not C30). M1 requires the column's shape type and material, so C40x60 is not a candidate despite equal dimensions. No other rectangular C30 section. M2: none => no_section_in_model, names [].",
   "input": {
@@ -12,14 +12,24 @@
       "story": "L1",
       "length_mm": 3000.0
     },
-    "size_b": {"value": 400.0, "unit": "mm"},
-    "size_h": {"value": 600.0, "unit": "mm"},
+    "size_b": {
+      "value": 400.0,
+      "unit": "mm"
+    },
+    "size_h": {
+      "value": 600.0,
+      "unit": "mm"
+    },
     "sections": {
       "frame_sections": [
         {
           "name": "C40x60",
           "material": "C35",
-          "shape": {"type": "rectangular", "b_mm": 400, "h_mm": 600}
+          "shape": {
+            "type": "rectangular",
+            "b_mm": 400,
+            "h_mm": 600
+          }
         }
       ],
       "area_sections": []
@@ -39,8 +49,8 @@
   },
   "refs": {
     "column": "res_01KCC000000000000000000031",
-    "size_b": "res_01KCC000000000000000000034",
-    "size_h": "res_01KCC000000000000000000035",
+    "size_b": "res_01KCC000000000000000000034#/size",
+    "size_h": "res_01KCC000000000000000000035#/size",
     "sections": "res_01KCC000000000000000000032",
     "basis": "res_01KCC000000000000000000033"
   },

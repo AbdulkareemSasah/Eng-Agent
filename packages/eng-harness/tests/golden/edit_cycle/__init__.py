@@ -1,3 +1,4 @@
+from eng_contract.refs import parse_ref
 """Golden cases of the edit-cycle calcs (plan 0007 T2; spec 0007 section 3.2): loader and runner, test support.
 
 A case file holds one hand-derived case of a calc of spec 0007 section 4.4: the input as the resolved payloads, the
@@ -58,7 +59,8 @@ def input_meta(refs: Mapping[str, str], incomplete: frozenset[str] = frozenset()
     return InputMeta(
         refs={
             name: RefMeta(
-                result_id=result_id,
+                result_id=parse_ref(result_id)[0],
+                ref=result_id,
                 kind=CHECK_KINDS[name],
                 complete=name not in incomplete,
                 model_id=None,
