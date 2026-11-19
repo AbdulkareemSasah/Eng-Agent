@@ -416,3 +416,144 @@ def test_product_with_routes() -> None:
     etabs = load_allowlist(text, "test.toml", route="native", product="ETABS")
     assert [tool.name for tool in etabs.tools] == ["read_native"]
     assert etabs.tool_names == frozenset({"read_native", "read_rest", "etabs_rest"})
+
+
+_SAFE_TOOLS = frozenset(
+    {
+        "csi_status",
+        "csi_launch",
+        "csi_attach",
+        "csi_exit",
+        "csi_open_model",
+        "csi_save_model",
+        "csi_model_info",
+        "csi_list_points",
+        "csi_list_areas",
+        "csi_list_frames",
+        "csi_list_grids",
+        "csi_list_area_sections",
+        "csi_list_materials",
+        "csi_list_load_patterns",
+        "csi_list_load_cases",
+        "csi_list_load_combos",
+        "csi_db_table_read",
+        "csi_db_table_fields",
+        "csi_set_point_load",
+        "csi_add_load_pattern",
+        "csi_add_load_combo",
+        "csi_delete_load_combo",
+        "csi_assign_area_section",
+        "csi_run_analysis",
+        "csi_analysis_status",
+        "csi_results_base_reactions",
+        "csi_results_joint_reactions",
+    }
+)
+_NOT_SAFE_TOOLS = (
+    "csi_db_tables_apply",
+    "csi_delete_object",
+    "csi_new_model",
+    "csi_new_blank_model",
+    "csi_define_wall_section",
+    "csi_design_run",
+    "csi_design_results",
+    "csi_results_story_drifts",
+    "csi_list_stories",
+    "csi_list_frame_sections",
+    "csi_results_frame_forces",
+    "csi_assign_frame_section",
+    "csi_set_frame_load_distributed",
+    "csi_set_area_load_uniform",
+    "csi_set_point_restraint",
+    "csi_detach",
+)
+
+
+def test_safe_entries_complete() -> None:
+    """AC3, AC4: packaged CSI allowlist serves the 27 SAFE entries and keeps ETABS unchanged."""
+    full = csi_allowlist()
+    safe = full.for_product("SAFE")
+    etabs = full.for_product("ETABS")
+    assert safe.product == "SAFE"
+    assert safe.build_expectation().product == "SAFE"
+    assert safe.tool_names == _SAFE_TOOLS
+    assert {tool.name for tool in safe.tools} == _SAFE_TOOLS
+    for tool in safe.tools:
+        assert "SAFE" in tool.products
+        if tool.effect == "write":
+            assert tool.readback is not None
+    for excluded in _NOT_SAFE_TOOLS:
+        assert excluded not in safe.tool_names
+        with pytest.raises(KeyError, match=excluded):
+            safe.descriptor(excluded)
+
+    point_load = safe.descriptor("csi_set_point_load")
+    assert (
+        point_load.kind,
+        point_load.timeout_class,
+        point_load.effect,
+        point_load.action,
+        point_load.args_model,
+        point_load.units,
+        point_load.confirm,
+        point_load.readback,
+        point_load.products,
+    ) == ("write", "call", "write", "plain", "SetPointLoadArgs", "token", "never", "point_load_table", ("SAFE",))
+
+    base_reactions = safe.descriptor("csi_results_base_reactions")
+    assert (
+        base_reactions.kind,
+        base_reactions.timeout_class,
+        base_reactions.effect,
+        base_reactions.action,
+        base_reactions.args_model,
+        base_reactions.result_kind,
+        base_reactions.units,
+        base_reactions.confirm,
+        base_reactions.products,
+    ) == (
+        "read",
+        "call",
+        "read",
+        "plain",
+        "ResultsBaseReactionsArgs",
+        "harness.base_reactions/1",
+        "token",
+        "never",
+        ("SAFE",),
+    )
+
+    load_cases = safe.descriptor("csi_list_load_cases")
+    assert (load_cases.kind, load_cases.effect, load_cases.args_model, load_cases.units, load_cases.products) == (
+        "read",
+        "read",
+        "ListLoadCasesArgs",
+        "none",
+        ("SAFE",),
+    )
+    table_fields = safe.descriptor("csi_db_table_fields")
+    assert (
+        table_fields.kind,
+        table_fields.effect,
+        table_fields.args_model,
+        table_fields.units,
+        table_fields.products,
+    ) == ("read", "read", "DbTableFieldsArgs", "none", ("SAFE",))
+
+    assert etabs.tool_fingerprint == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+    for safe_only in ("csi_list_load_cases", "csi_db_table_fields", "csi_set_point_load", "csi_results_base_reactions"):
+        assert safe_only not in etabs.tool_names
+
+
+def test_escape_hatches_refused_for_safe() -> None:
+    """AC3: escape hatches are absent from the SAFE allowlist and refused at load for product SAFE."""
+    safe = csi_allowlist().for_product("SAFE")
+    names = {tool.name for tool in safe.tools}
+    assert names
+    assert names.isdisjoint(ESCAPE_HATCH_NAMES)
+    assert not [n for n in names if any(m in n for m in ("script", "invoke", "eval", "tables_apply"))]
+    etabs_entry = _tool(name="csi_list_frames", products=["ETABS"])
+    for name in (*ESCAPE_HATCH_NAMES, "x_script_y", "x_invoke_y", "x_eval_y", "x_tables_apply"):
+        text = _text(etabs_entry, _tool(name=name, products=["SAFE"]), header=HEADER_PRODUCTS)
+        with pytest.raises(AllowlistError, match=name):
+            load_allowlist(text, "test.toml", product="SAFE")
