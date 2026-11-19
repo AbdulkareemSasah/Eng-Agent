@@ -17,8 +17,15 @@ SERVER = Path(__file__).resolve().parent / "server.py"
 class Rpc:
     """Newline-delimited JSON-RPC over the fake's stdio, driven from a private event loop."""
 
-    def __init__(self, control: Path, args: tuple[str, ...] = ("--disable-script", "--call-timeout-sec", "30")) -> None:
+    def __init__(
+        self,
+        control: Path,
+        args: tuple[str, ...] = ("--disable-script", "--call-timeout-sec", "30"),
+        *,
+        read_timeout: float = 30.0,
+    ) -> None:
         self.loop = asyncio.new_event_loop()
+        self.read_timeout = read_timeout
         env = {**os.environ, "SASAAH_IDEA_FAKE_CONTROL": str(control)}
         self.proc = self.loop.run_until_complete(
             asyncio.create_subprocess_exec(
@@ -44,7 +51,9 @@ class Rpc:
 
     def readline(self) -> str:
         assert self.proc.stdout is not None
-        return self.loop.run_until_complete(asyncio.wait_for(self.proc.stdout.readline(), 30)).decode("utf-8")
+        return self.loop.run_until_complete(
+            asyncio.wait_for(self.proc.stdout.readline(), self.read_timeout)
+        ).decode("utf-8")
 
     def wait(self) -> int:
         return self.loop.run_until_complete(asyncio.wait_for(self.proc.wait(), 10))
@@ -69,11 +78,14 @@ class Rpc:
         return bool(result.get("isError")), body
 
     def close(self) -> None:
-        assert self.proc.stdin is not None
-        if not self.proc.stdin.is_closing():
-            self.proc.stdin.close()
-        self.wait()
-        self.loop.close()
+        if self.proc.returncode is None:
+            self.proc.kill()
+            try:
+                self.wait()
+            except TimeoutError:
+                pass
+        if not self.loop.is_closed():
+            self.loop.close()
 
 
 def make_ideacon(path: Path, *, connections: list[dict[str, Any]] | None = None) -> Path:
@@ -330,40 +342,6 @@ def test_faults_license_timeouts_and_reply_anomalies(rpc: Rpc, control: Path, tm
     _fault(control, "timeout_calculate", tool="idea_native_calculate")
     assert rpc.call("idea_native_calculate", path=str(model))[1]["code"] == "timeout"
 
-    loads = rpc.call("idea_native_get_loads", path=str(model))[1]["loads"]
-    out_not_applied = tmp_path / "not_applied.ideaCon"
-    _fault(control, "timeout_set_loads", applied=False)
-    assert (
-        rpc.call("idea_native_set_loads", path=str(model), loads=loads, out_path=str(out_not_applied), confirm=True)[1][
-            "code"
-        ]
-        == "timeout"
-    )
-    assert not out_not_applied.exists()
-
-    out_applied = tmp_path / "applied.ideaCon"
-    _fault(control, "timeout_set_loads", applied=True)
-    assert (
-        rpc.call("idea_native_set_loads", path=str(model), loads=loads, out_path=str(out_applied), confirm=True)[1][
-            "code"
-        ]
-        == "timeout"
-    )
-    assert out_applied.is_file()
-
-    out_mismatch = tmp_path / "mismatch.ideaCon"
-    _fault(control, "timeout_set_loads", applied=True, mismatch=True)
-    assert (
-        rpc.call("idea_native_set_loads", path=str(model), loads=loads, out_path=str(out_mismatch), confirm=True)[1][
-            "code"
-        ]
-        == "timeout"
-    )
-    assert (
-        rpc.call("idea_native_get_loads", path=str(out_mismatch))[1]["loads"][0]["forcesOnSegments"][0]["n"]
-        != (loads[0]["forcesOnSegments"][0]["n"])
-    )
-
     _fault(control, "unexpected_shape", tool="idea_native_calculate")
     assert rpc.call("idea_native_calculate", path=str(model))[1] == {"unexpected": True, "payload": "malformed"}
 
@@ -387,6 +365,50 @@ def test_faults_license_timeouts_and_reply_anomalies(rpc: Rpc, control: Path, tm
     uncalc = rpc.call("idea_native_calculate", path=str(model))[1]["connections"][0]
     assert uncalc["calculated"] is False
     assert uncalc["checks"] == []
+
+
+@pytest.mark.parametrize(
+    ("applied", "mismatch"),
+    [
+        (False, False),
+        (True, False),
+        (True, True),
+    ],
+)
+def test_timeout_set_loads_loses_reply(
+    control: Path, tmp_path: Path, applied: bool, mismatch: bool
+) -> None:
+    """Spec 0014 §4.12: timeout_set_loads withholds the reply; the file may or may not be written."""
+    client = Rpc(control)
+    try:
+        model = make_ideacon(tmp_path / "joint.ideaCon")
+        assert not client.call("idea_open_project", path=str(model))[0]
+        loads = client.call("idea_native_get_loads", path=str(model))[1]["loads"]
+        original_n = loads[0]["forcesOnSegments"][0]["n"]
+        out = tmp_path / f"out_{applied}_{mismatch}.ideaCon"
+        # Fault sleep longer than the short client bound so the reply is lost past it.
+        _fault(control, "timeout_set_loads", applied=applied, mismatch=mismatch, seconds=5.0)
+        client.read_timeout = 0.25
+        with pytest.raises(TimeoutError):
+            client.call(
+                "idea_native_set_loads",
+                path=str(model),
+                loads=loads,
+                out_path=str(out),
+                confirm=True,
+            )
+        assert out.is_file() is applied
+        if applied:
+            reread = json.loads(out.read_text(encoding="utf-8"))
+            written_n = reread["connections"][0]["loads"][0]["forcesOnSegments"][0]["n"]
+            if mismatch:
+                assert written_n != original_n
+            else:
+                assert written_n == original_n
+        else:
+            assert not out.exists()
+    finally:
+        client.close()
 
 
 def test_crash_during_call_and_unknown_tool(rpc: Rpc, control: Path) -> None:
