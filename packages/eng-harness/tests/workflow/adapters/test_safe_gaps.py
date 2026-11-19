@@ -51,3 +51,21 @@ def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path
 
     anyio.run(body)
     assert _calls(control) == []
+
+
+@pytest.mark.parametrize("gap_id", [f"SG-{n}" for n in range(1, 10)])
+def test_safe_gap_registry_complete(gap_id: str) -> None:
+    """Amendment B-418: _gaps.py holds SG-1 to SG-9 ids and messages, wiring only SG-1 to a step."""
+    from eng_harness.adapters.csi._gaps import SAFE_GAPS, STEP_GAPS, raise_gap, refuse_step
+
+    assert SAFE_GAPS[gap_id]
+    with pytest.raises(NotImplementedGap) as caught:
+        raise_gap(gap_id)
+    assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
+    assert caught.value.evidence == (gap_id,)
+    assert caught.value.message == SAFE_GAPS[gap_id]
+    assert set(STEP_GAPS) == {"new_model"}
+    with pytest.raises(KeyError):
+        refuse_step("slab_design")
+    with pytest.raises(KeyError):
+        raise_gap("SG-99")

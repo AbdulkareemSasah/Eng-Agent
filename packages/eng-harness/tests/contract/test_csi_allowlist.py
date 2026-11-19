@@ -76,7 +76,7 @@ def test_against_inventory() -> None:
 
     inventory = _inventory()
     by_name = {t["name"]: t for t in inventory["tools"]}
-    allowlist = csi_allowlist()
+    allowlist = csi_allowlist().for_product("ETABS")
     assert allowlist.sasaah_commit == inventory["sasaah_commit"]
     assert allowlist.fingerprint_source == "s12-inventory"
     assert allowlist.tools
@@ -91,7 +91,7 @@ def test_against_inventory() -> None:
             assert tool.effect == "write", tool.name
         assert (tool.confirm != "never") == item["confirm_required"], tool.name
         assert tool.units == _expected_units(item), tool.name
-        assert tool.products == ("ETABS",)
+        assert "ETABS" in tool.products
 
 
 def test_allowlist_is_served_by_the_fake() -> None:
@@ -107,7 +107,7 @@ def test_pinned_fingerprint_from_inventory() -> None:
     from eng_harness.adapters.csi import csi_allowlist
     from eng_harness.servers._buildcheck import tool_list_fingerprint
 
-    allowlist = csi_allowlist()
+    allowlist = csi_allowlist().for_product("ETABS")
     assert allowlist.fingerprint_source == "s12-inventory"
     schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in allowlist.tool_names}
     assert set(schemas) == {tool.name for tool in allowlist.tools}

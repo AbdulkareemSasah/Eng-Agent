@@ -426,7 +426,7 @@ def test_launch_arguments_without_audit_log(
 
 def _checks(*, wrong_fingerprint: bool = False) -> dict[str, BuildExpectation]:
     """The build check of the CSI allowlist for server `csi`; the fingerprint can be made wrong on purpose."""
-    expected = csi_allowlist().build_expectation()
+    expected = csi_allowlist().for_product("ETABS").build_expectation()
     return {"csi": replace(expected, tool_fingerprint="0" * 64) if wrong_fingerprint else expected}
 
 
@@ -488,7 +488,7 @@ def test_preflight_over_the_csi_fake(tmp_path: Path, make_config: ConfigFactory,
         assert check.reason is None
         assert check.ok is True
         assert (check.server, check.build, check.min_build) == ("csi", f"{commit[:12]}+{exe[:12]}", commit)
-        assert check.fingerprint == check.expected_fingerprint == csi_allowlist().tool_fingerprint
+        assert check.fingerprint == check.expected_fingerprint == csi_allowlist().for_product("ETABS").tool_fingerprint
 
     _run(tmp_path, config, launcher, body, _checks())
 

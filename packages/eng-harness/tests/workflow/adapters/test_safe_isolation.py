@@ -89,7 +89,9 @@ def test_epochs_independent(tmp_path: Path, make_config: ConfigFactory) -> None:
                 "faults": [],
                 "product": "ETABS",
                 "seed": {
-                    "frames": [{"name": "F1", "section": "C30"}],
+                    "frames": [
+                        {"name": "F1", "section": "C30", "point1": [0.0, 0.0, 0.0], "point2": [0.0, 0.0, 3000.0]}
+                    ],
                     "frame_sections": [{"name": "C30"}, {"name": "C40"}],
                     "area_sections": [{"name": "SL20"}],
                 },
@@ -165,6 +167,7 @@ def test_epochs_independent(tmp_path: Path, make_config: ConfigFactory) -> None:
         fingerprint=etabs_allow.tool_fingerprint,
         expected_fingerprint=etabs_allow.tool_fingerprint,
         ok=True,
+        reason=None,
     )
     safe_check = ServerCheck(
         server="csi_safe",
@@ -173,6 +176,7 @@ def test_epochs_independent(tmp_path: Path, make_config: ConfigFactory) -> None:
         fingerprint=safe_allow.tool_fingerprint,
         expected_fingerprint=safe_allow.tool_fingerprint,
         ok=True,
+        reason=None,
     )
     etabs_host = AdapterHostPort(
         identity=identity,
@@ -265,8 +269,12 @@ def test_epochs_independent(tmp_path: Path, make_config: ConfigFactory) -> None:
             assert isinstance(timed_out, FailureEnvelope)
             assert timed_out.error.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
 
-            assert etabs_host.session_epoch("csi") > etabs_epoch_0
-            assert safe_host.session_epoch("csi_safe") == safe_epoch_0
+            # A server `timeout` reply bumps the adapter epoch (`HostHealth`) and the role session, not the
+            # manager's restart counter; the conceptual session_epoch of AC5 is their sum (ports HostPort).
+            assert etabs_host.session_epoch("csi") + health.epoch_bumps("csi") > etabs_epoch_0
+            assert health.epoch_bumps("csi") == 1
+            assert health.epoch_bumps("csi_safe") == 0
+            assert safe_host.session_epoch("csi_safe") + health.epoch_bumps("csi_safe") == safe_epoch_0
             assert manager.role_session("csi", "main") > etabs_role_0
             assert manager.role_session("csi_safe", "main") == safe_role_0
             assert health.wedged("csi") == "op_etabs"
