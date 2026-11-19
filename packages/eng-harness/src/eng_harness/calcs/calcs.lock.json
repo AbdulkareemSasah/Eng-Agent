@@ -61,6 +61,11 @@
       "version": 1
     },
     {
+      "content_sha256": "1cf16f341bf5402073993b748368d0e92f3f10f6f4b0d34057889e38515c8d62",
+      "id": "harness.placement_compare",
+      "version": 1
+    },
+    {
       "content_sha256": "772886bb74582a826c25e48d528aa8687abdcedfbdbc07912ca9eabfec097c2b",
       "id": "harness.readback_check",
       "version": 1

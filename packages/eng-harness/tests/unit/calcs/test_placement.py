@@ -4,8 +4,13 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+from eng_contract.errors import ContractError, ErrorCode
+
+from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder
 from eng_harness.calcs import REGISTRY
+from eng_harness.kinds.calcs import PlacementComparison
 
 CALC_ID = "harness.placement_compare"
 LENGTH = "compare.length_mm"
@@ -260,3 +265,175 @@ def test_counts_frames_areas_renames() -> None:
         assert case["synthetic"] is True
         assert case["method_ref"].startswith("§4.11")
         assert case["derivation"].strip()
+
+
+def _refusal(fields: dict[str, Any], refs: dict[str, Any]) -> ContractError:
+    with pytest.raises(ContractError) as caught:
+        _run(fields, refs)
+    return caught.value
+
+
+def test_basis_refused() -> None:
+    """Spec 4.4: compare.length_mm present, confirmed, in mm and >= 0; basis must be a record."""
+    frames = _frames(_frame("F1"))
+    fields = {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)}
+    refs = {
+        "a_frames": _ref(1, FP),
+        "b_frames": _ref(2, FP, revision=4),
+        "basis": _ref(9, "basis.design_basis/1", revision=None),
+    }
+    missing = _basis(1.0)
+    missing["fields"] = {}
+    detail = _refusal({**fields, "basis": missing}, refs).detail
+    assert (detail.code, detail.message) == (ErrorCode.INVALID_ARGUMENT, f"basis field {LENGTH} is missing (no default)")
+    unconfirmed = _basis(1.0)
+    unconfirmed["fields"][LENGTH] = _field(1.0, confirmed=False)
+    detail = _refusal({**fields, "basis": unconfirmed}, refs).detail
+    assert detail.message == f"basis field {LENGTH} is not confirmed"
+    from eng_contract.kinds.basis import BasisField, DesignBasis
+    from eng_contract.kinds.model import FramePlacements
+    from eng_harness.calcs.placement_compare import PlacementInput, placement_compare
+
+    wrong_unit = _basis(1.0)
+    wrong_unit["fields"][LENGTH] = _field(1.0, "deg")
+    with pytest.raises(Exception, match="unit of .compare.length_mm."):
+        _input_type().model_validate({**fields, "basis": wrong_unit})
+    # Calc also checks the unit for a basis built past the contract check (B-464).
+    constructed = PlacementInput.model_construct(
+        a_frames=FramePlacements.model_validate(frames),
+        b_frames=FramePlacements.model_validate(frames),
+        a_areas=None,
+        b_areas=None,
+        basis=DesignBasis.model_construct(
+            template=None,
+            fields={LENGTH: BasisField.model_validate(_field(1.0, "deg"))},
+        ),
+    )
+    with pytest.raises(ContractError) as caught:
+        placement_compare(constructed, InputMeta.model_validate({"refs": refs}), TraceBuilder())
+    assert caught.value.detail.message == f"basis field {LENGTH} must be in mm, not deg"
+
+    for bad in (-0.5, "1", True):
+        bad_basis = _basis(1.0)
+        bad_basis["fields"][LENGTH] = _field(bad)
+        detail = _refusal({**fields, "basis": bad_basis}, refs).detail
+        assert detail.message == f"basis field {LENGTH} must be a number >= 0"
+    no_basis_ref = {k: v for k, v in refs.items() if k != "basis"}
+    detail = _refusal(fields, no_basis_ref).detail
+    assert (detail.code, detail.message, detail.field) == (
+        ErrorCode.INVALID_ARGUMENT,
+        "the basis must be a record reference",
+        "basis",
+    )
+
+
+def test_zero_tolerance_needs_exact_geometry() -> None:
+    """P2: tolerance 0 accepts only exact equality; a subnormal offset is moved."""
+    tiny = 5e-324
+    frames = _frames(_frame("F1"))
+    moved = _frames(_frame("F1", i=(tiny, 0.0, 0.0), j=(0.0, 0.0, 3000.0)))
+    out = _run(
+        {"a_frames": frames, "b_frames": moved, "basis": _basis(0.0)},
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert _by_id(out, "frame", "F1")["result"] == "moved"
+    same = _run(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(0.0)},
+        {
+            "a_frames": _ref(1, FP),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert same["equal"] is True
+    assert _by_id(same, "frame", "F1")["result"] == "same"
+
+
+def test_incomplete_side_and_stale_ok_marks() -> None:
+    """complete is the conjunction of the input refs; only a_* fields are stale_ok (4.13)."""
+    frames = _frames(_frame("F1"))
+    out = _run(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},
+        {
+            "a_frames": _ref(1, FP, complete=False),
+            "b_frames": _ref(2, FP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert out["complete"] is False
+    properties = _input_type().model_json_schema()["properties"]
+    flags = {name: prop["x-eng"]["stale_ok"] for name, prop in properties.items()}
+    assert flags == {
+        "a_frames": True,
+        "b_frames": False,
+        "a_areas": True,
+        "b_areas": False,
+        "basis": False,
+    }
+
+
+def test_sides_must_match_and_be_records() -> None:
+    """Each side needs the same sections; a placement without a record reference is refused."""
+    frames = _frames(_frame("F1"))
+    areas = _areas(_area("A1", [(0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0)]))
+    with pytest.raises(Exception):
+        _input_type().model_validate({"a_frames": frames, "basis": _basis(1.0)})
+    with pytest.raises(Exception):
+        _input_type().model_validate({"a_frames": frames, "b_areas": areas, "basis": _basis(1.0)})
+    detail = _refusal(
+        {"a_frames": frames, "b_frames": frames, "basis": _basis(1.0)},
+        {"b_frames": _ref(2, FP, revision=4), "basis": _ref(9, "basis.design_basis/1", revision=None)},
+    ).detail
+    assert (detail.message, detail.field) == ("a placement must be a record reference", "a_frames")
+
+
+def test_golden_expectations_are_valid_payloads() -> None:
+    """Each placement golden expected body, with calc metadata and a trace added, fits the output kind."""
+    output_type = HARNESS_KINDS[REGISTRY[CALC_ID].output_kind]
+    assert output_type is PlacementComparison
+    files = sorted(GOLDEN_DIR.glob("placement-*.json"))
+    assert len(files) == 4
+    meta = {"id": CALC_ID, "version": 1, "content_sha256": "a" * 64, "status": "draft"}
+    trace = {"calc_id": CALC_ID, "calc_version": "1", "content_sha256": "a" * 64, "steps": [], "outputs": []}
+    for path in files:
+        expected = json.loads(path.read_text(encoding="utf-8"))["expected"]
+        output_type.model_validate(
+            expected | {"calc": meta, "draft": True, "trace": trace | {"inputs": [], "constants": []}}
+        )
+
+
+def test_reversed_area_not_same_orientation() -> None:
+    """P4: a reversed order is reversed, never same; a pure translation beyond tolerance is moved."""
+    triangle = [(0.0, 0.0, 0.0), (3000.0, 0.0, 0.0), (0.0, 4000.0, 0.0)]
+    out = _run(
+        {
+            "a_areas": _areas(_area("A1", triangle)),
+            "b_areas": _areas(_area("A1", [triangle[0], triangle[2], triangle[1]])),
+            "basis": _basis(1.0),
+        },
+        {
+            "a_areas": _ref(3, AP),
+            "b_areas": _ref(4, AP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    assert _by_id(out, "area", "A1")["result"] == "reversed"
+    moved = _run(
+        {
+            "a_areas": _areas(_area("A1", triangle)),
+            "b_areas": _areas(_area("A1", [(p[0] + 10.0, p[1], p[2]) for p in triangle])),
+            "basis": _basis(1.0),
+        },
+        {
+            "a_areas": _ref(3, AP),
+            "b_areas": _ref(4, AP, revision=4),
+            "basis": _ref(9, "basis.design_basis/1", revision=None),
+        },
+    )
+    row = _by_id(moved, "area", "A1")
+    assert row["result"] == "moved"
+    assert row["distance_mm"] == 10.0
