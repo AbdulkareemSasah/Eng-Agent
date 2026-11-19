@@ -8,12 +8,17 @@ the sink; `PageInputPort` shares it. Units: seconds. Errors: a refused answer is
 
 import asyncio
 import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from http import HTTPStatus
+from pathlib import Path
+
+from eng_contract.ids import Clock, SystemClock
 
 from eng_harness import _html as h
 from eng_harness._html import SafeToken, Tag, el, trusted
+from eng_harness.basis import BasisSetupAnswer, BasisSetupView
 from eng_harness.errors import HarnessCode
 from eng_harness.journal import Event
 from eng_harness.journal import _events as ev
@@ -21,7 +26,7 @@ from eng_harness.pages._answers import AnswerError, Request, bound_sha256, parse
 from eng_harness.pages._css import STYLESHEET
 from eng_harness.pages._routes import Kind, Response, Screen, page
 from eng_harness.pages._security import RefusalError, Route, Subject
-from eng_harness.pages._wait import wait_for
+from eng_harness.pages._wait import POLL_S, wait_for
 from eng_harness.ports import ApprovalAnswer, ApprovalRequest, InputAnswer, InputRequest
 from eng_harness.report._lineage import ReleaseMarks  # not `eng_harness.report`: its document module imports pages._css
 
@@ -47,6 +52,16 @@ class _Open:
     recorded: bool = False  # the sink has seen it journaled
 
 
+@dataclass
+class _Setup:
+    view: BasisSetupView
+    setups_dir: Path | None
+    clock: Clock
+    answer: BasisSetupAnswer | None = None
+    accepted: bool = False
+    recorded: bool = False
+
+
 class PageHub:
     """What the page serves (a `PageApp`) and the sink that tells it what the journal holds. Thread-safe.
 
@@ -66,6 +81,7 @@ class PageHub:
         self._report, self._ack_s, self._builders, self._setup = report, ack_timeout_s, builders, setup
         self._cond = threading.Condition()
         self._open: dict[str, _Open] = {}  # in the order the engine presented them, which is the journal's `seq` order
+        self._setups: dict[str, _Setup] = {}  # basis setup views presented before a run exists (spec 0006 4.4.7)
         self._approved: list[str] = []  # approved `CHANGE_SET` and `PROMOTION` requests, in the order they resolved
         self._voided: dict[str, str] = {}  # request id -> the message of the void (untrusted)
         self._run_message: str | None = None  # a void with no request in this process (spec 0006 4.4.5)
@@ -74,6 +90,26 @@ class PageHub:
         """Open `request` (engine loop); presenting it again, as after a refused answer, opens it afresh."""
         with self._cond:
             self._open[request.request_id] = _Open(request, asyncio.Event(), asyncio.get_running_loop())
+
+    def register_setup(self, view: BasisSetupView, *, setups_dir: Path | None, clock: Clock) -> None:
+        """Open a basis confirmation `view`; presenting it again opens it afresh."""
+        with self._cond:
+            self._setups[view.setup_id] = _Setup(view, setups_dir, clock)
+
+    def take_setup(self, setup_id: str, *, wait: bool) -> BasisSetupAnswer | None:
+        """The accepted basis answer, or `None` for no answer, a stop, the wait timeout or `wait=False`."""
+        end = None if self.wait_timeout_s is None else time.monotonic() + self.wait_timeout_s
+        with self._cond:
+            while True:
+                entry = self._setups.get(setup_id)
+                if entry is None:
+                    return None
+                if entry.answer is not None:
+                    return entry.answer
+                left = None if end is None else end - time.monotonic()
+                if not wait or self.stop_requested() or (left is not None and left <= 0):
+                    return None
+                self._cond.wait(POLL_S if left is None else min(POLL_S, left))
 
     async def take(self, request_id: str, *, wait: bool) -> ApprovalAnswer | InputAnswer | None:
         """The accepted answer, or `None` for no answer, a stop, the wait timeout or `wait=False` (engine loop)."""
@@ -117,12 +153,17 @@ class PageHub:
     def index(self) -> Response:
         """The open requests in `seq` order, each linked to its own page."""
         with self._cond:
+            setups = [e.view for e in self._setups.values() if not e.recorded]
             shown = [e.request for e in self._open.values() if not e.recorded]
             message = self._run_message
         rows = [
+            el(Tag.LI, _link(trusted("Open"), "setup", s.setup_id), h.field(trusted("Basis setup"), s.workflow))
+            for s in setups
+        ]
+        rows.extend(
             el(Tag.LI, _link(trusted("Open"), "request", r.request_id), h.field(trusted("Request"), r.title))
             for r in shown
-        ]
+        )
         body = [el(Tag.H1, trusted("Run")), _link(trusted("Report"), "report")]
         if message is not None:
             body.append(el(Tag.P, h.field(trusted("Voided approval"), message)))
@@ -133,6 +174,14 @@ class PageHub:
         """The screen of an open request (its kind's builder, else a refusal screen), or the basis screen. A recorded
         request has none, except for `answering`: its form token still binds, and `submit` refuses with 409 (AC30)."""
         if kind == "setup":
+            with self._cond:
+                setup = self._setups.get(subject_id)
+            if setup is not None:
+                if setup.recorded and not answering:
+                    return None
+                from eng_harness.pages._screens_basis import basis_screen
+
+                return basis_screen(self, setup.view)
             return self._setup(subject_id)
         with self._cond:
             entry = self._open.get(subject_id)
@@ -168,8 +217,10 @@ class PageHub:
 
     def submit(self, kind: Kind, subject_id: str, form: Mapping[str, str]) -> Response:
         """Check a posted answer, hand it to the engine and answer the browser once the journal holds it (AC37)."""
+        if kind == "setup":
+            return self._submit_setup(subject_id, form)
         with self._cond:
-            entry = self._open.get(subject_id) if kind == "request" else None
+            entry = self._open.get(subject_id)
             if entry is None:
                 raise RefusalError(HTTPStatus.NOT_FOUND)
             try:
@@ -188,6 +239,33 @@ class PageHub:
             done = entry.recorded
         words = trusted("Answer recorded." if done else "Answer received, not yet recorded.")
         return page(HTTPStatus.OK, trusted("Answer"), [el(Tag.P, words), _link(trusted("Back to the open requests"))])
+
+    def _submit_setup(self, subject_id: str, form: Mapping[str, str]) -> Response:
+        from eng_harness.pages._screens_basis import append_setup_log, parse_setup
+
+        with self._cond:
+            setup = self._setups.get(subject_id)
+            if setup is None:
+                raise RefusalError(HTTPStatus.NOT_FOUND)
+            try:
+                if setup.accepted or setup.recorded:
+                    raise AnswerError("this setup has been answered already", HTTPStatus.CONFLICT)
+                answer = parse_setup(setup.view, form, setup.clock)
+            except AnswerError as refused:
+                again = el(Tag.P, _link(trusted("Show the setup again"), "setup", subject_id))
+                text = el(Tag.P, h.Text(str(refused)))
+                return page(refused.status, trusted("Not accepted"), [el(Tag.H1, trusted("Not accepted")), text, again])
+            if setup.setups_dir is not None:
+                append_setup_log(setup.setups_dir, answer, answer.at or setup.clock.now())
+            setup.answer, setup.accepted, setup.recorded = answer, True, True
+            if answer.by is not None:
+                self.engineer = answer.by
+            self._cond.notify_all()
+        return page(
+            HTTPStatus.OK,
+            trusted("Basis confirmation"),
+            [el(Tag.P, trusted("Basis decision recorded.")), _link(trusted("Back"))],
+        )
 
 
 class PageApprovalPort:
@@ -230,3 +308,33 @@ class PageInputPort:
         """The engineer's answer; `None` when there is none, on a stop or on the wait timeout (the engine pauses)."""
         given = await self._hub.take(request_id, wait=wait)
         return given if isinstance(given, InputAnswer) else None
+
+
+class PageBasisSetupPort:
+    """The `BasisSetupPort` of the page, sharing the hub of `approvals` when given (spec 0006 4.4.7)."""
+
+    def __init__(
+        self,
+        approvals: PageApprovalPort | None = None,
+        *,
+        setups_dir: Path | None = None,
+        clock: Clock | None = None,
+        engineer: str | None = None,
+        stop_requested: Callable[[], bool] = lambda: False,
+        wait_timeout_s: float | None = None,
+    ) -> None:
+        self.hub = (
+            approvals.hub
+            if approvals is not None
+            else PageApprovalPort(engineer=engineer, stop_requested=stop_requested, wait_timeout_s=wait_timeout_s).hub
+        )
+        self._setups_dir = setups_dir
+        self._clock: Clock = clock or SystemClock()
+
+    def present(self, view: BasisSetupView) -> None:
+        """Show the basis draft `view` on the page."""
+        self.hub.register_setup(view, setups_dir=self._setups_dir, clock=self._clock)
+
+    def answer(self, setup_id: str, *, wait: bool) -> BasisSetupAnswer | None:
+        """The engineer's answer; `None` when there is none, on a stop or on the wait timeout."""
+        return self.hub.take_setup(setup_id, wait=wait)

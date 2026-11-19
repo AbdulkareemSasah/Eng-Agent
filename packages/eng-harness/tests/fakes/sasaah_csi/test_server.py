@@ -86,7 +86,7 @@ def rpc(control: Path) -> Iterator[Rpc]:
 
 def _fault(control: Path, fault: str, **extra: Any) -> None:
     data = json.loads(control.read_text())
-    data["faults"].append({"fault": fault, **extra})
+    data.setdefault("faults", []).append({"fault": fault, **extra})
     control.write_text(json.dumps(data))
 
 
@@ -308,5 +308,213 @@ def test_design_needs_its_run_and_results_are_seeded(control: Path) -> None:
         drifts = client.call("csi_results_story_drifts", units="kN_m_C")[1]
         assert (drifts["items"], drifts["units"]) == ([{"story": "S1"}], "kN_m_C")
         assert client.call("csi_results_frame_forces", units="kN_m_C")[1]["items"] == []  # nothing seeded
+    finally:
+        client.close()
+
+
+def test_safe_mode_seed_loads_results_and_faults(control: Path) -> None:
+    control.write_text(
+        json.dumps(
+            {
+                "product": "SAFE",
+                "seed": {
+                    "points": [{"name": "P1"}],
+                    "areas": [{"name": "A1"}],
+                    "area_sections": [{"name": "S1"}],
+                    "materials": [{"name": "C1"}],
+                    "load_patterns": [{"name": "D"}],
+                    "load_combos": [{"name": "U"}],
+                    "tables": {
+                        "Area Assignments - Area Springs": [{"UniqueName": "A1", "SpringProp": "K"}],
+                        "Spring Property Definitions - Area Springs": [{"Name": "K"}],
+                        "Joint Loads Assignments - Force": [
+                            {"UniqueName": "P1", "LoadPattern": "D", "XDim": 2, "YDim": 3}
+                        ],
+                        "Soil Pressures": [
+                            {"UniqueName": "A1", "Group": "F1", "Pressure": -10},
+                            {"UniqueName": "A2", "Group": "F2", "Pressure": -20},
+                        ],
+                    },
+                    "results": {"csi_results_base_reactions": [{"case": "D"}, {"case": "U"}]},
+                    "result_limits": {"csi_results_base_reactions": 1, "Soil Pressures": 1},
+                },
+            }
+        )
+    )
+    client = Rpc(control)
+    try:
+        assert client.call("csi_launch")[1]["product"] == "SAFE"
+        assert client.call("csi_new_model", confirm=True)[1]["code"] == "unsupported_by_version"
+        for kind in ("points", "areas", "area_sections", "materials", "load_patterns", "load_combos"):
+            assert client.call("csi_list_" + kind)[1]["count"] == 1
+        assert (
+            client.call("csi_db_table_read", table="Area Assignments - Area Springs")[1]["rows"][0]["SpringProp"] == "K"
+        )
+        assert (
+            "Name"
+            in client.call("csi_db_table_fields", table="Spring Property Definitions - Area Springs")[1]["fields"]
+        )
+        error, _ = client.call("csi_set_point_load", name="P1", load_pattern="D", force=[1, 2, 3], moment=[4, 5, 6])
+        assert not error
+        rows = client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"]
+        assert rows == [
+            {
+                "UniqueName": "P1",
+                "LoadPattern": "D",
+                "XDim": 2,
+                "YDim": 3,
+                "FX": 1,
+                "FY": 2,
+                "FZ": 3,
+                "MX": 4,
+                "MY": 5,
+                "MZ": 6,
+            }
+        ]
+        result = client.call("csi_results_base_reactions")[1]
+        assert result["count"] == 1
+        assert result["truncated"] is True
+        pressures = client.call("csi_db_table_read", table="Soil Pressures")[1]
+        assert len(pressures["rows"]) == 1
+        assert pressures["truncated"] is True
+        grouped = client.call("csi_db_table_read", table="Soil Pressures", group="F2")[1]
+        assert grouped["rows"] == [{"UniqueName": "A2", "Group": "F2", "Pressure": -20}]
+        assert grouped["truncated"] is False
+        _fault(control, "present_units_mm", tool="csi_model_info")
+        assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
+        assert client.call("csi_list_points", units="kN_m_C")[1]["units"] == "kN_m_C"
+        assert client.call("csi_model_info")[1]["units"] == "kN_mm_C"
+        assert not client.call(
+            "csi_set_point_load", name="P1", load_pattern="D", force=[1, 2, 3], moment=[4, 5, 6], units="kN_m_C"
+        )[0]
+        row = client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"][0]
+        assert row["MX"] == 4000
+        assert row["FX"] == 1
+    finally:
+        client.close()
+
+
+def test_safe_point_load_missing_and_zero(control: Path) -> None:
+    control.write_text(json.dumps({"product": "SAFE", "seed": {"points": [{"name": "P1"}]}}))
+    client = Rpc(control)
+    try:
+        client.call("csi_launch")
+        args = {"load_pattern": "D", "force": [1, 0, 0], "moment": [0, 0, 0]}
+        assert client.call("csi_set_point_load", name="missing", **args)[1]["code"] == "not_found"
+        assert not client.call("csi_set_point_load", name="P1", **args)[0]
+        args["force"] = [0, 0, 0]
+        assert not client.call("csi_set_point_load", name="P1", **args)[0]
+        assert client.call("csi_db_table_read", table="Joint Loads Assignments - Force")[1]["rows"] == []
+    finally:
+        client.close()
+
+
+def test_safe_mode_follows_effective_target_product(control: Path) -> None:
+    """SAFE behavior follows the active target or per-call target override, not only the control-file default."""
+    client = Rpc(control)
+    try:
+        error, target = client.call("csi_launch", product="SAFE")
+        assert not error
+        assert target["product"] == "SAFE"
+        error, body = client.call("csi_new_model", confirm=True)
+        assert error
+        assert body["code"] == "unsupported_by_version"
+
+        error, attached = client.call("csi_attach", product="SAFE", pid=4242)
+        assert not error
+        assert attached["product"] == "SAFE"
+        assert attached["launched"] is False
+        assert client.call("csi_status")[1]["current_target"]["product"] == "SAFE"
+        assert client.call("csi_new_model", confirm=True)[1]["code"] == "not_launched_by_server"
+
+        error, override_attached = client.call("csi_attach", target={"product": "SAFE", "pid": 4343})
+        assert not error
+        assert override_attached == {"product": "SAFE", "pid": 4343, "launched": False}
+
+        assert not client.call("csi_launch", product="ETABS")[0]
+        error, body = client.call("csi_new_model", confirm=True, target={"product": "SAFE"})
+        assert error
+        assert body["code"] == "unsupported_by_version"
+        assert not client.call("csi_new_model", confirm=True)[0]
+    finally:
+        client.close()
+
+    control.write_text(json.dumps({"product": "SAFE"}))
+    from_default = Rpc(control)
+    try:
+        assert from_default.call("csi_launch")[1]["product"] == "SAFE"
+        assert from_default.call("csi_new_model", confirm=True)[1]["code"] == "unsupported_by_version"
+        assert from_default.call("csi_launch", product="ETABS")[1]["product"] == "ETABS"
+        assert not from_default.call("csi_new_model", confirm=True)[0]
+    finally:
+        from_default.close()
+
+
+def test_units_restored_after_failed_point_load(rpc: Rpc, control: Path) -> None:
+    """A failed call restores resting units unless the intentional units_left_changed fault fires."""
+    _launch(rpc)
+    assert rpc.call("csi_model_info")[1]["units"] == "kN_m_C"
+    error, body = rpc.call(
+        "csi_set_point_load",
+        name="missing",
+        load_pattern="D",
+        force=[1, 0, 0],
+        moment=[0, 0, 0],
+        units="kN_mm_C",
+    )
+    assert error
+    assert body["code"] == "not_found"
+    assert rpc.call("csi_model_info")[1]["units"] == "kN_m_C"
+
+    _fault(control, "units_left_changed", tool="csi_set_point_load")
+    error, body = rpc.call(
+        "csi_set_point_load",
+        name="missing",
+        load_pattern="D",
+        force=[1, 0, 0],
+        moment=[0, 0, 0],
+        units="kN_mm_C",
+    )
+    assert error
+    assert body["code"] == "not_found"
+    assert rpc.call("csi_model_info")[1]["units"] == "kN_mm_C"
+
+
+def test_table_read_group_requires_membership(control: Path) -> None:
+    """A group filter matches only explicit Group/groups membership and never leaks ungrouped rows."""
+    control.write_text(
+        json.dumps(
+            {
+                "product": "SAFE",
+                "seed": {
+                    "tables": {
+                        "Soil Pressures": [
+                            {"UniqueName": "A1", "Group": "F1", "Pressure": -10},
+                            {"UniqueName": "A2", "groups": ["F2", "ALL"], "Pressure": -20},
+                        ],
+                        "Ungrouped Pressures": [
+                            {"UniqueName": "A3", "Pressure": -30},
+                        ],
+                    }
+                },
+            }
+        )
+    )
+    client = Rpc(control)
+    try:
+        client.call("csi_launch", product="SAFE")
+        assert client.call("csi_db_table_read", table="Soil Pressures", group="F2")[1] == {
+            "rows": [{"UniqueName": "A2", "groups": ["F2", "ALL"], "Pressure": -20}],
+            "truncated": False,
+        }
+        assert client.call("csi_db_table_read", table="Soil Pressures", group="UNKNOWN")[1] == {
+            "rows": [],
+            "truncated": False,
+        }
+        assert client.call("csi_db_table_read", table="Ungrouped Pressures", group="F1")[1] == {
+            "rows": [],
+            "truncated": False,
+        }
+        assert len(client.call("csi_db_table_read", table="Ungrouped Pressures")[1]["rows"]) == 1
     finally:
         client.close()
