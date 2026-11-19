@@ -144,7 +144,8 @@ engineering meaning"`.
   overlay entry (inherited, overridden or removed); a missing or duplicate entry, or an entry naming an unknown base
   check, raises `CheckDefinitionError`. Test: `tests/unit/test_overlay.py::test_completeness`.
 - AC18. Given an inherited entry, when the overlay check is evaluated, then it runs the base body and preconditions; its
-  verdicts carry the overlay's `code` and mapped clause; trace constants keep their base citations unchanged; a trace
+  verdicts carry the overlay's `code` and mapped clause (for inherited body verdicts, the runner validates explicit draft
+  clauses against the base check metadata; amendment B-579); trace constants keep their base citations unchanged; a trace
   message names the base `check_id` and the clause mapping; its content hash includes the base check's hash. Test:
   `tests/unit/test_overlay.py::test_inherited_evaluation`.
 - AC19. Given overridden and added entries, when evaluated, then each runs its own body; an inherited or overridden
@@ -526,8 +527,10 @@ Source المصدر · Assumptions الافتراضات · Subject العنصر 
 | `Removed` | `base_check_id`, `reason` | No overlay check; lookup gives `NOT_FOUND` with the reason (AC20) |
 
 Completeness (AC17): every base check appears in exactly one of `Inherited`, `Overridden` or `Removed`; inheritance is
-never implicit. Base citations in constants are never rewritten (AC18). Approval of an inherited check needs
-`inherited-confirmed` (§4.8).
+never implicit. Base citations in constants are never rewritten (AC18). For inherited body verdicts, the runner validates
+explicit draft clauses against the base check metadata, then emits the inherited check's mapped clause, code and check
+id, and preserves base trace citations (amendment B-579). Approval of an inherited check needs `inherited-confirmed`
+(§4.8).
 
 ### 4.12 Public evaluate API (10 §7)
 
