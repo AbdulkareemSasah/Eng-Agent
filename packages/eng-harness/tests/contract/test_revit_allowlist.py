@@ -73,9 +73,7 @@ def test_fake_schemas_match_inventory() -> None:
     inventory = _inventory()
     fake = _load(SCHEMAS)
     expected_schemas = {
-        _mcp_name(tool): tool["input_schema"]
-        for tool in inventory["tools"]
-        if _mcp_name(tool) in ALLOWLISTED_TOOLS
+        _mcp_name(tool): tool["input_schema"] for tool in inventory["tools"] if _mcp_name(tool) in ALLOWLISTED_TOOLS
     }
     expected_kinds = {
         _mcp_name(tool): tool["server_kind"] for tool in inventory["tools"] if _mcp_name(tool) in ALLOWLISTED_TOOLS
@@ -87,3 +85,24 @@ def test_fake_schemas_match_inventory() -> None:
     assert set(actual_schemas) == ALLOWLISTED_TOOLS
     assert actual_schemas == expected_schemas
     assert actual_kinds == expected_kinds
+
+
+def test_fake_process_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC30: the running Revit fake process serves the inventory schemas for the allowlisted tools."""
+    from fakes.sasaah_revit.test_server import Rpc
+
+    inventory = _inventory()
+    expected = {
+        _mcp_name(tool): tool["input_schema"] for tool in inventory["tools"] if _mcp_name(tool) in ALLOWLISTED_TOOLS
+    }
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"faults": [], "seed": {}}), encoding="utf-8")
+    rpc = Rpc(control)
+    try:
+        listed = rpc.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        assert len(listed) == len(actual)
+        assert set(actual) == ALLOWLISTED_TOOLS
+        assert actual == expected
+    finally:
+        rpc.close()
