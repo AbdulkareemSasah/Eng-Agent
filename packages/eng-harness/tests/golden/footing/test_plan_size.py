@@ -5,7 +5,7 @@ from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds.basis import DesignBasis
 from pydantic import BaseModel
 
-from eng_harness.calc import NotImplementedGap, TraceBuilder
+from eng_harness.calc import CalcInput, NotImplementedGap, TraceBuilder
 from eng_harness.calcs import REGISTRY
 from eng_harness.calcs.footing.plan_size import PlanSizeInput, footing_plan_size
 
@@ -22,8 +22,10 @@ KINDS = {
 
 def run_case(case: FootingGoldenCase, trace: TraceBuilder | None = None) -> BaseModel:
     definition = REGISTRY[CALC_ID]
-    return definition.fn(
-        definition.input_type.model_validate(case.input),  # type: ignore[attr-defined]
+    input_type = definition.input_type
+    assert isinstance(input_type, type) and issubclass(input_type, CalcInput)
+    return definition(
+        input_type.model_validate(case.input),
         input_meta(case.refs, KINDS),
         trace if trace is not None else TraceBuilder(),
     )
