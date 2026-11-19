@@ -359,7 +359,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 448
   },
   {
    "id": "B-137",
@@ -551,7 +552,8 @@
    "reviewer": "opus, low",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 454
   },
   {
    "id": "B-190",
@@ -581,7 +583,6 @@
    "prTitle": "feat(eng-harness): end-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule (B-191)",
    "risk": "r3",
    "pending_deps": [
-    "I.T15",
     "I.T16",
     "I.T16b"
    ],
@@ -676,7 +677,6 @@
    "prTitle": "test(eng-harness): real-engine re-checks of the screens and the run and resume commands (B-432)",
    "risk": "r3",
    "pending_deps": [
-    "I.T15",
     "I.T16",
     "I.T16b"
    ],
@@ -697,7 +697,6 @@
    "prTitle": "feat(eng-harness): bind the CliDeps defaults to the merged real implementations, except the port builder (B-433)",
    "risk": "r3",
    "pending_deps": [
-    "I.T15",
     "I.T16",
     "I.T16b",
     "W.T9"
@@ -1301,7 +1300,6 @@
    "prTitle": "feat(eng-harness): engine and edit-cycle amendments (allowed modes, exported child blocks, generated change sets) (B-289)",
    "risk": "r1, r3",
    "pending_deps": [
-    "W.T8",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -1721,7 +1719,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 450
   },
   {
    "id": "B-203",
@@ -1733,9 +1732,7 @@
    "branch": "feat/b203-harness-wt9-workflow-part-2-steps",
    "prTitle": "feat(eng-harness): workflow part 2 - steps 11 to 17 (analysis, design, summaries, engineer turn, promotion, sign-off) and the cycle loop (B-203)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T8"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1884,7 +1881,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 444
   },
   {
    "id": "B-397",
@@ -1936,7 +1934,6 @@
    "risk": "r1, r2, r3",
    "pending_deps": [
     "X.T4",
-    "X.T5",
     "X.T7",
     "X.T4b"
    ],
@@ -2082,7 +2079,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 452
   },
   {
    "id": "B-212",
@@ -2094,9 +2092,7 @@
    "branch": "feat/b212-harness-ft3-safe-allowlist-entries-pinned",
    "prTitle": "feat(eng-harness): sAFE allowlist entries, pinned SAFE fingerprint, session operations for .FDB, gap entries (B-212)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2190,8 +2186,7 @@
    "prTitle": "feat(eng-harness): recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list (B-217)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T7",
-    "S.T17"
+    "F.T7"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2438,8 +2433,7 @@
    "prTitle": "feat(eng-harness): record mode scenario for Revit, sanitizer rules, recordings contract tests and the record script (B-242)",
    "risk": "r1, r3",
    "pending_deps": [
-    "R.T11",
-    "S.T17"
+    "R.T11"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2500,9 +2494,7 @@
    "prTitle": "feat(eng-harness): sAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint (B-245)",
    "risk": "r1, r3",
    "pending_deps": [
-    "F.T2",
-    "F.T3",
-    "S.T17"
+    "F.T3"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2521,8 +2513,7 @@
    "prTitle": "feat(eng-harness): synthetic SAP2000 mode of the CSI fake and its schema check (B-246)",
    "risk": "r1, r3",
    "pending_deps": [
-    "A.T1",
-    "F.T2"
+    "A.T1"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2623,8 +2614,7 @@
    "pending_deps": [
     "A.T5",
     "A.T6",
-    "F.T8",
-    "S.T17"
+    "F.T8"
    ],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
@@ -2647,7 +2637,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 440
   },
   {
    "id": "B-301",
@@ -2659,9 +2650,7 @@
    "branch": "feat/b301-harness-ht2-synthetic-idea-fake-server",
    "prTitle": "feat(eng-harness): synthetic IDEA fake server (test-only), its faults and its schema check (B-301)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -2679,7 +2668,6 @@
    "prTitle": "feat(eng-harness): iDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header (B-302)",
    "risk": "r1, r3",
    "pending_deps": [
-    "H.T1",
     "H.T2"
    ],
    "writer": "sonnet, medium",
@@ -3229,7 +3217,6 @@
    "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "W.T8",
     "W.T8b"
    ],
    "writer": "sonnet, medium",
@@ -3832,9 +3819,7 @@
    "branch": "feat/b572-harness-wt8b-result-accessors",
    "prTitle": "feat(eng-harness): sanctioned result accessors for block code (B-572)",
    "risk": "r3",
-   "pending_deps": [
-    "W.T8"
-   ],
+   "pending_deps": [],
    "writer": "agy hydrogen medium",
    "reviewer": "codex terra",
    "verifier_lenses": [],
