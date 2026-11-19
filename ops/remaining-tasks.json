@@ -820,7 +820,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 434
   },
   {
    "id": "B-151",
@@ -832,9 +833,7 @@
    "branch": "feat/b151-harness-ct12-calc-6-element-count",
    "prTitle": "feat(eng-harness): calc 6, element count and position comparison (B-151)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "C.T11"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1208,9 +1207,7 @@
    "branch": "feat/b284-harness-gt5-calcs-harness-column-section",
    "prTitle": "feat(eng-harness): calcs harness.column_section_match and harness.column_change_set (B-284)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "C.T11"
-   ],
+   "pending_deps": [],
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
@@ -1290,7 +1287,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 447
   },
   {
    "id": "B-289",
@@ -1327,7 +1325,6 @@
     "G.T3",
     "G.T4",
     "G.T6",
-    "G.T9",
     "W.T9"
    ],
    "writer": "sonnet, medium",
@@ -1907,7 +1904,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 435
   },
   {
    "id": "B-398",
@@ -1939,7 +1937,6 @@
    "pending_deps": [
     "X.T4",
     "X.T5",
-    "X.T6",
     "X.T7",
     "X.T4b"
    ],

@@ -56,6 +56,8 @@ testpaths = ["tests"]
 pythonpath = ["tests"]  # shared test helpers import as helpers.<module>
 markers = [
     "windows: needs Windows; runs in the Windows CI job",
+    "recorded: contract test on a recording the owner committed (acceptance/recordings)",
+    "synthetic: contract test on a recording of the synthetic fake, made by record mode in the test run",
 ]
 
 [tool.eng-gate]
