@@ -33,5 +33,15 @@
     "name": "edit_cycle_readback_result",
     "version": 2,
     "schema_sha256": "42c48b1f6a4681a6c562b6caab38d1ed7eea88abb7e2e155bac800c0e56d711f"
+  },
+  {
+    "name": "footing_fix_strategy",
+    "version": 1,
+    "schema_sha256": "a1e9d33f63867c0bcb6b98027f27c4cc4646216363cd3a73a21519219835d72a"
+  },
+  {
+    "name": "footing_review",
+    "version": 1,
+    "schema_sha256": "be043cd88a8f85df7bd029ae74c874142569bfac9284d3d2c8762b6b13d82450"
   }
 ]
