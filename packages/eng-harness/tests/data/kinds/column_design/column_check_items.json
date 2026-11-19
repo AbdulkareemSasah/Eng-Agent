@@ -25,11 +25,62 @@
           "case": "COMB1"
         },
         "inputs": {
-          "Pu_kN": "res_00000000000000000000000001#/field"
+          "Pu_kN": 1200.0,
+          "b_mm": 500.0,
+          "h_mm": 500.0,
+          "Ast_mm2": 4000.0,
+          "fc_MPa": {
+            "$ref": "res_00000000000000000000000001#/fields/materials.concrete_fc_MPa/value"
+          },
+          "fy_MPa": {
+            "$ref": "res_00000000000000000000000001#/fields/materials.rebar_fy_MPa/value"
+          },
+          "transverse_kind": "tied",
+          "k_factor": {
+            "$ref": "res_00000000000000000000000001#/fields/columns.effective_length_factor_ratio/value"
+          },
+          "lu_mm": 3000.0,
+          "ratio_limit": {
+            "$ref": "res_00000000000000000000000001#/fields/limits.ratio_limit_ratio/value"
+          }
         }
       }
     ],
-    "aci318_14.22_4_1_1.axial_flexure_uniaxial": [],
+    "aci318_14.22_4_1_1.axial_flexure_uniaxial": [
+      {
+        "subject": {
+          "kind": "frame",
+          "id": "C1",
+          "station_mm": 0.0,
+          "case": "COMB1"
+        },
+        "inputs": {
+          "Pu_kN": 1200.0,
+          "Mu_kNm": 80.0,
+          "Mu_other_kNm": 0.0,
+          "b_mm": 500.0,
+          "h_mm": 500.0,
+          "d_prime_mm": 60.0,
+          "n_bars_b": 3,
+          "n_bars_h": 3,
+          "A_bar_mm2": 500.0,
+          "fc_MPa": {
+            "$ref": "res_00000000000000000000000001#/fields/materials.concrete_fc_MPa/value"
+          },
+          "fy_MPa": {
+            "$ref": "res_00000000000000000000000001#/fields/materials.rebar_fy_MPa/value"
+          },
+          "transverse_kind": "tied",
+          "k_factor": {
+            "$ref": "res_00000000000000000000000001#/fields/columns.effective_length_factor_ratio/value"
+          },
+          "lu_mm": 3000.0,
+          "ratio_limit": {
+            "$ref": "res_00000000000000000000000001#/fields/limits.ratio_limit_ratio/value"
+          }
+        }
+      }
+    ],
     "aci318_14.10_6_1_1.longitudinal_reinforcement_limits": [
       {
         "subject": {
@@ -39,8 +90,11 @@
           "case": null
         },
         "inputs": {
-          "Ag_mm2": "res_00000000000000000000000001#/field",
-          "Ast_mm2": "res_00000000000000000000000001#/field"
+          "Ag_mm2": 250000.0,
+          "Ast_mm2": 4000.0,
+          "ratio_limit": {
+            "$ref": "res_00000000000000000000000001#/fields/limits.ratio_limit_ratio/value"
+          }
         }
       }
     ]
