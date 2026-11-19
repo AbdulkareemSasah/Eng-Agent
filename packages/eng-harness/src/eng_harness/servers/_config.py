@@ -152,7 +152,7 @@ class ServerConfig(_Model):
     build: BuildPin
     host_key: str
     pipe_name: str | None = Field(default=None, validate_default=True)
-    # The host product this server serves (spec 0008 4.1): required for CSI, defaults to IDEA for sasaah-idea-mcp, Revit for sasaah-revit-mcp.
+    # The host product (spec 0008 4.1): required for CSI; defaults to IDEA or Revit for their adapters.
     product: str = Field(default="", validate_default=True)
     mcp_mode: str = "legacy"  # spec section 11 Q3
     # spec 0002 section 4.2 rule 5; a non-boolean is a ConfigError; validated when absent too (the IDEA rule below)
@@ -177,9 +177,8 @@ class ServerConfig(_Model):
     @field_validator("pipe_name")
     @classmethod
     def _pipe_name_revit(cls, value: str | None, info: ValidationInfo) -> str | None:
-        if info.data.get("adapter") == _REVIT_ADAPTER:
-            if not value or not value.strip():
-                raise ValueError("pipe_name is required for Revit")
+        if info.data.get("adapter") == _REVIT_ADAPTER and (not value or not value.strip()):
+            raise ValueError("pipe_name is required for Revit")
         return value
 
     @field_validator("product")
@@ -275,9 +274,7 @@ class ServerConfig(_Model):
 
     @field_validator("roles")
     @classmethod
-    def _roles_check(
-        cls, value: Mapping[str, RoleConfig], info: ValidationInfo
-    ) -> Mapping[str, RoleConfig]:
+    def _roles_check(cls, value: Mapping[str, RoleConfig], info: ValidationInfo) -> Mapping[str, RoleConfig]:
         adapter = info.data.get("adapter")
         if adapter == _IDEA_ADAPTER and tuple(value) != ("main",):
             raise ValueError(f"{_IDEA_ADAPTER} needs the single topology: exactly one role, named main")

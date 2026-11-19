@@ -369,7 +369,12 @@ def test_revit_server_section(tmp_path: Path) -> None:
         ("call_timeout_s = 10", "", "servers.revit.roles.read.call_timeout_s", "call_timeout_s"),
         ("client_grace_s = 5", "", "servers.revit.client_grace_s", "client_grace_s"),
         ('host_key = "revit"', 'host_key = "revit"\nproduct = "ETABS"', "servers.revit.product", "product"),
-        ('[servers.revit.roles.write]\nclasses = ["attended"]\ncall_timeout_s = 90', "", "servers.revit.roles", "roles"),
+        (
+            '[servers.revit.roles.write]\nclasses = ["attended"]\ncall_timeout_s = 90',
+            "",
+            "servers.revit.roles",
+            "roles",
+        ),
     ):
         with pytest.raises(ConfigError, match=match) as caught:
             load_servers_config(_write(tmp_path, _revit().replace(before, after)))
