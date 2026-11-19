@@ -131,7 +131,8 @@ def test_size_must_be_rounding_result() -> None:
         )
     detail = caught.value.detail
     assert detail.code is ErrorCode.INVALID_ARGUMENT
-    assert detail.field is not None and detail.field.startswith("sizes")
+    assert detail.field is not None
+    assert detail.field.startswith("sizes")
 
 
 def test_just_beyond_tolerance_is_not_a_candidate() -> None:

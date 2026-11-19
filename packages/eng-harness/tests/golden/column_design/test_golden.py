@@ -104,7 +104,7 @@ def test_registration_and_kinds() -> None:
         "draft",
     )
     assert definition.method_source == "eng-harness spec 0013 §4.4.1 (L1 to L3); eng-harness spec 0003 §4.11 P2"
-    assert COLUMN_DESIGN_CALCS == (column_select, column_section_match, column_change_set)
+    assert (column_select, column_section_match, column_change_set) == COLUMN_DESIGN_CALCS
     assert set(COLUMN_DESIGN_KINDS) <= set(HARNESS_KINDS)
     assert BASIS_FIELDS == ("compare.length_mm",)
 
