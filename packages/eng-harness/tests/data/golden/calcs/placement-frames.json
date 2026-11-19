@@ -1,0 +1,129 @@
+{
+  "source": "eng-harness spec 0003 §4.11 (P2, P3) and §4.4; synthetic frames and compare.length_mm, no project value",
+  "method_ref": "§4.11 P3",
+  "synthetic": true,
+  "derivation": "Tolerance t = 5 mm, t² = 25. F_rev: a ends (0,0,0)-(0,0,3000), b ends swapped (0,0,3000)-(0,0,0). Same-orientation end distances are both 3000 mm (d² = 9e6 > 25); reversed pairing: each end matches the other with d² = 0 <= 25, so result reversed, distance_mm = 0.0 (display sqrt of the larger reversed-end d²). F_bound: b i-end offset by the synthetic (3,4,0); d² = 3²+4²+0² = 9+16 = 25 = t², so within tolerance (P2 inclusive), other end d² = 0, result same, distance_mm = sqrt(25) = 5.0. F_far: b i-end offset by (6,8,0); d² = 36+64 = 100 > 25, reversed pairing also fails (j of a to i of b is far), result moved with the larger same-orientation end distance sqrt(100) = 10.0.",
+  "inputs": {
+    "input": {
+      "a_frames": {
+        "frames": [
+          {
+            "id": "F_rev",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F_bound",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F_far",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "b_frames": {
+        "frames": [
+          {
+            "id": "F_rev",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F_bound",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 3.0, "y_mm": 4.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F_far",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 6.0, "y_mm": 8.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 5,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "a_frames": {
+          "result_id": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "b_frames": {
+          "result_id": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "counts": [
+      {"element": "frame", "by": "story", "name": "unassigned", "a": 3, "b": 3, "difference": 0},
+      {"element": "frame", "by": "type", "name": "beam", "a": 0, "b": 0, "difference": 0},
+      {"element": "frame", "by": "type", "name": "brace", "a": 0, "b": 0, "difference": 0},
+      {"element": "frame", "by": "type", "name": "column", "a": 3, "b": 3, "difference": 0},
+      {"element": "frame", "by": "type", "name": "other", "a": 0, "b": 0, "difference": 0}
+    ],
+    "by_id": [
+      {"element": "frame", "id": "F_bound", "result": "same", "distance_mm": 5.0},
+      {"element": "frame", "id": "F_far", "result": "moved", "distance_mm": 10.0},
+      {"element": "frame", "id": "F_rev", "result": "reversed", "distance_mm": 0.0}
+    ],
+    "renamed": [],
+    "ambiguous": [],
+    "only_in_a": [],
+    "only_in_b": [],
+    "equal": false,
+    "complete": true
+  }
+}
