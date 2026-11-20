@@ -161,3 +161,44 @@ def test_safe_fingerprint_from_inventory() -> None:
     assert set(schemas) == {tool.name for tool in safe.tools}
     assert tool_list_fingerprint(schemas) == allowlist.fingerprint["SAFE"] == safe.tool_fingerprint
     assert allowlist.fingerprint["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+
+
+def test_sap2000_against_inventory() -> None:
+    """AC2: SAP2000 allowlist entries match the non-excluded S-12 inventory tools and are served by the fake."""
+    from eng_harness.adapters.csi import csi_allowlist
+
+    inventory = _inventory()
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    sap = csi_allowlist().for_product("SAP2000")
+    assert sap.sasaah_commit == inventory["sasaah_commit"]
+    assert sap.fingerprint_source == "s12-inventory"
+    assert len(sap.tools) == 33
+    served = {t["name"] for t in _load(SCHEMAS)["tools"]}
+    for tool in sap.tools:
+        item = by_name[tool.name]
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert tool.kind == ("session" if item["classification"] == "file" else item["classification"]), tool.name
+        if item["server_kind"] == "Read":
+            assert tool.effect == "read", tool.name
+        if item["server_kind"] in ("Write", "Destructive"):
+            assert tool.effect == "write", tool.name
+        assert (tool.confirm != "never") == item["confirm_required"], tool.name
+        assert tool.units == _expected_units(item), tool.name
+        assert "SAP2000" in tool.products
+        assert tool.name in served
+
+
+def test_sap2000_fingerprint_from_inventory() -> None:
+    """AC3: the SAP2000 tool-list fingerprint computed from S-12 equals the pinned one; ETABS and SAFE are unchanged."""
+    from eng_harness.adapters.csi import csi_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = csi_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    sap = allowlist.for_product("SAP2000")
+    schemas = {t["name"]: t["input_schema"] for t in _inventory()["tools"] if t["name"] in sap.tool_names}
+    assert set(schemas) == {tool.name for tool in sap.tools}
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["SAP2000"] == sap.tool_fingerprint
+    assert allowlist.fingerprint["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+    assert allowlist.fingerprint["SAFE"] == "ccdab3c9461b60387569af2ec7acc214c0803bd7953a5d66ca380e1c87c38025"

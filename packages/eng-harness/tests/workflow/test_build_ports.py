@@ -92,7 +92,9 @@ def test_allowlist_loaded_for_the_servers_product(tmp_path: Path) -> None:
         if not line.lstrip().startswith("{ name = ") or line.lstrip().startswith(status)
     ]
     replaced = "\n".join(
-        f'fingerprint = {{ SAFE = "{"c" * 64}", ETABS = "{"b" * 64}" }}' if line.startswith("fingerprint = ") else line
+        f'fingerprint = {{ SAFE = "{"c" * 64}", ETABS = "{"b" * 64}", SAP2000 = "{"d" * 64}" }}'
+        if line.startswith("fingerprint = ")
+        else line
         for line in entries
     )
     cfg = config(r.control)
