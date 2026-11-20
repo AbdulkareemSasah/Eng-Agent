@@ -140,3 +140,8 @@ def test_stop_wait_timeout_and_negative_wait(tmp_path: Path) -> None:
         assert "still stopping" in wait_zero.out.getvalue().lower()
     finally:
         lock.release()
+
+
+def test_stop_real_engine_pauses_at_safe_point(tmp_path: Path) -> None:
+    raise AssertionError("T17: stop real-engine pause-at-safe-point re-check not yet written")
+

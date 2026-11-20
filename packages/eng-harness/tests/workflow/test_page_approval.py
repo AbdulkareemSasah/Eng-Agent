@@ -60,3 +60,20 @@ def test_page_confirms_after_commit(tmp_path: Path) -> None:
     assert "Answer received, not yet recorded." in late.body
     assert 'href="/"' in late.body
     assert 0.25 <= waited < 5
+
+
+def test_per_item_reject_end_to_end(tmp_path: Path) -> None:
+    raise AssertionError("T17: per-item reject end-to-end re-check not yet written")
+
+
+def test_void_after_model_change(tmp_path: Path) -> None:
+    raise AssertionError("T17: void-after-model-change re-check not yet written")
+
+
+def test_answer_bound_to_hash_real_engine(tmp_path: Path) -> None:
+    raise AssertionError("T17: answer-bound-to-hash real-engine re-check not yet written")
+
+
+def test_page_confirms_after_commit_real_engine(tmp_path: Path) -> None:
+    raise AssertionError("T17: page-confirms-after-commit real-engine re-check not yet written")
+
