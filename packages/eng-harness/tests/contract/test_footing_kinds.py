@@ -7,10 +7,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from eng_contract.verdicts import VerdictStatus
 from pydantic import ValidationError
 
 from eng_harness._kinds import HARNESS_KINDS
-from eng_harness.kinds.footing import FOOTING_KINDS
+from eng_harness.kinds.footing import (
+    FOOTING_KINDS,
+    Families,
+    Family,
+    PatternRow,
+    ReactionsToJointLoads,
+)
 
 DATA = Path(__file__).resolve().parents[1] / "data" / "kinds" / "footing"
 KINDS = {
@@ -20,6 +27,7 @@ KINDS = {
     "status": "harness.footing_status/1",
     "schedule": "harness.footing_schedule/1",
     "safe_equilibrium": "harness.safe_equilibrium/1",
+    "reactions_to_joint_loads": "harness.reactions_to_joint_loads/1",
 }
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -93,6 +101,9 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("safe_equilibrium", _set(["patterns", 0, "status"], "NOT_COMPARED"), "self_weight"),
     ("safe_equilibrium", _set(["patterns", 1, "status"], "PASS"), "self_weight"),
     ("safe_equilibrium", _set(["patterns", 0, "status"], "MAYBE"), "status"),
+    ("reactions_to_joint_loads", _set(["axes"], "local"), "axes"),
+    ("reactions_to_joint_loads", _set(["loads", 0, "punch_x_mm"], 0.0), "punch_x_mm"),
+    ("reactions_to_joint_loads", _set(["loads", 0, "joint"], ""), "joint"),
 ]
 
 
@@ -113,7 +124,90 @@ def test_fixtures() -> None:
 
 
 def test_registration() -> None:
-    """The six kinds are exactly `FOOTING_KINDS` and are registered with the harness kinds."""
+    """The footing kinds are exactly `FOOTING_KINDS` and are registered with the harness kinds."""
     assert set(FOOTING_KINDS) == set(KINDS.values())
     for kind, model in FOOTING_KINDS.items():
         assert HARNESS_KINDS[kind] is model
+
+
+def test_reactions_ok_has_null_reason_and_needs_engineer_carries_reason() -> None:
+    """Spec 0010 §4.2 / §4.9: OK has reason null; NEEDS_ENGINEER carries each soft reason."""
+    model = ReactionsToJointLoads
+    ok = model.model_validate(_load("reactions_to_joint_loads"))
+    assert (ok.status, ok.reason) == ("OK", None)
+    for reason in ("UNMATCHED", "PATTERN_MISSING", "COMBO_CONFLICT"):
+        payload = copy.deepcopy(_load("reactions_to_joint_loads"))
+        payload["status"] = "NEEDS_ENGINEER"
+        payload["reason"] = reason
+        payload["loads"] = []
+        payload["combinations_to_add"] = []
+        parsed = model.model_validate(payload)
+        assert (parsed.status, parsed.reason, parsed.loads, parsed.combinations_to_add) == (
+            "NEEDS_ENGINEER",
+            reason,
+            [],
+            [],
+        )
+    with pytest.raises(ValidationError, match="Extra inputs"):
+        model.model_validate({**_load("reactions_to_joint_loads"), "unknown_field": True})
+
+
+def test_families_closure_passed_failing_and_needs_engineer() -> None:
+    """Spec 0010 §4.4.5: passed when all PASS; failing when any FAIL; else needs_engineer."""
+    all_pass = {
+        name: Family(status=VerdictStatus.PASS, ratio=0.5)
+        for name in (
+            "bearing",
+            "one_way_shear",
+            "punching",
+            "flexure",
+            "min_steel",
+            "development",
+        )
+    }
+    assert Families.model_validate(all_pass).closure() == "passed"
+    failing = dict(all_pass)
+    failing["bearing"] = Family(status=VerdictStatus.FAIL, ratio=1.2)
+    assert Families.model_validate(failing).closure() == "failing"
+    needs = dict(all_pass)
+    needs["flexure"] = Family(status=VerdictStatus.NEEDS_ENGINEER, ratio=None)
+    assert Families.model_validate(needs).closure() == "needs_engineer"
+    needs_and_fail = dict(needs)
+    needs_and_fail["punching"] = Family(status=VerdictStatus.FAIL, ratio=1.1)
+    assert Families.model_validate(needs_and_fail).closure() == "failing"
+
+
+def test_pattern_row_self_weight_matches_not_compared_only() -> None:
+    """self_weight patterns, and only they, are NOT_COMPARED (spec 0010 §4.9 step 6)."""
+    PatternRow.model_validate(
+        {"pattern": "DEAD", "self_weight": False, "applied_kN": 1.0, "reaction_kN": 1.0, "status": "PASS"}
+    )
+    PatternRow.model_validate(
+        {
+            "pattern": "SELF",
+            "self_weight": True,
+            "applied_kN": 0.0,
+            "reaction_kN": -10.0,
+            "status": "NOT_COMPARED",
+        }
+    )
+    with pytest.raises(ValidationError, match="self_weight"):
+        PatternRow.model_validate(
+            {
+                "pattern": "DEAD",
+                "self_weight": False,
+                "applied_kN": 1.0,
+                "reaction_kN": 1.0,
+                "status": "NOT_COMPARED",
+            }
+        )
+    with pytest.raises(ValidationError, match="self_weight"):
+        PatternRow.model_validate(
+            {
+                "pattern": "SELF",
+                "self_weight": True,
+                "applied_kN": 0.0,
+                "reaction_kN": -10.0,
+                "status": "PASS",
+            }
+        )
