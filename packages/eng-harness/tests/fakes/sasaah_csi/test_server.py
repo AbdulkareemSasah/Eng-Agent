@@ -518,3 +518,74 @@ def test_table_read_group_requires_membership(control: Path) -> None:
         assert len(client.call("csi_db_table_read", table="Ungrouped Pressures")[1]["rows"]) == 1
     finally:
         client.close()
+
+
+def test_sap2000_mode_gaps_frames_blank_and_target(control: Path) -> None:
+    """Spec 0012 §4.1: SAP2000 gaps, frame reply shape, renamed adds and blank-model sections."""
+    control.write_text(
+        json.dumps(
+            {
+                "product": "SAP2000",
+                "seed": {
+                    "frames": [{"name": "F1", "label": "Col-A", "story": "S1", "section": "W12"}],
+                    "frame_sections": [{"name": "W12"}],
+                    "area_sections": [{"name": "S1"}],
+                },
+            }
+        )
+    )
+    client = Rpc(control)
+    try:
+        assert client.call("csi_launch")[1]["product"] == "SAP2000"
+        for tool, kwargs in (
+            ("csi_list_stories", {}),
+            ("csi_list_grids", {}),
+            ("csi_frame_details", {}),
+            ("csi_export_joint", {}),
+            ("csi_results_story_drifts", {}),
+            ("csi_new_model", {"confirm": True}),
+        ):
+            error, body = client.call(tool, **kwargs)
+            assert error, tool
+            assert body["code"] == "unsupported_by_version", tool
+
+        frames = client.call("csi_list_frames")[1]["items"]
+        assert frames == [{"name": "F1", "section": "W12"}]
+        assert "label" not in frames[0]
+        assert "story" not in frames[0]
+
+        error, added = client.call(
+            "csi_add_frame_by_coord",
+            start=[0, 0, 0],
+            end=[0, 0, 3],
+            section="W12",
+            name="RequestedCol",
+        )
+        assert not error
+        assert added["name"] == "Frame2"
+        assert added["name"] != "RequestedCol"
+        listed = {row["name"] for row in client.call("csi_list_frames")[1]["items"]}
+        assert "RequestedCol" not in listed
+        assert "Frame2" in listed
+
+        assert client.call("csi_list_frame_sections")[1]["count"] == 1
+        assert not client.call("csi_new_blank_model", confirm=True)[0]
+        assert client.call("csi_list_frame_sections")[1]["items"] == []
+        assert client.call("csi_list_area_sections")[1]["items"] == []
+
+        assert not client.call("csi_launch", product="ETABS")[0]
+        assert not client.call("csi_list_stories")[0]
+        error, body = client.call("csi_new_model", confirm=True, target={"product": "SAP2000"})
+        assert error
+        assert body["code"] == "unsupported_by_version"
+    finally:
+        client.close()
+
+    from_default = Rpc(control)
+    try:
+        assert from_default.call("csi_launch")[1]["product"] == "SAP2000"
+        assert from_default.call("csi_list_stories")[1]["code"] == "unsupported_by_version"
+        assert from_default.call("csi_launch", product="ETABS")[1]["product"] == "ETABS"
+        assert not from_default.call("csi_list_stories")[0]
+    finally:
+        from_default.close()

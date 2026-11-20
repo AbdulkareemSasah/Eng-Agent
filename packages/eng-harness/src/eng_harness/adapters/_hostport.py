@@ -20,6 +20,7 @@ from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of, snapshot
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
 from eng_harness.adapters.csi._state import CsiStateReader, StateRead
+from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
@@ -52,7 +53,9 @@ class AdapterHostPort:
             sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
             exe_name=exe_name, visible=visible,
         )  # fmt: skip
-        self._reader = CsiStateReader(product=product, call=self._session._call)  # B-451: no public read on CsiSession
+        # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
+        reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
+        self._reader = reader_type(product=product, call=self._session._call)  # B-451: no public read on CsiSession
         self._load(files)
 
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:

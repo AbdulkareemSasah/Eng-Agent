@@ -718,3 +718,162 @@ def test_escape_hatches_refused_for_sap2000() -> None:
         text = _text(etabs_entry, _tool(name=name, products=["SAP2000"]), header=header)
         with pytest.raises(AllowlistError, match=name):
             load_allowlist(text, "test.toml", product="SAP2000")
+
+
+def test_idea_entries_match_classification() -> None:
+    """AC2: the packaged IDEA allowlist serves exactly the 9 tools of spec 0014 section 4.4 with their fields."""
+    from helpers.idea_classification import SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    assert allowlist.adapter == "sasaah-idea-mcp"
+    assert allowlist.routes == ("native", "rest")
+    assert allowlist.product == "IDEA"
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert set(allowlist.tool_names) == SERVED
+    assert len(allowlist.tools) == 9
+
+    expected = {
+        "idea_status": (
+            "session",
+            "session",
+            "read",
+            "plain",
+            "never",
+            ("native", "rest"),
+            "harness.idea_status/1",
+            None,
+        ),
+        "idea_open_project": (
+            "session",
+            "call",
+            "write",
+            "open",
+            "never",
+            ("rest",),
+            "harness.idea_project/1",
+            "idea_list_connections",
+        ),
+        "idea_close_project": (
+            "session",
+            "call",
+            "write",
+            "plain",
+            "never",
+            ("rest",),
+            "harness.idea_project/1",
+            "closed",
+        ),
+        "idea_list_connections": (
+            "read",
+            "call",
+            "read",
+            "plain",
+            "never",
+            ("rest",),
+            "harness.idea_project/1",
+            None,
+        ),
+        "idea_calculate": (
+            "analysis",
+            "long",
+            "write",
+            "analysis",
+            "approved",
+            ("rest",),
+            "verdicts.set/1",
+            "checks",
+        ),
+        "idea_get_check_results": (
+            "read",
+            "call",
+            "read",
+            "plain",
+            "never",
+            ("rest",),
+            "verdicts.set/1",
+            None,
+        ),
+        "idea_native_get_loads": (
+            "read",
+            "call",
+            "read",
+            "plain",
+            "never",
+            ("native",),
+            "harness.idea_loads/1",
+            None,
+        ),
+        "idea_native_set_loads": (
+            "write",
+            "call",
+            "write",
+            "plain",
+            "approved",
+            ("native",),
+            "harness.idea_loads/1",
+            "idea_native_get_loads",
+        ),
+        "idea_native_calculate": (
+            "analysis",
+            "long",
+            "read",
+            "analysis",
+            "never",
+            ("native",),
+            "verdicts.set/1",
+            None,
+        ),
+    }
+    for tool in allowlist.tools:
+        kind, timeout, effect, action, confirm, routes, result_kind, readback = expected[tool.name]
+        assert tool.kind == kind
+        assert tool.timeout_class == timeout
+        assert tool.effect == effect
+        assert tool.action == action
+        assert tool.confirm == confirm
+        assert tool.routes == routes
+        assert tool.result_kind == result_kind
+        assert tool.readback == readback
+        assert tool.units == "none"
+        assert tool.products == ("IDEA",)
+
+
+def test_idea_gap_and_not_served_refused() -> None:
+    """AC2: gap and not-served tools are absent from the allowlist (INVALID_ARGUMENT at the ToolPort)."""
+    from helpers.idea_classification import GAP, NOT_SERVED, SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    assert set(allowlist.tool_names) == SERVED
+    for name in sorted(GAP | NOT_SERVED):
+        with pytest.raises(KeyError):
+            allowlist.descriptor(name)
+
+
+def test_idea_run_script_refused() -> None:
+    """AC2: idea_run_script is an escape hatch refused at allowlist load; the packaged file does not list it."""
+    from eng_harness.adapters._allowlist import AllowlistError, load_allowlist
+    from eng_harness.adapters.idea import idea_allowlist
+
+    names = {tool.name for tool in idea_allowlist().tools}
+    assert "idea_run_script" not in names
+    assert not any("script" in n or "invoke" in n or "eval" in n or "tables_apply" in n for n in names)
+
+    header = (
+        'adapter = "sasaah-idea-mcp"\n'
+        'sasaah_commit = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n'
+        "also_tested_commits = []\n"
+        'fingerprint = { IDEA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }\n'
+        'fingerprint_source = "s12-inventory"\n'
+        'routes = ["native", "rest"]\n'
+    )
+    entry = (
+        'tool = [{ name = "idea_run_script", kind = "session", timeout_class = "session", '
+        'effect = "read", action = "plain", args_model = "ScriptArgs", units = "none", '
+        'confirm = "never", products = ["IDEA"], routes = ["native"] }]\n'
+    )
+    with pytest.raises(AllowlistError, match="idea_run_script"):
+        load_allowlist(header + entry, "idea/_allowlist.toml", route="native")

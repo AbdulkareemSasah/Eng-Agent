@@ -803,3 +803,77 @@ def test_sap2000_build_mismatch_stops_run(tmp_path: Path) -> None:
             assert r.calls("csi_open_model") == []
 
     anyio.run(body)
+
+
+def _idea_server(
+    tmp_path: Path, *, extra_args: tuple[str, ...] = (), control: Path | None = None
+) -> tuple[ServersConfig, Path]:
+    """A harness.toml IDEA section that launches the synthetic fake as a real process."""
+    from eng_harness.servers import ServerConfig
+
+    fake = Path(__file__).resolve().parents[2] / "fakes" / "sasaah_idea" / "server.py"
+    ctrl = control if control is not None else tmp_path / "idea-control.json"
+    if not ctrl.exists():
+        ctrl.write_text(json.dumps({"faults": [], "seed": {}}), encoding="utf-8")
+    wrapper = tmp_path / "sasaah-idea-mcp"
+    wrapper.write_text(f'#!/bin/sh\nexport SASAAH_IDEA_FAKE_CONTROL="{ctrl}"\nexec "{sys.executable}" "{fake}" "$@"\n')
+    wrapper.chmod(0o755)
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    section = ServerConfig.model_validate(
+        {
+            "adapter": "sasaah-idea-mcp",
+            "command": str(wrapper),
+            "args": ["--disable-script", *extra_args],
+            "route": "native",
+            "audit_log": False,
+            "client_grace_s": 5,
+            "shutdown_grace_s": 5,
+            "build": {"sasaah_commit": allowlist.sasaah_commit, "exe_sha256": "b" * 64},
+            "host_key": "idea",
+            "roles": {"main": {"classes": ["session", "call", "long"], "call_timeout_s": 30}},
+        }
+    )
+    # Pin the exe hash to the wrapper's real content so the build check reaches the status/flags step.
+    import hashlib
+
+    exe = hashlib.sha256(wrapper.read_bytes()).hexdigest()
+    section = section.model_copy(update={"build": section.build.model_copy(update={"exe_sha256": exe})})
+    return ServersConfig(servers={"idea": section}), ctrl
+
+
+def test_idea_script_enabled_stops_run(tmp_path: Path, launcher: RecordingLauncher) -> None:
+    """AC3: idea_status.script_enabled true stops the run before any write."""
+    from eng_harness.adapters.idea import idea_allowlist
+
+    cfg, control = _idea_server(tmp_path)
+    control.write_text(json.dumps({"faults": [{"fault": "script_enabled"}], "seed": {}}), encoding="utf-8")
+    expect = {"idea": idea_allowlist().build_expectation()}
+
+    async def body(manager: ServerManager) -> None:
+        checks = await manager.preflight({})
+        assert len(checks) == 1
+        assert checks[0].ok is False
+        assert checks[0].reason is not None
+        assert "script_enabled" in checks[0].reason
+
+    _run(tmp_path, cfg, launcher, body, check=expect)
+
+
+def test_idea_listed_run_script_stops_run(tmp_path: Path, launcher: RecordingLauncher) -> None:
+    """AC3: a listed idea_run_script fails the build check even when --disable-script is set."""
+    from eng_harness.adapters.idea import idea_allowlist
+
+    cfg, control = _idea_server(tmp_path)
+    control.write_text(json.dumps({"faults": [], "seed": {}, "list_run_script": True}), encoding="utf-8")
+    expect = {"idea": idea_allowlist().build_expectation()}
+
+    async def body(manager: ServerManager) -> None:
+        checks = await manager.preflight({})
+        assert len(checks) == 1
+        assert checks[0].ok is False
+        assert checks[0].reason is not None
+        assert "idea_run_script" in checks[0].reason
+
+    _run(tmp_path, cfg, launcher, body, check=expect)

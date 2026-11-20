@@ -17,7 +17,8 @@ from eng_harness.ports import ServerCheck
 from eng_harness.servers._config import BuildPin
 
 # Hidden by the required start options; `csi_db_tables_apply` is always listed (S12-G7), tolerated, never callable.
-_HATCH = re.compile(r"csi_(run_script|invoke|object_\w+)")
+# IDEA: `idea_run_script` is hidden by `--disable-script` (spec 0014 section 4.3 item 4).
+_HATCH = re.compile(r"csi_(run_script|invoke|object_\w+)|idea_run_script")
 
 
 @dataclass(frozen=True)
@@ -29,11 +30,12 @@ class BuildExpectation:
     tool_fingerprint: str  # over the tools that list `product` (spec 0008 4.1)
     tool_names: frozenset[str]  # every allowlisted tool of `product`, whatever its route
     product: str  # the product the allowlist was loaded for
+    status_tool: str = "csi_status"  # status tool the build check calls (spec 0014 AC3: idea_status)
 
 
 @dataclass(frozen=True)
 class Observed:
-    """Facts read off a started server; `tools` maps each listed name to its input schema, `status` is `csi_status`."""
+    """Facts read off a started server; `tools` is name to schema, `status` is the status-tool reply."""
 
     exe_sha256: str
     server_info: types.Implementation | None
@@ -88,7 +90,7 @@ def check_build(
         (bool(missing), f"allowlisted tool {', '.join(missing)} is not listed"),
         (bool(hatch), f"{', '.join(hatch)} is listed: the start options failed"),
         (fingerprint != want.tool_fingerprint, "tool-list fingerprint differs from the allowlist's"),
-        (bool(flags), f"csi_status {' and '.join(flags)} is not false"),
+        (bool(flags), f"{want.status_tool} {' and '.join(flags)} is not false"),
     ]
     reason = next((why for failed, why in failures if failed), None)
     build = f"{pin.sasaah_commit[:12]}+{seen.exe_sha256[:12]}"
