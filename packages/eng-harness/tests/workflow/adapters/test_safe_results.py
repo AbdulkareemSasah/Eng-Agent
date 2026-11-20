@@ -184,7 +184,6 @@ def test_soil_pressure_rows(tmp_path: Path, make_config: ConfigFactory, control:
             assert payload.summary.count == 1
             assert payload.summary.min_kpa == pytest.approx(12.5)
             assert payload.summary.max_kpa == pytest.approx(12.5)
-            assert payload.summary.min_kpa >= 0 or payload.summary.min_kpa < 0  # no abs() in the adapter
 
     anyio.run(body)
     assert any(c["tool"] == "csi_db_table_read" for c in _calls(control))
@@ -205,7 +204,7 @@ def test_soil_pressure_truncated(tmp_path: Path, make_config: ConfigFactory, con
             assert caught.value.detail.code is ErrorCode.LIMIT_EXCEEDED
             assert caught.value.detail.hint == "group"
             assert caught.value.detail.received == 1
-            assert "SG-6" in caught.value.detail.message or "group" in caught.value.detail.message.lower()
+            assert "SG-6" in caught.value.detail.message
 
     anyio.run(body)
 
@@ -347,3 +346,33 @@ def test_analysis_messages_unknown_is_gap(tmp_path: Path, make_config: ConfigFac
             assert MESSAGES in caught.value.evidence
 
     anyio.run(body)
+
+
+def test_base_reactions_missing_field_is_host_error() -> None:
+    """AC23 / review r1: a base-reaction row missing F3 is HOST_ERROR UNEXPECTED_REPLY, not KeyError."""
+    from eng_harness.adapters.csi.products import _safe_results as results
+
+    reply = {
+        "items": [
+            {"case": "DEAD", "F1": 1.0, "F2": -2.0, "M1": 0.5, "M2": -0.25, "M3": 0.0},  # no F3
+        ]
+    }
+    with pytest.raises(ContractError) as caught:
+        results.base_reactions(reply, "kN_m_C")
+    detail = caught.value.detail
+    assert detail.code is ErrorCode.HOST_ERROR
+    assert detail.host_code == "UNEXPECTED_REPLY"
+    assert detail.retryable is False
+
+
+def test_soil_pressure_empty_summary_has_no_pressure() -> None:
+    """Spec 0008 §4.6: summary holds raw min/max; with count 0 there is no raw value, so min/max are None."""
+    from eng_harness.adapters.csi._tables import MappedTable
+    from eng_harness.adapters.csi.products import _safe_results as results
+
+    mapped = MappedTable(table=SOIL, status="candidate", rows=(), columns_seen=())
+    payload = results.soil_pressures_from_mapped(mapped, units="kN_m_C", cases=["DEAD"])
+    assert payload.summary.count == 0
+    assert payload.summary.min_kpa is None
+    assert payload.summary.max_kpa is None
+
