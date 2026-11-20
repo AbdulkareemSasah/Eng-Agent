@@ -148,6 +148,10 @@ tasks:
     covers: [AC4, AC5, AC6]
     depends_on: [T4, T5]
   - id: T7
+    # Amendment (B-593, documents only): AC10 rebind and the §4.10 check_model integrity set need IdeaHostPort.check_model
+    # and the model-key rebind after a successful write in
+    # packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py (not previously in T7's files; T6 left an INTERNAL
+    # stub and a handoff). Measured by the B-306 writer and confirmed by its review (b306-review.md).
     title: Load map (unset), load plan, structure-preserving loading builder, set_loads, read-back and check_model
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea, eng_harness.kinds and more (amendment B-356)
@@ -155,6 +159,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/idea/_load_map.toml"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_loads.py"
       - "packages/eng-harness/src/eng_harness/adapters/idea/_checks.py"
+      - "packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py"  # replace check_model stub with §4.10 integrity set from last set_loads (load-map status, zero-dropped, read-back mismatch or unavailable); rebind model key to out_path after successful write (AC10); amendment B-593
       - "packages/eng-harness/src/eng_harness/kinds/idea.py"
       - "packages/eng-harness/tests/fixtures/idea/load_map_synthetic.toml"
       - "packages/eng-harness/tests/unit/adapters/test_idea_loads.py"
@@ -278,8 +283,10 @@ markers, the harness kinds, and the pure verdict mapping with its golden and pro
 
 **T7 Loads** (AC7 to AC10, AC16 in part). `_load_map.toml` with every sign unset and status `unconfirmed`, the load
 plan and builder (exact segment match, structure preserved, `forcesPercentageOnSegments` refused), the write to a new
-file, the read-back, the `harness.idea_loads/1` kind and `check_model` for the adapter. The synthetic map lives in
-`tests/fixtures/idea/` and says so in its header.
+file, the read-back, the `harness.idea_loads/1` kind and `check_model` for the adapter. T7 may only replace the
+`check_model` stub in `_session_ops.py` with the section 4.10 integrity set built from the last `set_loads` (load-map
+status, zero-dropped, read-back mismatch or unavailable) and rebind the model key to `out_path` after a successful write
+(AC10; amendment B-593). The synthetic map lives in `tests/fixtures/idea/` and says so in its header.
 
 **T8 Calculation** (AC11, AC12, AC13 in part, AC18). `idea_native_calculate` and `idea_calculate` / `idea_get_check_results` with the
 pre-flight and the stub refusal, host verdicts out, reconciliation of `idea_native_set_loads` by file and read-back, and
@@ -307,6 +314,10 @@ gap tests for that tool (a spec change, not a test changed to pass). Its own pla
   T10 to T12). The column workflow spec (B-083) is the first consumer of the load plan and the verdict set.
 - Owner decisions that do not block T1 to T9: Q1 to Q11 of the spec (the recommendations are implemented); the confirmed
   load map (Q11) is a data commit after L9, not a code task.
+- Shared file (amendment B-593): `packages/eng-harness/src/eng_harness/adapters/idea/_session_ops.py` belongs to T6; T7
+  extends it (serialization T6 then T7) so T7 may only replace the `check_model` INTERNAL stub with the section 4.10
+  integrity set built from the last `set_loads` (load-map status, zero-dropped, read-back mismatch or unavailable) and
+  rebind the model key to `out_path` after a successful write (AC10). T7 already depends on T6.
 
 ## 4. Verification
 
