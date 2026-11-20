@@ -150,15 +150,21 @@ class CsiReconciler:
         """AC12: applied when exactly one new frame matches the requested points and section."""
         if not isinstance(lost.model, sap2000_edits.AddFrameByCoordArgs):
             return Decision(outcome="unknown", evidence={"reason": "not an add-frame model"})
+        # Spec 0012 AC12: "exactly one frame not in the pre-image". Without a known pre-image (or without
+        # a frame_ids list) every current frame would look new and one geometry match would be a false applied.
+        base: dict[str, JsonValue] = {"pre_image_known": lost.known, "pre_image": lost.pre_image}
+        if not lost.known:
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image not known"})
+        if not isinstance(lost.pre_image, dict):
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image is not a dict"})
+        ids = lost.pre_image.get("frame_ids")
+        if not isinstance(ids, list):
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image.frame_ids is not a list"})
         if self._tolerance is None and self._provider is not None:
             self._tolerance = self._provider()
         snap = await self._snapshot(lost, read)
         frames = snap.state.payloads["model.frame_placements/1"].model_dump(mode="json")["frames"]
-        before: set[str] = set()
-        if lost.known and isinstance(lost.pre_image, dict):
-            ids = lost.pre_image.get("frame_ids")
-            if isinstance(ids, list):
-                before = {str(item) for item in ids}
+        before = {str(item) for item in ids}
         added = [row for row in frames if str(row["id"]) not in before]
         want = expect(lost.model).want or {}
         tol = self._tolerance
