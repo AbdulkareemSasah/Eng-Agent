@@ -41,6 +41,7 @@ from eng_harness.adapters.csi._edits import EDIT_MODELS as _BASE_EDIT_MODELS
 from eng_harness.adapters.csi._read_state_tool import READ_TOOLS, ModelArgs
 from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, Revisions, SavedFile, SaveModelArgs
 from eng_harness.adapters.csi.products import _safe_loads as _safe_loads
+from eng_harness.adapters.csi.products import _safe_results as _safe_results
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ToolInfo
 from eng_harness.servers import CallEffect
@@ -55,7 +56,8 @@ _BASE_TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_results_frame_forces": "kN_m_C",
     "csi_results_story_drifts": "kN_m_C",
 }
-TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS}  # SAFE point-load token (spec 0008 AC14)
+# SAFE point-load token (spec 0008 AC14) and SAFE base-reaction token (spec 0008 section 4.6, AC23).
+TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS, **_safe_results.TOKENS}
 
 
 def edit_builders() -> dict[str, Builder]:
@@ -133,7 +135,7 @@ LOCAL_TOOLS = (  # adapter-local (spec 0007 4.10): not in the server's tool list
 SESSION_TOOLS = frozenset({"csi_save_model", "csi_open_model"})  # allowlisted; their canonical arguments are below
 _UNRECONCILED = SESSION_TOOLS | {"csi_open_revision"}
 
-ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_model`
+_BASE_ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_model`
     "RunAnalysisArgs": _ModelArgs,
     "AnalysisStatusArgs": _ModelArgs,
     "DesignRunArgs": DesignRunArgs,
@@ -146,6 +148,8 @@ ANALYSIS_MODELS: dict[str, type[ParamModel]] = {  # by the allowlist's `args_mod
     "SaveModelArgs": SaveModelArgs,
     "OpenModelArgs": OpenModelArgs,
 }
+# SAFE base-reaction args (plan 0008 T7; spec 0008 AC23).
+ANALYSIS_MODELS: dict[str, type[ParamModel]] = {**_BASE_ANALYSIS_MODELS, **_safe_results.ANALYSIS_MODELS}
 
 
 def _reader(mapper: Callable[[Mapping[str, Any], Binding], BaseModel]) -> Reader:
@@ -155,7 +159,7 @@ def _reader(mapper: Callable[[Mapping[str, Any], Binding], BaseModel]) -> Reader
     return read
 
 
-READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1); the units token is the binding's
+_BASE_READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1); the units token is the binding's
     "csi_run_analysis": _reader(lambda r, b: _replies.analysis_run(r)),
     "csi_analysis_status": _reader(lambda r, b: _replies.analysis_status(r)),
     "csi_design_run": _reader(lambda r, b: _replies.design_run(r)),
@@ -163,6 +167,11 @@ READERS: dict[str, Reader] = {  # the host tool to its stored kind (spec 4.6.1);
     "csi_results_joint_reactions": _reader(lambda r, b: _replies.joint_reactions(r, b.units_system or "")),
     "csi_results_frame_forces": _reader(lambda r, b: _replies.member_forces(r, b.units_system or "")),
     "csi_results_story_drifts": _reader(lambda r, b: _replies.story_drifts(r, b.units_system or "")),
+}
+# SAFE base-reaction reader (plan 0008 T7); analysis keys from `_safe_results.READERS` are already in `_BASE_READERS`.
+READERS: dict[str, Reader] = {
+    **_BASE_READERS,
+    **{name: reader for name, reader in _safe_results.READERS.items() if name not in _BASE_READERS},
 }
 
 

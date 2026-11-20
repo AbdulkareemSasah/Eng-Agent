@@ -1,4 +1,4 @@
-"""SAFE product profile data and model extensions (plan 0008 T3, T5; spec 0008 section 4.1, 4.4)."""
+"""SAFE product profile data and model extensions (plan 0008 T3, T5, T7; spec 0008 section 4.1, 4.4, 4.8)."""
 
 MODEL_EXTENSIONS = (".FDB",)
 COMPANION_GLOBS: tuple[str, ...] = ()  # empty until local test L2 (spec 0008 section 4.1)
@@ -15,7 +15,7 @@ TABLES = {
     "soil_assignments": "Area Assignments - Area Springs",
 }
 READBACK: dict[str, tuple[str, str, str]] = {}
-# Gap registry (spec 0008 section 4.8); only SG-1 is wired to a step in T3 (plan 0008 T3 / plan 0012 T3).
+# Gap registry (spec 0008 section 4.8); T3 wires SG-1; T7 wires SG-2 to SG-5 and SG-9 (AC24, AC25, amendment B-418).
 GAPS = {
     "SG-1": "creating a new model is not implemented: provide a prepared model",
     "SG-2": "defining or changing a footing slab section is not implemented",
@@ -29,4 +29,10 @@ GAPS = {
 }
 STEP_GAPS = {
     "new_model": "SG-1",
+    "define_slab_section": "SG-2",
+    "define_area_spring": "SG-3",
+    "resize_area": "SG-4",
+    "slab_design": "SG-5",
+    "design_results": "SG-5",
+    "area_forces": "SG-9",
 }
