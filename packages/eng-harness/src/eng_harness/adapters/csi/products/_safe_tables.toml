@@ -1,0 +1,119 @@
+# SAFE field-map data (spec 0008 section 4.5). Every host key is from the named source; none is invented.
+# status: reference | candidate | unknown. Matching is exact equality of the normalized name
+# (lower case, letters and digits only). None or several matches is INTERNAL (AC13), never a first match.
+
+[tables."Slab Property Definitions"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Slab Property Definitions".fields]
+name = { host = "Name", required = true }
+prop_type = { host = "PropType", required = true }
+material = { host = "Material", required = true }
+thickness = { host = "Thickness", required = true }
+
+[tables."Material Properties - General"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Material Properties - General".fields]
+material = { host = "Material", required = true }
+type = { host = "Type", required = true }
+
+[tables."Material Properties - Basic Mechanical Properties"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Material Properties - Basic Mechanical Properties".fields]
+material = { host = "Material", required = true }
+unit_weight = { host = "UnitWeight", required = true }
+e1 = { host = "E1", required = true }
+u12 = { host = "U12", required = true }
+
+[tables."Material Properties - Concrete Data"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Material Properties - Concrete Data".fields]
+material = { host = "Material", required = true }
+fc = { host = "Fc", required = true }
+
+[tables."Spring Property Definitions - Area Springs"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Spring Property Definitions - Area Springs".fields]
+name = { host = "Name", required = true }
+stiff_opt = { host = "StiffOpt", required = true }
+stiff_u1 = { host = "StiffU1", required = true }
+stiff_u2 = { host = "StiffU2", required = true }
+stiff_u3 = { host = "StiffU3", required = true }
+nonlin_opt3 = { host = "NonlinOpt3", required = true }
+
+[tables."Area Assignments - Area Springs"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Area Assignments - Area Springs".fields]
+unique_name = { host = "UniqueName", required = true }
+spring_prop = { host = "SpringProp", required = true }
+
+[tables."Joint Loads Assignments - Force"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Joint Loads Assignments - Force".fields]
+unique_name = { host = "UniqueName", required = true }
+load_pattern = { host = "LoadPattern", required = true }
+fx = { host = "FX", required = true }
+fy = { host = "FY", required = true }
+fz = { host = "FZ", required = true }
+mx = { host = "MX", required = true }
+my = { host = "MY", required = true }
+mz = { host = "MZ", required = true }
+x_dim = { host = "XDim", required = true }
+y_dim = { host = "YDim", required = true }
+
+[tables."Load Pattern Definitions"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Load Pattern Definitions".fields]
+name = { host = "Name", required = true }
+type = { host = "Type", required = true }
+
+[tables."Load Combination Definitions"]
+status = "reference"
+source = "Sasaah SAFE 22 table reference (importable tables); spec 0008 section 4.5"
+[tables."Load Combination Definitions".fields]
+name = { host = "Name", required = true }
+type = { host = "Type", required = true }
+
+# Candidate names are already normalized (lower case, letters and digits only); SafePhase.cs lines cited in the source.
+[tables."Soil Pressures"]
+status = "candidate"
+source = "SafePhase.cs:529-531, 550-551, 573; spec 0008 section 4.5"
+[tables."Soil Pressures".fields]
+case = { names = ["outputcase", "loadcase", "case"], required = true }
+pressure = { names = ["pressure", "soilpressure"], required = true }
+joint = { names = ["joint"], required = false }
+area = { names = ["uniquename"], required = false }
+element = { names = ["shellelm", "element"], required = false }
+step_type = { names = ["steptype"], required = false }
+case_type = { names = ["casetype"], required = false }
+
+[tables."Soil Pressures Summary"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; spec 0008 section 4.5"
+
+[tables."Soil Pressures Enveloping Summary"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; spec 0008 section 4.5"
+
+[tables."Base Reactions"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; typed tool csi_results_base_reactions is preferred; spec 0008 section 4.5"
+
+[tables."Analysis Messages"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; gap until L5 recording; spec 0008 section 4.5"
+
+[tables."Concrete Slab Design - Punching Shear Data"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; gap until L5/L11; spec 0008 section 4.5"
+
+[tables."Concrete Slab Design - Flexure and Shear Data"]
+status = "unknown"
+source = "SAFE 22 reference lists the table with no fields; gap until L5/L11; spec 0008 section 4.5"

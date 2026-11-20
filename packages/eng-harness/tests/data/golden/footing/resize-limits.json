@@ -1,0 +1,213 @@
+{
+  "source": "eng-harness spec 0010 section 4.4.4, synthetic fixture",
+  "method_ref": "§4.4.4 R1 R2 R3",
+  "synthetic": true,
+  "derivation": "Same basis bounds as resize-actions. F1 enlarge_plan from L=3000 (=15*i): next=(15+1)*200=3200 > max_plan=3000, so L stays 3000, status LIMIT_REACHED, plan_at_max true. F2 increase_depth from h=800: next=850 > max_depth=800, h stays 800, LIMIT_REACHED, depth_at_max true. F3 reduce_bar_spacing from s=100: next=75 < min_spacing=100, s stays 100, LIMIT_REACHED, spacing_at_min true. F4 enlarge_plan from L=2800: next=(floor(2800/200)+1)*200=(14+1)*200=3000 <= 3000, so L=3000, status OK.",
+  "input": {
+    "dims": {
+      "footings": [
+        {
+          "id": "F1",
+          "Lx_mm": 3000.0,
+          "Ly_mm": 3000.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        },
+        {
+          "id": "F2",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 800.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        },
+        {
+          "id": "F3",
+          "Lx_mm": 2000.0,
+          "Ly_mm": 2000.0,
+          "h_mm": 500.0,
+          "s_mm": 100.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        },
+        {
+          "id": "F4",
+          "Lx_mm": 2800.0,
+          "Ly_mm": 2800.0,
+          "h_mm": 500.0,
+          "s_mm": 200.0,
+          "source": "calc",
+          "plan_at_max": false,
+          "depth_at_max": false,
+          "spacing_at_min": false,
+          "status": "OK",
+          "reason": null
+        }
+      ]
+    },
+    "actions": {
+      "F1": "enlarge_plan",
+      "F2": "increase_depth",
+      "F3": "reduce_bar_spacing",
+      "F4": "enlarge_plan"
+    },
+    "engineer_plan": {
+      "value": 2000.0,
+      "unit": "mm"
+    },
+    "engineer_depth": {
+      "value": 500.0,
+      "unit": "mm"
+    },
+    "engineer_spacing": {
+      "value": 200.0,
+      "unit": "mm"
+    },
+    "basis": {
+      "template": null,
+      "fields": {
+        "foundation.plan_increment_mm": {
+          "value": 200,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_plan_dimension_mm": {
+          "value": 1000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_plan_dimension_mm": {
+          "value": 3000,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.depth_increment_mm": {
+          "value": 50,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.min_depth_mm": {
+          "value": 400,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "foundation.max_depth_mm": {
+          "value": 800,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.spacing_increment_mm": {
+          "value": 25,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.min_spacing_mm": {
+          "value": 100,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "reinforcement.max_spacing_mm": {
+          "value": 300,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "dims": "res_00000000000000000000000001",
+    "basis": "res_00000000000000000000000002",
+    "engineer_plan": "res_00000000000000000000000003",
+    "engineer_depth": "res_00000000000000000000000003",
+    "engineer_spacing": "res_00000000000000000000000003"
+  },
+  "expected": {
+    "footings": [
+      {
+        "id": "F1",
+        "Lx_mm": 3000.0,
+        "Ly_mm": 3000.0,
+        "h_mm": 500.0,
+        "s_mm": 200.0,
+        "source": "calc",
+        "plan_at_max": true,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "LIMIT_REACHED",
+        "reason": null
+      },
+      {
+        "id": "F2",
+        "Lx_mm": 2000.0,
+        "Ly_mm": 2000.0,
+        "h_mm": 800.0,
+        "s_mm": 200.0,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": true,
+        "spacing_at_min": false,
+        "status": "LIMIT_REACHED",
+        "reason": null
+      },
+      {
+        "id": "F3",
+        "Lx_mm": 2000.0,
+        "Ly_mm": 2000.0,
+        "h_mm": 500.0,
+        "s_mm": 100.0,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": true,
+        "status": "LIMIT_REACHED",
+        "reason": null
+      },
+      {
+        "id": "F4",
+        "Lx_mm": 3000.0,
+        "Ly_mm": 3000.0,
+        "h_mm": 500.0,
+        "s_mm": 200.0,
+        "source": "calc",
+        "plan_at_max": false,
+        "depth_at_max": false,
+        "spacing_at_min": false,
+        "status": "OK",
+        "reason": null
+      }
+    ]
+  }
+}

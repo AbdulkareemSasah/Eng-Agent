@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Declare `public_modules = ["aci318_14"]` so the SBC 304-2018 overlay may import the base pack across the member boundary (IM002; B-327, plan amendment B-583).
 - Pack registration: `PACK` holds the three column checks `max_axial_strength`, `axial_flexure_uniaxial` and `longitudinal_reinforcement_limits` beside the six footing checks, with pack-level, payload and replay tests; all draft (B-334).
 - Shared column section model CS S1 to S7 and column preconditions CP (`_column.py`); the stress-block and `phi` constants and `beta1` move out of the flexure check into `_common.py` (`SECTION_CITED`) and `_column.py`, with no value, citation or output change (B-330).
 - Fix: `test_registry_and_specs` skips its clause-spec file assertions only in the mutation step's copy of the member (`MUTANT_UNDER_TEST` set, folder missing), which lacks the clause specs; MU002 stopped every pack source change (B-444).

@@ -1,0 +1,46 @@
+# Allowlist of the Sasaah IDEA server (spec 0014 section 4.4), reviewed data: a change of an entry is a reviewed
+# data change. Pinned to the S-12 inventory (spikes/S-12-sasaah-tool-inventory/inventory/sasaah-idea-mcp.json),
+# built by static reading of the C# catalog at the commit below; the live tools/list needs a local test.
+# The four classes of the 58 inventory tools: 9 served here, 20 gap, 28 not served, 1 excluded (idea_run_script).
+adapter = "sasaah-idea-mcp"
+sasaah_commit = "61da80f61a6562c8e3553168056bc107e3f93013"
+also_tested_commits = []
+fingerprint = { IDEA = "297db34f6c95f99eae3342885ac01535bf2605f76a8688c1c1689243ca0acc9b" }
+fingerprint_source = "s12-inventory"
+routes = ["native", "rest"]
+tool = [
+  { name = "idea_status", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "StatusArgs", result_kind = "harness.idea_status/1", units = "none", confirm = "never", products = ["IDEA"], routes = ["native", "rest"] },
+  { name = "idea_open_project", kind = "session", timeout_class = "call", effect = "write", action = "open", args_model = "OpenProjectArgs", result_kind = "harness.idea_project/1", units = "none", confirm = "never", readback = "idea_list_connections", products = ["IDEA"], routes = ["rest"] },
+  { name = "idea_close_project", kind = "session", timeout_class = "call", effect = "write", action = "plain", args_model = "CloseProjectArgs", result_kind = "harness.idea_project/1", units = "none", confirm = "never", readback = "closed", products = ["IDEA"], routes = ["rest"] },
+  { name = "idea_list_connections", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListConnectionsArgs", result_kind = "harness.idea_project/1", units = "none", confirm = "never", products = ["IDEA"], routes = ["rest"] },
+  { name = "idea_calculate", kind = "analysis", timeout_class = "long", effect = "write", action = "analysis", args_model = "CalculateArgs", result_kind = "verdicts.set/1", units = "none", confirm = "approved", readback = "checks", products = ["IDEA"], routes = ["rest"] },
+  { name = "idea_get_check_results", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetCheckResultsArgs", result_kind = "verdicts.set/1", units = "none", confirm = "never", products = ["IDEA"], routes = ["rest"] },
+  { name = "idea_native_get_loads", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "NativeGetLoadsArgs", result_kind = "harness.idea_loads/1", units = "none", confirm = "never", products = ["IDEA"], routes = ["native"] },
+  { name = "idea_native_set_loads", kind = "write", timeout_class = "call", effect = "write", action = "plain", args_model = "NativeSetLoadsArgs", result_kind = "harness.idea_loads/1", units = "none", confirm = "approved", readback = "idea_native_get_loads", products = ["IDEA"], routes = ["native"] },
+  { name = "idea_native_calculate", kind = "analysis", timeout_class = "long", effect = "read", action = "analysis", args_model = "NativeCalculateArgs", result_kind = "verdicts.set/1", units = "none", confirm = "never", products = ["IDEA"], routes = ["native"] },
+]
+# Declared units for native loads (S-12 §4, status declared); idea_set_loads has no unit (S12-G12), status missing (AC16).
+[[unit]]
+tool = "idea_native_get_loads"
+field = "force"
+unit = "N"
+unit_status = "declared"
+[[unit]]
+tool = "idea_native_get_loads"
+field = "moment"
+unit = "N.m"
+unit_status = "declared"
+[[unit]]
+tool = "idea_native_set_loads"
+field = "force"
+unit = "N"
+unit_status = "declared"
+[[unit]]
+tool = "idea_native_set_loads"
+field = "moment"
+unit = "N.m"
+unit_status = "declared"
+[[unit]]
+tool = "idea_set_loads"
+field = "forces"
+unit_status = "missing"
