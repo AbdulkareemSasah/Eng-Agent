@@ -59,9 +59,7 @@ def test_host_args_all_write_models() -> None:
         SetTypeParameterValuesArgs,
     )
 
-    setter = SetElementParameterValuesArgs(
-        element_ids=[1], parameter_name="b", value="450", value_type="double"
-    )
+    setter = SetElementParameterValuesArgs(element_ids=[1], parameter_name="b", value="450", value_type="double")
     assert _host_args(setter) == {
         "elementIds": [1],
         "parameterName": "b",
@@ -77,9 +75,15 @@ def test_host_args_all_write_models() -> None:
         element_ids=[3001],
     )
     type_args = _host_args(typed)
-    assert type_args["typeIds"] == [2001]
-    assert type_args["elementIds"] == [3001]
+    assert type_args == {
+        "typeIds": [2001],
+        "parameterName": "b",
+        "value": "450",
+        "valueType": "double",
+        "elementIds": [3001],
+    }
     assert "expected_instances" not in type_args
+    assert "expectedInstances" not in type_args
     guid = SetParameterValueByGuidArgs(
         element_ids=[3001],
         guid="11111111-1111-1111-1111-111111111111",
@@ -89,7 +93,10 @@ def test_host_args_all_write_models() -> None:
         target="instance",
     )
     guid_args = _host_args(guid)
+    assert guid_args["elementIds"] == [3001]
     assert guid_args["guid"] == "11111111-1111-1111-1111-111111111111"
+    assert guid_args["value"] == "450"
+    assert guid_args["valueType"] == "double"
     assert guid_args["unit"] == "mm"
     assert guid_args["target"] == "instance"
     change = ChangeElementTypeArgs(element_ids=[3001], type_id=2002)
@@ -136,9 +143,7 @@ def test_active_document_not_bound_is_unknown() -> None:
         found = await reconciler.decide(
             _lost(
                 "revit_set_element_parameter_values",
-                SetElementParameterValuesArgs(
-                    element_ids=[3001], parameter_name="b", value="450", value_type="double"
-                ),
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
             ),
             read,
         )
@@ -169,7 +174,8 @@ def test_duplicate_absent_and_present_branches() -> None:
         state["items"] = [{"name": "C450x450", "type_id": 2100}]
         applied = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), read)
         assert applied.outcome == "applied"
-        assert applied.evidence["observed"]["type_id"] == 2100
+        observed = cast(dict[str, Any], applied.evidence["observed"])
+        assert observed["type_id"] == 2100
 
         unknown = await reconciler.decide(
             _lost("revit_duplicate_family_type", model, pre_image={"name": "C450x450"}),
@@ -258,9 +264,7 @@ def test_observe_open_and_setter() -> None:
         open_obs = await reconciler.observe(_lost("revit_open_model", OpenModelArgs(path=str(BOUND))), read)
         assert open_obs == {"observed": {"path": str(BOUND)}}
 
-        setter = SetElementParameterValuesArgs(
-            element_ids=[3001], parameter_name="b", value="450", value_type="double"
-        )
+        setter = SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double")
         lost = _lost("revit_set_element_parameter_values", setter)
         observed = await reconciler.observe(lost, read)
         assert observed is not None
@@ -271,9 +275,7 @@ def test_observe_open_and_setter() -> None:
 
 def test_setter_applied_when_request_matches() -> None:
     async def body() -> None:
-        reconciler = RevitReconciler(
-            tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "col-3001"}
-        )
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "col-3001"})
         # 450 mm in feet (spec §4.6 rawValue).
         feet = 450.0 / 304.8
 
@@ -300,10 +302,131 @@ def test_setter_applied_when_request_matches() -> None:
         found = await reconciler.decide(
             _lost(
                 "revit_set_element_parameter_values",
-                SetElementParameterValuesArgs(
-                    element_ids=[3001], parameter_name="b", value="450", value_type="double"
-                ),
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
                 pre_image={"b": 304.8},
+            ),
+            read,
+        )
+        assert found.outcome == "applied"
+
+    anyio.run(body)
+
+
+def test_setter_not_applied_and_unknown() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND, unique_ids={3001: "col-3001"})
+        pre_feet = 300.0 / 304.8
+        other_feet = 400.0 / 304.8
+        state = {"raw": pre_feet}
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return {"path": str(BOUND), "active_path": str(BOUND)}
+            if tool == "revit_get_element_parameters":
+                return {
+                    "items": [
+                        {
+                            "parameters": [
+                                {
+                                    "name": "b",
+                                    "rawValue": state["raw"],
+                                    "specId": "autodesk.spec.aec:length-2.0.0",
+                                    "storageType": "Double",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            raise AssertionError(tool)
+
+        setter = SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double")
+        # Want-shaped pre-image in contract units (mm), as observe stores (workflow helper).
+        pre: JsonValue = {"b": 300.0}
+        not_applied = await reconciler.decide(
+            _lost("revit_set_element_parameter_values", setter, pre_image=pre),
+            read,
+        )
+        assert not_applied.outcome == "not_applied"
+
+        state["raw"] = other_feet
+        unknown = await reconciler.decide(
+            _lost("revit_set_element_parameter_values", setter, pre_image=pre),
+            read,
+        )
+        assert unknown.outcome == "unknown"
+
+    anyio.run(body)
+
+
+def test_observe_returns_none_for_unknown_tool() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            raise AssertionError(tool)
+
+        # Descriptor still loads; decide path would be unknown, observe has no rule.
+        lost = _lost(
+            "revit_set_element_parameter_values",
+            SetElementParameterValuesArgs(element_ids=[1], parameter_name="b", value="1", value_type="double"),
+        )
+
+        # Force an unrecognized name via a shallow copy of the descriptor is not allowed;
+        # open_model observe with non-str path covers the None branch of path typing.
+        async def meta_bad(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return {"path": 12}
+
+        obs = await reconciler.observe(_lost("revit_open_model", OpenModelArgs(path=str(BOUND))), meta_bad)
+        assert obs == {"observed": {"path": None}}
+
+    anyio.run(body)
+
+
+def test_open_model_unknown_when_path_missing() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return {"path": None, "active_path": None}
+
+        found = await reconciler.decide(
+            _lost("revit_open_model", OpenModelArgs(path=str(BOUND))),
+            read,
+        )
+        assert found.outcome == "unknown"
+
+    anyio.run(body)
+
+
+def test_bound_none_skips_active_check() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=None)
+        feet = 450.0 / 304.8
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return {"path": r"C:\other.rvt", "active_path": r"C:\other.rvt"}
+            if tool == "revit_get_element_parameters":
+                return {
+                    "items": [
+                        {
+                            "parameters": [
+                                {
+                                    "name": "b",
+                                    "rawValue": feet,
+                                    "specId": "autodesk.spec.aec:length-2.0.0",
+                                    "storageType": "Double",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(
+            _lost(
+                "revit_set_element_parameter_values",
+                SetElementParameterValuesArgs(element_ids=[3001], parameter_name="b", value="450", value_type="double"),
             ),
             read,
         )
