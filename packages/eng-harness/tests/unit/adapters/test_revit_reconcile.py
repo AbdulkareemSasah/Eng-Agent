@@ -102,13 +102,23 @@ def test_host_args_all_write_models() -> None:
     }
     assert "expected_instances" not in type_args
     assert "expectedInstances" not in type_args
+    typed_no_elements = SetTypeParameterValuesArgs(
+        parameter_name="b",
+        value="450",
+        value_type="double",
+        type_ids=[2001],
+        expected_instances=[3001],
+        element_ids=None,
+    )
+    assert "elementIds" not in _host_args(typed_no_elements)
     guid = SetParameterValueByGuidArgs(
         element_ids=[3001],
         guid="11111111-1111-1111-1111-111111111111",
         value="450",
         value_type="double",
         unit="mm",
-        target="instance",
+        target="type",  # non-default so dropping target= in _host_args is killed
+        all_or_nothing=False,  # non-default so dropping all_or_nothing= is killed
     )
     guid_args = _host_args(guid)
     assert guid_args["elementIds"] == [3001]
@@ -116,7 +126,8 @@ def test_host_args_all_write_models() -> None:
     assert guid_args["value"] == "450"
     assert guid_args["valueType"] == "double"
     assert guid_args["unit"] == "mm"
-    assert guid_args["target"] == "instance"
+    assert guid_args["target"] == "type"
+    assert guid_args["allOrNothing"] is False
     change = ChangeElementTypeArgs(element_ids=[3001], type_id=2002)
     assert _host_args(change) == {"elementIds": [3001], "typeId": 2002}
     dup = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="C450x450")
@@ -880,6 +891,54 @@ def test_host_args_raises_type_error_message() -> None:
         _host_args(cast(Any, object()))
 
 
+def test_decide_no_reconcile_rule() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            assert arguments == {}
+            assert effect is CallEffect.READ
+            return _meta_bound()
+
+        lost = LostWrite(
+            _desc("revit_get_model_metadata"),
+            OpenModelArgs(path=str(BOUND)),
+            Binding(target=HostTarget(product="revit", pid=7), owned=True),
+            True,
+            None,
+        )
+        found = await reconciler.decide(lost, read)
+        assert found.outcome == "unknown"
+        assert found.evidence == {"reason": "no reconcile rule for revit_get_model_metadata"}
+
+    anyio.run(body)
+
+
+def test_as_int_rejects_bool() -> None:
+    """bool must not be treated as an int type_id (kills `or`→`and` on the None/bool guard)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        types = [
+            {"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1},
+            {"name": "N", "type_id": True, "family": "F", "family_id": 1},  # invalid
+        ]
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_list_family_types_in_family":
+                return {"items": list(types), "truncated": False}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), read)
+        assert found.outcome == "unknown"
+        assert "type_id" in str(found.evidence.get("reason", "")).lower() or found.outcome == "unknown"
+
+    anyio.run(body)
+
+
 def test_observe_wrong_model_returns_none() -> None:
     async def body() -> None:
         reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
@@ -896,5 +955,254 @@ def test_observe_wrong_model_returns_none() -> None:
             None,
         )
         assert await reconciler.observe(lost, read) is None
+
+    anyio.run(body)
+
+
+def test_guid_and_type_setters() -> None:
+    from eng_harness.adapters.revit._tools import SetParameterValueByGuidArgs, SetTypeParameterValuesArgs
+
+    async def body() -> None:
+        reconciler = RevitReconciler(
+            tolerance_ratio=0.001,
+            bound_path=BOUND,
+            unique_ids={3001: "col-3001", 3002: "col-3002"},
+        )
+        guid = "11111111-1111-1111-1111-111111111111"
+        values = {3001: FEET_450, 3002: FEET_300}
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_parameters":
+                eid = int(arguments["elementIds"][0])
+                assert arguments.get("guid") is None or True
+                return {
+                    "items": [
+                        {
+                            "parameters": [
+                                {
+                                    "name": "b",
+                                    "guid": guid,
+                                    "rawValue": values[eid],
+                                    "specId": LENGTH_SPEC,
+                                    "storageType": "Double",
+                                }
+                            ]
+                        }
+                    ]
+                }
+            if tool == "revit_get_type_parameters":
+                tid = int(arguments["typeIds"][0])
+                raw = FEET_450 if tid == 2001 else FEET_300
+                return {"items": [{"parameters": [_param(raw)]}]}
+            raise AssertionError(tool)
+
+        guid_model = SetParameterValueByGuidArgs(
+            element_ids=[3001, 3002],
+            guid=guid,
+            value="450",
+            value_type="double",
+            unit="mm",
+            target="instance",
+            all_or_nothing=True,
+        )
+        guid_found = await reconciler.decide(
+            _lost("revit_set_parameter_value_by_guid", guid_model, pre_image={guid: 300.0}),
+            read,
+        )
+        assert guid_found.outcome == "partial"
+        assert guid_found.missing == ("col-3002",)
+        assert guid_found.evidence["requested"] == {guid: 450.0}
+
+        type_model = SetTypeParameterValuesArgs(
+            parameter_name="b",
+            value="450",
+            value_type="double",
+            type_ids=[2001, 2002],
+            expected_instances=[3001],
+        )
+        type_found = await reconciler.decide(
+            _lost("revit_set_type_parameter_values", type_model, pre_image={"b": 300.0}),
+            read,
+        )
+        assert type_found.outcome == "partial"
+        assert type_found.missing == ("2002",)
+        assert type_found.evidence["requested"] == {"b": 450.0}
+
+    anyio.run(body)
+
+
+def test_duplicate_family_name_only_scope() -> None:
+    """When the source row has no family_id, family_name must still scope the lookup."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+        types = [
+            {"name": "C300x300", "type_id": 2001, "family": "F"},  # no family_id
+            {"name": "N", "type_id": 55, "family": "F"},
+            {"name": "N", "type_id": 99, "family": "Other"},
+        ]
+        seen: list[dict[str, Any]] = []
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_list_family_types_in_family":
+                seen.append(dict(arguments))
+                family_name = arguments.get("family_name")
+                rows = [row for row in types if family_name is None or row.get("family") == family_name]
+                return {"items": rows, "truncated": False}
+            if tool == "revit_get_type_parameters":
+                return {"items": [{"id": int(arguments["typeIds"][0]), "parameters": [_param(1.0)]}]}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), read)
+        assert found.outcome == "applied"
+        assert any(call.get("family_name") == "F" for call in seen)
+
+    anyio.run(body)
+
+
+def test_wrong_model_branches_unknown() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return _meta_bound()
+
+        change = await reconciler.decide(
+            LostWrite(
+                _desc("revit_change_element_type"),
+                OpenModelArgs(path=str(BOUND)),
+                Binding(target=HostTarget(product="revit", pid=7), owned=True),
+                True,
+                None,
+            ),
+            read,
+        )
+        assert change.outcome == "unknown"
+        assert change.evidence["reason"] == "not a change-element-type model"
+
+        dup = await reconciler.decide(
+            LostWrite(
+                _desc("revit_duplicate_family_type"),
+                OpenModelArgs(path=str(BOUND)),
+                Binding(target=HostTarget(product="revit", pid=7), owned=True),
+                True,
+                None,
+            ),
+            read,
+        )
+        assert dup.outcome == "unknown"
+        assert dup.evidence["reason"] == "not a duplicate-family-type model"
+
+        open_wrong = await reconciler.decide(
+            LostWrite(
+                _desc("revit_open_model"),
+                ChangeElementTypeArgs(element_ids=[1], type_id=2),
+                Binding(target=HostTarget(product="revit", pid=7), owned=True),
+                True,
+                None,
+            ),
+            read,
+        )
+        assert open_wrong.outcome == "unknown"
+        assert open_wrong.evidence["reason"] == "not an open-model model"
+
+    anyio.run(body)
+
+
+def test_read_error_paths_with_reasons() -> None:
+    async def body() -> None:
+        reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
+        model = DuplicateFamilyTypeArgs(source_type_id="2001", new_type_name="N")
+
+        async def list_not_mapping(tool: str, arguments: dict[str, Any], effect: CallEffect) -> Any:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            return ["not", "a", "mapping"]
+
+        found = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), list_not_mapping)
+        assert found.outcome == "unknown"
+        assert "mapping" in str(found.evidence.get("reason", ""))
+
+        async def items_not_list(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            return {"items": "nope", "truncated": False}
+
+        found2 = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), items_not_list)
+        assert found2.outcome == "unknown"
+        assert "items are not a list" in str(found2.evidence.get("reason", ""))
+
+        async def source_missing(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            return {"items": [{"name": "Other", "type_id": 9, "family": "F", "family_id": 1}], "truncated": False}
+
+        found3 = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), source_missing)
+        assert found3.outcome == "unknown"
+        assert "was not found" in str(found3.evidence.get("reason", ""))
+
+        async def params_truncated(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_list_family_types_in_family":
+                return {
+                    "items": [
+                        {"name": "C300x300", "type_id": 2001, "family": "F", "family_id": 1},
+                        {"name": "N", "type_id": 55, "family": "F", "family_id": 1},
+                    ],
+                    "truncated": False,
+                }
+            return {"items": [{"id": 55, "parameters": [_param(1.0)]}], "truncated": True}
+
+        found4 = await reconciler.decide(_lost("revit_duplicate_family_type", model, pre_image=None), params_truncated)
+        assert found4.outcome == "unknown"
+        assert "truncated" in str(found4.evidence.get("reason", "")).lower()
+
+    anyio.run(body)
+
+
+def test_change_type_continue_across_elements() -> None:
+    """First element unknown must not stop the loop (continue, not break)."""
+
+    async def body() -> None:
+        reconciler = RevitReconciler(
+            tolerance_ratio=0.001,
+            bound_path=BOUND,
+            unique_ids={1: "u1", 2: "u2"},
+        )
+        details = {
+            1: None,  # missing → unknown
+            2: {"unique_id": "u2", "type_id": 99},
+        }
+
+        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool == "revit_get_model_metadata":
+                return _meta_bound()
+            if tool == "revit_get_element_details":
+                eid = int(arguments["elementIds"][0])
+                row = details[eid]
+                if row is None:
+                    raise ContractError(ErrorCode.NOT_FOUND, "gone")
+                return {"items": [row]}
+            raise AssertionError(tool)
+
+        found = await reconciler.decide(
+            _lost(
+                "revit_change_element_type",
+                ChangeElementTypeArgs(element_ids=[1, 2], type_id=99),
+                pre_image={"by_element": {"1": {"type_id": 1}, "2": {"type_id": 1}}},
+            ),
+            read,
+        )
+        # any unknown → unknown overall, but element 2 must still have been read (applied).
+        assert found.outcome == "unknown"
+        observed = cast(dict[str, Any], found.evidence["observed"])
+        assert observed["2"] == {"type_id": 99}
+        assert observed["1"] is None
 
     anyio.run(body)
