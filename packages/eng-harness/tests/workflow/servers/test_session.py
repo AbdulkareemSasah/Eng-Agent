@@ -710,3 +710,96 @@ def test_safe_build_mismatch_stops_run(tmp_path: Path) -> None:
             assert r.calls("csi_open_model") == []
 
     anyio.run(body)
+
+
+def test_sap2000_build_mismatch_stops_run(tmp_path: Path) -> None:
+    """Spec 0012 AC3: a SAP2000 build/fingerprint mismatch stops the run before journaling or any model open."""
+    from fakes.ports import FakeApprovalPort, FakeCalcPort, FakeInputPort
+    from fakes.sasaah_csi.wiring import config, pause, rig
+
+    from eng_harness.basis import StoreBasisPort
+    from eng_harness.block import Registry
+    from eng_harness.engine import Engine, EnginePorts, EngineSettings
+    from eng_harness.errors import HarnessCode, RunRefused
+    from eng_harness.ports import RunClass
+    from eng_harness.servers import HostProgramConfig
+
+    r = rig(tmp_path)
+    r.control.write_text(json.dumps({"faults": [], "seed": {}, "product": "SAP2000"}))
+    schemas_path = Path(__file__).resolve().parents[2] / "fakes" / "sasaah_csi" / "schemas.json"
+    bad_server = tmp_path / "bad_sap2000_server.py"
+    bad_server.write_text(
+        "\n".join(
+            [
+                "import json",
+                "from pathlib import Path",
+                "import anyio",
+                "from mcp import types",
+                "from mcp.server import Server",
+                "from mcp.server.stdio import stdio_server",
+                f"TOOLS = json.loads(Path({str(schemas_path)!r}).read_text())['tools']",
+                "async def on_list(ctx, params):",
+                "    items = [",
+                "        types.Tool(",
+                "            name=t['name'],",
+                "            input_schema={'type': 'object', 'properties': {'tampered': {'type': 'string'}}}",
+                "            if t['name'] == 'csi_list_frames' else t['input_schema'],",
+                "        )",
+                "        for t in TOOLS",
+                "    ]",
+                "    return types.ListToolsResult(tools=items)",
+                "async def on_call(ctx, params):",
+                "    body = {'read_only': False, 'script_enabled': False, 'instances': [], 'current_target': None}",
+                "    return types.CallToolResult(content=[types.TextContent(type='text', text=json.dumps(body))])",
+                "async def main():",
+                "    server = Server('sasaah-csi-fake', on_list_tools=on_list, on_call_tool=on_call)",
+                "    async with stdio_server() as (rd, wr):",
+                "        await server.run(rd, wr, server.create_initialization_options())",
+                "anyio.run(main)",
+            ]
+        )
+    )
+    cfg = config(r.control)
+    base = cfg.servers["csi"]
+    sap_section = base.model_copy(
+        update={
+            "product": "SAP2000",
+            "host_key": "csi_sap2000",
+            "args": (str(bad_server), "--disable-script"),
+        }
+    )
+    cfg = cfg.model_copy(
+        update={
+            "servers": {"csi_sap2000": sap_section},
+            "host_programs": {"sap2000": HostProgramConfig(executables=("SAP2000.exe",))},
+        }
+    )
+    flow = replace(pause, min_server_builds={"csi_sap2000": csi_allowlist().sasaah_commit}, copy_on_open=True)
+
+    async def body() -> None:
+        async with r.ports(config=cfg) as p:
+            engine = Engine(
+                r.workspace,
+                Registry([flow]),
+                EnginePorts(
+                    tool=p.tool_port,
+                    host=p.host_port,
+                    calc=FakeCalcPort(RunClass.TRIAL, []),
+                    basis=StoreBasisPort(r.store),
+                    approvals=FakeApprovalPort(),
+                    inputs=FakeInputPort(),
+                ),
+                r.store,
+                EngineSettings(),
+                r.clock,
+                r.ids,
+            )
+            with pytest.raises(RunRefused) as refused:
+                await engine.start(r.request())
+            assert refused.value.code is HarnessCode.SERVER_CHECK_FAILED
+            assert refused.value.evidence == ("csi_sap2000",)
+            assert "fingerprint" in refused.value.message
+            assert not (r.run_dir / "journal.sqlite").exists()
+            assert r.calls("csi_open_model") == []
+
+    anyio.run(body)
