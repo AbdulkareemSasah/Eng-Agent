@@ -126,20 +126,26 @@ def require_host_only(verdicts: Sequence[Verdict]) -> None:
             raise ValueError("a verdicts.set of IDEA host checks may not contain a code_pack verdict")
 
 
-def _connection_passed_agrees(connection: Mapping[str, Any], check_verdicts: Sequence[Verdict]) -> bool:
-    """True when `passed` matches the non-skipped check statuses (any FAIL or NEEDS_ENGINEER from a fail disagrees)."""
+def _connection_passed_agrees(
+    connection: Mapping[str, Any],
+    check_verdicts: Sequence[Verdict],
+    checks: Sequence[Any],
+) -> bool:
+    """True when `passed` agrees with non-skipped checks (AC14).
+
+    When `passed` is true, disagree on any non-skipped check whose `check_status` is false, or on a mapped
+    `FAIL` or `ERROR`. Host-pass / high-ratio `NEEDS_ENGINEER` alone is not a passed disagreement.
+    """
     if not bool(connection.get("passed", False)):
         return True
-    for verdict in check_verdicts:
-        if verdict.status in (VerdictStatus.FAIL, VerdictStatus.ERROR):
-            return False
+    for check in checks:
         if (
-            verdict.status is VerdictStatus.NEEDS_ENGINEER
-            and verdict.ratio is not None
-            and verdict.ratio > _RATIO_LIMIT
+            isinstance(check, Mapping)
+            and not bool(check.get("skipped", False))
+            and not bool(check.get("check_status", False))
         ):
             return False
-    return True
+    return not any(v.status in (VerdictStatus.FAIL, VerdictStatus.ERROR) for v in check_verdicts)
 
 
 def _mark_governing(verdicts: list[Verdict]) -> list[Verdict]:
@@ -194,7 +200,7 @@ def build_verdict_set(
             if isinstance(check, Mapping)
         ]
         verdicts.extend(check_verdicts)
-        if not _connection_passed_agrees(connection, check_verdicts):
+        if not _connection_passed_agrees(connection, check_verdicts, checks):
             verdicts.append(
                 Verdict(
                     source=VerdictSource.HOST,

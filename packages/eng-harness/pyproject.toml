@@ -80,8 +80,8 @@ r1_modules = [
   "src/eng_harness/decisions/_rules.py",
   "src/eng_harness/adapters/csi/_read_state_tool.py", "src/eng_harness/adapters/csi/_revisions.py",
   "src/eng_harness/rules/edit_cycle.py", "src/eng_harness/rules/footing.py",
-
-
+  "src/eng_harness/adapters/idea/_stub.py",
+  "src/eng_harness/adapters/idea/_verdicts.py",
 ]
 r2_modules = ["src/eng_harness/journal/**", "src/eng_harness/kinds/**", "src/eng_harness/ctx.py", "src/eng_harness/block.py",
               "src/eng_harness/ports.py", "src/eng_harness/errors.py"]

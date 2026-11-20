@@ -6,6 +6,7 @@ Units: none in this module (loads units are declared on the kinds). Errors: `Con
 `host_code` `UNEXPECTED_REPLY` when a reply cannot be mapped to its kind (spec 0014 AC12, A1).
 """
 
+import json
 from collections.abc import Mapping, Sequence
 from pathlib import PurePath, PureWindowsPath
 from typing import Any, cast
@@ -96,13 +97,13 @@ def _validate[T: BaseModel](kind: str, payload: Mapping[str, Any], model: type[T
     try:
         return model.model_validate(reduce_paths(dict(payload)))
     except ValidationError as error:
+        # Kind names carry `/1` and are not a FieldPath; put them in the message and received only.
         raise ContractError(
             ErrorCode.HOST_ERROR,
             f"the host reply is not a valid {kind}",
             retryable=False,
             host_code="UNEXPECTED_REPLY",
-            field=kind,
-            received={"errors": error.errors(include_url=False)},
+            received={"kind": kind, "errors": json.loads(error.json())},
         ) from None
 
 
