@@ -42,7 +42,6 @@ __all__ = [
 
 SOIL_TABLE = "Soil Pressures"
 MESSAGES_TABLE = "Analysis Messages"
-_REACTION = {"FX_kN": "F1", "FY_kN": "F2", "FZ_kN": "F3", "MX_kNm": "M1", "MY_kNm": "M2", "MZ_kNm": "M3"}
 
 
 class ResultsBaseReactionsArgs(ParamModel):
@@ -127,10 +126,11 @@ def soil_pressures_from_mapped(
             )
         seen[key] = row
     pressures = [row.pressure_kpa for row in rows]
+    # Spec 0008 §4.6: summary holds raw min/max; with no rows there is no raw value (never 0.0 as pressure).
     summary = SafeSoilPressureSummary(
         count=len(rows),
-        min_kpa=min(pressures) if pressures else 0.0,
-        max_kpa=max(pressures) if pressures else 0.0,
+        min_kpa=min(pressures) if pressures else None,
+        max_kpa=max(pressures) if pressures else None,
     )
     status: Literal["candidate", "reference"] = "candidate" if mapped.status == "candidate" else "reference"
     return SafeSoilPressures(
@@ -197,40 +197,17 @@ async def read_analysis_messages(call: HostCall, *, product: str, pid: int) -> N
     raise AssertionError("Analysis Messages map entry must stay unknown until recorded")
 
 
-def _case_ref_from_host(row: Mapping[str, Any]) -> dict[str, Any]:
-    step = row.get("step")
-    return {
-        "case": str(row["case"]),
-        "case_type": "load_combination" if row.get("kind") == "combo" else "load_case",
-        "step": None if step in (None, "") else str(step),
-    }
-
-
-def _scaled(row: Mapping[str, Any], units: str, fields: Mapping[str, str]) -> dict[str, float]:
-    system = csi_unit_system(units)
-    unit_of = {"kN": ("force", "kN"), "kNm": ("moment", "kN.m")}
-    scaled: dict[str, float] = {}
-    for name, key in fields.items():
-        member, unit = unit_of[name.rpartition("_")[2]]
-        scaled[name] = convert(float(row[key]), getattr(system, member), unit)
-    return scaled
-
-
+# Reuse shared CSI reply helpers so base and joint reaction mapping cannot drift (review r1).
+# `_mapped` / `_case_ref` / `_scaled` / `_REACTION` / `_rows` are package-private on `_replies` (not in its
+# `__all__`); importing them here is intentional so host-field failures become HOST_ERROR like joint_reactions.
+@_replies._mapped
 def base_reactions(reply: Mapping[str, Any], units: str) -> BaseReactions:
     """Map `csi_results_base_reactions` to `harness.base_reactions/1` (AC23)."""
-    items = reply.get("items")
-    if not isinstance(items, list) or not all(isinstance(row, dict) for row in items):
-        raise ContractError(
-            ErrorCode.HOST_ERROR,
-            "the reply of csi_results_base_reactions has no usable items",
-            retryable=False,
-            host_code="UNEXPECTED_REPLY",
-            host_method="csi_results_base_reactions",
-            field="items",
-        )
     rows = [
-        BaseReactionRow.model_validate({"case": _case_ref_from_host(row), **_scaled(row, units, _REACTION)})
-        for row in items
+        BaseReactionRow.model_validate(
+            {"case": _replies._case_ref(row), **_replies._scaled(row, units, _replies._REACTION)}
+        )
+        for row in _replies._rows(reply, "items")
     ]
     return BaseReactions(moment_reference="host_unconfirmed/1", rows=rows)
 

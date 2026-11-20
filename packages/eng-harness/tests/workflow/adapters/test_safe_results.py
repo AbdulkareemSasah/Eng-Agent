@@ -375,4 +375,3 @@ def test_soil_pressure_empty_summary_has_no_pressure() -> None:
     assert payload.summary.count == 0
     assert payload.summary.min_kpa is None
     assert payload.summary.max_kpa is None
-

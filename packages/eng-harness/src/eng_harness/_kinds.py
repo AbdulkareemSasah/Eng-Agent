@@ -159,7 +159,10 @@ class SafeSoilPressureRow(BaseModel):
 
 
 class SafeSoilPressureSummary(BaseModel):
-    """Raw min/max and count of a soil-pressure reply; no absolute values (spec 0008 section 4.6)."""
+    """Raw min/max and count of a soil-pressure reply; no absolute values (spec 0008 section 4.6).
+
+    When `count` is 0 there is no raw min/max, so both are `null` (never 0.0 as a fake pressure).
+    """
 
     model_config = ConfigDict(
         extra="forbid",
@@ -170,8 +173,8 @@ class SafeSoilPressureSummary(BaseModel):
     )
 
     count: Annotated[int, Field(ge=0)]
-    min_kpa: Annotated[float, Field(allow_inf_nan=False, alias="min_kPa")]
-    max_kpa: Annotated[float, Field(allow_inf_nan=False, alias="max_kPa")]
+    min_kpa: Annotated[float | None, Field(allow_inf_nan=False, alias="min_kPa")]
+    max_kpa: Annotated[float | None, Field(allow_inf_nan=False, alias="max_kPa")]
 
 
 class SafeSoilPressures(BaseModel):
