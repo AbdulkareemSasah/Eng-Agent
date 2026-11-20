@@ -7,7 +7,7 @@ duplicate and change_element_type branches that workflow faults do not hit alone
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import anyio
 import pytest
