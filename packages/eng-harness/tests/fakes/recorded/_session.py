@@ -59,15 +59,84 @@ SEED = {  # a small model: list values in kN_mm_C (millimetres), table values in
     },
 }  # fmt: skip
 USER = "jdoe"  # the stand-in user and home of the scripted session: the sanitizer must remove both
+# SAFE synthetic seed: state tables of plan 0008 T5 plus soil pressures and reaction results (spec 0008 §4.4, §4.6).
+SAFE_SEED: dict[str, Any] = {
+    "grids": [
+        {
+            "name": "G1", "type": "Cartesian", "origin": [0.0, 0.0], "rotation_deg": 0.0,
+            "x_lines": [{"id": "1", "ordinate": 0.0, "visible": True}, {"id": "2", "ordinate": 4000.0}],
+            "y_lines": [{"id": "A", "ordinate": 0.0, "visible": True}],
+        }
+    ],
+    "points": [{"name": "P1", "x": 1000.0, "y": 500.0, "z": 0.0}],
+    "frames": [
+        {
+            "name": "B1", "label": "B1", "point1": [0.0, 0.0, 0.0], "point2": [4000.0, 0.0, 0.0],
+            "section": "GB", "story": "",
+        }
+    ],
+    "areas": [
+        {
+            "name": "A1",
+            "points": [[0.0, 0.0, 0.0], [4000.0, 0.0, 0.0], [4000.0, 4000.0, 0.0], [0.0, 4000.0, 0.0]],
+            "section": "FOOT",
+        }
+    ],
+    "load_patterns": [{"name": "DEAD", "type": "Dead", "self_weight": 1.0}],
+    "load_combos": [{"name": "C1", "type": 0, "items": [{"name": "DEAD", "factor": 1.4, "kind": "case"}]}],
+    "tables": {
+        "Slab Property Definitions": [
+            {"Name": "FOOT", "PropType": "Footing", "Material": "C30", "Thickness": 0.5},
+        ],
+        "Material Properties - General": [{"Material": "C30", "Type": "Concrete"}],
+        "Material Properties - Basic Mechanical Properties": [
+            {"Material": "C30", "UnitWeight": 24.0, "E1": 30_000.0, "U12": 0.2}
+        ],
+        "Material Properties - Concrete Data": [{"Material": "C30", "Fc": 30_000.0}],
+        "Load Pattern Definitions": [{"Name": "DEAD", "Type": "Dead", "SelfWtMultpl": 1.0}],
+        "Load Combination Definitions": [{"Name": "C1", "Type": "Linear Add"}],
+        "Joint Loads Assignments - Force": [
+            {
+                "UniqueName": "P1", "LoadPattern": "DEAD", "FX": 0.0, "FY": 0.0, "FZ": -100.0,
+                "MX": 0.0, "MY": 0.0, "MZ": 0.0, "XDim": 0.4, "YDim": 0.4,
+            }
+        ],
+        "Spring Property Definitions - Area Springs": [
+            {
+                "Name": "K1", "StiffOpt": "Link", "StiffU1": 0.0, "StiffU2": 0.0, "StiffU3": 20000.0,
+                "NonlinOpt3": "Compression Only",
+            }
+        ],
+        "Area Assignments - Area Springs": [{"UniqueName": "A1", "SpringProp": "K1"}],
+        "Soil Pressures": [
+            {
+                "UniqueName": "A1", "ShellElm": "E1", "Joint": "J1", "OutputCase": "DEAD",
+                "StepType": "Max", "CaseType": "LinStatic", "Pressure": 12.5,
+            }
+        ],
+    },
+    "results": {
+        "csi_results_base_reactions": [
+            {"case": "DEAD", "F1": 1.0, "F2": -2.0, "F3": 50.0, "M1": 0.5, "M2": -0.25, "M3": 0.0}
+        ],
+        "csi_results_joint_reactions": [
+            {"joint": "P1", "case": "DEAD", "F1": 0.0, "F2": 0.0, "F3": -100.0, "M1": 0.0, "M2": 0.0, "M3": 0.0}
+        ],
+    },
+}  # fmt: skip
 
 
 @asynccontextmanager
 async def fake_client(
-    run_dir: Path, seed: Mapping[str, Any] = SEED, *, recording: Recording | None = None
+    run_dir: Path,
+    seed: Mapping[str, Any] = SEED,
+    *,
+    recording: Recording | None = None,
+    product: str = "ETABS",
 ) -> AsyncIterator[Client]:
     """A client on a fresh synthetic fake process (seeded); with `recording` every exchange is recorded."""
     control = run_dir / "control.json"
-    control.write_text(json.dumps({"faults": [], "seed": dict(seed)}))
+    control.write_text(json.dumps({"faults": [], "seed": dict(seed), "product": product}))
     spec = LaunchSpec(
         argv=[sys.executable, str(SERVER)],
         env={**get_default_environment(), "SASAAH_CSI_FAKE_CONTROL": str(control)},
@@ -88,13 +157,14 @@ async def _body(client: Client, tool: str, arguments: dict[str, Any]) -> dict[st
     return body
 
 
-async def scripted_session(client: Client, home: str) -> None:
+async def scripted_session(client: Client, home: str, *, product: str = "ETABS") -> None:
     """Launch, open a model under `home`, read the model state as the adapter does, analysis and results, two errors."""
     await client.list_tools()
     await _body(client, "csi_status", {})
-    pid = (await _body(client, "csi_launch", {"product": "ETABS"}))["pid"]
-    target = {"target": {"product": "ETABS", "pid": pid}}
-    model = f"{home}/Clients/Acme Tower/Tower-A.EDB"
+    pid = (await _body(client, "csi_launch", {"product": product}))["pid"]
+    target = {"target": {"product": product, "pid": pid}}
+    extension = {"ETABS": ".EDB", "SAFE": ".FDB", "SAP2000": ".SDB"}[product]
+    model = f"{home}/Clients/Acme Tower/Tower-A{extension}"
     await _body(client, "csi_open_model", {"path": model, "confirm": True, **target})
 
     async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
@@ -102,7 +172,18 @@ async def scripted_session(client: Client, home: str) -> None:
         assert "code" not in body, body
         return body
 
-    await CsiStateReader(product="ETABS", call=call).read(pid, Path(model))
+    if product == "SAFE":
+        from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+
+        await SafeStateReader(product=product, call=call).read(pid, Path(model))
+        await _body(client, "csi_db_table_read", {"table": "Project Information", **target})  # dropped by record mode
+        await _body(client, "csi_results_joint_reactions", {"cases": ["DEAD"], "units": "kN_m_C", **target})
+        await _body(client, "csi_results_base_reactions", {"cases": ["DEAD"], "units": "kN_m_C", **target})
+        await _body(client, "csi_run_analysis", target)  # no `confirm`: the host refuses
+        await _body(client, "csi_analysis_status", target)
+        return
+
+    await CsiStateReader(product=product, call=call).read(pid, Path(model))
     await _body(client, "csi_db_table_read", {"table": "Project Information", **target})  # dropped by record mode
     await _body(client, "csi_results_joint_reactions", {"cases": ["DEAD"], "units": "kN_m_C", **target})
     await _body(client, "csi_run_analysis", target)  # no `confirm`: the host refuses
@@ -110,27 +191,37 @@ async def scripted_session(client: Client, home: str) -> None:
     await _body(client, "csi_analysis_status", target)
 
 
-def record_synthetic(directory: Path, run_dir: Path, *, tool_names: frozenset[str] | None = None) -> Path:
+def record_synthetic(
+    directory: Path, run_dir: Path, *, tool_names: frozenset[str] | None = None, product: str = "ETABS"
+) -> Path:
     """Record the scripted session on the synthetic fake into `directory`; returns the manifest path."""
     home = "/home/" + USER
     recording = Recording(
         directory, run_dir, adapter="sasaah-csi-mcp", build="synthetic", tool_names=tool_names, user=USER, home=home
     )
+    seed: Mapping[str, Any] = SAFE_SEED if product == "SAFE" else SEED
 
     async def session() -> None:
-        async with fake_client(run_dir, recording=recording) as client:
-            await scripted_session(client, home)
+        async with fake_client(run_dir, seed, recording=recording, product=product) as client:
+            await scripted_session(client, home, product=product)
 
     anyio.run(session)
     return directory / "manifest.json"
 
 
-def replay_on_fake(host: Any, run_dir: Path, seed: Mapping[str, Any] = SEED) -> list[tuple[Any, dict[str, Any]]]:
+def replay_on_fake(
+    host: Any,
+    run_dir: Path,
+    seed: Mapping[str, Any] | None = None,
+    *,
+    product: str = "ETABS",
+) -> list[tuple[Any, dict[str, Any]]]:
     """Send every recorded `tools/call` of `host` to a fresh synthetic fake, in recorded order; pairs with the reply."""
     answers: list[tuple[Any, dict[str, Any]]] = []
+    used = SAFE_SEED if product == "SAFE" and seed is None else (SEED if seed is None else seed)
 
     async def session() -> None:
-        async with fake_client(run_dir, seed) as client:
+        async with fake_client(run_dir, used, product=product) as client:
             for exchange in host.calls:
                 reply = await client.call_tool(exchange.tool, exchange.arguments)
                 answers.append((exchange, reply.model_dump(mode="json", by_alias=True, exclude_none=True)))

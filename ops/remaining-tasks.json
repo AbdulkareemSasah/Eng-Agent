@@ -2191,14 +2191,13 @@
    "branch": "feat/b217-harness-ft8-recordings-contract-tests-for",
    "prTitle": "feat(eng-harness): recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list (B-217)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 504
   },
   {
    "id": "B-230",
@@ -2421,7 +2420,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "BLOCKED on owner question OQ-Q104 (element ids source)"
+   ]
   },
   {
    "id": "B-242",
@@ -2547,15 +2549,13 @@
    "branch": "feat/b248-harness-at4-table-data-all-unknown",
    "prTitle": "feat(eng-harness): table data (all unknown), model-state reader with declared absences, fingerprint (B-248)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T3",
-    "F.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 503
   },
   {
    "id": "B-249",
