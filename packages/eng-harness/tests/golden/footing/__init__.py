@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from eng_harness.calc import InputMeta, RefMeta
 
 GOLDEN_DIR = Path(__file__).resolve().parents[2] / "data" / "golden" / "footing"
-METHOD_REF = r"^§4\.4\.[1-6]\s+\S"
+METHOD_REF = r"^§4\.(?:4\.[1-6]|9)\s+\S"
 """A rule of spec 0010 sections 4.4.1 to 4.4.6, such as "§4.4.1 S5"."""
 
 

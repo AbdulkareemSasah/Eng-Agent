@@ -84,6 +84,8 @@ ALLOWED_NAMES = {
     "eng_contract.refs": {"RefString", "JsonPointer"},
     "eng_contract.errors": {"ContractError", "ErrorCode"},
     "eng_contract.params": {"eng_param"},
+    # Registered host kind models only (spec 0003 §4.3, amendment B-592); no function calls, no registry mutation.
+    "eng_harness._kinds": {"ModelPoints", "JointLoads", "BaseReactions"},
 }
 FORBIDDEN_CALLS = {"open", "input", "eval", "exec", "compile", "__import__", "globals", "vars", "setattr", "breakpoint"}
 MUTABLE_CALLS = {"list", "dict", "set", "bytearray", "defaultdict", "deque", "Counter"}
@@ -240,6 +242,7 @@ VIOLATIONS = {
     "def f(a):\n    return a * 2": "FB005",
     "from eng_contract.cited import Cited\nX = Cited(3, '')": "FB005",
     "from eng_contract.params import ParamModel": "import",
+    "from eng_harness._kinds import HARNESS_KINDS": "import",
     "@calc(version=1.5)\ndef f():\n    return None\n": "FB005",
     "read_lock()\n": "read_lock",
 }
@@ -257,6 +260,7 @@ ALLOWED = [
     "from eng_harness.kinds.column_design import X",
     "from eng_harness.kinds.edit_cycle import X",
     "from eng_harness.kinds.csi import X",
+    "from eng_harness._kinds import ModelPoints, JointLoads, BaseReactions",
     "from eng_harness.workflows.model_edit_cycle._change_set import ChangeSetDraft",
     "from eng_harness.calc import calc\n@calc(version=1)\ndef f():\n    return None\n",
 ]

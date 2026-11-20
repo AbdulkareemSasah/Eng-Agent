@@ -1,0 +1,144 @@
+{
+  "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
+  "method_ref": "§4.9 M2",
+  "synthetic": true,
+  "derivation": "compare.length_mm = 10 mm. Subject J1 at (0, 0); SAFE point P1 at (10.1, 0, 0). Plan distance squared = 10.1^2 = 102.01; tolerance squared = 100; 102.01 > 100 so no SAFE point matches. Spec 0010 4.9 M2: none gives NEEDS_ENGINEER (UNMATCHED). Spec 0003 4.2: engineering outcomes are payload statuses, never exceptions. Expected payload status NEEDS_ENGINEER, reason UNMATCHED; loads and combinations_to_add empty (no transfer proceeds).",
+  "input": {
+    "reactions": {
+      "axes": "global",
+      "rows": [
+        {
+          "joint": "J1",
+          "case": {
+            "case": "DEAD",
+            "case_type": "load_pattern",
+            "step": null
+          },
+          "FX_kN": 0.0,
+          "FY_kN": 0.0,
+          "FZ_kN": 50.0,
+          "MX_kNm": 0.0,
+          "MY_kNm": 0.0,
+          "MZ_kNm": 0.0
+        }
+      ]
+    },
+    "subjects": {
+      "calc": {
+        "id": "harness.footing_subjects",
+        "version": 1,
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.footing_subjects",
+        "calc_version": "1",
+        "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "subjects": [
+        {
+          "id": "F1",
+          "joint": "J1",
+          "column": "C1",
+          "x_mm": 0.0,
+          "y_mm": 0.0,
+          "cx_mm": 400.0,
+          "cy_mm": 600.0
+        }
+      ],
+      "excluded": []
+    },
+    "etabs_load_set": {
+      "patterns": [
+        {
+          "name": "DEAD",
+          "type": "dead",
+          "self_weight_ratio": 0.0
+        }
+      ],
+      "combinations": [
+        {
+          "name": "S1",
+          "type": "linear_add",
+          "items": [
+            {
+              "case": {
+                "case": "DEAD",
+                "case_type": "load_pattern",
+                "step": null
+              },
+              "scale_ratio": 1.0
+            }
+          ]
+        }
+      ],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "safe_points": {
+      "points": [
+        {
+          "name": "P1",
+          "x_mm": 10.1,
+          "y_mm": 0.0,
+          "z_mm": 0.0
+        }
+      ]
+    },
+    "safe_load_set": {
+      "patterns": [
+        {
+          "name": "DEAD",
+          "type": "dead",
+          "self_weight_ratio": 0.0
+        }
+      ],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "cases": [
+      "S1"
+    ],
+    "basis": {
+      "template": null,
+      "fields": {
+        "compare.length_mm": {
+          "value": 10.0,
+          "unit": "mm",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        },
+        "checks.equilibrium_relative_tolerance_ratio": {
+          "value": 0.01,
+          "unit": "1",
+          "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+          "confirmed": true,
+          "citation": null
+        }
+      }
+    }
+  },
+  "refs": {
+    "reactions": "res_00000000000000000000000001",
+    "subjects": "res_00000000000000000000000002",
+    "etabs_load_set": "res_00000000000000000000000003",
+    "safe_points": "res_00000000000000000000000004",
+    "safe_load_set": "res_00000000000000000000000005",
+    "cases": "res_00000000000000000000000006",
+    "basis": "res_00000000000000000000000007"
+  },
+  "expected": {
+    "axes": "global",
+    "loads": [],
+    "combinations_to_add": [],
+    "status": "NEEDS_ENGINEER",
+    "reason": "UNMATCHED"
+  }
+}
