@@ -7,7 +7,8 @@ Exercises `_assumptions`, `_error_verdict`, `_verdicts_from_connections`, `_look
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import Any, cast
 
 import anyio
 import pytest
@@ -16,6 +17,7 @@ from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from eng_contract.verdicts import SubjectKind, VerdictSource, VerdictStatus
 from mcp.types import CallToolResult, TextContent
+from pydantic import JsonValue
 
 from eng_harness._kinds import HARNESS_KINDS
 from eng_harness.adapters.idea import _calculate as m
@@ -199,7 +201,7 @@ def test_verdicts_from_connections_mix_and_filter() -> None:
         42,  # not a Mapping
     ]
     payload = m._verdicts_from_connections(
-        mixed,  # type: ignore[arg-type]
+        cast("Sequence[Mapping[str, Any]]", mixed),
         design_code=_DESIGN_CODE,
         route="native",
         load_map_confirmed=True,
@@ -276,7 +278,7 @@ def test_raise_host_unexpected_and_mapped() -> None:
 
     err = CallToolResult(
         content=[TextContent(type="text", text='{"code":"timeout","message":"The call timed out."}')],
-        isError=True,
+        is_error=True,
     )
     with pytest.raises(ContractError) as mapped:
         m._raise_host(
@@ -311,7 +313,7 @@ def test_store_pair(tmp_path: Any) -> None:
         trace_ref=None,
         assumptions=[HOST_ASSUMPTION],
     )
-    counts = {status: 0 for status in VerdictStatus}
+    counts = dict.fromkeys(VerdictStatus, 0)
     counts[VerdictStatus.PASS] = 1
     verdicts = VerdictSet(verdicts=[verdict], traces=[], counts=counts, draft=True)
     connection = {
@@ -349,7 +351,9 @@ def test_store_pair(tmp_path: Any) -> None:
     assert raw_env.summary["route"] == "native"
     assert raw_env.summary["connections"] == 1
     assert verd_env.summary["draft"] is True
-    assert verd_env.summary["counts"]["PASS"] == 1
+    counts_summary = verd_env.summary["counts"]
+    assert isinstance(counts_summary, dict)
+    assert counts_summary["PASS"] == 1
 
     raw_empty: dict[str, Any] = {
         "route": "rest",
@@ -368,18 +372,18 @@ def test_store_pair(tmp_path: Any) -> None:
 
 def _status_result(*, reachable: bool | None, is_error: bool = False, empty: bool = False) -> CallToolResult:
     if empty:
-        return CallToolResult(content=[], isError=False)
+        return CallToolResult(content=[], is_error=False)
     if is_error:
         return CallToolResult(
             content=[TextContent(type="text", text='{"code":"service_unavailable","message":"down"}')],
-            isError=True,
+            is_error=True,
         )
     if reachable is None:
         body = '{"service":"not-a-map"}'
     else:
         flag = "true" if reachable else "false"
         body = '{"service":{"reachable":' + flag + "}}"
-    return CallToolResult(content=[TextContent(type="text", text=body)], isError=False)
+    return CallToolResult(content=[TextContent(type="text", text=body)], is_error=False)
 
 
 def test_require_service_reachable_branches() -> None:
@@ -441,7 +445,7 @@ def test_process_success_rejects_unexpected_shape(tmp_path: Any) -> None:
     ids = SeededIdSource(b"proc", FixedClock(_START))
     bad = CallToolResult(
         content=[TextContent(type="text", text='{"unexpected":true,"payload":"malformed"}')],
-        isError=False,
+        is_error=False,
     )
 
     async def body() -> None:
@@ -483,7 +487,7 @@ def test_raise_host_timeout_read_vs_write() -> None:
     """AC17: timeout maps READ→TIMEOUT_NO_EFFECT and WRITE→TIMEOUT_UNKNOWN_OUTCOME; op_id on write."""
     err = CallToolResult(
         content=[TextContent(type="text", text='{"code":"timeout","message":"The call timed out."}')],
-        isError=True,
+        is_error=True,
     )
     ids = SeededIdSource(b"rh-to", FixedClock(_START))
     with pytest.raises(ContractError) as read_to:
@@ -502,7 +506,7 @@ def test_raise_host_mapped_host_code_and_retryable() -> None:
     for code in ("idea_error", "iom_error"):
         err = CallToolResult(
             content=[TextContent(type="text", text=f'{{"code":"{code}","message":"host boom"}}')],
-            isError=True,
+            is_error=True,
         )
         with pytest.raises(ContractError) as raised:
             m._raise_host(err, tool="idea_calculate", effect=CallEffect.WRITE, ids=ids)
@@ -516,7 +520,7 @@ def test_raise_host_mapped_host_code_and_retryable() -> None:
 def test_raise_host_missing_body_no_code_fallback() -> None:
     """AC17: isError with missing body → no-code mapper path (not UNEXPECTED_REPLY)."""
     ids = SeededIdSource(b"rh-miss", FixedClock(_START))
-    empty = CallToolResult(content=[], isError=True)
+    empty = CallToolResult(content=[], is_error=True)
     with pytest.raises(ContractError) as raised:
         m._raise_host(empty, tool="idea_get_check_results", effect=CallEffect.READ, ids=ids)
     # READ + no code → INTERNAL (not HOST_ERROR / UNEXPECTED_REPLY).
@@ -551,7 +555,7 @@ def test_store_pair_kinds_summary_parents_and_provenance(tmp_path: Any) -> None:
         trace_ref=None,
         assumptions=[HOST_ASSUMPTION],
     )
-    counts = {status: 0 for status in VerdictStatus}
+    counts = dict.fromkeys(VerdictStatus, 0)
     counts[VerdictStatus.PASS] = 1
     verdicts = VerdictSet(verdicts=[verdict], traces=[], counts=counts, draft=False)
     raw_payload: dict[str, Any] = {
@@ -592,7 +596,9 @@ def test_store_pair_kinds_summary_parents_and_provenance(tmp_path: Any) -> None:
     assert raw_env.summary["connections"] == 1
     assert set(verd_env.summary.keys()) == {"draft", "counts"}
     assert verd_env.summary["draft"] is False
-    assert verd_env.summary["counts"]["PASS"] == 1
+    counts_summary = verd_env.summary["counts"]
+    assert isinstance(counts_summary, dict)
+    assert counts_summary["PASS"] == 1
     assert raw_env.provenance.tool == "harness/idea_get_check_results"
     assert verd_env.provenance.tool == "harness/idea_get_check_results"
     assert verd_env.provenance.tool_version == "1"
@@ -644,13 +650,13 @@ def test_store_pair_records_put_args_via_fake_store() -> None:
         trace_ref=None,
         assumptions=[HOST_ASSUMPTION],
     )
-    counts = {status: 0 for status in VerdictStatus}
+    counts = dict.fromkeys(VerdictStatus, 0)
     counts[VerdictStatus.PASS] = 1
     verdicts = VerdictSet(verdicts=[verdict], traces=[], counts=counts, draft=True)
     raw_env, verd_env = m._store_pair(
-        store=_FakeStore(),  # type: ignore[arg-type]
+        store=cast(ResultStore, _FakeStore()),
         tool="idea_calculate",
-        raw_payload={"route": "rest", "connections": "not-a-list"},  # type: ignore[dict-item]
+        raw_payload=cast(dict[str, JsonValue], {"route": "rest", "connections": "not-a-list"}),
         verdicts=verdicts,
     )
     assert len(puts) == 2
@@ -675,7 +681,7 @@ def test_process_success_offline_stub_refused(tmp_path: Any) -> None:
                 text='{"offline_stub":true,"connections":[],"backend":"rest"}',
             )
         ],
-        isError=False,
+        is_error=False,
     )
 
     async def body() -> None:
@@ -729,7 +735,7 @@ def test_process_success_parses_minimal_native_connections(tmp_path: Any) -> Non
     }
     ok = CallToolResult(
         content=[TextContent(type="text", text=json.dumps(body_obj))],
-        isError=False,
+        is_error=False,
     )
 
     async def body() -> None:
@@ -761,7 +767,7 @@ def test_process_success_unexpected_shape_exact_literals(tmp_path: Any) -> None:
     ids = SeededIdSource(b"proc-unexp", FixedClock(_START))
     bad = CallToolResult(
         content=[TextContent(type="text", text='{"unexpected":true}')],
-        isError=False,
+        is_error=False,
     )
 
     async def body() -> None:
@@ -870,7 +876,7 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
             sessions=_Sessions(),
             server="idea",
             role="main",
-            path=Path("/tmp/model.ideaCon"),
+            path=Path("model.ideaCon"),
             connection_id="CON1",
             design_code=_DESIGN_CODE,
             load_map_confirmed=True,
@@ -887,7 +893,7 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
     assert tool == "idea_native_calculate"
     assert effect is CallEffect.READ
     assert args["save"] is False
-    assert args["path"] == "/tmp/model.ideaCon"
+    assert args["path"] == "model.ideaCon"
     assert args["connection_id"] == "CON1"
     assert "out_path" not in args
     assert len(process_kwargs) == 1
@@ -910,7 +916,9 @@ def test_calculate_native_error_raises_host(monkeypatch: pytest.MonkeyPatch, tmp
 
     def _fake_raise(result: Any, **kwargs: Any) -> None:
         raise_kwargs.append(dict(kwargs))
-        raise ContractError(ErrorCode.HOST_ERROR, "mapped", retryable=False, host_code="idea_error", host_method=kwargs["tool"])
+        raise ContractError(
+            ErrorCode.HOST_ERROR, "mapped", retryable=False, host_code="idea_error", host_method=kwargs["tool"]
+        )
 
     monkeypatch.setattr(m, "_raise_host", _fake_raise)
 
@@ -920,7 +928,7 @@ def test_calculate_native_error_raises_host(monkeypatch: pytest.MonkeyPatch, tmp
                 sessions=_Sessions(),
                 server="idea",
                 role="main",
-                path=Path("/tmp/model.ideaCon"),
+                path=Path("model.ideaCon"),
                 connection_id=None,
                 design_code=_DESIGN_CODE,
                 load_map_confirmed=False,
@@ -976,7 +984,7 @@ def test_calculate_rest_success_tool_args_effect_and_route(monkeypatch: pytest.M
     anyio.run(body)
     assert preflight == [1]
     assert len(calls) == 1
-    server, role, tool, args, effect = calls[0]
+    _server, _role, tool, args, effect = calls[0]
     assert tool == "idea_calculate"
     assert effect is CallEffect.WRITE
     assert args["connection_ids"] == [1, 2]
@@ -1150,7 +1158,7 @@ def test_calculate_rest_without_approval_omits_confirm(monkeypatch: pytest.Monke
     monkeypatch.setattr(m, "_process_success", _fake_process)
 
     async def body() -> None:
-        result = await m.calculate_rest(
+        result: Any = await m.calculate_rest(
             sessions=_Sessions(),
             server="idea",
             role="main",

@@ -108,7 +108,9 @@ def _lost_calculate() -> LostWrite:
 def _lost_unknown_tool() -> LostWrite:
     allowlist = idea_allowlist(route="rest")
     descriptor = allowlist.descriptor("idea_status").model_copy(update={"name": "idea_unknown_tool"})
-    return LostWrite(descriptor=descriptor, model=None, binding=_binding(), known=False, pre_image=None)
+    return LostWrite(
+        descriptor=descriptor, model=idea_tools.StatusArgs(), binding=_binding(), known=False, pre_image=None
+    )
 
 
 def _lost_native_calculate() -> LostWrite:
@@ -343,7 +345,9 @@ def test_decide_unknown_missing_effect_on_readback(tmp_path: Path) -> None:
     async def body() -> None:
         decided = await reconciler.decide(lost, read)
         assert decided.outcome == "unknown"
-        assert "READBACK_MISMATCH" in decided.evidence["issue_codes"]
+        codes = decided.evidence["issue_codes"]
+        assert isinstance(codes, list)
+        assert "READBACK_MISMATCH" in codes
 
     anyio.run(body)
 
