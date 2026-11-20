@@ -97,7 +97,11 @@ class IdeaLoadEffect(_Host):
 
 
 class IdeaLoads(_Host):
-    """`harness.idea_loads/1` (spec 0014 section 4.5)."""
+    """`harness.idea_loads/1` (spec 0014 section 4.5).
+
+    Force fields are canonical kN / kN.m. The adapter converts host N / N.m on read-back
+    (`adapters.idea._loads.host_loads_to_canonical`, spec 0014 AC16 / section 4.6).
+    """
 
     connection: _Str
     effects: list[IdeaLoadEffect]
