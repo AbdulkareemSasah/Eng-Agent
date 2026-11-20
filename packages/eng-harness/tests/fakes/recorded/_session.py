@@ -285,9 +285,7 @@ async def scripted_revit_session(client: Client, home: str) -> None:
     )
 
 
-def record_revit_synthetic(
-    directory: Path, run_dir: Path, *, tool_names: frozenset[str] | None = None
-) -> Path:
+def record_revit_synthetic(directory: Path, run_dir: Path, *, tool_names: frozenset[str] | None = None) -> Path:
     """Record the scripted Revit session on the synthetic fake into `directory`; returns the manifest path."""
     home = "/home/" + USER
     recording = Recording(

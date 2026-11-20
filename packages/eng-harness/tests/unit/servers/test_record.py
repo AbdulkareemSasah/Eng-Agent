@@ -378,16 +378,14 @@ def test_revit_sanitized(tmp_path: Path) -> None:
     """AC31: titles, paths and user names are replaced (spec 0011 section 4.13 / AC31)."""
     run, out = tmp_path / "run", tmp_path / "recordings" / "sasaah-revit-mcp-build1"
     run.mkdir()
-    tools = [
-        {"name": n, "inputSchema": SCHEMA}
-        for n in ("revit_open_model", "revit_get_model_metadata", "revit_connection_status")
-    ]
+    tool_names = ("revit_open_model", "revit_get_model_metadata", "revit_connection_status")
+    tools: list[dict[str, Any]] = [{"name": n, "inputSchema": SCHEMA} for n in tool_names]
     recording = Recording(
         out,
         run,
         adapter="sasaah-revit-mcp",
         build="0123456789ab+fedcba987654",
-        tool_names=frozenset(t["name"] for t in tools),
+        tool_names=frozenset(tool_names),
         user="jdoe",
         home=HOME,
     )

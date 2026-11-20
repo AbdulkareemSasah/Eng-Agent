@@ -31,8 +31,9 @@ def _revit_recording_params() -> list[pytest.ParameterSet]:
 @pytest.fixture(scope="module")
 def generated(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The scripted session on the synthetic Revit fake, recorded through record mode."""
-    from eng_harness.adapters.revit import revit_allowlist
     from fakes.recorded._session import record_revit_synthetic
+
+    from eng_harness.adapters.revit import revit_allowlist
 
     base = tmp_path_factory.mktemp("recorded-revit")
     (base / "run").mkdir()
@@ -69,9 +70,10 @@ def test_synthetic_matches_recordings(recording: Path, tmp_path: Path) -> None:
 
 def test_the_synthetic_recording(generated: Path) -> None:
     """The scripted Revit session as recorded: sanitized, with a manifest that verifies and the pinned build."""
+    from fakes.recorded._session import USER
+
     from eng_harness.adapters.revit import revit_allowlist
     from eng_harness.servers import verify_manifest
-    from fakes.recorded._session import USER
 
     assert verify_manifest(generated) == []
     host = RecordedHost(generated)
@@ -90,8 +92,9 @@ def test_the_synthetic_recording(generated: Path) -> None:
 
 
 def test_committed_revit_recordings_are_fingerprint_filtered(tmp_path: Path) -> None:
-    from eng_harness.adapters.revit import revit_allowlist
     from fakes.recorded._checks import applicable_revit_recordings
+
+    from eng_harness.adapters.revit import revit_allowlist
 
     write_fp = revit_allowlist(role="write").tool_fingerprint
     for name, fingerprint in (("revit-a", write_fp), ("revit-b", "other"), ("notes", None)):
@@ -99,6 +102,6 @@ def test_committed_revit_recordings_are_fingerprint_filtered(tmp_path: Path) -> 
         folder.mkdir()
         if fingerprint is not None:
             (folder / "manifest.json").write_text(
-                '{"tool_fingerprint": "%s", "files": {}}' % fingerprint, encoding="utf-8"
+                f'{{"tool_fingerprint": "{fingerprint}", "files": {{}}}}', encoding="utf-8"
             )
     assert applicable_revit_recordings(tmp_path) == [tmp_path / "revit-a"]
