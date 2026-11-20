@@ -265,6 +265,11 @@ tasks:
     covers: [AC1, AC2, AC5, AC21, AC22, AC23, AC30]
     depends_on: [T8]
   - id: T10
+    # Amendment (B-585, documents only): T10 registers its §4.9 result kind harness.reactions_to_joint_loads/1 in
+    # kinds/footing.py (a T1 file: only that new kind, plus the contract test and fixture); kinds/footing.py is in
+    # every footing calc's content-hash closure, so T10 also refreshes only the content-hash line in the six footing
+    # verification records. Input harness.base_reactions/1 is plan 0008 T7 (F.T7); depends_on gains that cross-plan
+    # wait (comment). External amendment of T1 recorded in §3. Risk set already includes r2.
     title: Calcs harness.reactions_to_joint_loads and harness.safe_equilibrium
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.reactions_to_loads and more (amendment B-356)
@@ -275,6 +280,15 @@ tasks:
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"
       - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"
+      - "packages/eng-harness/src/eng_harness/kinds/footing.py"  # only the new result kind harness.reactions_to_joint_loads/1 (amendment B-585; T1 owns the file)
+      - "packages/eng-harness/tests/contract/test_footing_kinds.py"  # fixture coverage for that kind (amendment B-585; T1 owns the file)
+      - "packages/eng-harness/tests/data/kinds/footing/reactions_to_joint_loads.json"  # amendment B-585
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_layout.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_plan_size.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_resize.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_schedule.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_status.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
+      - "packages/eng-harness/docs/verification/calcs/harness.footing_subjects.md"  # content-hash line only; hash moved by kinds/footing.py (amendment B-585)
       - "packages/eng-harness/tests/unit/footing/test_calcs_registered.py"
       - "packages/eng-harness/tests/golden/footing/test_reactions_to_loads.py"
       - "packages/eng-harness/tests/golden/footing/test_equilibrium.py"
@@ -286,7 +300,7 @@ tasks:
       - "packages/eng-harness/tests/golden/footing/test_reactions_to_loads.py::test_golden_cases"
       - "packages/eng-harness/tests/golden/footing/test_equilibrium.py::test_golden_cases"
     covers: [AC24, AC25]
-    depends_on: [T3]
+    depends_on: [T3]  # external: plan 0008 T7 (F.T7) for harness.base_reactions/1 (amendment B-585); also plan 0008 T5 as in §3
   - id: T11
     title: Block footing_safe_cross_check and the allowlist contract test
     files:
@@ -456,7 +470,10 @@ creates, amendment B-471, without waiting for this task; if those tasks name ano
 the file list is amended).
 
 **T10 SAFE calcs** (spec §4.9 items 2 and 6). Matching, negation, missing patterns, combinations to add; equilibrium by
-magnitude with the basis tolerance.
+magnitude with the basis tolerance. Amendment (B-585, documents only): T10 registers the result kind
+`harness.reactions_to_joint_loads/1` in `kinds/footing.py` (T1 owns the file; only that kind plus its contract fixture),
+refreshes only the content-hash line of the six footing verification records, and waits for plan 0008 T7
+(`harness.base_reactions/1`, F.T7) as well as plan 0008 T5.
 
 **T11 SAFE stage** (spec §4.9). The child block, its approval, the candidate-map rule, the soil-pressure limit, and the
 contract test that every tool the workflow can call is in the CSI allowlist and none is an escape hatch.
@@ -486,7 +503,7 @@ determinism. The non-test lines are at most a test-support helper.
 | T7 | plan 0005 T1 to T4, T7 |
 | T8 | plan 0001 T10, T14, T14b (ctx calls, decide, ask); plan 0005 T9 (`decide_many`); plan 0009 T5 is not needed (the fake provider is in plan 0005 T5); ACI T9 (registered pack) |
 | T9 | plan 0001 T16, T17; plan 0002 T11, T13, T19a (amendment B-475); plan 0004 T8 to T10; plan 0006 T10 (choice screens); plan 0007 T6 (`copy_on_open`, `basis_fields`); plan 0007 T9b (shipped-workflow registry in `workflows/__init__.py` and `block.discover()`, amendment B-417); SBC T1 (workspace member) and T3 (registration, `check_id_for`) |
-| T10 | plan 0008 T5 (`harness.joint_loads/1`, points) |
+| T10 | plan 0008 T5 (`harness.joint_loads/1`, points); plan 0008 T7 (`harness.base_reactions/1`, amendment B-585) |
 | T11 | plan 0008 T6, T7 (load import, analysis, soil pressures, reactions) |
 | T12 | plan 0006 T11 to T13 (report); plan 0007 T10 (audits); SC T13 (calculation notes) |
 | T13 | plan 0001 T19 (crash-matrix worker) |
@@ -500,6 +517,16 @@ determinism. The non-test lines are at most a test-support helper.
   `packages/eng-harness/docs/verification/calcs/harness.footing_resize.md` once that record exists on build/v1
   (nothing else in those records), because `RefMeta.ref` in `calc.py` moves every calc's `content_sha256` in
   `calcs.lock.json` and those plan 0010 records embed the hashes compared by the footing registration test.
+
+- External amendment (B-585, from plan 0010 T10 / the B-401 writer): T10 may add only the result kind
+  `harness.reactions_to_joint_loads/1` in `packages/eng-harness/src/eng_harness/kinds/footing.py` and its contract
+  coverage in `packages/eng-harness/tests/contract/test_footing_kinds.py` and
+  `packages/eng-harness/tests/data/kinds/footing/reactions_to_joint_loads.json` (T1 owns those paths for the §4.2
+  kinds), and may refresh only the content-hash line in the six footing verification records listed under T10
+  (nothing else), because `kinds/footing.py` is in every footing calc's content-hash closure. Spec 0010 §4.9 names
+  the calc; the richer CalcPayload kind (loads plus combinations_to_add) is not listed in §4.2, so T10 registers it.
+  T10's `harness.safe_equilibrium` input is `harness.base_reactions/1` from plan 0008 T7 (spec 0008 §4.6 / AC23;
+  F.T7), so T10 waits for F.T7 as well as plan 0008 T5.
 
 ## 4. Verification
 
