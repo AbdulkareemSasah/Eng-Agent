@@ -8,7 +8,7 @@ import re
 import sys
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, cast
 
@@ -344,14 +344,76 @@ def _safe_seed() -> dict[str, Any]:
     return seed
 
 
-def SAFE_STEPS(r: Rig) -> list[tuple[str, dict[str, Any]]]:
+@dataclass
+class SafeRig(Rig):
+    """SAFE cycle/crash rig: same Engine path as Rig, SAFE host program and quantity refs (plan 0008 T8)."""
+
+    qty: dict[str, Ref] = field(default_factory=dict)
+
+    def ports(self, **options: Any) -> Any:
+        from eng_harness.adapters import build_ports
+
+        return build_ports(
+            options.pop("config", safe_config(self.control)),
+            self.workspace,
+            self.store,
+            self.run_dir,
+            self.clock,
+            self.ids,
+            inspector=SafeInspector(self.control),
+            launcher=PosixLauncher(),
+            lock_dir=self.root / "locks",
+            files={"m": self.original},
+            **options,
+        )
+
+    def engine(self, ports: Any, steps: Any = None, *, inputs: Any = None, paused: bool = False) -> Engine:
+        flow = pause if paused else chain(steps if steps is not None else safe_steps(self))
+        flow = replace(flow, min_server_builds={"csi": csi_allowlist().sasaah_commit}, copy_on_open=True)
+        return Engine(
+            self.workspace,
+            Registry([flow]),
+            EnginePorts(
+                tool=ports.tool_port,
+                host=ports.host_port,
+                calc=FakeCalcPort(RunClass.TRIAL, []),
+                basis=StoreBasisPort(self.store),
+                approvals=FakeApprovalPort(),
+                inputs=inputs or FakeInputPort(),
+            ),
+            self.store,
+            EngineSettings(),
+            self.clock,
+            self.ids,
+        )
+
+    async def read_soil_pressures(self, ports: Any, *, model: str = "m@copy") -> Any:
+        from eng_harness.adapters.csi.products._safe_results import read_soil_pressures as _read
+        from eng_harness.servers import CallEffect
+        from eng_harness.servers._session import reply_body
+
+        held = await ports.host_port.locate(model)
+        assert held is not None
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            # safe_config names the server section `csi`.
+            reply = await ports.servers.call("csi", "main", tool, arguments, effect)
+            body = reply_body(reply)
+            assert body is not None
+            return body
+
+        assert held.pid is not None
+        return await _read(call, product="SAFE", pid=held.pid, cases=["DEAD"], units="kN_m_C")
+
+
+def safe_steps(r: SafeRig) -> list[tuple[str, dict[str, Any]]]:
     """AC26 cycle: open, import one point load, save, analyse, base and joint reactions.
 
     Model state is read by the host port after open (SafeStateReader via the profile); the adapter-local
     `csi_read_model_state` tool is ETABS-shaped (stories/restraints) and is not used for SAFE here.
     Quantity refs are fixed on the rig so a crash worker and its parent resume share the same arguments.
     """
-    qty = getattr(r, "_safe_qty")
+    qty = r.qty
     return [
         ("csi_open_model", {"model": "m"}),
         (
@@ -375,7 +437,7 @@ def SAFE_STEPS(r: Rig) -> list[tuple[str, dict[str, Any]]]:
     ]
 
 
-def safe_rig(root: Path, *, tolerance: Any = 0.25) -> Rig:
+def safe_rig(root: Path, *, tolerance: Any = 0.25) -> SafeRig:
     """Production wiring over a synthetic SAFE process (plan 0008 T8).
 
     The first call on `root` writes basis and load quantity results and a marker; later calls (the crash worker,
@@ -410,7 +472,7 @@ def safe_rig(root: Path, *, tolerance: Any = 0.25) -> Rig:
         basis_ref = store.put("basis.design_basis/1", basis, provenance).result_id
         qty = {}
         qty_refs: dict[str, str] = {}
-        for field, number in (
+        for name, number in (
             ("FX_kN", 0.0),
             ("FY_kN", 0.0),
             ("FZ_kN", -100.0),
@@ -418,79 +480,16 @@ def safe_rig(root: Path, *, tolerance: Any = 0.25) -> Rig:
             ("MY_kNm", 0.0),
             ("MZ_kNm", 0.0),
         ):
-            result_id = store.put("harness.run_input/1", {"value": {field: number}}, provenance).result_id
-            pointer = f"{result_id}#/value/{field}"
-            qty[field] = Ref.model_validate({"$ref": pointer})
-            qty_refs[field] = pointer
+            result_id = store.put("harness.run_input/1", {"value": {name: number}}, provenance).result_id
+            pointer = f"{result_id}#/value/{name}"
+            qty[name] = Ref.model_validate({"$ref": pointer})
+            qty_refs[name] = pointer
         run_id = f"run_{ids.new_ulid()}"
         marker.write_text(json.dumps({"basis_ref": basis_ref, "qty": qty_refs}), encoding="utf-8")
     original = root / "original.FDB"
     if not original.exists():
         original.write_bytes(b"synthetic safe model")
-    r = Rig(root, control, workspace, store, clock, ids, basis_ref, run_id, original)
-    r._safe_qty = qty  # type: ignore[attr-defined]
-
-    def ports(**options: Any) -> Any:
-        from eng_harness.adapters import build_ports
-
-        return build_ports(
-            options.pop("config", safe_config(control)),
-            workspace,
-            store,
-            r.run_dir,
-            clock,
-            ids,
-            inspector=SafeInspector(control),
-            launcher=PosixLauncher(),
-            lock_dir=root / "locks",
-            files={"m": original},
-            **options,
-        )
-
-    r.ports = ports  # type: ignore[method-assign]
-
-    def engine(ports: Any, steps: Any = None, *, inputs: Any = None, paused: bool = False) -> Engine:
-        flow = pause if paused else chain(steps if steps is not None else SAFE_STEPS(r))
-        flow = replace(flow, min_server_builds={"csi": csi_allowlist().sasaah_commit}, copy_on_open=True)
-        return Engine(
-            workspace,
-            Registry([flow]),
-            EnginePorts(
-                tool=ports.tool_port,
-                host=ports.host_port,
-                calc=FakeCalcPort(RunClass.TRIAL, []),
-                basis=StoreBasisPort(store),
-                approvals=FakeApprovalPort(),
-                inputs=inputs or FakeInputPort(),
-            ),
-            store,
-            EngineSettings(),
-            clock,
-            ids,
-        )
-
-    r.engine = engine  # type: ignore[method-assign]
-
-    async def read_soil_pressures(ports: Any, *, model: str = "m@copy") -> Any:
-        from eng_harness.adapters.csi.products._safe_results import read_soil_pressures as _read
-        from eng_harness.servers import CallEffect
-        from eng_harness.servers._session import reply_body
-
-        held = await ports.host_port.locate(model)
-        assert held is not None
-
-        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
-            # safe_config names the server section `csi`.
-            reply = await ports.servers.call("csi", "main", tool, arguments, effect)
-            body = reply_body(reply)
-            assert body is not None
-            return body
-
-        assert held.pid is not None
-        return await _read(call, product="SAFE", pid=held.pid, cases=["DEAD"], units="kN_m_C")
-
-    r.read_soil_pressures = read_soil_pressures  # type: ignore[attr-defined]
-    return r
+    return SafeRig(root, control, workspace, store, clock, ids, basis_ref, run_id, original, qty)
 
 
 class SafeAppliedInput(FakeInputPort):

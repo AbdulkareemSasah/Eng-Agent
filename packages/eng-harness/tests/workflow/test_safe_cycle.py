@@ -11,13 +11,13 @@ from eng_harness.journal import _events as ev
 
 
 def test_cycle_steps(tmp_path: Path) -> None:
-    """AC26: open copy, read state, import loads, save, analyse, soil pressures and base reactions; journal holds all."""
-    # SAFE cycle wiring (SAFE_STEPS / safe_rig) lands in the feat commit; missing names fail at the base (TF004).
-    from fakes.sasaah_csi.wiring import SAFE_STEPS, safe_rig
+    """AC26: open copy, import loads, save, analyse, soil pressures and base reactions; journal holds all."""
+    # SAFE cycle wiring (safe_steps / safe_rig) lands in the feat commit; missing names fail at the base (TF004).
+    from fakes.sasaah_csi.wiring import safe_rig, safe_steps
 
     r = safe_rig(tmp_path)
     original = r.original.read_bytes()
-    steps = SAFE_STEPS(r)
+    steps = safe_steps(r)
 
     async def body() -> None:
         async with r.ports() as ports:

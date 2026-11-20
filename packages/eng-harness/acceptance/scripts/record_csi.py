@@ -55,9 +55,7 @@ async def _body(client: Client, tool: str, arguments: dict[str, Any]) -> dict[st
     return body
 
 
-async def _session(
-    client: Client, model: Path, analysis: dict[str, list[str]] | None, *, product: str
-) -> None:
+async def _session(client: Client, model: Path, analysis: dict[str, list[str]] | None, *, product: str) -> None:
     await client.list_tools()
     await _body(client, "csi_status", {})
     pid = (await _body(client, "csi_launch", {"product": product}))["pid"]

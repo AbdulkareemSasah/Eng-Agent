@@ -165,7 +165,7 @@ def _state_problems(host: RecordedHost, *, product: str) -> list[str]:
     pid = first.arguments["target"]["pid"]
     path = (_body(first.result or {}) or {}).get("model_path")
     replay = RecordedHost(host.directory)
-    # SAFE state tables live on SafeStateReader (plan 0008 T5); ETABS (and others without joint_loads) use CsiStateReader.
+    # SAFE tables: SafeStateReader (0008 T5). Others without joint_loads: CsiStateReader.
     from eng_harness.adapters.csi.products import profile
 
     tables = profile(product).tables
@@ -183,7 +183,7 @@ def _state_problems(host: RecordedHost, *, product: str) -> list[str]:
 
 
 def adapter_problems(host: RecordedHost, workspace: Path, *, product: str = "ETABS") -> list[str]:
-    """The adapter on a recording (AC34 / AC28): the tool-list fingerprint, every recorded reply, the model-state read."""
+    """Adapter on a recording (AC34 / AC28): tool-list fingerprint, replies, model-state read."""
     allowlist = csi_allowlist().for_product(product)
     listed = {n: s for n, s in host.tool_schemas.items() if n in allowlist.tool_names}
     problems: list[str] = []
