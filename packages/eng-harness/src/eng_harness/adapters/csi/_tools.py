@@ -42,6 +42,7 @@ from eng_harness.adapters.csi._read_state_tool import READ_TOOLS, ModelArgs
 from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, Revisions, SavedFile, SaveModelArgs
 from eng_harness.adapters.csi.products import _safe_loads as _safe_loads
 from eng_harness.adapters.csi.products import _safe_results as _safe_results
+from eng_harness.adapters.csi.products import _sap2000_edits as _sap2000_edits
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ToolInfo
 from eng_harness.servers import CallEffect
@@ -56,18 +57,19 @@ _BASE_TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_results_frame_forces": "kN_m_C",
     "csi_results_story_drifts": "kN_m_C",
 }
-# SAFE point-load token (spec 0008 AC14) and SAFE base-reaction token (spec 0008 section 4.6, AC23).
-TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS, **_safe_results.TOKENS}
+# SAFE point-load token (spec 0008 AC14), SAFE base-reaction token (spec 0008 section 4.6, AC23),
+# SAP2000 add-frame/area token (spec 0012 section 5, AC11).
+TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS, **_safe_results.TOKENS, **_sap2000_edits.TOKENS}
 
 
 def edit_builders() -> dict[str, Builder]:
-    """Edit builders: base CSI map plus SAFE point-load and SAFE pattern SuperDead override (plan 0008 T6)."""
-    return {**_BASE_EDIT_BUILDERS, **_safe_loads.EDIT_BUILDERS}
+    """Edit builders: base CSI map plus SAFE and SAP2000 product builders (plan 0008 T6, plan 0012 T5)."""
+    return {**_BASE_EDIT_BUILDERS, **_safe_loads.EDIT_BUILDERS, **_sap2000_edits.EDIT_BUILDERS}
 
 
 def edit_models() -> dict[str, type[ParamModel]]:
-    """Argument models for the edit builders, including `SetPointLoadArgs`."""
-    return {**_BASE_EDIT_MODELS, **_safe_loads.EDIT_MODELS}
+    """Argument models for the edit builders, including SAFE and SAP2000 models."""
+    return {**_BASE_EDIT_MODELS, **_safe_loads.EDIT_MODELS, **_sap2000_edits.EDIT_MODELS}
 
 
 EDIT_BUILDERS = edit_builders()  # module-level for tool_allowlist and call-site commits
@@ -270,6 +272,8 @@ class CsiToolPort(AdapterToolPort):
                 model = self._resolve_model_key(validated.model.model, model)
                 if validated.model.as_new_revision:
                     return await self._new_revision(descriptor, args, op_id, model)
+            if tool == "csi_add_frame_by_coord":
+                await self._ensure_frame_section(descriptor, args, model)
             if self._revisions is not None and descriptor.effect == "write":
                 self._not_a_snapshot(await self._open_file(descriptor, model))
         except (ContractError, ToolFailed) as error:
@@ -277,9 +281,40 @@ class CsiToolPort(AdapterToolPort):
         reply = await super().call(tool, args, op_id=op_id, model=model)
         key = str(args.get("model"))
         if isinstance(reply, SuccessEnvelope) and tool in EDIT_BUILDERS:  # analysis and reads change no model row
+            if tool == "csi_add_frame_by_coord":
+                self._record_frame_name(args, reply)
             self._written.commit(key)
             self._wrote(key)
         return reply
+
+    async def _ensure_frame_section(
+        self, descriptor: ToolDescriptor, args: Mapping[str, JsonValue], model: str | None
+    ) -> None:
+        """Refuse add-frame when the section is absent (spec 0012 AC11, section 6); nothing is sent."""
+        server = self._config.servers[self._server]
+        binding = await self._binder.binding(server.host_key, model, descriptor)
+        listed = await self._read(
+            "csi_list_frame_sections",
+            {"target": binding.target.model_dump(), "limit": 2000},
+            CallEffect.READ,
+        )
+        items = listed.get("items") if isinstance(listed, dict) else None
+        names = {str(row["name"]) for row in items} if isinstance(items, list) else set()
+        _sap2000_edits.require_section(str(args["section"]), names)
+
+    def _record_frame_name(self, args: Mapping[str, JsonValue], reply: SuccessEnvelope) -> None:
+        """Map the requested name to the host reply name and retarget the prepared read-back (spec 0012 AC11)."""
+        payload = reply.data if isinstance(reply.data, dict) else {}
+        value = payload.get("value") if isinstance(payload, dict) else None
+        if not (isinstance(value, dict) and isinstance(value.get("name"), str)):
+            stored = self._store.payload(reply.result_id)
+            value = stored.get("value") if isinstance(stored, dict) else None
+        host = value.get("name") if isinstance(value, dict) else None
+        if not isinstance(host, str):
+            return
+        requested = args.get("name")
+        _sap2000_edits.record_name(str(requested) if isinstance(requested, str) else None, host)
+        self._written.retarget(str(args.get("model")), host)
 
     def _wired(self) -> Revisions:
         if self._revisions is None:

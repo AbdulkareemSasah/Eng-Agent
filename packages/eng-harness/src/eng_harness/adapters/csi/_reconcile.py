@@ -14,7 +14,7 @@ lines of the op (no reader exists yet).
 """
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import JsonValue
 
@@ -22,6 +22,7 @@ from eng_harness.adapters._toolport import Decision, HostRead, LostWrite
 from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import OBSERVE, Expect, Snapshot, Want, compare, expect, snapshot
 from eng_harness.adapters.csi._state import CsiStateReader
+from eng_harness.adapters.csi.products import _sap2000_edits as sap2000_edits
 from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
 from eng_harness.servers import CallEffect
@@ -45,6 +46,31 @@ def _as_requested(item: Expect, snap: Snapshot, tolerance: float | None) -> bool
     """True when the state shows the request, False when it does not, `None` when that cannot be told."""
     issue = compare(item, snap, tolerance)
     return None if issue is not None and issue.code == _UNAVAILABLE else issue is None
+
+
+def _frame_matches(row: dict[str, Any], want: Want, tolerance: float | None) -> bool:
+    """True when a frame row has the requested section and end points within `tolerance`."""
+    if row.get("section") != want.get("section"):
+        return False
+    i_pt, j_pt = row["i"], row["j"]
+    pairs = (
+        ("xi_mm", i_pt["x_mm"]),
+        ("yi_mm", i_pt["y_mm"]),
+        ("zi_mm", i_pt["z_mm"]),
+        ("xj_mm", j_pt["x_mm"]),
+        ("yj_mm", j_pt["y_mm"]),
+        ("zj_mm", j_pt["z_mm"]),
+    )
+    for name, seen in pairs:
+        wanted = want.get(name)
+        if not isinstance(wanted, int | float) or not isinstance(seen, int | float):
+            return False
+        if tolerance is None:
+            if seen != wanted:
+                return False
+        elif abs(seen - wanted) > tolerance * abs(wanted):
+            return False
+    return True
 
 
 def _outcome(
@@ -94,6 +120,8 @@ class CsiReconciler:
         """The outcome of `lost` (spec 4.5.7); the evidence is what was read."""
         if lost.descriptor.name in LONG:
             return await self._long(lost, read)
+        if lost.descriptor.name == "csi_add_frame_by_coord" and self._profile.add_frame_naming == "reply":
+            return await self._add_frame_by_geometry(lost, read)
         item = expect(lost.model)
         snap = await self._snapshot(lost, read)
         if self._tolerance is None and self._provider is not None:
@@ -109,9 +137,51 @@ class CsiReconciler:
         """`{"observed": state}` of the written object (`None` as a value: absent); no read-back for the long tools."""
         if lost.descriptor.name in LONG:
             return None
+        if lost.descriptor.name == "csi_add_frame_by_coord" and self._profile.add_frame_naming == "reply":
+            snap = await self._snapshot(lost, read)
+            frames = snap.state.payloads["model.frame_placements/1"].model_dump(mode="json")["frames"]
+            ids = sorted(str(row["id"]) for row in frames)
+            return {"observed": {"frame_ids": cast(JsonValue, ids), "frames": cast(JsonValue, frames)}}
         item = expect(lost.model)
         readable, state = _seen(item, await self._snapshot(lost, read))
         return {"observed": state} if readable else None
+
+    async def _add_frame_by_geometry(self, lost: LostWrite, read: HostRead) -> Decision:
+        """AC12: applied when exactly one new frame matches the requested points and section."""
+        if not isinstance(lost.model, sap2000_edits.AddFrameByCoordArgs):
+            return Decision(outcome="unknown", evidence={"reason": "not an add-frame model"})
+        # Spec 0012 AC12: "exactly one frame not in the pre-image". Without a known pre-image (or without
+        # a frame_ids list) every current frame would look new and one geometry match would be a false applied.
+        base: dict[str, JsonValue] = {"pre_image_known": lost.known, "pre_image": lost.pre_image}
+        if not lost.known:
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image not known"})
+        if not isinstance(lost.pre_image, dict):
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image is not a dict"})
+        ids = lost.pre_image.get("frame_ids")
+        if not isinstance(ids, list):
+            return Decision(outcome="unknown", evidence=base | {"reason": "pre_image.frame_ids is not a list"})
+        if self._tolerance is None and self._provider is not None:
+            self._tolerance = self._provider()
+        snap = await self._snapshot(lost, read)
+        frames = snap.state.payloads["model.frame_placements/1"].model_dump(mode="json")["frames"]
+        before = {str(item) for item in ids}
+        added = [row for row in frames if str(row["id"]) not in before]
+        want = expect(lost.model).want or {}
+        tol = self._tolerance
+        matches = [row for row in added if _frame_matches(row, want, tol)]
+        if len(matches) == 1:
+            outcome: _Outcome = "applied"
+        elif len(matches) == 0 and len(added) == 0:
+            outcome = "not_applied"
+        else:
+            outcome = "unknown"
+        evidence: dict[str, JsonValue] = {
+            "requested": cast(JsonValue, want),
+            "observed": {"added": cast(JsonValue, added), "matches": cast(JsonValue, matches)},
+            "pre_image_known": lost.known,
+            "pre_image": lost.pre_image,
+        }
+        return Decision(outcome=outcome, evidence=evidence)
 
     async def _long(self, lost: LostWrite, read: HostRead) -> Decision:
         """Analysis and design: `unknown` whatever the host answers; `locked` and the raw status codes are evidence."""

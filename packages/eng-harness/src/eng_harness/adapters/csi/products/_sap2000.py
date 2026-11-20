@@ -1,4 +1,4 @@
-"""SAP2000 product profile data and model extensions (plan 0012 T1, T4; spec 0012 section 4.3, 4.4, 4.5)."""
+"""SAP2000 product profile data and model extensions (plan 0012 T1, T4, T5; spec 0012 section 4.3, 4.4, 4.5)."""
 
 MODEL_EXTENSIONS = (".SDB",)
 COMPANION_GLOBS: tuple[str, ...] = ()  # empty until local test L2 (spec 0012 section 4.3)
@@ -8,6 +8,8 @@ TABLES: dict[str, str] = {}
 READBACK: dict[str, tuple[str, str, str]] = {}
 # Declared absences of the state reader (spec 0012 section 4.3, AC8): stories and grids are not produced.
 DECLARED_ABSENCES: tuple[str, ...] = ("stories", "grids")
+# Spec 0012 section 4.3 / A1: the host ignores the requested frame name; reconciliation matches by geometry.
+ADD_FRAME_NAMING = "reply"
 # Gap registry (spec 0012 section 4.5); only SP-1 is wired to a step in T3 (plan 0012 T3).
 GAPS = {
     "SP-1": "creating a new model is not implemented: provide a prepared model",
