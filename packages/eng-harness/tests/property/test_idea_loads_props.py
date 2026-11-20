@@ -151,5 +151,14 @@ def test_structure_preserved(n: float, qy: float, qz: float, mx: float, my: floa
     assert mapped["beamSegmentId"] == original["beamSegmentId"]
     assert mapped["position"] == original["position"]
     assert mapped["host_meta"] == original["host_meta"]
+    from eng_contract.units import convert
+
     for key in _force_keys:
         assert key in mapped
+    # Spec 0014 §4.7 / AC8: synthetic map signs are +1; host units are N / N.m from kN / kN.m.
+    assert mapped["n"] == convert(n, "kN", "N")
+    assert mapped["qy"] == convert(qy, "kN", "N")
+    assert mapped["qz"] == convert(qz, "kN", "N")
+    assert mapped["mx"] == convert(mx, "kN.m", "N.m")
+    assert mapped["my"] == convert(my, "kN.m", "N.m")
+    assert mapped["mz"] == convert(mz, "kN.m", "N.m")
