@@ -135,8 +135,12 @@ def test_mapping_table(
     assert detail.host_code == host_code
     assert got_certainty == certainty
     if code is not None:
-        assert code in detail.message.lower() or code.replace("_", " ") in detail.message.lower()
-    assert message.split()[0] in detail.message or message in detail.message
+        assert code in detail.message.lower()
+    # Declined dialog rewrites the message to "declined in Revit" (spec 0011 §4.7); others keep the host text.
+    if want is C.CONFIRMATION_REQUIRED and "declined" in message.lower():
+        assert "declined in Revit" in detail.message
+    else:
+        assert message.split()[0] in detail.message or message in detail.message
     assert (detail.incident_id is not None) is (want is C.INTERNAL)
     assert (detail.op_id == "op-revit") is (want is C.TIMEOUT_UNKNOWN_OUTCOME)
 

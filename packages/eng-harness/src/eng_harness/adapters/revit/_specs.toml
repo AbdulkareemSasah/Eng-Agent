@@ -1,0 +1,18 @@
+# Revit specification identifiers → contract quantity kind and internal unit (spec 0011 §4.6).
+# status: candidate until recorded at local test L7; v1 maps length (ft→mm) and angle (rad→deg) only.
+# Length identifier pinned by the synthetic fake seed (spec 0011 §4.13 / tests/fakes/sasaah_revit).
+# Angle identifier uses the same Autodesk Spec AEC schema family as that length id (candidate, L7).
+
+[specs."autodesk.spec.aec:length-2.0.0"]
+kind = "length"
+internal_unit = "ft"
+contract_unit = "mm"
+status = "candidate"
+source = "spec 0011 §4.6, §4.13 synthetic fake seed; eng_contract.units ft (NIST SP 811)"
+
+[specs."autodesk.spec.aec:angle-2.0.0"]
+kind = "angle"
+internal_unit = "rad"
+contract_unit = "deg"
+status = "candidate"
+source = "spec 0011 §4.6 (angle rad→deg); Autodesk Spec AEC schema family of the length id above; L7 confirms"
