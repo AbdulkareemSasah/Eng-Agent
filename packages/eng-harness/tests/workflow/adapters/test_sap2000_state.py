@@ -176,7 +176,12 @@ def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, contr
             assert read.status.units == "kN_m_C"
             assert read.status.file_name == port.model_files(key)[0].name
 
-            seen = {first.fingerprint}
+            # Declared absences (empty TABLES) still record the fingerprint on save (B-590 / _record_save).
+            saved = await port.save(key, "pre_analysis")
+            assert saved.fingerprint
+            assert saved.fingerprint == (await port.model_state(key, held.instance_id)).fingerprint
+
+            seen = {first.fingerprint, saved.fingerprint}
             edits: list[tuple[str, dict[str, Any]]] = [
                 ("csi_assign_frame_section", {"name": "F1", "section": "C400"}),
                 ("csi_add_load_pattern", {"name": "LIVE", "type": "Live"}),
