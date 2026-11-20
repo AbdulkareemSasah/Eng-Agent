@@ -230,6 +230,8 @@ tasks:
   - id: T12
     title: Calc harness.frame_element_map and its kind, with golden cases
     # Amendment (B-467, documents only): the calc reads the basis field compare.length_mm (spec 0007 4.8 name).
+    # Amendment (B-595, documents only, OQ-Q104): second input structure (harness.revit_structure/1) supplies
+    # element_id and type_id after geometric pairing; collateral PREFIXES, calc-kinds fixture and stale_ok files.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -241,12 +243,16 @@ tasks:
       - "packages/eng-harness/tests/unit/calcs/test_frame_element_map.py"
       - "packages/eng-harness/tests/property/test_frame_element_map.py"
       - "packages/eng-harness/tests/data/golden/calcs/frame-element-map-*.json"
+      - "packages/eng-harness/tests/golden/test_calcs_golden.py"  # PREFIXES entry for frame stems (amendment B-595)
+      - "packages/eng-harness/tests/contract/test_calc_kinds.py"  # CALC_KINDS equality for frame_element_map (amendment B-595)
+      - "packages/eng-harness/tests/data/kinds/calcs/frame_element_map.json"  # kind fixture (amendment B-595)
+      - "packages/eng-harness/tests/data/calcs/stale_ok.json"  # harness.frame_element_map: [] (amendment B-595)
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
       # Amendment (B-452): the golden cases of the shared loader tests/golden/test_calcs_golden.py are data, not test
-      # functions, and this task does not change that file, so they cannot be test-first evidence (gate TF008, TF010);
-      # the task's golden files stay in its first commit and run in the tests step.
+      # functions, so they cannot be test-first evidence (gate TF008, TF010); B-595 adds that file to files for the
+      # PREFIXES entry only. The task's golden files stay in its first commit and run in the tests step.
       - "packages/eng-harness/tests/property/test_frame_element_map.py::test_permutation_invariant"
       - "packages/eng-harness/tests/unit/calcs/test_frame_element_map.py::test_basis_fields_required"
     covers: [AC27, AC28, AC29]
@@ -388,9 +394,10 @@ element-not-found case of `change_element_type`, with the evidence stored.
 `NotImplementedGap`, empty `started_instances`, the identity rule for an engineer save, and the host lock keyed by the
 pipe name.
 
-**T12 Mapping calc** (spec §4.11). Pure function over `model.frame_placements/1` inputs, the optional link map and the
-basis fields (`compare.length_mm`, `mapping.offset_*`), exact arithmetic, the output kind, the verification record
-(draft), and golden cases derived by hand and written in each file's `derivation` field.
+**T12 Mapping calc** (spec §4.11). Pure function over `model.frame_placements/1` inputs, the `structure` input
+(`harness.revit_structure/1`; OQ-Q104 / B-595), the optional link map and the basis fields (`compare.length_mm`,
+`mapping.offset_*`), exact arithmetic, the output kind, the verification record (draft), and golden cases derived by
+hand and written in each file's `derivation` field.
 
 **T13 Recordings** (spec §4.13, AC31). The Revit scenario of record mode (titles, paths and user names replaced), the
 sanitizer test, the recorded-reply contract tests (run on every applicable committed recording under
