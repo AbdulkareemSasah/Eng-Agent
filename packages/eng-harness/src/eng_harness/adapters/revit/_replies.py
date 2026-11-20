@@ -56,7 +56,5 @@ def parse_revit_reply(result: Mapping[str, Any]) -> ParsedRevitReply:
         warnings.append(ContractWarning(code=WarningCode.HOST_WARNING, message=host_warning[:2000]))
     complete = data.get("truncated") is not True
     if not complete:
-        warnings.append(
-            ContractWarning(code=WarningCode.PARTIAL_DATA, message="the host reply was truncated")
-        )
+        warnings.append(ContractWarning(code=WarningCode.PARTIAL_DATA, message="the host reply was truncated"))
     return ParsedRevitReply(body=data, warnings=tuple(warnings), complete=complete)

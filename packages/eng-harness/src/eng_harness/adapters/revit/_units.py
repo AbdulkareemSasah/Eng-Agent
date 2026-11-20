@@ -5,12 +5,12 @@ Purpose: convert a parameter's `rawValue` by `_specs.toml` (length `ft`→`mm`, 
 `PARAMETER_UNIT_UNMAPPED`. Units: mm, deg. Errors: none raised.
 """
 
+import tomllib
 from collections.abc import Mapping
 from functools import lru_cache
 from importlib.resources import files
 from typing import Any, Literal, NamedTuple
 
-import tomllib
 from eng_contract.issues import ModelIssue, Severity
 from eng_contract.units import convert
 from eng_contract.verdicts import Subject

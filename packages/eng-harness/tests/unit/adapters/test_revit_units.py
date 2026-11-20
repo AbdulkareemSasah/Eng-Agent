@@ -22,7 +22,7 @@ def test_length_feet_to_mm() -> None:
         {
             "name": "b",
             "rawValue": raw_ft,
-            "displayValue": "12\"",  # project display; must not be used
+            "displayValue": '12"',  # project display; must not be used
             "specId": "autodesk.spec.aec:length-2.0.0",
         },
         subject=Subject(kind=SubjectKind.SECTION, id="C300x300"),

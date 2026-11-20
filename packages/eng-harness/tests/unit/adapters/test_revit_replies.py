@@ -6,7 +6,7 @@ import pytest
 from eng_contract.errors import ContractError, ErrorCode, WarningCode
 
 
-def _tool_result(body: dict | str, *, is_error: bool = False) -> dict:
+def _tool_result(body: dict[str, object] | str, *, is_error: bool = False) -> dict[str, object]:
     text = body if isinstance(body, str) else json.dumps(body)
     return {"content": [{"type": "text", "text": text}], "isError": is_error}
 

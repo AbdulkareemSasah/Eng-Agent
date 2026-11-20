@@ -45,7 +45,15 @@ ROWS: list[tuple[str | None, str, CallEffect, ErrorCode, bool, str | None, Certa
     ("bridge_busy", "bridge is busy", W, C.HOST_BUSY, True, None, "not_applied"),
     ("bridge_busy", "bridge is busy", R, C.HOST_BUSY, True, None, None),
     ("timeout", "revit_list_levels was NOT executed", R, C.TIMEOUT_NO_EFFECT, True, None, None),
-    ("timeout", "revit_set_element_parameter_values was NOT executed", W, C.TIMEOUT_UNKNOWN_OUTCOME, False, None, "unknown"),
+    (
+        "timeout",
+        "revit_set_element_parameter_values was NOT executed",
+        W,
+        C.TIMEOUT_UNKNOWN_OUTCOME,
+        False,
+        None,
+        "unknown",
+    ),
     (
         "timeout",
         "prepare_destructive is already executing",
