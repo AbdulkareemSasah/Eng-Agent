@@ -36,16 +36,18 @@ from eng_harness.adapters._envelope import make_envelope
 from eng_harness.adapters._toolport import AdapterToolPort, Binding, Builder, ModelBinder, Reader
 from eng_harness.adapters.csi import _replies, csi_allowlist
 from eng_harness.adapters.csi._checks import WrittenItems
-from eng_harness.adapters.csi._edits import EDIT_BUILDERS, EDIT_MODELS
+from eng_harness.adapters.csi._edits import EDIT_BUILDERS as _BASE_EDIT_BUILDERS
+from eng_harness.adapters.csi._edits import EDIT_MODELS as _BASE_EDIT_MODELS
 from eng_harness.adapters.csi._read_state_tool import READ_TOOLS, ModelArgs
 from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, Revisions, SavedFile, SaveModelArgs
+from eng_harness.adapters.csi.products import _safe_loads as _safe_loads
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ToolInfo
 from eng_harness.servers import CallEffect
 
-__all__ = ["READERS", "TOKENS", "CsiToolPort", "tool_allowlist"]
+__all__ = ["EDIT_BUILDERS", "READERS", "TOKENS", "CsiToolPort", "edit_builders", "tool_allowlist"]
 
-TOKENS = {  # spec 4.6.2 and 4.6.3
+_BASE_TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_define_wall_section": "kN_mm_C",
     "csi_set_frame_load_distributed": "kN_m_C",
     "csi_set_area_load_uniform": "kN_m_C",
@@ -53,6 +55,21 @@ TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_results_frame_forces": "kN_m_C",
     "csi_results_story_drifts": "kN_m_C",
 }
+TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS}  # SAFE point-load token (spec 0008 AC14)
+
+
+def edit_builders() -> dict[str, Builder]:
+    """Edit builders: base CSI map plus SAFE point-load and SAFE pattern SuperDead override (plan 0008 T6)."""
+    return {**_BASE_EDIT_BUILDERS, **_safe_loads.EDIT_BUILDERS}
+
+
+def edit_models() -> dict[str, type[ParamModel]]:
+    """Argument models for the edit builders, including `SetPointLoadArgs`."""
+    return {**_BASE_EDIT_MODELS, **_safe_loads.EDIT_MODELS}
+
+
+EDIT_BUILDERS = edit_builders()  # module-level for tool_allowlist and call-site commits
+EDIT_MODELS = edit_models()
 
 
 DesignKind = Literal["steel", "concrete", "aluminum", "coldformed"]  # the host rejects the last two (S-12 1)
@@ -206,12 +223,12 @@ class CsiToolPort(AdapterToolPort):
     ) -> None:  # fmt: skip
         self._written, self._wrote, self._revisions = written or WrittenItems(), wrote or (lambda key: None), revisions
         self._reopened, self._saved, self._opener = reopened or (lambda key, path: None), saved or _no_save, opener
-        builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in EDIT_BUILDERS.items()}
+        builders: dict[str, Builder] = {tool: _noting(build, self._written) for tool, build in edit_builders().items()}
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
         )  # the open file in place; no `as_new_revision`
         super().__init__(
-            allowlist=tool_allowlist(), arg_models=EDIT_MODELS | ANALYSIS_MODELS, builders=builders, readers=READERS,
+            allowlist=tool_allowlist(), arg_models=edit_models() | ANALYSIS_MODELS, builders=builders, readers=READERS,
             binder=_TokenBinder(binder), **wiring,
         )  # fmt: skip
 

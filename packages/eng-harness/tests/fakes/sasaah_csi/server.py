@@ -210,7 +210,8 @@ def _edit(name: str, args: dict[str, Any], units: str) -> bool:
             ),
             {},
         )
-        row: dict[str, Any] = {k: old[k] for k in ("XDim", "YDim") if k in old}
+        # Always keep XDim/YDim columns (SAFE field map requires them); preserve prior values when Replace.
+        row: dict[str, Any] = {"XDim": old.get("XDim"), "YDim": old.get("YDim")}
         row.update(UniqueName=a["name"], LoadPattern=a["load_pattern"])
         moments = [value * LENGTH_M[units] / LENGTH_M[STATE.resting] for value in a["moment"]]
         row.update(zip(("FX", "FY", "FZ", "MX", "MY", "MZ"), [*a["force"], *moments], strict=True))
