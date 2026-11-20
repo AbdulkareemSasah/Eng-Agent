@@ -1992,7 +1992,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "amendment B-585 (#488): T10 depends on plan 0008 T7 (harness.base_reactions/1); held until B-216 merges"
-   ]
+   ],
+   "merged_pr": 505
   },
   {
    "id": "B-402",
@@ -2317,14 +2318,13 @@
    "branch": "feat/b236-harness-rt7-revit-state-reader-chunked",
    "prTitle": "feat(eng-harness): revit state reader, chunked reads, fingerprint and the neutral kinds (B-236)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T6"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 508
   },
   {
    "id": "B-237",
@@ -2336,14 +2336,13 @@
    "branch": "feat/b237-harness-rt8-revit-edit-kinds-value",
    "prTitle": "feat(eng-harness): revit edit kinds, value encoding, call preconditions (identity, active document, shared type, parameter resolution) (B-237)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 514
   },
   {
    "id": "B-238",
@@ -2393,14 +2392,13 @@
    "branch": "feat/b240-harness-rt11-revit-session-operations-working",
    "prTitle": "feat(eng-harness): revit session operations (working copy, gaps), Revit identity rules and the pipe-keyed host lock (B-240)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 513
   },
   {
    "id": "B-241",
@@ -2435,14 +2433,13 @@
    "branch": "feat/b242-harness-rt13-record-mode-scenario-for",
    "prTitle": "feat(eng-harness): record mode scenario for Revit, sanitizer rules, recordings contract tests and the record script (B-242)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T11"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 515
   },
   {
    "id": "B-243",
@@ -2567,15 +2564,13 @@
    "branch": "feat/b249-harness-at5-add-frame-edit-with",
    "prTitle": "feat(eng-harness): add-frame edit with name from the reply, typed read-back edits, reconciliation by geometry (B-249)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T4",
-    "F.T6"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 511
   },
   {
    "id": "B-250",
@@ -2587,14 +2582,13 @@
    "branch": "feat/b250-harness-at6-analysis-result-readers-and",
    "prTitle": "feat(eng-harness): analysis, result readers and design run and results for SAP2000 (B-250)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 512
   },
   {
    "id": "B-251",
@@ -2606,16 +2600,13 @@
    "branch": "feat/b251-harness-at7-end-to-end-block",
    "prTitle": "feat(eng-harness): end-to-end block, crash matrix, recorded-reply contract tests and SAP2000 local-testing part (B-251)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T5",
-    "A.T6",
-    "F.T8"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 516
   },
   {
    "id": "B-300",
