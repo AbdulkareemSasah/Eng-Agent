@@ -140,3 +140,87 @@ def test_stop_wait_timeout_and_negative_wait(tmp_path: Path) -> None:
         assert "still stopping" in wait_zero.out.getvalue().lower()
     finally:
         lock.release()
+
+
+def test_stop_real_engine_pauses_at_safe_point(tmp_path: Path) -> None:
+    """AC9 re-check: `stop` pauses a live real engine at the next safe point (plan T17; FileRunControl wired)."""
+    import time
+    from typing import Any, cast
+
+    from eng_contract.ids import SeededIdSource
+    from helpers.cli_deps import FakeInput, FakeOutput, FakePorts
+    from workflows.rig import Host
+
+    from eng_harness.block import Registry, workflow
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class BlockingHost(Host):
+        async def call(self, tool: str, args: Any, *, op_id: str, model: str | None = None) -> Any:
+            if not entered.is_set():
+                entered.set()
+                assert release.wait(30)
+            return await super().call(tool, args, op_id=op_id, model=model)
+
+    @workflow(name="stop_flow", version=1, description="Two reads so stop can land between them.")
+    async def stop_flow(ctx: Any, inp: FakeInput) -> FakeOutput:
+        await ctx.tool("read_a", {"n": 0})
+        await ctx.tool("read_a", {"n": 1})
+        return FakeOutput()
+
+    rig = Rig(tmp_path / "live", real_engine=True)
+    hosts: list[BlockingHost] = []
+
+    def port_builder(
+        config: Any,
+        workspace: Any,
+        store: Any,
+        run_folder: Any,
+        clock: Any,
+        ids: Any,
+        *,
+        files: Any = None,
+        visible: bool = False,
+    ) -> FakePorts:
+        host = BlockingHost(cast(SeededIdSource, ids), clock, workspace.root / "runs")
+        hosts.append(host)
+        rig.built.append((config, workspace, store, run_folder))
+        return FakePorts(rig.log, host)
+
+    exit_codes: list[int] = []
+    thread = threading.Thread(
+        target=lambda: exit_codes.append(
+            rig.main(
+                "run",
+                "stop_flow",
+                "--no-report",
+                "--progress",
+                "off",
+                workflow_registry=Registry([stop_flow]),
+                port_builder=port_builder,
+            )
+        ),
+        daemon=True,
+    )
+    thread.start()
+    assert entered.wait(timeout=10)
+    deadline = time.monotonic() + 10
+    while not (rig.workspace / "runs").exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    run_ids = sorted(p.name for p in (rig.workspace / "runs").iterdir())
+    assert run_ids
+    run_id = run_ids[0]
+
+    stop_rig = Rig(tmp_path / "live")
+    assert stop_rig.main("stop", run_id, "--wait", "5", clock=FixedClock(START_MS, 1)) == ExitCode.OK
+    release.set()
+    thread.join(timeout=15)
+    assert exit_codes == [ExitCode.STOPPED]
+    run_dir = rig.runs / run_id
+    assert not (run_dir / STOP_FILE).exists()
+    reader = JournalReader(run_dir)
+    try:
+        assert reader.events()[-1].payload == ev.RunPaused(reason="stop_requested", request_ids=[])
+    finally:
+        reader.close()
