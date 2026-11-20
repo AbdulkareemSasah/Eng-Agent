@@ -165,14 +165,20 @@ def _state_problems(host: RecordedHost, *, product: str) -> list[str]:
     pid = first.arguments["target"]["pid"]
     path = (_body(first.result or {}) or {}).get("model_path")
     replay = RecordedHost(host.directory)
-    # SAFE tables: SafeStateReader (0008 T5). Others without joint_loads: CsiStateReader.
+    # Profile dispatch (spec 0008 AC2 / 0012 AC8): declared absences → Sap2000StateReader;
+    # joint_loads → SafeStateReader; else CsiStateReader. No product-name branch.
     from eng_harness.adapters.csi.products import profile
 
-    tables = profile(product).tables
-    if "joint_loads" in tables:
+    prof = profile(product)
+    tables = prof.tables
+    if prof.declared_absences:
+        from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
+
+        reader: Any = Sap2000StateReader(product=product, call=replay.host_call)
+    elif "joint_loads" in tables:
         from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 
-        reader: Any = SafeStateReader(product=product, call=replay.host_call)
+        reader = SafeStateReader(product=product, call=replay.host_call)
     else:
         reader = CsiStateReader(product=product, call=replay.host_call)
     try:
