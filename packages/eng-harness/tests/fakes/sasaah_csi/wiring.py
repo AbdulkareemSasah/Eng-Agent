@@ -614,8 +614,12 @@ def _sap2000_seed() -> dict[str, Any]:
     from workflow.adapters.test_sap2000_state import _seed
 
     seed = _seed(points=1, frames=1)
-    seed["results"] = dict(_RESULTS_SEED["results"])
-    seed["load_cases"] = list(_RESULTS_SEED["load_cases"])
+    results = _RESULTS_SEED["results"]
+    cases = _RESULTS_SEED["load_cases"]
+    assert isinstance(results, dict)
+    assert isinstance(cases, list)
+    seed["results"] = results
+    seed["load_cases"] = cases
     return seed
 
 

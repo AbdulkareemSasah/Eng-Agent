@@ -486,11 +486,10 @@ def _sap2000_recording_params() -> list[pytest.ParameterSet]:
 @pytest.fixture(scope="module")
 def generated_sap2000(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The scripted SAP2000 session on the synthetic fake, recorded through record mode."""
-    from fakes.recorded._session import record_synthetic
-
     # SAP2000_SEED lands in the feat commit; missing name fails at the base (TF004).
-    from fakes.recorded._session import SAP2000_SEED  # noqa: F401
+    from fakes.recorded._session import SAP2000_SEED, record_synthetic
 
+    assert "frames" in SAP2000_SEED
     base = tmp_path_factory.mktemp("recorded-sap2000")
     (base / "run").mkdir()
     record_synthetic(
