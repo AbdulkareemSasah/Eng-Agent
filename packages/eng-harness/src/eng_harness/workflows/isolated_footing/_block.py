@@ -407,39 +407,27 @@ async def _resize(
     plan: Ref,
     depth: Ref,
     spacing: Ref,
-    *,
-    keep: list[str] | None = None,
 ) -> Any:
-    """Resize with an action for every footing still in `dims` (spec 0010 §4.4.4); closed ids get `none`.
+    """Resize with an action for every footing still in `dims` (spec 0010 §4.4.4).
 
-    When `keep` is set, only those footing ids are retained in the next dims (closed rows dropped for
-    open-only layout/status rounds, spec 0010 §4.6 steps 1-2.3).
+    Closed footings that remain in `dims` get action `none` so sizes stay unchanged (no calc filter;
+    closed sizes are retained via closures and prior plan/design output, spec 0010 §4.6 / P6).
     """
     covered = dict(actions)
     for row in await _data(ctx, dims.ref, "/footings"):
-        if keep is not None and row["id"] not in keep:
-            continue
         if row["id"] not in covered:
             covered[row["id"]] = "none"
-    args: dict[str, Any] = {
-        "dims": dims.ref,
-        "actions": covered,
-        "engineer_plan": plan,
-        "engineer_depth": depth,
-        "engineer_spacing": spacing,
-        "basis": ctx.basis.record_ref(),
-    }
-    if keep is not None:
-        args["keep"] = list(keep)
-    return await ctx.calc("harness.footing_resize", args)
-
-
-async def _keep_open_dims(ctx: Any, dims: Any, open_ids: list[str], plan: Ref, depth: Ref, spacing: Ref) -> Any:
-    """Drop closed footings from trial dims so the next layout/status see only open ids."""
-    present = [row["id"] for row in await _data(ctx, dims.ref, "/footings")]
-    if len(present) == len(open_ids) and all(item in open_ids for item in present):
-        return dims
-    return await _resize(ctx, dims, {}, plan, depth, spacing, keep=list(open_ids))
+    return await ctx.calc(
+        "harness.footing_resize",
+        {
+            "dims": dims.ref,
+            "actions": covered,
+            "engineer_plan": plan,
+            "engineer_depth": depth,
+            "engineer_spacing": spacing,
+            "basis": ctx.basis.record_ref(),
+        },
+    )
 
 
 async def _gap_reason(ctx: Any, bearing: Ref, footing_id: str) -> str | None:
@@ -524,24 +512,22 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
         if not open_ids:
             break
 
-        # Spec 0010 §4.6 steps 1-2.3: layout/status see only open footings; closed sizes stay in closures.
+        # Resize always needs three Quantity refs (spec 0010 §4.4.4); unused except for engineer_set.
         unused = (
             _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/L/value"),
             _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/h/value"),
             _ref(f"{_rid(inp.unused_engineer_dims)}#/fields/s/value"),
         )
-        dims = await _keep_open_dims(ctx, dims, open_ids, *unused)
-        design = await ctx.calc(
-            "harness.footing_layout",
-            {"dims": dims.ref, "subjects": inp.subjects, "basis": ctx.basis.record_ref()},
-        )
-        last_design = design.ref
+
+        # Status requires a verdict for every design footing (spec 0010 §4.4.5). Closed rows may still
+        # sit in dims/design (resize has no drop action); check every design id, then act only on open_ids.
+        design_ids = [row["id"] for row in await _data(ctx, design.ref, "/footings")]
 
         service = await _cases(ctx, inp.service_cases)
         factored = await _cases(ctx, inp.factored_cases)
         families = await _batch_checks(
             ctx,
-            open_ids=open_ids,
+            open_ids=design_ids,
             subjects_ref=inp.subjects,
             reactions=inp.reactions,
             design=design.ref,
@@ -640,8 +626,6 @@ async def design_isolated_footing(ctx: Any, inp: DesignIsolatedFootingInput) -> 
                 asked.field_ref("s"),
             )
             open_ids = await _apply_limit_closures(ctx, dims, open_ids, closures)
-
-        dims = await _keep_open_dims(ctx, dims, open_ids, *unused)
 
     return DesignIsolatedFootingOutput(
         design=last_design,

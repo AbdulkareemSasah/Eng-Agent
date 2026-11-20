@@ -68,11 +68,7 @@ class ResizeAction(StrEnum):
 
 
 class ResizeInput(CalcInput):
-    """Trial dims, one action per footing, the engineer triple, and the nine basis fields.
-
-    Optional `keep`: when set, only those footing ids from `dims` are resized and returned (spec 0010 §4.6
-    open-only rounds; closed footings are dropped from the next dims). Every kept id still needs an action.
-    """
+    """Trial dims, one action per footing, the engineer triple, and the nine basis fields."""
 
     dims: FootingDims = eng_param(ref_capable=True, ref_kinds={"harness.footing_dims/1"}, engineering_quantity=True)
     actions: dict[str, ResizeAction] = eng_param()
@@ -98,7 +94,6 @@ class ResizeInput(CalcInput):
         engineering_quantity=True,
     )
     basis: DesignBasis = eng_param(ref_capable=True, ref_kinds={"basis.design_basis/1"}, engineering_quantity=True)
-    keep: list[str] | None = None
 
 
 class ResizeBody(BaseModel):
@@ -529,20 +524,8 @@ def footing_resize(inp: ResizeInput, meta: InputMeta, trace: TraceBuilder) -> Re
             field="engineer_plan",
         )
     engineer = (plan, depth, spacing)
-    source = list(inp.dims.footings)
-    if inp.keep is not None:
-        keep_ids = list(dict.fromkeys(inp.keep))
-        by_id = {row.id: row for row in source}
-        missing = [footing_id for footing_id in keep_ids if footing_id not in by_id]
-        if missing:
-            raise ContractError(
-                ErrorCode.INVALID_ARGUMENT,
-                f"keep names unknown footing ids: {', '.join(missing)}",
-                field="keep",
-            )
-        source = [by_id[footing_id] for footing_id in keep_ids]
     rows: list[DimRow] = []
-    for index, row in enumerate(source):
+    for index, row in enumerate(inp.dims.footings):
         action = inp.actions.get(row.id)
         if action is None:
             raise ContractError(
@@ -551,8 +534,7 @@ def footing_resize(inp: ResizeInput, meta: InputMeta, trace: TraceBuilder) -> Re
                 field="actions",
             )
         rows.append(_apply(row, action, quantities, engineer, meta, trace, index))
-    allowed = {row.id for row in source}
-    extra = sorted(set(inp.actions) - allowed)
+    extra = sorted(set(inp.actions) - {row.id for row in inp.dims.footings})
     if extra:
         raise ContractError(
             ErrorCode.INVALID_ARGUMENT,
