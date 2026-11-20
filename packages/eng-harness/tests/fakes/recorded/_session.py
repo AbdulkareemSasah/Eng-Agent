@@ -1,8 +1,9 @@
-"""Sessions on the synthetic CSI fake, plain or recorded (plan 0002 T17; spec 0002 sections 4.8.1, 4.8.3).
+"""Sessions on the synthetic CSI and Revit fakes, plain or recorded (plan 0002 T17; plan 0011 T13).
 
-`record_synthetic` runs a short scripted session on the synthetic fake process through `RecordMode`, which gives the
-contract tests a recording to work on until the owner commits real ones. `replay_on_fake` sends the requests of a
-recording to a fresh fake and returns what the fake answers.
+`record_synthetic` / `record_revit_synthetic` run a short scripted session on the synthetic fake process through
+`RecordMode`, which gives the contract tests a recording to work on until the owner commits real ones.
+`replay_on_fake` / `replay_on_revit_fake` send the requests of a recording to a fresh fake and return what the fake
+answers.
 """
 
 import json
@@ -300,6 +301,92 @@ def replay_on_fake(
 
     async def session() -> None:
         async with fake_client(run_dir, used, product=product) as client:
+            for exchange in host.calls:
+                reply = await client.call_tool(exchange.tool, exchange.arguments)
+                answers.append((exchange, reply.model_dump(mode="json", by_alias=True, exclude_none=True)))
+
+    anyio.run(session)
+    return answers
+
+
+# --- Revit synthetic record mode (plan 0011 T13; spec 0011 AC31, section 4.13) ---
+
+REVIT_SERVER = Path(__file__).resolve().parents[1] / "sasaah_revit" / "server.py"
+# Seed used by the scripted Revit session: default fake model is enough; open_model sets path and title.
+REVIT_SEED: dict[str, Any] = {}
+
+
+@asynccontextmanager
+async def revit_fake_client(
+    run_dir: Path,
+    seed: Mapping[str, Any] = REVIT_SEED,
+    *,
+    recording: Recording | None = None,
+) -> AsyncIterator[Client]:
+    """A client on a fresh synthetic Revit fake process; with `recording` every exchange is recorded."""
+    control = run_dir / "control.json"
+    control.write_text(json.dumps({"faults": [], "seed": dict(seed)}))
+    spec = LaunchSpec(
+        argv=[sys.executable, str(REVIT_SERVER)],
+        env={**get_default_environment(), "SASAAH_REVIT_FAKE_CONTROL": str(control)},
+        cwd=run_dir, stderr_path=run_dir / "servers" / "revit-fake.stderr.log", job=JobPolicy.SERVER,
+    )  # fmt: skip
+    transport = ProcessTransport(PosixLauncher().start(spec), grace_s=5.0)
+    async with Client(
+        transport if recording is None else RecordMode(transport, recording), mode="legacy", cache=None,
+        read_timeout_seconds=None,
+    ) as client:  # fmt: skip
+        yield client
+
+
+async def scripted_revit_session(client: Client, home: str) -> None:
+    """Open a model under `home` and read the model state as the adapter does (spec 0011 section 4.9).
+
+    Connection status is read inside `RevitStateReader` after open, so the default fake document path is not
+    recorded before the working-copy path (and does not take the first model placeholder).
+    """
+    from eng_harness.adapters.revit._parameters import load_role_map
+    from eng_harness.adapters.revit._state import RevitStateReader
+
+    await client.list_tools()
+    model = f"{home}/Clients/Acme Tower/Tower-A.rvt"
+    await _body(client, "revit_open_model", {"path": model, "activate": True})
+
+    async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+        reply = await client.call_tool(tool, arguments)
+        dump = reply.model_dump(mode="json", by_alias=True, exclude_none=True)
+        assert not reply.is_error, dump
+        return dump
+
+    await RevitStateReader(call=call, role_map=load_role_map({}), catalog_version="synthetic").read(
+        bound_path=Path(model)
+    )
+
+
+def record_revit_synthetic(directory: Path, run_dir: Path, *, tool_names: frozenset[str] | None = None) -> Path:
+    """Record the scripted Revit session on the synthetic fake into `directory`; returns the manifest path."""
+    home = "/home/" + USER
+    recording = Recording(
+        directory, run_dir, adapter="sasaah-revit-mcp", build="synthetic", tool_names=tool_names, user=USER, home=home
+    )
+
+    async def session() -> None:
+        async with revit_fake_client(run_dir, REVIT_SEED, recording=recording) as client:
+            await scripted_revit_session(client, home)
+
+    anyio.run(session)
+    return directory / "manifest.json"
+
+
+def replay_on_revit_fake(
+    host: Any, run_dir: Path, seed: Mapping[str, Any] | None = None
+) -> list[tuple[Any, dict[str, Any]]]:
+    """Send every recorded Revit `tools/call` to a fresh synthetic fake; pairs with the reply."""
+    answers: list[tuple[Any, dict[str, Any]]] = []
+    used = REVIT_SEED if seed is None else seed
+
+    async def session() -> None:
+        async with revit_fake_client(run_dir, used) as client:
             for exchange in host.calls:
                 reply = await client.call_tool(exchange.tool, exchange.arguments)
                 answers.append((exchange, reply.model_dump(mode="json", by_alias=True, exclude_none=True)))

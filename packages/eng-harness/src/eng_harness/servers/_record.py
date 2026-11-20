@@ -2,8 +2,9 @@
 
 `RecordMode` hands every request and its reply to a `Recording`, which at the end of the session writes
 `<seq>-<tool>.json` files, sanitized, and a `manifest.json` of SHA-256 hashes; reads of `Project Information` are
-dropped and the name mapping stays in the run folder. Free text cannot be sanitized mechanically: the owner reviews
-a recording before committing it. Units: none. Errors: `verify_manifest` returns the problems it finds.
+dropped and the name mapping stays in the run folder. A JSON string under the key `title` is replaced (spec 0011
+section 4.13). Free text cannot be sanitized mechanically: the owner reviews a recording before committing it.
+Units: none. Errors: `verify_manifest` returns the problems it finds.
 """
 
 import getpass
@@ -54,7 +55,9 @@ class Sanitizer:
     A path inside `run_dir` becomes `<run>/<relative>`, any other absolute path `<path>/<name>`, the home folder
     `<home>`, the user name `<user>`. A model or file name (the last component of a path, or a bare name with a known
     extension) becomes `<model-N>` or `<file-N>` and keeps its extension; the same base name is the same placeholder
-    wherever it appears, also without its extension. Sanitizing a sanitized value changes nothing.
+    wherever it appears, also without its extension. A JSON string under the key `title` becomes `<title-N>`, or the
+    matching model placeholder when the title equals a model stem already seen (spec 0011 section 4.13). Sanitizing a
+    sanitized value changes nothing.
     """
 
     def __init__(self, run_dir: Path | str, *, user: str, home: str) -> None:
@@ -62,6 +65,8 @@ class Sanitizer:
         self._run, self._home = _slash(str(run_dir)), _slash(home)
         self._users = re.compile(rf"(?<![\w<])({re.escape(user)})(?![\w>])", re.IGNORECASE) if user else None
         self._index: dict[str, str] = {}  # base name (case folded) -> placeholder
+        self._titles: dict[str, str] = {}  # title (case folded) -> placeholder
+        self._title_forms: list[str] = []  # original title strings, longest first for free-text replacement
         self.names: dict[str, str] = {}  # original file name -> placeholder name: for the run folder, not the recording
 
     def _name(self, part: str) -> str:
@@ -70,6 +75,18 @@ class Sanitizer:
         holder = self._index.setdefault(stem.casefold(), f"<{kind}-{len(self._index) + 1}>")
         self.names[part] = holder + suffix
         return holder + suffix
+
+    def _title(self, raw: str) -> str:
+        """A document or model title: reuse a model stem placeholder when it matches, else `<title-N>`."""
+        if raw.startswith("<") and raw.endswith(">"):
+            return raw
+        folded = raw.casefold()
+        if folded in self._index:
+            return self._index[folded]
+        if folded not in self._titles:
+            self._titles[folded] = f"<title-{len(self._titles) + 1}>"
+            self._title_forms.append(raw)
+        return self._titles[folded]
 
     def _path(self, raw: str) -> str:
         core = raw.rstrip(".)")
@@ -85,10 +102,14 @@ class Sanitizer:
         return f"<path>/{self._name(path.rsplit('/', 1)[-1])}{tail}"
 
     def text(self, value: str) -> str:
-        """The text with paths, file names and the user replaced."""
+        """The text with paths, file names, titles and the user replaced."""
         if _WHOLE.fullmatch(value):
             return self._path(value)
         value = _FILE.sub(lambda m: self._name(m.group(0)), _PATH.sub(lambda m: self._path(m.group(0)), value))
+        if self._title_forms:  # full titles (may contain spaces) before bare stems
+            forms = "|".join(re.escape(t) for t in sorted(self._title_forms, key=len, reverse=True))
+            titles = re.compile(rf"(?<![\w<])({forms})(?![\w>])", re.IGNORECASE)
+            value = titles.sub(lambda m: self._titles[m.group(1).casefold()], value)
         if self._index:  # a base name quoted without its extension
             bases = "|".join(re.escape(b) for b in sorted(self._index, key=len, reverse=True))
             pattern = re.compile(rf"(?<![\w<$-])({bases})(?![\w>$-])", re.IGNORECASE)
@@ -96,12 +117,17 @@ class Sanitizer:
         return value if self._users is None else self._users.sub("<user>", value)
 
     def value(self, value: JsonValue) -> JsonValue:
-        """`value` with every string sanitized (the keys are not)."""
+        """`value` with every string sanitized (the keys are not); a string under `title` uses the title rule."""
+        return self._walk(value, key=None)
+
+    def _walk(self, value: JsonValue, key: str | None) -> JsonValue:
         if isinstance(value, str):
-            return self.text(value)
+            return self._title(value) if key == "title" else self.text(value)
         if isinstance(value, list):
-            return [self.value(item) for item in value]
-        return {key: self.value(item) for key, item in value.items()} if isinstance(value, dict) else value
+            return [self._walk(item, None) for item in value]
+        if isinstance(value, dict):
+            return {name: self._walk(item, name) for name, item in value.items()}
+        return value
 
 
 class _Raw(NamedTuple):
