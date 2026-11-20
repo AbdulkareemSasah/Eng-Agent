@@ -408,7 +408,9 @@ port preserves the original input reference with its pointer (not only the recor
 
 **T6 Rules and golden harness** (spec AC3, AC46). The AST rules test covers every module under `calcs/`: allowed
 imports, top-level imports only, no I/O names, no `global`, no mutable module-level state, and FB005's literal rule,
-checked locally so it runs before the gate is merged. The golden loader parametrizes `test_case[<file stem>]` over
+checked locally so it runs before the gate is merged. Amendment (B-592, external from plan 0010 T10): the rules test
+must accept calc modules importing registered host kind models from `eng_harness._kinds` (spec §4.3), to read calc
+inputs only; no function calls, no registry mutation. The golden loader parametrizes `test_case[<file stem>]` over
 `tests/data/golden/calcs/*.json`. The golden file lint checks `source`, `method_ref`, `synthetic` and the schema. The
 verification record template goes in `docs/verification/calcs/README.md`. Almost everything here is test code.
 
@@ -448,6 +450,10 @@ file. T9 reuses `_compare.py` and the diff function (no copy). T7, T9 and T10 ad
   `packages/eng-harness/src/eng_harness/_calc/_port.py` (the port writes that reference into `RefMeta`), and
   `packages/eng-harness/tests/unit/calcs/test_port.py` (`test_ref_meta_preserves_pointer`: sibling pointers
   `#/required` and `#/increment` on a `harness.section_size/1` record whose `required` differs from `size`).
+- External amendment (B-592, from plan 0010 T10 / the B-401 integration): the rules test in
+  `packages/eng-harness/tests/rules/test_calc_modules.py` (T6) must accept calc modules importing registered host
+  kind models from `eng_harness._kinds` per spec §4.3 (to read calc inputs; no function calls, no registry
+  mutation).
 
 ## 4. Verification
 
