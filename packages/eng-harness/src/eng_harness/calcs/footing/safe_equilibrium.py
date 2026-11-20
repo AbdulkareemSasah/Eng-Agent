@@ -11,16 +11,16 @@ Errors: `ContractError` `INVALID_ARGUMENT` (basis field missing, unconfirmed or 
 from __future__ import annotations
 
 from fractions import Fraction
-from typing import Annotated, Any, Literal
+from typing import Any, Literal
 
 from eng_contract.cited import Cited
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.kinds.basis import DesignBasis
 from eng_contract.kinds.model import LoadSet
 from eng_contract.params import eng_param
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field
 
-from eng_harness._kinds import JointLoads
+from eng_harness._kinds import BaseReactions, JointLoads
 from eng_harness.calc import CalcInput, InputMeta, TraceBuilder, calc
 from eng_harness.calcs._compare import as_fraction
 from eng_harness.kinds.footing import PatternRow
@@ -31,40 +31,6 @@ BASIS_FIELDS = (_TOLERANCE,)
 ZERO = Cited(value=0, unit="1", source="eng-harness spec 0010 §4.9: relative tolerance is >= 0")
 VERSION = Cited(value=1, unit="1", source="Calc version 1 of spec 0010 4.9; a change of method is a new version")
 _RULE = "spec 0010 4.9 step 6"
-_Name = Annotated[str, StringConstraints(min_length=1, max_length=200)]
-
-
-class _CaseRef(BaseModel):
-    """Case reference shape of `harness.base_reactions/1` (spec 0008 §4.6); CaseRef is not a public export."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    case: _Name
-    case_type: Literal["load_pattern", "load_case", "load_combination"]
-    step: str | None = None
-
-
-class BaseReactionRow(BaseModel):
-    """One row of `harness.base_reactions/1` (spec 0008 §4.6); local until plan 0008 T7 registers the kind."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-
-    case: _CaseRef
-    FX_kN: float
-    FY_kN: float
-    FZ_kN: float
-    MX_kNm: float
-    MY_kNm: float
-    MZ_kNm: float
-
-
-class BaseReactions(BaseModel):
-    """`harness.base_reactions/1` payload shape used as calc input (spec 0008 §4.6)."""
-
-    model_config = ConfigDict(frozen=True, extra="forbid", allow_inf_nan=False)
-
-    rows: list[BaseReactionRow]
-    moment_reference: Literal["host_unconfirmed/1"] = "host_unconfirmed/1"
 
 
 class EquilibriumInput(CalcInput):
@@ -147,7 +113,8 @@ def safe_equilibrium(inp: EquilibriumInput, meta: InputMeta, trace: TraceBuilder
         applied[load.pattern] = applied.get(load.pattern, Fraction()) + Fraction(load.fz_kn)
     reactions: dict[str, Fraction] = {}
     for row in inp.base_reactions.rows:
-        reactions[row.case.case] = reactions.get(row.case.case, Fraction()) + Fraction(row.FZ_kN)
+        # harness.base_reactions/1 (spec 0008 §4.6): case is HarnessCaseRef; FZ wire alias is fz_kn
+        reactions[row.case.case] = reactions.get(row.case.case, Fraction()) + Fraction(row.fz_kn)
     patterns = sorted(set(applied) | set(reactions))
     trace.input("load_rows", len(inp.loads.loads), ref=meta.refs["loads"].result_id)
     trace.input("reaction_rows", len(inp.base_reactions.rows), ref=meta.refs["base_reactions"].result_id)
