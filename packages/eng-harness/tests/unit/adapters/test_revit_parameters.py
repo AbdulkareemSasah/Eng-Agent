@@ -22,7 +22,7 @@ def _family(
 
 
 def test_role_map_rules() -> None:
-    """AC33: missing name/status, unknown status, or two roles with one GUID → ConfigError; a valid map loads."""
+    """AC33: missing/empty name or status, unknown status/role, empty guid, or duplicate GUID → ConfigError; valid map loads."""
     from eng_harness.adapters.revit._parameters import ROLE_NAMES, load_role_map
 
     assert ROLE_NAMES == (
@@ -55,6 +55,12 @@ def test_role_map_rules() -> None:
                     "builtin": None,
                     "status": "candidate",
                 },
+                "etabs_link": {
+                    "name": "Sasaah_EtabsElementId",
+                    "guid": None,
+                    "builtin": None,
+                    "status": "reference",
+                },
             },
         )
     }
@@ -62,6 +68,7 @@ def test_role_map_rules() -> None:
     assert loaded["Rectangular Column"]["section_b"].name == "b"
     assert loaded["Rectangular Column"]["section_b"].status == "candidate"
     assert loaded["Rectangular Column"]["section_h"].guid == "11111111-1111-1111-1111-111111111111"
+    assert loaded["Rectangular Column"]["etabs_link"].status == "reference"
 
     with pytest.raises(ConfigError, match="name") as missing_name:
         load_role_map(
@@ -97,6 +104,53 @@ def test_role_map_rules() -> None:
             }
         )
     assert "parameters" in unknown_status.value.key
+
+    with pytest.raises(ConfigError, match="unknown parameter role") as unknown_role:
+        load_role_map(
+            {
+                "Rectangular Column": _family(
+                    extra={
+                        "not_a_role": {
+                            "name": "x",
+                            "guid": None,
+                            "builtin": None,
+                            "status": "candidate",
+                        },
+                    },
+                )
+            }
+        )
+    assert "parameters" in unknown_role.value.key
+
+    with pytest.raises(ConfigError, match="name") as empty_name:
+        load_role_map(
+            {
+                "Rectangular Column": _family(
+                    section_b={
+                        "name": "",
+                        "guid": None,
+                        "builtin": None,
+                        "status": "candidate",
+                    },
+                )
+            }
+        )
+    assert "parameters" in empty_name.value.key
+
+    with pytest.raises(ConfigError, match="guid") as empty_guid:
+        load_role_map(
+            {
+                "Rectangular Column": _family(
+                    section_b={
+                        "name": "b",
+                        "guid": "",
+                        "builtin": None,
+                        "status": "candidate",
+                    },
+                )
+            }
+        )
+    assert "parameters" in empty_guid.value.key
 
     shared = "22222222-2222-2222-2222-222222222222"
     with pytest.raises(ConfigError, match="GUID") as dup_guid:

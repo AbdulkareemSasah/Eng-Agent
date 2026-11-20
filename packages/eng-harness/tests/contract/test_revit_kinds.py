@@ -82,13 +82,24 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("levels", _rename(["levels", 0, "elevation_mm"], "elevation"), "elevation_mm"),
     ("grids", _rename(["grids", 0, "length_mm"], "length"), "length_mm"),
     ("structure", _rename(["elements", 0, "rotation_deg"], "rotation"), "rotation_deg"),
+    # length role in parameters: bare number without a Quantity unit (spec 0011 §4.8 storage)
+    ("structure", _set(["elements", 0, "parameters", "section_b"], 300.0), "Quantity"),
+    # length role with an unknown field on the Quantity value
+    (
+        "structure",
+        _set(
+            ["elements", 0, "parameters", "section_b"],
+            {"value": 300.0, "unit": "mm", "unknown_field": 1},
+        ),
+        "Extra inputs",
+    ),
     # unsorted lists (spec 0011 AC33 / §4.5)
     ("levels", _levels_unsorted, "sorted"),
     ("grids", _grids_unsorted, "sorted"),
     ("structure", _elements_unsorted, "sorted"),
     ("structure", _types_unsorted, "sorted"),
-    # counts that do not match rows (instance_ids length vs declared count is not used;
-    # structure types.instance_ids uniqueness / element category)
+    ("structure", _set(["types", 0, "instance_ids"], [3002, 3001]), "instance_ids"),
+    # invalid category / empty required strings (AC33 has no count field on these kinds)
     ("structure", _set(["elements", 0, "category"], "wall"), "category"),
     ("write_result", _set(["targets", 0, "element_id"], ""), "element_id"),
     ("status", _set(["ping_status"], ""), "ping_status"),

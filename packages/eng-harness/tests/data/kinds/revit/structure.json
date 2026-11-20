@@ -15,7 +15,10 @@
       "rotation_deg": 0.0,
       "parameters": {
         "section_b": {"value": 300.0, "unit": "mm"},
-        "section_h": {"value": 300.0, "unit": "mm"}
+        "section_h": {"value": 300.0, "unit": "mm"},
+        "rotation": {"value": 0.0, "unit": "deg"},
+        "etabs_link": "ETABS-C1",
+        "material": "Concrete C30"
       }
     },
     {
@@ -42,7 +45,8 @@
       "instance_ids": [3001],
       "parameters": {
         "section_b": {"value": 300.0, "unit": "mm"},
-        "section_h": {"value": 300.0, "unit": "mm"}
+        "section_h": {"value": 300.0, "unit": "mm"},
+        "material": "Concrete C30"
       }
     },
     {
