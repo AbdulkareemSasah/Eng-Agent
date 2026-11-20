@@ -1,0 +1,32 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_13_3_1_1.bearing_pressure_service (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-1: the unconfirmed gap check raises NotImplementedGap at precondition SBC_CONFIRMED, so the verdict is NEEDS_ENGINEER with null demand, capacity and ratio. Inputs are the ACI bearing_pressure_service HC-1 set (clause spec §8 / golden YAML); no SBC equation runs.
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_13_3_1_1.bearing_pressure_service
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs:
+      FX_kN: 0.0
+      FY_kN: 0.0
+      FZ_kN: 1200.0
+      MX_kNm: 0.0
+      MY_kNm: 0.0
+      Lx_mm: 2500.0
+      Ly_mm: 2500.0
+      reaction_height_mm: 0.0
+      h_mm: 600.0
+      soil_depth_mm: 1000.0
+      gamma_c_kN_m3: 24.0
+      gamma_s_kN_m3: 18.0
+      surcharge_kPa: 0.0
+      q_allow_kPa: 250.0
+      allowable_kind: gross
+    covers: [G-1, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null
