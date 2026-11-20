@@ -270,13 +270,16 @@ tasks:
     # every footing calc's content-hash closure, so T10 also refreshes only the content-hash line in the six footing
     # verification records. Input harness.base_reactions/1 is plan 0008 T7 (F.T7); depends_on gains that cross-plan
     # wait (comment). External amendment of T1 recorded in §3. Risk set already includes r2.
+    # Amendment (B-592, documents only): T10 must import the registered host kinds from eng_harness._kinds instead of
+    # copying them into kinds/footing.py; it may only extend the allowed-import table in test_calc_modules.py for
+    # eng_harness._kinds kind models per spec 0003 §4.3. External amendment of plan 0003 T6 recorded there.
     title: Calcs harness.reactions_to_joint_loads and harness.safe_equilibrium
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.footing, eng_harness.calcs.footing.reactions_to_loads and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/calcs/footing/__init__.py"
-      - "packages/eng-harness/src/eng_harness/calcs/footing/reactions_to_loads.py"
-      - "packages/eng-harness/src/eng_harness/calcs/footing/safe_equilibrium.py"
+      - "packages/eng-harness/src/eng_harness/calcs/footing/reactions_to_loads.py"  # import registered host kinds from eng_harness._kinds; do not copy into kinds/footing.py (amendment B-592)
+      - "packages/eng-harness/src/eng_harness/calcs/footing/safe_equilibrium.py"  # import registered host kinds from eng_harness._kinds; do not copy into kinds/footing.py (amendment B-592)
       - "packages/eng-harness/src/eng_harness/calcs/calcs.lock.json"
       - "packages/eng-harness/docs/verification/calcs/harness.reactions_to_joint_loads.md"
       - "packages/eng-harness/docs/verification/calcs/harness.safe_equilibrium.md"
@@ -294,6 +297,7 @@ tasks:
       - "packages/eng-harness/tests/golden/footing/test_equilibrium.py"
       - "packages/eng-harness/tests/data/golden/footing/loads-*.json"
       - "packages/eng-harness/tests/data/golden/footing/equilibrium-*.json"
+      - "packages/eng-harness/tests/rules/test_calc_modules.py"  # T10 may only extend the allowed-import table for eng_harness._kinds kind models per spec 0003 §4.3 (amendment B-592)
     max_changed_lines: 320
     max_sessions: 3
     tests_first:
@@ -473,7 +477,10 @@ the file list is amended).
 magnitude with the basis tolerance. Amendment (B-585, documents only): T10 registers the result kind
 `harness.reactions_to_joint_loads/1` in `kinds/footing.py` (T1 owns the file; only that kind plus its contract fixture),
 refreshes only the content-hash line of the six footing verification records, and waits for plan 0008 T7
-(`harness.base_reactions/1`, F.T7) as well as plan 0008 T5.
+(`harness.base_reactions/1`, F.T7) as well as plan 0008 T5. Amendment (B-592, documents only): T10 imports the
+registered host kinds from `eng_harness._kinds` and may only extend the allowed-import table in
+`tests/rules/test_calc_modules.py` for those kind models (spec 0003 §4.3); it must not copy host kinds into
+`kinds/footing.py`.
 
 **T11 SAFE stage** (spec §4.9). The child block, its approval, the candidate-map rule, the soil-pressure limit, and the
 contract test that every tool the workflow can call is in the CSI allowlist and none is an escape hatch.
