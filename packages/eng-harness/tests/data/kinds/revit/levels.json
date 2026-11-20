@@ -1,0 +1,14 @@
+{
+  "levels": [
+    {
+      "element_id": 1001,
+      "name": "L1",
+      "elevation_mm": 0.0
+    },
+    {
+      "element_id": 1002,
+      "name": "L2",
+      "elevation_mm": 3500.0
+    }
+  ]
+}

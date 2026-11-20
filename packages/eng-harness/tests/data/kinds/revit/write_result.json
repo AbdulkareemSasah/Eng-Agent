@@ -1,0 +1,12 @@
+{
+  "tool": "revit_change_element_type",
+  "op_id": "op-1",
+  "targets": [
+    {
+      "unique_id": "aaaa-bbbb-0001",
+      "element_id": 3001,
+      "type_id": null
+    }
+  ],
+  "reply_summary": "changed"
+}
