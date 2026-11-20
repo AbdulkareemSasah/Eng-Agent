@@ -259,10 +259,10 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 ([process/05](../../../../design/process/05-testing-and-verification.md) §9). Each task adds a `CHANGELOG.md` line. No
 public module is added (everything is internal), so `[tool.eng-gate] public_modules` is unchanged. Tasks that share a
 source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7; plan 0012 T3 after them for the gap and step-gap registries only, B-586),
-`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586),
+`products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586; plan 0012 T4 after it for ProductProfile.declared_absences only, B-590),
 `_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
-`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map),
-`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern).
+`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map; plan 0012 T4 after them for absences-aware state-reader selection and fingerprint on save only, B-590),
+`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern), `_reconcile.py` (T6; plan 0012 T4 for absences-aware state-reader selection from the profile only, B-590).
 
 Reuse (spec §2): everything in plan 0002; the SAFE 22 table reference of the Sasaah repository only as a source of field
 keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
@@ -370,6 +370,13 @@ local test shows that no allowlisted tool can run the SAFE designer, this task i
   `ProductProfile` (`profile(product).step_gaps`); T3 may only move those registries onto the profile (no other change);
   required for spec 0008 AC2 (`test_no_product_branches_in_shared`). Recorded in this plan's `_safe.py` and
   `products/__init__.py` serialization above.
+- External amendment (B-590, from plan 0012 T4 / the B-248 writer): plan 0012 T4 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries
+  `declared_absences` (wired from `_sap2000.DECLARED_ABSENCES`), and
+  `packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py` so it selects the absences-aware state reader from
+  the profile (no product-name branch; spec 0008 AC2); T4 may only make those profile-field and reader-selection
+  changes. Recorded in this plan's `products/__init__.py`, `_hostport.py` and `_reconcile.py` serialization above. Plan 0002 records
+  the matching external amendment for `_hostport.py`, `products/__init__.py` and `csi/_reconcile.py`.
 
 ## 4. Verification
 
