@@ -375,7 +375,12 @@ def test_outcomes_per_tool(tool: str, applied: bool, expected: str, tmp_path: Pa
         assert isinstance(found, Decision)
         assert found.outcome == expected
         assert found.missing == ()
-        assert "requested" in found.evidence or "path" in found.evidence or "observed" in found.evidence
+        # Evidence always carries the observed read; open_model also carries path (§4.10).
+        assert "observed" in found.evidence
+        if tool == "revit_open_model":
+            assert "path" in found.evidence or "requested" in found.evidence
+        else:
+            assert "requested" in found.evidence
 
     helpers.run_scenario(tmp_path, config, body)
 
@@ -537,11 +542,43 @@ def test_duplicate_type_after_retry(tmp_path: Path) -> None:
         assert observed.get("name") == "C450x450"
         assert observed.get("type_id") is not None
 
-        # Present with other parameters (pre-image already held the name) is unknown (AC21).
-        again = await reconciler.decide(
-            _lost(tool, host_args, target, known=True, pre_image={"name": "C450x450", "type_id": 1}),
-            read,
+        # AC21: no second type is created (exactly one type of the requested name).
+        listed = await read(
+            "revit_list_family_types_in_family",
+            {"family_name": "Concrete-Rectangular-Column", "start_index": 0, "max_types": 100},
+            CallEffect.READ,
         )
-        assert again.outcome == "unknown"
+        names = [row.get("name") for row in listed.get("items", []) if isinstance(row, dict)]
+        assert names.count("C450x450") == 1
+
+        new_type_id = observed["type_id"]
+        assert isinstance(new_type_id, int)
+
+        # AC21: type absent in pre-image but parameters differ from the source → unknown.
+        other_params = await read(
+            "revit_get_type_parameters",
+            {"typeIds": [new_type_id]},
+            CallEffect.READ,
+        )
+        items = other_params.get("items") or []
+        assert items
+        assert isinstance(items[0], dict)
+        params = list(items[0].get("parameters") or [])
+        assert params
+        assert isinstance(params[0], dict)
+        params[0] = dict(params[0])
+        params[0]["rawValue"] = float(params[0]["rawValue"]) + 1.0
+
+        async def read_other(tool_name: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if tool_name == "revit_get_type_parameters" and arguments.get("typeIds") == [new_type_id]:
+                return {"items": [{"id": new_type_id, "parameters": params}]}
+            return await read(tool_name, arguments, effect)
+
+        other = await reconciler.decide(
+            _lost(tool, host_args, target, known=True, pre_image=None),
+            read_other,
+        )
+        assert other.outcome == "unknown"
+        assert other.evidence.get("reason") == "type exists with other parameters"
 
     helpers.run_scenario(tmp_path, config, body)
