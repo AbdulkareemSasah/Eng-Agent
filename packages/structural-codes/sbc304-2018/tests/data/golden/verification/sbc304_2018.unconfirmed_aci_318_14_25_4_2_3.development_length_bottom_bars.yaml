@@ -1,0 +1,32 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_25_4_2_3.development_length_bottom_bars (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-6: SBC_CONFIRMED raises NotImplementedGap before any ACI development length step, so status is NEEDS_ENGINEER. Inputs are the ACI development_length_bottom_bars HC-1 set.
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_25_4_2_3.development_length_bottom_bars
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs:
+      Lx_mm: 2500
+      Ly_mm: 2500
+      coating: uncoated
+      concrete_class: normalweight
+      cover_x_mm: 75
+      cover_y_mm: 75
+      cx_mm: 400
+      cy_mm: 400
+      db_x_mm: 16
+      db_y_mm: 16
+      end_cover_mm: 75
+      fc_MPa: 28
+      fy_MPa: 420
+      s_x_mm: 200
+      s_y_mm: 200
+    covers: [G-6, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null
