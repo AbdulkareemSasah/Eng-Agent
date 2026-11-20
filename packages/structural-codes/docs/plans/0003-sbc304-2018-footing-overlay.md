@@ -57,7 +57,13 @@ tasks:
     depends_on: [T1]
   - id: T3
     title: Pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage
+    # Amendment (B-583, documents only): T3 may only add public_modules = ["aci318_14"] to the ACI 318-14
+    # pyproject.toml so the overlay can import the base pack across the member boundary (IM002); measured by the
+    # B-327 writer. importlib.metadata is forbidden in the pack content-hash closure, so the ACI public module must
+    # be declared. That path was outside T3's files; a trial with that one line made the SBC member gate pass.
     files:
+      - "packages/structural-codes/aci318-14/pyproject.toml"  # T3 may only add public_modules = ["aci318_14"] so the overlay can import the base pack across the member boundary (IM002); amendment B-583
+      - "packages/structural-codes/aci318-14/CHANGELOG.md"  # one line for the public_modules declaration (amendment B-583)
       - "packages/structural-codes/sbc304-2018/src/sbc304_2018/__init__.py"
       - "packages/structural-codes/sbc304-2018/pyproject.toml"
       - "packages/structural-codes/sbc304-2018/README.md"
@@ -151,7 +157,9 @@ overlay identity and retains base citations; an invalid explicit base clause rai
 **T3 Assembly.** `PACK` with `base="aci318_14"` and the built overlay, the entry point
 `[project.entry-points."structural_codes.packs"] sbc304_2018 = "sbc304_2018:PACK"`, `check_id_for`; one case file per
 check with one `boundary` case expecting `NEEDS_ENGINEER` and `program_comparison.not_available` (SP §9); README usage
-with `check_id_for` and `structural_codes.evaluate`; changelog entry for 0.1.0.
+with `check_id_for` and `structural_codes.evaluate`; changelog entry for 0.1.0. Amendment B-583: T3 may only add
+`public_modules = ["aci318_14"]` to `packages/structural-codes/aci318-14/pyproject.toml` (with a changelog line) so
+`from aci318_14 import PACK` passes the import-boundary check IM002.
 
 **T4 Column rows.** Dropped (amendment B-579): B-334 already registered the column checks, so rows G-7 to G-9 and their
 test fold into T2 and the case files into T3 (§1).

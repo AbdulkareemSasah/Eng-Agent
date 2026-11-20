@@ -1,10 +1,10 @@
-"""Commands `run` and `resume` (spec 0006 sections 4.2.1, 4.2.2, 4.2.3, 4.4.8; plan 0006 T14 and T14c).
+"""Commands `run` and `resume` (spec 0006 sections 4.2.1, 4.2.2, 4.2.3, 4.4.8; plan 0006 T14, T14c and T16b).
 
 Purpose: validate the request, the answers file and the model files without creating anything, build the ports, check
-the calcs of a production run, enter the ports around `Engine.start` or `Engine.resume`, remove the stop file the run
-process owns, write the report and map the outcome to the exit code. Units: none. Errors: every failure is printed on
-standard error and becomes an exit code; the engine's exceptions map as spec 4.2.3 says and an unexpected one is
-`INTERNAL` with an error id (the journal is intact).
+the calcs of a production run, enter the ports around `Engine.start` or `Engine.resume`, run the heartbeat beside the
+engine (T16b), remove the stop file the run process owns, write the report and map the outcome to the exit code. Units:
+none. Errors: every failure is printed on standard error and becomes an exit code; the engine's exceptions map as
+spec 4.2.3 says and an unexpected one is `INTERNAL` with an error id (the journal is intact).
 """
 
 import asyncio
@@ -13,7 +13,7 @@ import logging
 import re
 from argparse import Namespace
 from collections.abc import Awaitable, Callable, Mapping
-from contextlib import closing
+from contextlib import closing, suppress
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any, cast
@@ -47,18 +47,20 @@ from eng_harness.cli._signals import install_interrupt_handler
 from eng_harness.cli._wiring import (
     EngineLike,
     FileAnswers,
+    IsolatingFanOut,
     PageSession,
     RunIdCell,
     RunPortSet,
     engine_settings,
+    heartbeat_run_dir,
     open_workspace,
     release_marks,
 )
 from eng_harness.engine import PermissionMode, RunOutcome, RunRequest, RunStatus
 from eng_harness.journal import Event, JournalReader
 from eng_harness.journal import _events as ev
-from eng_harness.ports import DecisionPort, RunClass
-from eng_harness.progress import ExpectedTimes, Mode, ProgressRenderer, TerminalProgress
+from eng_harness.ports import DecisionPort, ProgressSink, RunClass
+from eng_harness.progress import ExpectedTimes, Heartbeat, Mode, ProgressRenderer, TerminalProgress
 from eng_harness.report import ReportError, build_report, write_report
 from eng_harness.servers import ConfigError
 from eng_harness.templates import ResolvedTemplate, TemplateRepository, TemplateSource, resolve
@@ -174,7 +176,9 @@ def _command(args: Namespace, deps: CliDeps, *, resume: bool) -> int:
                 decision = decision_factory(runtime, config, workspace, deps.clock, deps.ids)
                 progress = _progress(args, deps, config, workspace, plan.workflow)
                 parts = _PortParts(calc, page, progress, decision)
-                outcome = asyncio.run(_drive(deps, built, registry, config, workspace, store, parts, plan, basis_ref))
+                outcome = asyncio.run(
+                    _drive(deps, built, registry, config, workspace, store, parts, plan, basis_ref, cell)
+                )
             finally:
                 page.close()
                 if progress is not None:
@@ -390,17 +394,35 @@ def _progress(
 
 async def _drive(
     deps: CliDeps, built: RunPorts, registry: Registry, config: HarnessConfig, workspace: Workspace,
-    store: ResultStore, parts: _PortParts, plan: _Plan, basis_ref: str,
+    store: ResultStore, parts: _PortParts, plan: _Plan, basis_ref: str, cell: RunIdCell,
 ) -> RunOutcome:  # fmt: skip
-    """Enter the ports, run the engine and leave the ports when it returns or raises (spec 4.2.2 step 5, AC71)."""
+    """Enter the ports, run the engine with the production fan-out and heartbeat, then leave (spec 4.2.2 step 5)."""
     async with built as hosted:
+        members: list[ProgressSink] = []
+        if parts.progress is not None:
+            members.append(parts.progress)
+        members.append(parts.page.page.hub)
+        progress = IsolatingFanOut(members, cell=cell)
         ports = RunPortSet(
             tool=hosted.tool_port, host=hosted.host_port, calc=parts.calc, basis=StoreBasisPort(store),
             approvals=parts.page.approvals, inputs=parts.page.inputs, decision=parts.decision,
-            progress=parts.progress, run_control=FileRunControl(workspace.root / "runs"),
+            progress=progress, run_control=FileRunControl(workspace.root / "runs"),
         )  # fmt: skip
         engine = deps.engine_factory(workspace, registry, ports, store, engine_settings(config), deps.clock, deps.ids)
-        return await plan.call(engine, basis_ref)
+        beat: asyncio.Task[None] | None = None
+        if parts.progress is not None:
+            heartbeat = Heartbeat(
+                parts.progress, deps.clock, interval_s=config.progress.heartbeat_s,
+                run_dir=heartbeat_run_dir(cell),
+            )  # fmt: skip
+            beat = asyncio.create_task(heartbeat.run(), name="eng-harness-heartbeat")
+        try:
+            return await plan.call(engine, basis_ref)
+        finally:
+            if beat is not None:
+                beat.cancel()
+                with suppress(asyncio.CancelledError):
+                    await beat
 
 
 def _finish(
