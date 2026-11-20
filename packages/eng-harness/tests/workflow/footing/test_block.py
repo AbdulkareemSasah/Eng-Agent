@@ -245,11 +245,11 @@ def test_attempts_exhausted_closes_open_footings(tmp_stand_root: Path) -> None:
 
 
 def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
-    """AC19 / Q18: q_min < 0 at the plan of §4.4.2 → bearing NEEDS_ENGINEER; no decide, no enlarge round.
+    """AC19 / Q18: q_min < 0 at the plan of §4.4.2 → bearing NEEDS_ENGINEER with the gap; no decide, no enlarge.
 
     Derivation: at L=2000 mm, N≈736 kN, q_avg=184 kPa; MY=300 kN.m → M/S≈225 > 184 → q_min < 0 (BP G-1 /
     FULL_CONTACT). Factored MY=0 and denser max spacing so other families do not FAIL (status would then be
-    failing, not needs_engineer — spec 0010 4.4.5).
+    failing, not needs_engineer — spec 0010 4.4.5). Closure.reason carries the pack gap/precondition id.
     """
     stand = build_stand(
         tmp_stand_root / "eccentric",
@@ -265,8 +265,12 @@ def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
     assert outcome.output is not None
     out = cast(Any, outcome.output)
     closed = _closures(outcome)
-    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] is None for c in closed)
-    # Sole bearing NEEDS_ENGINEER; no decide, no enlarge (plan stays at §4.4.2 size 2000 mm).
+    gap_closed = [
+        c
+        for c in closed
+        if c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] in {"FULL_CONTACT", "G-1"}
+    ]
+    assert gap_closed, closed
     assert not any(s.kind == "decide_many" for s in stand.steps())
     assert _footing_row(stand, outcome)["Lx_mm"] == _footing_row(stand, outcome)["Ly_mm"] == 2000.0
     assert out.rounds == 1
@@ -275,7 +279,6 @@ def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
     for family in _FAMILIES:
         if family != "bearing":
             assert state0[family] == "PASS", family
-    # BP precondition FULL_CONTACT / gap G-1 on the bearing verdict-set traces (ACI 318-14 BP).
     bearing = cast(dict[str, Any], stand.store.payload(out.verdict_sets[0].ref))
     messages = [m for t in cast(list[dict[str, Any]], bearing.get("traces", [])) for m in t.get("messages", [])]
     assert any("FULL_CONTACT" in m and "G-1" in m for m in messages)
@@ -409,3 +412,155 @@ def test_width_too_small_closes(tmp_stand_root: Path) -> None:
     assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] == "WIDTH_TOO_SMALL" for c in closed)
     assert cast(Any, outcome.output).rounds == 1
     assert not any(s.kind == "decide_many" for s in stand.steps())
+
+
+def test_plan_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
+    """Spec 0010 §4.6 steps 1–2.3 / P6: one footing closed at plan; sibling still reaches status.
+
+    F1: service FZ <= 0 → plan UPLIFT → closed before rounds.
+    F2: FZ=576 kN, MY=50 → plan 2000 mm, bearing FAIL under full contact (enlarge-until-pass loads);
+    factored MY=0 and dense bars so only bearing fails and status runs for F2.
+    """
+    stand = build_stand(
+        tmp_stand_root / "mix_plan_status",
+        subjects=subjects_payload(
+            subject("F1", "J1", "C1"),
+            subject("F2", "J2", "C2"),
+        ),
+        reactions=reactions_payload(
+            reaction_row("J1", "S1", fz=-10.0),
+            reaction_row("J1", "U1", fz=100.0),
+            reaction_row("J2", "S1", fz=576.0, my=50.0),
+            reaction_row("J2", "U1", fz=800.0, my=0.0),
+        ),
+        basis={"reinforcement.max_spacing_mm": (100.0, "mm")},
+    )
+    outcome = stand.play(_refuse_decide)
+    assert outcome.status is RunStatus.COMPLETED
+    assert outcome.output is not None
+    closed = _closures(outcome)
+    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] == "UPLIFT" for c in closed)
+    assert any(s.kind == "calc" and s.name == "harness.footing_status" for s in stand.steps())
+    assert any(c["id"] == "F2" for c in closed) or any(
+        r["id"] == "F2" for r in _status_rows(stand)[0]["footings"]
+    )
+
+
+def test_width_closed_sibling_open_reaches_status(tmp_stand_root: Path) -> None:
+    """Spec 0010 §4.6.2.1–2.3 / B-568: WIDTH_TOO_SMALL sibling closed; open footing still reaches status.
+
+    F1: same WIDTH_TOO_SMALL derivation as test_width_too_small_closes (cover 100, min plan 200).
+    F2: enlarge-until-pass bearing-fail loads with dense bars so status runs for F2 only.
+    """
+    stand = build_stand(
+        tmp_stand_root / "mix_width_status",
+        subjects=subjects_payload(
+            subject("F1", "J1", "C1", cx_mm=100.0, cy_mm=100.0),
+            subject("F2", "J2", "C2"),
+        ),
+        reactions=reactions_payload(
+            reaction_row("J1", "S1", fz=5.0),
+            reaction_row("J1", "U1", fz=8.0),
+            reaction_row("J2", "S1", fz=576.0, my=50.0),
+            reaction_row("J2", "U1", fz=800.0, my=0.0),
+        ),
+        basis={
+            "durability.cover_footing_mm": (100.0, "mm"),
+            "foundation.min_plan_dimension_mm": (200.0, "mm"),
+            "foundation.plan_increment_mm": (100.0, "mm"),
+            "reinforcement.max_spacing_mm": (100.0, "mm"),
+        },
+    )
+    outcome = stand.play(_refuse_decide)
+    assert outcome.status is RunStatus.COMPLETED
+    closed = _closures(outcome)
+    assert any(c["id"] == "F1" and c["reason"] == "WIDTH_TOO_SMALL" for c in closed)
+    assert any(s.kind == "calc" and s.name == "harness.footing_status" for s in stand.steps())
+    assert any(c["id"] == "F2" for c in closed) or any(
+        r["id"] == "F2" for r in _status_rows(stand)[0]["footings"]
+    )
+
+
+def test_status_closed_sibling_still_resizes(tmp_stand_root: Path) -> None:
+    """Spec 0010 §4.6.2.3–2.7: one footing closed at status NEEDS_ENGINEER; sibling still resizes.
+
+    F1: eccentric service MY so bearing NEEDS_ENGINEER (FULL_CONTACT / G-1); closed at status, no decide.
+    F2: bearing FAIL under full contact → rule enlarge_plan. Resize must still list an action for F1 (closed in dims).
+    Factored MY=0 and dense bars so F1 stays needs_engineer and F2 is bearing-only.
+    """
+    stand = build_stand(
+        tmp_stand_root / "mix_status_resize",
+        subjects=subjects_payload(
+            subject("F1", "J1", "C1"),
+            subject("F2", "J2", "C2"),
+        ),
+        reactions=reactions_payload(
+            reaction_row("J1", "S1", fz=576.0, my=300.0),
+            reaction_row("J1", "U1", fz=800.0, my=0.0),
+            reaction_row("J2", "S1", fz=576.0, my=50.0),
+            reaction_row("J2", "U1", fz=800.0, my=0.0),
+        ),
+        basis={"reinforcement.max_spacing_mm": (100.0, "mm")},
+    )
+    outcome = stand.play(_refuse_decide)
+    assert outcome.status is RunStatus.COMPLETED
+    assert outcome.output is not None
+    closed = _closures(outcome)
+    assert any(
+        c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] in {"FULL_CONTACT", "G-1", None}
+        for c in closed
+    )
+    assert any("F2:enlarge_plan:" in d for d in cast(Any, outcome.output).decisions)
+
+
+def test_combine_one_resize_sibling(tmp_stand_root: Path) -> None:
+    """Spec 0010 §4.6.2.6–2.7: combine closes one footing; sibling still resizes (actions for every dims id).
+
+    Mixed family failures so no draft rule matches (engineer decides). One decide_many screen: F1 combine, F2 enlarge.
+    """
+    from eng_harness.ports import InputAnswer
+
+    stand = build_stand(
+        tmp_stand_root / "mix_combine_resize",
+        subjects=subjects_payload(
+            subject("F1", "J1", "C1"),
+            subject("F2", "J2", "C2"),
+        ),
+        reactions=reactions_payload(
+            # Bearing + punching both FAIL → no single-family rule (engineer path).
+            reaction_row("J1", "S1", fz=576.0, my=50.0),
+            reaction_row("J1", "U1", fz=2500.0),
+            reaction_row("J2", "S1", fz=576.0, my=50.0),
+            reaction_row("J2", "U1", fz=2500.0),
+        ),
+        basis={
+            "foundation.min_depth_mm": (400.0, "mm"),
+            "attempts.footing_rounds": (2, None),
+        },
+    )
+
+    def responder(stand: Stand, shown: InputRequest) -> Any:
+        props = _props(shown)
+        enums = {
+            name: cast(list[str], prop.get("enum") or ())
+            for name, prop in props.items()
+            if isinstance(prop, dict) and "enum" in prop
+        }
+        if enums:
+            names = sorted(enums)
+            choices = {names[0]: "combine_with_neighbor", names[1]: "enlarge_plan"}
+            for name in names[2:]:
+                choices[name] = "enlarge_plan"
+            return InputAnswer(
+                request_id=shown.request_id,
+                shown_sha256=shown.fields_schema_sha256,
+                choices=choices,
+                by="engineer:test",
+            )
+        return _auto(stand, shown)
+
+    outcome = stand.play(responder)
+    assert outcome.status is RunStatus.COMPLETED
+    closed = _closures(outcome)
+    assert any(c["id"] == "F1" and c["reason"] == "COMBINE_REQUESTED" for c in closed)
+    assert any("F2:enlarge_plan:" in d for d in cast(Any, outcome.output).decisions)
