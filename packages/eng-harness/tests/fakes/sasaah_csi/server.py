@@ -460,10 +460,15 @@ def _note(name: str, args: dict[str, Any]) -> None:
     audit = sys.argv[sys.argv.index("--audit-log") + 1] if "--audit-log" in sys.argv else ""
     role = Path(audit).name.removesuffix("-audit.jsonl").rsplit("-", 1)[-1]
     entry: dict[str, Any] = {"tool": name, "pid": pid, "path": args.get("path"), "role": role}
-    if name == "csi_launch" and isinstance(pid, int):
-        entry["visible"] = bool(args.get("visible", False))
-        launched = data.get("launched")
-        data["launched"] = [*launched, pid] if isinstance(launched, list) else [pid]
+    if name == "csi_launch":
+        if "product" in args:
+            entry["product"] = args["product"]
+        if isinstance(pid, int):
+            entry["visible"] = bool(args.get("visible", False))
+            launched = data.get("launched")
+            data["launched"] = [*launched, pid] if isinstance(launched, list) else [pid]
+    if name == "csi_open_model" and "confirm" in args:
+        entry["confirm"] = bool(args["confirm"])
     calls = data.get("calls")
     data["calls"] = [*calls, entry] if isinstance(calls, list) else [entry]
     path.write_text(json.dumps(data))
