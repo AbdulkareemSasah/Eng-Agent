@@ -1,0 +1,34 @@
+# synthetic test values, not engineering
+# Fixture for plan 0014 T7 / spec 0014 AC7: a confirmed map so unit and workflow tests can exercise the builder.
+status = "confirmed"
+sign_convention = "host_local/1"
+
+[components.n]
+csi_field = "P_kN"
+sign_i = 1
+sign_j = 1
+
+[components.qy]
+csi_field = "V2_kN"
+sign_i = 1
+sign_j = 1
+
+[components.qz]
+csi_field = "V3_kN"
+sign_i = 1
+sign_j = 1
+
+[components.mx]
+csi_field = "T_kNm"
+sign_i = 1
+sign_j = 1
+
+[components.my]
+csi_field = "M2_kNm"
+sign_i = 1
+sign_j = 1
+
+[components.mz]
+csi_field = "M3_kNm"
+sign_i = 1
+sign_j = 1

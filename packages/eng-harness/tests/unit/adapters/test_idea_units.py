@@ -1,6 +1,11 @@
-"""IDEA unit header: declared N and N.m for native loads; missing for idea_set_loads (plan 0014 T3; spec 0014 AC16)."""
+"""IDEA unit header and canonical load read-back (plan 0014 T3/T7; spec 0014 AC16, section 4.6)."""
+
+from __future__ import annotations
+
+from typing import Any
 
 import pytest
+from eng_contract.units import convert
 
 
 def test_declared_units_and_status() -> None:
@@ -28,3 +33,39 @@ def test_declared_units_and_status() -> None:
     }
     with pytest.raises(KeyError):
         allowlist.descriptor("idea_set_loads")
+
+
+def test_read_back_loads_canonical() -> None:
+    """AC16: stored read-back loads convert host N / N.m to canonical kN / kN.m (section 4.6)."""
+    from eng_harness.adapters.idea import _loads as loads
+
+    host_effect: dict[str, Any] = {
+        "id": 1,
+        "name": "LE1",
+        "checkEquilibrium": True,
+        "forcesOnSegments": [
+            {
+                "beamSegmentId": 1,
+                "position": 0.0,
+                "n": 10000.0,
+                "qy": 0.0,
+                "qz": -5000.0,
+                "mx": 0.0,
+                "my": 2000.0,
+                "mz": 0.0,
+            }
+        ],
+        "forcesPercentageOnSegments": [],
+    }
+    canonical = loads.host_loads_to_canonical(
+        connection="CON1",
+        effects=[host_effect],
+        file_sha256="ab" * 32,
+    )
+    seg = canonical.effects[0].segments[0]
+    assert seg.N_kN == convert(10000.0, "N", "kN")
+    assert seg.Qz_kN == convert(-5000.0, "N", "kN")
+    assert seg.My_kNm == convert(2000.0, "N.m", "kN.m")
+    assert seg.beam_segment_id == 1
+    assert seg.position_host == 0.0
+    assert canonical.percentage_segments_present is False
