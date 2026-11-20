@@ -304,6 +304,31 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_revit_map_stale.py::test_map_stale_after_edit"
     covers: [AC22, AC29]
     depends_on: [T10, T11, T12, T13, T14]
+  - id: T16
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0011 section 9 names adapters/revit/_errors.py, _edits.py
+    # and _units.py that are merged but absent from that list (_reconcile.py is added by B-239
+    # T10; calcs/frame_element_map.py is already covered by calcs/**). This task adds those three
+    # paths to r1_modules, adds a contract guard that the section 9 list is covered by a glob,
+    # and strengthens the existing tests until each module reaches mutation_min (80 %) with real
+    # tests. No exclusions, pragmas or lowered thresholds; no module may be removed from
+    # r1_modules to pass MU001. No source module is listed: the work strengthens tests only.
+    # If a module cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0011_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_revit_errors.py"  # adapters/revit/_errors.py
+      - "packages/eng-harness/tests/workflow/adapters/test_revit_edits.py"  # adapters/revit/_edits.py
+      - "packages/eng-harness/tests/unit/adapters/test_revit_units.py"  # adapters/revit/_units.py
+    max_changed_lines: 60
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0011_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T5, T8, T10]  # T5 _errors and _units; T8 _edits; T10 (B-239) also edits r1_modules for _reconcile.py
 ---
 
 # Implementation plan: the `sasaah-revit-mcp` adapter

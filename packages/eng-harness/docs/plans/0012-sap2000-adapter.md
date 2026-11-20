@@ -180,6 +180,34 @@ tasks:
       - "packages/eng-harness/tests/contract/test_csi_recordings.py::test_sap2000_synthetic_matches_recordings"
     covers: [AC18, AC19]
     depends_on: [T5, T6]
+  - id: T8
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0012 section 9 names products/_sap2000.py and the
+    # add-frame reconcile rule (held in adapters/csi/_reconcile.py: _add_frame_by_geometry /
+    # add_frame_naming == "reply") that are merged but absent from that list. This task adds
+    # those paths to r1_modules, adds a contract guard that the section 9 list is covered by a
+    # glob, and strengthens the existing tests until each module reaches mutation_min (80 %)
+    # with real tests. No exclusions, pragmas or lowered thresholds; no module may be removed
+    # from r1_modules to pass MU001. No source module is listed: the work strengthens tests
+    # only. products/_sap2000.py is mostly declarative profile data; if it cannot reach 80 %
+    # without a source change, the implementing writer reports NEEDS_PLAN_AMENDMENT. The
+    # blocked tables-and-loads work formerly sketched as T8 in section 2 stays out of the
+    # front matter and takes the next free id when it is amended in.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0012_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_products.py"  # adapters/csi/products/_sap2000.py profile data
+      - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"  # adapters/csi/products/_sap2000.py allowlist/gap coverage
+      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_reconcile.py"  # add-frame reconcile rule in adapters/csi/_reconcile.py
+      - "packages/eng-harness/tests/workflow/adapters/test_sap2000_edits.py"  # add-frame edit path that feeds the reconcile rule
+    max_changed_lines: 60
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0012_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T1, T5]  # T1 products/_sap2000.py; T5 add-frame reconcile rule in csi/_reconcile.py
 ---
 
 # Implementation plan: SAP2000 through the CSI adapter

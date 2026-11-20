@@ -233,6 +233,30 @@ tasks:
       - "packages/eng-harness/tests/unit/test_doctor.py::test_idea_section"
     covers: [AC20, AC21, AC22]
     depends_on: [T8]
+  - id: T10
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0014 section 9 names adapters/idea/_errors.py that is
+    # merged but absent from that list (_stub.py, _verdicts.py and _loads.py are already in
+    # r1_modules; _reconcile.py is added by B-307 T8). This task adds that path to r1_modules,
+    # adds a contract guard that the section 9 list is covered by a glob, and strengthens the
+    # existing unit tests until the module reaches mutation_min (80 %) with real tests. No
+    # exclusions, pragmas or lowered thresholds; no module may be removed from r1_modules to
+    # pass MU001. No source module is listed: the work strengthens tests only. If the module
+    # cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT. The blocked typed-loads work formerly sketched as T10 in section 2
+    # stays out of the front matter and takes the next free id when it is amended in.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0014_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_idea_errors.py"  # adapters/idea/_errors.py
+    max_changed_lines: 40
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0014_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T4, T8]  # T4 _errors.py; T8 (B-307) also edits r1_modules for _reconcile.py
 ---
 
 # Implementation plan: the `sasaah-idea-mcp` adapter

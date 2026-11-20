@@ -238,6 +238,31 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_safe_slab_design.py::test_design_run_and_punching_rows"
     covers: [AC24]
     depends_on: [T8]
+  - id: T10
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0008 section 9 names products/_safe_loads.py, _tables.py
+    # and the SAFE reconcile rules (held in adapters/csi/_reconcile.py: the joint_loads / SAFE
+    # profile branch) that are merged but absent from that list. This task adds those paths to
+    # r1_modules, adds a contract guard that the section 9 list is covered by a glob, and
+    # strengthens the existing tests until each module reaches mutation_min (80 %) with real
+    # tests. No exclusions, pragmas or lowered thresholds; no module may be removed from
+    # r1_modules to pass MU001. No source module is listed: the work strengthens tests only.
+    # If a module cannot reach 80 % without a source change, the implementing writer reports
+    # NEEDS_PLAN_AMENDMENT.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0008_section_9_modules_in_r1
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_loads.py"  # adapters/csi/products/_safe_loads.py
+      - "packages/eng-harness/tests/unit/adapters/test_safe_tables.py"  # adapters/csi/_tables.py
+      - "packages/eng-harness/tests/workflow/adapters/test_safe_reconcile.py"  # SAFE reconcile rules in adapters/csi/_reconcile.py
+    max_changed_lines: 60
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0008_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T4, T6]  # T4 _tables.py; T6 _safe_loads.py and the SAFE reconcile rules in csi/_reconcile.py
 ---
 
 # Implementation plan: SAFE through the CSI adapter

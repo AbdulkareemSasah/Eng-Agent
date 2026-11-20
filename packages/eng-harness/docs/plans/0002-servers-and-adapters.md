@@ -718,6 +718,34 @@ tasks:
       - "packages/eng-harness/tests/workflow/adapters/test_csi_open_original.py::test_visible_launch"
     covers: [AC51]
     depends_on: [T19c]  # external: plan 0007 T5 and T13 (merged; csi/_tools.py and _hostport.py)
+  - id: T24
+    title: "Mutation scope: the section 9 modules in r1_modules"
+    # Amendment (B-601, owner decision D-46, 2026-11-20): CI mutates only modules listed in
+    # [tool.eng-gate] r1_modules; spec 0002 section 9 names seven R1 modules that are merged but
+    # absent from that list, so they have never been mutated. This task adds those paths to
+    # r1_modules, adds a contract guard that the section 9 list is covered by a glob, and
+    # strengthens the existing unit and workflow tests until each module reaches mutation_min
+    # (80 %) with real tests. No exclusions, pragmas or lowered thresholds; no module may be
+    # removed from r1_modules to pass MU001. No source module is listed: the work strengthens
+    # tests only. If a module cannot reach 80 % without a source change, the implementing
+    # writer reports NEEDS_PLAN_AMENDMENT.
+    files:
+      - "packages/eng-harness/pyproject.toml"  # r1_modules entries for the listed modules only, amendment B-601
+      - "packages/eng-harness/CHANGELOG.md"
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py"  # shared by the five B-601 tasks; this task adds test_spec_0002_section_9_modules_in_r1
+      - "packages/eng-harness/tests/unit/adapters/test_csi_errors.py"  # adapters/_errors.py and adapters/csi/_errors.py
+      - "packages/eng-harness/tests/unit/adapters/test_timeouts.py"  # adapters/_errors.py timeout paths
+      - "packages/eng-harness/tests/workflow/adapters/test_reconcile.py"  # adapters/csi/_reconcile.py
+      - "packages/eng-harness/tests/unit/adapters/test_args.py"  # adapters/_args.py
+      - "packages/eng-harness/tests/unit/servers/test_buildcheck.py"  # servers/_buildcheck.py
+      - "packages/eng-harness/tests/unit/servers/test_hostlock.py"  # servers/_hostlock.py
+      - "packages/eng-harness/tests/workflow/servers/test_guard.py"  # servers/_guard.py
+    max_changed_lines: 80
+    max_sessions: 2
+    tests_first:
+      - "packages/eng-harness/tests/contract/test_mutation_scope.py::test_spec_0002_section_9_modules_in_r1"
+    covers: []  # section 9 mutation scope is not an AC; this plan's covers style lists ACs only
+    depends_on: [T6b, T7, T8, T9, T14]  # T6b _buildcheck; T7 _hostlock and _guard; T8 _args; T9 _errors and csi/_errors; T14 _reconcile
 ---
 
 # Implementation plan: eng-harness servers and adapters
