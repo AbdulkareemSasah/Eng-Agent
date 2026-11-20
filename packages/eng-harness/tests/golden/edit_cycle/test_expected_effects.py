@@ -65,6 +65,7 @@ def meta_for(
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=KINDS[name],
                 complete=True,
                 model_id=models.get(name, MDL if name in STATE else None),
@@ -312,6 +313,7 @@ def _readback(effects: dict[str, Any], key: str, before: dict[str, Any], after: 
     def ref(n: int, revision: int | None) -> RefMeta:
         return RefMeta(
             result_id=f"res_{n:026d}",
+            ref=f"res_{n:026d}",
             kind=kind if revision else "harness.expected_effects/1",
             complete=True,
             model_id=MDL if revision else None,
@@ -324,6 +326,7 @@ def _readback(effects: dict[str, Any], key: str, before: dict[str, Any], after: 
     refs = {f"before_{key}": ref(11, 3), f"after_{key}": ref(12, 4), "effects": ref(13, None)}
     basis = RefMeta(
         result_id=f"res_{14:026d}",
+        ref=f"res_{14:026d}",
         kind=KINDS["basis"],
         complete=True,
         model_id=None,

@@ -26,8 +26,10 @@ _ids = st.lists(st.sampled_from(["F1", "F2", "F3", "F4", "F5"]), max_size=5, uni
 
 
 def _ref(n: int, revision: int) -> dict[str, Any]:
+    result_id = f"res_0000000000000000000000000{n}"
     return {
-        "result_id": f"res_0000000000000000000000000{n}",
+        "result_id": result_id,
+        "ref": result_id,
         "kind": FP,
         "complete": True,
         "model_id": "mdl_00000000000000000000000000",

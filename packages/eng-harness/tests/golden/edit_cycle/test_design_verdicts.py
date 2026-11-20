@@ -33,6 +33,7 @@ def meta_for(refs: dict[str, str], incomplete: frozenset[str] = frozenset()) -> 
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=KINDS[name],
                 complete=name not in incomplete,
                 model_id=None,
