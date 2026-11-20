@@ -12,7 +12,7 @@ from eng_harness.journal import _events as ev
 
 def test_cycle_steps(tmp_path: Path) -> None:
     """AC18: open copy, read state, assign section, save, analyse, frame forces and reactions; journal holds all."""
-    # SAP2000 cycle wiring (sap2000_steps / sap2000_rig) lands in the feat commit; missing names fail at the base (TF004).
+    # sap2000_steps / sap2000_rig land in the feat commit; missing names fail at the base (TF004).
     from fakes.sasaah_csi.wiring import sap2000_rig, sap2000_steps
 
     r = sap2000_rig(tmp_path)
@@ -32,7 +32,7 @@ def test_cycle_steps(tmp_path: Path) -> None:
             assert EventType.HOST_STARTED in [e.type for e in journal]
             assert EventType.MODEL_BOUND in [e.type for e in journal]
             assert EventType.MODEL_SAVED in [e.type for e in journal]
-            # Host port reads SAP2000 state after open (Sap2000StateReader); not the ETABS-shaped csi_read_model_state tool.
+            # Host port reads SAP2000 state after open (Sap2000StateReader), not csi_read_model_state.
             held = await ports.host_port.locate("m@copy")
             assert held is not None
             assert ports.host_port.last_read("m@copy") is not None
