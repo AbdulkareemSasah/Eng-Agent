@@ -322,28 +322,54 @@ def test_truncation_by_level(tmp_path: Path) -> None:
 
 
 def test_response_too_large_halves(tmp_path: Path) -> None:
-    """AC9: RESPONSE_TOO_LARGE on a details chunk halves the chunk and retries until it fits."""
+    """AC9: RESPONSE_TOO_LARGE on a details chunk halves the chunk and retries until it fits.
+
+    The packaged fake only raises `response_too_large` on `revit_list_elements` (outside this task's
+    file list). The call wrapper injects one oversized details reply so the reader must halve.
+    """
     control = tmp_path / "control.json"
-    faults = [{"fault": "response_too_large", "tool": "revit_get_element_details"}]
     seed = _seed_complete()
     seed["elements"] = [
         _complete_column(element_id=3001, unique_id="col-3001"),
         _complete_column(element_id=3003, unique_id="col-3003"),
     ]
     seed["types"][0]["instance_ids"] = [3001, 3003]
-    config = _revit_config(tmp_path, control, seed=seed, faults=faults)
+    config = _revit_config(tmp_path, control, seed=seed)
 
     async def body(manager: ServerManager) -> None:
-        reader = _reader(manager, config)
+        from eng_harness.adapters.revit._parameters import load_role_map
+        from eng_harness.adapters.revit._state import RevitStateReader
+
+        section = config.servers["revit"]
+        roles = load_role_map(section.parameters)
+        detail_sizes: list[int] = []
+        oversized_once = True
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            nonlocal oversized_once
+            if tool == "revit_get_element_details":
+                ids = list(arguments.get("elementIds") or [])
+                detail_sizes.append(len(ids))
+                if oversized_once and len(ids) > 1:
+                    oversized_once = False
+                    return {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "RESPONSE_TOO_LARGE: the reply exceeded the transport limit.",
+                            }
+                        ],
+                        "isError": True,
+                    }
+            return await _call_dump(manager, tool, arguments, effect)
+
+        reader = RevitStateReader(call=call, role_map=roles, catalog_version="test-catalog")
         read = await reader.read(bound_path=_BOUND)
         structure = read.payloads["harness.revit_structure/1"].model_dump(mode="json")
         ids = {row["element_id"] for row in structure["elements"]}
         assert {3001, 3003}.issubset(ids)
-        data = json.loads(control.read_text(encoding="utf-8"))
-        detail_calls = [c for c in data.get("calls", []) if c.get("tool") == "revit_get_element_details"]
-        assert len(detail_calls) >= 2
-        sizes = [len(c["args"].get("elementIds") or []) for c in detail_calls]
-        assert sizes[0] > sizes[1]
+        assert len(detail_sizes) >= 2
+        assert detail_sizes[0] > detail_sizes[1]
 
     _run(tmp_path, config, body)
 
@@ -389,7 +415,8 @@ def test_neutral_kinds_complete_rows_only(tmp_path: Path) -> None:
         complete = next(row for row in frames.model_dump(mode="json")["frames"] if row["id"] == "col-3001")
         assert complete["kind"] == "column"
         assert complete["section"] == f"{_FAMILY}: C300x300"
-        assert complete["i_joint"] is None and complete["j_joint"] is None
+        assert complete["i_joint"] is None
+        assert complete["j_joint"] is None
         assert complete["rotation_deg"] == 0.0
         by_id = {row["unique_id"]: row for row in structure["elements"]}
         b_param = by_id["col-3001"]["parameters"].get("section_b")

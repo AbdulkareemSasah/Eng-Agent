@@ -103,9 +103,7 @@ EDITS = (
 
 @settings(derandomize=True, max_examples=80, deadline=None)
 @given(revit_read_sets(), st.sampled_from(EDITS), st.data())
-def test_order_independent_and_edit_sensitive(
-    read: dict[str, Any], edit: str, data: st.DataObject
-) -> None:
+def test_order_independent_and_edit_sensitive(read: dict[str, Any], edit: str, data: st.DataObject) -> None:
     """AC10: same fingerprint under any element order; any read-set edit changes it; counts/save time excluded."""
     from eng_harness.adapters.revit._state import fingerprint
 

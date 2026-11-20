@@ -1,4 +1,8 @@
-"""HostPort file and instance methods (plan 0002 T10; spec 0002 sections 4.4.2, 4.5.8, 4.5.9)."""
+"""HostPort file and instance methods (plan 0002 T10; spec 0002 sections 4.4.2, 4.5.8, 4.5.9).
+
+Revit locate / model_state hooks (plan 0011 T7; spec 0011 §4.12): the bound document is loaded only when
+`get_model_metadata` path equals the file; `HostInstance.pid` is `None` (Revit is never launched here).
+"""
 
 import hashlib
 import json
@@ -6,6 +10,7 @@ import os
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 from eng_contract.envelope import Envelope, HostInfo
 from eng_contract.errors import ContractError, ContractWarning, ErrorCode, Precondition, WarningCode
@@ -19,13 +24,17 @@ from eng_harness.adapters._toolport import Binding
 from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import ReadBack, check_envelope, issues_of, snapshot
 from eng_harness.adapters.csi._session_ops import CsiSession, OpenedInstance
-from eng_harness.adapters.csi._state import CsiStateReader, StateRead
+from eng_harness.adapters.csi._state import CsiStateReader
 from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+from eng_harness.adapters.revit._parameters import RoleMap
+from eng_harness.adapters.revit._state import RevitStateReader, revit_document_loaded
 from eng_harness.ports import HostInstance, HostLease, HostModelState, SavedModel, ServerCheck, UnitsState
 from eng_harness.servers._guard import ProcessGuard, StartedInstance
 from eng_harness.servers._hostlock import HostLocks
 from eng_harness.servers._procinfo import ProcessIdentity, ProcessInspector
 from eng_harness.servers._session import CallEffect, ServerManager
+
+_REVIT_PRODUCT = "Revit"  # ServerConfig default for sasaah-revit-mcp (spec 0011 section 4.2)
 
 
 class AdapterHostPort:
@@ -35,10 +44,13 @@ class AdapterHostPort:
         files: Mapping[str, Path], server: str = "csi", host_key: str = "csi", states: ModelStateStore | None = None,
         readback: ReadBack | None = None, visible: bool = False,
         tolerance: Callable[[], float | None] | None = None,
+        role_map: RoleMap | None = None, catalog_version: str = "",
     ) -> None:  # fmt: skip
         self._identity, self._clock, self._ids, self._sessions, self._locks = identity, clock, ids, sessions, locks
         self._run_dir, self._program, self._host_key = run_dir, program, host_key
-        self._product, self._profile, self._readback = product, products.profile(product), readback
+        self._product, self._readback = product, readback
+        self._server = server
+        self._revit = product == _REVIT_PRODUCT
         self._tolerance = tolerance
         self._files = {key: path.resolve() for key, path in files.items()}
         self._models: dict[str, str] = {}
@@ -46,16 +58,26 @@ class AdapterHostPort:
         self._instances: dict[str, OpenedInstance] = {}
         self._units: dict[str, str] = {}
         self._states = states  # without it an outside edit of the model in memory (4.6.4) cannot raise the revision
-        self._reads: dict[str, StateRead] = {}
+        self._reads: dict[str, Any] = {}
         self._written: set[str] = set()
         self._warnings: list[tuple[str, WarningCode]] = []
-        self._session = CsiSession(
-            sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
-            exe_name=exe_name, visible=visible,
-        )  # fmt: skip
-        # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
-        reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
-        self._reader = reader_type(product=product, call=self._session._call)  # B-451: no public read on CsiSession
+        self._reader: Any
+        if self._revit:
+            # Revit: no CSI profile; T11 binds the document. Reader uses the read role (plan 0011 T7).
+            self._profile = None
+            self._session = None
+            self._reader = RevitStateReader(
+                call=self._revit_call, role_map=role_map or {}, catalog_version=catalog_version
+            )
+        else:
+            self._profile = products.profile(product)
+            self._session = CsiSession(
+                sessions, guard, inspector, locks, ids, server=server, product=product, program=program,
+                exe_name=exe_name, visible=visible,
+            )  # fmt: skip
+            # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
+            reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
+            self._reader = reader_type(product=product, call=self._session._call)  # B-451: no public read on CsiSession
         self._load(files)
 
     async def preflight(self, min_builds: Mapping[str, str]) -> list[ServerCheck]:
@@ -66,7 +88,7 @@ class AdapterHostPort:
 
     async def acquire(self, host_key: str) -> HostLease:
         """Lease the host: lock again each live instance of the run state (`HOST_LOCKED` when held elsewhere)."""
-        if host_key == self._host_key:
+        if host_key == self._host_key and self._session is not None:
             for opened in self._instances.values():
                 if self._session.alive(opened):
                     self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
@@ -77,28 +99,31 @@ class AdapterHostPort:
 
     async def open_original(self, model_key: str) -> Path:
         """Open the file of `model_key` in the run's instance (launching one) and bind it (spec 4.5.9, step 2 open)."""
+        session = self._csi_session()
         source = self._file(model_key)
         model_id = self._identity.resolve(source).model_id
-        opened = await self._session.open_file(source, self._reusable(), self._clock.now())
+        opened = await session.open_file(source, self._reusable(), self._clock.now())
         self._keep(model_key, source, model_id, opened)
-        self._units[model_key] = await self._session.units(opened)
+        self._units[model_key] = await session.units(opened)
         self._persist()
         return source
 
     async def working_copy(self, model_key: str, folder: Path) -> str:
+        session = self._csi_session()
         source = self._file(model_key)
         self._identity.resolve(source)
         dest = _copied(source, folder)
         copy_key = f"{model_key}@copy"
-        opened = await self._session.open_file(dest, self._reusable(), self._clock.now())
+        opened = await session.open_file(dest, self._reusable(), self._clock.now())
         self._keep(copy_key, dest, self._identity.resolve(dest).model_id, opened)
-        self._units[copy_key] = await self._session.units(opened)
+        self._units[copy_key] = await session.units(opened)
         self._persist()
         return copy_key
 
     async def save(self, model_key: str, role: str) -> SavedModel:
+        session = self._csi_session()
         path, opened = self._held(model_key)
-        await self._session.save(path, opened)
+        await session.save(path, opened)
         return await self._record_save(model_key, path, opened)
 
     async def tool_saved(self, model_key: str) -> None:
@@ -108,7 +133,8 @@ class AdapterHostPort:
 
     async def _record_save(self, model_key: str, path: Path, opened: OpenedInstance) -> SavedModel:
         fingerprint: str | None = None
-        if self._profile.tables:  # products without a table map yet (SAFE before T5) keep their prior fingerprint
+        # products without a table map yet (SAFE before T5) keep their prior fingerprint; Revit has no CSI tables.
+        if self._profile is not None and self._profile.tables:
             read = await self._reader.read(opened.pid, path)  # B-451 L3: the saved state's own
             self._reads[model_key] = read
             fingerprint = read.fingerprint
@@ -121,12 +147,13 @@ class AdapterHostPort:
         return SavedModel(model_id=s.model_id, revision=s.revision, fingerprint=fp, file_sha256=digest, file_name=name)
 
     async def restore(self, model_key: str, saved: SavedModel) -> HostInstance:
+        session = self._csi_session()
         path = self._file(model_key)
         if hashlib.sha256(path.read_bytes()).hexdigest() != saved.file_sha256:
             raise ContractError(ErrorCode.CONFLICT, "the saved file's hash differs from the record")
-        opened = await self._session.open_file(path, self._bound_instance(model_key), self._clock.now())
+        opened = await session.open_file(path, self._bound_instance(model_key), self._clock.now())
         self._keep(model_key, path, saved.model_id, opened)
-        self._units[model_key] = await self._session.units(opened)
+        self._units[model_key] = await session.units(opened)
         self._persist()
         return self._host(opened)
 
@@ -134,13 +161,24 @@ class AdapterHostPort:
         """The state of the model in `instance_id` (spec 4.6.4); `loaded` false when it is absent from that instance.
 
         A fingerprint that changed with no `wrote` mark since the last read, or a file saved outside, is an outside
-        edit: the revision rises and `take_warnings` gives `MODEL_CHANGED_OUTSIDE`.
+        edit: the revision rises and `take_warnings` gives `MODEL_CHANGED_OUTSIDE`. Revit: loaded only when the
+        metadata path equals the bound file (spec 0011 §4.12).
         """
         held = await self.locate(model_key)
         if held is None or held.instance_id != instance_id:
             return HostModelState(loaded=False)
         path, opened = self._held(model_key)
-        read = await self._reader.read(opened.pid, path)
+        if self._revit:
+            reader = self._reader
+            if not isinstance(reader, RevitStateReader):
+                raise ContractError(
+                    ErrorCode.INTERNAL, "Revit state reader is not wired", incident_id=self._ids.new_ulid()
+                )
+            read: Any = await reader.read(bound_path=path)
+            if not read.status.active_is_bound:
+                return HostModelState(loaded=False)
+        else:
+            read = await self._reader.read(opened.pid, path)
         resolved = self._identity.resolve(path)
         revision, outside = resolved.revision, bool(resolved.warnings)
         previous = self._reads.get(model_key)
@@ -170,13 +208,17 @@ class AdapterHostPort:
             self._readback = replace(self._readback, tolerance_ratio=self._tolerance())
         path, opened = self._held(model_key)
         started, began = self._clock.now(), self._clock.now_ms()
-        read = await self._reader.read(opened.pid, path)
+        if self._revit or self._profile is None:
+            raise ContractError(
+                ErrorCode.INTERNAL, "check_model is not wired for this host", incident_id=self._ids.new_ulid()
+            )
+        csi_read = await self._reader.read(opened.pid, path)
         target = {"target": {"product": self._product, "pid": opened.pid}}
-        snap = await snapshot(self._reader._rows, target, read, self._profile)  # B-451: the reader's validated read
+        snap = await snapshot(self._reader._rows, target, csi_read, self._profile)  # B-451
         issues = issues_of(self._readback, model_key, snap)
         resolved = self._identity.resolve(path)
         host = HostInfo(
-            program=self._program, version=read.status.program_version, model_id=resolved.model_id,
+            program=self._program, version=csi_read.status.program_version, model_id=resolved.model_id,
             model_revision=resolved.revision,
         )  # fmt: skip
         outside = [
@@ -204,26 +246,31 @@ class AdapterHostPort:
             )
         key = live[0]
         _, opened = self._held(key)
-        self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
+        if not self._revit:
+            self._locks.acquire(self._program, ProcessIdentity(opened.pid, opened.started_at, opened.exe_name))
         resolved = self._identity._known(self._models[key])  # read-only: binding must not consume an outside file edit
         read = self.last_read(key)
+        version = ""
         if read is None:
-            info = await self._session._call("csi_model_info", self._session._target(opened.pid), CallEffect.READ)
+            session = self._csi_session()
+            info = await session._call("csi_model_info", session._target(opened.pid), CallEffect.READ)
             value = info.get("program_version")
             version = value if isinstance(value, str) else ""
         else:
-            version = read.status.program_version
+            raw_version = getattr(read.status, "program_version", None) or getattr(read.status, "revit_version", "")
+            version = raw_version if isinstance(raw_version, str) else ""
         revision = self.revision(resolved.model_id)
+        owned = False if self._session is None else self._session.owns(opened)
         return Binding(
             target=HostTarget(product=self._product, pid=opened.pid),
             units_system=self._units.get(key),
             host=HostInfo(
                 program=self._program,
-                version=version,
+                version=version if isinstance(version, str) else "",
                 model_id=resolved.model_id,
                 model_revision=resolved.revision if revision is None else revision,
             ),
-            owned=self._session.owns(opened),
+            owned=owned,
         )
 
     def revision(self, model_id: str) -> int | None:
@@ -231,7 +278,7 @@ class AdapterHostPort:
         state = None if self._states is None else self._states.get(model_id)
         return None if state is None else state.revision
 
-    def last_read(self, model_key: str) -> StateRead | None:
+    def last_read(self, model_key: str) -> Any | None:
         """The payloads, status and fingerprint of the last `model_state` of `model_key`, or `None`."""
         return self._reads.get(model_key)
 
@@ -264,15 +311,34 @@ class AdapterHostPort:
         held = await self.locate(model_key)
         if held is None or held.instance_id != instance_id:
             return UnitsState(loaded=False, ok=True, present=None, expected=expected)
-        present = await self._session.units(self._held(model_key)[1])
+        if self._revit:
+            # Spec 0011 §4.6: Revit has no unit tokens; present is always `revit_schema/1`.
+            present = "revit_schema/1"
+            expected_revit = expected or "revit_schema/1"
+            return UnitsState(loaded=True, ok=present == expected_revit, present=present, expected=expected_revit)
+        present = await self._csi_session().units(self._held(model_key)[1])
         return UnitsState(loaded=True, ok=present == expected, present=present, expected=expected)
 
     async def locate(self, model_key: str) -> HostInstance | None:
         opened = self._bound_instance(model_key)
-        if opened is None or not self._session.alive(opened):
+        if opened is None:
             return None
-        reported = await self._session.model_path(opened)
-        if reported is None or reported.resolve() != self._files.get(model_key):
+        if self._revit:
+            path = self._files.get(model_key)
+            if path is None:
+                return None
+            meta = await self._revit_call("revit_get_model_metadata", {}, CallEffect.READ)
+            from eng_harness.adapters.revit._replies import parse_revit_reply
+
+            body = parse_revit_reply(dict(meta)).body
+            reported = body.get("path")
+            if not revit_document_loaded(str(reported) if isinstance(reported, str) else None, path):
+                return None
+            return self._host(opened)
+        if self._session is None or not self._session.alive(opened):
+            return None
+        reported_path = await self._session.model_path(opened)
+        if reported_path is None or reported_path.resolve() != self._files.get(model_key):
             return None
         return self._host(opened)
 
@@ -285,7 +351,7 @@ class AdapterHostPort:
         return [self._host(item) for item in self._instances.values()]
 
     async def close_started(self, host_key: str, instances: Sequence[HostInstance]) -> None:
-        if host_key != self._host_key:
+        if host_key != self._host_key or self._session is None:
             return
         started: list[StartedInstance] = []
         for item in instances:
@@ -295,7 +361,19 @@ class AdapterHostPort:
         await self._session.close(started)
 
     def _reusable(self) -> OpenedInstance | None:
-        return next((i for i in self._instances.values() if self._session.owns(i) and self._session.alive(i)), None)
+        session = self._session
+        if session is None:
+            return None
+        return next((i for i in self._instances.values() if session.owns(i) and session.alive(i)), None)
+
+    def _csi_session(self) -> CsiSession:
+        if self._session is None:
+            raise ContractError(
+                ErrorCode.INTERNAL,
+                "CSI session operations are not available on the Revit host port",
+                incident_id=self._ids.new_ulid(),
+            )
+        return self._session
 
     def _file(self, model_key: str) -> Path:
         try:
@@ -322,9 +400,18 @@ class AdapterHostPort:
 
     def _host(self, opened: OpenedInstance) -> HostInstance:
         at = opened.observed_at
+        # Spec 0011 §4.12: Revit is never launched here; HostInstance.pid is None.
         return HostInstance(
-            instance_id=opened.instance_id, pid=opened.pid, process_started_at=at, program=self._program
+            instance_id=opened.instance_id,
+            pid=None if self._revit else opened.pid,
+            process_started_at=at,
+            program=self._program,
         )
+
+    async def _revit_call(self, tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+        """Raw tool result dump for the Revit read role (plan 0011 T7)."""
+        result = await self._sessions.call(self._server, "read", tool, arguments, effect)
+        return result.model_dump(by_alias=True)
 
     def _load(self, files: Mapping[str, Path]) -> None:
         """Take the run state of an earlier port as a cache (spec 4.5.9; the journal wins); instances get session -1."""
@@ -343,7 +430,7 @@ class AdapterHostPort:
                 r["visible"],
             )
             self._instances[opened.instance_id] = opened
-            if self._session.alive(opened):
+            if self._session is not None and self._session.alive(opened):
                 self._sessions.bind_instance(self._host_key, pid=opened.pid, product=self._product)
         for key, b in saved["bindings"].items():
             self._bound[key], self._models[key] = b["instance_id"], b["model_id"]
