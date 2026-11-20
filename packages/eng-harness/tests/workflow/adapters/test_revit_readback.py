@@ -11,8 +11,7 @@ from typing import Any
 
 import pytest
 from eng_contract.envelope import HostInfo, SuccessEnvelope
-from eng_contract.ids import FixedClock, SeededIdSource
-from eng_contract.store import LocationClass, ResultStore, Workspace
+from eng_contract.store import ResultStore
 
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.revit._checks import ReadBack, WrittenItems, check_model, expect_write
@@ -22,7 +21,6 @@ from eng_harness.servers import CallEffect, ServerManager
 
 from . import _revit_edit_helpers as helpers
 
-_START = 1_700_000_000_000
 SHA = "d" * 64
 CHECK = ServerCheck(
     server="revit",
@@ -79,14 +77,7 @@ def _prior() -> dict[str, Any]:
     }
 
 
-def _store(tmp_path: Path) -> ResultStore:
-    clock = FixedClock(_START, 1)
-    ids = SeededIdSource(b"revit-rb", clock)
-    workspace = Workspace(root=tmp_path / "idws", classification=LocationClass.LOCAL)
-    return ResultStore(workspace, clock, ids)
-
-
-def test_commit_unchecked_detected(tmp_path: Path) -> None:
+def test_commit_unchecked_detected(tmp_path: Path, store: ResultStore) -> None:
     """AC19: success reply with fault commit_unchecked → check_model READBACK_MISMATCH."""
     control = tmp_path / "control.json"
     config = helpers.revit_config(
@@ -94,7 +85,6 @@ def test_commit_unchecked_detected(tmp_path: Path) -> None:
         control,
         faults=[{"fault": "commit_unchecked", "tool": "revit_set_element_parameter_values"}],
     )
-    store = _store(tmp_path)
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -138,11 +128,10 @@ def test_commit_unchecked_detected(tmp_path: Path) -> None:
     helpers.run_scenario(tmp_path, config, body)
 
 
-def test_mismatch(tmp_path: Path) -> None:
+def test_mismatch(tmp_path: Path, store: ResultStore) -> None:
     """AC19: written value then changed behind the harness → READBACK_MISMATCH; clean when equal."""
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
-    store = _store(tmp_path)
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -202,7 +191,7 @@ def test_mismatch(tmp_path: Path) -> None:
     helpers.run_scenario(tmp_path, config, body)
 
 
-def test_check_model_issues(tmp_path: Path) -> None:
+def test_check_model_issues(tmp_path: Path, store: ResultStore) -> None:
     """AC19: ELEMENT_MISSING after element_replaced; REVIT_WARNINGS_INCREASED; MODEL_UNSAVED info."""
     seed = helpers.seed_model()
     seed["warnings"] = [{"type": "Unconnected", "count": 1}]
@@ -213,7 +202,6 @@ def test_check_model_issues(tmp_path: Path) -> None:
         seed=seed,
         faults=[{"fault": "element_replaced", "tool": "revit_change_element_type"}],
     )
-    store = _store(tmp_path)
 
     async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -227,8 +215,8 @@ def test_check_model_issues(tmp_path: Path) -> None:
                 manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
 
-        # Pre-image warnings before the write that increases them.
-        pre_warnings = [{"type": "Unconnected", "count": 1}]
+        # Pre-image has no warnings; the seed already carries some → REVIT_WARNINGS_INCREASED.
+        pre_warnings: list[dict[str, Any]] = []
         # Duplicate a type then assign it so element_replaced can fire on change_element_type.
         dup_args = build_edit_args(
             "duplicate_family_type",
@@ -261,17 +249,6 @@ def test_check_model_issues(tmp_path: Path) -> None:
         types = parse_revit_reply(listed).body.get("items") or parse_revit_reply(listed).body.get("types") or []
         new_type = next(t for t in types if isinstance(t, dict) and t.get("name") == "C450x450")
         new_type_id = int(new_type["type_id"])
-
-        # Increase warnings after the pre-image snapshot the check will compare against.
-        seed_path = control
-        import json
-
-        data = json.loads(seed_path.read_text(encoding="utf-8"))
-        data["seed"]["warnings"] = [
-            {"type": "Unconnected", "count": 2},
-            {"type": "NewWarning", "count": 1},
-        ]
-        seed_path.write_text(json.dumps(data), encoding="utf-8")
 
         change_args = build_edit_args(
             "change_element_type",
