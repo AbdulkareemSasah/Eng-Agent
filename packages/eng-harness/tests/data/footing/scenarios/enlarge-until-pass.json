@@ -2,11 +2,21 @@
   "source": "eng-harness spec 0010 section 4.6 AC17, synthetic engineer inputs",
   "method_ref": "§4.4.2 P3 with BP S5 moments; golden plan-gross overburden",
   "synthetic": true,
-  "derivation": "q_allow=200 kPa, w=40 kPa (h=500 mm, γc=24, soil_depth=1000 mm, γs=18, surcharge=10). Service FZ=576 kN → A_req=3.6 m² → plan 2000 mm. MY=50 kN.m at L=2000 mm: q_avg=184 kPa, M/S≈37.5 kPa, q_max≈221.5 > 200 (bearing FAIL) with q_min≈146.5 ≥ 0 (full contact). enlarge_plan to 2200 mm brings q_max below 200.",
+  "derivation": "q_allow=200 kPa, w=40 kPa (h=500 mm, γc=24, soil_depth=1000 mm, γs=18, surcharge=10). Service FZ=576 kN → A_req=3.6 m² → plan 2000 mm. Service MY=50 kN.m at L=2000 mm: q_avg=184 kPa, M/S≈37.5 kPa, q_max≈221.5 > 200 (bearing FAIL) with q_min≈146.5 ≥ 0 (full contact). Factored MY=0 and reinforcement.max_spacing_mm=100 mm so strength and min_steel PASS (bearing-only). enlarge_plan to 2200 mm brings q_max below 200; every check passes. Smallest passing plan = 2200 mm.",
+  "basis_overrides": {
+    "reinforcement.max_spacing_mm": [100.0, "mm"]
+  },
   "service_cases": ["S1"],
   "factored_cases": ["U1"],
   "reactions": [
     {"joint": "J1", "case": "S1", "FZ_kN": 576.0, "MY_kNm": 50.0},
-    {"joint": "J1", "case": "U1", "FZ_kN": 800.0, "MY_kNm": 50.0}
-  ]
+    {"joint": "J1", "case": "U1", "FZ_kN": 800.0, "MY_kNm": 0.0}
+  ],
+  "expected": {
+    "Lx_mm": 2200.0,
+    "Ly_mm": 2200.0,
+    "closure_status": "PASSED",
+    "rounds": 2,
+    "verdict_sets_per_round": 6
+  }
 }

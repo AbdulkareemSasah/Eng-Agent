@@ -57,6 +57,14 @@ def test_shadow_suggestion_not_applied(tmp_stand_root: Path) -> None:
     # Provider was consulted (shadow), but its combine suggestion is not the applied choice when the engineer picks.
     assert stand.model is not None
     assert stand.model.requests  # the provider saw the request
+    # AC15: the provider's choice is recorded as a shadow suggestion on DECISION_MADE (spec 0010 AC15).
+    applied = next(m for m in made if getattr(m, "choice", None) == "enlarge_plan")
+    assert any(
+        isinstance(s, dict) and s.get("outcome") == "shadow" and s.get("choice") == "combine_with_neighbor"
+        for s in applied.suggestions
+    )
+    assert applied.choice == "enlarge_plan"
+    assert str(applied.decided_by).startswith("engineer:")
 
 
 def test_no_provider(tmp_stand_root: Path) -> None:

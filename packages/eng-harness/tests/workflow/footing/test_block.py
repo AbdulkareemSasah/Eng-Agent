@@ -6,6 +6,7 @@ bearing full-contact bounds. No project value is used.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +22,10 @@ from .conftest import (
     subject,
     subjects_payload,
 )
+
+_SCENARIOS = Path(__file__).resolve().parents[2] / "data" / "footing" / "scenarios"
+_ENLARGE = json.loads((_SCENARIOS / "enlarge-until-pass.json").read_text(encoding="utf-8"))
+_FAMILIES = ("bearing", "one_way_shear", "punching", "flexure", "min_steel", "development")
 
 
 def _props(shown: InputRequest) -> dict[str, Any]:
@@ -72,37 +77,87 @@ def _closures(outcome: Any) -> list[dict[str, Any]]:
     return [c.model_dump() for c in cast(Any, outcome.output).closures]
 
 
+def _refuse_decide(stand: Stand, shown: InputRequest) -> Any:
+    """Rules must answer; a decide screen means the single-family setup failed."""
+    props = _props(shown)
+    if any(isinstance(p, dict) and "enum" in p for p in props.values()):
+        raise AssertionError("rule should have answered; engineer was asked")
+    return _auto(stand, shown)
+
+
+def _status_rows(stand: Stand) -> list[dict[str, Any]]:
+    """Stored `harness.footing_status` payloads in journal order (one per completed check round)."""
+    rows: list[dict[str, Any]] = []
+    for event in stand.events():
+        payload = event.payload
+        if (
+            isinstance(payload, ev.StepCompleted)
+            and payload.calc is not None
+            and payload.calc.id == "harness.footing_status"
+            and payload.result is not None
+        ):
+            rows.append(cast(dict[str, Any], stand.store.payload(payload.result.ref)))
+    return rows
+
+
+def _footing_state(status_payload: dict[str, Any], footing_id: str = "F1") -> dict[str, Any]:
+    row = next(r for r in cast(list[dict[str, Any]], status_payload["footings"]) if r["id"] == footing_id)
+    return cast(dict[str, Any], row["state"])
+
+
+def _reaction_from_scenario(row: dict[str, Any]) -> dict[str, Any]:
+    return reaction_row(
+        str(row["joint"]),
+        str(row["case"]),
+        fz=float(row["FZ_kN"]),
+        my=float(row.get("MY_kNm", 0.0)),
+        mx=float(row.get("MX_kNm", 0.0)),
+    )
+
+
 def test_enlarge_until_pass(tmp_stand_root: Path) -> None:
     """AC17: bearing fails at the initial plan (moments, full contact); rounds enlarge until every check passes.
 
-    Derivation (spec 0010 4.4.2 / 4.6; BP S5): basis of golden plan-gross (q_allow=200 kPa, w=40 kPa).
-    Service FZ=576 kN → plan size 2000 mm (A=4 m²). With MY=50 kN.m, q_avg=184 kPa, M/S≈37.5 kPa,
-    q_max≈221.5 > 200 (FAIL) and q_min≈146.5 ≥ 0 (full contact). After enlarge_plan to 2200 mm, q_max < 200.
+    Derivation (spec 0010 4.4.2 / 4.6; BP S5): see `tests/data/footing/scenarios/enlarge-until-pass.json`.
+    Service FZ=576 kN → plan 2000 mm; MY=50 kN.m → q_max≈221.5 > 200 (FAIL), q_min≥0 (full contact).
+    Factored MY=0 and max_spacing_mm=100 so only bearing fails; enlarge_plan to 2200 mm passes every check.
     """
+    basis = {
+        path: (float(value), unit)
+        for path, (value, unit) in cast(dict[str, list[Any]], _ENLARGE["basis_overrides"]).items()
+    }
     stand = build_stand(
         tmp_stand_root / "enlarge",
         subjects=subjects_payload(subject()),
-        reactions=reactions_payload(
-            reaction_row("J1", "S1", fz=576.0, my=50.0),
-            reaction_row("J1", "U1", fz=800.0, my=50.0),
-        ),
+        reactions=reactions_payload(*(_reaction_from_scenario(r) for r in _ENLARGE["reactions"])),
+        basis=basis,
     )
-    outcome = stand.play(_auto)
+    outcome = stand.play(_refuse_decide)
     assert outcome.status is RunStatus.COMPLETED
     assert outcome.output is not None
-    # Final design plan is the smallest multiple that passes (spec AC17).
+    out = cast(Any, outcome.output)
+    expected = cast(dict[str, Any], _ENLARGE["expected"])
     row = _footing_row(stand, outcome)
-    assert row["Lx_mm"] == row["Ly_mm"]
-    assert row["Lx_mm"] >= 2000.0
-    assert any(isinstance(e.payload, ev.StepCompleted) and e.payload.calc for e in stand.events())
-    assert cast(Any, outcome.output).verdict_sets  # each round's verdict sets are retained
+    assert row["Lx_mm"] == row["Ly_mm"] == expected["Lx_mm"]
+    assert any(c["id"] == "F1" and c["status"] == expected["closure_status"] for c in _closures(outcome))
+    # Two completed rounds (fail at 2000 mm, pass at 2200 mm); one verdict-set ref per family per round.
+    assert out.rounds == expected["rounds"]
+    per_round = int(expected["verdict_sets_per_round"])
+    assert len(out.verdict_sets) == per_round * out.rounds
+    assert list(out.decisions) == ["F1:enlarge_plan:rule:footing_fix_strategy.bearing_only"]
+    state0 = _footing_state(_status_rows(stand)[0])
+    assert state0["bearing"] == "FAIL"
+    for family in _FAMILIES:
+        if family != "bearing":
+            assert state0[family] == "PASS", family
 
 
 def test_shear_deepens(tmp_stand_root: Path) -> None:
-    """AC18: punching fails alone → increase_depth; depth grows.
+    """AC18: punching (and one-way) fail alone → rule `shear_only` picks `increase_depth`; depth grows.
 
     Concentric high factored FZ on a large plan (bearing passes); thin depth so punching governs.
-    Initial h = foundation.min_depth_mm = 500 mm from plan size.
+    Dense bars (max_spacing_mm=100) so flexure and min_steel PASS — otherwise the rule does not match.
+    Initial h = foundation.min_depth_mm = 400 mm from plan size.
     """
     stand = build_stand(
         tmp_stand_root / "shear",
@@ -111,44 +166,61 @@ def test_shear_deepens(tmp_stand_root: Path) -> None:
             reaction_row("J1", "S1", fz=400.0),
             reaction_row("J1", "U1", fz=2500.0),
         ),
-        basis={"foundation.min_depth_mm": (400.0, "mm"), "foundation.max_depth_mm": (1500.0, "mm")},
+        basis={
+            "foundation.min_depth_mm": (400.0, "mm"),
+            "foundation.max_depth_mm": (1500.0, "mm"),
+            "reinforcement.max_spacing_mm": (100.0, "mm"),
+        },
     )
-
-    def responder(stand: Stand, shown: InputRequest) -> Any:
-        props = _props(shown)
-        if any(isinstance(p, dict) and "enum" in p for p in props.values()):
-            return stand.choose(shown, "increase_depth")
-        return _auto(stand, shown)
-
-    outcome = stand.play(responder)
+    outcome = stand.play(_refuse_decide)
     assert outcome.status is RunStatus.COMPLETED
     assert outcome.output is not None
+    state0 = _footing_state(_status_rows(stand)[0])
+    assert state0["punching"] == "FAIL"
+    assert state0["bearing"] == "PASS"
+    assert state0["flexure"] == "PASS"
+    assert state0["min_steel"] == "PASS"
+    assert state0["development"] == "PASS"
+    decisions = list(cast(Any, outcome.output).decisions)
+    assert decisions
+    assert all(d.startswith("F1:increase_depth:rule:footing_fix_strategy.shear_only") for d in decisions)
     assert _footing_row(stand, outcome)["h_mm"] > 400.0
 
 
 def test_flexure_reduces_spacing(tmp_stand_root: Path) -> None:
-    """AC18: flexure fails alone → reduce_bar_spacing; spacing shrinks from max_spacing_mm."""
+    """AC18: min_steel fails alone (steel_only) → `reduce_bar_spacing`; spacing shrinks from max_spacing_mm.
+
+    Deep footing (min_depth_mm=900) so shear PASS; sparse bars (350 mm) so min_steel FAIL; concentric loads so
+    flexure from moments does not mix families (spec 0010 4.5 steel_only / Q5).
+    """
     stand = build_stand(
         tmp_stand_root / "flexure",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
-            reaction_row("J1", "S1", fz=400.0),
-            reaction_row("J1", "U1", fz=900.0, my=200.0),
+            reaction_row("J1", "S1", fz=500.0),
+            reaction_row("J1", "U1", fz=800.0),
         ),
-        basis={"reinforcement.max_spacing_mm": (400.0, "mm"), "reinforcement.min_spacing_mm": (100.0, "mm")},
+        basis={
+            "foundation.min_depth_mm": (900.0, "mm"),
+            "reinforcement.max_spacing_mm": (350.0, "mm"),
+            "reinforcement.min_spacing_mm": (100.0, "mm"),
+        },
     )
-
-    def responder(stand: Stand, shown: InputRequest) -> Any:
-        props = _props(shown)
-        if any(isinstance(p, dict) and "enum" in p for p in props.values()):
-            return stand.choose(shown, "reduce_bar_spacing")
-        return _auto(stand, shown)
-
-    outcome = stand.play(responder)
+    outcome = stand.play(_refuse_decide)
     assert outcome.status is RunStatus.COMPLETED
     assert outcome.output is not None
+    state0 = _footing_state(_status_rows(stand)[0])
+    assert state0["min_steel"] == "FAIL"
+    assert state0["flexure"] == "PASS"
+    assert state0["bearing"] == "PASS"
+    assert state0["one_way_shear"] == "PASS"
+    assert state0["punching"] == "PASS"
+    assert state0["development"] == "PASS"
+    decisions = list(cast(Any, outcome.output).decisions)
+    assert decisions
+    assert all(d.startswith("F1:reduce_bar_spacing:rule:footing_fix_strategy.steel_only") for d in decisions)
     row = _footing_row(stand, outcome)
-    assert row["s_mm"] < 400.0 or row["s_x_mm"] < 400.0
+    assert row["s_mm"] < 350.0 or row["s_x_mm"] < 350.0
 
 
 def test_attempts_exhausted_closes_open_footings(tmp_stand_root: Path) -> None:
@@ -169,14 +241,15 @@ def test_attempts_exhausted_closes_open_footings(tmp_stand_root: Path) -> None:
     assert outcome.status is RunStatus.COMPLETED
     closed = _closures(outcome)
     assert any(c["id"] == "F1" and c["reason"] == "ATTEMPTS_EXHAUSTED" for c in closed)
+    assert cast(Any, outcome.output).rounds == 1
 
 
 def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
     """AC19 / Q18: q_min < 0 at the plan of §4.4.2 → bearing NEEDS_ENGINEER; no decide, no enlarge round.
 
-    Derivation: at L=2000 mm, N≈736 kN, q_avg=184 kPa; MY=300 kN.m → M/S≈225 > 184 → q_min < 0 (BP G-1).
-    Factored MY=0 and denser max spacing so other families do not FAIL (status would then be failing, not
-    needs_engineer — spec 0010 4.4.5).
+    Derivation: at L=2000 mm, N≈736 kN, q_avg=184 kPa; MY=300 kN.m → M/S≈225 > 184 → q_min < 0 (BP G-1 /
+    FULL_CONTACT). Factored MY=0 and denser max spacing so other families do not FAIL (status would then be
+    failing, not needs_engineer — spec 0010 4.4.5).
     """
     stand = build_stand(
         tmp_stand_root / "eccentric",
@@ -189,14 +262,27 @@ def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
     )
     outcome = stand.play(_auto)
     assert outcome.status is RunStatus.COMPLETED
+    assert outcome.output is not None
+    out = cast(Any, outcome.output)
     closed = _closures(outcome)
-    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" for c in closed)
-    # No decide_many step for this footing (closed as needs_engineer from status / bearing gap).
+    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] is None for c in closed)
+    # Sole bearing NEEDS_ENGINEER; no decide, no enlarge (plan stays at §4.4.2 size 2000 mm).
     assert not any(s.kind == "decide_many" for s in stand.steps())
+    assert _footing_row(stand, outcome)["Lx_mm"] == _footing_row(stand, outcome)["Ly_mm"] == 2000.0
+    assert out.rounds == 1
+    state0 = _footing_state(_status_rows(stand)[0])
+    assert state0["bearing"] == "NEEDS_ENGINEER"
+    for family in _FAMILIES:
+        if family != "bearing":
+            assert state0[family] == "PASS", family
+    # BP precondition FULL_CONTACT / gap G-1 on the bearing verdict-set traces (ACI 318-14 BP).
+    bearing = cast(dict[str, Any], stand.store.payload(out.verdict_sets[0].ref))
+    messages = [m for t in cast(list[dict[str, Any]], bearing.get("traces", [])) for m in t.get("messages", [])]
+    assert any("FULL_CONTACT" in m and "G-1" in m for m in messages)
 
 
 def test_engineer_dimensions(tmp_stand_root: Path) -> None:
-    """AC20 / Q17: ask_engineer asks one L, h, s; schedule source engineer; next round checks them."""
+    """AC20 / Q17: ask_engineer asks one L, h, s; next size equals the engineer answer (2600 / 550 / 200)."""
     stand = build_stand(
         tmp_stand_root / "engineer",
         subjects=subjects_payload(subject()),
@@ -227,6 +313,11 @@ def test_engineer_dimensions(tmp_stand_root: Path) -> None:
     assert outcome.status is RunStatus.COMPLETED
     assert outcome.output is not None
     assert any(s.kind == "ask" for s in stand.steps())
+    row = _footing_row(stand, outcome)
+    assert row["Lx_mm"] == row["Ly_mm"] == 2600.0
+    assert row["h_mm"] == 550.0
+    assert row["s_mm"] == 200.0
+    assert row["source"] == "engineer"
 
 
 def test_combine_closes(tmp_stand_root: Path) -> None:
@@ -275,3 +366,46 @@ def test_limit_closes(tmp_stand_root: Path) -> None:
     outcome = stand.play(responder)
     closed = _closures(outcome)
     assert any(c["id"] == "F1" and c["reason"] == "LIMIT_REACHED" for c in closed)
+
+
+def test_plan_size_needs_engineer_closes(tmp_stand_root: Path) -> None:
+    """Plan-size P6: service FZ <= 0 → UPLIFT → block closes NEEDS_ENGINEER before any sizing round."""
+    stand = build_stand(
+        tmp_stand_root / "uplift",
+        subjects=subjects_payload(subject()),
+        reactions=reactions_payload(
+            reaction_row("J1", "S1", fz=-10.0),
+            reaction_row("J1", "U1", fz=100.0),
+        ),
+    )
+    outcome = stand.play(_auto)
+    closed = _closures(outcome)
+    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] == "UPLIFT" for c in closed)
+    assert cast(Any, outcome.output).rounds == 0
+    assert not list(cast(Any, outcome.output).decisions)
+
+
+def test_width_too_small_closes(tmp_stand_root: Path) -> None:
+    """Layout L1: span <= 0 → WIDTH_TOO_SMALL (spec 0010 §4.4.3 / B-568); closed before checks.
+
+    Derivation: q_net≈160 kPa; FZ=5 kN → A_req≈0.031 m² → plan stays at min 200 mm (increment 100 mm).
+    cover=100 mm, db=16 mm → 2*cover+db=216 mm > 200 mm → span < 0 → WIDTH_TOO_SMALL.
+    """
+    stand = build_stand(
+        tmp_stand_root / "width",
+        subjects=subjects_payload(subject(cx_mm=100.0, cy_mm=100.0)),
+        reactions=reactions_payload(
+            reaction_row("J1", "S1", fz=5.0),
+            reaction_row("J1", "U1", fz=8.0),
+        ),
+        basis={
+            "durability.cover_footing_mm": (100.0, "mm"),
+            "foundation.min_plan_dimension_mm": (200.0, "mm"),
+            "foundation.plan_increment_mm": (100.0, "mm"),
+        },
+    )
+    outcome = stand.play(_auto)
+    closed = _closures(outcome)
+    assert any(c["id"] == "F1" and c["status"] == "NEEDS_ENGINEER" and c["reason"] == "WIDTH_TOO_SMALL" for c in closed)
+    assert cast(Any, outcome.output).rounds == 1
+    assert not any(s.kind == "decide_many" for s in stand.steps())
