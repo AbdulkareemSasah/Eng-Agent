@@ -103,6 +103,10 @@ tasks:
     covers: [AC5, AC6, AC7]
     depends_on: [T3]
   - id: T6
+    # Amendment (B-589, documents only): AC33 needs REVIT_KINDS registered on HARNESS_KINDS in _kinds.py (outside
+    # T6's prior files) and the kinds contract fixtures under tests/data/kinds/revit/; measured by the B-235 writer.
+    # Plan 0008 T4/T5/T7 already list _kinds.py the same way for SAFE (B-216). Every other non-test file of that
+    # branch was already listed here.
     title: Revit kinds and the parameter role map
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.revit, eng_harness.kinds and more (amendment B-356)
@@ -111,7 +115,9 @@ tasks:
       - "packages/eng-harness/src/eng_harness/kinds/__init__.py"
       - "packages/eng-harness/src/eng_harness/adapters/revit/_parameters.py"
       - "packages/eng-harness/src/eng_harness/servers/_config.py"
+      - "packages/eng-harness/src/eng_harness/_kinds.py"  # T6 may only register REVIT_KINDS on HARNESS_KINDS (amendment B-589)
       - "packages/eng-harness/tests/contract/test_revit_kinds.py"
+      - "packages/eng-harness/tests/data/kinds/revit/**"  # kinds fixtures for test_fixtures (amendment B-589)
       - "packages/eng-harness/tests/unit/adapters/test_revit_parameters.py"
     max_changed_lines: 330
     max_sessions: 3
@@ -359,7 +365,9 @@ resend cannot produce is certain: the declined dialog; a consumed-token or "NOT 
 specification table `_specs.toml` (length and angle only) with the conversions through `eng_contract.units`.
 
 **T6 Kinds and role map** (spec §4.5, §4.8). The `harness.revit_*` kinds with strict models and the `frame_element_map`
-kind registration point, and the role map loader with statuses and the load-time rules.
+kind registration point, and the role map loader with statuses and the load-time rules. T6 may only register
+`REVIT_KINDS` on `HARNESS_KINDS` in `_kinds.py` and add the kinds fixtures under `tests/data/kinds/revit/` (the same
+`_kinds.py` listing as plan 0008 T4 for SAFE; amendment B-589), so AC33's kinds are usable through the registry.
 
 **T7 State** (spec §4.5, §4.9). The reader (metadata, levels, grids, the two category lists, details, parameters of the
 mapped roles, types), chunking by halving, the per-level re-read, the fingerprint over raw replies, the neutral kinds
