@@ -98,7 +98,8 @@ class Rig:
         assert reply.error.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
 
     async def reconcile(self, tool: str, args: dict[str, Any], op_id: str = "op-1") -> Reconciliation:
-        return await self.port.reconcile(tool, {"model": "m", **args}, op_id)
+        found: Reconciliation = await self.port.reconcile(tool, {"model": "m", **args}, op_id)
+        return found
 
 
 @asynccontextmanager

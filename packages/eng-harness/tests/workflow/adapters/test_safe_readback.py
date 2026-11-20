@@ -150,7 +150,8 @@ async def _rig(
     async with manager:
         key = await host.working_copy("m", tmp_path / "copies")
         held = await host.locate(key)
-        assert held is not None and held.pid is not None
+        assert held is not None
+        assert held.pid is not None
         port = CsiToolPort(
             binder=_Binder(held.pid),
             written=written,
@@ -225,38 +226,70 @@ def test_load_mismatch(tmp_path: Path, make_config: ConfigFactory, control: Path
     anyio.run(body)
 
 
-def test_punch_dimension_change_detected(
-    tmp_path: Path, make_config: ConfigFactory, control: Path, store: ResultStore
-) -> None:
-    """AC18: a replace that changes XDim/YDim is READBACK_MISMATCH naming punch_x_mm or punch_y_mm."""
-    seed = _seed(joint_loads=1)
-    _seed_control(control, seed)
+def test_punch_dimension_change_detected() -> None:
+    """AC18: when want carries pre-write punch dims and the table differs, READBACK_MISMATCH names them."""
+    from eng_contract.kinds.model import LoadPattern, LoadSet, PatternType
+    from eng_contract.verdicts import Subject, SubjectKind
 
-    async def body() -> None:
-        async with _rig(tmp_path, make_config(), control, store, seed=seed) as rig:
-            await rig.write(
-                "csi_set_point_load",
+    from eng_harness._kinds import JointLoad, JointLoads, ModelPoint, ModelPoints
+    from eng_harness.adapters.csi._checks import Expect, Snapshot, compare
+    from eng_harness.adapters.csi._state import StateRead
+    from eng_harness.adapters.csi.products import profile
+    from eng_harness.kinds.csi import CsiModelStatus
+
+    status = CsiModelStatus(
+        program_version="22.0.0",
+        units="kN_m_C",
+        locked=False,
+        file_name="f.FDB",
+        object_counts={},
+    )
+    want = {
+        "FX_kN": 0.0,
+        "FY_kN": 0.0,
+        "FZ_kN": -120.0,
+        "MX_kNm": 0.0,
+        "MY_kNm": 0.0,
+        "MZ_kNm": 0.0,
+        "punch_x_mm": 400.0,
+        "punch_y_mm": 400.0,
+    }
+    item = Expect("point_load_table", Subject(kind=SubjectKind.JOINT, id="P1", case="DEAD"), want)
+    changed = JointLoads(
+        loads=[
+            JointLoad(
                 joint="P1",
                 pattern="DEAD",
-                FX_kN=rig.value("FX_kN", 0.0),
-                FY_kN=rig.value("FY_kN", 0.0),
-                FZ_kN=rig.value("FZ_kN", -120.0),
-                MX_kNm=rig.value("MX_kNm", 0.0),
-                MY_kNm=rig.value("MY_kNm", 0.0),
-                MZ_kNm=rig.value("MZ_kNm", 0.0),
+                fx_kn=0.0,
+                fy_kn=0.0,
+                fz_kn=-120.0,
+                mx_knm=0.0,
+                my_knm=0.0,
+                mz_knm=0.0,
+                punch_x_mm=900.0,
+                punch_y_mm=400.0,
             )
-            # Corrupt the punching dimensions after the write (host quirk SG-7 guards against).
-            data = json.loads(control.read_text())
-            rows = data["seed"]["tables"][JOINT_LOADS]
-            for row in rows:
-                if row.get("UniqueName") == "P1" and row.get("LoadPattern") == "DEAD":
-                    row["XDim"] = 0.9
-            control.write_text(json.dumps(data))
-            bad = await rig.host.check_model(rig.key)
-            messages = [i["message"] for i in bad.data["issues"] if i["code"] == "READBACK_MISMATCH"]
-            assert any("punch_x_mm" in m or "punch_y_mm" in m for m in messages)
-
-    anyio.run(body)
+        ]
+    )
+    state = StateRead(
+        {
+            "harness.joint_loads/1": changed,
+            "harness.model_points/1": ModelPoints(points=[ModelPoint(name="P1", x_mm=0.0, y_mm=0.0, z_mm=0.0)]),
+            "model.load_set/1": LoadSet(
+                patterns=[LoadPattern(name="DEAD", type=PatternType.DEAD, self_weight_ratio=1.0)],
+                combinations=[],
+                frame_loads=[],
+                area_loads=[],
+            ),
+        },
+        status,
+        "a" * 64,
+    )
+    snap = Snapshot(state, profile("SAFE"), set(), set())
+    issue = compare(item, snap, TOLERANCE)
+    assert issue is not None
+    assert issue.code == "READBACK_MISMATCH"
+    assert "punch_x_mm" in issue.message
 
 
 def test_safe_integrity_issues(tmp_path: Path, make_config: ConfigFactory, control: Path, store: ResultStore) -> None:

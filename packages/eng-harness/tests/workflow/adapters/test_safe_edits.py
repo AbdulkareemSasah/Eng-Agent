@@ -18,10 +18,10 @@ from eng_harness.errors import HarnessCode, NotImplementedGap
 
 def _build(tool: str, model: Any, token: str | None = None) -> dict[str, JsonValue]:
     from eng_harness.adapters.csi import csi_allowlist
-    from eng_harness.adapters.csi._tools import EDIT_BUILDERS
+    from eng_harness.adapters.csi._tools import edit_builders
 
     binding = Binding(target=HostTarget(product="SAFE", pid=4242), units_system=token)
-    return EDIT_BUILDERS[tool](model, csi_allowlist().for_product("SAFE").descriptor(tool), binding)
+    return edit_builders()[tool](model, csi_allowlist().for_product("SAFE").descriptor(tool), binding)
 
 
 def _item(case: str, kind: str, scale: float) -> CombinationItem:
@@ -38,9 +38,7 @@ def test_patterns_and_combos() -> None:
         pattern = e.AddLoadPatternArgs(model="m", name="P", type=PatternType(kind), self_weight_ratio=1.0)
         assert _build("csi_add_load_pattern", pattern) == {"name": "P", "type": name, "self_weight": 1.0}
 
-    super_dead = e.AddLoadPatternArgs(
-        model="m", name="SDL", type=PatternType.SUPERIMPOSED_DEAD, self_weight_ratio=0.0
-    )
+    super_dead = e.AddLoadPatternArgs(model="m", name="SDL", type=PatternType.SUPERIMPOSED_DEAD, self_weight_ratio=0.0)
     assert _build("csi_add_load_pattern", super_dead) == {"name": "SDL", "type": "SuperDead", "self_weight": 0.0}
     assert loads.SAFE_PATTERN[PatternType.SUPERIMPOSED_DEAD] == "SuperDead"
 

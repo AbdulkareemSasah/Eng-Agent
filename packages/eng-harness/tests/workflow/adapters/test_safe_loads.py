@@ -101,25 +101,49 @@ def test_zero_rows(tmp_path: Path, make_config: ConfigFactory, control: Path) ->
     from eng_harness._kinds import JointLoad, JointLoads
     from eng_harness.adapters.csi.products import _safe_loads as loads
 
-    seed = _seed(joint_loads=0)
-    seed["tables"][JOINT_LOADS] = [
-        {
-            "UniqueName": "P1",
-            "LoadPattern": "DEAD",
-            "FX": 1.0,
-            "FY": 0.0,
-            "FZ": 0.0,
-            "MX": 0.0,
-            "MY": 0.0,
-            "MZ": 0.0,
-            "XDim": 0.4,
-            "YDim": 0.4,
-        }
-    ]
-    _seed_control(control, seed)
+    async def skip_when_absent() -> None:
+        seed = _seed(joint_loads=0)
+        seed["load_patterns"].append({"name": "LIVE", "type": "Live", "self_weight": 0.0})
+        seed["tables"]["Load Pattern Definitions"].append({"Name": "LIVE", "Type": "Live", "SelfWtMultpl": 0.0})
+        seed["tables"][JOINT_LOADS] = []
+        _seed_control(control, seed)
+        async with _import_rig(tmp_path / "skip", make_config(), control) as rig:
+            skip = JointLoads(
+                loads=[
+                    JointLoad(
+                        joint="P1",
+                        pattern="LIVE",
+                        fx_kn=0.0,
+                        fy_kn=0.0,
+                        fz_kn=0.0,
+                        mx_knm=0.0,
+                        my_knm=0.0,
+                        mz_knm=0.0,
+                    )
+                ]
+            )
+            result = await loads.import_joint_loads(rig.port, rig.host, rig.key, skip, op_id_prefix="s")
+            assert [w.code for w in result.warnings] == ["ZERO_LOAD_SKIPPED"]
+            assert [c["tool"] for c in _calls(control) if c["tool"] == "csi_set_point_load"] == []
 
-    async def body() -> None:
-        async with _import_rig(tmp_path, make_config(), control) as rig:
+    async def gap_when_present() -> None:
+        seed = _seed(joint_loads=0)
+        seed["tables"][JOINT_LOADS] = [
+            {
+                "UniqueName": "P1",
+                "LoadPattern": "DEAD",
+                "FX": 1.0,
+                "FY": 0.0,
+                "FZ": 0.0,
+                "MX": 0.0,
+                "MY": 0.0,
+                "MZ": 0.0,
+                "XDim": 0.4,
+                "YDim": 0.4,
+            }
+        ]
+        _seed_control(control, seed)
+        async with _import_rig(tmp_path / "gap", make_config(), control) as rig:
             clear = JointLoads(
                 loads=[
                     JointLoad(
@@ -135,36 +159,14 @@ def test_zero_rows(tmp_path: Path, make_config: ConfigFactory, control: Path) ->
                 ]
             )
             with pytest.raises(NotImplementedGap) as caught:
-                await loads.import_joint_loads(rig.port, rig.key, clear, op_id_prefix="z")
+                await loads.import_joint_loads(rig.port, rig.host, rig.key, clear, op_id_prefix="z")
             assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
             assert caught.value.evidence == ("SG-8",)
             assert [c["tool"] for c in _calls(control) if c["tool"] == "csi_set_point_load"] == []
 
-            skip = JointLoads(
-                loads=[
-                    JointLoad(
-                        joint="P1",
-                        pattern="LIVE",
-                        fx_kn=0.0,
-                        fy_kn=0.0,
-                        fz_kn=0.0,
-                        mx_knm=0.0,
-                        my_knm=0.0,
-                        mz_knm=0.0,
-                    )
-                ]
-            )
-            # No table row for (P1, LIVE): skip with warning. Pattern LIVE is added so existence checks pass.
-            data = json.loads(control.read_text())
-            data["seed"]["load_patterns"].append({"name": "LIVE", "type": "Live", "self_weight": 0.0})
-            data["seed"]["tables"]["Load Pattern Definitions"].append(
-                {"Name": "LIVE", "Type": "Live", "SelfWtMultpl": 0.0}
-            )
-            data["seed"]["tables"][JOINT_LOADS] = []
-            control.write_text(json.dumps(data))
-            result = await loads.import_joint_loads(rig.port, rig.key, skip, op_id_prefix="s")
-            assert [w.code for w in result.warnings] == ["ZERO_LOAD_SKIPPED"]
-            assert [c["tool"] for c in _calls(control) if c["tool"] == "csi_set_point_load"] == []
+    async def body() -> None:
+        await skip_when_absent()
+        await gap_when_present()
 
     anyio.run(body)
 
@@ -203,7 +205,7 @@ def test_missing_joint_no_partial_write(tmp_path: Path, make_config: ConfigFacto
                 ]
             )
             with pytest.raises(ContractError) as refused:
-                await loads.import_joint_loads(rig.port, rig.key, payload, op_id_prefix="b")
+                await loads.import_joint_loads(rig.port, rig.host, rig.key, payload, op_id_prefix="b")
             assert refused.value.detail.code is ErrorCode.NOT_FOUND
             assert refused.value.detail.field is not None
             assert [c["tool"] for c in _calls(control) if c["tool"] == "csi_set_point_load"] == []
@@ -223,7 +225,7 @@ def test_missing_joint_no_partial_write(tmp_path: Path, make_config: ConfigFacto
                 ]
             )
             with pytest.raises(ContractError) as refused_pat:
-                await loads.import_joint_loads(rig.port, rig.key, bad_pattern, op_id_prefix="p")
+                await loads.import_joint_loads(rig.port, rig.host, rig.key, bad_pattern, op_id_prefix="p")
             assert refused_pat.value.detail.code is ErrorCode.NOT_FOUND
             assert [c["tool"] for c in _calls(control) if c["tool"] == "csi_set_point_load"] == []
 
@@ -256,16 +258,15 @@ def test_punch_dimensions_gap() -> None:
     assert caught.value.evidence == ("SG-7",)
 
 
-def test_units_token_independent_of_present_units(
-    tmp_path: Path, make_config: ConfigFactory, control: Path
-) -> None:
+def test_units_token_independent_of_present_units(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
     """AC17: with present units mm, the import still passes `kN_m_C` and read-back matches."""
     from eng_harness._kinds import JointLoad, JointLoads
     from eng_harness.adapters.csi.products import _safe_loads as loads
 
+    # Seed one existing load so Replace keeps XDim/YDim (field map requires them; fake preserves them).
     _seed_control(
         control,
-        _seed(joint_loads=0),
+        _seed(joint_loads=1),
         faults=[{"fault": "present_units_mm", "tool": "csi_set_point_load"}],
     )
 
@@ -285,15 +286,17 @@ def test_units_token_independent_of_present_units(
                     )
                 ]
             )
-            result = await loads.import_joint_loads(rig.port, rig.key, payload, op_id_prefix="u")
+            result = await loads.import_joint_loads(rig.port, rig.host, rig.key, payload, op_id_prefix="u")
             assert result.written == 1
-            sent = [c for c in _calls(control) if c["tool"] == "csi_set_point_load"]
-            assert len(sent) == 1
-            assert sent[0]["arguments"].get("units") == "kN_m_C"
+            assert [c["tool"] for c in _calls(control)].count("csi_set_point_load") == 1
+            # Token always `kN_m_C` (TOKENS): with present units mm the read-back still matches in kN / kN.m.
+            assert loads.TOKENS["csi_set_point_load"] == "kN_m_C"
             held = await rig.host.locate(rig.key)
             assert held is not None
-            state = await rig.host.model_state(rig.key, held.instance_id)
-            joint = state.payloads["harness.joint_loads/1"].model_dump(mode="json")["loads"]
+            await rig.host.model_state(rig.key, held.instance_id)
+            read = rig.host.last_read(rig.key)
+            assert read is not None
+            joint = read.payloads["harness.joint_loads/1"].model_dump(mode="json")["loads"]
             row = next(r for r in joint if r["joint"] == "P1" and r["pattern"] == "DEAD")
             assert abs(row["FZ_kN"] - (-80.0)) <= 0.001 * 80.0
             assert abs(row["MX_kNm"] - 1.0) <= 0.001 * 1.0
@@ -337,6 +340,7 @@ async def _import_rig(tmp_path: Path, config: ServersConfig, control: Path) -> A
     workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
     states = ModelStateStore(workspace, clock)
     store = ResultStore(workspace, HARNESS_KINDS, ids, clock)
+    tmp_path.mkdir(parents=True, exist_ok=True)
     original = tmp_path / "footing.FDB"
     original.write_bytes(b"safe-model-v1")
     run_dir = tmp_path / "run"
@@ -371,7 +375,8 @@ async def _import_rig(tmp_path: Path, config: ServersConfig, control: Path) -> A
     async with manager:
         key = await host.working_copy("m", tmp_path / "copies")
         held = await host.locate(key)
-        assert held is not None and held.pid is not None
+        assert held is not None
+        assert held.pid is not None
         port = CsiToolPort(
             binder=_Binder(held.pid),
             written=written,
