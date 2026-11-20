@@ -55,6 +55,8 @@ _ATTEMPTS = "ATTEMPTS_EXHAUSTED"
 _COMBINE = "COMBINE_REQUESTED"
 _LIMIT = "LIMIT_REACHED"
 _WIDTH = "WIDTH_TOO_SMALL"
+
+
 class ResizeKind(StrEnum):
     """Resize actions of `harness.footing_resize` (spec 0010 4.4.4); local copy so block code imports no calc."""
 
@@ -331,9 +333,7 @@ async def _batch_checks(
             bearing_items.append(
                 {
                     "subject": subject,
-                    "inputs": _bearing_inputs(
-                        ctx, reactions=reactions, design=design, row_i=row_i, design_i=design_i
-                    ),
+                    "inputs": _bearing_inputs(ctx, reactions=reactions, design=design, row_i=row_i, design_i=design_i),
                 }
             )
 
@@ -421,9 +421,7 @@ async def _resize(
     )
 
 
-async def _apply_limit_closures(
-    ctx: Any, dims: Any, open_ids: list[str], closures: list[Closure]
-) -> list[str]:
+async def _apply_limit_closures(ctx: Any, dims: Any, open_ids: list[str], closures: list[Closure]) -> list[str]:
     resized = list(await _data(ctx, dims.ref, "/footings"))
     kept: list[str] = []
     for row in resized:

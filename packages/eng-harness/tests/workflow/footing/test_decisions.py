@@ -19,7 +19,7 @@ from .conftest import (
     subject,
     subjects_payload,
 )
-from .test_block import _auto
+from .test_block import _auto, _props
 
 
 def _failing_stand(root: Path, *, model: Any = None) -> Stand:
@@ -40,8 +40,7 @@ def test_shadow_suggestion_not_applied(tmp_stand_root: Path) -> None:
     stand = _failing_stand(tmp_stand_root / "shadow", model=shadow_model("combine_with_neighbor"))
 
     def responder(stand: Stand, shown: InputRequest) -> Any:
-        props = shown.fields_schema.get("properties", {})
-        assert isinstance(props, dict)
+        props = _props(shown)
         if any(isinstance(p, dict) and "enum" in p for p in props.values()):
             # Engineer overrides the shadow suggestion.
             return stand.choose(shown, "enlarge_plan")
@@ -51,7 +50,10 @@ def test_shadow_suggestion_not_applied(tmp_stand_root: Path) -> None:
     assert outcome.status is RunStatus.COMPLETED
     made = [e.payload for e in stand.events() if e.type is EventType.DECISION_MADE]
     assert made
-    assert all(getattr(m, "decided_by", "").startswith("engineer:") or getattr(m, "decided_by", "").startswith("rule:") for m in made)
+    assert all(
+        getattr(m, "decided_by", "").startswith("engineer:") or getattr(m, "decided_by", "").startswith("rule:")
+        for m in made
+    )
     # Provider was consulted (shadow), but its combine suggestion is not the applied choice when the engineer picks.
     assert stand.model is not None
     assert stand.model.requests  # the provider saw the request
@@ -91,8 +93,7 @@ def test_one_screen_per_round(tmp_stand_root: Path) -> None:
 
     def responder(stand: Stand, shown: InputRequest) -> Any:
         nonlocal screens
-        props = shown.fields_schema.get("properties", {})
-        assert isinstance(props, dict)
+        props = _props(shown)
         if any(isinstance(p, dict) and "enum" in p for p in props.values()):
             screens += 1
             # Count enum properties: decide_many puts one question per footing on one screen.
@@ -103,7 +104,7 @@ def test_one_screen_per_round(tmp_stand_root: Path) -> None:
 
     outcome = stand.play(responder)
     assert outcome.status is RunStatus.COMPLETED
-    decide_many = [s for s in stand.steps("decide_many")]
+    decide_many = list(stand.steps("decide_many"))
     assert len(decide_many) >= 1
     # One decide_many step for the first round's three footings (AC16).
     assert screens >= 1

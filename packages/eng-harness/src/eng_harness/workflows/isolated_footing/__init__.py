@@ -20,16 +20,16 @@ from eng_harness.workflows.isolated_footing._points import (
 
 __all__ = [
     "CHECK_BASE_IDS",
+    "FIX_STRATEGY_POLICY",
+    "REVIEW_POLICY",
     "Closure",
     "DesignIsolatedFootingInput",
     "DesignIsolatedFootingOutput",
-    "FIX_STRATEGY_POLICY",
     "FootingAction",
     "FootingDimensions",
     "FootingFailureState",
     "FootingReviewAction",
     "FootingReviewState",
-    "REVIEW_POLICY",
     "ResizeKind",
     "design_isolated_footing",
 ]

@@ -1,3 +1,4 @@
+# ruff: noqa: N803  # reaction helpers keep contract unit suffixes (FZ_kN, MY_kNm)
 """Stand of the isolated-footing block tests (plan 0010 T8).
 
 Test code, never shipped. Every basis and reaction value below is a synthetic test input labelled so; no case
@@ -39,7 +40,16 @@ from eng_harness.decisions import Cascade, LabelStore
 from eng_harness.decisions._points import discover
 from eng_harness.decisions._policy import DecisionSettings
 from eng_harness.decisions.interfaces import ChoiceAnswer
-from eng_harness.engine import Engine, EnginePorts, EngineSettings, PermissionMode, RunOutcome, RunRequest, RunStatus, rule_guard
+from eng_harness.engine import (
+    Engine,
+    EnginePorts,
+    EngineSettings,
+    PermissionMode,
+    RunOutcome,
+    RunRequest,
+    RunStatus,
+    rule_guard,
+)
 from eng_harness.journal import JournalReader
 from eng_harness.journal import _events as ev
 from eng_harness.ports import InputAnswer, InputRequest, RunClass, ToolInfo
@@ -52,6 +62,7 @@ CHECK_IDS = {base: base for base in FOOTING_CHECK_IDS}
 
 class Empty(BaseModel):
     """No engineer workflow input beyond the stored refs."""
+
 
 # Synthetic engineer basis for the footing block scenarios (spec 0010 4.7 paths; values from golden plan-gross
 # overburden derivation and ACI packing needs). Cited in scenario JSON under tests/data/footing/.
@@ -128,7 +139,9 @@ class Stand:
     model: FakeDecisionProvider | None = None
 
     def flow(self) -> Any:
-        """The test workflow: one call of `design_isolated_footing` (imported here so a missing module fails the test)."""
+        """The test workflow: one `design_isolated_footing` call (import here so a missing module fails the test)."""
+        from eng_contract.refs import Ref
+
         from eng_harness.rules import footing as footing_rules
         from eng_harness.workflows import isolated_footing
         from eng_harness.workflows.isolated_footing._block import (
@@ -137,15 +150,13 @@ class Stand:
             DesignIsolatedFootingOutput,
             design_isolated_footing,
         )
-        from eng_contract.refs import Ref
 
         _warm_coverage_multiline_maps(
             Path(isolated_footing.__file__).resolve().parent, Path(footing_rules.__file__).resolve()
         )
 
-        required = tuple(
-            sorted({*PLAN_FIELDS, *LAYOUT_FIELDS, *RESIZE_FIELDS, *BASIS_VALUES})
-        )
+        required = tuple(sorted({*PLAN_FIELDS, *LAYOUT_FIELDS, *RESIZE_FIELDS, *BASIS_VALUES}))
+
         @workflow(
             name="footing_block_test",
             version=1,
@@ -153,7 +164,7 @@ class Stand:
             required_basis=required,
         )
         async def run(ctx: Any, inp: Empty) -> DesignIsolatedFootingOutput:
-            return await ctx.block(
+            out = await ctx.block(
                 design_isolated_footing,
                 DesignIsolatedFootingInput(
                     subjects=Ref.model_validate({"$ref": self.subjects_ref}),
@@ -164,6 +175,7 @@ class Stand:
                     unused_engineer_dims=Ref.model_validate({"$ref": self.unused_dims_ref}),
                 ),
             )
+            return cast(DesignIsolatedFootingOutput, out)
 
         return run
 
@@ -234,7 +246,7 @@ class Stand:
             run_id=self.run_id,
         )
 
-    def play(self, responder: Callable[["Stand", InputRequest], InputAnswer | None]) -> RunOutcome:
+    def play(self, responder: Callable[[Stand, InputRequest], InputAnswer | None]) -> RunOutcome:
         """Start the run and answer every pause until it ends."""
 
         async def body() -> RunOutcome:
@@ -283,9 +295,7 @@ class Stand:
 
     def steps(self, kind: str | None = None) -> list[Any]:
         return [
-            e.payload
-            for e in self.events()
-            if isinstance(e.payload, ev.StepStarted) and kind in (None, e.payload.kind)
+            e.payload for e in self.events() if isinstance(e.payload, ev.StepStarted) and kind in (None, e.payload.kind)
         ]
 
 
@@ -412,7 +422,7 @@ def reaction_row(
     }
 
 
-def subjects_payload(*rows: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
+def subjects_payload(*rows: dict[str, JsonValue]) -> dict[str, JsonValue]:
     return {
         "subjects": list(rows),
         "excluded": [],
@@ -435,7 +445,7 @@ def subjects_payload(*rows: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
     }
 
 
-def reactions_payload(*rows: Mapping[str, JsonValue]) -> dict[str, JsonValue]:
+def reactions_payload(*rows: dict[str, JsonValue]) -> dict[str, JsonValue]:
     return {"axes": "global", "rows": list(rows)}
 
 
