@@ -1,10 +1,10 @@
-"""Child blocks of the edit cycle, steps 3 to 10 (spec 0007 section 4.5; plan 0007 T8).
+"""Child blocks of the edit cycle, steps 3 to 15 (spec 0007 section 4.5; plan 0007 T8 and T9a).
 
-Purpose: `read_state` (steps 3 and 4: read the model, report the differences from the last recorded revision),
-`obtain_change_set` (step 5: ask for the change set and check it, asking again while the check fails),
-`apply_change_set` (steps 6 to 10: approve, save the revision snapshot, write, read back, decide D-2, save) and
-`edit_cycle_once` (the return to step 3 after a voided approval or a restore, spec 0007 4.5.1). Every value moves by
-reference; the blocks read statuses, names and lists of stored results through `ctx.read` and never a number.
+Purpose: `read_state` (steps 3 and 4), `obtain_change_set` (step 5), `apply_change_set` (steps 6 to 10),
+`edit_cycle_once` (the return to step 3 after a voided approval or a restore, spec 0007 4.5.1) and
+`run_and_summarize` (steps 11 to 15: analysis, design, results, D-3, design summaries, engineer turn). Every value
+moves by reference; the blocks read statuses, names and lists of stored results through `ctx.read` and never a
+number.
 Units: none here; the calcs and the tool port hold them.
 Errors: `AttemptsExhausted` (an engine escalation) when `attempts.change_set` or `attempts.approval_void` runs out;
 `ToolFailed`, `CalcRefused` and the other step errors of the ctx calls reach the engine unchanged.
@@ -24,10 +24,16 @@ from eng_harness.errors import ApprovalVoid
 from eng_harness.rules import edit_cycle as edit_rules
 from eng_harness.workflows.model_edit_cycle._change_set import ChangeSetDraft
 from eng_harness.workflows.model_edit_cycle._points import (
+    ANALYSIS_POLICY,
     READBACK_POLICY,
+    TURN_POLICY,
+    AnalysisAction,
+    AnalysisState,
     ReadbackAction,
     ReadbackReason,
     ReadbackState,
+    TurnAction,
+    TurnState,
 )
 
 __all__ = [
@@ -38,14 +44,18 @@ __all__ = [
     "ChangeSetRequest",
     "CycleInput",
     "CycleOutput",
+    "DesignRun",
     "ReadInput",
     "ReadOutput",
     "Route",
     "StateRefs",
+    "SummarizeInput",
+    "SummarizeOutput",
     "apply_change_set",
     "edit_cycle_once",
     "obtain_change_set",
     "read_state",
+    "run_and_summarize",
 ]
 
 _SECTIONS = ("stories", "frames", "areas", "loads", "restraints")
@@ -174,6 +184,32 @@ class CycleOutput(_M):
     change_set: ChangeSetOutput | None
     effects: Ref | None
     readback: Ref | None
+
+
+class DesignRun(StrEnum):
+    """The basis choice `design.run`: which host design kinds step 12 runs (spec 0007 4.8)."""
+
+    STEEL = "steel"
+    CONCRETE = "concrete"
+    STEEL_AND_CONCRETE = "steel_and_concrete"
+
+
+class SummarizeInput(_M):
+    """What steps 11 to 15 need: the key, `R[k]`, the difference report, the read-back and prior design summaries."""
+
+    model: str
+    state: StateRefs
+    diff: Ref
+    readback: Ref | None
+    previous_designs: tuple[tuple[str, Ref], ...] = ()
+
+
+class SummarizeOutput(_M):
+    """The analysis summary, one design summary per kind (steel before concrete) and the engineer turn choice."""
+
+    analysis: Ref
+    designs: tuple[tuple[str, Ref], ...]
+    turn: TurnAction
 
 
 def _ref(value: object) -> Ref:
@@ -400,3 +436,106 @@ async def edit_cycle_once(ctx: Any, inp: CycleInput) -> CycleOutput:
         route=applied.route, state=state, diff=read.diff, change_set=kept, effects=applied.effects,
         readback=applied.readback,
     )  # fmt: skip
+
+
+_WORST = (
+    VerdictStatus.FAIL,
+    VerdictStatus.ERROR,
+    VerdictStatus.NEEDS_ENGINEER,
+    VerdictStatus.PASS,
+    VerdictStatus.NOT_APPLICABLE,
+)
+"""Member status order of spec 0003 4.9 S5, worst first; used for the turn's design status."""
+
+
+def _kinds(choice: DesignRun) -> tuple[str, ...]:
+    """The host design kinds of a `design.run` choice, steel before concrete (spec 0007 4.5 step 12 and 14)."""
+    if choice is DesignRun.STEEL_AND_CONCRETE:
+        return ("steel", "concrete")
+    return (str(choice),)
+
+
+def _worse(left: VerdictStatus, right: VerdictStatus) -> VerdictStatus:
+    """The worse of two statuses in the S5 order of spec 0003 4.9."""
+    return left if _WORST.index(left) <= _WORST.index(right) else right
+
+
+@block(name="run_and_summarize", version=1)
+async def run_and_summarize(ctx: Any, inp: SummarizeInput) -> SummarizeOutput:
+    """Steps 11 to 15: analysis, design, results, D-3, design summaries and the engineer turn (spec 0007 4.5, 4.6)."""
+    await ctx.tool("csi_run_analysis", {"model": inp.model})  # step 11
+    kinds = _kinds(ctx.basis.choice("design.run", DesignRun))
+    for kind in kinds:  # step 12
+        await ctx.tool("csi_design_run", {"model": inp.model, "kind": kind})
+    combos = list(await _data(ctx, inp.state.names, "/combinations"))
+    parts = await ctx.parallel(  # step 13
+        ctx.tool("csi_read_analysis_messages", {"model": inp.model}),
+        ctx.tool("csi_results_story_drifts", {"model": inp.model, "cases": [], "combos": combos}),
+        *[ctx.tool("csi_design_results", {"model": inp.model, "kind": kind}) for kind in kinds],
+        ctx.tool("csi_read_model_state", {"model": inp.model}),
+    )
+    messages, drifts, *design_rows, framed = parts
+    frames = _state(framed)
+    analysis = await ctx.calc(
+        "harness.analysis_summary",
+        {"messages": messages.ref, "drifts": drifts.ref, "basis": ctx.basis.record_ref()},
+    )
+    exceeding = await _data(ctx, analysis.ref, "/exceeding")
+    drift_status = VerdictStatus.PASS if not exceeding else VerdictStatus.NEEDS_ENGINEER
+    decided = await ctx.decide(
+        "edit_cycle_analysis_messages",
+        AnalysisAction,
+        AnalysisState(
+            has_errors=bool(await _data(ctx, analysis.ref, "/has_errors")),
+            has_unclassified=bool(await _data(ctx, analysis.ref, "/has_unclassified")),
+            drift_status=drift_status,
+            refs=(analysis.ref,),
+        ),
+        [edit_rules.analysis_messages_clean],
+        ANALYSIS_POLICY,
+    )
+    designs: list[tuple[str, Ref]] = []
+    if decided.choice is AnalysisAction.CONTINUE:  # step 14 design summaries after a continuing D-3
+        prior = dict(inp.previous_designs)
+        for kind, rows in zip(kinds, design_rows, strict=True):
+            verdicts = await ctx.calc(
+                "harness.host_design_verdicts",
+                {"results": rows.ref, "kind": kind, "basis": ctx.basis.record_ref()},
+            )
+            args: dict[str, Any] = {
+                "verdicts": verdicts.ref,
+                "frames": frames.frames,
+                "basis": ctx.basis.record_ref(),
+            }
+            if kind in prior:
+                args["previous"] = prior[kind]
+            summary = await ctx.calc("harness.design_summary", args)
+            designs.append((kind, summary.ref))
+    readback_status = VerdictStatus.PASS
+    if inp.readback is not None:
+        readback_status = VerdictStatus(await _data(ctx, inp.readback, "/status"))
+    analysis_status = VerdictStatus(await _data(ctx, analysis.ref, "/status"))
+    design_status = VerdictStatus.NOT_APPLICABLE
+    for _, ref in designs:
+        design_status = _worse(design_status, VerdictStatus(await _data(ctx, ref, "/status")))
+    refs = (analysis.ref, inp.diff, *(ref for _, ref in designs))
+    if inp.readback is not None:
+        refs = (inp.readback, *refs)
+    turn = await ctx.decide(  # step 15
+        "edit_cycle_engineer_turn",
+        TurnAction,
+        TurnState(
+            readback_status=readback_status,
+            analysis_status=analysis_status,
+            design_status=design_status,
+            counts=(
+                f"readback {readback_status}",
+                f"analysis {analysis_status}",
+                f"design {design_status}",
+            ),
+            refs=refs,
+        ),
+        (),
+        TURN_POLICY,
+    )
+    return SummarizeOutput(analysis=analysis.ref, designs=tuple(designs), turn=turn.choice)

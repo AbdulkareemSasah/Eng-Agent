@@ -1,0 +1,31 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_22_4_1_1.axial_flexure_uniaxial (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-8: SBC_CONFIRMED raises NotImplementedGap before any ACI axial-flexure step, so status is NEEDS_ENGINEER. Inputs are the ACI axial_flexure_uniaxial HC-1 set (clause spec §8).
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_22_4_1_1.axial_flexure_uniaxial
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: frame, id: C1}
+    inputs:
+      A_bar_mm2: 500
+      Mu_kNm: 300
+      Mu_other_kNm: 0
+      Pu_kN: 1500
+      b_mm: 500
+      d_prime_mm: 60
+      fc_MPa: 28
+      fy_MPa: 420
+      h_mm: 500
+      k_factor: 1
+      lu_mm: 3000
+      n_bars_b: 3
+      n_bars_h: 3
+      transverse_kind: tied
+    covers: [G-8, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null

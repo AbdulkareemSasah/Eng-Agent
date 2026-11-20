@@ -1,0 +1,26 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_22_4_2_1.max_axial_strength (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-7: SBC_CONFIRMED raises NotImplementedGap before any ACI max axial strength step, so status is NEEDS_ENGINEER. Inputs are the ACI max_axial_strength HC-1 set (clause spec §8).
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_22_4_2_1.max_axial_strength
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: frame, id: C1}
+    inputs:
+      Ast_mm2: 4000
+      Pu_kN: 3000
+      b_mm: 500
+      fc_MPa: 28
+      fy_MPa: 420
+      h_mm: 500
+      k_factor: 1
+      lu_mm: 3000
+      transverse_kind: tied
+    covers: [G-7, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null

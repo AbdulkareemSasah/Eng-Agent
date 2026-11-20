@@ -1,0 +1,31 @@
+# Case file of sbc304_2018.unconfirmed_aci_318_14_22_5_5_1.one_way_shear (plan 0003 T3; spec 0003 §9). Protected test oracle.
+# The pack evaluates no SBC equation: the single boundary case expects NEEDS_ENGINEER on the gap path
+# (core spec 4.9.4 (3)). Inputs are synthetic ACI HC-1 values, not project values. No worked example (G-WE).
+# Derivation (hand): Spec 0003 §4.3 and clause-map §3 G-2: SBC_CONFIRMED raises NotImplementedGap before any ACI one-way shear step, so status is NEEDS_ENGINEER. Inputs are the ACI one_way_shear HC-1 set (clause spec §8).
+format: structural-codes-verification/1
+check_id: sbc304_2018.unconfirmed_aci_318_14_22_5_5_1.one_way_shear
+program_comparison:
+  not_available: "returns NEEDS_ENGINEER until the SBC row is confirmed"
+cases:
+  - id: BD-1
+    kind: boundary
+    subject: {kind: footing, id: F1}
+    inputs:
+      FX_kN: 0
+      FY_kN: 0
+      FZ_kN: 1700
+      MX_kNm: 0
+      MY_kNm: 0
+      Lx_mm: 2500
+      Ly_mm: 2500
+      concrete_class: normalweight
+      cx_mm: 400
+      cy_mm: 400
+      d_x_mm: 500
+      d_y_mm: 500
+      fc_MPa: 28
+      reaction_height_mm: 0
+    covers: [G-2, SBC_CONFIRMED]
+    expected:
+      status: NEEDS_ENGINEER
+review: null
