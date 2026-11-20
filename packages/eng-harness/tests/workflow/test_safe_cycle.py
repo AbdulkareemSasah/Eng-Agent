@@ -32,6 +32,10 @@ def test_cycle_steps(tmp_path: Path) -> None:
             assert EventType.HOST_STARTED in [e.type for e in journal]
             assert EventType.MODEL_BOUND in [e.type for e in journal]
             assert EventType.MODEL_SAVED in [e.type for e in journal]
+            # Host port reads SAFE state after open (SafeStateReader); not the ETABS-shaped csi_read_model_state tool.
+            held = await ports.host_port.locate("m@copy")
+            assert held is not None
+            assert ports.host_port.last_read("m@copy") is not None
             checked = [
                 e.payload.model_key
                 for e in journal
