@@ -12,37 +12,39 @@ from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.revit._edits import prepare_and_send_write
 from eng_harness.servers import CallEffect
 
-from . import _revit_edit_helpers as H
+from . import _revit_edit_helpers as helpers
 
 
 def test_active_document_checked(tmp_path: Path) -> None:
     """AC13: after the working copy is bound, metadata path must equal the bound path or PRECONDITION_FAILED."""
     other = r"C:\models\other.rvt"
-    control = tmp_path / "control.json"
-    # Active document is another file; bound working copy is H.BOUND.
-    config = H.revit_config(
-        tmp_path,
-        control,
-        seed=H.seed_model(active_path=other, document_path=other),
+    host_args = {
+        "elementIds": [3001],
+        "parameterName": "b",
+        "value": "350.0",
+        "valueType": "double",
+    }
+
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
+    control_bad = bad_dir / "control.json"
+    config_bad = helpers.revit_config(
+        bad_dir,
+        control_bad,
+        seed=helpers.seed_model(active_path=other, document_path=other),
     )
 
-    async def body(manager) -> None:
-        ledger = WriteLedger(tmp_path / "run")
+    async def body_bad(manager) -> None:
+        ledger = WriteLedger(bad_dir / "run-ledger")
         writes: list[str] = []
 
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
             if effect is CallEffect.WRITE:
                 writes.append(tool)
-            return await H.call_dump(
+            return await helpers.call_dump(
                 manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
 
-        host_args = {
-            "elementIds": [3001],
-            "parameterName": "b",
-            "value": "350.0",
-            "valueType": "double",
-        }
         with pytest.raises(ContractError) as wrong:
             await prepare_and_send_write(
                 call,
@@ -50,7 +52,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
                 tool="revit_set_element_parameter_values",
                 host_args=host_args,
                 op_id="op-active-bad",
-                bound_path=H.BOUND,
+                bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
             )
@@ -59,33 +61,34 @@ def test_active_document_checked(tmp_path: Path) -> None:
         assert not writes
         assert not ledger.path.exists()
 
-        # When active path equals the bound document, the write proceeds.
-        control2 = tmp_path / "control-ok.json"
-        config_ok = H.revit_config(tmp_path / "ok", control2, seed=H.seed_model())
+    helpers.run_scenario(bad_dir, config_bad, body_bad)
 
-        async def body_ok(manager_ok) -> None:
-            ledger_ok = WriteLedger(tmp_path / "ok-run")
-            writes_ok: list[str] = []
+    ok_dir = tmp_path / "ok"
+    ok_dir.mkdir()
+    control_ok = ok_dir / "control.json"
+    config_ok = helpers.revit_config(ok_dir, control_ok, seed=helpers.seed_model())
 
-            async def call_ok(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
-                if effect is CallEffect.WRITE:
-                    writes_ok.append(tool)
-                return await H.call_dump(
-                    manager_ok, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
-                )
+    async def body_ok(manager) -> None:
+        ledger = WriteLedger(ok_dir / "run-ledger")
+        writes: list[str] = []
 
-            await prepare_and_send_write(
-                call_ok,
-                ledger_ok,
-                tool="revit_set_element_parameter_values",
-                host_args=host_args,
-                op_id="op-active-ok",
-                bound_path=H.BOUND,
-                references={3001: "col-3001"},
-                element_ids=[3001],
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            if effect is CallEffect.WRITE:
+                writes.append(tool)
+            return await helpers.call_dump(
+                manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
-            assert writes_ok == ["revit_set_element_parameter_values"]
 
-        H.run_scenario(tmp_path / "ok", config_ok, body_ok)
+        await prepare_and_send_write(
+            call,
+            ledger,
+            tool="revit_set_element_parameter_values",
+            host_args=host_args,
+            op_id="op-active-ok",
+            bound_path=helpers.BOUND,
+            references={3001: "col-3001"},
+            element_ids=[3001],
+        )
+        assert writes == ["revit_set_element_parameter_values"]
 
-    H.run_scenario(tmp_path, config, body)
+    helpers.run_scenario(ok_dir, config_ok, body_ok)

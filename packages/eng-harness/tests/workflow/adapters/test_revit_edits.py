@@ -19,7 +19,7 @@ from eng_harness.adapters.revit._edits import (
 )
 from eng_harness.servers import CallEffect
 
-from . import _revit_edit_helpers as H
+from . import _revit_edit_helpers as helpers
 
 
 @pytest.mark.parametrize(
@@ -35,7 +35,7 @@ from . import _revit_edit_helpers as H
 def test_edit_mapping(kind: str, tmp_path: Path) -> None:
     """AC14: host arguments equal the section 4.8 mapping; ledger append before send."""
     control = tmp_path / "control.json"
-    config = H.revit_config(tmp_path, control)
+    config = helpers.revit_config(tmp_path, control)
 
     async def body(manager) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -45,7 +45,7 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
             if effect is CallEffect.WRITE:
                 assert ledger.path.exists(), "ledger must be appended before the host send"
                 sent.append((tool, dict(arguments)))
-            return await H.call_dump(
+            return await helpers.call_dump(
                 manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
 
@@ -57,7 +57,7 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
                         {
                             "name": "b",
                             "storageType": "Double",
-                            "specId": H.LENGTH_SPEC,
+                            "specId": helpers.LENGTH_SPEC,
                             "isReadOnly": False,
                             "guid": "11111111-1111-1111-1111-111111111111",
                         }
@@ -66,14 +66,14 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
             },
             "types": {
                 2001: {
-                    "family": H.FAMILY,
+                    "family": helpers.FAMILY,
                     "name": "C300x300",
                     "instance_ids": [3001],
                     "parameters": [
                         {
                             "name": "b",
                             "storageType": "Double",
-                            "specId": H.LENGTH_SPEC,
+                            "specId": helpers.LENGTH_SPEC,
                             "isReadOnly": False,
                         }
                     ],
@@ -97,11 +97,12 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
                 tool="revit_duplicate_family_type",
                 host_args=args,
                 op_id="op-dup",
-                bound_path=H.BOUND,
+                bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=None,
             )
-            assert sent and sent[0][0] == "revit_duplicate_family_type"
+            assert sent
+            assert sent[0][0] == "revit_duplicate_family_type"
             payload = sent[0][1]
             assert "type_parameter_overrides" not in payload
             assert payload["source_type_id"] == "2001"
@@ -128,7 +129,7 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
                 tool="revit_set_type_parameter_values",
                 host_args=args,
                 op_id="op-type",
-                bound_path=H.BOUND,
+                bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=None,
             )
@@ -150,7 +151,7 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
                 tool="revit_change_element_type",
                 host_args=args,
                 op_id="op-chg",
-                bound_path=H.BOUND,
+                bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
             )
@@ -175,7 +176,7 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
                 tool="revit_set_element_parameter_values",
                 host_args=args,
                 op_id="op-inst",
-                bound_path=H.BOUND,
+                bound_path=helpers.BOUND,
                 references={3001: "col-3001"},
                 element_ids=[3001],
             )
@@ -203,13 +204,13 @@ def test_edit_mapping(kind: str, tmp_path: Path) -> None:
             tool="revit_set_parameter_value_by_guid",
             host_args=args,
             op_id="op-guid",
-            bound_path=H.BOUND,
+            bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=[3001],
         )
         assert sent[0][1]["unit"] == "mm"
 
-    H.run_scenario(tmp_path, config, body)
+    helpers.run_scenario(tmp_path, config, body)
 
 
 def test_batch_fits_dialog_summary() -> None:
@@ -229,13 +230,13 @@ def test_batch_fits_dialog_summary() -> None:
 
     # Grow until a single batch would exceed the limit, then split.
     ids: list[int] = []
-    while len(dialog_summary(make_args(ids + [len(ids) + 1]))) <= DIALOG_SUMMARY_LIMIT:
+    while len(dialog_summary(make_args([*ids, len(ids) + 1]))) <= DIALOG_SUMMARY_LIMIT:
         ids.append(len(ids) + 1)
         if len(ids) > 200:
             break
     assert len(ids) >= 1
     # Adding one more must overflow.
-    overflow = ids + [len(ids) + 1]
+    overflow = [*ids, len(ids) + 1]
     assert len(dialog_summary(make_args(overflow))) > DIALOG_SUMMARY_LIMIT
 
     batches = batch_ids_fitting_dialog(overflow, make_args)
@@ -246,7 +247,7 @@ def test_batch_fits_dialog_summary() -> None:
     assert [i for batch in batches for i in batch] == overflow
     # Each batch is maximal: merging the next id into a non-final batch would overflow.
     for index, batch in enumerate(batches[:-1]):
-        trial = batch + [batches[index + 1][0]]
+        trial = [*batch, batches[index + 1][0]]
         assert len(dialog_summary(make_args(trial))) > DIALOG_SUMMARY_LIMIT
 
 
@@ -260,7 +261,7 @@ def test_shared_type_refused(tmp_path: Path) -> None:
                 "element_id": eid,
                 "unique_id": uid,
                 "category": "OST_StructuralColumns",
-                "family": H.FAMILY,
+                "family": helpers.FAMILY,
                 "type_id": 2001,
                 "type_name": "C300x300",
                 "level_id": 100,
@@ -268,22 +269,22 @@ def test_shared_type_refused(tmp_path: Path) -> None:
                 "location_kind": "point",
                 "i": {"x": 0.0, "y": 0.0, "z": 0.0},
                 "j": None,
-                "parameters": [H.length_param("b", H.B_FT)],
+                "parameters": [helpers.length_param("b", helpers.B_FT)],
             }
         )
     types = [
         {
             "type_id": 2001,
-            "family": H.FAMILY,
+            "family": helpers.FAMILY,
             "name": "C300x300",
             "family_id": 1001,
             "category": "OST_StructuralColumns",
-            "parameters": [H.length_param("b", H.B_FT)],
+            "parameters": [helpers.length_param("b", helpers.B_FT)],
             "instance_ids": [3001, 3002],
         }
     ]
     control = tmp_path / "control.json"
-    config = H.revit_config(tmp_path, control, seed=H.seed_model(elements=elements, types=types))
+    config = helpers.revit_config(tmp_path, control, seed=helpers.seed_model(elements=elements, types=types))
 
     async def body(manager) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -292,12 +293,24 @@ def test_shared_type_refused(tmp_path: Path) -> None:
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
             if effect is CallEffect.WRITE:
                 writes.append(tool)
-            return await H.call_dump(
+            return await helpers.call_dump(
                 manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
 
         prior = {
-            "types": {2001: {"instance_ids": [3001, 3002], "parameters": [{"name": "b", "storageType": "Double", "specId": H.LENGTH_SPEC, "isReadOnly": False}]}},
+            "types": {
+                2001: {
+                    "instance_ids": [3001, 3002],
+                    "parameters": [
+                        {
+                            "name": "b",
+                            "storageType": "Double",
+                            "specId": helpers.LENGTH_SPEC,
+                            "isReadOnly": False,
+                        }
+                    ],
+                }
+            },
             "elements": {},
         }
         with pytest.raises(ContractError) as refused:
@@ -329,19 +342,19 @@ def test_shared_type_refused(tmp_path: Path) -> None:
             tool="revit_set_type_parameter_values",
             host_args=args,
             op_id="op-shared-ok",
-            bound_path=H.BOUND,
+            bound_path=helpers.BOUND,
             references={3001: "col-3001", 3002: "col-3002"},
             element_ids=None,
         )
         assert writes == ["revit_set_type_parameter_values"]
 
-    H.run_scenario(tmp_path, config, body)
+    helpers.run_scenario(tmp_path, config, body)
 
 
 def test_duplicate_no_overrides(tmp_path: Path) -> None:
     """AC16: duplicate_family_type carries no overrides; existing name is CONFLICT before the call."""
     control = tmp_path / "control.json"
-    config = H.revit_config(tmp_path, control)
+    config = helpers.revit_config(tmp_path, control)
 
     async def body(manager) -> None:
         ledger = WriteLedger(tmp_path / "run")
@@ -351,15 +364,15 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
             if effect is CallEffect.WRITE:
                 writes.append(tool)
                 assert "type_parameter_overrides" not in arguments
-            return await H.call_dump(
+            return await helpers.call_dump(
                 manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
             )
 
         prior = {
             "types": {
-                2001: {"family": H.FAMILY, "name": "C300x300", "instance_ids": [3001], "parameters": []},
+                2001: {"family": helpers.FAMILY, "name": "C300x300", "instance_ids": [3001], "parameters": []},
             },
-            "family_type_names": {H.FAMILY: {"C300x300"}},
+            "family_type_names": {helpers.FAMILY: {"C300x300"}},
             "elements": {},
         }
         with pytest.raises(ContractError) as exists:
@@ -399,7 +412,7 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
             tool="revit_duplicate_family_type",
             host_args=host,
             op_id="op-dup2",
-            bound_path=H.BOUND,
+            bound_path=helpers.BOUND,
             references={3001: "col-3001"},
             element_ids=None,
         )
@@ -408,14 +421,14 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
         body_json = reply
         assert body_json is not None
 
-    H.run_scenario(tmp_path, config, body)
+    helpers.run_scenario(tmp_path, config, body)
 
 
 def test_parameter_resolution() -> None:
     """AC17: name must match exactly one non-read-only parameter on each target of the prior read."""
     params_ok = [
-        {"name": "b", "storageType": "Double", "specId": H.LENGTH_SPEC, "isReadOnly": False},
-        {"name": "h", "storageType": "Double", "specId": H.LENGTH_SPEC, "isReadOnly": False},
+        {"name": "b", "storageType": "Double", "specId": helpers.LENGTH_SPEC, "isReadOnly": False},
+        {"name": "h", "storageType": "Double", "specId": helpers.LENGTH_SPEC, "isReadOnly": False},
     ]
     assert resolve_parameter_name("b", {3001: params_ok, 3002: params_ok}, side="instance") == "b"
 
@@ -424,13 +437,13 @@ def test_parameter_resolution() -> None:
     assert missing.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert missing.value.detail.field == "parameter"
 
-    dup = params_ok + [{"name": "b", "storageType": "Double", "specId": H.LENGTH_SPEC, "isReadOnly": False}]
+    dup = [*params_ok, {"name": "b", "storageType": "Double", "specId": helpers.LENGTH_SPEC, "isReadOnly": False}]
     with pytest.raises(ContractError) as several:
         resolve_parameter_name("b", {3001: dup}, side="instance")
     assert several.value.detail.code is ErrorCode.INVALID_ARGUMENT
     assert several.value.detail.field == "parameter"
 
-    read_only = [{"name": "b", "storageType": "Double", "specId": H.LENGTH_SPEC, "isReadOnly": True}]
+    read_only = [{"name": "b", "storageType": "Double", "specId": helpers.LENGTH_SPEC, "isReadOnly": True}]
     with pytest.raises(ContractError) as ro:
         resolve_parameter_name("b", {3001: read_only}, side="instance")
     assert ro.value.detail.code is ErrorCode.INVALID_ARGUMENT
