@@ -28,7 +28,7 @@ from eng_harness.adapters.idea import _gaps as gaps
 from eng_harness.adapters.idea._errors import IdeaErrorMapper
 from eng_harness.adapters.idea._session_ops import new_out_path, require_inside_run
 from eng_harness.adapters.idea._tools import build_native_set_loads_args
-from eng_harness.kinds.idea import IdeaLoadEffect, IdeaLoadSegment, IdeaLoads
+from eng_harness.kinds.idea import IdeaLoadEffect, IdeaLoads, IdeaLoadSegment
 from eng_harness.servers import CallEffect
 from eng_harness.servers._session import reply_body
 
@@ -493,7 +493,10 @@ def _find_segment(segments: list[Any], beam_segment_id: int, position_host: floa
     for segment in segments:
         if not isinstance(segment, dict):
             continue
-        if int(segment.get("beamSegmentId", -1)) == beam_segment_id and float(segment.get("position")) == position_host:
+        position = segment.get("position")
+        if not isinstance(position, (int, float)):
+            continue
+        if int(segment.get("beamSegmentId", -1)) == beam_segment_id and float(position) == position_host:
             return segment
     raise ContractError(
         ErrorCode.INVALID_ARGUMENT,
@@ -538,7 +541,17 @@ def _raise_host(result: Any, *, tool: str, effect: CallEffect, ids: Any | None) 
     detail = IdeaErrorMapper(mapper_ids).map(failure, effect=effect, tool=tool, op_id="")
     extra = {
         key: value
-        for key in ("field", "host_code", "host_method", "op_id", "incident_id", "hint", "precondition", "expected", "received")
+        for key in (
+            "field",
+            "host_code",
+            "host_method",
+            "op_id",
+            "incident_id",
+            "hint",
+            "precondition",
+            "expected",
+            "received",
+        )
         if (value := getattr(detail, key, None)) is not None
     }
     raise ContractError(detail.code, detail.message, retryable=detail.retryable, **extra)

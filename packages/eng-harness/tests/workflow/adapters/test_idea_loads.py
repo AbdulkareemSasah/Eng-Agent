@@ -76,24 +76,31 @@ def _store(tmp_path: Path) -> ResultStore:
     return ResultStore(workspace, HARNESS_KINDS, ids, clock)
 
 
-def _put_row(store: ResultStore, *, p_kN: float = 25.0) -> str:
-    payload = {
-        "sign_convention": "host_local/1",
-        "rows": [
-            {
-                "member": "B1",
-                "case": {"case": "DEAD", "case_type": "load_case"},
-                "end": "i",
-                "station_mm": 0.0,
-                "P_kN": p_kN,
-                "V2_kN": 0.0,
-                "V3_kN": 0.0,
-                "T_kNm": 0.0,
-                "M2_kNm": 0.0,
-                "M3_kNm": 0.0,
-            }
-        ],
-    }
+def _put_row(store: ResultStore, *, p_kn: float = 25.0) -> str:
+    from typing import cast
+
+    from pydantic import JsonValue
+
+    payload = cast(
+        dict[str, JsonValue],
+        {
+            "sign_convention": "host_local/1",
+            "rows": [
+                {
+                    "member": "B1",
+                    "case": {"case": "DEAD", "case_type": "load_case"},
+                    "end": "i",
+                    "station_mm": 0.0,
+                    "P_kN": p_kn,
+                    "V2_kN": 0.0,
+                    "V3_kN": 0.0,
+                    "T_kNm": 0.0,
+                    "M2_kNm": 0.0,
+                    "M3_kNm": 0.0,
+                }
+            ],
+        },
+    )
     prov = Provenance(
         tool="harness",
         tool_version="1",
@@ -105,10 +112,10 @@ def _put_row(store: ResultStore, *, p_kN: float = 25.0) -> str:
     return store.put("forces.member_end/1", payload, prov).result_id
 
 
-def _plan(store: ResultStore, path: Path, *, p_kN: float = 25.0) -> Any:
+def _plan(store: ResultStore, path: Path, *, p_kn: float = 25.0) -> Any:
     from eng_harness.adapters.idea import _loads as loads
 
-    rid = _put_row(store, p_kN=p_kN)
+    rid = _put_row(store, p_kn=p_kn)
     return loads.LoadPlan.model_validate(
         {
             "path": str(path),
@@ -227,8 +234,12 @@ def test_readback_mismatch_detected() -> None:
             "forcesPercentageOnSegments": [],
         }
     ]
-    got = copy.deepcopy(requested)
-    got[0]["forcesOnSegments"][0]["n"] = 25001.0
+    got: list[dict[str, Any]] = copy.deepcopy(requested)
+    segments = got[0]["forcesOnSegments"]
+    assert isinstance(segments, list)
+    first = segments[0]
+    assert isinstance(first, dict)
+    first["n"] = 25001.0
     issues = checks.compare_loads_readback(
         requested=requested,
         got=got,
@@ -247,7 +258,6 @@ def test_zero_effect_dropped_warning(tmp_path: Path) -> None:
     config = _idea_config(tmp_path, control)
     original = make_ideacon(tmp_path / "joint.ideaCon")
     run_dir = tmp_path / "run"
-    store = _store(tmp_path)
 
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
@@ -335,7 +345,7 @@ def test_all_zero_loads_host_error(tmp_path: Path) -> None:
                     sessions=manager,
                     server="idea",
                     role="main",
-                    plan=_plan(store, path, p_kN=0.0),
+                    plan=_plan(store, path, p_kn=0.0),
                     load_map=loads.load_map_file(_SYNTHETIC_MAP),
                     source=store,
                     current_revision=lambda _: 1,

@@ -124,9 +124,7 @@ def compare_loads_readback(
                             severity=Severity.ERROR,
                             code="READBACK_MISMATCH",
                             subject=subject,
-                            message=(
-                                f"effect {name!r} segment {key} field {force} reads {actual}, requested {wanted}"
-                            ),
+                            message=(f"effect {name!r} segment {key} field {force} reads {actual}, requested {wanted}"),
                         )
                     )
     return issues

@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import copy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from eng_contract.envelope import HostInfo, Provenance
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.store import ResultStore
+from pydantic import JsonValue
 
 from eng_harness.errors import NotImplementedGap
 
@@ -30,9 +31,7 @@ _CSI_FIELDS = ("P_kN", "V2_kN", "V3_kN", "T_kNm", "M2_kNm", "M3_kNm")
 
 def _provenance(revision: int | None = 1) -> Provenance:
     host = (
-        None
-        if revision is None
-        else HostInfo(program="ETABS", version="22", model_id=_MODEL, model_revision=revision)
+        None if revision is None else HostInfo(program="ETABS", version="22", model_id=_MODEL, model_revision=revision)
     )
     return Provenance(
         tool="harness",
@@ -45,7 +44,7 @@ def _provenance(revision: int | None = 1) -> Provenance:
 
 
 def _put_member_end(store: ResultStore, row: dict[str, Any], *, revision: int = 1) -> str:
-    payload = {"sign_convention": "host_local/1", "rows": [row]}
+    payload = cast(dict[str, JsonValue], {"sign_convention": "host_local/1", "rows": [row]})
     return store.put("forces.member_end/1", payload, _provenance(revision)).result_id
 
 
@@ -119,7 +118,7 @@ def _plan(
     row_override: dict[str, Any] | None = None,
     revision: int = 1,
     member_map: dict[str, list[dict[str, Any]]] | None = None,
-) -> dict[str, Any]:
+) -> Any:
     from eng_harness.adapters.idea import _loads as loads
 
     row = row_override or _row(member=member, end=end)
@@ -180,10 +179,7 @@ def test_refs_resolved_converted(store: ResultStore) -> None:
         current_revision=lambda _: 1,
     )
     seg = next(
-        s
-        for effect in built
-        for s in effect["forcesOnSegments"]
-        if s["beamSegmentId"] == 1 and s["position"] == 0.0
+        s for effect in built for s in effect["forcesOnSegments"] if s["beamSegmentId"] == 1 and s["position"] == 0.0
     )
     # 10 kN → 10000 N; 1 kN → 1000 N; -2 kN → -2000 N; 0.5 kN.m → 500 N.m; etc. (contract §4.7 exact factors)
     assert seg["n"] == 10000.0
@@ -195,7 +191,8 @@ def test_refs_resolved_converted(store: ResultStore) -> None:
     assert provenance
     for value in provenance.values():
         text = str(value)
-        assert "10.0" not in text and "10000" not in text
+        assert "10.0" not in text
+        assert "10000" not in text
         assert "ref" in text.lower() or "$ref" in text or "res_" in text
 
 
@@ -263,21 +260,24 @@ def test_wrong_kind_refused(store: ResultStore) -> None:
 
     other = store.put(
         "forces.joint_reactions/1",
-        {
-            "axes": "global",
-            "rows": [
-                {
-                    "joint": "J1",
-                    "case": {"case": "DEAD", "case_type": "load_case"},
-                    "FX_kN": 1.0,
-                    "FY_kN": 0.0,
-                    "FZ_kN": 0.0,
-                    "MX_kNm": 0.0,
-                    "MY_kNm": 0.0,
-                    "MZ_kNm": 0.0,
-                }
-            ],
-        },
+        cast(
+            dict[str, JsonValue],
+            {
+                "axes": "global",
+                "rows": [
+                    {
+                        "joint": "J1",
+                        "case": {"case": "DEAD", "case_type": "load_case"},
+                        "FX_kN": 1.0,
+                        "FY_kN": 0.0,
+                        "FZ_kN": 0.0,
+                        "MX_kNm": 0.0,
+                        "MY_kNm": 0.0,
+                        "MZ_kNm": 0.0,
+                    }
+                ],
+            },
+        ),
         _provenance(1),
     ).result_id
     plan = loads.LoadPlan.model_validate(

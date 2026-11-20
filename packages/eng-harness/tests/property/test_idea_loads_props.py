@@ -6,13 +6,14 @@ import copy
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from eng_contract.envelope import HostInfo, Provenance
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.store import LocationClass, ResultStore, Workspace
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from pydantic import JsonValue
 
 _FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "idea"
 _SYNTHETIC_MAP = _FIXTURES / "load_map_synthetic.toml"
@@ -33,23 +34,26 @@ def _store() -> ResultStore:
 
 
 def _put_row(store: ResultStore, values: dict[str, float]) -> str:
-    payload = {
-        "sign_convention": "host_local/1",
-        "rows": [
-            {
-                "member": "B1",
-                "case": {"case": "DEAD", "case_type": "load_case"},
-                "end": "i",
-                "station_mm": 0.0,
-                "P_kN": values["n"],
-                "V2_kN": values["qy"],
-                "V3_kN": values["qz"],
-                "T_kNm": values["mx"],
-                "M2_kNm": values["my"],
-                "M3_kNm": values["mz"],
-            }
-        ],
-    }
+    payload = cast(
+        dict[str, JsonValue],
+        {
+            "sign_convention": "host_local/1",
+            "rows": [
+                {
+                    "member": "B1",
+                    "case": {"case": "DEAD", "case_type": "load_case"},
+                    "end": "i",
+                    "station_mm": 0.0,
+                    "P_kN": values["n"],
+                    "V2_kN": values["qy"],
+                    "V3_kN": values["qz"],
+                    "T_kNm": values["mx"],
+                    "M2_kNm": values["my"],
+                    "M3_kNm": values["mz"],
+                }
+            ],
+        },
+    )
     prov = Provenance(
         tool="harness",
         tool_version="1",
@@ -71,9 +75,7 @@ def _put_row(store: ResultStore, values: dict[str, float]) -> str:
     mz=_finite,
     other_n=_finite,
 )
-def test_structure_preserved(
-    n: float, qy: float, qz: float, mx: float, my: float, mz: float, other_n: float
-) -> None:
+def test_structure_preserved(n: float, qy: float, qz: float, mx: float, my: float, mz: float, other_n: float) -> None:
     """AC9: non-force fields and unmapped segments are byte-equal to the read loading after the build."""
     from eng_harness.adapters.idea import _loads as loads
 
