@@ -358,21 +358,10 @@ def test_setter_not_applied_and_unknown() -> None:
     anyio.run(body)
 
 
-def test_observe_returns_none_for_unknown_tool() -> None:
+def test_observe_open_model_non_str_path() -> None:
     async def body() -> None:
         reconciler = RevitReconciler(tolerance_ratio=0.001, bound_path=BOUND)
 
-        async def read(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
-            raise AssertionError(tool)
-
-        # Descriptor still loads; decide path would be unknown, observe has no rule.
-        lost = _lost(
-            "revit_set_element_parameter_values",
-            SetElementParameterValuesArgs(element_ids=[1], parameter_name="b", value="1", value_type="double"),
-        )
-
-        # Force an unrecognized name via a shallow copy of the descriptor is not allowed;
-        # open_model observe with non-str path covers the None branch of path typing.
         async def meta_bad(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
             return {"path": 12}
 
