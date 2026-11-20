@@ -372,3 +372,70 @@ def test_record_mode_drops_project_information_reads(tmp_path: Path) -> None:
     [only] = _files(out)
     assert only.name == "001-csi_db_table_read.json"
     assert json.loads(only.read_text(encoding="utf-8"))["request"]["arguments"] == {"table": "Story Definitions"}
+
+
+def test_revit_sanitized(tmp_path: Path) -> None:
+    """AC31: titles, paths and user names are replaced (spec 0011 section 4.13 / AC31)."""
+    run, out = tmp_path / "run", tmp_path / "recordings" / "sasaah-revit-mcp-build1"
+    run.mkdir()
+    tool_names = ("revit_open_model", "revit_get_model_metadata", "revit_connection_status")
+    tools: list[dict[str, Any]] = [{"name": n, "inputSchema": SCHEMA} for n in tool_names]
+    recording = Recording(
+        out,
+        run,
+        adapter="sasaah-revit-mcp",
+        build="0123456789ab+fedcba987654",
+        tool_names=frozenset(tool_names),
+        user="jdoe",
+        home=HOME,
+    )
+    house = f"{HOME}/Clients/Acme Tower/Tower-A.rvt"
+    title = "Acme Tower Project"
+    recording.add("tools/list", None, result={"tools": tools})
+    recording.add(
+        "tools/call",
+        {"name": "revit_open_model", "arguments": {"path": house, "activate": True}},
+        result=_text({"opened": True, "path": house}),
+    )
+    recording.add(
+        "tools/call",
+        {"name": "revit_get_model_metadata", "arguments": {}},
+        result=_text(
+            {
+                "title": title,
+                "path": house,
+                "message": f"Document {title} opened by jdoe",
+            }
+        ),
+    )
+    assert recording.finish() == out / "manifest.json"
+    names = [p.name for p in _files(out)]
+    assert names == [
+        "001-tools-list.json",
+        "002-revit_open_model.json",
+        "003-revit_get_model_metadata.json",
+    ]
+    for path in _files(out):
+        text = path.read_text(encoding="utf-8")
+        for leak in ("jdoe", "Acme", "Tower", "Clients", "Project", str(tmp_path)):
+            assert leak not in text, (path.name, leak)
+    opened = json.loads((out / names[1]).read_text(encoding="utf-8"))
+    assert opened["request"] == {
+        "name": "revit_open_model",
+        "arguments": {"path": "<path>/<model-1>.rvt", "activate": True},
+    }
+    meta = _body(out / names[2])
+    assert meta["title"] == "<title-1>"
+    assert meta["path"] == "<path>/<model-1>.rvt"
+    assert meta["message"] == "Document <title-1> opened by <user>"
+    assert verify_manifest(out) == []
+
+
+def test_revit_title_matches_model_stem() -> None:
+    """When the title equals a model stem already seen, the model placeholder is reused (AC31)."""
+    sanitizer = _sanitizer()
+    assert sanitizer.text("/models/Tower-A.rvt") == "<path>/<model-1>.rvt"
+    assert sanitizer.value({"title": "Tower-A", "path": "/models/Tower-A.rvt"}) == {
+        "title": "<model-1>",
+        "path": "<path>/<model-1>.rvt",
+    }
