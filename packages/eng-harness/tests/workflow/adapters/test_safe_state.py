@@ -97,9 +97,10 @@ def _seed(*, points: int = 1, joint_loads: int = 1) -> dict[str, Any]:
             ],
             "Material Properties - General": [{"Material": "C30", "Type": "Concrete"}],
             "Material Properties - Basic Mechanical Properties": [
-                {"Material": "C30", "UnitWeight": 24.0, "E1": 25000.0, "U12": 0.2}
+                # Present stress under kN_m_C is kN/m2 (T4 / spec 0008 section 4.5): 30e3 → 30 MPa.
+                {"Material": "C30", "UnitWeight": 24.0, "E1": 30_000.0, "U12": 0.2}
             ],
-            "Material Properties - Concrete Data": [{"Material": "C30", "Fc": 30.0}],
+            "Material Properties - Concrete Data": [{"Material": "C30", "Fc": 30_000.0}],
             "Load Pattern Definitions": [{"Name": "DEAD", "Type": "Dead", "SelfWtMultpl": 1.0}],
             "Load Combination Definitions": [{"Name": "C1", "Type": "Linear Add"}],
             JOINT_LOADS: [
@@ -184,7 +185,7 @@ async def _write(manager: ServerManager, pid: int, tool: str, **arguments: Any) 
 def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
     """AC9: SAFE kinds and status validate; one state has one fingerprint; each section 4.4 edit changes it."""
     from eng_harness.adapters.csi._replies import CSI_KINDS
-    from eng_harness.adapters.csi.products._safe_state import SafeStateReader  # noqa: F401
+    from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 
     assert "harness.model_points/1" in HARNESS_KINDS
     assert "harness.joint_loads/1" in HARNESS_KINDS
@@ -193,6 +194,7 @@ def test_kinds_and_fingerprint(tmp_path: Path, make_config: ConfigFactory, contr
 
     async def body() -> None:
         port, manager = _port(tmp_path, make_config(), control, clock, SeededIdSource(b"safe-state", clock))
+        assert isinstance(port._reader, SafeStateReader)
         async with manager:
             key = await port.working_copy("m", tmp_path / "run" / "copies")
             held = await port.locate(key)
@@ -273,13 +275,14 @@ def test_truncated_raises(
     tmp_path: Path, make_config: ConfigFactory, control: Path, seed: dict[str, int], where: str
 ) -> None:
     """AC10: a list or table cut at 2000 rows raises LIMIT_EXCEEDED with the count; no partial payload."""
-    from eng_harness.adapters.csi.products._safe_state import SafeStateReader  # noqa: F401
+    from eng_harness.adapters.csi.products._safe_state import SafeStateReader
 
     _seeded(control, **seed)
     clock = FixedClock(_START)
 
     async def body() -> None:
         port, manager = _port(tmp_path, make_config(), control, clock, SeededIdSource(b"safe-trunc", clock))
+        assert isinstance(port._reader, SafeStateReader)
         async with manager:
             key = await port.working_copy("m", tmp_path / "run" / "copies")
             held = await port.locate(key)

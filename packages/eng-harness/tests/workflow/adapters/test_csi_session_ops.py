@@ -275,13 +275,22 @@ def test_restore_after_timeout(
     anyio.run(body)
 
 
-def test_save_records_the_state_fingerprint(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
-    """`save` keeps the saved state's fingerprint, so the engine's resume check sees no `model_differs` (B-451 L3)."""
+@pytest.mark.parametrize(("product", "exe_name", "ext", "server"), PRODUCTS)
+def test_save_records_the_state_fingerprint(
+    tmp_path: Path, make_config: ConfigFactory, control: Path, product: str, exe_name: str, ext: str, server: str
+) -> None:
+    """`save` keeps the saved state's fingerprint, so the engine's resume check sees no `model_differs` (B-451 L3).
+
+    Parametrized over SAFE once its profile.tables are filled (plan 0008 T5 / L-B212-1).
+    """
     clock = FixedClock(_START)
     ids = SeededIdSource(b"fingerprint", clock)
 
     async def body() -> None:
-        port, manager, _inspector, states, _original = await _open(tmp_path, make_config(), control, clock, ids)
+        cfg = _product_config(make_config, product, server, control)
+        port, manager, _inspector, states, _original = await _open(
+            tmp_path, cfg, control, clock, ids, product=product, exe_name=exe_name, ext=ext, server=server
+        )
         async with manager:
             key = await port.working_copy("m", tmp_path / "run" / "copies")
             saved = await port.save(key, "pre_analysis")

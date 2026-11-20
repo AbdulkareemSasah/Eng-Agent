@@ -71,6 +71,60 @@ class SafeSoilSupports(BaseModel):
     assignments: list[SafeSoilAssignment]
 
 
+class ModelPoint(BaseModel):
+    """One point of `harness.model_points/1` (spec 0008 section 4.4)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    name: Name
+    x_mm: Annotated[float, Field(allow_inf_nan=False)]
+    y_mm: Annotated[float, Field(allow_inf_nan=False)]
+    z_mm: Annotated[float, Field(allow_inf_nan=False)]
+
+
+class ModelPoints(BaseModel):
+    """`harness.model_points/1` from `csi_list_points` (spec 0008 section 4.4, AC9)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    points: list[ModelPoint]
+
+
+class JointLoad(BaseModel):
+    """One row of `harness.joint_loads/1` (spec 0008 section 4.3).
+
+    Wire names `FX_kN`..`MZ_kNm` and `punch_*_mm` are fixed by the spec; Python attributes stay snake_case.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        allow_inf_nan=False,
+        serialize_by_alias=True,
+        validate_by_name=True,
+    )
+
+    joint: Name
+    pattern: Name
+    fx_kn: Annotated[float, Field(allow_inf_nan=False, alias="FX_kN")]
+    fy_kn: Annotated[float, Field(allow_inf_nan=False, alias="FY_kN")]
+    fz_kn: Annotated[float, Field(allow_inf_nan=False, alias="FZ_kN")]
+    mx_knm: Annotated[float, Field(allow_inf_nan=False, alias="MX_kNm")]
+    my_knm: Annotated[float, Field(allow_inf_nan=False, alias="MY_kNm")]
+    mz_knm: Annotated[float, Field(allow_inf_nan=False, alias="MZ_kNm")]
+    punch_x_mm: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
+    punch_y_mm: Annotated[float, Field(gt=0, allow_inf_nan=False)] | None = None
+
+
+class JointLoads(BaseModel):
+    """`harness.joint_loads/1` (spec 0008 section 4.3, 4.4; AC9)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+    axes: Annotated[str, Field(pattern=r"^global$")] = "global"
+    loads: list[JointLoad]
+
+
 HARNESS_KINDS = NEUTRAL_KINDS.extend(
     {
         "harness.journal_blob/1": Value,
@@ -79,6 +133,8 @@ HARNESS_KINDS = NEUTRAL_KINDS.extend(
         "harness.approval_preview/1": ApprovalPreview,
         "harness.file_input/1": FileSource,  # an engineer-provided file, hashed (spec 0002 section 4.7)
         "harness.safe_soil_supports/1": SafeSoilSupports,  # plan 0008 T4; spec 0008 section 4.4, AC12
+        "harness.model_points/1": ModelPoints,  # plan 0008 T5; spec 0008 section 4.4, AC9
+        "harness.joint_loads/1": JointLoads,  # plan 0008 T5; spec 0008 section 4.3, 4.4, AC9
     }
 ).extend(CALC_KINDS | FOOTING_KINDS | EDIT_CYCLE_KINDS | CSI_KINDS | COLUMN_DESIGN_KINDS)
 """The neutral, harness, calc (0003 4.6 to 4.11), footing (0010 4.2), edit-cycle, CSI (0002 4.6) and column kinds."""
