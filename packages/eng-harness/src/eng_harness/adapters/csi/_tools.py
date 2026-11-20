@@ -43,6 +43,7 @@ from eng_harness.adapters.csi._revisions import CsiToolInfo, OpenRevisionArgs, R
 from eng_harness.adapters.csi.products import _safe_loads as _safe_loads
 from eng_harness.adapters.csi.products import _safe_results as _safe_results
 from eng_harness.adapters.csi.products import _sap2000_edits as _sap2000_edits
+from eng_harness.adapters.csi.products import _sap2000_results as _sap2000_results
 from eng_harness.errors import ToolFailed
 from eng_harness.ports import ToolInfo
 from eng_harness.servers import CallEffect
@@ -58,8 +59,15 @@ _BASE_TOKENS = {  # spec 4.6.2 and 4.6.3
     "csi_results_story_drifts": "kN_m_C",
 }
 # SAFE point-load token (spec 0008 AC14), SAFE base-reaction token (spec 0008 section 4.6, AC23),
-# SAP2000 add-frame/area token (spec 0012 section 5, AC11).
-TOKENS = {**_BASE_TOKENS, **_safe_loads.TOKENS, **_safe_results.TOKENS, **_sap2000_edits.TOKENS}
+# SAP2000 add-frame/area token (spec 0012 section 5, AC11), and SAP2000 force tokens
+# (spec 0012 AC15; plan 0012 T5/T6 merge pattern of B-588).
+TOKENS = {
+    **_BASE_TOKENS,
+    **_safe_loads.TOKENS,
+    **_safe_results.TOKENS,
+    **_sap2000_edits.TOKENS,
+    **_sap2000_results.TOKENS,
+}
 
 
 def edit_builders() -> dict[str, Builder]:
@@ -238,6 +246,8 @@ class CsiToolPort(AdapterToolPort):
         builders["csi_save_model"] = (
             lambda model, descriptor, binding: {}
         )  # the open file in place; no `as_new_revision`
+        # SAP2000 design builders refuse aluminum/coldformed and concrete non-beam before any call (AC16).
+        builders.update(_sap2000_results.BUILDERS)
         super().__init__(
             allowlist=tool_allowlist(), arg_models=edit_models() | ANALYSIS_MODELS, builders=builders, readers=READERS,
             binder=_TokenBinder(binder), **wiring,
