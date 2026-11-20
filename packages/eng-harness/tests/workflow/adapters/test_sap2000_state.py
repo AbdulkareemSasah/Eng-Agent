@@ -249,7 +249,9 @@ def test_other_unsupported_raises(tmp_path: Path, make_config: ConfigFactory, co
                     "csi_list_points is not supported by this version",
                     retryable=False,
                 )
-            return await real(tool, arguments, effect)
+            body = await real(tool, arguments, effect)
+            assert isinstance(body, dict)
+            return body
 
         port._reader = Sap2000StateReader(product="SAP2000", call=call)
         async with manager:

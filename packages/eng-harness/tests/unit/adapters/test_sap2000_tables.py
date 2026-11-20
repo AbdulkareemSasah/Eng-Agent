@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from eng_harness.adapters.csi._tables import load_field_map, map_rows
+from eng_harness.adapters.csi._tables import FieldMap, load_field_map, map_rows
 from eng_harness.errors import HarnessCode, NotImplementedGap
 
 
-def _sap2000_map():
+def _sap2000_map() -> FieldMap:
     from importlib.resources import files
 
     text = files("eng_harness.adapters.csi.products").joinpath("_sap2000_tables.toml").read_text(encoding="utf-8")

@@ -150,9 +150,7 @@ class Sap2000StateReader:
             # The kinds are produced empty until a recording (L4) keys the tables (spec 0012 section 4.4).
             payloads: dict[str, BaseModel] = {
                 "model.frame_placements/1": frames(rows["frames"], READ_UNITS),
-                "model.area_placements/1": areas(
-                    rows["areas"], READ_UNITS, area_section_kinds(rows["area_sections"])
-                ),
+                "model.area_placements/1": areas(rows["areas"], READ_UNITS, area_section_kinds(rows["area_sections"])),
                 "harness.model_points/1": points_from_items(rows["points"], READ_UNITS),
                 "model.sections/1": Sections(frame_sections=[], area_sections=[]),
                 "model.materials/1": Materials(materials=[]),
