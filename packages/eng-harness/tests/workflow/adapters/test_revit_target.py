@@ -63,9 +63,7 @@ def _revit_config(tmp_path: Path, control: Path, *, pipe_name: str = _PIPE) -> S
     allowlist = revit_allowlist(role="write")
     wrapper = tmp_path / "sasaah-revit-mcp"
     wrapper.write_text(
-        "#!/bin/sh\n"
-        f'export SASAAH_REVIT_FAKE_CONTROL="{control}"\n'
-        f'exec "{sys.executable}" "{_FAKE}" "$@"\n',
+        f'#!/bin/sh\nexport SASAAH_REVIT_FAKE_CONTROL="{control}"\nexec "{sys.executable}" "{_FAKE}" "$@"\n',
         encoding="utf-8",
     )
     wrapper.chmod(0o755)
@@ -131,17 +129,13 @@ def test_pipe_pinned(tmp_path: Path, launcher: RecordingLauncher) -> None:
         argv = launcher.specs[0].argv
         assert "--pipe-name" in argv
         assert argv[argv.index("--pipe-name") + 1] == _PIPE
-        target = _text(
-            await manager.call("revit", "read", "revit_get_current_target", {}, CallEffect.READ)
-        )
+        target = _text(await manager.call("revit", "read", "revit_get_current_target", {}, CallEffect.READ))
         assert target["pipe_name"] == _PIPE
         listed = await manager.list_tools("revit", "read")
         names = {tool.name for tool in listed}
         assert "revit_switch_target" not in names
         assert "revit_switch_target" not in revit_allowlist().tool_names
-        available = _text(
-            await manager.call("revit", "read", "revit_list_available_targets", {}, CallEffect.READ)
-        )
+        available = _text(await manager.call("revit", "read", "revit_list_available_targets", {}, CallEffect.READ))
         pipes = {row["pipe_name"] for row in available["targets"]}
         assert pipes == {_PIPE, _OTHER}
         assert target["pipe_name"] == _PIPE

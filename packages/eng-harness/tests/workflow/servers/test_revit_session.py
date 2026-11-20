@@ -80,9 +80,7 @@ def _revit_config(
     allowlist = revit_allowlist(role="write")
     wrapper = tmp_path / "sasaah-revit-mcp"
     wrapper.write_text(
-        "#!/bin/sh\n"
-        f'export SASAAH_REVIT_FAKE_CONTROL="{control}"\n'
-        f'exec "{sys.executable}" "{_FAKE}" "$@"\n',
+        f'#!/bin/sh\nexport SASAAH_REVIT_FAKE_CONTROL="{control}"\nexec "{sys.executable}" "{_FAKE}" "$@"\n',
         encoding="utf-8",
     )
     wrapper.chmod(0o755)
