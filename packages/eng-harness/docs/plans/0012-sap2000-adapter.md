@@ -81,12 +81,21 @@ tasks:
     depends_on: [T1, T2]
   - id: T4
     title: Table data (all unknown), model-state reader with declared absences, fingerprint
+    # Amendment (B-590, documents only): production AdapterHostPort and reconciliation pick CsiStateReader for every
+    # CSI product, so SAP2000 would call stories and grids it does not have; the B-248 writer measured that wiring
+    # Sap2000StateReader without a product-name branch (spec 0008 AC2) needs products/__init__.py
+    # (ProductProfile.declared_absences from _sap2000.DECLARED_ABSENCES), adapters/_hostport.py (select the
+    # absences-aware reader when profile.declared_absences is non-empty; record the fingerprint on save when absences
+    # or tables are set), and adapters/csi/_reconcile.py (same reader selection) — not previously in T4's files.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_tables.toml"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000_state.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_sap2000.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py"  # T4 may only add ProductProfile.declared_absences (wired from _sap2000.DECLARED_ABSENCES) and select the state reader from the profile (no product-name branch) (amendment B-590)
+      - "packages/eng-harness/src/eng_harness/adapters/_hostport.py"  # T4 may only select the absences-aware state reader from profile.declared_absences and record the fingerprint on save when absences or tables are set (no product-name branch) (amendment B-590)
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_reconcile.py"  # T4 may only select the absences-aware state reader from profile.declared_absences (no product-name branch) (amendment B-590)
       - "packages/eng-harness/tests/unit/adapters/test_sap2000_tables.py"
       - "packages/eng-harness/tests/workflow/adapters/test_sap2000_state.py"
       - "packages/eng-harness/tests/property/test_fingerprint.py"
@@ -194,6 +203,8 @@ so shared `_gaps.py` asks `profile(product).step_gaps` (spec 0008 AC2; amendment
 
 **T4 State** (AC7 to AC10). `_sap2000_tables.toml` with every entry `unknown`, the state reader with declared absences
 (`LEVELS_NOT_AVAILABLE`, `GRID_NOT_AVAILABLE`), truncation, the fingerprint over the profile's kinds.
+T4 may wire only `ProductProfile.declared_absences` and select the absences-aware state reader from the profile in
+`_hostport.py` and `_reconcile.py` (spec 0008 AC2; amendment B-590).
 
 **T5 Edits** (AC11 to AC13). Add frame with the name from the reply, assign section, area, patterns and combinations with
 typed read-back, the table-read-back edits as gap SP-4, reconcile by geometry.
