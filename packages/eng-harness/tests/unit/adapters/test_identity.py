@@ -78,3 +78,52 @@ def test_resolution_rules(tmp_path: Path) -> None:
         assert "original" not in text
         assert str(copy) not in text
         assert str(third) not in text
+
+
+def test_revit_resolution(tmp_path: Path) -> None:
+    """AC25 / ADR-0032: a `.rvt` resolves like any model; engineer-save hash keeps revision; no path stored."""
+    from eng_harness.adapters._identity import IdentityStore
+
+    clock = FixedClock(1_700_000_000_000)
+    workspace = Workspace(root=tmp_path, classification=LocationClass.LOCAL)
+    states = ModelStateStore(workspace, clock)
+    store = IdentityStore(workspace=workspace, states=states, ids=SeededIdSource(b"revit-identity", clock))
+    original = tmp_path / "tower.rvt"
+    original.write_bytes(b"rvt-v1")
+
+    first = store.resolve(original)
+    assert first.revision == 0
+    assert first.derived_from is None
+    assert first.warnings == ()
+    assert store.resolve(original).model_id == first.model_id
+
+    copy = tmp_path / "copies" / "tower.rvt"
+    copy.parent.mkdir()
+    copy.write_bytes(original.read_bytes())
+    derived = store.resolve(copy)
+    assert derived.model_id != first.model_id
+    assert derived.derived_from == first.model_id
+    assert derived.revision == 0
+
+    copy.write_bytes(b"rvt-v2-engineer-save")
+    same = store.register_hash(derived.model_id, copy, fingerprint="fp1", previous_fingerprint="fp1")
+    assert same.model_id == derived.model_id
+    assert same.revision == 0
+    assert same.warnings == ()
+    assert store.resolve(copy).revision == 0
+
+    copy.write_bytes(b"rvt-v3-hand-edit")
+    outside = store.register_hash(derived.model_id, copy, fingerprint="fp2", previous_fingerprint="fp1")
+    assert outside.model_id == derived.model_id
+    assert outside.revision == 1
+    assert outside.warnings == (WarningCode.MODEL_CHANGED_OUTSIDE,)
+
+    root = tmp_path / ".eng" / "state" / "model-files"
+    for path in (root / "by-path").glob("*.json"):
+        text = path.read_text()
+        assert set(json.loads(text)) == {"model_id", "last_file_sha256"}
+        assert "/" not in text
+        assert "\\" not in text
+        assert "tower" not in text
+        assert str(original) not in text
+        assert str(copy) not in text
