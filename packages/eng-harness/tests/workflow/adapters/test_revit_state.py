@@ -424,3 +424,154 @@ def test_neutral_kinds_complete_rows_only(tmp_path: Path) -> None:
         assert Quantity.model_validate(b_param).value == pytest.approx(_B_MM)
 
     _run(tmp_path, config, body)
+
+
+def test_truncation_by_level_recovers(tmp_path: Path) -> None:
+    """AC9: when truncation splits across levels, the per-level re-read succeeds."""
+    control = tmp_path / "control.json"
+    per_level = (LIST_CAP // 2) + 1  # two levels → unfiltered list exceeds LIST_CAP; each level fits
+    seed = _seed_complete()
+    level1 = [_complete_column(element_id=10_000 + n, level_id=100, unique_id=f"col-l1-{n}") for n in range(per_level)]
+    level2 = [_complete_column(element_id=20_000 + n, level_id=101, unique_id=f"col-l2-{n}") for n in range(per_level)]
+    seed["elements"] = level1 + level2
+    seed["types"] = [
+        {
+            "type_id": 2001,
+            "family": _FAMILY,
+            "name": "C300x300",
+            "family_id": 1001,
+            "category": "OST_StructuralColumns",
+            "parameters": [_length_param("b", _B_FT), _length_param("h", _H_FT)],
+            "instance_ids": [row["element_id"] for row in seed["elements"]],
+        }
+    ]
+    config = _revit_config(tmp_path, control, seed=seed)
+
+    async def body(manager: ServerManager) -> None:
+        reader = _reader(manager, config)
+        read = await reader.read(bound_path=_BOUND)
+        structure = read.payloads["harness.revit_structure/1"].model_dump(mode="json")
+        ids = {row["element_id"] for row in structure["elements"]}
+        assert {10_000, 20_000}.issubset(ids)
+        assert len(ids) >= 2 * per_level
+
+    _run(tmp_path, config, body)
+
+
+def test_hostport_locate_model_state_read_units(tmp_path: Path) -> None:
+    """Spec 0011 §4.12: AdapterHostPort with injected document capabilities (no product-name branch)."""
+    import os
+
+    from eng_contract.ids import FixedClock, SeededIdSource, Timestamp
+    from eng_contract.store import LocationClass, ModelStateStore, Workspace
+
+    from eng_harness.adapters._hostport import AdapterHostPort, DocumentHostCapabilities
+    from eng_harness.adapters._identity import IdentityStore
+    from eng_harness.adapters.csi._session_ops import OpenedInstance
+    from eng_harness.adapters.revit._parameters import load_role_map
+    from eng_harness.adapters.revit._state import document_host_capabilities
+    from eng_harness.servers._guard import ProcessGuard
+    from eng_harness.servers._hostlock import HostLocks
+    from eng_harness.servers._procinfo import ProcessIdentity
+
+    clock = FixedClock(1_700_000_000_000)
+    ids = SeededIdSource(b"hostport-revit", clock)
+    bound = tmp_path / "state.rvt"
+    bound.write_bytes(b"rvt-bytes")
+    # Fake metadata path must equal the bound file for locate / loaded (spec 0011 §4.12).
+    seed = _seed_complete()
+    seed["document"] = {
+        "path": str(bound),
+        "title": "state",
+        "is_workshared": False,
+        "revit_version": "2026",
+    }
+    seed["active_path"] = str(bound)
+    control = tmp_path / "control.json"
+    config = _revit_config(tmp_path, control, seed=seed)
+
+    class _StubInspector:
+        def identity(self, pid: int) -> ProcessIdentity | None:
+            return None
+
+        def alive(self, identity: ProcessIdentity) -> bool:
+            return False
+
+        def children(self, pid: int) -> list[ProcessIdentity]:
+            return []
+
+        def snapshot(self, exe_names: list[str]) -> list[ProcessIdentity]:
+            return []
+
+        def terminate(self, identity: ProcessIdentity) -> bool:
+            return False
+
+    async def body(manager: ServerManager) -> None:
+        section = config.servers["revit"]
+        roles = load_role_map(section.parameters)
+
+        async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+            return await _call_dump(manager, tool, arguments, effect)
+
+        caps = document_host_capabilities(call=call, role_map=roles, catalog_version="test-catalog")
+        assert isinstance(caps, DocumentHostCapabilities)
+        workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
+        states = ModelStateStore(workspace, clock)
+        run_dir = tmp_path / "run-host"
+        inspector = _StubInspector()
+        guard = ProcessGuard(inspector, run_dir, host_exes=["revit"])
+        locks = HostLocks(
+            tmp_path / "locks",
+            run_id="b236",
+            engine=ProcessIdentity(os.getpid(), "t0", "python"),
+            clock=clock,
+        )
+        port = AdapterHostPort(
+            identity=IdentityStore(workspace=workspace, states=states, ids=ids),
+            states=states,
+            sessions=manager,
+            guard=guard,
+            inspector=inspector,
+            locks=locks,
+            clock=clock,
+            ids=ids,
+            run_dir=run_dir,
+            product="unused-csi-product",
+            program="revit",
+            exe_name="revit",
+            server="revit",
+            host_key="revit",
+            files={"m": bound},
+            document=caps,
+        )
+        resolved = port._identity.resolve(bound)
+        opened = OpenedInstance(ids.new_ulid(), 42, "t0", Timestamp(clock.now()), "revit", -1, False)
+        port._models["m"] = resolved.model_id
+        port._bound["m"] = opened.instance_id
+        port._instances[opened.instance_id] = opened
+        port._units["m"] = caps.units_schema
+
+        held = await port.locate("m")
+        assert held is not None
+        assert held.pid is None
+        assert held.instance_id == opened.instance_id
+
+        state = await port.model_state("m", held.instance_id)
+        assert state.loaded is True
+        assert re.fullmatch("[0-9a-f]{64}", state.fingerprint or "")
+
+        units = await port.read_units("m", held.instance_id)
+        assert units.loaded is True
+        assert units.present == "revit_schema/1"
+        assert units.expected == "revit_schema/1"
+        assert units.ok is True
+
+        # Metadata path mismatch → locate returns None; model_state reports not loaded.
+        other = tmp_path / "other.rvt"
+        other.write_bytes(b"other")
+        port._files["m"] = other.resolve()
+        assert await port.locate("m") is None
+        absent = await port.model_state("m", opened.instance_id)
+        assert absent.loaded is False
+
+    _run(tmp_path, config, body)
