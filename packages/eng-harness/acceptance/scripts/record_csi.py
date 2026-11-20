@@ -1,10 +1,11 @@
 """Record a session with the real Sasaah CSI server on a COPY of a model (owner only; spec 0002 section 4.8.1).
 
     uv run python acceptance/scripts/record_csi.py --config harness.toml --model D:/copies/copy.EDB [--analysis ...]
+    uv run python acceptance/scripts/record_csi.py --config harness.toml --model D:/copies/copy.FDB --product SAFE
 
-Starts the configured CSI server, launches ETABS through it, opens the copy, reads the model state as the adapter does,
-with `--analysis` runs the analysis (it locks the copy) and reads the status and the results of the named cases and
-combinations, and ends the instance it launched. Everything goes through record mode into
+Starts the configured CSI server, launches the chosen product through it, opens the copy, reads the model state as the
+adapter does, with `--analysis` runs the analysis (it locks the copy) and reads the status and the results of the named
+cases and combinations, and ends the instance it launched. Everything goes through record mode into
 `acceptance/recordings/<adapter>-<build>/`; read acceptance/recordings/README.md before committing it.
 Exit code 0: recorded; 1: the server refused a step (the recording is written anyway); 2: usage.
 """
@@ -35,8 +36,12 @@ from eng_harness.servers._launcher import JobPolicy, LaunchSpec
 from eng_harness.servers._session import reply_body
 from eng_harness.servers._transport import ProcessTransport
 
-_PRODUCT = "ETABS"  # the product of the CSI allowlist (spec 0002 section 4.5.1)
-_RESULTS = ("csi_results_joint_reactions", "csi_results_frame_forces", "csi_results_story_drifts")
+# Result tools per product (spec 0002 §4.6.4; spec 0008 §4.6). SAFE has no frame forces or story drifts.
+_RESULTS: dict[str, tuple[str, ...]] = {
+    "ETABS": ("csi_results_joint_reactions", "csi_results_frame_forces", "csi_results_story_drifts"),
+    "SAFE": ("csi_results_joint_reactions", "csi_results_base_reactions"),
+    "SAP2000": ("csi_results_joint_reactions", "csi_results_base_reactions", "csi_results_frame_forces"),
+}
 
 
 class RefusedError(Exception):
@@ -50,9 +55,7 @@ async def _body(client: Client, tool: str, arguments: dict[str, Any]) -> dict[st
     return body
 
 
-async def _session(
-    client: Client, model: Path, analysis: dict[str, list[str]] | None, *, product: str = _PRODUCT
-) -> None:
+async def _session(client: Client, model: Path, analysis: dict[str, list[str]] | None, *, product: str) -> None:
     await client.list_tools()
     await _body(client, "csi_status", {})
     pid = (await _body(client, "csi_launch", {"product": product}))["pid"]
@@ -63,12 +66,20 @@ async def _session(
         async def call(tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
             return await _body(client, tool, arguments)
 
-        await CsiStateReader(product=product, call=call).read(pid, model)
+        if product == "SAFE":
+            from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+
+            await SafeStateReader(product=product, call=call).read(pid, model)
+        else:
+            await CsiStateReader(product=product, call=call).read(pid, model)
         if analysis is not None:
             await _body(client, "csi_run_analysis", {"confirm": True, **target})
             await _body(client, "csi_analysis_status", target)
-            for tool in _RESULTS:
+            for tool in _RESULTS.get(product, ()):
                 await _body(client, tool, {**analysis, "units": "kN_m_C", **target})
+            if product == "SAFE":
+                # Soil pressures are a table read (spec 0008 §4.6), not a typed results tool.
+                await _body(client, "csi_db_table_read", {"table": "Soil Pressures", "row_limit": 2000, **target})
     finally:  # the instance this script launched is ended, whatever happened
         await client.call_tool("csi_exit", {"confirm": True})
 
@@ -112,11 +123,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--analysis", action="store_true", help="also run the analysis and read the results")
     parser.add_argument("--cases", nargs="*", default=[], help="load cases of the results to read")
     parser.add_argument("--combos", nargs="*", default=[], help="combinations of the results to read")
+    parser.add_argument(
+        "--product",
+        choices=sorted(_RESULTS),
+        default=None,
+        help="CSI product to record (default: the product of the first sasaah-csi-mcp server)",
+    )
     args = parser.parse_args(argv)
-    servers = load_servers_config(args.config).servers.values()
-    server = next((s for s in servers if s.adapter == "sasaah-csi-mcp" and s.product == _PRODUCT), None)
+    servers = [s for s in load_servers_config(args.config).servers.values() if s.adapter == "sasaah-csi-mcp"]
+    product = args.product or (servers[0].product if servers else None)
+    server = next((s for s in servers if s.product == product), None)
     if server is None or not args.model.is_file():
-        parser.error("no sasaah-csi-mcp server in the configuration, or the model copy was not found")
+        parser.error("no sasaah-csi-mcp server for that product in the configuration, or the model copy was not found")
     run_dir = args.run_dir or Path(tempfile.mkdtemp(prefix="record-csi-"))
     analysis = {"cases": args.cases, "combos": args.combos} if args.analysis else None
     try:

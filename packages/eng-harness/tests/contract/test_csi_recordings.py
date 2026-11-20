@@ -412,3 +412,55 @@ def test_record_script_usage(tmp_path: Path) -> None:
     with pytest.raises(SystemExit) as stopped:
         _script().main(["--config", str(_config(tmp_path, control)), "--model", str(tmp_path / "missing.EDB")])
     assert stopped.value.code == 2
+
+
+# --- SAFE product (plan 0008 T8; spec 0008 AC28, amendment B-573) ---
+
+
+def _safe_recording_params() -> list[pytest.ParameterSet]:
+    """Synthetic SAFE recording plus every committed recording whose fingerprint is SAFE's (B-573)."""
+    try:
+        from fakes.recorded._checks import applicable_recordings
+
+        committed = applicable_recordings("SAFE")
+    except ImportError:
+        committed = []
+    return [
+        pytest.param(None, id="synthetic", marks=pytest.mark.synthetic),
+        *(pytest.param(path, id=path.name, marks=pytest.mark.recorded) for path in committed),
+    ]
+
+
+@pytest.fixture(scope="module")
+def generated_safe(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The scripted SAFE session on the synthetic fake, recorded through record mode."""
+    from fakes.recorded._session import record_synthetic
+
+    base = tmp_path_factory.mktemp("recorded-safe")
+    (base / "run").mkdir()
+    # product= is added in the feat commit; without it the base run fails for the right reason (TF004).
+    record_synthetic(
+        base / "recording",
+        base / "run",
+        tool_names=csi_allowlist().for_product("SAFE").tool_names,
+        product="SAFE",
+    )
+    return base / "recording"
+
+
+@pytest.fixture(params=_safe_recording_params())
+def safe_recording(request: pytest.FixtureRequest, generated_safe: Path) -> Path:
+    """Each committed SAFE recording, and the synthetic SAFE fake's own (AC28, B-573)."""
+    return generated_safe if request.param is None else Path(request.param)
+
+
+def test_safe_adapter_on_recordings(safe_recording: Path, tmp_path: Path) -> None:
+    """AC28: the adapter reads every SAFE recorded reply; the recorded tool list has the SAFE fingerprint."""
+    assert adapter_problems(RecordedHost(safe_recording), tmp_path / "workspace", product="SAFE") == []
+
+
+def test_safe_synthetic_matches_recordings(safe_recording: Path, tmp_path: Path) -> None:
+    """AC28: the synthetic SAFE fake gives the recorded reply shape and error codes for every recorded operation."""
+    run_dir = tmp_path / "fake"
+    run_dir.mkdir()
+    assert fidelity_problems(RecordedHost(safe_recording), run_dir, product="SAFE") == []
