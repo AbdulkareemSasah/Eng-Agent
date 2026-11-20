@@ -57,3 +57,20 @@ ANSWERED by the owner: «الكتلة تمرر المفتوحة فقط» (option
 Consequences (lead): each round the block stores an open-only design record that the layout, status and resize calcs
 read; a closed footing keeps its last result aside; no merged and verified calc changes. A documents amendment of spec
 0010 section 4.6 and plan 0010 T8 records the rule, then B-399 continues on its branch.
+
+## OQ-Q94 to OQ-Q97, OQ-Q99 and OQ-Q100 (second question round)
+
+- OQ-Q94 (footing resize, an engineer plan both outside the bounds and off the grid): «كما بُني» (as built: status
+  `OUTSIDE_BASIS_BOUNDS`, reason `OFF_INCREMENT`). No change.
+- OQ-Q95 (footing resize rule R2): «الحالي + الزيادة (كما بُني)» (the new depth is the current depth plus the
+  increment, no snap to the grid). No change.
+- OQ-Q96 (ACI pack fields ConcreteClass and Coating): «نقبل كما بُني» (literal values decoded from the confirmed
+  basis). No change.
+- OQ-Q97 (engineer plan, depth and spacing for harness.footing_resize): «سؤال المهندس مبكراً» (the footing workflow
+  asks the engineer early; no value is derived or invented). Documents amendment B-599 of spec 0010 and plan 0010 T9,
+  after B-597.
+- OQ-Q99 (spec 0006 AC48, 10 MB adversarial text against the 16 KB inline cap): «تعديل AC48» (journal fields carry
+  adversarial text within the inline cap; oversized examples go through preview and result, as B-191 tests).
+  Documents amendment B-598.
+- OQ-Q100 (earlier review items held during the absence): «نعتمدها كما دُمجت» (confirmed as merged; review again after
+  the first live run if needed).
