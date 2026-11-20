@@ -104,7 +104,7 @@ def _port(
 
 
 def test_working_copy_hash(tmp_path: Path) -> None:
-    """AC4: working_copy copies a .ideaCon into the run folder with equal hashes and derived_from lineage; no host launch."""
+    """AC4: working_copy copies a .ideaCon into the run folder with equal hashes and derived_from; no host launch."""
     control = tmp_path / "control.json"
     config = _idea_config(tmp_path, control, route="native")
     original = make_ideacon(tmp_path / "joint.ideaCon")
@@ -158,8 +158,8 @@ def test_out_path_new_and_distinct(tmp_path: Path) -> None:
             out_path=str(path),
             approved=True,
         )
-    assert same.value.code is ErrorCode.INVALID_ARGUMENT
-    assert same.value.field == "out_path"
+    assert same.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    assert same.value.detail.field == "out_path"
 
 
 def test_no_path_outside_run_folder(tmp_path: Path) -> None:
@@ -177,12 +177,12 @@ def test_no_path_outside_run_folder(tmp_path: Path) -> None:
     outside.write_text("{}", encoding="utf-8")
     with pytest.raises(ContractError) as caught:
         require_inside_run(outside, run_dir)
-    assert caught.value.code is ErrorCode.INVALID_ARGUMENT
-    assert caught.value.field == "path"
+    assert caught.value.detail.code is ErrorCode.INVALID_ARGUMENT
+    assert caught.value.detail.field == "path"
 
 
 def test_rest_route_requires_live_project(tmp_path: Path) -> None:
-    """AC5: route rest raises HOST_NOT_CONNECTED when open is not backend=rest with live_project=true; project closed."""
+    """AC5: route rest raises HOST_NOT_CONNECTED when open is not live rest; project is closed."""
     control = tmp_path / "control.json"
     _fault(control, "live_create_fallback", tool="idea_open_project")
     config = _idea_config(tmp_path, control, route="rest")
@@ -201,7 +201,7 @@ def test_rest_route_requires_live_project(tmp_path: Path) -> None:
             copy_key = await port.working_copy("m", run_dir / "copies")
             with pytest.raises(ContractError) as caught:
                 await port.ensure_route_ready(copy_key)
-            assert caught.value.code is ErrorCode.HOST_NOT_CONNECTED
+            assert caught.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
             # Project must be closed after the failed precondition (AC5).
             listed = await manager.call("idea", "main", "idea_list_connections", {}, CallEffect.READ)
             assert listed.is_error is True
@@ -229,7 +229,7 @@ def test_service_unreachable_host_not_connected(tmp_path: Path) -> None:
             copy_key = await port.working_copy("m", run_dir / "copies")
             with pytest.raises(ContractError) as caught:
                 await port.ensure_route_ready(copy_key)
-            assert caught.value.code is ErrorCode.HOST_NOT_CONNECTED
+            assert caught.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
             status = await manager.call("idea", "main", "idea_status", {}, CallEffect.READ)
             body_json = reply_body(status)
             assert body_json is not None
@@ -239,7 +239,7 @@ def test_service_unreachable_host_not_connected(tmp_path: Path) -> None:
 
 
 def test_native_route_requires_hidden_calculator(tmp_path: Path) -> None:
-    """AC5: route native raises HOST_NOT_CONNECTED when no installed version reports a hidden calculator, or path is not .ideaCon."""
+    """AC5: route native raises HOST_NOT_CONNECTED without a hidden calculator or a .ideaCon path."""
     control = tmp_path / "control.json"
     _seed(
         control,
@@ -249,21 +249,21 @@ def test_native_route_requires_hidden_calculator(tmp_path: Path) -> None:
     model = make_ideacon(tmp_path / "joint.ideaCon")
     run_dir = tmp_path / "run"
 
+    other = tmp_path / "not-idea.txt"
+    other.write_text("x", encoding="utf-8")
+
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
-            port = _port(tmp_path, manager, route="native", files={"m": model})
+            port = _port(tmp_path, manager, route="native", files={"m": model, "x": other})
             copy_key = await port.working_copy("m", run_dir / "copies")
             with pytest.raises(ContractError) as caught:
                 await port.ensure_route_ready(copy_key)
-            assert caught.value.code is ErrorCode.HOST_NOT_CONNECTED
+            assert caught.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
 
             # Non-.ideaCon working copy is refused the same way.
-            other = tmp_path / "not-idea.txt"
-            other.write_text("x", encoding="utf-8")
-            port_bad = _port(tmp_path, manager, route="native", files={"x": other})
-            bad_key = await port_bad.working_copy("x", run_dir / "copies-bad")
+            bad_key = await port.working_copy("x", run_dir / "copies-bad")
             with pytest.raises(ContractError) as bad:
-                await port_bad.ensure_route_ready(bad_key)
-            assert bad.value.code is ErrorCode.HOST_NOT_CONNECTED
+                await port.ensure_route_ready(bad_key)
+            assert bad.value.detail.code is ErrorCode.HOST_NOT_CONNECTED
 
     anyio.run(body)
