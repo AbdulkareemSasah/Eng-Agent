@@ -476,3 +476,151 @@ def test_no_config_file_and_environment(tmp_path: Path) -> None:
     assert not any(name.startswith(("server executable", "tool-list fingerprint")) for name in names)
     assert ["ok", "lock directory", "writable; no stale lock"] in rows
     assert ["ok", "installed host programs", "none declared"] in rows
+
+
+def _write_revit(
+    path: Path,
+    command: str,
+    sha: str,
+    addin: str,
+    addin_sha: str,
+    pipe: str,
+    *,
+    write_timeout_s: int,
+    read_timeout_s: int = 90,
+) -> None:
+    """Minimal `[servers.revit]` section (spec 0011 section 4.2)."""
+    path.write_text(
+        "\n".join(
+            [
+                "[servers.revit]",
+                'adapter = "sasaah-revit-mcp"',
+                f"command = {json.dumps(command)}",
+                f"pipe_name = {json.dumps(pipe)}",
+                "client_grace_s = 5",
+                "shutdown_grace_s = 1",
+                (
+                    f'build = {{ sasaah_commit = "{COMMIT}", exe_sha256 = "{sha}", '
+                    f'addin_sha256 = ["{addin_sha}"], addin_paths = [{json.dumps(addin)}] }}'
+                ),
+                'host_key = "revit"',
+                "",
+                "[servers.revit.roles.read]",
+                'classes = ["session", "call"]',
+                f"call_timeout_s = {read_timeout_s}",
+                "",
+                "[servers.revit.roles.write]",
+                'classes = ["attended"]',
+                f"call_timeout_s = {write_timeout_s}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_revit_checks(tmp_path: Path) -> None:
+    """AC32: Revit doctor rows for pipe/bridge, hashes, toolset, version, document, timeout warn; fail exits 1."""
+    import eng_harness.doctor as doctor
+
+    exe = tmp_path / "sasaah-revit-mcp"
+    exe.write_bytes(b"revit-server-bytes")
+    addin = tmp_path / "Sasaah.Agent.Revit.Bridge.dll"
+    addin.write_bytes(b"revit-addin-bytes")
+    sha, addin_sha = _sha(exe), _sha(addin)
+    pipe = r"\\.\pipe\sasaah.revit.bridge.v1"
+    # Spec 0011 section 4.4: bridge-destructive MCP names (kind destructive).
+    destructive = {
+        "revit_set_type_parameter_values",
+        "revit_set_element_parameter_values",
+        "revit_set_parameter_value_by_guid",
+        "revit_change_element_type",
+    }
+    schemas = {name: SCHEMA for name in ("revit_connection_status", "revit_ping", *destructive)}
+    status = {
+        "ping_status": "ok",
+        "catalog_version": "cat-1",
+        "pipe_name": pipe,
+        "revit_version": "2026",
+        "title": "Tower",
+        "path": r"C:\models\Tower.rvt",
+    }
+    facts = {
+        ("revit", "read"): doctor.RoleFacts({"revit_connection_status": SCHEMA}, status, None),
+        ("revit", "write"): doctor.RoleFacts(schemas, status, None),
+    }
+    home = tmp_path / "home"
+    config = tmp_path / "harness.toml"
+    _write_revit(config, str(exe), sha, str(addin), addin_sha, pipe, write_timeout_s=90)
+    deps = _deps(doctor, home, roles=_Roles(facts), inspector=_Procs({}))
+    code, table = _run(doctor, config, deps, json_output=False, show_paths=False)
+    assert code == 0
+    lines = [line.split(" | ", 2) for line in table.splitlines()]
+    by_name = {name: (row_status, detail) for row_status, name, detail in lines}
+    assert "pipe and bridge revit" in by_name
+    assert by_name["pipe and bridge revit"][0] == "ok"
+    assert "sasaah.revit.bridge.v1" in by_name["pipe and bridge revit"][1]
+    assert "ping_status=ok" in by_name["pipe and bridge revit"][1]
+    assert "add-in hashes revit" in by_name
+    assert by_name["add-in hashes revit"][0] == "ok"
+    assert "matches" in by_name["add-in hashes revit"][1]
+    assert "destructive toolset revit" in by_name
+    assert by_name["destructive toolset revit"][0] == "ok"
+    assert "Revit version revit" in by_name
+    assert "2026" in by_name["Revit version revit"][1]
+    assert "open document revit" in by_name
+    assert "Tower.rvt" in by_name["open document revit"][1]
+    assert "write call_timeout_s revit" in by_name
+    assert by_name["write call_timeout_s revit"][0] == "ok"
+    assert "60" in by_name["write call_timeout_s revit"][1]
+    assert by_name["server executable revit"][0] == "ok"
+    # No CSI fingerprint rows for Revit (spec 0011 AC32; CSI flags do not apply).
+    assert not any(name.startswith("tool-list fingerprint revit/") for name in by_name)
+
+    # Write timeout not greater than the add-in queue deadline (60 s, §4.2 rule 1) → warn, exit still 0.
+    _write_revit(config, str(exe), sha, str(addin), addin_sha, pipe, write_timeout_s=60)
+    code, warned = _run(doctor, config, deps, json_output=False, show_paths=False)
+    assert code == 0
+    warn_row = next(line for line in warned.splitlines() if "write call_timeout_s revit" in line)
+    assert warn_row.startswith("warn |")
+    assert "60" in warn_row
+
+    # Bridge down → fail and exit 1.
+    down = dict(status, ping_status="down")
+    down_facts = {
+        ("revit", "read"): doctor.RoleFacts({"revit_connection_status": SCHEMA}, down, None),
+        ("revit", "write"): doctor.RoleFacts(schemas, down, None),
+    }
+    _write_revit(config, str(exe), sha, str(addin), addin_sha, pipe, write_timeout_s=90)
+    code, failed = _run(
+        doctor,
+        config,
+        _deps(doctor, home, roles=_Roles(down_facts), inspector=_Procs({})),
+        json_output=False,
+        show_paths=False,
+    )
+    assert code == 1
+    assert "ping_status" in failed
+    assert "fail | pipe and bridge revit |" in failed
+
+    # Destructive toolset off (write tools missing) → fail naming bridgeToolsets.
+    off_facts = {
+        ("revit", "read"): doctor.RoleFacts({"revit_connection_status": SCHEMA}, status, None),
+        ("revit", "write"): doctor.RoleFacts({"revit_connection_status": SCHEMA}, status, None),
+    }
+    code, toolset = _run(
+        doctor,
+        config,
+        _deps(doctor, home, roles=_Roles(off_facts), inspector=_Procs({})),
+        json_output=False,
+        show_paths=False,
+    )
+    assert code == 1
+    assert "bridgeToolsets" in toolset
+    assert "fail | destructive toolset revit |" in toolset
+
+    # Add-in hash mismatch → fail.
+    _write_revit(config, str(exe), sha, str(addin), "b" * 64, pipe, write_timeout_s=90)
+    code, bad_addin = _run(doctor, config, deps, json_output=False, show_paths=False)
+    assert code == 1
+    assert "fail | add-in hashes revit |" in bad_addin
