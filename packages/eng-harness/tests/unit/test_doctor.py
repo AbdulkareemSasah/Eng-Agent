@@ -536,7 +536,7 @@ def test_revit_checks(tmp_path: Path) -> None:
         "revit_set_parameter_value_by_guid",
         "revit_change_element_type",
     }
-    schemas = {name: SCHEMA for name in ("revit_connection_status", "revit_ping", *destructive)}
+    schemas = dict.fromkeys(("revit_connection_status", "revit_ping", *destructive), SCHEMA)
     status = {
         "ping_status": "ok",
         "catalog_version": "cat-1",

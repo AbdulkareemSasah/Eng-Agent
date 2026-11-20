@@ -1,4 +1,4 @@
-"""`eng-harness doctor` (plan 0002 T18; spec 0002 section 4.9, AC37, AC39)."""
+"""`eng-harness doctor` (plan 0002 T18; plan 0011 T14; spec 0002 section 4.9, AC37, AC39; spec 0011 AC32)."""
 
 import hashlib
 import json
@@ -25,6 +25,7 @@ from eng_harness.adapters.csi import csi_allowlist
 from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig, load_servers_config
 from eng_harness.servers._buildcheck import tool_list_fingerprint
+from eng_harness.servers._config import ServerConfig
 from eng_harness.servers._hostlock import default_lock_dir
 from eng_harness.servers._launcher import ProcessLauncher
 from eng_harness.servers._platform import platform_inspector, platform_launcher
@@ -32,6 +33,21 @@ from eng_harness.servers._procinfo import ProcessIdentity, ProcessInspector
 
 # ADR-0028 §5; spec 0002 §4.2 (CsiServerConfig.cs:18); uv bound of cli/_opener.py; medium RID (winnt.h).
 _PY, _SASAAH_S, _UV_S, _MEDIUM = (3, 14), 120, 30, 0x2000
+# Spec 0011 §4.2 rule 1: add-in queue deadline (E/Runtime/MainThreadRequestQueue.cs:25).
+_ADDIN_QUEUE_DEADLINE_S = 60
+_REVIT_ADAPTER = "sasaah-revit-mcp"  # spec 0011 section 4.2
+_REVIT_STATUS_TOOL = "revit_connection_status"  # S-12 inventory; build check (plan 0011 T4)
+# Spec 0011 section 4.4: bridge-destructive MCP names (kind destructive).
+_REVIT_DESTRUCTIVE = frozenset(
+    {
+        "revit_set_type_parameter_values",
+        "revit_set_element_parameter_values",
+        "revit_set_parameter_value_by_guid",
+        "revit_change_element_type",
+    }
+)
+# Spec 0011 section 4.3 item 4 / build check reason when those tools are missing.
+_DESTRUCTIVE_REASON = "destructive toolset disabled in Revit (`bridgeToolsets`)"
 _LEVELS = {  # winnt.h SECURITY_MANDATORY_*_RID
     0x0000: "untrusted", 0x1000: "low", 0x2000: "medium", 0x2100: "medium plus",
     0x3000: "high", 0x4000: "system", 0x5000: "protected",
@@ -39,6 +55,7 @@ _LEVELS = {  # winnt.h SECURITY_MANDATORY_*_RID
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]")  # file-name rule of servers/_hostlock.py (spec 0002 §4.4.1)
 _FLAGS = ("read_only", "script_enabled")
 _STATUS = frozenset({*_FLAGS, "instances", "current_target"})
+_CSI_STATUS_TOOL = "csi_status"
 
 
 class Check(BaseModel):
@@ -57,6 +74,113 @@ class CheckProvider(Protocol):
     name: str
 
     def checks(self) -> Sequence[Check]: ...
+
+
+class RevitChecks:
+    """Revit doctor rows (plan 0011 T14; spec 0011 AC32): pipe/bridge, hashes, toolset, version, document, timeout."""
+
+    name: str
+
+    def __init__(
+        self,
+        name: str,
+        server: ServerConfig,
+        facts: Mapping[tuple[str, str], RoleFacts],
+        show_paths: bool,
+    ) -> None:
+        self.name = name
+        self._server = server
+        self._facts = facts
+        self._show_paths = show_paths
+
+    def checks(self) -> Sequence[Check]:
+        write = self._facts.get((self.name, "write")) or RoleFacts({}, None, "the role was not inspected")
+        status = write.status if write.error is None else None
+        if status is None and write.error is None:
+            read = self._facts.get((self.name, "read"))
+            if read is not None and read.error is None:
+                status = read.status
+        return [
+            self._pipe_and_bridge(status, write.error),
+            self._addin_hashes(),
+            self._destructive_toolset(write),
+            self._revit_version(status, write.error),
+            self._open_document(status, write.error),
+            self._write_timeout(),
+        ]
+
+    def _pipe_and_bridge(self, status: Mapping[str, Any] | None, error: str | None) -> Check:
+        title = f"pipe and bridge {self.name}"
+        pipe = self._server.pipe_name or ""
+        if error:
+            return _row(title, "fail", error)
+        if status is None:
+            return _row(title, "fail", f"{_REVIT_STATUS_TOOL} gave no JSON object")
+        ping = status.get("ping_status")
+        detail = f"pipe_name={pipe}; ping_status={ping}"
+        return _row(title, "ok" if ping == "ok" else "fail", detail)
+
+    def _addin_hashes(self) -> Check:
+        title = f"add-in hashes {self.name}"
+        pin = self._server.build
+        try:
+            digests = tuple(hashlib.sha256(Path(path).read_bytes()).hexdigest() for path in pin.addin_paths)
+        except OSError:
+            digests = ()
+        if digests == pin.addin_sha256 and digests:
+            listed = "; ".join(
+                f"{_shown(path, self._show_paths)} SHA-256 {digest} matches {expected}"
+                for path, digest, expected in zip(pin.addin_paths, digests, pin.addin_sha256, strict=True)
+            )
+            return _row(title, "ok", listed)
+        return _row(title, "fail", "add-in SHA-256 differs from the pinned build or cannot be read")
+
+    def _destructive_toolset(self, write: RoleFacts) -> Check:
+        title = f"destructive toolset {self.name}"
+        if write.error:
+            return _row(title, "fail", write.error)
+        missing = sorted(_REVIT_DESTRUCTIVE - write.tools.keys())
+        if not missing:
+            return _row(title, "ok", "on; " + ", ".join(sorted(_REVIT_DESTRUCTIVE)))
+        if frozenset(missing) == _REVIT_DESTRUCTIVE:
+            return _row(title, "fail", _DESTRUCTIVE_REASON)
+        return _row(title, "fail", f"allowlisted tool {', '.join(missing)} is not listed")
+
+    def _revit_version(self, status: Mapping[str, Any] | None, error: str | None) -> Check:
+        title = f"Revit version {self.name}"
+        if error:
+            return _row(title, "fail", error)
+        if status is None:
+            return _row(title, "fail", f"{_REVIT_STATUS_TOOL} gave no JSON object")
+        version = status.get("revit_version")
+        if isinstance(version, str) and version:
+            return _row(title, "ok", f"revit_version={version}")
+        return _row(title, "fail", "revit_version is missing")
+
+    def _open_document(self, status: Mapping[str, Any] | None, error: str | None) -> Check:
+        title = f"open document {self.name}"
+        if error:
+            return _row(title, "fail", error)
+        if status is None:
+            return _row(title, "fail", f"{_REVIT_STATUS_TOOL} gave no JSON object")
+        path = status.get("path")
+        if isinstance(path, str) and path:
+            base = PureWindowsPath(path).name if "\\" in path else Path(path).name
+            return _row(title, "ok", f"base name {base}")
+        title_text = status.get("title")
+        if isinstance(title_text, str) and title_text:
+            return _row(title, "ok", f"base name {title_text}")
+        return _row(title, "ok", "no open document")
+
+    def _write_timeout(self) -> Check:
+        title = f"write call_timeout_s {self.name}"
+        role = self._server.roles.get("write")
+        if role is None:
+            return _row(title, "fail", "write role is missing")
+        value = role.call_timeout_s
+        detail = f"write call_timeout_s={value}; add-in queue deadline {_ADDIN_QUEUE_DEADLINE_S} s"
+        # Spec 0011 §4.2 rule 1 / AC32: warn when not greater than the deadline.
+        return _row(title, "ok" if value > _ADDIN_QUEUE_DEADLINE_S else "warn", detail)
 
 
 @dataclass(frozen=True)
@@ -141,6 +265,7 @@ def _collect(config: ServersConfig, deps: DoctorDeps, show: bool, extra: Sequenc
         _row("uv and Python", "ok" if version and right else "fail", base if right else base + "; need CPython 3.14")
     ]
     missed, statuses = RoleFacts({}, None, "the role was not inspected"), []
+    revit_providers: list[CheckProvider] = []
     for name, server in config.servers.items():
         shown, path, title = _shown(server.command, show), Path(server.command), f"server executable {name}"
         if not path.is_file():
@@ -150,6 +275,10 @@ def _collect(config: ServersConfig, deps: DoctorDeps, show: bool, extra: Sequenc
             state = "matches" if digest == pin else "differs from"
             rows.append(_row(title, "ok" if digest == pin else "fail", f"{shown} SHA-256 {digest} {state} {pin}"))
         allow = deps.allowlist_for(server.adapter)
+        if server.adapter == _REVIT_ADAPTER:
+            # AC32: Revit checks are a CheckProvider; CSI fingerprint/flags do not apply.
+            revit_providers.append(RevitChecks(name, server, facts, show))
+            continue
         for role in server.roles:
             hit = facts.get((name, role)) or missed
             rows.append(_fingerprint(name, role, hit, allow))
@@ -193,7 +322,7 @@ def _collect(config: ServersConfig, deps: DoctorDeps, show: bool, extra: Sequenc
     found.update(config.unreleased_tools())
     released = ", ".join(f"{name} ({record})" for name, record in sorted(found.items()))
     rows.append(_row("unreleased tools", "warn" if found else "ok", released or "none"))
-    for index, provider in enumerate(extra):
+    for index, provider in enumerate([*revit_providers, *extra]):
         label = f"extra[{index}]"
         try:
             label = provider.name
@@ -283,10 +412,11 @@ def run(
     return 1 if any(item.status == "fail" for item in report.checks) else 0
 
 
-async def _one(manager: ServerManager, server: str, role: str) -> RoleFacts:
+async def _one(manager: ServerManager, server: str, role: str, *, status_tool: str) -> RoleFacts:
     try:
         listed = await manager.list_tools(server, role)
-        result = await manager.call(server, role, "csi_status", {}, CallEffect.READ)
+        # Revit: call revit_connection_status (plan 0011 T4 build-check API); do not change Allowlist.build_expectation.
+        result = await manager.call(server, role, status_tool, {}, CallEffect.READ)
     except ToolFailed as error:
         return RoleFacts({}, None, error.detail.message)
     block = result.content[0] if result.content else None
@@ -301,9 +431,13 @@ async def _one(manager: ServerManager, server: str, role: str) -> RoleFacts:
 
 
 async def _gather(config: ServersConfig, run_dir: Path, launcher: ProcessLauncher) -> dict[tuple[str, str], RoleFacts]:
-    pairs = [(name, role) for name, server in config.servers.items() for role in server.roles]
+    pairs = [
+        (name, role, _REVIT_STATUS_TOOL if server.adapter == _REVIT_ADAPTER else _CSI_STATUS_TOOL)
+        for name, server in config.servers.items()
+        for role in server.roles
+    ]
     async with ServerManager(config, run_dir, launcher=launcher) as manager:
-        return {key: await _one(manager, *key) for key in pairs}
+        return {(name, role): await _one(manager, name, role, status_tool=tool) for name, role, tool in pairs}
 
 
 def _windows_rid(pid: int | None) -> int | None:
