@@ -4,6 +4,7 @@ Plan 0002 T6 and T20; spec 0002 AC16, AC38, AC41 and AC42.
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -522,7 +523,7 @@ def test_safe_entries_complete() -> None:
         "harness.base_reactions/1",
         "token",
         "never",
-        ("SAFE",),
+        ("SAFE", "SAP2000"),
     )
 
     load_cases = safe.descriptor("csi_list_load_cases")
@@ -531,7 +532,7 @@ def test_safe_entries_complete() -> None:
         "read",
         "ListLoadCasesArgs",
         "none",
-        ("SAFE",),
+        ("SAFE", "SAP2000"),
     )
     table_fields = safe.descriptor("csi_db_table_fields")
     assert (
@@ -540,7 +541,7 @@ def test_safe_entries_complete() -> None:
         table_fields.args_model,
         table_fields.units,
         table_fields.products,
-    ) == ("read", "read", "DbTableFieldsArgs", "none", ("SAFE",))
+    ) == ("read", "read", "DbTableFieldsArgs", "none", ("SAFE", "SAP2000"))
 
     assert etabs.tool_fingerprint == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
     for safe_only in ("csi_list_load_cases", "csi_db_table_fields", "csi_set_point_load", "csi_results_base_reactions"):
@@ -603,3 +604,117 @@ def test_ports_revit_extensions() -> None:
     assert HostInstance(instance_id="pipe", pid=1, process_started_at=ts, program="revit").pid == 1
     with pytest.raises(ValidationError):
         HostInstance(instance_id="pipe", pid=0, process_started_at=ts, program="revit")
+
+
+_SAP2000_SPEC = Path(__file__).resolve().parents[3] / "docs" / "specs" / "0012-sap2000-adapter.md"
+# Spec 0012 section 4.1: serve and serve-diff are on the allowlist; gap and not served are refused.
+_ETABS_FINGERPRINT = "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
+_SAFE_FINGERPRINT = "ccdab3c9461b60387569af2ec7acc214c0803bd7953a5d66ca380e1c87c38025"
+
+
+def _coverage_tools(status_prefix: str) -> frozenset[str]:
+    """Tool names whose coverage-table status starts with `status_prefix` (spec 0012 section 4.1)."""
+    import re
+
+    found: set[str] = set()
+    for line in _SAP2000_SPEC.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("| `csi_"):
+            continue
+        parts = [part.strip() for part in line.strip("|").split("|")]
+        tools_cell, status = parts[0], parts[1].lower()
+        if not status.startswith(status_prefix):
+            continue
+        found.update(re.findall(r"csi_[a-z0-9_]+", tools_cell))
+    return frozenset(found)
+
+
+def test_sap2000_entries_match_coverage_table() -> None:
+    """AC2: packaged CSI allowlist for SAP2000 is exactly the serve and serve-diff rows of spec 0012 section 4.1."""
+    serve = _coverage_tools("serve")
+    # `csi_design_run` also appears as a gap row for aluminum/coldformed; the tool itself is served (steel/concrete).
+    assert "csi_design_run" in serve
+    full = csi_allowlist()
+    sap = full.for_product("SAP2000")
+    etabs = full.for_product("ETABS")
+    safe = full.for_product("SAFE")
+    assert sap.product == "SAP2000"
+    assert sap.build_expectation().product == "SAP2000"
+    assert sap.tool_names == serve
+    assert {tool.name for tool in sap.tools} == serve
+    for tool in sap.tools:
+        assert "SAP2000" in tool.products
+        if tool.effect == "write":
+            assert tool.readback is not None
+
+    launch = sap.descriptor("csi_launch")
+    assert (launch.kind, launch.effect, launch.args_model, launch.confirm, launch.products) == (
+        "session",
+        "write",
+        "LaunchArgs",
+        "never",
+        ("ETABS", "SAFE", "SAP2000"),
+    )
+    unlock = sap.descriptor("csi_unlock_model")
+    assert (
+        unlock.kind,
+        unlock.timeout_class,
+        unlock.effect,
+        unlock.action,
+        unlock.args_model,
+        unlock.units,
+        unlock.confirm,
+        unlock.readback,
+        unlock.products,
+    ) == ("write", "call", "write", "unlock", "UnlockModelArgs", "none", "approved", "locked", ("SAP2000",))
+    add_frame = sap.descriptor("csi_add_frame_by_coord")
+    assert (
+        add_frame.kind,
+        add_frame.effect,
+        add_frame.args_model,
+        add_frame.units,
+        add_frame.readback,
+        add_frame.products,
+    ) == ("write", "write", "AddFrameByCoordArgs", "token", "frame", ("SAP2000",))
+    design = sap.descriptor("csi_design_run")
+    assert (design.kind, design.effect, design.action, design.confirm, design.products) == (
+        "design",
+        "write",
+        "design",
+        "approved",
+        ("ETABS", "SAP2000"),
+    )
+    assert etabs.tool_fingerprint == _ETABS_FINGERPRINT
+    assert safe.tool_fingerprint == _SAFE_FINGERPRINT
+    assert "csi_unlock_model" not in etabs.tool_names
+    assert "csi_add_frame_by_coord" not in etabs.tool_names
+    assert "csi_list_stories" not in sap.tool_names
+
+
+def test_sap2000_gap_tools_refused() -> None:
+    """AC2: a tool marked gap or not served is absent from the SAP2000 allowlist (INVALID_ARGUMENT at the tool port)."""
+    sap = csi_allowlist().for_product("SAP2000")
+    serve = _coverage_tools("serve")
+    refused = (_coverage_tools("gap") | _coverage_tools("not served") | _coverage_tools("refused")) - serve
+    assert refused
+    for name in sorted(refused):
+        assert name not in sap.tool_names
+        with pytest.raises(KeyError, match=name):
+            sap.descriptor(name)
+
+
+def test_escape_hatches_refused_for_sap2000() -> None:
+    """AC2: escape hatches are absent from the SAP2000 allowlist and refused at load for product SAP2000."""
+    sap = csi_allowlist().for_product("SAP2000")
+    names = {tool.name for tool in sap.tools}
+    assert names
+    assert names.isdisjoint(ESCAPE_HATCH_NAMES)
+    assert not [n for n in names if any(m in n for m in ("script", "invoke", "eval", "tables_apply"))]
+    etabs_entry = _tool(name="csi_list_frames", products=["ETABS"])
+    header = (
+        f'adapter = "test-adapter"\nsasaah_commit = "{COMMIT}"\nalso_tested_commits = []\n'
+        f'fingerprint = {{ ETABS = "{SHA}", SAP2000 = "{"d" * 64}" }}\nfingerprint_source = "s12-inventory"\n'
+    )
+    for name in (*ESCAPE_HATCH_NAMES, "x_script_y", "x_invoke_y", "x_eval_y", "x_tables_apply"):
+        text = _text(etabs_entry, _tool(name=name, products=["SAP2000"]), header=header)
+        with pytest.raises(AllowlistError, match=name):
+            load_allowlist(text, "test.toml", product="SAP2000")
