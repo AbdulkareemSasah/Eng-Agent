@@ -1,0 +1,138 @@
+"""Contract tests of the IDEA fake and allowlist schemas (plan 0014 T2; spec 0014 AC21)."""
+
+from pathlib import Path
+
+from helpers import load_json_dict, load_repo_json
+
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = PACKAGE_ROOT.parents[1]
+INVENTORY = REPO_ROOT / "spikes" / "S-12-sasaah-tool-inventory" / "inventory" / "sasaah-idea-mcp.json"
+SCHEMAS = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_idea" / "schemas.json"
+
+SERVED_TOOLS = frozenset(
+    {
+        "idea_status",
+        "idea_open_project",
+        "idea_close_project",
+        "idea_list_connections",
+        "idea_calculate",
+        "idea_get_check_results",
+        "idea_native_get_loads",
+        "idea_native_set_loads",
+        "idea_native_calculate",
+    }
+)
+SCRIPT_TOOL = "idea_run_script"
+
+
+def test_fake_schemas_match_inventory() -> None:
+    """AC21: the fake's tool schemas equal the S-12 inventory for the 9 served tools and idea_run_script."""
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    fake = load_json_dict(SCHEMAS)
+    expected_names = SERVED_TOOLS | {SCRIPT_TOOL}
+    expected_schemas = {t["name"]: t["input_schema"] for t in inventory["tools"] if t["name"] in expected_names}
+    expected_kinds = {t["name"]: t["server_kind"] for t in inventory["tools"] if t["name"] in expected_names}
+    actual_schemas = {t["name"]: t["input_schema"] for t in fake["tools"]}
+    actual_kinds = {t["name"]: t.get("server_kind") for t in fake["tools"]}
+    assert fake["sasaah_commit"] == inventory["sasaah_commit"]
+    assert len(fake["tools"]) == len(actual_schemas)
+    assert set(actual_schemas) == expected_names
+    assert actual_schemas == expected_schemas
+    assert actual_kinds == expected_kinds
+
+
+def test_fake_process_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC21: the running IDEA fake process serves the exact inventory schemas with or without --disable-script."""
+    import json
+
+    from fakes.sasaah_idea.test_server import Rpc
+
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    by_name = {t["name"]: t["input_schema"] for t in inventory["tools"]}
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"faults": [], "seed": {}}), encoding="utf-8")
+
+    disabled = Rpc(control, args=("--disable-script", "--call-timeout-sec", "30"))
+    try:
+        listed = disabled.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        assert len(listed) == len(actual)
+        assert set(actual) == SERVED_TOOLS
+        assert actual == {name: by_name[name] for name in SERVED_TOOLS}
+    finally:
+        disabled.close()
+
+    enabled = Rpc(control, args=("--call-timeout-sec", "30"))
+    try:
+        listed = enabled.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected_names = SERVED_TOOLS | {SCRIPT_TOOL}
+        assert len(listed) == len(actual)
+        assert set(actual) == expected_names
+        assert actual == {name: by_name[name] for name in expected_names}
+    finally:
+        enabled.close()
+
+
+def test_against_inventory() -> None:
+    """AC2: the four classes partition the 58 inventory names; served entries match the allowlist."""
+    from helpers.idea_classification import EXCLUDED, GAP, NOT_SERVED, SERVED
+
+    from eng_harness.adapters.idea import idea_allowlist
+
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    names = {t["name"] for t in inventory["tools"]}
+    assert len(names) == 58
+    assert names == SERVED | GAP | NOT_SERVED | EXCLUDED
+    assert len(SERVED) + len(GAP) + len(NOT_SERVED) + len(EXCLUDED) == 58
+
+    allowlist = idea_allowlist()
+    assert allowlist.sasaah_commit == inventory["sasaah_commit"]
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert set(allowlist.tool_names) == SERVED
+    by_name = {t["name"]: t for t in inventory["tools"]}
+    for tool in allowlist.tools:
+        item = by_name[tool.name]
+        assert not item["excluded_from_allowlist"], tool.name
+        assert item["classification"] != "escape-hatch", tool.name
+        assert "IDEA" in tool.products
+        assert tool.units == "none"
+
+
+def test_fingerprint_from_inventory() -> None:
+    """AC3: the fingerprint of the 9 served tools computed from S-12 equals the pinned IDEA fingerprint."""
+    from eng_harness.adapters.idea import idea_allowlist
+    from eng_harness.servers._buildcheck import tool_list_fingerprint
+
+    allowlist = idea_allowlist()
+    assert allowlist.fingerprint_source == "s12-inventory"
+    assert allowlist.product == "IDEA"
+    inventory = load_repo_json(
+        INVENTORY,
+        reason="the S-12 inventory is outside the package copy that the mutation step runs (B-369); expires 2026-12-31",
+    )
+    schemas = {t["name"]: t["input_schema"] for t in inventory["tools"] if t["name"] in allowlist.tool_names}
+    assert set(schemas) == set(allowlist.tool_names) == SERVED_TOOLS
+    assert tool_list_fingerprint(schemas) == allowlist.fingerprint["IDEA"] == allowlist.tool_fingerprint
+
+
+def test_unit_header() -> None:
+    """AC16: the allowlist header declares native load units as declared and idea_set_loads as missing."""
+    from eng_harness.adapters.idea import idea_allowlist
+
+    allowlist = idea_allowlist()
+    rows = {(e.tool, e.field, e.unit, e.unit_status) for e in allowlist.units}
+    assert ("idea_native_get_loads", "force", "N", "declared") in rows
+    assert ("idea_native_get_loads", "moment", "N.m", "declared") in rows
+    assert ("idea_native_set_loads", "force", "N", "declared") in rows
+    assert ("idea_native_set_loads", "moment", "N.m", "declared") in rows
+    assert ("idea_set_loads", "forces", None, "missing") in rows

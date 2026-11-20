@@ -1,0 +1,47 @@
+[
+  {
+    "name": "column_design_engineer_turn",
+    "version": 1,
+    "schema_sha256": "5962ec415df10613c18e9e246cc59041f1cadfba6f85e99c1b1263d0a7429883"
+  },
+  {
+    "name": "column_design_member_action",
+    "version": 1,
+    "schema_sha256": "15d95f2176fd5006cc0bc3cd5e3033067285b79ad78b8a7b8b09b9e9246d3827"
+  },
+  {
+    "name": "column_revit_map_result",
+    "version": 1,
+    "schema_sha256": "6ce4ab2cabf4358e677c37e15d9f6ea4c33deda271980898947377dc536c2945"
+  },
+  {
+    "name": "column_revit_readback_result",
+    "version": 1,
+    "schema_sha256": "16e2d5b486b815818733704b93bee36de36fa33db8bb0766a13e1a9837111533"
+  },
+  {
+    "name": "edit_cycle_analysis_messages",
+    "version": 1,
+    "schema_sha256": "de2e7d03ab64e162e3709d06b29acc402f1a89d9e4f0cf447d07ed57b92f40d5"
+  },
+  {
+    "name": "edit_cycle_engineer_turn",
+    "version": 1,
+    "schema_sha256": "8b6108fd17736ed80b1eb90152ee4699f182653fecdc516a3f585cc150b92af2"
+  },
+  {
+    "name": "edit_cycle_readback_result",
+    "version": 2,
+    "schema_sha256": "42c48b1f6a4681a6c562b6caab38d1ed7eea88abb7e2e155bac800c0e56d711f"
+  },
+  {
+    "name": "footing_fix_strategy",
+    "version": 1,
+    "schema_sha256": "a1e9d33f63867c0bcb6b98027f27c4cc4646216363cd3a73a21519219835d72a"
+  },
+  {
+    "name": "footing_review",
+    "version": 1,
+    "schema_sha256": "be043cd88a8f85df7bd029ae74c874142569bfac9284d3d2c8762b6b13d82450"
+  }
+]

@@ -1,0 +1,70 @@
+{
+ "verdict": "PASS",
+ "mode": "pull_request",
+ "head": "cb4007ec02843aac66a1c1d10ece9947e24c3bbf",
+ "base": "00770cf1b304c0ee52196908f535f57fa1f6ab0e",
+ "jobs": {
+  "setup": {
+   "exit": 0,
+   "seconds": 0,
+   "tail": ""
+  },
+  "gate-check": {
+   "exit": 0,
+   "seconds": 2,
+   "tail": ""
+  },
+  "risk-floor": {
+   "exit": 0,
+   "seconds": 1,
+   "tail": ""
+  },
+  "test-first": {
+   "exit": 0,
+   "seconds": 0,
+   "tail": ""
+  },
+  "agents-drift": {
+   "exit": 0,
+   "seconds": 0,
+   "tail": ""
+  },
+  "ci-review": {
+   "exit": 0,
+   "seconds": 0,
+   "tail": ""
+  },
+  "security": {
+   "exit": 0,
+   "seconds": 1,
+   "tail": ""
+  },
+  "build": {
+   "exit": 0,
+   "seconds": 1,
+   "tail": ""
+  },
+  "gate": {
+   "exit": 0,
+   "seconds": 956,
+   "tail": ""
+  }
+ },
+ "failing": [],
+ "started_at": "2026-11-17T20:00:01Z",
+ "finished_at": "2026-11-17T20:16:19Z",
+ "batch": {
+  "members": [
+   417,
+   418
+  ],
+  "heads": {
+   "417": "b2d9f734617f8a40fc03bb9701e292dff71dc407",
+   "418": "cb4007ec02843aac66a1c1d10ece9947e24c3bbf"
+  },
+  "commit": "c0830db1316ab9eced7f9ca5c70a3b56aa67fab0",
+  "tree": "7bae8899e8ffeb9b25bc28ef06260553337b4b81",
+  "base": "00770cf1b304c0ee52196908f535f57fa1f6ab0e",
+  "leader": 417
+ }
+}

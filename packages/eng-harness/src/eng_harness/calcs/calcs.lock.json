@@ -1,0 +1,120 @@
+{
+  "calcs": [
+    {
+      "content_sha256": "07267936bb08ae7e88c71c9be9561371f626c6759a46ddacdaf74ad1f3e8629f",
+      "id": "harness.analysis_summary",
+      "version": 1
+    },
+    {
+      "content_sha256": "778470779324d9012e0bb35f04c6841efda0ba11799a51bfcf52c132bf1b84a6",
+      "id": "harness.change_set_check",
+      "version": 1
+    },
+    {
+      "content_sha256": "48280c7e46b9775a0c83e076f9125ccb60d99adf1b149859e00a400a59222250",
+      "id": "harness.column_change_set",
+      "version": 1
+    },
+    {
+      "content_sha256": "33b8247ddd3d4dfd9744a143ed11cb6e955333223ff20f0ee6a4e2ce876b46de",
+      "id": "harness.column_demands",
+      "version": 1
+    },
+    {
+      "content_sha256": "0e500dccd1906b9addbe59d00eea6542f9ff181e87a877013742dcf980f16c22",
+      "id": "harness.column_review",
+      "version": 1
+    },
+    {
+      "content_sha256": "3175b48d36b6db16874b1e64440aa1e70a7e797d7f95cbc96bff2fb26f9b3043",
+      "id": "harness.column_section_match",
+      "version": 1
+    },
+    {
+      "content_sha256": "55998c522c431105471a5c77456ad252de144c4ef9c0ceb76d8559a0b0928d06",
+      "id": "harness.column_select",
+      "version": 1
+    },
+    {
+      "content_sha256": "33c02a8e2922503d14d8597dd4fefb255ef726c83f56b568f687dd6eadb8226e",
+      "id": "harness.design_summary",
+      "version": 1
+    },
+    {
+      "content_sha256": "3d0a65668d63d139aa259c63503343fc9286231c749609d9f6075666715dfaa8",
+      "id": "harness.expected_effects",
+      "version": 1
+    },
+    {
+      "content_sha256": "42d4c0e1b8967d26b715e343c9f05f21c26b1dd4daf480babd403303d9c7c180",
+      "id": "harness.footing_layout",
+      "version": 1
+    },
+    {
+      "content_sha256": "02e956834edac5f767c55de2b8d7c42671a241fb63c2b465569d91caf6de29b7",
+      "id": "harness.footing_plan_size",
+      "version": 1
+    },
+    {
+      "content_sha256": "a13b74764eb45eecbaad7ba8a24847dcdccf9170683594678f75c451ae8efd4c",
+      "id": "harness.footing_resize",
+      "version": 1
+    },
+    {
+      "content_sha256": "b0e55b805078f3f65f1805e04a389b191ab72bfe60b147962003efa1913e9218",
+      "id": "harness.footing_schedule",
+      "version": 1
+    },
+    {
+      "content_sha256": "9fd7f9c96bd95e72ee112931a9c1412cb2335d7d8e6fda3919bb96fc5160c7fc",
+      "id": "harness.footing_status",
+      "version": 1
+    },
+    {
+      "content_sha256": "5eab9374397ea4dcc1b14190aa3abc558b2fe38ea53a3d28ec8d94ae38d87118",
+      "id": "harness.footing_subjects",
+      "version": 1
+    },
+    {
+      "content_sha256": "2170ef2ef05a2d9228dde87616cc0c3150df4c04f8c1b7101ccd54f98bded6d1",
+      "id": "harness.host_design_verdicts",
+      "version": 1
+    },
+    {
+      "content_sha256": "215c1ad970bf4a79087ab6a8f582e97b1dd749234fcb28c647870c648509703b",
+      "id": "harness.model_diff",
+      "version": 1
+    },
+    {
+      "content_sha256": "57eeb2893e6d39b6924ad327fc9ab7aac89032ac4f8fdf33bf4e273c25f0eda2",
+      "id": "harness.model_fingerprint",
+      "version": 1
+    },
+    {
+      "content_sha256": "b2e49954f2aea5621b0c9a296f804ef0afc9682f2713bfccfea0b32b6e661b6d",
+      "id": "harness.placement_compare",
+      "version": 1
+    },
+    {
+      "content_sha256": "da4738f86a28bdbe4deb9d5e18de6b069e6a6118a4f7fa313494fb59115e58ae",
+      "id": "harness.reactions_to_joint_loads",
+      "version": 1
+    },
+    {
+      "content_sha256": "488f530d638dbf289ea078123b3525073cb5f3a2d1063714e18700d384e01119",
+      "id": "harness.readback_check",
+      "version": 1
+    },
+    {
+      "content_sha256": "48511f8ecd661e52bfe578395126401ef7bb809483973c7a3fb20d8815f61a23",
+      "id": "harness.safe_equilibrium",
+      "version": 1
+    },
+    {
+      "content_sha256": "cb8b9c12cd248a2d39f1025969ec2ab389a2002ba7474e73d2b22f90e40b9069",
+      "id": "harness.section_round",
+      "version": 1
+    }
+  ],
+  "schema": 1
+}

@@ -1,0 +1,420 @@
+{
+  "source": "eng-harness spec 0003 §4.8 (R0 to R4), §4.7 (D1 to D7) and §4.4; synthetic read sets, effects and tolerances, no project value",
+  "method_ref": "§4.8 R4",
+  "synthetic": true,
+  "derivation": "Revision 3: frames F1 and F2 (section S1), load set with pattern DEAD and one frame load on F1 (DEAD, gravity, w 10.0 kN/m). Revision 4: F1 section S2, the frame load w 12.4. Every tolerance is 1 (basis). R0: same model, 4 > 3, no shared record, effects parents are the change set and the before records. R1 (D2 to D5): frames: F1 changed at /section, 'S1' to 'S2' (string, D4, no tolerance), F2 unchanged; load set: pattern DEAD unchanged, the row ['frame_loads','F1','DEAD','gravity'] changed at /w_kN_m, |12.4 - 10.0| = 2.4 > 1 (D3, line_load, kN/m). R2: e1 expects 'S2' at /section of ['frames','F1'], reads 'S2': match (D4). e2 expects 12.0 at /w_kN_m of the frame-load row, reads 12.4: |12.4 - 12.0| = 0.4 <= 1, match (D3, tolerance 1). R3: the F1 change is explained by e1 (same section, key, pointer), the load change by e2. Nothing unexpected. R4: no mismatch, missing, unexpected or not read; both sides complete: PASS.",
+  "inputs": {
+    "input": {
+      "before_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "before_loads": {
+        "patterns": [
+          {
+            "name": "DEAD",
+            "type": "dead",
+            "self_weight_ratio": 1.0
+          }
+        ],
+        "combinations": [],
+        "frame_loads": [
+          {
+            "frame": "F1",
+            "pattern": "DEAD",
+            "direction": "gravity",
+            "w_kN_m": 10.0
+          }
+        ],
+        "area_loads": []
+      },
+      "after_frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "S2",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "F2",
+            "kind": "column",
+            "section": "S1",
+            "i": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 6000.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "after_loads": {
+        "patterns": [
+          {
+            "name": "DEAD",
+            "type": "dead",
+            "self_weight_ratio": 1.0
+          }
+        ],
+        "combinations": [],
+        "frame_loads": [
+          {
+            "frame": "F1",
+            "pattern": "DEAD",
+            "direction": "gravity",
+            "w_kN_m": 12.4
+          }
+        ],
+        "area_loads": []
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 1.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.angle_deg": {
+            "value": 1.0,
+            "unit": "deg",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.stress_MPa": {
+            "value": 1.0,
+            "unit": "MPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.unit_weight_kN_m3": {
+            "value": 1.0,
+            "unit": "kN/m3",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.line_load_kN_m": {
+            "value": 1.0,
+            "unit": "kN/m",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.area_load_kPa": {
+            "value": 1.0,
+            "unit": "kPa",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "compare.dimensionless_ratio": {
+            "value": 1.0,
+            "unit": "1",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      },
+      "effects": {
+        "change_set": "res_00000000000000000000000005",
+        "model_id": "mdl_00000000000000000000000000",
+        "effects": [
+          {
+            "item_id": "e1",
+            "section": "model.frame_placements/1",
+            "key": [
+              "frames",
+              "F1"
+            ],
+            "op": "set",
+            "pointer": "/section",
+            "value": "S2",
+            "unit": null
+          },
+          {
+            "item_id": "e2",
+            "section": "model.load_set/1",
+            "key": [
+              "frame_loads",
+              "F1",
+              "DEAD",
+              "gravity"
+            ],
+            "op": "set",
+            "pointer": "/w_kN_m",
+            "value": 12.0,
+            "unit": "kN/m"
+          }
+        ]
+      }
+    },
+    "meta": {
+      "refs": {
+        "before_frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "before_loads": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "model.load_set/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "after_frames": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "after_loads": {
+          "result_id": "res_00000000000000000000000004",
+          "ref": "res_00000000000000000000000004",
+          "kind": "model.load_set/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        },
+        "effects": {
+          "result_id": "res_00000000000000000000000008",
+          "ref": "res_00000000000000000000000008",
+          "kind": "harness.expected_effects/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [
+            "res_00000000000000000000000005",
+            "res_00000000000000000000000001",
+            "res_00000000000000000000000003"
+          ],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "status": "PASS",
+    "items": [
+      {
+        "item_id": "e1",
+        "result": "match",
+        "expected": "S2",
+        "read": "S2",
+        "tolerance": null,
+        "rule": "D4"
+      },
+      {
+        "item_id": "e2",
+        "result": "match",
+        "expected": 12.0,
+        "read": 12.4,
+        "tolerance": 1.0,
+        "rule": "D3"
+      }
+    ],
+    "unexpected": [],
+    "diff": {
+      "before": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 3,
+        "covered": [
+          "model.frame_placements/1",
+          "model.load_set/1"
+        ]
+      },
+      "after": {
+        "model_id": "mdl_00000000000000000000000000",
+        "model_revision": 4,
+        "covered": [
+          "model.frame_placements/1",
+          "model.load_set/1"
+        ]
+      },
+      "tolerances": {
+        "length": {
+          "value": 1.0,
+          "unit": "mm",
+          "ref": "res_00000000000000000000000009#/fields/compare.length_mm"
+        },
+        "angle": {
+          "value": 1.0,
+          "unit": "deg",
+          "ref": "res_00000000000000000000000009#/fields/compare.angle_deg"
+        },
+        "stress": {
+          "value": 1.0,
+          "unit": "MPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.stress_MPa"
+        },
+        "unit_weight": {
+          "value": 1.0,
+          "unit": "kN/m3",
+          "ref": "res_00000000000000000000000009#/fields/compare.unit_weight_kN_m3"
+        },
+        "line_load": {
+          "value": 1.0,
+          "unit": "kN/m",
+          "ref": "res_00000000000000000000000009#/fields/compare.line_load_kN_m"
+        },
+        "area_load": {
+          "value": 1.0,
+          "unit": "kPa",
+          "ref": "res_00000000000000000000000009#/fields/compare.area_load_kPa"
+        },
+        "dimensionless": {
+          "value": 1.0,
+          "unit": "1",
+          "ref": "res_00000000000000000000000009#/fields/compare.dimensionless_ratio"
+        }
+      },
+      "changes": [
+        {
+          "section": "model.frame_placements/1",
+          "key": [
+            "frames",
+            "F1"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/section",
+              "before": "S1",
+              "after": "S2",
+              "unit": null,
+              "quantity_kind": null,
+              "tolerance": null,
+              "rule": "D4"
+            }
+          ]
+        },
+        {
+          "section": "model.load_set/1",
+          "key": [
+            "frame_loads",
+            "F1",
+            "DEAD",
+            "gravity"
+          ],
+          "change": "changed",
+          "before": null,
+          "after": null,
+          "properties": [
+            {
+              "pointer": "/w_kN_m",
+              "before": 10.0,
+              "after": 12.4,
+              "unit": "kN/m",
+              "quantity_kind": "line_load",
+              "tolerance": 1.0,
+              "rule": "D3"
+            }
+          ]
+        }
+      ],
+      "within_tolerance": [],
+      "not_compared": [],
+      "counts": {
+        "model.frame_placements/1": {
+          "added": 0,
+          "removed": 0,
+          "changed": 1,
+          "ambiguous": 0,
+          "unchanged": 1,
+          "within_tolerance": 0
+        },
+        "model.load_set/1": {
+          "added": 0,
+          "removed": 0,
+          "changed": 1,
+          "ambiguous": 0,
+          "unchanged": 1,
+          "within_tolerance": 0
+        }
+      },
+      "identical": false,
+      "complete": true
+    },
+    "complete": true
+  }
+}

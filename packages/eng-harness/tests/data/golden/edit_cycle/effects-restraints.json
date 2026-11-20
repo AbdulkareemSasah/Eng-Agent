@@ -1,0 +1,214 @@
+{
+  "source": "eng-harness spec 0007 section 4.4.2 (projection per kind), synthetic fixture",
+  "method_ref": "§4.4.2 joint_restraints: set per property on a row the state holds, add of a new row",
+  "synthetic": true,
+  "derivation": "Synthetic fixture. State: joint J1 restrained in ux, uy, uz and free in rx, ry, rz. f1 sets J1 to restrain ux, uy, uz, rx, ry and free rz: J1 is in the state, so one `set` per property on [joints, J1], sorted by pointer /rx, /ry, /rz, /ux, /uy, /uz, with the values true, true, false, true, true, true (ids f1/1 to f1/6; the unchanged properties are no-op writes that read back as a match). f2 sets joint J2, which the state lacks, to restrain uz only: one `add` of the whole row {joint J2, ux false, uy false, uz true, rx false, ry false, rz false}. J1 sorts before J2.",
+  "input": {
+    "check": {
+      "calc": {
+        "id": "harness.change_set_check",
+        "version": 1,
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "status": "draft"
+      },
+      "draft": true,
+      "trace": {
+        "calc_id": "harness.change_set_check",
+        "calc_version": "1",
+        "content_sha256": "abababababababababababababababababababababababababababababababab",
+        "inputs": [],
+        "constants": [],
+        "steps": [],
+        "outputs": []
+      },
+      "status": "PASS",
+      "resolved": [
+        {
+          "item_id": "f1",
+          "kind": "joint_restraints",
+          "targets": [
+            "J1"
+          ],
+          "values": []
+        },
+        {
+          "item_id": "f2",
+          "kind": "joint_restraints",
+          "targets": [
+            "J2"
+          ],
+          "values": []
+        }
+      ],
+      "issues": [],
+      "complete": true
+    },
+    "approval_items": [
+      "f1",
+      "f2"
+    ],
+    "change_set": {
+      "items": [
+        {
+          "id": "f1",
+          "kind": "joint_restraints",
+          "joints": [
+            "J1"
+          ],
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": true,
+          "ry": true,
+          "rz": false
+        },
+        {
+          "id": "f2",
+          "kind": "joint_restraints",
+          "joints": [
+            "J2"
+          ],
+          "ux": false,
+          "uy": false,
+          "uz": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      ]
+    },
+    "sections": {
+      "frame_sections": [],
+      "area_sections": []
+    },
+    "loads": {
+      "patterns": [],
+      "combinations": [],
+      "frame_loads": [],
+      "area_loads": []
+    },
+    "restraints": {
+      "joints": [
+        {
+          "joint": "J1",
+          "ux": true,
+          "uy": true,
+          "uz": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        }
+      ]
+    },
+    "basis": {
+      "template": null,
+      "fields": {}
+    }
+  },
+  "refs": {
+    "check": "res_00000000000000000000000001",
+    "change_set": "res_00000000000000000000000002",
+    "sections": "res_00000000000000000000000003",
+    "loads": "res_00000000000000000000000004",
+    "restraints": "res_00000000000000000000000005",
+    "basis": "res_00000000000000000000000006"
+  },
+  "expected": {
+    "change_set": "res_00000000000000000000000002#/fields/change_set/value",
+    "model_id": "mdl_00000000000000000000000000",
+    "effects": [
+      {
+        "item_id": "f1/1",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/rx",
+        "value": true,
+        "unit": null
+      },
+      {
+        "item_id": "f1/2",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/ry",
+        "value": true,
+        "unit": null
+      },
+      {
+        "item_id": "f1/3",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/rz",
+        "value": false,
+        "unit": null
+      },
+      {
+        "item_id": "f1/4",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/ux",
+        "value": true,
+        "unit": null
+      },
+      {
+        "item_id": "f1/5",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/uy",
+        "value": true,
+        "unit": null
+      },
+      {
+        "item_id": "f1/6",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J1"
+        ],
+        "op": "set",
+        "pointer": "/uz",
+        "value": true,
+        "unit": null
+      },
+      {
+        "item_id": "f2",
+        "section": "model.joint_restraints/1",
+        "key": [
+          "joints",
+          "J2"
+        ],
+        "op": "add",
+        "pointer": null,
+        "value": {
+          "joint": "J2",
+          "ux": false,
+          "uy": false,
+          "uz": true,
+          "rx": false,
+          "ry": false,
+          "rz": false
+        },
+        "unit": null
+      }
+    ]
+  }
+}

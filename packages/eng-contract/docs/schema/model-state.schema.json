@@ -1,0 +1,81 @@
+{
+  "additionalProperties": false,
+  "description": "Persisted identity and revision of a host model (spec 4.5.5).",
+  "properties": {
+    "contract": {
+      "const": "eng-contract/1",
+      "default": "eng-contract/1",
+      "title": "Contract",
+      "type": "string"
+    },
+    "derived_from": {
+      "anyOf": [
+        {
+          "pattern": "^mdl_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Derived From"
+    },
+    "file_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "File Sha256"
+    },
+    "fingerprint": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Fingerprint"
+    },
+    "model_id": {
+      "pattern": "^mdl_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+      "title": "Model Id",
+      "type": "string"
+    },
+    "promoted_from": {
+      "items": {
+        "pattern": "^mdl_[0-7][0-9A-HJKMNP-TV-Z]{25}$",
+        "type": "string"
+      },
+      "title": "Promoted From",
+      "type": "array"
+    },
+    "revision": {
+      "minimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "updated_at": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "model_id",
+    "revision",
+    "updated_at"
+  ],
+  "title": "ModelState",
+  "type": "object"
+}

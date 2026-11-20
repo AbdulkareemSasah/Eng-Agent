@@ -1,0 +1,1239 @@
+---
+id: spec-0002-servers-and-adapters
+issue: "B-061"
+status: draft        # draft | approved (approved only by merging this file's own pull request)
+size: large
+risk: [r1, r2, r3]   # r2 added by amendment B-537 (T21 adds a kinds module)
+---
+
+# Spec 0002: eng-harness servers and adapters
+
+Package: `eng-harness` (import package `eng_harness`) · Author: agent identity (bootstrap mode,
+[ADR-0028](../../../../design/docs/adr/0028-build-v1-in-this-repository.md) §4) · Date: 2026-11-03
+
+This spec implements the `ToolPort` and `HostPort` of the
+[engine spec](0001-engine.md) ("engine §n") for the Sasaah servers and command-line tools
+([ADR-0024](../../../../design/docs/adr/0024-harness-on-existing-sasaah-servers.md)): `harness.toml` server sections,
+server processes and Job Objects, the MCP sessions, the build check, the host-instance lock and process guard, the
+adapter framework, the CSI adapter for the edit cycle on ETABS, the command-line tool adapter, record mode and the test
+fakes, and `eng-harness doctor`. It follows [11](../../../../design/docs/architecture/11-harness-engine.md) ("11 §n")
+§6 items 2, 6, 8, 9, 10 and §9, with [ADR-0030](../../../../design/docs/adr/0030-replay-by-step-path-and-reconciliation.md)
+decisions 7 and 8, and proposes [ADR-0031](../../../../design/docs/adr/0031-model-locked-after-analysis.md)
+(`model_locked`) and [ADR-0032](../../../../design/docs/adr/0032-harness-side-model-identity.md) (model identity).
+Tool facts come from the [S-12 report](../../../../spikes/S-12-sasaah-tool-inventory/REPORT.md) ("S-12 §n") and its
+`inventory/*.json` at Sasaah commit `61da80f61a6562c8e3553168056bc107e3f93013`; the Job Object facts from the
+[S-10 report](../../../../spikes/S-10-replay/REPORT.md) ("S-10"). The contract API is
+[eng-contract spec 0001](../../../eng-contract/docs/specs/0001-eng-contract-0.1.md) ("contract §n"). Details that the
+architecture leaves open are marked **[added]** and listed in §11.
+
+## 1. Problem
+
+The session review behind ADR-0024 (Sasaah `agent-sessions/_baseline/REPORT.md` §5 and §6) lost most host time to
+deployment and session failures, not to the servers' tools: a server build older than its own fix failed 7 of 7 design
+runs with `model_locked`; 10 of 74 analysis runs timed out with an unknown outcome; `csi_attach` failed with
+`target_disconnected`; more than 8 ETABS instances were left orphaned by scripts; one session killed a process that
+belonged to another session and an engineer's SAP2000 session disappeared; an unlock reached the engineer's own
+instance and deleted its results; thicknesses came out 1000 times too large from an unintended unit in a
+`define_*_section` call. The Sasaah servers do not guard any of this themselves (S-12 §3 to §7). The harness has to:
+start and stop them so nothing is orphaned, refuse a server build it was not tested with, keep one driver per host
+instance, close only what it started, speak the contract on their behalf, report honest outcomes after timeouts, and
+check units and read back after every write.
+
+## 2. Reuse research
+
+| Candidate | Finding | Decision |
+|---|---|---|
+| Official MCP Python SDK 2.x (`mcp` 2.3.0, MIT; read from the installed package) | `mcp.Client(server, mode=..., cache=..., read_timeout_seconds=...)` accepts any `Transport` (an async context manager yielding the read and write streams, `mcp/client/_transport.py`); `call_tool(name, arguments, read_timeout_seconds=...)` raises `MCPError` with `REQUEST_TIMEOUT` after sending a courtesy `notifications/cancelled` (`mcp/shared/jsonrpc_dispatcher.py`); `list_tools(cursor=, cache_mode=)`; `server_info` after the handshake. Its own `stdio_client` on Windows creates a Job Object with kill-on-close **after** the spawn and without breakaway (`mcp/os/win32/utilities.py`: "if that ever bites, the fix is a CREATE_SUSPENDED spawn") | Used for the client session and message types (`mcp_types.jsonrpc_message_adapter`, `mcp.shared.message.SessionMessage`). Its `stdio_client` and `StdioServerParameters` are **not** used: the race and the missing breakaway contradict ADR-0030 decisions 7 and 8. The harness supplies its own `Transport` over its own process (§4.3.3). New runtime dependency: package ADR (plan T1) |
+| S-10 `jobobject.py` | Proves the job mechanism; uses `Popen`, a thread scan to resume and a PID lookup to assign | Design reused, code not (S-10 "PID use"): `CreateProcessW` with handles in hand |
+| S-02 and S-04 scripts | Call sequences against the real server (launch, open copy, save, analysis, design, unlock probe, model-state reads, table keys) | The call sequences and the read set are reused as the basis of the CSI adapter and of the record-mode scripts; code not copied |
+| `ctypes`, `msvcrt`, `fcntl`, `tomllib`, `hashlib`, `subprocess` (standard library) | Win32 calls, OS locks, configuration, hashes, the POSIX launcher | Used; no `pywin32` import (it is a transitive dependency of `mcp` on Windows only) |
+| `eng-contract` 0.1 | Envelopes, `ResultStore`, `ModelStateStore`, `validate_input`, `ParamModel`, `eng_param`, `units.csi_unit_system`, `convert`, `extract_raw_reply`, kinds, `resolve_workspace` | Used; no logic re-implemented |
+| Sasaah's own audit log (`--audit-log`, `CsiAuditJournal.cs`) | Records Write, Destructive and Code calls with an argument hash and result code (S-12 §5) | Pointed at the run folder; read as reconciliation evidence only (a call completing on an abandoned thread is not recorded as completed) |
+
+## 3. Acceptance criteria
+
+Test paths are relative to `packages/eng-harness/`. "Synthetic CSI fake" is the test-only MCP server of §4.8.3 (lead
+decision D-5), run as a real process over stdio. "Fake-host workflow test" is a test block run by the real engine
+with the real `ToolPort` and `HostPort` of this spec against synthetic fakes.
+
+### 3.1 `harness.toml`
+
+- AC1. Given a `harness.toml` with every required key, when loaded, then `ServersConfig` holds each server's command,
+  arguments, environment, roles with their call timeouts, pinned build and toolsets, and each command-line tool's
+  shell, script, declared inputs and outputs and timeout. Test: `tests/unit/servers/test_config.py::test_load_full`.
+- AC2. Given a server or tool without a timeout, a role without `call_timeout_s`, or no `client_grace_s`, when
+  loaded, then `ConfigError` names the key; no timeout has a default. Test:
+  `tests/unit/servers/test_config.py::test_timeouts_required`.
+- AC3. Given arguments or environment that enable scripts, generic invoke, attached writes or read-only mode
+  (§4.2 forbidden list), or a toolset that includes an escape hatch, when loaded, then `ConfigError`. Test:
+  `tests/unit/servers/test_config.py::test_forbidden_options`.
+
+### 3.2 Processes and Job Objects
+
+- AC4. Given the POSIX launcher, when a server is stopped, then `terminate_job` ends it and its children (one process
+  group per server) while a host stand-in it started in a new session survives; when the engine process is killed,
+  the server exits on stdin end-of-file. Tests: `tests/unit/servers/test_launcher_posix.py::test_group_terminated`,
+  `::test_server_exits_when_engine_killed`.
+- AC5. Given Windows, when a server is started, then it is created suspended, assigned to its own job with
+  kill-on-close and silent breakaway, resumed, and the job handle is not inheritable; killing the engine ends the
+  server and its non-breakaway children, while a child the server starts survives (silent breakaway). Tests:
+  `tests/windows/test_jobs.py::test_suspended_assign_resume`, `::test_kill_on_close`, `::test_breakaway_survives`.
+- AC6. Given a command-line tool job (no breakaway), when the step times out, then every process of the job ends and
+  the step fails `TIMEOUT_NO_EFFECT`. Tests: `tests/unit/servers/test_launcher_posix.py::test_tool_timeout_kills_group`,
+  `tests/windows/test_jobs.py::test_tool_job_no_breakaway`, `tests/workflow/adapters/test_cli.py::test_timeout_no_effect`
+  (the step part, plan T16; amendment B-388).
+- AC7. Given a running process, when `ProcessInspector.identity(pid)` is read twice, then the start time is equal;
+  given a pid reused by a new process, then `alive(pid, started_at)` is false; `terminate(pid, started_at)` ends the
+  process only if both match. Tests: `tests/unit/servers/test_procinfo.py::test_identity_stable`,
+  `::test_terminate_checks_start_time`, `tests/windows/test_procinfo.py::test_identity_windows`.
+- AC7a. Given a process the engine may not open (another user's host program on a shared machine: `OpenProcess` fails
+  with access denied), then `snapshot` and `children` leave it out and log its pid, while `identity` and `terminate`
+  on that pid raise. Test: `tests/windows/test_procinfo.py::test_listing_skips_inaccessible` (over the fake kernel32;
+  amendment B-388).
+
+### 3.3 MCP session and build check
+
+- AC8. Given a synthetic CSI fake, when the session starts, then the MCP handshake runs over the harness transport,
+  `tools/list` is read uncached and completely (all pages), and a `tools/call` round trip returns the raw reply. Test:
+  `tests/workflow/servers/test_session.py::test_start_list_call`.
+- AC9. Given the pinned build, when the build check runs, then the executable SHA-256, `serverInfo` (recorded), the
+  allowlist's Sasaah commit and the tool-list fingerprint all match and `ServerCheck.ok` is true; given any one of
+  them different, or an allowlisted tool missing, or a script or generic-invoke tool listed, then `ok` false with the
+  reason, and the engine stops before any write (engine AC44). Tests:
+  `tests/unit/servers/test_buildcheck.py::test_fingerprint_definition`, `::test_each_mismatch`,
+  `tests/workflow/servers/test_session.py::test_build_mismatch_stops_run` (the engine clause; it runs the real engine,
+  plan task T19a; amendments B-413, B-475).
+- AC10. Given the S-12 inventory, when the fingerprint of the CSI allowlist is computed from it, then it equals the
+  value pinned in the allowlist data (`fingerprint_source = "s12-inventory"`). Test:
+  `tests/contract/test_csi_allowlist.py::test_pinned_fingerprint_from_inventory`.
+- AC11. Given a server that exits during a call, then a read returns `HOST_NOT_CONNECTED` and a write, analysis,
+  design or save returns `TIMEOUT_UNKNOWN_OUTCOME`; the session epoch increases; the next call restarts the server
+  (at most `max_restarts_per_run`), repeats the build check, re-attaches to the bound instance by process id, and the
+  engine reads units before the next step (engine AC45). Tests: `tests/workflow/servers/test_session.py::test_crash_restart`,
+  `::test_restart_repeats_build_check` (the build check on a restart, plan task T6b; amendment B-413).
+- AC12. Given engine shutdown, then each session closes, each server process is waited for up to its grace time and
+  then its job is terminated; no host instance is ended by it. Test:
+  `tests/workflow/servers/test_session.py::test_shutdown_leaves_hosts`.
+
+### 3.4 Host-instance lock and process guard
+
+- AC13. Given a host instance locked by another live engine process, when this engine addresses it, then
+  `ContractError` `HOST_LOCKED` names the holder's run id, and no call is sent; the engine does not retry. Test:
+  `tests/unit/servers/test_hostlock.py::test_second_driver_refused`.
+- AC14. Given a lock file whose holder has died, then the lock is acquired (the OS released it) and the takeover is
+  logged; given the same pid with a different start time, then it is a different lock. Test:
+  `tests/unit/servers/test_hostlock.py::test_stale_and_pid_reuse`.
+- AC15. Given instances this run launched (journaled `host_started`) and an instance it attached to, when
+  `close_started` runs, then only launched instances whose pid and start time still match are closed: through
+  `csi_exit` when the launching role holds launch ownership and `csi_status` names the instance as the current
+  target, else, for an instance launched hidden, by terminating the process; a visible instance that cannot be exited
+  gracefully is left running and reported; the attached instance is never closed. Given a `timeout` on the launching
+  role (synthetic fault, a read included) after `csi_launch`, then no `csi_exit` is sent and the fallback applies;
+  and `restore` after such a timeout sends no `csi_open_model` to the old instance but launches a new hidden instance
+  and opens the file there. Tests: `tests/workflow/servers/test_guard.py::test_close_only_started`,
+  `::test_close_after_timeout_falls_back`, `tests/workflow/adapters/test_csi_session_ops.py::test_restore_after_timeout`.
+
+### 3.5 Adapter framework
+
+- AC16. Given the allowlist data, when loaded, then every entry has a kind, timeout class, effect, action, units
+  handling and canonical argument model; any name in the escape-hatch deny list, any tool the S-12 inventory marks
+  `excluded_from_allowlist`, or a tool absent from the pinned build is refused at load. Tests:
+  `tests/unit/adapters/test_allowlist.py::test_entries_complete`, `::test_escape_hatches_refused`,
+  `tests/contract/test_csi_allowlist.py::test_against_inventory`.
+- AC17. Given a tool outside the allowlist, then `ToolPort.describe` and `call` raise `INVALID_ARGUMENT` and nothing
+  is sent. Test: `tests/unit/adapters/test_toolport.py::test_not_allowlisted`.
+- AC18. Given canonical arguments with `$ref`s, when called, then references resolve through `eng_contract` (kind,
+  pointer, unit, staleness), the input is validated before any host call, values are converted to the units token
+  the call passes, and provenance records the references, never the values. Test:
+  `tests/unit/adapters/test_args.py::test_refs_resolved_converted_recorded`.
+- AC19. Given a host reply, then the envelope carries the canonical-unit payload in the store, a summary of at most
+  4096 bytes, inline data only if at most 16384 bytes, `complete` false with `PARTIAL_DATA` when the server reported
+  `truncated`, and provenance with tool, build, host program, model id and revision. Test:
+  `tests/unit/adapters/test_envelope.py::test_limits_and_provenance`.
+- AC20. Given each Sasaah error code of the S-12 table (§4.5.5), then the mapped contract code, `retryable`,
+  `host_code`, `host_method` and precondition are as tabled; unexpected text with no code maps to `INTERNAL` with an
+  `incident_id`. Test: `tests/unit/adapters/test_csi_errors.py::test_mapping_table` (parametrized over the table).
+- AC21. Given a server `timeout` or a client backstop timeout, then a read gives `TIMEOUT_NO_EFFECT`, and a write,
+  save, analysis, design or unlock gives `TIMEOUT_UNKNOWN_OUTCOME` with the `op_id`; the host is marked wedged and the
+  epoch increases. Test: `tests/unit/adapters/test_timeouts.py::test_timeout_mapping`.
+- AC22. Given a timeout on a host whose units were left changed (synthetic fault `units_left_changed`), when the next
+  step on that host runs, then `read_units` reports the mismatch and the engine stops with `PRECONDITION_FAILED`
+  (`units_verified`) before reconciliation. Test: `tests/workflow/adapters/test_units_after_timeout.py::test_units_trap`
+  (it runs the real engine, plan task T19a; amendments B-413, B-475).
+- AC23. Given a write in flight, when reconciled, then the adapter reads the object's state and answers `applied`,
+  `not_applied`, `partial` or `unknown` per §4.5.7, with the evidence stored as a result; given an analysis or design
+  in flight with no proof of end of the abandoned call (v1), then the answer is `unknown` whatever the host answers,
+  and the adapter sends no re-run. Tests:
+  `tests/workflow/adapters/test_reconcile.py::test_outcomes_per_tool` (parametrized over the write tools),
+  `::test_long_tools_unknown_without_proof_of_end`.
+- AC24. Given a successful write, when the engine's `check_model` runs, then every written item is read back and
+  compared; a mismatch (including a thickness written in the wrong units, the x1000 case) is an `error` issue
+  `READBACK_MISMATCH`, and a read-back that is not available is `READBACK_UNAVAILABLE` (error). Test:
+  `tests/workflow/adapters/test_readback.py::test_mismatch_detected`.
+
+### 3.6 CSI adapter (ETABS)
+
+- AC25. Given the edit-cycle steps of §4.6.1, when each step's tool is called against the synthetic CSI fake, then the
+  arguments sent equal the mapping (names, explicit `target`, `units` token, `confirm` only under an approval) and the
+  reply becomes the stated kind. Test: `tests/workflow/adapters/test_csi_steps.py::test_step_mapping` (parametrized).
+- AC26. Given each edit kind of §4.6.2, then the canonical arguments map to the S-12 tool; an edit kind or direction
+  marked "not implemented" raises `NotImplementedGap` (`NOT_IMPLEMENTED`) with its gap id. Tests:
+  `tests/workflow/adapters/test_csi_edits.py::test_edit_kinds`, `::test_gaps_not_implemented`.
+- AC27. Given the model-state reader, when it reads a model, then it produces `model.stories/1`,
+  `model.grid_system/1`, `model.frame_placements/1`, `model.area_placements/1`, `model.load_set/1` and
+  `model.joint_restraints/1` payloads that validate, the status (`units`, `locked`, counts), and a fingerprint that
+  is the same for the same state read twice and differs after any edit kind; a read that is `truncated` raises
+  `LIMIT_EXCEEDED`. Tests: `tests/unit/adapters/test_csi_replies.py::test_six_kinds_and_status_validate`,
+  `tests/workflow/adapters/test_csi_state.py::test_kinds_and_fingerprint`,
+  `tests/property/test_fingerprint.py::test_order_independent_and_edit_sensitive` (amendment B-450).
+- AC28. Given analysis or design, then the call goes to the `long` role server with its own call timeout, after the
+  engine's save (engine AC43). Test: `tests/workflow/adapters/test_csi_analysis.py::test_long_role_and_save_first`.
+- AC29. Given `model_locked` from a write, then until ADR-0031 is accepted the code is `HOST_LOCKED` and no unlock is
+  offered; after the switch task, `PRECONDITION_FAILED` (`model_unlocked`), and `csi_unlock_model` runs only under an
+  approval. Tests: `tests/unit/adapters/test_csi_errors.py::test_model_locked_interim`,
+  `tests/workflow/adapters/test_csi_unlock.py::test_unlock_under_approval` (plan task T15, blocked on ADR-0031).
+- AC30. Given a model file at first use, then its identity resolves per ADR-0032 (content hash, path hash, new); a
+  working copy gets a new identity `derived_from` the original; every save writes the new content hash before
+  `model_saved`; no path is stored. Test: `tests/unit/adapters/test_identity.py::test_resolution_rules`.
+
+### 3.7 Command-line tools
+
+- AC31. Given `dxf-prep/prepare` with input files, when run, then inputs are hashed (`FileSource`), the process runs
+  in a tool job in a fresh attempt folder, the declared outputs are hashed into `harness.cli_run/1`, the exit code
+  maps per §4.7, and the step is journaled. Test: `tests/workflow/adapters/test_cli.py::test_prepare_outputs_hashed`.
+- AC32. Given `etabs-model/build`, then the configuration is copied with `outputFolder` set to the attempt folder and
+  relative input paths made absolute; an output that already exists is never overwritten; a pinned build artifact
+  whose hash changed during the call fails the step. Test: `tests/workflow/adapters/test_cli.py::test_build_config_and_pins`.
+
+### 3.8 Record mode and fakes
+
+- AC33. Given record mode, when a session runs, then every `tools/list` and `tools/call` request and reply is written
+  as a fixture with paths outside the run folder and user names replaced, Project Information reads dropped, and a
+  manifest of SHA-256 hashes; the manifest verifies. Test: `tests/unit/servers/test_record.py::test_sanitized_and_manifest`.
+- AC34. Given recordings, when the recorded-reply fake serves a session, then the adapter's contract tests pass on
+  them, and the synthetic fake gives the same reply shape and error codes for every recorded operation (fake
+  fidelity, process/05 §4). The tests run on every applicable committed recording under `acceptance/recordings` and on
+  the synthetic recording produced by record mode for that adapter; the real server is verified only once the owner
+  commits a recording (spec §12 item 13; amendment B-573). Tests: `tests/contract/test_csi_recordings.py::test_adapter_on_recordings`,
+  `::test_synthetic_matches_recordings`.
+- AC35. Given the synthetic CSI fake, then its tool list equals the S-12 inventory schemas for every allowlisted tool
+  (so its fingerprint equals the pinned one) and it is never part of the built package. Tests:
+  `tests/contract/test_csi_allowlist.py::test_fake_schemas_match_inventory`,
+  `tests/unit/test_package_contents.py::test_fakes_not_shipped`.
+
+### 3.9 Engine integration, replay and doctor
+
+- AC36. Given a test block that runs launch, open copy, read state, unlock-free edits, save, analysis, design and
+  results through the real engine and real server processes, then the journal holds every step, check and save, and
+  a kill of the engine at each write step followed by a resume reconciles and completes without a repeated write.
+  The matrix supplies explicit engineer decisions for unreconciled opens and saves and for unknown analysis
+  and design outcomes (H-G7). If an engineer confirms an interrupted save as applied and its result carries no
+  read-back evidence, the existing host-state check may also request acceptance of the working copy as a new
+  baseline (engine AC34, §4.5.4). A revision record still requires the evidence in engine §4.6.
+  Tests: `tests/workflow/test_csi_cycle.py::test_cycle_steps`, `tests/replay/test_csi_resume.py::test_crash_matrix`.
+- AC37. Given `eng-harness doctor`, then it reports uv and Python, each server executable and its hash against the
+  pin, each live tool-list fingerprint, installed host programs, the integrity level (warning when not medium), and
+  the workspace class, as a table and as JSON with base names only, exit code 0 without failures and 1 with any.
+  Tests: `tests/unit/test_doctor.py::test_checks_and_output`, `tests/windows/test_doctor_windows.py::test_integrity_level`
+  (amendment B-413: a distinct base name, since mypy names a test module by its base name without an `__init__.py`).
+- AC38. Given an allowlist or `[cli_tools.*]` entry with `release = "unreleased"` and a `release_record`, then
+  `ToolPort.unreleased_tools()` returns it with its record; an `unreleased` entry without a record, or a record on a
+  `released` entry, is refused at load; with no such entry the mapping is empty. Tests:
+  `tests/unit/adapters/test_allowlist.py::test_release_marks`,
+  `tests/unit/servers/test_config.py::test_cli_tools_release_marks`,
+  `tests/unit/adapters/test_toolport.py::test_unreleased_tools`.
+- AC39. Given `doctor.run(..., extra_checks=[provider])` where the provider returns checks (as spec 0006 does for the
+  page binding, browser opening, console encoding, locale and calendar, its Q13), then those checks appear in the
+  table and the JSON after the checks of §4.9, a `fail` among them gives exit 1, and a provider that raises gives one
+  `fail` check naming it; and given unreleased tools (AC38), then a `warn` check lists them with their records. Test:
+  `tests/unit/test_doctor.py::test_extra_checks_and_unreleased_tools`.
+- AC40. **[added: B-085]** Given a server section without `audit_log`, when its roles start, then `audit_log` is true
+  and each role's argv is the one of §4.3.2 with `--audit-log` (the CSI argv is unchanged); given `audit_log = false`,
+  then no `--audit-log` argument is built; a value that is not a boolean is a `ConfigError`. Tests: `tests/unit/servers/test_config.py::test_audit_log_flag`,
+  `tests/unit/servers/test_launch_args.py::test_audit_log_default_and_off`.
+- AC41. **[added: B-085]** Given an allowlist whose header declares `routes`, when it is loaded, then every entry
+  carries a non-empty `routes` list drawn from them (else a load error), and loading it for a server section's `route`
+  gives exactly the entries whose `routes` include that route, so a tool of another route is refused as in AC17; a
+  `route` the header does not declare, or a missing `route` for such an adapter, is a load error. Given an allowlist
+  without `routes` in its header (CSI), then an entry with `routes` or a server section with `route` is a load error.
+  The tool-list fingerprint (§4.3.4 item 4) stays over every allowlisted entry, whatever its routes. `build_ports`
+  loads each adapter's allowlist for its server section's `route`. Tests:
+  `tests/unit/adapters/test_allowlist.py::test_routes_declared`, `::test_route_filter` (also a `route` on a CSI
+  section; amendment B-413: a `route` on a CSI section is decided at allowlist load),
+  `tests/workflow/test_build_ports.py::test_allowlist_loaded_for_route` (a synthetic routed allowlist, test data,
+  given through the `allowlists` keyword of `build_ports`, §4.1; amendment B-530).
+- AC42. **[added: B-085]** Given allowlist header `[[unit]]` entries (`tool`, `field`, `unit`, `unit_status`), when
+  loaded, then all are exposed on `Allowlist.units`, and each entry of an allowlisted tool also on that tool's
+  descriptor; `unit_status` is `declared`, `missing` or `confirmed`. An entry with status `missing` may name a tool the
+  allowlist does not serve (it records why the tool stays unserved, as `idea_set_loads` in spec 0014 AC16); it then
+  serves nothing and appears on no descriptor. An unknown status, a `unit` with status `missing`, a status other than
+  `missing` without a `unit`, a `declared` or `confirmed` entry whose `tool` is not an allowlisted entry, or a `tool`
+  in the escape-hatch deny list (§4.5.1) is a load error; each adapter's contract test checks every `[[unit]]` tool
+  against its pinned inventory. Tests: `tests/unit/adapters/test_allowlist.py::test_unit_header_entries`,
+  `::test_unit_header_missing_on_unserved_tool`.
+- AC43. **[added: B-475]** Given `[cli_tools.*]` entries, then `build_ports` routes each to the command-line tool
+  adapter (§4.7), and `ToolPort.describe` and `ToolPort.call` of such a tool reach it. Until plan task T19b,
+  `build_ports` refuses a configuration with any `[cli_tools.*]` entry with `NotImplementedGap` (`NOT_IMPLEMENTED`, gap
+  H-G8) naming the entries, rather than drop them; raised where the command line builds its ports (spec 0006 §4.2.2
+  step 2, outside the engine, so nothing is journaled; amendment B-536), it ends `run` and `resume` with exit 2 `USAGE` (a
+  configuration this build cannot serve: spec 0006 §4.2.3 and §6 map its `NOT_IMPLEMENTED` to 2; owner answer of
+  2026-11-14, B-495, §11 Q9), and its message, printed on standard error, names H-G8 and the entries. Tests:
+  `tests/workflow/test_build_ports.py::test_cli_tools_not_wired_gap` (plan task T19a; replaced in T19b),
+  `tests/unit/cli/test_exit_codes.py::test_error_codes` (the exit code, plan task T19a),
+  `tests/workflow/test_cli_run.py::test_port_builder_gap_exits_2` (the command line catches it, spec 0006 AC68, plan
+  0006 task T14c; amendment B-536),
+  `tests/workflow/test_build_ports.py::test_cli_tool_routed_through_build_ports` (plan task T19b).
+- AC44. **[added: B-503]** Given a run whose frozen basis holds `checks.readback_relative_tolerance_ratio`, when
+  `check_model` of the ports `build_ports` made reads back a quantity written through them, then it is compared within
+  that value, at start and after a resume of the run (§4.5.8); given a basis without the field, then the quantity is
+  `READBACK_UNAVAILABLE`. Test: `tests/workflow/test_build_ports.py::test_readback_tolerance_from_run_basis` (plan task
+  T19a; closes H-G9).
+- AC45. **[added: B-503]** Given the CSI ports `build_ports` made, then a write through the tool port is in the
+  written-items book that `check_model` reads and is marked on the host port (`wrote`), so it is not reported as
+  `MODEL_CHANGED_OUTSIDE`; its ledger entry's `pre_image_ref` resolves to the `observed` value of a `read_back` taken
+  before it (§4.5.7); the revision tools use the run's snapshot record (`run_dir/copies`,
+  `run_dir/adapter/revisions.json`; spec 0007 §4.5.1) and tell the host port the restored working file (spec 0007
+  AC38); and `ToolPort.preview` answers a `Preview` built from the canonical arguments and the pre-image (§4.5.9),
+  sends no write to the host and refuses a binding without model identity (`PRECONDITION_FAILED`, `model_open`),
+  except for a tool with action `open` on a key with no bound model, whose preview has `models` empty (amendment
+  B-543). Tests: `tests/workflow/test_build_ports.py::test_csi_wiring_shares_book_and_pre_image`,
+  `::test_csi_preview_sends_no_write`, `::test_binder_from_host_port` (the binder of §4.5.9, amendment B-530),
+  `::test_open_preview_without_binding` (amendment B-543) (plan task T19a).
+- AC46. **[added: B-503]** Given `HARNESS_KINDS`, then it holds the six `harness.csi_*` kinds of A1 with the payload
+  models of `eng_harness.kinds.csi`, so a store over it keeps an analysis or design result, and
+  `eng_harness.adapters.csi._replies` answers those same models. Test:
+  `tests/contract/test_csi_kinds.py::test_csi_kinds_registered` (plan task T21).
+- AC47. **[added: B-530]** Given an `AdapterHostPort`, then `preflight` and `session_epoch` answer its
+  `ServerManager`'s, `acquire` answers a `HostLease` and `release` gives up every host lock; given a new host port over
+  the `run_dir` of an earlier one, then it loads `run_dir/adapter/state.json` (§4.5.9), finds the bound working copy
+  and re-locks at `acquire` each persisted instance still alive with the same pid and start time; and after `save`,
+  `SavedModel.fingerprint` is the fingerprint of the saved state, not `""`. Tests:
+  `tests/workflow/adapters/test_csi_host_resume.py::test_lease_preflight_and_epoch`,
+  `::test_new_port_restores_from_run_state`,
+  `tests/workflow/adapters/test_csi_session_ops.py::test_save_records_the_state_fingerprint` (plan task T19c).
+- AC48. **[added: B-541]** Given an `AdapterPorts` (§4.1), when it is entered, then its `ServerManager` is entered (so
+  a role can start), and when it is left, normally or by an exception, then the manager is left, which is the shutdown
+  of §4.3.5 (AC12). Test: `tests/unit/adapters/test_ports.py::test_ports_enter_and_leave_server_manager` (plan task
+  T22).
+- AC49. **[added: B-541]** Given `platform_inspector()` and `platform_launcher(inspector)` (§4.1), then on POSIX they
+  are the POSIX inspector and a POSIX launcher over it, and on Windows the Windows inspector and the Job Object
+  launcher; the doctor starts its server roles through `platform_launcher` over the inspector it reports with; and
+  `doctor.run(None, ...)` checks no server section, while its `env` argument replaces the environment of the
+  workspace and lock-directory rows (§4.9). Tests: `tests/unit/servers/test_platform.py::test_platform_pair`,
+  `tests/unit/test_doctor.py::test_live_roles_use_platform_launcher`,
+  `tests/unit/test_doctor.py::test_no_config_file_and_environment`, and for the Windows pair, in the Windows job,
+  `tests/windows/test_platform_windows.py` (plan task T22).
+- AC50. **[added: B-541]** Given the parsed tables of a `harness.toml`, then `servers_config(data)` validates its
+  server, tool and host-program sections as `load_servers_config` does (a `ConfigError` naming the dotted key); given
+  a file that starts with a UTF-8 byte-order mark, then `load_servers_config` reads it as without the mark; and
+  `ServersConfig.host_program(product)` returns the `[host_programs.<name>]` entry whose name is the product in lower
+  case, or raises `ConfigError` naming `host_programs.<name>` when there is none. Tests:
+  `tests/unit/servers/test_config.py::test_servers_config_from_tables`,
+  `::test_byte_order_mark_accepted`, `::test_host_program_of_product` (plan task T22).
+- AC51. **[added: B-543]** Given a CSI tool port whose opener is its host port's `open_original` (the binder a test
+  binder until T19a wires the host port's own, B-530) and a model key in the host
+  port's files, when `csi_open_model` is called with that key and no `path`, then the host port opens that file in the
+  run's own instance (launching and locking one when the run has none), `locate` of the key finds it, `read_units`
+  matches the units recorded at the open, the answer is a success envelope, and `working_copy` then opens the copy in
+  the same instance; a `csi_open_model` that names a `path`, a key with no file and a port without `open_original`
+  answer failure envelopes (`INVALID_ARGUMENT`, `NOT_FOUND`, `INTERNAL`) and raise nothing; and a host port made with
+  `visible` true sends `csi_launch` with `visible: true` and records the launch as visible, while the default sends
+  `visible: false`. Tests: `tests/workflow/adapters/test_csi_open_original.py::test_open_original_then_working_copy`,
+  `::test_open_refusals_are_envelopes`, `::test_visible_launch` (plan task T23).
+- AC52. **[added: B-562]** The CSI tool descriptor guarantees unchanged model content for a pathless
+  `csi_open_model` of the original (§4.5.9). A call specifying `path`, a revision open, and ordinary writes get no
+  such guarantee. In the real-engine cycle the journal records that guarantee and the original's write effect.
+  After the working copy opens in the same instance, the original's open triggers no model-content checks, and the
+  working copy's writes are still checked. After a confirmed applied original open, any missing binding, units
+  check and first working copy occur before later steps on the model (engine EC1). The existing engineer decision
+  path still resolves an unknown open. Tests: `tests/workflow/adapters/test_csi_revisions.py`,
+  `tests/workflow/test_csi_cycle.py`, `tests/replay/test_csi_resume.py`, and the focused engine and journal
+  regressions of plan T19a.
+
+## 4. Design
+
+### 4.1 Package layout and public API
+
+`packages/eng-harness/src/eng_harness/`, extending the engine layout (engine §4.1.1).
+
+| Module | Public names | Who may import |
+|---|---|---|
+| `eng_harness.servers` | `ServersConfig`, `ServerConfig`, `RoleConfig`, `CliToolConfig`, `ConfigError`, `load_servers_config`, `servers_config` **[added: B-541]**, `ServerManager`, `ServerCheck` (re-export of the port type), `RecordMode`, `platform_inspector`, `platform_launcher` **[added: B-541]** | engine wiring (0006), doctor, tests |
+| `eng_harness.adapters` | `build_ports(config: ServersConfig, workspace, store, run_dir, clock, ids, *, inspector=None, launcher=None, lock_dir=None, files=None, checks=None, allowlists=None, visible=False) -> AdapterPorts` (`tool_port`, `host_port`, `servers`; an async context manager, **[added: B-541]**), `Allowlist`, `ToolDescriptor`, `AdapterError` | engine wiring (0006), tests |
+| `eng_harness.doctor` | `run(config_path, *, json_output, show_paths, extra_checks=(), env=None) -> int` (`config_path` may be `None`, and `env`, **[added: B-541]**), `DoctorReport`, `Check`, `CheckProvider` | CLI (0006) |
+| `eng_harness.kinds.csi` **[added: B-503]** | `CSI_KINDS` and the payload models of the harness kinds of A1 (`CsiModelStatus`, `CsiAnalysisRun`, `CaseStatus`, `CsiAnalysisStatus`, `CsiDesignRun`, `CsiRows`); imports `pydantic` only; registered in `HARNESS_KINDS` (`_kinds.py`), the registry of the run's store | adapters, calcs (spec 0003 §4.3), tests |
+
+`build_ports` keywords **[added: B-530]** (the six positional arguments stay, so spec 0006 calls it unchanged):
+
+1. `inspector` (`ProcessInspector`) defaults to the platform inspector (as the doctor's) and is given to the
+   launcher, the process guard, the CSI session and the host port; `launcher` defaults to the platform launcher over
+   that inspector. **[added: B-541]** Both come from one factory in `servers/_platform.py`, which the doctor uses
+   too: `platform_inspector()` (the POSIX inspector, or on Windows the Windows inspector over `kernel32`) and
+   `platform_launcher(inspector)` (the POSIX launcher, or on Windows the Job Object launcher of §4.3.1 over that
+   inspector). Decision: one factory, because the doctor built its `ServerManager` with the POSIX default, whose
+   inspector reads `/proc` at construction and fails on Windows, and `windows_launcher()` had no caller.
+2. `lock_dir` defaults to `default_lock_dir` (§4.4.1). The engine identity in the holder record is
+   `inspector.identity(os.getpid())` and the run id is the name of `run_dir`, so no further seam is needed.
+3. `files` (`Mapping[str, Path]`, model key to file) defaults to empty; a key it lacks stays `NOT_FOUND`. The command
+   line fills it from the run's input (spec 0006 §4.2.2 step 2; amendment B-536 closes gap H-G10).
+4. `checks` (`Mapping[str, ServerCheck]`, per server section) defaults, for a section it lacks, to a placeholder with
+   `ok` false, empty fingerprints and the build formatted as an unchecked `ServerCheck` of §4.3.4. The ports read only
+   its `build` (provenance); the engine's `preflight` result is the authority for a stop.
+5. `allowlists` (`Mapping[str, Callable[[str | None], Allowlist]]`, adapter name to a loader that takes the server
+   section's `route`) defaults to `csi_allowlist` (which gains the `route` argument) under the CSI adapter name; each
+   server section's adapter selects its loader and calls it with the section's `route`, so the load applies the rule
+   of AC41. Decision: a loader, not a loaded allowlist, because `load_allowlist` refuses a routed allowlist loaded
+   without a route and its route filter is private. For CSI the result only validates the section's route (the CSI
+   allowlist declares none, so a route is refused): `CsiToolPort` builds its own `tool_allowlist()`.
+6. `visible` (`bool`) **[added: B-543]** defaults to false and is given to the CSI host port, which launches every
+   instance of the run with it (§4.5.9); the command line passes the run input's `visible_host` (spec 0006 §4.2.2
+   step 2, spec 0007 §4.2). `build_ports` also passes the host port's `open_original` to `CsiToolPort` as `opener`.
+
+**[added: B-541]** Three rules of the result and the input:
+
+- `config` is a `ServersConfig`. Decision: the command line keeps the sections of this spec as raw tables (spec 0006
+  AC4) and converts them with `servers_config(data)`, the validation of `load_servers_config` over tables already
+  parsed, because adapters may not import the command line and the servers package owns these sections.
+- `AdapterPorts` (`tool_port`, `host_port`, `servers`, the run's `ServerManager`) is an async context manager:
+  entering it enters the manager, whose task group every role start needs (§4.3.2; nothing starts on entry), and
+  leaving it leaves the manager, which is the shutdown of §4.3.5. The caller enters it around `Engine.start` and
+  `Engine.resume` (spec 0006 §4.2.2 step 5). Decision: the ports own the manager's lifetime, because `build_ports`
+  creates the manager and no engine port has a close method.
+- The host program of a server section is the `[host_programs.<name>]` entry whose name is the adapter's product in
+  lower case (`etabs` for the CSI adapter's ETABS profile), found by `ServersConfig.host_program(product)`; the host
+  port's `program` (the host-lock key of §4.4.1 and `HostInstance.program`) is that entry name, its `exe_name` is the
+  entry's first executable and the process guard's `host_exes` are all its executables. Decision: `program` is the
+  entry name, because `[host_programs.*]` holds only executables and install folders and the name is the one stable
+  key both the lock file and the configuration share. A missing
+  entry is a `ConfigError` naming `host_programs.<name>`. Decision: the product names the entry, because the server
+  section names no program and the product is what the adapter drives; the example of §4.2 already names it so.
+
+Internal modules (planned): `servers/_config.py`, `servers/_launcher.py` (ports, POSIX), `servers/_launcher_windows.py`,
+`servers/_procinfo.py`, `servers/_platform.py` (**[added: B-541]**), `servers/_transport.py`, `servers/_launch_args.py` (the argv of §4.3.2, **[added: B-085]**),
+`servers/_session.py`, `servers/_buildcheck.py`,
+`servers/_hostlock.py`, `servers/_guard.py`, `servers/_record.py`; `adapters/_descriptors.py`, `adapters/_allowlist.py`,
+`adapters/_args.py`, `adapters/_envelope.py`, `adapters/_errors.py`, `adapters/_ledger.py`, `adapters/_toolport.py`,
+`adapters/_hostport.py`, `adapters/_identity.py`, `adapters/csi/` (`_allowlist.toml`, `_tools.py`, `_errors.py`,
+`_edits.py`, `_replies.py`, `_state.py`, `_reconcile.py`, `_checks.py`, `_session_ops.py`, `products/_etabs.py`),
+`adapters/cli/_adapter.py`. Fakes live in `tests/fakes/` only.
+
+### 4.2 `harness.toml`: server and tool sections
+
+Spec 0006 owns where the file is found and its `[engine]` section; this spec owns `[servers.*]`, `[cli_tools.*]` and
+`[host_programs.*]`. Example (placeholders in angle brackets):
+
+```toml
+[servers.csi]
+adapter = "sasaah-csi-mcp"
+command = "<absolute path to sasaah-csi-mcp.exe>"
+args = ["--disable-script"]            # the adapter adds --call-timeout-sec and --audit-log per role
+env = {}                               # added to a minimal inherited environment
+toolsets = []                          # the CSI server has no toolset option; listed tools are filtered by the allowlist
+client_grace_s = <required>            # client backstop = role call_timeout_s + client_grace_s
+max_restarts_per_run = 1               # software setting
+shutdown_grace_s = 10                  # software setting
+build = { sasaah_commit = "<40 hex>", exe_sha256 = "<64 hex>", server_info_version = "<optional>" }
+host_key = "csi"
+mcp_mode = "legacy"                    # §11 Q3
+audit_log = true                       # [added: B-085] default; false for a server without --audit-log (spec 0014)
+
+[servers.csi.roles.main]               # one server process per role
+classes = ["session", "call"]
+call_timeout_s = <required>            # passed as --call-timeout-sec (Sasaah default 120 s, CsiServerConfig.cs:18)
+
+[servers.csi.roles.long]
+classes = ["long"]                     # analysis and design
+call_timeout_s = <required>            # sized by S-02; no default (OQ-G6)
+
+[host_programs.etabs]
+executables = ["ETABS.exe"]            # to recognise host instances among processes
+install_dirs = ["<optional install folders, checked by doctor>"]
+
+[cli_tools."dxf-prep/prepare"]
+shell = "<absolute path to pwsh.exe>"
+script = "<absolute path to tools/dxf-prep/prepare.ps1>"
+timeout_s = <required>
+build_artifacts = [{ path = "<cached CLI exe>", sha256 = "<64 hex>" }]
+```
+
+Rules:
+
+1. **No timeout has a default** (11 §9, OQ-G6): `client_grace_s`, every role's `call_timeout_s` and every tool's
+   `timeout_s` are required until S-02 measures them; the doctor prints the Sasaah default for comparison only.
+   `max_restarts_per_run` and `shutdown_grace_s` are software settings with defaults.
+2. **Roles.** Each role is one server process with one server-wide `--call-timeout-sec` (the Sasaah server has no
+   per-call timeout, S-12 §5). Every timeout class of the adapter's descriptors must be served by exactly one role. A
+   configuration with only a `main` role serving all classes is allowed (`single` topology) and the doctor warns that
+   a hung read then waits as long as an analysis (§11 Q2). **[added: B-085]** An adapter may require the `single`
+   topology when the server process itself holds the open project, so a second process cannot act on it (IDEA, spec
+   0014 §4.2 and its Q2): a second role is then a `ConfigError`, and the doctor's warning still applies.
+3. **Forbidden options and environment** (S-12 §8, `inventory/sasaah-csi-mcp.json` `server.start_options`):
+   `--enable-script`, `--enable-generic-invoke`, `--allow-attached-writes`, `--read-only`, and the variables
+   `SASAAH_CSI_ENABLE_SCRIPT` (any value) and `SASAAH_CSI_DISABLE_SCRIPT` other than true. `--disable-script` is
+   required for the CSI adapter. `--call-timeout-sec`, `--audit-log` and `SASAAH_CSI_CALL_TIMEOUT_SEC` are set by the
+   adapter only (`--audit-log` only when `audit_log` is true, rule 5). Phase 4 adds `--disable-script` as required for
+   the IDEA server (OQ-G13); its other options are in spec 0014 §4.2.
+4. Paths are absolute; the loader never resolves against the working directory. The file holds no secrets.
+5. **[added: B-085]** `audit_log` (boolean, default true) says whether the server has Sasaah's `--audit-log` option;
+   false for a server without it (IDEA: an unknown argument would only be warned about and ignored, spec 0014 §4.2
+   rule 4). `route` (string) names one of the routes the adapter's allowlist header declares (§4.5.1); it is required
+   for such an adapter (IDEA: `native` or `rest`) and refused for one that declares none (CSI). A `route` on a section
+   whose adapter declares no routes (CSI), and a missing or undeclared `route` for an adapter that declares routes, are
+   allowlist load errors (AC41; amendment B-413); the configuration loader adds no route rule of its own here. Spec 0014
+   AC1 adds the IDEA section's own configuration check for a missing `route` (plan 0014 T1).
+6. **[added: B-541]** The file is read as UTF-8 with an optional byte-order mark (`utf-8-sig`), as spec 0006 §4.7
+   reads it, so both loaders accept the same file. Decision: a mark is accepted because Windows PowerShell 5
+   (`Out-File -Encoding utf8`) and older Notepad write one and it carries no meaning.
+
+### 4.3 Server lifecycle
+
+#### 4.3.1 Launcher and process inspector (ports)
+
+`ProcessLauncher` (`typing.Protocol`): `start(spec: LaunchSpec) -> LaunchedProcess`. `LaunchSpec`: `argv`, `env`,
+`cwd` (the run folder), `stderr_path`, `job: JobPolicy` (`SERVER`: kill on close, silent breakaway; `TOOL`: kill on
+close, no breakaway). `LaunchedProcess`: `pid`, `started_at` (from the inspector), `stdin`, `stdout` (binary pipes),
+`wait(timeout) -> int | None`, `terminate_job()`, `job_members() -> list[ProcessIdentity]`, `close()`.
+
+`ProcessInspector`: `identity(pid) -> ProcessIdentity | None` (`pid`, `started_at: str`, `exe_name`), `alive(identity)
+-> bool`, `children(pid) -> list[ProcessIdentity]`, `snapshot(exe_names) -> list[ProcessIdentity]`,
+`terminate(identity) -> bool`. `started_at` is the OS creation time as an opaque string (Windows: the creation
+`FILETIME` from `GetProcessTimes` as an integer; Linux: `/proc/<pid>/stat` field 22 plus the boot id from
+`/proc/sys/kernel/random/boot_id`). `terminate` opens the process once, compares the start time on that handle and
+terminates through the same handle, so a reused pid is never hit. `snapshot` and `children` leave out a process the
+engine may not open (it could not act on it anyway) and log its pid; `identity` and `terminate` on a given pid keep
+raising (AC7a). `LaunchedProcess.close()` releases the handles; on Windows that closes the last job handle, so
+kill-on-close ends the job: callers close a process only when its job may end (amendment B-388, B-122 reviews).
+
+- **POSIX** (development and Linux CI only; no host program runs there): `subprocess.Popen` with
+  `start_new_session=True`; the "job" is the process group and `terminate_job` is `killpg`. POSIX has no kill-on-close
+  job: when the engine is killed, a server ends because its stdin reaches end-of-file (the synthetic fakes exit then).
+  This is enough for tests; the guarantee for the owner's machine is the Windows job.
+- **Windows** (`_launcher_windows.py`, `ctypes` only): `CreateJobObjectW`; `SetInformationJobObject` with
+  `JobObjectExtendedLimitInformation` and `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, plus
+  `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK` for `SERVER` jobs (ADR-0030 decision 8); the job handle is created
+  non-inheritable. `CreateProcessW` with `CREATE_SUSPENDED | CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT |
+  EXTENDED_STARTUPINFO_PRESENT` and a `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` that lets the child inherit only its three
+  pipe handles; `AssignProcessToJobObject(job, hProcess)`; `ResumeThread(hThread)`; both handles are kept. Members are
+  listed with `QueryInformationJobObject` (`JobObjectBasicProcessIdList`). Flag values come from the Windows SDK
+  headers and the Win32 pages "JOBOBJECT_BASIC_LIMIT_INFORMATION", "Process Creation Flags" and
+  "UpdateProcThreadAttribute", cited next to each constant in code (software constants, not stated here). If
+  `AssignProcessToJobObject` fails, the suspended process is terminated and the start fails.
+- **Breakaway choice** (S-10 open risk, ADR-0030 decision 8): `SILENT_BREAKAWAY_OK` for server jobs, because the
+  Sasaah server does not pass `CREATE_BREAKAWAY_FROM_JOB` when it launches a host (S-12 shows `csi_launch` goes through
+  the CSI helper's `CreateObject`, Sasaah `CsiSession.cs:214-280`), and a host killed with the server would lose an
+  engineer's work. Cost: helper processes a server starts also break away; the guard (§4.4.2) lists the children of
+  job members after every call and at stop, records those that are not host programs, and terminates them at server
+  stop when their identity still matches. `JOB_OBJECT_LIMIT_BREAKAWAY_OK` becomes the target when Sasaah passes the
+  flag (owner queue). Tool jobs allow no breakaway: a command-line tool's own hidden ETABS ends with the tool.
+
+#### 4.3.2 Server roles and start
+
+`ServerManager` starts each role lazily before its first call, in the run folder, with
+`argv = [command, *args, "--call-timeout-sec", str(role.call_timeout_s), "--audit-log", run_dir/"servers"/f"{server}-{role}-audit.jsonl"]`,
+built by `servers/_launch_args.py`, without the two `--audit-log` items when the section's `audit_log` is false
+(§4.2 rule 5; an adapter adds its own required options there, spec 0014 §4.2), and stderr to `run_dir/servers/<server>-<role>.stderr.log`. Integrity level (16 §6): the server inherits the
+engine's; nothing elevates or lowers it.
+
+#### 4.3.3 Transport and MCP session
+
+`ProcessTransport(launched)` implements the SDK's `Transport`: two worker threads (through `anyio.to_thread`) read
+`stdout` lines and write `stdin` lines, parse with `mcp_types.jsonrpc_message_adapter` into `SessionMessage`, as the
+SDK's `stdio_client` does; EOF or a broken pipe closes the read stream, which the session sees as the connection
+ending. The session is `mcp.Client(transport, mode=config.mcp_mode, cache=None, read_timeout_seconds=None)`:
+`cache=None` so every `tools/list` reaches the server; timeouts are per call. Each call is
+`client.call_tool(name, args, read_timeout_seconds=role.call_timeout_s + config.client_grace_s)`; the server's own
+timeout (`timeout`) is expected first and the client one is a backstop (§4.5.6).
+
+#### 4.3.4 Build check (11 §6 item 8)
+
+`ServerManager.preflight(min_builds) -> list[ServerCheck]`, run at run start and at every resume and restart, before
+any write. The engine calls `preflight` at run start and at every resume; the `ServerManager` runs the same check
+itself on a restart (§4.3.5), never on a role's first start. The check is given to the `ServerManager` by its caller
+(`build_ports` builds it from each server section's adapter allowlist, as it does the launcher); a `ServerManager` built
+without one answers `preflight` with `ok` false for every server and runs no check on a restart (only tests that drive
+the transport alone build one so; amendment B-413). Per server:
+
+1. SHA-256 of `command` equals `build.exe_sha256`.
+2. `client.server_info` is recorded (name, version); if `build.server_info_version` is set, it must equal it (Sasaah
+   sets none today, S12-G1; what the SDK reports by default needs a local test).
+3. `build.sasaah_commit` equals the adapter allowlist's `sasaah_commit` (the build the adapter was tested with) and
+   satisfies the workflow's minimum, which names a Sasaah commit; "at least" is not evaluable without a build id
+   (S-12 §3), so the minimum is satisfied by equality or by a commit listed in the allowlist's `also_tested_commits`.
+4. **Tool-list fingerprint** over the allowlisted tools: `sha256(canonical_json(sorted([{"name": n, "input_schema":
+   strip(s)} for each allowlisted n])))`, where `strip` removes every `description` and `title` member whose value is
+   a string, except members of a `properties` object (a property may be named `description`). It must equal the
+   allowlist's `tool_fingerprint`. Every allowlisted tool must be listed. A listed `csi_run_script`, `csi_invoke` or
+   `csi_object_*` fails the check (they are hidden by the required start options; seeing one means the options
+   failed); `csi_db_tables_apply` is always listed (S12-G7) and is tolerated but never callable. The full-list
+   fingerprint is recorded too, for diagnosis.
+5. `csi_status.read_only` and `script_enabled` are false.
+
+A failure returns `ServerCheck(ok=False, reason=...)`; the engine stops with `SERVER_CHECK_FAILED` (engine §4.6
+item 8). `ServerCheck.build` is `"<commit[:12]>+<exe sha256[:12]>"`, also used as `provenance.tool_version`.
+
+#### 4.3.5 Crash, reconnect, restart, shutdown
+
+- **Crash**: the process exited or the transport closed. In-flight call outcome per §4.5.6; the role is marked
+  `crashed`; `session_epoch(host_key)` increases.
+- **Restart**: before the next call to that role, if fewer than `max_restarts_per_run` restarts were made: terminate
+  the old job, start the role again, run the build check, then `csi_attach` with the bound instance's `pid` and
+  `product` (S-12: attached instances are `launched: false`, so `csi_open_model`, `csi_new_model` and `csi_exit` are
+  refused afterwards; launch ownership ends, §4.4.2). The epoch increases. Beyond the limit: the call fails
+  `HOST_NOT_CONNECTED` and the engine escalates. Restarting a role never touches another role or a host instance.
+- **Reconnect** (11 §6 item 9): `no_target` or `target_disconnected` on a read → `csi_attach` by pid once on the same
+  role, epoch increases, then the read is retried by the engine (retry rule `always`). The engine reads units before
+  the next step on that host because the epoch changed (engine §4.6 item 9 (c)).
+- **Long role attach**: the `long` role attaches by pid to the instance the `main` role launched, before its first
+  call. An attach failure (`target_disconnected`, as in the baseline when the instance is not registered for COM) is
+  `HOST_NOT_CONNECTED`; whether a server-launched instance can be attached by a second server is a local test (§12).
+- **Shutdown**: close each `Client`, wait `shutdown_grace_s` for the process, then `terminate_job`; then the guard
+  terminates recorded helpers (§4.4.2). Host instances are closed only by `close_started`. It runs when the
+  `ServerManager` context is left, that is when the caller leaves `AdapterPorts` (§4.1, AC48; **[added: B-541]**).
+
+### 4.4 Host-instance lock and process guard (11 §6 item 10)
+
+#### 4.4.1 Lock
+
+- A machine-level lock per host instance, keyed by program, pid and start time:
+  `<lock_dir>/host-<program>-<pid>-<started_at>.lock`, where `lock_dir` is `%LOCALAPPDATA%\eng\locks` on Windows and
+  `$XDG_STATE_HOME/eng/locks` (else `~/.local/state/eng/locks`) on POSIX **[added]**: not the workspace, because two
+  workspaces can drive one instance (Sasaah `DESIGN-NOTES.md` ج6).
+- Acquire: open or create the file, then an exclusive non-blocking OS lock (`msvcrt.locking(LK_NBLCK)` on byte 0,
+  `fcntl.flock(LOCK_EX | LOCK_NB)`), held by the engine process until release or exit; the OS releases it when the
+  process dies, so a lock whose holder died is acquired normally (stale handling) and the previous holder record is
+  logged. After acquiring, the holder record (`engine_pid`, its `started_at`, `run_id`, `acquired_at`) is written to
+  the file. Lock files are never deleted (deleting a lock file others may hold races); a new instance with a reused
+  pid has another start time, so another file.
+- Refusal: `ContractError(HOST_LOCKED, message="host instance driven by run <run_id>")`, never retried (04 §8.1).
+- `HostPort.acquire(host_key)` returns a `HostLease` for the server group; the lease locks each instance before the
+  first call addressed to it: after `csi_launch` returns (and before any other call), or before `csi_attach` to an
+  existing instance. At resume, `acquire` re-locks every instance in the adapter's run state that is still alive.
+  Limitation: a program that drives a host without this lock (another tool on the same machine) is not stopped;
+  the adapter therefore writes only to instances it launched.
+
+#### 4.4.2 Process guard
+
+- **Which instances the run started.** For `csi_launch`, the adapter snapshots processes of the host program's
+  executables before and after the call; the instance is the pid the reply or `csi_status` names, confirmed by
+  appearing in the "after" snapshot only, with a start time after the call began. Zero or several candidates →
+  `ContractError(CONFLICT, "launched instance not identified")`, and the run escalates; the instance is not adopted.
+  (Sasaah's own pid detection is the same diff and can pick another session's new instance, `CsiSession.cs:282-300`.)
+  The identity (`pid`, `started_at`, program, `visible`) goes to `HostPort.started_instances`, which the engine
+  journals as `host_started` (engine §4.6 item 10).
+- **Launch ownership.** The Sasaah server treats an instance as its own (`launched: true`) only in the session that
+  ran `csi_launch`; any server `timeout` invalidates the cached session, and the next call re-attaches with `launched:
+  false` (S-12 §5, `ComThread.cs:125-133`, `CsiSession.cs:66-83, 194`), without a restart. The adapter therefore keeps,
+  per role, a session counter increased on every `timeout`, client backstop, crash, reconnect or restart of that role
+  (reads included), and records at `csi_launch` the role and its counter. The role **holds launch ownership** of the
+  instance only while that counter is unchanged. Tools with `confirm = "owned"` (`csi_open_model`, `csi_exit`,
+  `csi_delete_load_combo`) are sent only under launch ownership.
+- **Closing** (`close_started(host_key, instances)`, at run end only): for each instance whose pid and start time
+  still match: if the launching role holds launch ownership, the adapter reads `csi_status` and, only when the
+  session's current target is that instance (pid), sends `csi_exit(confirm=true)` (the tool has no `target` parameter
+  and acts on the current target, S-12 inventory). In every other case (ownership lost, another current target, or
+  `csi_exit` refused with `not_launched_by_server`, timed out or failed) the fallback applies: an instance launched
+  with `visible: false` is terminated through `ProcessInspector.terminate` (identity re-checked); a visible one is left
+  running and listed in `run_dir/hosts/left_open.json` for the run report (0006). An instance whose identity no
+  longer matches is ignored. Instances the run did not start are never closed. Idempotent.
+- **Helpers**: children of job members that are not host executables are recorded with their identity at each
+  observation and terminated at server stop if they still match (ADR-0030 decision 8 trade-off).
+
+### 4.5 Adapter framework
+
+#### 4.5.1 Tool descriptors and the allowlist (data)
+
+An adapter's allowlist is a TOML file in the package (`adapters/csi/_allowlist.toml`), pinned with the server build:
+header `adapter`, `sasaah_commit`, `also_tested_commits`, `tool_fingerprint`, `fingerprint_source` (`s12-inventory`
+until a recording replaces it, then `recording`), optionally `routes` and `[[unit]]` entries **[added: B-085]** (below),
+and one `[[tool]]` entry per tool:
+
+| Field | Values |
+|---|---|
+| `name` | the server's tool name |
+| `kind` | `read`, `write`, `analysis`, `design`, `session` (S-12 classification, reviewed) |
+| `timeout_class` | `session`, `call`, `long` |
+| `effect`, `action` | engine `ToolInfo` (engine §4.8): effect `read` or `write`; action `plain`, `open`, `save`, `analysis`, `design`, `delete`, `unlock` |
+| `args_model` | name of the canonical argument model (`ParamModel`, contract §5) in the adapter's Python code |
+| `result_kind` | the kind the reply becomes |
+| `units` | `token` (the tool takes `units` and restores them: the adapter passes a token), `none`, `present` (quantities follow present units: only allowed for tools without quantity arguments in v1), `declared_ignored` (the reply is in present units whatever `units` says: `csi_get_assigned_loads`) |
+| `confirm` | `never`, `approved` (the adapter sets `confirm: true` only for a step under an approval or an engine-inserted always-ask approval), `owned` (also needs a server-launched instance) |
+| `readback` | the read-back helper name, required for every `write` |
+| `products` | products the entry applies to (`ETABS` in v1; SAFE and SAP2000 later) |
+| `release` | `released` (default) or `unreleased` (a project-lane tool not yet through the release lane, ADR-0026 §3) **[added: spec 0006 Q5]** |
+| `release_record` | repository path of the tool's gap report or session record; required when `release` is `unreleased`, refused otherwise |
+| `routes` | **[added: B-085]** the routes of the header's `routes` on which the tool is served; required and non-empty when the header declares `routes`, refused otherwise |
+
+**Routes [added: B-085].** A server whose tools work in more than one way on the host (IDEA: the hidden calculator on
+a file, `native`, or the REST service, `rest`, spec 0014 §1) declares the route names in the header `routes`; the
+server section's `route` selects one (§4.2 rule 5) and the allowlist is loaded for it: only the entries whose `routes`
+include it are served, so a tool of another route is refused as any tool outside the allowlist (AC17, AC41). The CSI
+and Revit allowlists declare no routes. The fingerprint and the "every allowlisted tool is listed" check of §4.3.4 cover
+all entries, whatever the route, because one build serves them all.
+
+**Unit header [added: B-085].** `[[unit]]` entries record what is known of a unit the server does not switch: `tool`,
+`field` (the argument or reply field), `unit` (a contract unit token, or absent), and `unit_status`: `declared` (from
+the tool's description or schema, not confirmed by a live run), `missing` (no unit is declared; the adapter's spec
+then serves no quantity of that field) or `confirmed` (a recorded local test confirms it). A `declared` or `confirmed`
+entry names an allowlisted entry; a `missing` entry may also name a tool the allowlist does not serve, where it records
+why that tool stays unserved (spec 0014: `idea_set_loads`, gap IG-1). A change of status is a reviewed data change, not
+code. Spec 0014 §4.6 and AC16 are the first user (AC42).
+
+`ToolPort.unreleased_tools()` (engine §4.8) returns `{name: release_record}` for every allowlisted entry and every
+`[cli_tools.*]` entry (which takes the same two keys) marked `unreleased`; the engine records it in `run_started`
+(engine §4.4.2, AC68), so a later change of the allowlist or of `harness.toml` cannot unmark a journaled run.
+
+`ToolInfo.engineering_params` are the `args_model` fields declared `engineering_quantity`; references are required
+for them (11 §6 item 2). **Escape hatches never**: the loader refuses a name in the deny list (`csi_run_script`,
+`csi_db_tables_apply`, `csi_invoke`, `csi_object_add`, `csi_object_delete`, `csi_object_set`, `csi_object_get`, and
+for later adapters `idea_run_script`, `compile_and_run`, `revit_send_code_to_revit`, `dev_hot_run`, `dev_hot_unload`,
+`run_baked_tool`, the bake-suggestion tools, `batch_execute`, `run_synapse_command`), any name containing `script`,
+`invoke`, `eval` or `tables_apply`, and any tool the S-12 inventory marks `excluded_from_allowlist`; a contract test
+checks the file against the inventory. Tools with an untyped `spec` (`csi_define_material`,
+`csi_define_frame_section`, `csi_define_area_section`, `csi_define_load_case`) are not on the v1 allowlist (§4.6.2,
+gap H-G1).
+
+#### 4.5.2 Arguments from neutral kinds and references
+
+`ToolPort.call(tool, args, op_id=, model=)`: (1) look up the descriptor; (2) `validate_input(args_model, args,
+source=store, current_revision=<adapter revisions>, policy=InputPolicy(require_refs=True))` (contract §5): shape,
+policy, references (kind, pointer, unit, staleness), units, bounds, cross-field rules, never changing a value; (3)
+the host preconditions (§4.5.8); (4) the tool's builder turns the validated canonical model into host arguments:
+quantities converted with `eng_contract.units.convert` from the canonical unit to the units of the token the call
+passes (`csi_unit_system(token)`), the explicit `target` (`product`, `pid` of the model's bound instance, never
+omitted: Sasaah `TargetResolver.cs` otherwise uses the session's current target), and `confirm` per the descriptor;
+(5) append the op to the ledger (§4.5.7) and send.
+
+#### 4.5.3 Envelopes, provenance and storage
+
+Every reply is parsed with `eng_contract.mcp.extract_raw_reply` (the Sasaah servers send one JSON text block, with
+`isError: true` and `{code, message, data}` on failure, S-12 §6) and becomes a contract envelope:
+
+- the payload, in canonical units, validated against `result_kind`, stored with `ResultStore.put`; `parents` are the
+  results of the resolved references;
+- `summary` at most 4096 bytes and inline `data` only when at most 16384 bytes (contract §4.2.5); larger data is in
+  the store and `data` is null;
+- `complete: false` and `PARTIAL_DATA` when the reply says `truncated: true` (lists are capped at 2000 with no paging,
+  S-12 §2);
+- provenance: `tool = "<adapter>/<tool>"` (for example `sasaah-csi-mcp/csi_assign_frame_section`), `tool_version`
+  the build string (§4.3.4), `host` (`program`, `version` from `csi_model_info.program_version`, `model_id`,
+  `model_revision`), `files` for file inputs, `inputs` (references as references), `started_at`, `duration_ms`.
+  **[added: B-569]** For a tool whose descriptor has action `save`, or for which `saves_new_file(args)` is true (a
+  save to a new file, or an open of a new working file such as `csi_open_revision`, spec 0007 §4.10), `host` is the
+  model identity and revision after the step, not the binding read before the call: after a successful reply, and
+  before the result is stored, the tool port records the save on the host port (`IdentityStore.record_save` with the
+  model's file and fingerprint, as `HostPort.save` does, §4.5.8), takes that read as the new outside-edit baseline
+  (§4.6.4), and builds `provenance.host` from the binding read after that record. The stored result and the returned
+  envelope are the same record; an envelope is never re-provenanced after it is stored. A save the harness makes
+  through its own tool is therefore never `MODEL_CHANGED_OUTSIDE`, while a save made outside the harness still raises
+  the revision with that warning (§4.6.4). The engine takes the `model_saved` revision from this `host` (engine §4.6
+  "Tool saves", EC2, EC5), and the host-state check at a resume compares with it (engine §4.5.4). A crash between the
+  save reply and the record leaves the save unrecorded, so the next `model_state` reports it as an outside change for
+  the engineer, which is the honest outcome, since tool saves are not reconciled (§4.5.9). Decision (B-569): the
+  adapter records the save before it stores the result, because the stored producer `host` is what the approval
+  chain (engine §4.9) and the resume check read; correcting the envelope after storage would leave the stored record
+  stale.
+
+#### 4.5.4 Units handling
+
+The adapter never relies on the present units being canonical. For a `token` tool it chooses the token whose units
+make the conversion simplest for the call's quantities and always passes it; for `declared_ignored` and for
+interpreting reply values of `none` tools it reads `csi_model_info.units` first (one read per batch) and labels the
+values with that system. A model in a `Ton_*` system is refused (`UnitGapError`, contract G-1). Expected units of a
+model are its units when the adapter first opened it, kept in the run state (§4.5.9); `read_units` compares
+`csi_model_info.units` of the bound instance with them (11 §6 item 9).
+
+#### 4.5.5 Error mapping (S-12 §6, ADR-0031)
+
+| Sasaah code | Contract code | Rule |
+|---|---|---|
+| `no_target` | `HOST_NOT_CONNECTED` | reconnect once (§4.3.5) |
+| `ambiguous_target` | `INVALID_ARGUMENT` | should not occur: `target` always carries `pid` |
+| `target_disconnected` | read: `HOST_NOT_CONNECTED`; write, save, analysis, design, unlock: `TIMEOUT_UNKNOWN_OUTCOME` | the code also covers bridge timeouts |
+| `timeout` | read: `TIMEOUT_NO_EFFECT`; others: `TIMEOUT_UNKNOWN_OUTCOME` | host marked wedged, epoch increases |
+| `com_worker_recycled` | `TIMEOUT_NO_EFFECT` | the call never started (its message says so) |
+| `unsupported_by_version`, `api_not_available` | `NOT_SUPPORTED_BY_VERSION` | |
+| `confirmation_required` | `CONFIRMATION_REQUIRED` | an adapter bug: confirm is set only under approval |
+| `model_locked` | interim `HOST_LOCKED`; after ADR-0031 `PRECONDITION_FAILED` (`model_unlocked`) | never retried; certain not-applied |
+| `not_launched_by_server` | interim `CONFLICT`; after ADR-0031 `PRECONDITION_FAILED` (`server_owned_instance`) | |
+| `read_only`, `script_disabled`, `generic_invoke_disabled`, `unsupported_operation` | `INTERNAL` | a configuration or allowlist bug |
+| `csi_error` with `data.member`, `data.return_code` or `data.hresult` | `HOST_ERROR`, `host_code` from `return_code` or `hresult`, `host_method` from `member`, `retryable: false` | |
+| `csi_error` without such data | `NOT_FOUND` when the message matches one of the adapter's listed "not found" texts (for example "was not found", "does not exist"), else `INVALID_ARGUMENT` | the texts are listed in `csi/_errors.py` with their Sasaah source lines |
+| no code (unexpected-error text) | `INTERNAL` with a new `incident_id`; on a write, `TIMEOUT_UNKNOWN_OUTCOME` when the text says the call timed out | `Program.cs:102-106` |
+
+The original code and message are kept in the stored failure evidence (never in a summary beyond 2000 characters).
+
+**Harness host codes [added: B-085].** Where a reply carries no Sasaah error code but must not be believed, the adapter
+raises `HOST_ERROR` itself, with `retryable: false`, `host_method` the tool, the reply stored only as failure evidence,
+and one of these `host_code` values: `OFFLINE_STUB` (the reply is a result the server invented, spec 0014 AC11) and
+`UNEXPECTED_REPLY` (the reply does not match the tool's reply model, spec 0014 AC12). The CSI table above is unchanged.
+
+#### 4.5.6 Timeouts
+
+- The server's `timeout` arrives within the role's `call_timeout_s`; the client backstop
+  (`call_timeout_s + client_grace_s`) covers a server that never answers. A backstop on a read is
+  `TIMEOUT_NO_EFFECT`; on a write, save, analysis, design or unlock it is `TIMEOUT_UNKNOWN_OUTCOME`. After a backstop
+  the role is restarted before its next call (the SDK has cancelled the request; the server's worker may still hold
+  the host).
+- After any `timeout`, backstop, crash or reconnect, the host is "wedged" for the adapter: `session_epoch` increases,
+  and the engine's reconciliation (invariant 6) and units read (invariant 9) run before the next step on that host.
+  Until `reconcile` has run for the in-flight op, `ToolPort.call` on that host returns `HOST_WEDGED` without sending;
+  the `HostPort` reads the engine runs first (`read_units`, `model_state`) and `reconcile` itself are allowed.
+
+#### 4.5.7 Write ledger and reconciliation by reading model state
+
+Before sending a write, the adapter appends `{op_id, tool, args_sha256, target, pre_image_ref, sent_at}` to
+`run_dir/adapter/ops.jsonl` (flushed and `fsync`ed), where `pre_image_ref` points to the last model-state read of the
+object: it resolves to the `observed` value of a `read_back(tool, args)` that the port takes and stores just before the
+write (`<result_id>#/value/observed`), and is absent for a tool with no read-back (amendment B-503; the binding of
+the call carries it, plan T19a). `reconcile(tool, args, op_id)`
+first waits for the host to answer `csi_model_info` within the `call` class (a timeout → `unknown`), then reads the
+object with the tool's read-back helper and decides as below. An answer from the new worker does not show that the
+abandoned host call has ended (S-12 §5: the abandoned worker "keeps whatever host call it was in"), so for the long
+tools the adapter also needs **proof of end** of the abandoned call; no proof mechanism is specified in v1 (gap H-G7,
+with S-02, §12), so `proof_of_end` is `False` until one is accepted, and the analysis and design rows give `unknown`.
+
+| Tool kind | `applied` | `not_applied` | `partial` / `unknown` |
+|---|---|---|---|
+| Setters (`csi_assign_frame_section`, `csi_assign_area_section`, `csi_set_point_restraint`, `csi_set_frame_load_distributed`, `csi_set_area_load_uniform`, `csi_define_wall_section`) | the state equals the requested state | the state equals the pre-image and differs from the request | anything else: `unknown` |
+| `csi_add_load_pattern` | present with the requested type and self-weight | absent | present with other values: `unknown` |
+| `csi_add_load_combo` (delete then re-add, not atomic, S-12 §2) | present with the requested type and components | absent and absent before | absent but present before: `partial` (`missing: [name]`); present with other components: `unknown` |
+| `csi_delete_load_combo` | absent | present | — |
+| `csi_save_model` | the file exists and its hash differs from the pre-save hash | the file is unchanged and the model is dirty | otherwise `unknown` |
+| `csi_unlock_model` | `locked` false | `locked` true | — |
+| `csi_run_analysis` | proof of end, and `csi_model_info.locked` changed from false (pre-image) to true; `csi_analysis_status` codes are stored as evidence, not decoded | proof of end, and `locked` still false | anything else (no proof of end, `locked` unreadable): `unknown` |
+| `csi_design_run` | — (the model is already locked; no readable state shows that a design ran) | — | always `unknown` |
+
+The evidence (reads, the Sasaah audit-log lines for the op, if any; none when `audit_log` is false) is stored as a result and referenced from the
+`Reconciliation`. A re-run of an analysis or design after `unknown` is never decided by the adapter: it is the
+engineer's explicit retry decision, journaled by the engine (engine §4.5.3), and it is sent only after proof of end
+(§11 Q4). A read-back that is not available for the tool gives `unknown` (the engineer decides, engine §4.5.3).
+
+#### 4.5.8 Host preconditions, read-back and check after write
+
+- Before a write: the model is bound and its instance locked; units were verified in this epoch; for `owned` tools
+  the role holds launch ownership (§4.4.2), else the call is not sent and fails with the interim `CONFLICT` or, after
+  ADR-0031, `PRECONDITION_FAILED` (`server_owned_instance`).
+- `HostPort.check_model(model_key)` (engine invariant 1): reads back every item written since the last check with the
+  read-back helpers, compares with the requested state, and returns `issues.model_check/1` with `READBACK_MISMATCH`
+  or `READBACK_UNAVAILABLE` (error), plus the integrity checks that need no tolerance: frames or areas whose section is
+  not defined (`SECTION_UNDEFINED`), combinations naming a missing pattern or combination (`COMBO_REFERENCE_MISSING`),
+  the model locked (`MODEL_LOCKED`, info). An adapter adds its own tolerance-free codes in its spec **[added: B-085]**:
+  for IDEA `LOADS_UNCONFIRMED_MAP` (info: the load map is unconfirmed, so no load is written) and
+  `LOAD_EFFECT_ZERO_DROPPED` (warning: the server dropped all-zero load effects before the write) (spec 0014 §4.10,
+  AC10). Quantities read back are compared within the design basis field
+  `checks.readback_relative_tolerance_ratio` (required by every workflow that writes quantities; never a constant here,
+  §11 G-2): the value comes from that basis field, passed by the workflow, and arrives as `ReadBack.tolerance_ratio`;
+  when none is passed a quantity read back is `READBACK_UNAVAILABLE` (owner answer of 2026-11-14, B-495, §11 Q8).
+  Delivery (amendment B-503, closes H-G9): `build_ports` gives the CSI host port a provider (a keyword argument of
+  `AdapterHostPort`, a callable that answers the ratio or `None`); `check_model` calls it each time it runs until it
+  answers a value, keeps that value, and uses it in place of `ReadBack.tolerance_ratio`. The provider reads the
+  `basis_ref` of the run header (`run_started`) in `run_dir` through `JournalReader`, loads that frozen basis from the
+  store (`StoreBasisPort`) and takes the field's value. The header is written by `Engine.start` before any step and
+  kept at a resume, which freezes nothing, so a resumed run reads the basis its start froze. While the header cannot be
+  read, or the basis lacks the field or holds no number in it, the provider answers `None`: `READBACK_UNAVAILABLE`,
+  never a constant. No engine port signature changes, and the command line passes nothing (spec 0006 §4.2.2). Built by
+  plan T19a. The 06 §7 list is otherwise not implemented in v1 (gap H-G4).
+- **Save before analysis** (11 §6 item 7): `HostPort.save(model_key, role)` calls `csi_save_model(path=<current>,
+  confirm=true)` on the `main` role, hashes the file, updates the identity store (ADR-0032) and returns `SavedModel`;
+  the engine journals `model_saved` before the analysis.
+
+#### 4.5.9 HostPort and ToolPort mapping
+
+| Port method | Implementation |
+|---|---|
+| `preflight` | §4.3.4 |
+| `acquire`, `release` | §4.4.1 |
+| `session_epoch` | per host key, increased on timeout, crash, restart, reconnect |
+| `locate(model_key)` | the bound instance if alive and its `csi_model_info.model_path` (normalized) is the model's file, else `None`; an instance the run did not launch or bind is never searched |
+| `model_state(model_key, instance_id)` | §4.6.4; `loaded: false` when the instance is not running or holds another file |
+| `check_model`, `save` | §4.5.8 |
+| `read_units` | §4.5.4 |
+| `open_original(model_key)` **[added: B-543]** (not an engine `HostPort` method; the CSI tool port's opener) | the file of `model_key` from the files mapping (else `NOT_FOUND`); `csi_open_model(file, confirm=true)` on the run's own instance if its launching role holds launch ownership, else launch one (visible as configured) on the `main` role, lock it and open the file there; bind the key to that instance, record its expected units and persist the run state; returns the `HostInstance` |
+| `working_copy(model_key, folder)` | copy the model file into `folder` (hash before and after the copy must match), launch an instance (visible as configured) on the `main` role if the host has none for this run, lock it, `csi_open_model(copy, confirm=true)`, record expected units, identity `derived_from` the original (ADR-0032); returns `<model_key>@copy` |
+| `restore(model_key, saved)` | check the saved file's hash equals `saved.file_sha256` (else `CONFLICT`); `csi_open_model` on the bound instance if its launching role holds launch ownership (§4.4.2); otherwise, or when `csi_open_model` is refused with `not_launched_by_server`, launch a new instance (visible as configured; reported by `started_instances`), lock it and open the file there; the old instance is left to `close_started` (terminated if hidden, reported if visible) |
+| `model_files` | the model file only (`.EDB`); companion files are the host's |
+| `started_instances`, `close_started` | §4.4.2 |
+| `describe`, `call`, `preview`, `read_back`, `supports_reconcile`, `reconcile` | §4.5.1, §4.5.2, preview from the canonical arguments and the pre-image (amendment B-503, plan T19a: one item whose id is the tool name, whose label names the tool and its target, and whose refs are the stored canonical arguments and, for a tool with a read-back, the stored pre-image; no `diff_ref`; the call's model from its binding's `host` (model id and revision); a binding without `host` is refused with `PRECONDITION_FAILED` and precondition `model_open` before anything is stored, as `AdapterHostPort` refuses a model key with no bound instance; no write is sent; except that a tool with action `open` whose key has no binding with `host`, the step 2
+`csi_open_model` (amendment B-543), gets the same one item with `models` empty and no pre-image, and no binding is
+read), read-back helpers, `supports_reconcile` true for every `write` except the session tools `csi_save_model` and `csi_open_model` and the adapter-local `csi_open_revision`, whose cut-off save or open the engineer decides (corrected by B-536 to what B-199 merged), §4.5.7 |
+
+Adapter run state (`run_dir/adapter/state.json`, written atomically): instances (with the process start time, the time
+it was observed and the exe name, amendment B-530), bindings (model key to instance id, model id and file), expected
+units, the `visible` flag of launches. A host port built over the same `run_dir` loads instances, bindings and expected
+units at construction (amendment B-530), so a resumed run finds its working copy and re-locks its live instances
+(§4.4.1). Decision (B-530): a reloaded instance gets the session value `-1`, which no role session counter (0 and
+growing) ever holds, so a resumed port never claims launch ownership of it (§4.4.2) and `open_file` and `restore` launch
+anew; the reason is that launch ownership is not proven across a restart of the engine. It is a cache: where it
+disagrees with the journal (`host_started`, `model_bound`), the journal wins. **[added: B-541]** At a resume, a missing
+file is an empty state, and a file that exists but cannot be parsed (`JSONDecodeError`, a missing member) is raised
+from the port's construction, so `resume` ends at step 2 of spec 0006 §4.2.2 as an unexpected exception (exit 70)
+with nothing journaled. Decision (merged plan T19c code, stated here): a missing file means that nothing was bound,
+because every bind writes the file before its first use; damage is not repaired or ignored, because the file is
+written by a temporary file and a rename (`os.replace`), so a damaged file means an outside change the engineer must
+see.
+
+Model binder **[added: B-530]**: the host port is the CSI tool port's `ModelBinder` (`binding`, `revision`). Decision:
+`Binding.host.version` is the program version of the last `model_state` read of that model key, and, when none was
+read since the model was bound, of one `csi_model_info` read on the bound instance (`""` when its reply has none, as
+the model-status mapping does); this reuses the reply the reader already maps and changes no outside-edit baseline.
+
+Tool saves **[added: B-569]** (§4.5.3 provenance). The generic tool port has one protected hook, called after a
+successful, non-error reply and before the envelope is made, that returns the binding the stored result's
+`provenance.host` is built from; by default it returns the binding read before the call, so a tool that saves nothing
+is unchanged. The CSI tool port overrides it: for `csi_save_model` (in place or `as_new_revision`) it calls the host
+port's tool-save record (`AdapterHostPort.tool_saved(model_key)`, a callback the CSI tool port takes like `wrote` and
+`reopened`; `build_ports` passes it), and for the open inside `csi_open_revision` it calls `reopened` there, before
+the result is stored, not after; then it reads the binding again. `AdapterHostPort.save` and the tool-save record share
+one recording (read the state for its fingerprint, `IdentityStore.record_save` with the model's file, that read as
+the outside-edit baseline). For `as_new_revision` the record happens after the in-place save and before the snapshot
+copy, so the snapshot's hash still equals the recorded file hash (spec 0007 §4.10). Built by plan 0007 T13b
+(criterion spec 0007 AC43).
+
+Opening the original **[added: B-543]** (spec 0007 §4.5 step 2, AC51). The CSI tool port answers `csi_open_model`
+with a model key and no `path` by calling its `opener` (a keyword like `reopened`; `build_ports` passes the host
+port's `open_original`) and then the binder, and returns a success envelope (`harness.run_output/1`, payload the key and
+the file's base name, provenance from the binding's `host`). It refuses a `csi_open_model` that names a `path` (only
+`csi_open_revision` sends one, inside the port), and it gives that refusal, a key with no file, a port without opener
+and every `ContractError` or `ToolFailed` of the open as a failure envelope, never a raised error, because the engine
+treats an error raised from a write as an unknown outcome; any other exception stays that unknown outcome and goes to
+the engineer (`engine.in_flight`), as for every write. Nothing
+is ledgered for it: the open writes no model content and is not reconciled (row above). Decision (B-543): the host
+port opens the original, as it opens the working copy and a restore, because only it maps a key to a file and launches
+and locks instances; a block cannot name a path. In `approve_each_write` the engine asks for an approval before the
+open (engine §4.7), when no model is bound yet: its preview (row above) names the tool and the key and carries no
+model. Decision (B-543): the open's preview reads no binding and binds no model, because the open writes no model
+content and the approval then has nothing to re-check; refusing it as `model_open` would stop every run in that mode
+at step 2. Visible launch: `AdapterHostPort` and its `CsiSession` take
+`visible` (default false; `build_ports` passes its `visible` keyword, §4.1) and every `csi_launch` of the run sends it,
+records it and keeps it in the run state, so a visible instance is reported, never terminated, at `close_started`
+(§4.4.2).
+
+**Open capability (B-562, AC52).** `CsiToolInfo.opens_model_without_writing(args)` returns true only for this
+adapter's `csi_open_model` without `path` (spec 0007 §4.5 step 2). It returns false for `csi_open_revision`, which
+creates a new working file (§4.6, spec 0007 §4.10), and for all other calls. The pathless original open keeps its
+`write` effect and `open` action. Engine §§4.4.2, 4.5.4 and 4.6 describe how the recorded capability governs
+the model-content checks after the open.
+
+### 4.6 CSI adapter for the edit cycle on ETABS
+
+Product-specific parts (tool availability, design kinds, result tools that exist only for ETABS such as story
+drifts) are in `adapters/csi/products/_etabs.py`; the rest is shared, so SAFE (phase 2) and SAP2000 (phase 3) add a
+product module and allowlist entries, not a new adapter.
+
+#### 4.6.1 Steps of the cycle (18 §4; S-12 §1)
+
+| Step | Tools (role) | Mapping |
+|---|---|---|
+| 1 Server builds | `csi_status` (main), `tools/list` | §4.3.4 |
+| 2 Open a working copy | `csi_launch` (main; `product`, `version` from the basis or the configured product, `visible: false` unless the workflow needs an engineer turn in that instance: the run input's `visible_host` through `build_ports`, amendment B-543), `csi_open_model` (`confirm`), `csi_save_model` with a new `path` | `open_original` (the step 2 tool step), then `HostPort.working_copy`; never on an instance the run did not launch (S-12 §1 step 2) |
+| 3 Read the model state | `csi_model_info`, `csi_list_stories`, `csi_list_grids`, `csi_list_points`, `csi_list_frames`, `csi_list_areas`, `csi_list_frame_sections`, `csi_list_area_sections`, `csi_list_materials`, `csi_list_load_patterns`, `csi_list_load_combos`, `csi_db_table_read` (tables of §4.6.4) | §4.6.4 |
+| 7, 10 Save | `csi_save_model` | `HostPort.save` |
+| 8 Apply the edits | §4.6.2 | one call per object (no batch tool, OQ-G7) |
+| 9 Read back and check | read-back helpers | §4.5.8 |
+| 11 Analysis | `csi_run_analysis` (`confirm`; long role) | synchronous; no start-and-poll (OQ-G6); result `harness.csi_analysis_run/1`; then `csi_analysis_status` (main), raw per-case codes, not decoded, `harness.csi_analysis_status/1` |
+| 12 Design | `csi_design_run` (`kind` `steel` or `concrete`, `confirm`; long role) | `harness.csi_design_run/1`; aluminum and cold-formed are `NOT_SUPPORTED_BY_VERSION` |
+| 13 Results | `csi_results_joint_reactions` → `forces.joint_reactions/1`; `csi_results_frame_forces` → `forces.member_end/1` (`host_local/1`, contract G-3); `csi_results_story_drifts` → `forces.story_drifts/1`; `csi_design_results` → `harness.csi_design_results/1` (raw host output, never a verdict, 06 §9); table `Analysis Messages` → `harness.csi_analysis_messages/1` | `units` token `kN_m_C` for forces; conversion to canonical by `eng_contract.units` |
+| Unlock (ADR-0031) | `csi_unlock_model` (`confirm`) | after the switch task only |
+
+Steps 4 to 6 and 14 to 17 are harness work (workflow spec 0007).
+
+#### 4.6.2 Edit kinds (18 §2; S-12 §2)
+
+| Edit kind | Tool and argument mapping | Read-back | Status |
+|---|---|---|---|
+| Assign a section to frames | `csi_assign_frame_section(name=frame, section)`, one call per frame; the section must exist (checked against the state) | `csi_list_frames` `section` of the frame | implemented |
+| Assign an area section | `csi_assign_area_section(name=area, section)` | table `Area Assignments - Section Properties` | implemented; table key needs local test |
+| Change a wall thickness | `csi_define_wall_section(name, material, thickness, wall_type="Specified", shell_type, units)`: `thickness_mm` (engineering quantity) sent with `units="kN_mm_C"`, so the value is millimetres; `shell_type` from the canonical enum `ShellThin`, `ShellThick`, `Membrane` (the schema's values) | table `Wall Property Definitions - Specified` | implemented; table key needs local test |
+| Change a slab thickness, define a frame or slab section, define a material | `csi_define_area_section`, `csi_define_frame_section`, `csi_define_material` take an untyped `spec` whose keys are CSi API parameter names not in the schema (S-12 §2) | — | **not implemented**, gap H-G1 (OQ-G11) |
+| Uniform load on frames | `csi_set_frame_load_distributed(name, load_pattern, value, direction="gravity", units="kN_m_C")`: `w_kN_m` (engineering quantity) in kN/m; replaces that pattern's load on the frame (`Replace` true, S-12 §2) | table `Frame Loads Assignments - Distributed` | implemented for `gravity`; other directions **not implemented**, gap H-G2 (S12-G9) |
+| Uniform load on areas | `csi_set_area_load_uniform(name, load_pattern, value, direction="gravity", units="kN_m_C")`: `q_kPa` in kN/m² | table `Area Load Assignments - Uniform` | implemented for `gravity`; other directions gap H-G2 |
+| Point loads on frames | `csi_set_frame_load_point` passes `direction` unmapped (S-12 §2) | — | **not implemented**, gap H-G2 |
+| Add a load pattern | `csi_add_load_pattern(name, type, self_weight)`: `type` from `model.load_set/1` pattern types `dead`→`Dead`, `live`→`Live`, `seismic`→`Quake`, `wind`→`Wind`, `snow`→`Snow`, `other`→`Other` (the values the tool's schema names); `superimposed_dead` and `roof_live` not mapped (gap H-G3); `self_weight_ratio` (engineering quantity) | `csi_list_load_patterns` (names) plus table `Load Pattern Definitions` for type and self-weight (key needs local test) | implemented for the mapped types |
+| Change or delete a load pattern | no tool | — | **not implemented** (OQ-G8) |
+| Add or replace a load combination | `csi_add_load_combo(name, combo_type, components)`: `linear_add`→0, `envelope`→1, `absolute_add`→2, `srss`→3 (the schema's codes); `range` not mapped (gap H-G3); components `{name, factor, kind}` from `CaseRef` (`load_combination`→`combo`, others→`case`) and `scale_ratio` (engineering quantity) | `csi_list_load_combos` plus table `Load Combination Definitions` (key needs local test) | implemented; replace is not atomic (§4.5.7) |
+| Delete a load combination | `csi_delete_load_combo(name, confirm=true)`, action `delete` (always ask) | `csi_list_load_combos` | implemented; `owned` |
+| Change restraints | `csi_set_point_restraint(name, values=[ux, uy, uz, rx, ry, rz])` from `model.joint_restraints/1` (never the presets) | table `Joint Assignments - Restraints` | implemented; table key needs local test |
+| Seismic load parameters | no tool (S12-G5) | — | **excluded** (OQ-G8) |
+
+The table keys are those of Sasaah `docs/csi-mcp-server/reference/etabs22-all-tables.json` as used by the S-04 script;
+they are confirmed at the first local run (OQ-G10).
+
+#### 4.6.3 Units, timeouts, `model_locked`, identity
+
+- Units: tokens `kN_mm_C` for lengths and thicknesses, `kN_m_C` for loads and forces; values converted from the
+  canonical units by `eng_contract.units`, never by hand. The model's present units are left to the server's restore
+  and verified by `read_units` (§4.5.4).
+- Timeouts: classes from the descriptors; seconds from `harness.toml` (§4.2), never defaulted.
+- `model_locked`: §4.5.5 and ADR-0031; the model state reports `locked`.
+- Identity: ADR-0032, implemented in `adapters/_identity.py` for every adapter.
+
+#### 4.6.4 Model-state reader and fingerprint
+
+`model_state` reads (all with `units` tokens where the tool takes them; every list tool with `limit` 2000 and every
+`csi_db_table_read` with `row_limit` 2000, the inventory's parameter names). `csi_db_table_read` has no `units`
+parameter: its values are in the present units, read and labelled as in §4.5.4:
+
+| Kind | Source |
+|---|---|
+| `model.stories/1` | `csi_list_stories` (`name`, `elevation`, `height`, `is_master`, `similar_to`; Sasaah `CsiModel.cs` story list) |
+| `model.grid_system/1` | `csi_list_grids` Cartesian systems (`origin`, `rotation_deg`, `x_lines` and `y_lines` with `id`, `ordinate`, `visible`); other grid types are skipped and listed as `info` issues |
+| `model.frame_placements/1` | `csi_list_frames` (`point1`, `point2`, `section`, `label`, `story`); `kind` is `other` (the reply has no design orientation; gap H-G5) |
+| `model.area_placements/1` | `csi_list_areas` plus area-section types from `csi_list_area_sections` |
+| `model.load_set/1` | patterns (`csi_list_load_patterns` plus the pattern table), combinations (`csi_list_load_combos` plus the combination table), frame and area uniform loads from their tables |
+| `model.joint_restraints/1` | table `Joint Assignments - Restraints` |
+| status (`harness.csi_model_status/1`) | `csi_model_info`: `units`, `locked` (absent when the host getter failed: then `None`, and any write is refused until it reads), `object_counts`, `program_version`, file base name only |
+
+A list or table read with `truncated: true` raises `LIMIT_EXCEEDED` (the v1 reader cannot see the whole model,
+S-12 §2). **Fingerprint**: `sha256(canonical_json({...}))` over the six payloads in the host units tokens used for the
+reads (before conversion, so no conversion rounding enters it), with every list sorted by its name or id, plus
+`object_counts`; the file save time is not included (it changes on save without a model change). It also covers the
+rows of table `Wall Property Definitions - Specified` (§4.6.2), since `csi_list_area_sections` returns name and type
+only (S-12 §2) and a wall-thickness change would otherwise leave it unchanged (amendment B-465). It is stable when
+the same state is read twice (property test) and S-04 measures it on real models (§12). `HostModelState`:
+`model_id` and `revision` from the identity store and `ModelStateStore`, `fingerprint`, `file_sha256` of the last
+save. A fingerprint that changed with no adapter write since the last read increments the revision and adds
+`MODEL_CHANGED_OUTSIDE` (04 §3.4).
+
+#### 4.6.5 Fit for phases 2 to 4
+
+| Adapter | What it adds to the framework |
+|---|---|
+| SAFE, SAP2000 (phases 2, 3) | product modules and allowlist entries in the CSI adapter; the same error table, units, roles and reader structure |
+| `sasaah-revit-mcp` (phase 3, 07) | its error parser (one text `"<code> <message> <hint>"`, S-12 §6), the timeout text rule (never started → no effect, executing → unknown outcome), `catalog_version` recorded beside the harness fingerprint, no `units` tokens (mm and degrees in schemas), no save tool (gap OQ-G12) |
+| `sasaah-idea-mcp` (phase 4, 08) | `--disable-script` required (scripts are on by default), stub results of `idea_calculate` refused, the missing load unit of `idea_set_loads` (OQ-G13); specified in spec 0014 on the additions A3 of §11 (`routes`, `audit_log = false`, the `single` topology, the unit header, its codes) |
+
+### 4.7 Command-line tool adapter
+
+Tools: `dxf-prep/prepare` and `dxf-prep/inspect` (effect `read`: they write only into the attempt folder) and
+`etabs-model/build` (effect `write`, action `plain`: it creates a model in its own hidden ETABS and runs an analysis,
+S-12 §12). `etabs-model/classify-columns` is not adopted (engineering thresholds, OQ-G14); the Python helpers are not
+tools.
+
+- Invocation: `[shell, "-NoProfile", "-NonInteractive", "-File", script, *named arguments]` in a `TOOL` job, cwd and
+  `-OutDir` the attempt folder `run_dir/tools/<step path>/<attempt>/`, bounded by `timeout_s`. Arguments come from a
+  canonical model per tool: file inputs as references to `harness.file_input/1` results (engineer-provided files,
+  hashed as `FileSource`) or as engineer-chosen paths that are hashed before the run; numeric options (`SnapTol`,
+  `BeamSpacing`, `ColumnGrow`) are engineering quantities from the design basis in millimetres, converted to the
+  metres the tool takes; options not in the model cannot be passed. The cached CLI executables in `build_artifacts`
+  are hashed before and after the call; a mismatch fails the step (`ToolFailed`, harness code `BUILD_CHANGED`
+  **[added]**) because the wrappers rebuild from source when it is newer (S-12 §3).
+- `etabs-model/build`: the configuration (an engineer input file) is copied into the attempt folder with
+  `outputFolder` set to the attempt's output folder, and relative `templateE2k` and `dxf` values made absolute against
+  the original file's folder (Sasaah `docs/etabs-model/README.md`: "Relative `dxf`/`templateE2k` paths resolve against
+  the config file's folder"); every input it names is hashed. Output files are never written outside the attempt
+  folder, so nothing is overwritten.
+- Result `harness.cli_run/1`: exit code, duration, declared outputs found (base name, SHA-256, size), the tails of
+  stdout and stderr (stored, not in the summary). Exit 0 → success; the tool's documented failure codes (S-12 §12:
+  dxf-prep CLI 1 usage, 2 unreadable input, 3 failed; etabs-model 1 failure, 2 usage) → `INVALID_ARGUMENT` for usage
+  and unreadable input, `HOST_ERROR` (`host_code` the exit code) otherwise. Timeout → the job is terminated,
+  `TIMEOUT_NO_EFFECT` (nothing outside the discarded attempt folder changed). New host-program processes that appear
+  during the step and outlive it (a COM-started ETABS outside the job) are reported as a warning, never killed.
+- Reconciliation of an in-flight `etabs-model/build`: `applied` when the attempt folder holds the completion record
+  the adapter writes after the process ends, else `not_applied` (the next attempt uses a new folder).
+
+### 4.8 Record mode, recorded-reply fakes and synthetic fakes
+
+#### 4.8.1 Recording proxy
+
+`RecordMode` wraps the `ProcessTransport` of a session: every `tools/list`, `tools/call` request and the matching
+reply (and the `initialize` result) is written to `acceptance/recordings/<adapter>-<build>/<seq>-<tool>.json`
+(process/05 §4). Sanitizing before writing: model and file base names (in paths and in values such as
+`csi_model_info.model_path` and host messages that quote them) are replaced by stable placeholders per recording
+session, numbered in order of first appearance and keeping the extension (`<model-1>.EDB`, `<file-2>.dxf`); the
+mapping is kept only in the run folder, never in the recording or the repository. Absolute paths inside the run folder
+become `<run>/<relative with placeholders>`, any other absolute path becomes `<path>/<placeholder>`; the user name (from the environment) and the home folder become `<user>`
+and `<home>`; reads of `Project Information` are dropped entirely (S-04 practice). A `manifest.json` lists every
+file with its SHA-256, the adapter, the build string, the tool fingerprint of the recorded `tools/list`, and the
+harness version. The owner still reviews recordings for client or project names in other free text before committing
+them (free text cannot be sanitized mechanically). Record mode is a `harness.toml` switch for live runs and is used by the
+record scripts in `acceptance/scripts/` (owner only).
+
+#### 4.8.2 Recorded-reply fake and contract tests
+
+`tests/fakes/recorded/` serves a session from recordings: requests are matched by tool and canonical sanitized
+arguments in recorded order; an unmatched request fails the test. Contract tests (`tests/contract/`, marker
+`recorded`) run every recorded reply through the adapter (parse, map, envelope, kinds) and compare the recorded
+`tools/list` fingerprint with the allowlist's. When a recording exists for a build, the allowlist's
+`fingerprint_source` becomes `recording` and its fingerprint is the recorded one.
+
+#### 4.8.3 Synthetic fakes (test-only MCP servers, lead decision D-5)
+
+`tests/fakes/sasaah_csi/server.py`: an MCP server built with the SDK's server API, started as a real process over
+stdio by the harness launcher. Its tool list is generated from `tests/fakes/sasaah_csi/schemas.json`, a copy of the
+S-12 inventory's names and input schemas (a contract test keeps it equal to the inventory). It holds an in-memory
+model (stories, grids, points, frames, areas, sections, materials, patterns, combinations, loads, restraints, units,
+`locked`, file path), answers in the Sasaah reply shape (one JSON text block; `isError` with `{code, message,
+data}`), and implements the S-12 behaviors the adapter relies on: per-call `units` set and restore, `model_locked`
+after analysis, `not_launched_by_server` after attach and after any `timeout` (a timeout invalidates the session; the
+next call re-attaches with `launched: false`), `csi_exit` acting on the current target, `truncated` at `limit` and
+`row_limit`, `com_worker_recycled`. Faults are set
+by a control file named in its environment: `timeout_before_apply`, `timeout_after_apply`, `crash_during_call`,
+`units_left_changed`, `slow_analysis`. A recording replaces a synthetic fixture per operation: the fake-fidelity test
+(AC34) compares the synthetic reply with the recorded one and a mismatch is fixed in the fake first. A synthetic
+command-line tool (`tests/fakes/sasaah_cli/`, Python) stands in for the PowerShell scripts on Linux. Nothing under
+`tests/` is packaged (AC35).
+
+### 4.9 `eng-harness doctor`
+
+Logic in `eng_harness.doctor`, registered as a subcommand by spec 0006. Checks, each `ok`, `warn`, `fail` or
+`skip` with a detail:
+
+| Check | How |
+|---|---|
+| uv and Python | `uv --version` on PATH; the interpreter is CPython 3.14 (ADR-0028 §5) |
+| Server executables and hashes | exists; SHA-256 equals `build.exe_sha256` |
+| Tool-list fingerprints | starts each server role briefly (no host program is launched; only `tools/list` and `csi_status`), compares with the allowlist; reports `read_only`, `script_enabled` and installed products from `csi_status` |
+| Installed host programs | behind an `InstalledProgramsProbe` interface: v1 checks the declared `install_dirs` and the installed products `csi_status` reports; a registry probe is not implemented until its keys are confirmed (gap H-G6) |
+| Integrity level (16 §6) | Windows: the process token's mandatory integrity level (`GetTokenInformation`, `TokenIntegrityLevel`; RID constants cited from the SDK headers); `warn` when not medium; running host instances whose token cannot be read are `skip`. Nothing is changed |
+| Workspace | `eng_contract.store.resolve_workspace` with the default location probe: `fail` unless `LOCAL` |
+| Timeouts | `warn` for a `single` topology; prints configured values beside the Sasaah default |
+| Lock directory | writable; lists lock files whose host instance no longer runs (information only) |
+| Unreleased tools | `warn` listing each `unreleased` tool and its `release_record` (§4.5.1); `ok` when none |
+
+**Extension point** **[added: spec 0006 Q13]**. `extra_checks` is a sequence of `CheckProvider`s (a `Protocol`:
+`name: str`, `checks() -> Sequence[Check]`). Spec 0006 passes its own (page binding to `127.0.0.1`, browser opening,
+console encoding, locale and calendar); their logic belongs to spec 0006. The doctor runs them after its own checks,
+in order; a provider that raises becomes one `fail` check with its name and the exception type (AC39).
+
+**[added: B-541]** The doctor starts its server roles through `platform_launcher` over the inspector it reports with
+(§4.1, AC49). `config_path` is `None` when the command line found no `harness.toml`: no server, tool or host-program
+section is checked. `env`, when given, replaces the environment of the default dependencies for the workspace and
+lock-directory rows, so the command line's `--workspace` reaches them (spec 0006 §4.2.1).
+
+Output: a table, or JSON with `--json`; paths shown as base names unless `--show-paths`. Exit 0 when no check is
+`fail`, 1 otherwise.
+
+## 5. Inputs and outputs
+
+| Name | Type | Unit | Bounds | Ref-capable | Source |
+|---|---|---|---|---|---|
+| `thickness_mm` (wall section) | float | mm | > 0 (a thickness is positive) | yes, engineering quantity | design basis or change set |
+| `w_kN_m` (frame uniform load) | float | kN/m | finite | yes, engineering quantity | change set (`model.load_set/1`) |
+| `q_kPa` (area uniform load) | float | kPa | finite | yes, engineering quantity | change set |
+| `self_weight_ratio`, `scale_ratio` | float | 1 | ≥ 0 | yes, engineering quantity | change set |
+| `SnapTol_mm`, `BeamSpacing_mm`, `ColumnGrow_mm` (dxf-prep) | float | mm | ≥ 0 | yes, engineering quantity | design basis |
+| `call_timeout_s`, `client_grace_s`, `timeout_s` | int | s | ≥ 1 | no | `harness.toml`, required |
+| `checks.readback_relative_tolerance_ratio` | float | 1 | > 0 | basis field | design basis (required by writing workflows) |
+| Outputs | envelopes of the kinds in §4.6 and §4.7 | canonical | — | — | adapters |
+
+## 6. Errors
+
+| Condition | Code | Fields |
+|---|---|---|
+| Tool not on the allowlist | `INVALID_ARGUMENT` | `field: tool` |
+| Literal for an engineering quantity; reference errors; units; bounds | contract §5 codes | `field` |
+| Host instance driven by another engine | `HOST_LOCKED` | message names the run |
+| Server build, fingerprint or options mismatch | `ServerCheck.ok` false → engine `SERVER_CHECK_FAILED` | `reason` |
+| Launched instance not identified | `CONFLICT` | message |
+| Model list truncated at 2000 | `LIMIT_EXCEEDED` | `received` (the count) |
+| Model in a `Ton_*` unit system | `UNIT_MISMATCH` (`UnitGapError`) | `received` |
+| Edit kind or direction not implemented | `NotImplementedGap` (`NOT_IMPLEMENTED`) | gap id |
+| Sasaah error codes, timeouts, crashes | §4.5.5, §4.5.6 | as tabled |
+| Stub or unexpected reply (harness host codes, **[added: B-085]**) | `HOST_ERROR` (`OFFLINE_STUB`, `UNEXPECTED_REPLY`) | `host_method` |
+| Pinned command-line build artifact changed | `ToolFailed` (`BUILD_CHANGED`) | artifact base name |
+| Configuration invalid or forbidden | `ConfigError` (before any run) | key |
+| No `[host_programs.<name>]` entry for a server section's product (§4.1, **[added: B-541]**) | `ConfigError` (raised by `build_ports`, before any run; spec 0006 exit 2) | `host_programs.<name>` |
+
+## 7. Non-goals
+
+- Any MCP server for a host program (ADR-0024); the fakes under `tests/` are test doubles only.
+- Scripts, generic invoke, table writes or any escape hatch, including as a workaround for a gap.
+- The `spec`-based define tools, seismic parameters, load-pattern change or delete, non-gravity load directions,
+  point loads on frames (gaps H-G1 to H-G3, OQ-G8).
+- Start-and-poll analysis (OQ-G6); batch edit tools (OQ-G7).
+- Revit and IDEA adapters (phases 3 and 4; §4.6.5 only shows the fit); SAFE and SAP2000 product modules.
+- `harness.toml` discovery, the `[engine]` section and the `eng-harness` command dispatch (spec 0006).
+- Engineering checks beyond read-back equality within a basis tolerance; the 06 §7 `check_model` list (gap H-G4).
+
+## 8. Risks
+
+| Risk | Class | Mitigation |
+|---|---|---|
+| A write repeated or lost after a timeout because reconciliation by reads decides wrongly | R1 | Pre-images, per-tool rules (§4.5.7), `unknown` → engineer; crash matrix (AC36); live test (§12) |
+| Units left changed after a timeout produce wrong values (the x1000 class) | R1 | Explicit tokens, units read after every timeout or reconnect, read-back of every written quantity (AC22, AC24) |
+| A host program killed with the engine, or an orphaned instance | R1 | Silent breakaway for server jobs, guard closes only identified launched instances (AC5, AC15) |
+| Another session's process closed | R1 | Identity by pid and start time, terminate through one handle (AC7) |
+| A Sasaah behavior change behind an unchanged schema passes the fingerprint (the baseline's `model_locked` fix) | R1 | Executable hash and pinned commit beside the fingerprint (AC9) |
+| The SDK's client API changes in a minor release | R3 | Version range pinned in the package ADR; the transport is ours; contract tests on recordings |
+| Windows-only code untested on Linux CI | R3 | `windows` marker in the Windows CI job (AC5, AC6, AC7, AC37) |
+
+## 9. Test strategy
+
+| Criteria | Layer | Location |
+|---|---|---|
+| AC1 to AC3, AC7, AC13, AC14, AC16, AC17 to AC21, AC29 (interim), AC30, AC33, AC37 to AC42, AC48 to AC50 | Unit | `tests/unit/` |
+| AC4, AC6 (POSIX) | Unit with real processes | `tests/unit/servers/` |
+| AC5, AC6, AC7, AC37, AC49 (Windows; AC49 in `tests/windows/test_platform_windows.py`, B-541) | Unit, marker `windows` | `tests/windows/` |
+| AC10, AC16, AC34, AC35, AC46 | Contract (inventory, recordings, kinds; markers `synthetic`, `recorded`) | `tests/contract/` |
+| AC8, AC9, AC11, AC12, AC15, AC22 to AC29, AC31, AC32, AC36, AC41 (`build_ports` route), AC43 to AC45, AC47, AC51, AC52 | Fake-host workflow (real engine, real server processes of the synthetic fakes) | `tests/workflow/` |
+| AC36 (crash matrix), AC52 (content comparison and recovery) | Replay | `tests/replay/` |
+| AC52 (journal compatibility and engine post-open behavior) | Unit | `tests/unit/` |
+| AC27 (fingerprint) | Property (Hypothesis, derandomized in CI) | `tests/property/` |
+
+No golden engineering tests: the adapters compute no engineering value (conversions are the contract's). Coverage
+floors 85% line and 75% branch (process/05 §2); mutation testing on `adapters/_errors.py`, `adapters/csi/_errors.py`,
+`adapters/csi/_reconcile.py`, `adapters/_args.py`, `servers/_buildcheck.py`, `servers/_hostlock.py` and
+`servers/_guard.py` (R1).
+
+## 10. Version impact
+
+Part of `eng-harness` 0.1.0. The allowlist data and its fingerprint are versioned with the package; a new Sasaah
+build is a new allowlist header (and recordings) in a minor release. The ADR-0031 switch changes an error mapping: a
+minor release with a changelog entry, after the `eng-contract` minor that adds the precondition values.
+
+## 11. Open questions, gaps and additions
+
+| Id | Question or gap | Owner | Recommendation |
+|---|---|---|---|
+| Q1 | ADR-0031: `model_locked` as `PRECONDITION_FAILED` (`model_unlocked`), `server_owned_instance`, unlock under approval, `unlock` always-ask (engine spec 0001 §4.7 needs the same addition) | Owner | Accept; until then the interim mapping holds and the cycle stops at the second cycle's first edit |
+| Q2 | Timeout topology: a dedicated `long` role attached to the `main` role's instance (OQ-Q21), or one role with the analysis timeout | Owner | Dedicated role; fall back to `single` only if the local test shows a second server cannot attach to a server-launched instance |
+| Q3 | MCP protocol mode with the Sasaah servers (C# SDK 1.1.0): `legacy` (initialize handshake) or `auto` (probe, then fall back) | Owner | `legacy`, so recordings are deterministic; configurable |
+| Q4 | Analysis and design in flight at a timeout reconcile as `unknown` in v1, because an answer from the new worker does not show that the abandoned host call ended (S-12 §5); a re-run is the engineer's journaled retry decision, sent only after proof of end | Owner | Accept; once S-02 gives a proof-of-end mechanism (H-G7), `csi_run_analysis` decides `applied` or `not_applied` from `locked` as in §4.5.7 |
+| Q5 | ADR-0032: harness-side identity by content and path hash | Owner | Accept; ask Sasaah for a typed `csi_set_project_info` (S12-G6) |
+| Q6 | Silent breakaway lets server helpers escape; the guard terminates recorded helpers | Owner | Accept; ask Sasaah to start hosts with `CREATE_BREAKAWAY_FROM_JOB`, then switch to `BREAKAWAY_OK` |
+| Q7 | A launched instance that cannot be exited gracefully and was visible is left running | Owner | Accept: an engineer may be using a visible instance; the run report lists it |
+| Q8 | Where `check_model(model_key)`, which takes no basis, takes the read-back tolerance from (B-465) | Owner | Decided (owner answer of 2026-11-14, B-495): from the basis field `checks.readback_relative_tolerance_ratio`, passed by the workflow (§4.5.8); the merged plan T12b code takes it as `ReadBack.tolerance_ratio` and reports `READBACK_UNAVAILABLE` for a quantity without it; delivered from the run's frozen basis by plan T19a (§4.5.8, AC44; H-G9 closed by amendment B-503) |
+| Q9 | Exit code of the H-G8 refusal of `[cli_tools.*]` entries (AC43) | Owner | Decided (owner answer of 2026-11-14, B-495): 2 (`USAGE`), not 70 (spec 0006 §4.2.3, §6); built by plan T19a |
+| Q10 | **[added: B-503]** Whether `csi_design_run` (and `csi_run_analysis`) count as adapter writes for the outside-edit check: a steel design with auto-select sections changes frame sections, `CsiToolPort` calls `wrote` only after the edit tools, so the next `model_state` reports `MODEL_CHANGED_OUTSIDE` and raises the revision (§4.6.4) | Owner | Writer's recommendation: yes for the outside-edit mark only: `CsiToolPort` calls `wrote(model_key)` after a successful analysis or design, which adds no read-back item; confirm in the local test which design settings change sections |
+| Q11 | **[added: B-503]** The reconciliation evidence names "the Sasaah audit-log lines for the op" (§4.5.7), but no reader, line format or rule that matches a line to an `op_id` is specified, and the merged reconciler stores reads only | Owner | Writer's recommendation: v1 stores the reads only and says so in the evidence; the audit-log lines join once the local test (§12) has recorded the log format and how a line names its call |
+| Q12 | **[added: B-503]** A requested value of zero is compared exactly: §4.5.8 defines only a relative tolerance, so `abs(read - 0) <= ratio * 0` passes only an exact zero, and a host that reads back a tiny non-zero value gives `READBACK_MISMATCH` | Owner | Writer's recommendation: keep the exact comparison in v1 (no constant may be added, §11 G-2); if the local test shows a non-zero read-back of a written zero, add an absolute floor as a design basis field with a source |
+| Q13 | **[added: B-503]** `AdapterHostPort.take_warnings()` drains the warnings of every model, so `check_model` of one model reports, and removes, the `MODEL_CHANGED_OUTSIDE` warnings that `model_state` found for another model (related to OQ-Q67, which asks which result reports them) | Owner | Writer's recommendation: keep the warnings per model key and let `check_model(model_key)` drain only that model's |
+| Q14 | **[added: B-503]** §4.7 and §6 name `BUILD_CHANGED` a harness code raised as `ToolFailed` (A1), but `HarnessCode` has no such member; the command-line adapter written for plan T16 (pull request 345) raises `HOST_ERROR` with `host_code` `BUILD_CHANGED`, and also a `host_code` `LAUNCH_FAILED` that this spec does not name | Owner | Writer's recommendation: amend §4.7, §6 and A1 to the contract code `HOST_ERROR` with the host codes `BUILD_CHANGED` and `LAUNCH_FAILED`, as A3 did for `OFFLINE_STUB` and `UNEXPECTED_REPLY`, rather than add a `HarnessCode` member |
+| Q15 | **[added: B-503]** §4.7 puts a command-line tool's attempt folder at `run_dir/tools/<step path>/<attempt>/`; the plan T16 adapter (pull request 345) uses `run_dir/tools/<op_id>`, where the engine's `op_id` already hashes the run, the step path and the attempt | Owner | Writer's recommendation: amend §4.7 to `run_dir/tools/<op_id>/`: one folder per attempt, and no step-path characters in a folder name |
+| Q16 | **[added: B-569]** B-202 F2: the CSI tool port stored a tool save's result with the binding read before the call and never recorded the save, so the next `model_state` resolved the new file hash as an outside save (revision + 1, `MODEL_CHANGED_OUTSIDE`): the first write after the edit cycle's step 7 save met `ApprovalVoid`, a resume after any tool save met `host_state_mismatch`, and `csi_open_revision` had the same lag because `reopened` ran after the result was stored | Owner | Decided (lead, B-569; engine spec 0001 §11 Q46): the tool port records the save on the host port before it stores the result, and `provenance.host` carries the revision after the step (§4.5.3, §4.5.9 "Tool saves"); the engine is unchanged; built by plan 0007 T13b (spec 0007 §4.10, AC43) |
+| H-G1 | `csi_define_area_section`, `csi_define_frame_section`, `csi_define_material` need CSi API `spec` keys not in the schema; slab thickness change is therefore not implemented | Owner | Confirm the keys locally and pin a method and key list (OQ-G11), or a Sasaah typed slab tool (the engine's `DefineSlabSection` exists unexposed); test `test_gaps_not_implemented` expects `NOT_IMPLEMENTED` |
+| H-G2 | Load directions other than `gravity` and frame point loads (S12-G9) | Owner | Local test of the direction codes, then a Sasaah fix |
+| H-G3 | Load pattern types `superimposed_dead`, `roof_live` and combination type `range` have no documented Sasaah value | Owner | Confirm the host names locally; until then refused |
+| H-G4 | The 06 §7 `check_model` list beyond tolerance-free checks | Owner | Later minor; duplicates need a basis tolerance |
+| H-G5 | `model.frame_placements/1` `kind` cannot be read from `csi_list_frames` | Owner | Read design orientation through `csi_frame_details` after a local check of its reply |
+| H-G6 | Registry keys of installed CSI programs | Owner | Not needed while `csi_status` lists installed products |
+| H-G7 | No proof that a host call abandoned at a server `timeout` has ended (the abandoned worker keeps its host call, S-12 §5) | Owner | Measure with S-02 which signal is reliable; ask Sasaah to report abandoned workers in `csi_status`; until then long tools reconcile `unknown` and a re-run waits for the engineer (test `test_long_tools_unknown_without_proof_of_end`) |
+| H-G8 | **[added: B-475]** `build_ports` does not yet route `[cli_tools.*]` entries to the command-line tool adapter (the first live run, the edit cycle on ETABS, names no command-line tool) | Lead | Refuse such a configuration with `NOT_IMPLEMENTED` until plan task T19b closes the gap (AC43); the owner's `harness.toml` holds no `[cli_tools.*]` section until then; the refusal exits 2 (Q9) |
+| H-G9 | **[added: B-495]** No plan task delivers the frozen basis value to `ReadBack.tolerance_ratio` (Q8): the ports are built at step 1 of spec 0006 §4.2.2, the basis is frozen at step 3, `resume` runs steps 1, 5 and 6 with no freeze, and `build_ports` (plan T19a) takes no basis. Until a task delivers it, every written quantity reads back `READBACK_UNAVAILABLE` on the first live run | Lead | Closed by amendment B-503: plan T19a gives the CSI host port a provider that reads the frozen basis named by the run header (§4.5.8, AC44); no engine port signature changes and the command line passes nothing |
+| H-G10 | **[added: B-530]** No component turns the workflow's `harness.file_input/1` model reference (base name, SHA-256, size) into the `files` mapping (model key to path) that `build_ports` gives the host port (§4.1); until one does, a run whose host port has no file for its model key fails `NOT_FOUND` at `working_copy` | Lead | Closed by amendment B-536: the command line builds `files` from the model-file fields of the run's input (spec 0006 §4.2.2 step 2, AC67; plan 0006 T14c), and spec 0007 §4.2 gives the edit cycle's model as such a field; plan T19a's tests pass `files` |
+| G-2 | Read-back of quantities needs a tolerance | Owner | A design basis field `checks.readback_relative_tolerance_ratio` with a source; no constant in code |
+| A1 | **[added]** machine-level `lock_dir`; harness code `BUILD_CHANGED`; harness kinds `harness.csi_model_status/1`, `harness.csi_analysis_run/1`, `harness.csi_analysis_status/1`, `harness.csi_analysis_messages/1`, `harness.csi_design_run/1`, `harness.csi_design_results/1`, `harness.cli_run/1`, `harness.file_input/1` | Owner | Accept with this spec |
+| A2 | **[added]** by B-068 for spec 0006 Q5 and Q13: descriptor keys `release` and `release_record`, `ToolPort.unreleased_tools()`, the doctor's unreleased-tools check and its `extra_checks` extension point (AC38, AC39) | Owner | Accept with engine Q23 |
+| A3 | **[added]** by B-085 for spec 0014 A1 (IDEA adapter): `routes` in the allowlist header and on entries, and the server section's `route`; `audit_log` on the server section (default true; false for IDEA, so no `--audit-log` argument); an adapter may require the `single` topology (one `main` role serving all classes); allowlist header `[[unit]]` entries with `unit_status`; the issue codes `LOADS_UNCONFIRMED_MAP` (info) and `LOAD_EFFECT_ZERO_DROPPED` (warning); the harness host codes `OFFLINE_STUB` and `UNEXPECTED_REPLY`; the harness kinds `harness.idea_status/1`, `harness.idea_project/1`, `harness.idea_loads/1`, `harness.idea_check_raw/1` (spec 0014 §4.5). AC40 to AC42 (plan T20); the IDEA uses of each are in spec 0014 and plan 0014 | Owner | Accept with spec 0014 |
+| C1 | Conflict: 11 §9 says analysis may be "started and then followed through `csi_analysis_status`"; S-12 §5 shows the call is synchronous | Owner | This spec follows S-12; amend 11 §9 and 18 step 11 (S-12 "Consequences") |
+| C2 | Conflict: 11 §9 and ADR-0008 name two excluded CSI tools; S-12 §8 finds seven, and `DisableScript` does not hide `csi_db_tables_apply` | Owner | This spec excludes all seven; amend 11 §9 and ADR-0008 |
+| C3 | The SDK's `stdio_client` on Windows assigns its job after the spawn and allows no breakaway | Owner | Not used (§2); recorded here so a later SDK upgrade is checked against it |
+
+## 12. Needs local test
+
+Listed in `docs/local-testing.md` by the plan (no host program runs in CI): (1) `csi_launch` on the owner's machine:
+which process is the ETABS parent (server child or COM activation), the pid the reply names, and that the instance
+survives the server job's closure (silent breakaway); (2) a second server (`long` role) attaching by pid to a
+server-launched instance; (3) the live `tools/list` fingerprint against the allowlist's (replace the S-12 value with
+a recording); (4) `serverInfo` the Sasaah server reports; (5) every table key of §4.6.2 and §4.6.4 and their reply
+fields; (6) the reply fields of every list tool mapped in §4.6.4; (7) a server `timeout` during a write and during an
+analysis, the units afterwards, each reconciliation rule of §4.5.7, `locked` after a completed analysis, and a
+proof-of-end mechanism for an abandoned analysis call (H-G7, with S-02); (7a) after a `timeout` on a role, that the
+next call re-attaches with `launched: false` and `csi_exit` is refused, and what `csi_status` reports as the current
+target; (8) fingerprint stability and the
+blind spots of the read set (S-04); (9) `close_started` closing a hidden launched instance and leaving a visible one;
+(10) the host-instance lock across two engine processes; (11) `dxf-prep/prepare` and `etabs-model/build` through the
+adapter, including the configuration rewrite and the build-artifact hash; (12) `eng-harness doctor` on the owner's
+machine, including the integrity level and installed products, and that its tool-list rows come from roles started
+through `platform_launcher` (`servers/_platform.py`) in a Job Object (**[added: B-541]**); (13) record mode on a copy, and the owner's review of
+the recordings before commit.

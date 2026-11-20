@@ -1,0 +1,24 @@
+# Package floors (design/process/01-lifecycle.md section 6; spec 0001 section 4.1).
+# The R1 modules of the core; the rest of core/src is r2. Engineering checks (packages/**/checks/**) are r1 in the root map.
+- paths:
+    - "core/src/structural_codes/trace.py"
+    - "core/src/structural_codes/check.py"
+    - "core/src/structural_codes/_verdict.py"
+    - "core/src/structural_codes/applicability.py"
+    - "core/src/structural_codes/overlay.py"
+    - "core/src/structural_codes/lifecycle.py"
+    - "core/src/structural_codes/content_hash.py"
+    - "core/src/structural_codes/verification.py"
+    - "core/src/structural_codes/_runner.py"
+  risk: r1
+- paths:
+    - "core/src/**"
+  risk: r2
+# Every module of the ACI 318-14 pack is r1 (plan 0002 T1).
+- paths:
+    - "aci318-14/src/aci318_14/**"
+  risk: r1
+# Every module of the SBC 304-2018 pack is r1 (plan 0003 T1).
+- paths:
+    - "sbc304-2018/src/sbc304_2018/**"
+  risk: r1

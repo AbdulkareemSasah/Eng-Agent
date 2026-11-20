@@ -1,0 +1,33 @@
+# Allowlist of the Sasaah Revit server (spec 0011 section 4.4), reviewed data: a change of an entry is a reviewed
+# data change. Pinned to the S-12 inventory (spikes/S-12-sasaah-tool-inventory/inventory/sasaah-revit-mcp.json),
+# built by static reading of the C# catalog at the commit below; the live tools/list needs a local test.
+# Fingerprints are keyed by role (plan 0011 dependencies; spec 0011 section 4.3 item 4): the read role lists only
+# read and session tools (--read-only); the write role lists all 21 allowlisted tools.
+adapter = "sasaah-revit-mcp"
+sasaah_commit = "61da80f61a6562c8e3553168056bc107e3f93013"
+also_tested_commits = []
+fingerprint = { read = "4a1af000a4f43e7ae28eea6fc30e74b0ba2183c4eaa9a7d59c0e9bfa8bd6e526", write = "231b3352530f71b68ac5854e1347c3be4db16e43d93c76ce9849a43fe6475b18" }
+fingerprint_source = "s12-inventory"
+tool = [
+  { name = "revit_connection_status", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "ConnectionStatusArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_ping", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "PingArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_current_target", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "GetCurrentTargetArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_available_targets", kind = "session", timeout_class = "session", effect = "read", action = "plain", args_model = "ListAvailableTargetsArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_model_metadata", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetModelMetadataArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_levels", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListLevelsArgs", result_kind = "harness.revit_levels/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_grids", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListGridsArgs", result_kind = "harness.revit_grids/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_elements", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListElementsArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_element_details", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetElementDetailsArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_element_parameters", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetElementParametersArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_type_parameters", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetTypeParametersArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_available_family_types", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetAvailableFamilyTypesArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_family_types_in_family", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListFamilyTypesInFamilyArgs", result_kind = "harness.revit_structure/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_list_worksets", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "ListWorksetsArgs", result_kind = "issues.model_check/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_get_model_warnings_summary", kind = "read", timeout_class = "call", effect = "read", action = "plain", args_model = "GetModelWarningsSummaryArgs", result_kind = "issues.model_check/1", units = "none", confirm = "never", products = ["read", "write"] },
+  { name = "revit_open_model", kind = "session", timeout_class = "attended", effect = "write", action = "open", args_model = "OpenModelArgs", result_kind = "harness.revit_status/1", units = "none", confirm = "host_dialog", readback = "revit_get_model_metadata", products = ["write"] },
+  { name = "revit_duplicate_family_type", kind = "write", timeout_class = "attended", effect = "write", action = "plain", args_model = "DuplicateFamilyTypeArgs", result_kind = "harness.revit_write_result/1", units = "none", confirm = "host_dialog", readback = "revit_list_family_types_in_family", products = ["write"] },
+  { name = "revit_set_type_parameter_values", kind = "write", timeout_class = "attended", effect = "write", action = "plain", args_model = "SetTypeParameterValuesArgs", result_kind = "harness.revit_write_result/1", units = "none", confirm = "host_dialog", readback = "revit_get_type_parameters", products = ["write"] },
+  { name = "revit_set_element_parameter_values", kind = "write", timeout_class = "attended", effect = "write", action = "plain", args_model = "SetElementParameterValuesArgs", result_kind = "harness.revit_write_result/1", units = "none", confirm = "host_dialog", readback = "revit_get_element_parameters", products = ["write"] },
+  { name = "revit_set_parameter_value_by_guid", kind = "write", timeout_class = "attended", effect = "write", action = "plain", args_model = "SetParameterValueByGuidArgs", result_kind = "harness.revit_write_result/1", units = "none", confirm = "host_dialog", readback = "revit_get_element_parameters", products = ["write"] },
+  { name = "revit_change_element_type", kind = "write", timeout_class = "attended", effect = "write", action = "plain", args_model = "ChangeElementTypeArgs", result_kind = "harness.revit_write_result/1", units = "none", confirm = "host_dialog", readback = "revit_get_element_details", products = ["write"] },
+]

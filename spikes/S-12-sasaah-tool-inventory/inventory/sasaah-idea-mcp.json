@@ -1,0 +1,3337 @@
+{
+  "inventory": "sasaah-idea-mcp",
+  "sasaah_commit": "61da80f61a6562c8e3553168056bc107e3f93013",
+  "provenance": "Built by static reading of the C# catalog sources with extract.py; nothing was run against a host. Compare with the live tools/list of the pinned build (needs local test).",
+  "server": {
+    "executable": "sasaah-idea-mcp (AssemblyName in 04_Deployments/Sasaah.Mcp.Idea.Server/Sasaah.Mcp.Idea.Server.csproj)",
+    "transport": "stdio, JSON-RPC",
+    "mcp_sdk": "ModelContextProtocol 1.1.0 (csproj)",
+    "start_options": {
+      "--read-only": "hides Write, Destructive and Code tools",
+      "--disable-script": "hides idea_run_script; the DEFAULT is that scripts are enabled (IdeaModels.cs:435)",
+      "--call-timeout-sec": "default 120",
+      "--idea-dir / --default-project / --service-url": "install dir, project, REST service URL (default http://localhost:5000 in IdeaSession.cs:41)"
+    },
+    "version_reporting": "No server version or build id; idea_status reports installed IDEA versions and REST service state only. Directory.Build.props pins Version 0.1.0.",
+    "tool_count": 58
+  },
+  "tools": [
+    {
+      "name": "idea_status",
+      "description": "List installed IDEA StatiCa versions, the Connection REST service state and the session's current project. Works with no IDEA software running.",
+      "toolset": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "session",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 44
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_create_project",
+      "description": "Create a new empty IDEA connection project with the given name and design code (e.g. ECEN, American, AUS). Makes it the current project. Pass template_id or template_name to pre-populate one connection from a built-in template (see idea_list_templates).",
+      "toolset": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Project name."
+          },
+          "design_code": {
+            "type": "string",
+            "default": "ECEN",
+            "description": "Design code, e.g. ECEN, American, AUS."
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Optional built-in template id (see idea_list_templates)."
+          },
+          "template_name": {
+            "type": "string",
+            "description": "Optional built-in template name (alternative to template_id)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "session",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 48
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_create_project_from_template",
+      "description": "Create a new IDEA connection project pre-populated with one connection built from a built-in template (see idea_list_templates). Makes it the current project.",
+      "toolset": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Project name."
+          },
+          "template_id": {
+            "type": "string",
+            "description": "Built-in template id or name (see idea_list_templates)."
+          },
+          "design_code": {
+            "type": "string",
+            "default": "ECEN",
+            "description": "Design code, e.g. ECEN, American, AUS."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "session",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 57
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_list_templates",
+      "description": "List the built-in default connection templates with id, name, description, category and thumbnail info. Works with no project open.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 65
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_open_project",
+      "description": "Open an IDEA project file (.ideaCon via the live service, or a Sasaah IDEA JSON file offline). Makes it the current project.",
+      "toolset": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Project file path."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "session",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 69
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_close_project",
+      "description": "Close the current project. The in-memory model is dropped; save first if it matters.",
+      "toolset": "session",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Meta",
+      "classification": "session",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 75
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_save_project",
+      "description": "Save the current project to a file. Overwriting an existing file requires confirm:true. Offline saves use the Sasaah IDEA JSON format; use idea_export_iom for IOM exchange.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path. Defaults to the project file path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true when overwriting an existing file."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 79
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_list_connections",
+      "description": "List connections (design items) in the current project with id, name and calculated state.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 500,
+            "description": "Maximum items to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 86
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_get_connection",
+      "description": "Get one connection with its members, plates, bolt groups, welds and load effects.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 90
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_create_connection",
+      "description": "Create an empty connection (design item) in the current project and return its id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Connection name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 96
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_set_members",
+      "description": "Replace the member list of a connection. Each member needs name, cross_section and material; set bearing_member on the bearing member. Optional geometry: length_mm, position_x/y/z_mm, rotation_x/y/z_deg, eccentricity_y/z_mm.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "members": {
+            "type": "array",
+            "description": "Members {name, cross_section, material, length_mm?, bearing_member?, position_x_mm?, position_y_mm?, position_z_mm?, rotation_x_deg?, rotation_y_deg?, rotation_z_deg?, eccentricity_y_mm?, eccentricity_z_mm?}.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "cross_section": {
+                  "type": "string"
+                },
+                "material": {
+                  "type": "string"
+                },
+                "length_mm": {
+                  "type": "number"
+                },
+                "bearing_member": {
+                  "type": "boolean"
+                },
+                "position_x_mm": {
+                  "type": "number"
+                },
+                "position_y_mm": {
+                  "type": "number"
+                },
+                "position_z_mm": {
+                  "type": "number"
+                },
+                "rotation_x_deg": {
+                  "type": "number"
+                },
+                "rotation_y_deg": {
+                  "type": "number"
+                },
+                "rotation_z_deg": {
+                  "type": "number"
+                },
+                "eccentricity_y_mm": {
+                  "type": "number"
+                },
+                "eccentricity_z_mm": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 103
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_plate",
+      "description": "Add a plate operation to a connection. Returns the plate id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Plate name."
+          },
+          "thickness_mm": {
+            "type": "number",
+            "description": "Plate thickness in mm."
+          },
+          "material": {
+            "type": "string",
+            "default": "S355",
+            "description": "Steel material."
+          },
+          "width_mm": {
+            "type": "number",
+            "description": "Optional plate width in mm."
+          },
+          "height_mm": {
+            "type": "number",
+            "description": "Optional plate height in mm."
+          },
+          "origin_x_mm": {
+            "type": "number",
+            "description": "Optional plate origin X in mm."
+          },
+          "origin_y_mm": {
+            "type": "number",
+            "description": "Optional plate origin Y in mm."
+          },
+          "origin_z_mm": {
+            "type": "number",
+            "description": "Optional plate origin Z in mm."
+          },
+          "offset_mm": {
+            "type": "number",
+            "description": "Optional plate thickness offset in mm."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 110
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_bolt_group",
+      "description": "Add a bolt group operation to a connection. Returns the bolt group id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Bolt group name."
+          },
+          "bolt_assembly": {
+            "type": "string",
+            "default": "M20 8.8",
+            "description": "Bolt assembly from the material library."
+          },
+          "diameter_mm": {
+            "type": "number",
+            "description": "Optional bolt diameter in mm."
+          },
+          "count": {
+            "type": "integer",
+            "description": "Optional bolt count."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 125
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_weld",
+      "description": "Add a weld operation to a connection. Returns the weld id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Weld name."
+          },
+          "weld_type": {
+            "type": "string",
+            "default": "Fillet",
+            "description": "Weld type, e.g. Fillet, Butt, Plug."
+          },
+          "size_mm": {
+            "type": "number",
+            "description": "Optional weld size in mm."
+          },
+          "length_mm": {
+            "type": "number",
+            "description": "Optional weld length in mm."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 135
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_set_loads",
+      "description": "Replace the load effects of a connection. Each load effect carries member forces N, Vy, Vz, Mx, My, Mz.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "loads": {
+            "type": "array",
+            "description": "Load effects {name, member_id?, nx?, vy?, vz?, mx?, my?, mz?, load_case?}.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "member_id": {
+                  "type": "integer"
+                },
+                "nx": {
+                  "type": "number"
+                },
+                "vy": {
+                  "type": "number"
+                },
+                "vz": {
+                  "type": "number"
+                },
+                "mx": {
+                  "type": "number"
+                },
+                "my": {
+                  "type": "number"
+                },
+                "mz": {
+                  "type": "number"
+                },
+                "load_case": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 145
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_calculate",
+      "description": "Run the CBFEM calculation for the selected connections (all when omitted). Live CBFEM needs the Connection REST service; offline returns a marked stub summary. Requires confirm:true.",
+      "toolset": "analysis",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Connection ids. Defaults to all connections."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: calculation recomputes all results."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "analysis",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 152
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_get_check_results",
+      "description": "Read stored check results for one connection (or all when omitted): pass/fail per check with utilization percentages.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id. Defaults to all calculated connections."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 159
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_export_iom",
+      "description": "Export the current project (or one connection) to an IOM XML file for exchange with IDEA StatiCa.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Target .xml/.iom file path."
+          },
+          "connection_id": {
+            "type": "integer",
+            "description": "Optional single connection to export."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 165
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_import_iom",
+      "description": "Import an IOM XML file as the current project, replacing it. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .xml/.iom file path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the current project is replaced."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 172
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_list_materials_sections",
+      "description": "List steel materials, bolt assemblies, weld materials and cross-sections known to the current project.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 500,
+            "description": "Maximum items to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 179
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_cut",
+      "description": "Add a cut operation (e.g. beam cope) to a connection. Returns the cut id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Cut name."
+          },
+          "depth_mm": {
+            "type": "number",
+            "default": 0,
+            "description": "Cut depth in mm."
+          },
+          "length_mm": {
+            "type": "number",
+            "description": "Optional cut length in mm."
+          },
+          "offset_mm": {
+            "type": "number",
+            "description": "Optional cut offset in mm."
+          },
+          "member_name": {
+            "type": "string",
+            "description": "Optional target member name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 183
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_stiffener",
+      "description": "Add a stiffener operation to a connection. Returns the stiffener id.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Stiffener name."
+          },
+          "thickness_mm": {
+            "type": "number",
+            "default": 10,
+            "description": "Stiffener thickness in mm."
+          },
+          "position_mm": {
+            "type": "number",
+            "description": "Optional stiffener position in mm."
+          },
+          "member_name": {
+            "type": "string",
+            "description": "Optional target member name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 194
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_list_operations",
+      "description": "List all manufacturing operations (plates, bolt groups, welds, cuts, stiffeners) of a connection.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000,
+            "default": 500,
+            "description": "Maximum items to return."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 204
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_delete_operation",
+      "description": "Delete one manufacturing operation from a connection. Requires confirm:true.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "operation_id": {
+            "type": "integer",
+            "description": "Operation id."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true for destructive operations."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 211
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_update_operation",
+      "description": "Update fields of one manufacturing operation (name plus type-specific geometry params). Returns the updated operation.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "operation_id": {
+            "type": "integer",
+            "description": "Operation id."
+          },
+          "params": {
+            "type": "object",
+            "description": "Fields to update (e.g. name, thickness_mm, width_mm, depth_mm, position_mm)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 219
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_get_model_info",
+      "description": "Get model info for one connection (or all): member lengths, plate sizes, operation counts, load counts and an extent summary.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id. Defaults to all connections."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 227
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_get_project_settings",
+      "description": "Get the project settings: design code, safety factors, mesh quality, analysis type and national annex.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 233
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_set_project_settings",
+      "description": "Set project settings (design_code, gamma_m0/m1/m2 in 0.1..3.0, mesh_quality Coarse/Medium/Fine, analysis_type Linear/Buckling/Stiffness, national_annex). Only the given fields change.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "design_code": {
+            "type": "string",
+            "description": "Design code, e.g. ECEN, American, AUS."
+          },
+          "gamma_m0": {
+            "type": "number",
+            "description": "Partial factor gamma_M0 (0.1..3.0)."
+          },
+          "gamma_m1": {
+            "type": "number",
+            "description": "Partial factor gamma_M1 (0.1..3.0)."
+          },
+          "gamma_m2": {
+            "type": "number",
+            "description": "Partial factor gamma_M2 (0.1..3.0)."
+          },
+          "mesh_quality": {
+            "type": "string",
+            "description": "Mesh quality: Coarse, Medium or Fine."
+          },
+          "analysis_type": {
+            "type": "string",
+            "description": "Analysis type: Linear, Buckling or Stiffness."
+          },
+          "national_annex": {
+            "type": "string",
+            "description": "National annex, e.g. CEN, DIN, BSI."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 237
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_load_case",
+      "description": "Add a named load case to one connection (or all connections when connection_id is omitted). Names are deduplicated per connection.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id. Defaults to all connections."
+          },
+          "name": {
+            "type": "string",
+            "description": "Load case name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 249
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_set_load_combinations",
+      "description": "Replace the load combinations of a connection. Each combination has a name and factors mapping load-case names to numbers.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "combinations": {
+            "type": "array",
+            "description": "Combinations {name, factors: {loadCase: number}}.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "factors": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "name",
+                "factors"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 256
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_export_report",
+      "description": "Write a local connection report file (json or html, no native PDF dependency) for one connection or the whole project.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Target report file path."
+          },
+          "format": {
+            "type": "string",
+            "default": "json",
+            "description": "Report format: json or html."
+          },
+          "connection_id": {
+            "type": "integer",
+            "description": "Optional single connection to report."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 263
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_get_connection_stiffness",
+      "description": "Get the rotational stiffness of a connection: the live value when calculated against the REST service, otherwise a marked offline stub.",
+      "toolset": "model_read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 271
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_material",
+      "description": "Add a steel material to the project library (deduplicated by name, surfaced in idea_list_materials_sections).",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Material name, e.g. S460."
+          },
+          "grade": {
+            "type": "string",
+            "description": "Optional grade, e.g. S460M."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 277
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_add_section",
+      "description": "Add a cross-section to the project library (deduplicated by name, surfaced in idea_list_materials_sections).",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Section name, e.g. HEB400."
+          },
+          "profile": {
+            "type": "string",
+            "description": "Optional profile family, e.g. HEB."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 284
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_duplicate_connection",
+      "description": "Duplicate a connection (members, operations, loads and combinations) under a new id. Results are reset.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "Optional name for the copy."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 291
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_delete_connection",
+      "description": "Delete a connection from the current project. Requires confirm:true.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true for destructive operations."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 298
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_rename_connection",
+      "description": "Rename a connection. Results are kept.",
+      "toolset": "model_edit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "connection_id": {
+            "type": "integer",
+            "description": "Connection id."
+          },
+          "name": {
+            "type": "string",
+            "description": "New connection name."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 305
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_info",
+      "description": "Native 21.x file-direct project info: read an .ideaCon file (members, plates, bolt/anchor grids, welds, load effects per connection) plus code setup and the design subcode. No project needs to be open.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 312
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_get_loads",
+      "description": "Native 21.x raw loading JSON for one connection (or all when connection_id is omitted and several exist): array of {id,name,checkEquilibrium,percentageLoad,forcesOnSegments,forcesPercentageOnSegments} in N and N·m.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 318
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_set_loads",
+      "description": "Native 21.x replace the loading of one connection with raw loading JSON (N, N·m). All-zero effects are dropped and reported (IDEA rejects them). Requires confirm:true. Writes out_path when given, else overwrites path.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "loads": {
+            "type": "array",
+            "description": "Loading JSON array (effects with forcesOnSegments).",
+            "items": {
+              "type": "object"
+            }
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 325
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_calculate",
+      "description": "Native 21.x CBFEM calculate: summary per check plus error/warning messages and a compact digest (bolt/anchor/weld/plate/concrete maxima, americanSubcode 50=LRFD/51=ASD). Analysis 0 % with no error is surfaced as an unstable model. save:true persists results (then requires confirm:true) to out_path or path.",
+      "toolset": "analysis",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to all connections."
+          },
+          "save": {
+            "type": "boolean",
+            "default": false,
+            "description": "Save results into the output file (requires confirm:true)."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path when saving. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true when save is true."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "analysis",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 335
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Declared read-only (ReadOnlyHint true) but the schema has a confirm gate and the description says some modes write the file: the annotation is inaccurate; the adapter must classify it as write.",
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_split_pass_fail",
+      "description": "Native 21.x long-running split: calculate every load effect alone, classify PASS/FAIL/NO RESULT, write <tag>-summary.csv plus <tag>-PASS.ideaCon/<tag>-FAIL.ideaCon (geometry copies with only those effects, calculated). Requires confirm:true. Progress goes to stderr; honours --call-timeout-sec.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Required when several connections exist."
+          },
+          "out_dir": {
+            "type": "string",
+            "description": "Output directory. Defaults to the source directory."
+          },
+          "tag": {
+            "type": "string",
+            "description": "File tag. Defaults to the source file name without extension."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: output files are written."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "write",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 345
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_code_setup",
+      "description": "Native 21.x code setup: get the whole object, or merge-update fields (e.g. applyConeBreakoutCheck 0/1, distanceBetweenBoltsEdge). Updating requires confirm:true and writes out_path when given, else overwrites path.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "fields": {
+            "type": "object",
+            "description": "Fields to merge into the code setup. Omit to only read."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path when updating. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true when updating."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 355
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Declared read-only (ReadOnlyHint true) but the schema has a confirm gate and the description says some modes write the file: the annotation is inaccurate; the adapter must classify it as write.",
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_libraries",
+      "description": "Native 21.x libraries: materials, bolt assemblies (Identifier, Name) and cross-sections. add_bolt_assembly creates one (requires confirm:true) and writes out_path when given, else overwrites path.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "add_bolt_assembly": {
+            "type": "string",
+            "description": "Bolt assembly name to add. Omit to only list."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path when adding. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true when adding."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 364
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Declared read-only (ReadOnlyHint true) but the schema has a confirm gate and the description says some modes write the file: the annotation is inaccurate; the adapter must classify it as write.",
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_export_template",
+      "description": "Native 21.x export a connection to a template file (UTF-16 XML with Properties/Items operations and Sequence/Operations).",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "template_path": {
+            "type": "string",
+            "description": "Output template file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Write",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 373
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_apply_template",
+      "description": "Native 21.x apply a full template file to a connection (optional setting: DefaultBoltAssemblyID, DefaultConcreteMaterialID, DefaultCleatCrossSectionID, DefaultStiffMemberCrossSectionID). Requires confirm:true. Writes out_path when given, else overwrites path.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "template_path": {
+            "type": "string",
+            "description": "Template file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          },
+          "setting": {
+            "type": "object",
+            "description": "ApplyConnTemplateSetting ids (DefaultBoltAssemblyID, DefaultConcreteMaterialID, DefaultCleatCrossSectionID, DefaultStiffMemberCrossSectionID)."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 381
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_apply_simple_template",
+      "description": "Native 21.x apply a simple template: main member id plus attached member ids (BeamByOperationId). Requires confirm:true. Writes out_path when given, else overwrites path.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "template_path": {
+            "type": "string",
+            "description": "Template file path."
+          },
+          "main_member_id": {
+            "type": "integer",
+            "description": "Main member id (BeamByOperationId)."
+          },
+          "attached_member_ids": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Attached member ids."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          },
+          "setting": {
+            "type": "object",
+            "description": "ApplyConnTemplateSetting ids (DefaultBoltAssemblyID, DefaultConcreteMaterialID, DefaultCleatCrossSectionID, DefaultStiffMemberCrossSectionID)."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 392
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_delete_operations",
+      "description": "Native 21.x delete all operations of a connection. Requires confirm:true. Writes out_path when given, else overwrites path.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 405
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_create_from_iom",
+      "description": "Native 21.x create an .ideaCon project from IOM XML (content or file path) via CreateConProjFromIOM. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "iom_xml": {
+            "type": "string",
+            "description": "IOM XML content."
+          },
+          "iom_path": {
+            "type": "string",
+            "description": "IOM XML file path (alternative to iom_xml)."
+          },
+          "iom_res_xml": {
+            "type": "string",
+            "description": "Optional IOM results XML content or path."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "New .ideaCon file path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the output file is written."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 414
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_export_iom",
+      "description": "Native 21.x export the full IOM OpenModelContainer XML of a connection (GetAllConnectionData; BOM/utf-16 declaration stripped). Returns the XML inline, or writes out_path when given.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "connection_id": {
+            "type": "string",
+            "description": "Connection identifier, numeric id or name. Defaults to the single connection."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Optional output XML path."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 424
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_set_design_subcode",
+      "description": "Native 21.x archive edit: rewrite the design subcode (LRFD or ASD) in ModelerData/Data.wsCon and repack. Works on a temp copy; the target is replaced only after the repacked file re-opens and calculates. Requires confirm:true. Writes out_path when given, else overwrites path.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "subcode": {
+            "type": "string",
+            "description": "LRFD or ASD."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 432
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_fix_library_links",
+      "description": "Native 21.x archive edit: relink zero TableIds of IOM-imported bolt assemblies to the IDEA library table (default 5ce99ba7-64ce-4482-8b6d-667f63b5494d, the American bolt-assembly table on this install; pass table_id when the install differs). Works on a temp copy; the target is replaced only after the repacked file re-opens and calculates. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Source .ideaCon file path."
+          },
+          "table_id": {
+            "type": "string",
+            "description": "Library table GUID. Defaults to the documented American bolt-assembly table."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "Output .ideaCon path. Defaults to overwriting path."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the target file is overwritten."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 441
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_loads_from_frame_forces",
+      "description": "Pure converter (no IDEA needed): SAP2000/ETABS Element Joint Forces rows (global, joint-on-element, kN/kN·m) plus a member mapping (frame element/joint, far-end point or direction, IDEA segment/position) to IDEA loading JSON in N/N·m. screening:true keeps only combos giving a max/min of some component.",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "description": "Frame-force rows {element, joint, output_case, f1,f2,f3,m1,m2,m3}.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "members": {
+            "type": "array",
+            "description": "Member maps {idea_member?, element, joint, joint_coords?, far_end_point?|direction, z_direction?, beam_segment_id, position, abs_position?, force_in?}.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "screening": {
+            "type": "boolean",
+            "default": false,
+            "description": "Keep only max/min combos per component."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 450
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_run_script",
+      "description": "Compile and run C# against the current project. The script defines a class with public static object Run(IdeaScriptContext ctx); ctx exposes Session, Project, Args and Log(string).",
+      "toolset": "script",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "description": "C# class source with the Run entry point."
+          },
+          "args": {
+            "type": "object",
+            "description": "JSON arguments available as ctx.Args."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Code",
+      "classification": "escape-hatch",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 458
+      },
+      "excluded_from_allowlist": true,
+      "exclusion_reason": "Compiles and runs C# against the current project (kind Code); DisableScript defaults to FALSE for this server (IdeaModels.cs:435).",
+      "notes": []
+    },
+    {
+      "name": "idea_native_create_from_joint",
+      "description": "Native 21.x create an .ideaCon connection from an ETABS joint bundle (sasaah.joint/1): plan members/sections/load targets in C#, instantiate the IOM through the bridge (auto retries library sections with parametric ones), set the design subcode (LRFD by default), convert ALL governing load effects (bearing member unloaded, zero effects dropped), optional template, optional calculate. Writes the link sidecar. For a TYPICAL connection, pass bundle_paths with the extra joints: geometry and plan come from bundle_path, loads are enveloped over all joints. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "bundle_path": {
+            "type": "string",
+            "description": "sasaah.joint/1 bundle file path (see csi_export_joint); the representative joint for typical connections."
+          },
+          "bundle_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra joint bundles for a TYPICAL connection (one file per joint). Member rules are derived from the plan; loads are enveloped over all joints."
+          },
+          "out_path": {
+            "type": "string",
+            "description": "New .ideaCon file path."
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Frame names to include. Defaults to all bundle members."
+          },
+          "bearing_frame": {
+            "type": "string",
+            "description": "Bearing ETABS frame. Defaults to the column ending at the joint from below, else the first member."
+          },
+          "section_mode": {
+            "type": "string",
+            "default": "auto",
+            "description": "Steel I sections: auto (library first, parametric retry), library or parametric."
+          },
+          "max_member_length": {
+            "type": "number",
+            "default": 2.0,
+            "description": "Modelled member length in metres; longer members are capped."
+          },
+          "design_subcode": {
+            "type": "string",
+            "default": "LRFD",
+            "description": "LRFD, ASD or keep (leave the fresh file's subcode)."
+          },
+          "combos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Base combos to convert (envelope Max/Min rows follow). Defaults to all bundle forces."
+          },
+          "screening": {
+            "type": "boolean",
+            "default": true,
+            "description": "Keep only combos giving a max/min of some component."
+          },
+          "template_path": {
+            "type": "string",
+            "description": "Optional template file to apply after the loads."
+          },
+          "template_mode": {
+            "type": "string",
+            "default": "full",
+            "description": "Template mode: full or simple."
+          },
+          "main_member_frame": {
+            "type": "string",
+            "description": "Main ETABS frame for simple templates (required then)."
+          },
+          "attached_frames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Attached ETABS frames for simple templates."
+          },
+          "calculate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Calculate after creation and report the digest (results are saved)."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: output files are written."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 465
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": [
+        "Writes or overwrites a file on disk (path/out_path argument); the harness works on copies."
+      ]
+    },
+    {
+      "name": "idea_native_link",
+      "description": "Native 21.x link an EXISTING hand-built .ideaCon file to ETABS joint bundle(s): explicit member map, member rules, or auto-match by member direction (5°). Member rules [{idea_member, position?, frame?, section?, role?, material_type?, side?}] match by section/role/material on every joint (side A/B disambiguates continuous members by direction) and are required with several bundles; member_map and auto-match are single-joint only. Writes the sasaah.idea-link/1 sidecar only; the .ideaCon file is untouched. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Existing .ideaCon file path."
+          },
+          "bundle_path": {
+            "type": "string",
+            "description": "sasaah.joint/1 bundle file path; the representative joint with bundle_paths."
+          },
+          "bundle_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extra joint bundles for a TYPICAL connection (one file per joint). Requires member_rules."
+          },
+          "member_map": {
+            "type": "array",
+            "description": "Explicit map [{idea_member, frame, position?}] (single joint only); omitted positions default to 1. Without member_map and member_rules, members auto-match by direction (single joint only).",
+            "items": {
+              "type": "object"
+            }
+          },
+          "member_rules": {
+            "type": "array",
+            "description": "Member rules [{idea_member, position?, frame?, section?, role?, material_type?, side?}]: all given criteria must match exactly one bundle member per joint; side A/B is only for continuous IDEA members. Works for one or several joints.",
+            "items": {
+              "type": "object"
+            }
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the sidecar file is written."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 486
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_sync_from_joint",
+      "description": "Native 21.x re-sync loads: convert new joint bundle forces through the stored per-joint maps, rename effects 'J<joint> <combo>', merge and envelope-screen across all joints, replace the connection loading, optionally calculate. Bundle paths come from the sidecar; bundle_path/bundle_paths override them (matched by joint name). Reports per-source counts, per-member before/after maxima and the governing joint+combo per member. Updates the sidecar. Requires confirm:true.",
+      "toolset": "file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Linked .ideaCon file path."
+          },
+          "bundle_path": {
+            "type": "string",
+            "description": "Override sasaah.joint/1 bundle file path (matched by joint name). Defaults to the sidecar's stored path."
+          },
+          "bundle_paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Override bundles for several joints (matched by joint name); a linked joint missing here keeps its stored path."
+          },
+          "screening": {
+            "type": "boolean",
+            "description": "Envelope-screen across all joints (keep max/min effects). Defaults to the link's screening flag."
+          },
+          "calculate": {
+            "type": "boolean",
+            "default": false,
+            "description": "Calculate after syncing and report the digest (results are saved)."
+          },
+          "confirm": {
+            "type": "boolean",
+            "description": "Must be true: the file's loading is replaced."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Destructive",
+      "classification": "file",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": true,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 497
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    },
+    {
+      "name": "idea_native_link_info",
+      "description": "Read the sasaah.idea-link/1 sidecar of an .ideaCon file (or 'not linked').",
+      "toolset": "native",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": ".ideaCon file path."
+          }
+        },
+        "additionalProperties": false
+      },
+      "declared_annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "derived_from": "04_Deployments/Sasaah.Mcp.Idea.Server/Program.cs:72-77 (computed from the catalog kind)"
+      },
+      "server_kind": "Read",
+      "classification": "read",
+      "changes_host_units": {
+        "mechanism": "none",
+        "units_param_declared": false,
+        "applied": false,
+        "note": "No unit switching: field names carry the unit (_mm, _deg); load effects are N, Vy, Vz, Mx, My, Mz as declared (idea_set_loads) with no unit label in the schema."
+      },
+      "confirm_required": false,
+      "timeout": {
+        "default_seconds": 120,
+        "source": "04_Deployments/Sasaah.Mcp.Idea.Server/IdeaServerConfig.cs:13 and 02_Engines/Sasaah.Idea.Engine/IdeaModels.cs:436",
+        "option": "--call-timeout-sec / SASAAH_IDEA_CALL_TIMEOUT_SEC",
+        "declared_per_tool": false,
+        "applies_to": "IdeaSession.Invoke (Task.Run + Wait; the work is not cancelled on timeout, IdeaSession.cs:84-103), REST client HttpClient timeout, hidden-calc process timeout"
+      },
+      "source": {
+        "file": "02_Engines/Sasaah.Idea.Engine/IdeaToolCatalog.cs",
+        "line": 508
+      },
+      "excluded_from_allowlist": false,
+      "exclusion_reason": "",
+      "notes": []
+    }
+  ]
+}

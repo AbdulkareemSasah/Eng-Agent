@@ -1,0 +1,36 @@
+[project]
+name = "eng-dev-gate"
+version = "0.1.0"
+description = "Mechanical enforcement of the Eng-Agent process: the gate that runs locally and in CI."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+# Runtime dependencies are justified in docs/adr/0001-runtime-dependencies.md (status Proposed, owner queue).
+dependencies = [
+    "pyyaml>=6.0.3",
+    "pydantic>=2.13.0",
+    "ruff>=0.17.3",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "coverage>=7.14.0",
+    "mutmut>=3.8.1",
+]
+
+[project.scripts]
+eng-gate = "eng_dev_gate.cli:run"
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["hypothesis>=6.170.14", "pytest-cov>=7.1.0", "types-pyyaml>=6.0.12"]
+
+[tool.eng-gate]
+profile = "tool"
+layer = "tool"
+import_names = ["eng_dev_gate"]
+coverage_line = 95
+coverage_branch = 90
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

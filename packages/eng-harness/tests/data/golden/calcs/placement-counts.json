@@ -1,0 +1,142 @@
+{
+  "source": "eng-harness spec 0003 §4.11 (P1 to P6) and §4.4; synthetic placements and compare.length_mm, no project value",
+  "method_ref": "§4.11 P1",
+  "synthetic": true,
+  "derivation": "Side a: columns C1 and C2 on story S1, beams B1 on S1 and B2 on S2. Side b: C1 and B1 only (one column and one beam fewer, verification case). Tolerance compare.length_mm = 1 mm (unused for identical common ids). P1 counts by type: column a=2 b=1 difference=b-a=-1; beam a=2 b=1 difference=-1; brace and other a=b=0 difference=0. By story: S1 a=3 (C1,C2,B1) b=2 (C1,B1) difference=-1; S2 a=1 (B2) b=0 difference=-1; unassigned a=b=0. Common ids C1 and B1 are geometrically identical so by_id result same with distance_mm 0. C2 and B2 are only_in_a. equal is false (P6).",
+  "inputs": {
+    "input": {
+      "a_frames": {
+        "frames": [
+          {
+            "id": "C1",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "story": "S1",
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "C2",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 6000.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 6000.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "story": "S1",
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "B1",
+            "kind": "beam",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "j": {"x_mm": 6000.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "story": "S1",
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "B2",
+            "kind": "beam",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 6000.0},
+            "j": {"x_mm": 6000.0, "y_mm": 0.0, "z_mm": 6000.0},
+            "story": "S2",
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "b_frames": {
+        "frames": [
+          {
+            "id": "C1",
+            "kind": "column",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+            "j": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "story": "S1",
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "B1",
+            "kind": "beam",
+            "section": "S1",
+            "i": {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "j": {"x_mm": 6000.0, "y_mm": 0.0, "z_mm": 3000.0},
+            "story": "S1",
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 1,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "a_frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "b_frames": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "counts": [
+      {"element": "frame", "by": "story", "name": "S1", "a": 3, "b": 2, "difference": -1},
+      {"element": "frame", "by": "story", "name": "S2", "a": 1, "b": 0, "difference": -1},
+      {"element": "frame", "by": "story", "name": "unassigned", "a": 0, "b": 0, "difference": 0},
+      {"element": "frame", "by": "type", "name": "beam", "a": 2, "b": 1, "difference": -1},
+      {"element": "frame", "by": "type", "name": "brace", "a": 0, "b": 0, "difference": 0},
+      {"element": "frame", "by": "type", "name": "column", "a": 2, "b": 1, "difference": -1},
+      {"element": "frame", "by": "type", "name": "other", "a": 0, "b": 0, "difference": 0}
+    ],
+    "by_id": [
+      {"element": "frame", "id": "B1", "result": "same", "distance_mm": 0.0},
+      {"element": "frame", "id": "C1", "result": "same", "distance_mm": 0.0}
+    ],
+    "renamed": [],
+    "ambiguous": [],
+    "only_in_a": [
+      {"element": "frame", "id": "B2"},
+      {"element": "frame", "id": "C2"}
+    ],
+    "only_in_b": [],
+    "equal": false,
+    "complete": true
+  }
+}

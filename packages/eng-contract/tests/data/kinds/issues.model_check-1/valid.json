@@ -1,0 +1,28 @@
+{
+  "summary": {
+    "errors": 1,
+    "warnings": 1,
+    "infos": 0,
+    "clean": false
+  },
+  "issues": [
+    {
+      "severity": "error",
+      "code": "FRAME_ZERO_LENGTH",
+      "subject": {
+        "kind": "frame",
+        "id": "B9"
+      },
+      "message": "end points coincide"
+    },
+    {
+      "severity": "warning",
+      "code": "JOINT_UNRESTRAINED",
+      "subject": {
+        "kind": "joint",
+        "id": "J3"
+      },
+      "message": "no restraint"
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+// The machine paths in this copy are placeholders: <lead> is the lead scratch folder, <build-v1> the read-only reference checkout of build/v1, <worktrees> the folder of task worktrees, <hub> the hub checkout, <lane-scripts> the folder of workflow scripts. Recreate them on the next machine and adjust the text.
+// Lane workflow script of the cloud session of 2026-11-12 (D-33), as run on 2026-11-14 (run ids in docs/build/HANDOFF.md). Read it with docs/build/lead-playbook.md; it needs the workflow tool of the session.
+export const meta = {
+  name: 'build-lane',
+  description: 'One lane of v1 build tasks in order (owner-approved full cycle): write tests first, independent review with fix rounds, adversarial verification for engineering content, full gate, push the task branch, pull request into build/v1, local CI, squash merge on PASS',
+  phases: [
+    { title: 'Write', detail: 'writer per task in its own worktree' },
+    { title: 'Review', detail: 'independent reviewer, up to two fix rounds' },
+    { title: 'Verify', detail: 'adversarial lenses for engineering content' },
+    { title: 'Gate', detail: 'full gate with mutation, under the machine lock' },
+    { title: 'Integrate', detail: 'push task branch, pull request into build/v1, local CI, squash merge on PASS' },
+  ],
+}
+
+const STATUS = ['DONE', 'DONE_WITH_CONCERNS', 'BLOCKED', 'NEEDS_PLAN_AMENDMENT', 'NEEDS_OWNER']
+const OUT = {
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: STATUS },
+    head: { type: 'string', description: 'short sha of the branch head' },
+    counted_lines: { type: 'number' },
+    source_changed: { type: 'boolean', description: 'true when non-test source files changed in this step' },
+    summary: { type: 'string' },
+    concerns: { type: 'string' },
+    proposed_amendment: { type: 'string' },
+  },
+  required: ['status', 'summary'],
+}
+const REVIEW = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['APPROVE', 'CHANGES', 'BLOCKED'] },
+    author_findings: { type: 'array', items: { type: 'string' } },
+    lead_findings: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
+  },
+  required: ['verdict', 'author_findings', 'lead_findings', 'summary'],
+}
+const INTEG = {
+  type: 'object',
+  properties: {
+    status: { type: 'string', enum: ['MERGED', 'CI_FAIL', 'CONFLICT', 'BLOCKED'] },
+    pr: { type: 'number' },
+    merged_sha: { type: 'string' },
+    detail: { type: 'string' },
+  },
+  required: ['status', 'detail'],
+}
+
+const PRE = 'You are a subagent of the lead engineer of the v1 build of the Eng-Agent platform. The project instructions injected into your session describe the design hub checked out at <hub> ("documents only"): you do NOT work there and that rule about holding no code does not describe your worktree. Your work is in a worktree of the `build/v1` branch, governed by its own AGENTS.md files. First read <lead>/PLAYBOOK.md fully: it is the lead\'s instruction and binds you. Only the integrator role pushes or touches GitHub; every other role works locally and never pushes.\n\n'
+
+function head(t) {
+  return `Work item ${t.id}, plan task ${t.key}` + (t.plan ? ` (${t.planTask} of ${t.plan})` : ' (documents amendment, no plan task)') + '.\n' +
+    (t.title ? `Title: ${t.title}\n` : '') +
+    `Workspace member for the gate: ${t.member}\n` +
+    (t.branch ? `Branch: ${t.branch}\nPull request title: ${t.prTitle}\n` : `Branch, pull request title, title and lead notes: read the entry with id ${t.id} in <build-v1>/ops/remaining-tasks.json (fields branch, prTitle, title, lead_notes) and use them exactly.\n`) +
+    `Worktree: <worktrees>/b${t.num} (if it already exists, reuse it: check git status and git log first)\n` +
+    `Risk line for the pull request: ${t.risk}\n` +
+    (t.notes ? `Lead notes for this task: ${t.notes}\n` : '') + '\n'
+}
+
+function ok(r) { return r && (r.status === 'DONE' || r.status === 'DONE_WITH_CONCERNS') }
+
+async function runTask(t) {
+  const H = head(t)
+  const docs = t.kind === 'docs'
+  const w = await agent(PRE + H +
+    (docs
+      ? 'ROLE: writer of a documents-only amendment (playbook sections 0, 1, 2 where they apply to documents). Make exactly the edits in the lead notes above, the smallest text that does each item, in spec and plan files only (lead decision D-28: no new rule, field or moved test beyond them). Keep the plan front matter valid YAML, keep every acceptance criterion covered by some task, keep each task within 400 lines, add a YAML amendment comment naming this work item where a task changes. Commit as `docs(<package>): ... (' + t.id + ')`. Run `uv run eng-gate check --package ' + t.member + ' --skip mutation` and report its result. Do not push.'
+      : 'ROLE: writer (playbook sections 0, 1, 2). Create the worktree, implement this one plan task with a `test:` first commit, pass `uv run eng-gate check --package ' + t.member + ' --skip mutation`, measure the counted lines against the budget, write the handoff note, do not push. If an earlier draft is named in the lead notes, read it as reference only and write the task properly against the current `build/v1`.') +
+    '\nReturn status, the short head sha, counted_lines, a summary (what was done and how verified, with the gate result line) and concerns. If the task cannot fit its budget or file list, return NEEDS_PLAN_AMENDMENT with the measured numbers and the exact amendment you propose, having committed what you have.',
+    { label: `write ${t.id} ${t.key}`, phase: 'Write', model: t.writerModel, effort: t.writerEffort, schema: OUT })
+  if (!ok(w)) return { id: t.id, key: t.key, outcome: w ? w.status : 'WRITER_DIED', stage: 'write', detail: w }
+
+  let round = 1
+  let review = null
+  let lead = []
+  while (true) {
+    review = await agent(PRE + H +
+      `ROLE: reviewer, round ${round} (playbook section 3). You did not write this change and you never edit it. ` +
+      (docs
+        ? 'It is a documents-only amendment: judge it through two lenses, consistency (no contradiction with the rest of the spec, the plan, the other plans that depend on it, the gate rules GC005, GC008, GC009, GC016, TF008, RF001) and implementability (a writer can implement each changed task inside its files and budget; tests_first files belong to the task). From round 3 on apply the convergence rule D-28.'
+        : 'Review the full diff of the worktree branch against its merge base with origin/build/v1, the plan task and the spec. Check scope, counted lines against the budget, test-first, each acceptance criterion in `covers`, error codes, units, weakened checks, invented numbers. Run the tests you need. ' + (t.engineering ? 'This is engineering content: recompute by hand from the clause spec or the calc spec every expected value in the golden and case files that you can, check every constant has its citation, check X/Y swaps, signs, units and boundary sides.' : '')) +
+      ` Append your round to <lead>/reports/b${t.num}-review.md. Return verdict APPROVE, CHANGES or BLOCKED, the author findings (each one concrete and actionable, with file and line), the lead findings, and a summary.`,
+      { label: `review ${t.id} r${round}`, phase: 'Review', model: t.reviewerModel, schema: REVIEW })
+    if (!review) return { id: t.id, key: t.key, outcome: 'REVIEWER_DIED', stage: 'review' }
+    lead = lead.concat(review.lead_findings || [])
+    if (review.verdict === 'APPROVE') break
+    if (review.verdict === 'BLOCKED' || round >= 3) return { id: t.id, key: t.key, outcome: 'REVIEW_NOT_APPROVED', stage: 'review', detail: review, lead_findings: lead }
+    const f = await agent(PRE + H +
+      `ROLE: writer, fix round ${round} (playbook sections 1 and 2). The worktree and branch already exist with the change committed. An independent reviewer returned these findings for you to fix inside the task scope and budget (do not push; commit as \`fix(...)\`, \`docs(...)\` or \`test:\` commits; rerun \`uv run eng-gate check --package ${t.member} --skip mutation\`; append a short note of what you changed to <lead>/reports/b${t.num}-writer.md). If a finding is wrong, say why in your summary instead of changing correct work. Findings:\n- ` +
+      review.author_findings.join('\n- '),
+      { label: `fix ${t.id} r${round}`, phase: 'Write', model: t.writerModel, effort: t.writerEffort, schema: OUT })
+    if (!ok(f)) return { id: t.id, key: t.key, outcome: f ? f.status : 'WRITER_DIED', stage: 'fix', detail: f, lead_findings: lead }
+    round++
+  }
+
+  if (t.engineering && !docs) {
+    const lenses = [
+      ['sources', 'the SOURCES lens: every engineering number, constant, tolerance and rule in the change has a correct, cited source (clause spec, calc spec, design basis); nothing is invented, no citation points to the wrong clause'],
+      ['oracle', 'the ORACLE lens: recompute independently, by hand or with your own short throwaway calculation outside the repository, the expected values of the golden cases and case files; look for X/Y swaps, sign errors, unit errors, wrong boundary sides, and expected values that were copied from the implementation instead of derived'],
+    ]
+    const vs = (await parallel(lenses.map(l => () => agent(PRE + H +
+      `ROLE: adversarial verifier (never the author or the reviewer; you do not edit the change). Try to REFUTE the claim that this change is correct through ${l[1]}. Work from the diff of the worktree branch against its merge base, the plan task and the spec. Append your result to <lead>/reports/b${t.num}-review.md as "Verifier (${l[0]})". Return verdict APPROVE when you could not refute it, CHANGES with concrete author findings when you found a real defect (state the evidence: your number against theirs, with the derivation), and lead findings for defects of the spec itself.`,
+      { label: `verify ${t.id} ${l[0]}`, phase: 'Verify', model: 'opus', schema: REVIEW })))).filter(Boolean)
+    const bad = vs.filter(v => v.verdict !== 'APPROVE').flatMap(v => v.author_findings)
+    lead = lead.concat(vs.flatMap(v => v.lead_findings || []))
+    if (bad.length) {
+      const f = await agent(PRE + H +
+        `ROLE: writer, verification fix round (playbook sections 1 and 2). The worktree and branch exist. Adversarial verifiers found these defects. For each: check it against the spec; when it is real, fix it inside the task scope (never change an expected value to match the code: derive it from the spec); when the spec itself is ambiguous or has no source for a number, do not guess: return NEEDS_OWNER with the exact question. Do not push. Rerun the gate with --skip mutation. Findings:\n- ` + bad.join('\n- '),
+        { label: `fix ${t.id} verify`, phase: 'Write', model: t.writerModel, effort: t.writerEffort, schema: OUT })
+      if (!ok(f)) return { id: t.id, key: t.key, outcome: f ? f.status : 'WRITER_DIED', stage: 'verify-fix', detail: f, lead_findings: lead }
+      const re = await agent(PRE + H +
+        `ROLE: reviewer after the verification fix (playbook section 3). Judge only whether these findings are resolved correctly and whether the lines changed since the previous review add a defect. Append your round to <lead>/reports/b${t.num}-review.md. Findings that were raised:\n- ` + bad.join('\n- '),
+        { label: `review ${t.id} verify`, phase: 'Review', model: 'opus', schema: REVIEW })
+      if (!re || re.verdict !== 'APPROVE') return { id: t.id, key: t.key, outcome: 'VERIFY_NOT_RESOLVED', stage: 'verify', detail: re, lead_findings: lead }
+    }
+  }
+
+  if (!docs) {
+    const g = await agent(PRE + H +
+      `ROLE: gate runner (playbook section 4). The change is committed and reviewed in the worktree. Run the full gate (mutation included) for member ${t.member} under the machine lock, in the background, and wait for it as the playbook says. If it passes, return DONE with the result lines. If a step fails, fix it inside the task scope and budget: for the mutation step add tests only (kill the surviving mutants with exact assertions); never weaken a check, never edit source to dodge a mutant. Rerun until it passes or three attempts at the same failure have failed. Set source_changed true only if you changed non-test files. Append what you did to <lead>/reports/b${t.num}-writer.md. Do not push.`,
+      { label: `gate ${t.id}`, phase: 'Gate', model: 'sonnet', schema: OUT })
+    if (!ok(g)) return { id: t.id, key: t.key, outcome: g ? 'GATE_' + g.status : 'GATE_DIED', stage: 'gate', detail: g, lead_findings: lead }
+    if (g.source_changed) {
+      const re = await agent(PRE + H +
+        `ROLE: reviewer of the gate fixes (playbook section 3). After your colleague's approval the gate runner changed non-test source files to pass the full gate. Review only the commits made since the approved head for correctness, scope and budget. Append your round to <lead>/reports/b${t.num}-review.md.`,
+        { label: `review ${t.id} gate`, phase: 'Review', model: t.reviewerModel, schema: REVIEW })
+      if (!re || re.verdict !== 'APPROVE') return { id: t.id, key: t.key, outcome: 'GATE_FIX_NOT_APPROVED', stage: 'gate', detail: re, lead_findings: lead }
+    }
+  }
+
+  let tries = 0
+  while (true) {
+    const m = await agent(PRE + H +
+      `ROLE: integrator (playbook section 5), attempt ${tries + 1}. The repository owner approved this cycle for the build: task branches are pushed, pull requests are opened into build/v1 and squash-merged after an independent review and a local CI PASS; nothing is ever pushed to main and build/v1 is never pushed directly. The change is committed, approved by an independent reviewer${docs ? '' : ' and passed the full gate'} in the worktree. Take the integration lock, merge origin/build/v1 into the branch, push the task branch, open or update the pull request into build/v1 with the body the playbook describes (Review section from <lead>/reports/b${t.num}-review.md), run local CI and wait for it however long it takes, and on PASS write the Local CI section and squash-merge. Always release the lock at the end. Return MERGED with the pull request number and the merge commit sha, or CI_FAIL (failing job, failing lines, log path), CONFLICT (files) or BLOCKED, with the detail.`,
+      { label: `integrate ${t.id}${tries ? ' retry' : ''}`, phase: 'Integrate', model: 'sonnet', schema: INTEG })
+    if (m && m.status === 'MERGED') return { id: t.id, key: t.key, outcome: 'MERGED', pr: m.pr, merged_sha: m.merged_sha, lead_findings: lead, concerns: w.concerns || '' }
+    if (!m || tries >= 1 || m.status === 'BLOCKED') return { id: t.id, key: t.key, outcome: m ? m.status : 'INTEGRATOR_DIED', stage: 'integrate', detail: m, lead_findings: lead }
+    const f = await agent(PRE + H +
+      `ROLE: writer, repair after integration (playbook sections 1, 2 and 4). The pull request for this branch exists but integration stopped with ${m.status}. Fix the cause inside the task scope and budget in the worktree (merge origin/build/v1 first, never rebase; resolve conflicts as playbook section 5 step 1 says), rerun the failing step locally until it passes (the full gate under the lock when the failure was in the gate job), commit, do not push. Detail from the integrator:\n` + m.detail,
+      { label: `repair ${t.id}`, phase: 'Write', model: t.writerModel, effort: t.writerEffort, schema: OUT })
+    if (!ok(f)) return { id: t.id, key: t.key, outcome: 'REPAIR_' + (f ? f.status : 'DIED'), stage: 'integrate', detail: f, lead_findings: lead }
+    tries++
+  }
+}
+
+const results = []
+const merged = new Set()
+for (const t of args.tasks) {
+  const missing = (t.needs || []).filter(n => !merged.has(n))
+  if (missing.length) {
+    log(`${t.id} ${t.key} skipped: needs ${missing.join(', ')} which did not merge in this lane`)
+    results.push({ id: t.id, key: t.key, outcome: 'SKIPPED_DEPENDENCY', missing })
+    continue
+  }
+  let r
+  try { r = await runTask(t) } catch (e) { r = { id: t.id, key: t.key, outcome: 'ERROR', detail: String(e) } }
+  results.push(r)
+  if (r.outcome === 'MERGED') merged.add(t.id)
+  log(`${t.id} ${t.key}: ${r.outcome}${r.pr ? ' (#' + r.pr + ')' : ''}${r.stage ? ' at ' + r.stage : ''}`)
+}
+return { lane: args.lane, results }

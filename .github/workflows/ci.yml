@@ -1,0 +1,274 @@
+# Thin root workflow (eng-dev-gate spec 4.14): triggers, checkouts and calls to the composite actions in
+# tools/eng-dev-gate/actions. Pull-request jobs judge the head with the gate of the base commit (.gate-base);
+# the head variant of an action runs only when the base commit does not have that action yet.
+name: ci
+
+on:
+  pull_request:
+    branches: [build/v1, main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [build/v1]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/gate
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/gate
+      - name: Spike checks
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(spikes/*/check.py)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No spikes/*/check.py found; nothing to run."
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            uv run --script "$f"
+            echo "::endgroup::"
+          done
+
+  gate-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate-check/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/gate-check
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/gate-check/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/gate-check
+
+  ci-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/ci-review/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/ci-review
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/ci-review/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/ci-review
+
+  agents-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/agents-drift/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/agents-drift
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/agents-drift/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/agents-drift
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/security/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/security
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/security/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/security
+
+  risk-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/risk-floor/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/risk-floor
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/risk-floor/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/risk-floor
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/build/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/build
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/build/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/build
+
+  test-first:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - if: github.event_name == 'pull_request'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .gate-base
+          persist-credentials: false
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/setup
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/setup/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/setup
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/test-first/action.yml') != ''
+        uses: ./.gate-base/tools/eng-dev-gate/actions/test-first
+        with:
+          gate-root: .gate-base
+      - if: hashFiles('.gate-base/tools/eng-dev-gate/actions/test-first/action.yml') == ''
+        uses: ./tools/eng-dev-gate/actions/test-first
+
+  # Pushes to build/v1 only (head variants: the commit is merged).
+  windows:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/build/v1'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./tools/eng-dev-gate/actions/setup
+      - uses: ./tools/eng-dev-gate/actions/windows
+      - name: Windows spike checks
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(spikes/*/windows_check.py)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No spikes/*/windows_check.py found; nothing to run."
+          fi
+          for f in "${files[@]}"; do
+            echo "::group::$f"
+            uv run --script "$f"
+            echo "::endgroup::"
+          done

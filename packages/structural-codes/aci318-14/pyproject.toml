@@ -1,0 +1,58 @@
+[project]
+name = "structural-codes-aci318-14"
+version = "0.1.0.dev0"
+description = "ACI 318-14 pack of the structural-codes folder of the Eng-Agent platform: footing checks."
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = ["structural-codes-core", "eng-contract"]
+
+# Test-only dependencies of this package (imports rule IM006 of the gate, spec 4.10); the versions follow the
+# workspace root's dev group. The approvals test reads YAML (test-only import), typed by types-PyYAML.
+[dependency-groups]
+dev = ["pytest>=9.2.0", "hypothesis>=6.170.14", "pyyaml>=6,<7", "types-pyyaml>=6"]
+
+[project.entry-points."structural_codes.packs"]
+aci318_14 = "aci318_14:PACK"
+
+[tool.uv.sources]
+eng-contract = { workspace = true }
+structural-codes-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "aci318_14"
+
+# Only keys of the gate's allowed set (eng-dev-gate spec 4.12); mypy takes the workspace root's configuration and the
+# gate runs coverage itself with the thresholds of [tool.eng-gate].
+[tool.ruff]
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "N", "S", "T20", "C4", "PIE", "RUF", "PT"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers --strict-config"
+testpaths = ["tests"]
+markers = [
+    "windows: needs Windows; runs in the Windows CI job",
+]
+
+# Plan 0002 T1: check_modules is the whole pack source (core spec 4.5); every module is R1.
+[tool.eng-gate]
+profile = "codes"
+layer = 3
+import_names = ["aci318_14"]
+check_modules = ["src/aci318_14/**/*.py"]
+coverage_line = 95
+coverage_branch = 90
+mutation_min = 80
+r1_modules = ["src/aci318_14/**/*.py"]
+# Plan 0003 T3 (amendment B-583): declare the pack root so the SBC overlay may import PACK across the member boundary (IM002).
+public_modules = ["aci318_14"]

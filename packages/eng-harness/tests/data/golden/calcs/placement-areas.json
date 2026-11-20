@@ -1,0 +1,145 @@
+{
+  "source": "eng-harness spec 0003 §4.11 (P2, P4) and §4.4; synthetic areas and compare.length_mm, no project value",
+  "method_ref": "§4.11 P4",
+  "synthetic": true,
+  "derivation": "Tolerance t = 1 mm. Triangle P0=(0,0,0), P1=(3000,0,0), P2=(0,4000,0). A_rot: a = [P0,P1,P2], b = [P1,P2,P0] (cyclic rotation by one vertex). Reading b from index shift (b[(i + shift) mod 3] paired with a[i]), shift 2 pairs P0 with P0, P1 with P1 and P2 with P2 (d² = 0 <= 1), so result same, distance_mm = 0.0. A_rev: a = [P0,P1,P2], b = [P0,P2,P1]. Reversing b gives [P1,P2,P0], and reading it from shift 2 pairs every point on a with d² = 0 <= 1 (no forward shift of b matches), so result reversed, distance_mm = 0.0. A_shape: a has three points, b has four (adds (1500,2000,0)); different point counts give reshaped with distance_mm null.",
+  "inputs": {
+    "input": {
+      "a_areas": {
+        "areas": [
+          {
+            "id": "A_rot",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0}
+            ]
+          },
+          {
+            "id": "A_rev",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0}
+            ]
+          },
+          {
+            "id": "A_shape",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0}
+            ]
+          }
+        ]
+      },
+      "b_areas": {
+        "areas": [
+          {
+            "id": "A_rot",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0}
+            ]
+          },
+          {
+            "id": "A_rev",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0},
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0}
+            ]
+          },
+          {
+            "id": "A_shape",
+            "kind": "slab",
+            "section": "S200",
+            "points": [
+              {"x_mm": 0.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 3000.0, "y_mm": 0.0, "z_mm": 0.0},
+              {"x_mm": 1500.0, "y_mm": 2000.0, "z_mm": 0.0},
+              {"x_mm": 0.0, "y_mm": 4000.0, "z_mm": 0.0}
+            ]
+          }
+        ]
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 1,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "a_areas": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "model.area_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "b_areas": {
+          "result_id": "res_00000000000000000000000004",
+          "ref": "res_00000000000000000000000004",
+          "kind": "model.area_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "counts": [
+      {"element": "area", "by": "story", "name": "unassigned", "a": 3, "b": 3, "difference": 0},
+      {"element": "area", "by": "type", "name": "deck", "a": 0, "b": 0, "difference": 0},
+      {"element": "area", "by": "type", "name": "other", "a": 0, "b": 0, "difference": 0},
+      {"element": "area", "by": "type", "name": "slab", "a": 3, "b": 3, "difference": 0},
+      {"element": "area", "by": "type", "name": "wall", "a": 0, "b": 0, "difference": 0}
+    ],
+    "by_id": [
+      {"element": "area", "id": "A_rev", "result": "reversed", "distance_mm": 0.0},
+      {"element": "area", "id": "A_rot", "result": "same", "distance_mm": 0.0},
+      {"element": "area", "id": "A_shape", "result": "reshaped", "distance_mm": null}
+    ],
+    "renamed": [],
+    "ambiguous": [],
+    "only_in_a": [],
+    "only_in_b": [],
+    "equal": false,
+    "complete": true
+  }
+}
