@@ -202,3 +202,29 @@ def test_sap2000_fingerprint_from_inventory() -> None:
     assert tool_list_fingerprint(schemas) == allowlist.fingerprint["SAP2000"] == sap.tool_fingerprint
     assert allowlist.fingerprint["ETABS"] == "67e0f08ace144fdc41f43882b6671c4296899b36bbfb122433ef879c2e2ebdd1"
     assert allowlist.fingerprint["SAFE"] == "ccdab3c9461b60387569af2ec7acc214c0803bd7953a5d66ca380e1c87c38025"
+
+
+def test_sap2000_fake_schemas_match_inventory(tmp_path: Path) -> None:
+    """AC19: the SAP2000-mode process serves the pinned inventory schemas."""
+    from fakes.sasaah_csi.test_server import Rpc
+
+    control = tmp_path / "control.json"
+    control.write_text(json.dumps({"product": "SAP2000"}))
+    rpc = Rpc(control)
+    try:
+        error, target = rpc.call("csi_launch")
+        assert not error
+        assert target["product"] == "SAP2000"
+        # SAP2000 mode gaps of spec 0012 §4.1: stories are unsupported_by_version.
+        error, body = rpc.call("csi_list_stories")
+        assert error
+        assert body["code"] == "unsupported_by_version"
+        listed = rpc.request("tools/list", {})["tools"]
+        actual = {tool["name"]: tool["inputSchema"] for tool in listed}
+        expected = {
+            tool["name"]: tool["input_schema"] for tool in _inventory()["tools"] if not tool["excluded_from_allowlist"]
+        }
+        assert len(listed) == len(actual)
+        assert actual == expected
+    finally:
+        rpc.close()
