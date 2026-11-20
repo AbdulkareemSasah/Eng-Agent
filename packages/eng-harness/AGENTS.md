@@ -6,7 +6,7 @@
 
 ## 1. What this package is
 
-The harness (layer 4) of the Eng-Agent platform: the run engine, the append-only journal, the ports to host adapters and models, the block and workflow registry, and the workflows built on them. It depends on eng-contract only, talks to host programs through ports (fakes in tests, no host program in CI), and holds no engineering decisions beyond what its specs cite.
+The harness (layer 4) of the Eng-Agent platform: the run engine, the append-only journal, the ports to host adapters and models, the block and workflow registry, and the workflows built on them. It depends on eng-contract only, talks to host programs through ports (fakes in tests, no host program in CI), and holds no engineering decisions beyond what its specs cite. Run `run` and `resume` in the background and follow with `status`, or `--no-wait` and tell the engineer; never read or relay the launch address or open the page; approvals are the engineer's.
 
 - Layer: 4 harness (import name `eng_harness`)
 - May import: eng-contract (public modules only); Pydantic 2 · Must never import: Sasaah code (reached only over MCP or as a tool step); internal modules of any package; any package other than eng-contract until a later plan names it
@@ -21,7 +21,7 @@ The harness (layer 4) of the Eng-Agent platform: the run engine, the append-only
 | Run tests | `uv run pytest` |
 | Add a runtime dependency (needs an ADR) | `uv add <package>` |
 | Add a development dependency | `uv add --dev <package>` |
-| Run the server or app | `uv run eng-gate check (the engine is a library; a command line arrives with plan 0006)` |
+| Run the server or app | `uv run --package eng-harness eng-harness <command>` |
 | Build | `uv build` |
 | Not applicable | This package has no C# code |
 
