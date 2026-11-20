@@ -452,7 +452,7 @@ def _kinds(choice: DesignRun) -> tuple[str, ...]:
     """The host design kinds of a `design.run` choice, steel before concrete (spec 0007 4.5 step 12 and 14)."""
     if choice is DesignRun.STEEL_AND_CONCRETE:
         return ("steel", "concrete")
-    return (choice.value,)
+    return (str(choice),)
 
 
 def _worse(left: VerdictStatus, right: VerdictStatus) -> VerdictStatus:
@@ -529,9 +529,9 @@ async def run_and_summarize(ctx: Any, inp: SummarizeInput) -> SummarizeOutput:
             analysis_status=analysis_status,
             design_status=design_status,
             counts=(
-                f"readback {readback_status.value}",
-                f"analysis {analysis_status.value}",
-                f"design {design_status.value}",
+                f"readback {readback_status}",
+                f"analysis {analysis_status}",
+                f"design {design_status}",
             ),
             refs=refs,
         ),
