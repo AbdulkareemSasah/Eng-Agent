@@ -68,6 +68,8 @@ class RefMeta(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     result_id: str
+    ref: str
+    """The original input reference string, including its JSON pointer (amendment B-580)."""
     kind: str
     complete: bool
     model_id: str | None

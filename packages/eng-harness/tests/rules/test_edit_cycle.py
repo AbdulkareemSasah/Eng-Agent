@@ -120,6 +120,7 @@ def test_clean_drift_at_and_above_the_limit() -> None:
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=kinds[name],
                 complete=True,
                 model_id=None,

@@ -23,6 +23,7 @@ META = InputMeta(
     refs={
         name: RefMeta(
             result_id=f"res_01KCC{'0' * 20}{n}",
+            ref=f"res_01KCC{'0' * 20}{n}",
             kind=kind,
             complete=True,
             model_id=None,
