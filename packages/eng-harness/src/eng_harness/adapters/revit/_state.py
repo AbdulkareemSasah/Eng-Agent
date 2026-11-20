@@ -32,6 +32,7 @@ from eng_contract.units import convert
 from eng_contract.verdicts import Subject, SubjectKind
 from pydantic import BaseModel
 
+from eng_harness.adapters._hostport import DocumentHostCapabilities
 from eng_harness.adapters.revit._parameters import ROLE_NAMES, RoleMap
 from eng_harness.adapters.revit._replies import parse_revit_reply
 from eng_harness.adapters.revit._units import convert_parameter
@@ -48,7 +49,14 @@ from eng_harness.kinds.revit import (
 )
 from eng_harness.servers import CallEffect
 
-__all__ = ["LIST_LIMIT", "RevitStateReader", "StateRead", "fingerprint", "revit_document_loaded"]
+__all__ = [
+    "LIST_LIMIT",
+    "RevitStateReader",
+    "StateRead",
+    "document_host_capabilities",
+    "fingerprint",
+    "revit_document_loaded",
+]
 
 LIST_LIMIT = 1000  # spec 0011 §4.5: list_elements caps at 1000 with no offset
 _CATEGORIES = ("OST_StructuralColumns", "OST_StructuralFraming")
@@ -62,6 +70,33 @@ def revit_document_loaded(metadata_path: str | None, bound: Path) -> bool:
     if not metadata_path:
         return False
     return PureWindowsPath(metadata_path) == PureWindowsPath(bound)
+
+
+def document_host_capabilities(
+    *,
+    call: HostCall,
+    role_map: RoleMap,
+    catalog_version: str,
+) -> DocumentHostCapabilities:
+    """Build injected host-port capabilities for the Revit document path (spec 0011 §4.1, §4.6, §4.12).
+
+    Shared `_hostport` dispatches on these capabilities only; it never imports this module or names Revit.
+    """
+    reader = RevitStateReader(call=call, role_map=role_map, catalog_version=catalog_version)
+
+    async def is_document_loaded(bound: Path) -> bool:
+        meta = await call("revit_get_model_metadata", {}, CallEffect.READ)
+        body = parse_revit_reply(dict(meta)).body
+        reported = body.get("path")
+        return revit_document_loaded(str(reported) if isinstance(reported, str) else None, bound)
+
+    return DocumentHostCapabilities(
+        reader=reader,
+        is_document_loaded=is_document_loaded,
+        units_schema="revit_schema/1",  # spec 0011 §4.6: no unit tokens; present is always this schema id
+        null_pid=True,
+        status_version=lambda status: str(getattr(status, "revit_version", "") or ""),
+    )
 
 
 def fingerprint(read_set: Mapping[str, Any]) -> str:
