@@ -12,7 +12,7 @@ import os
 import re
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import anyio
 import pytest
@@ -88,7 +88,6 @@ def _port(
 ) -> tuple[Any, ServerManager]:
     from eng_harness.adapters._hostport import AdapterHostPort
     from eng_harness.adapters._identity import IdentityStore
-    from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
 
     workspace = Workspace(root=tmp_path / "ws", classification=LocationClass.LOCAL)
     states = ModelStateStore(workspace, clock)
@@ -120,8 +119,6 @@ def _port(
         host_key="csi_sap2000",
         files={"m": original},
     )
-    # T4 file list omits _hostport.py: drive the SAP2000 reader directly until a plan amendment wires it.
-    port._reader = cast(Any, Sap2000StateReader(product="SAP2000", call=port._session._call))
     return port, manager
 
 
@@ -253,7 +250,8 @@ def test_other_unsupported_raises(tmp_path: Path, make_config: ConfigFactory, co
             assert isinstance(body, dict)
             return body
 
-        port._reader = cast(Any, Sap2000StateReader(product="SAP2000", call=call))
+        # Inject a failing call for one served list tool; production wiring still selected Sap2000StateReader.
+        port._reader = Sap2000StateReader(product="SAP2000", call=call)
         async with manager:
             key = await port.working_copy("m", tmp_path / "run" / "copies")
             held = await port.locate(key)
