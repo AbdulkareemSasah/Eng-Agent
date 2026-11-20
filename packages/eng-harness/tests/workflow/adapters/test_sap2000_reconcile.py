@@ -210,3 +210,58 @@ def test_add_frame_outcomes(
                 assert len(matches) == 1
 
     anyio.run(body)
+
+
+def test_add_frame_no_pre_image_is_unknown(
+    make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path
+) -> None:
+    """AC12: without a pre-image on record, a geometry match is unknown (never a false applied)."""
+
+    async def body() -> None:
+        async with _rig(make_config(), control, store, tmp_path / "run") as rig:
+            args = _args(rig)
+            await rig.cut_off("csi_add_frame_by_coord", args, AFTER)
+            found = await rig.reconcile("csi_add_frame_by_coord", args)
+            assert found.outcome == "unknown"
+            evidence = cast(dict[str, Any], store.payload(found.evidence[0].ref)["value"])
+            assert evidence["pre_image_known"] is False
+            assert "reason" in evidence
+
+    anyio.run(body)
+
+
+def test_add_frame_two_matching_new_frames_is_unknown(
+    make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path
+) -> None:
+    """AC12: two new frames with the requested points and section is unknown (not applied)."""
+
+    async def body() -> None:
+        async with _rig(make_config(), control, store, tmp_path / "run") as rig:
+            args = _args(rig)
+            await rig.before("csi_add_frame_by_coord", args)
+            # A second matching frame already in the model (not in the pre-image) before the cut-off write.
+            planted = await rig.manager.call(
+                "csi_sap2000",
+                "main",
+                "csi_add_frame_by_coord",
+                {
+                    "target": {"product": "SAP2000", "pid": rig.pid},
+                    "name": "Extra",
+                    "section": "C300",
+                    "start": [5000.0, 0.0, 0.0],
+                    "end": [5000.0, 0.0, 3500.0],
+                    "units": "kN_mm_C",
+                },
+                CallEffect.WRITE,
+            )
+            block = planted.content[0]
+            assert isinstance(block, types.TextContent)
+            assert json.loads(block.text)["name"].startswith("Frame")
+            await rig.cut_off("csi_add_frame_by_coord", args, AFTER)
+            found = await rig.reconcile("csi_add_frame_by_coord", args)
+            assert found.outcome == "unknown"
+            evidence = cast(dict[str, Any], store.payload(found.evidence[0].ref)["value"])
+            matches = cast(list[Any], evidence["observed"]["matches"])
+            assert len(matches) == 2
+
+    anyio.run(body)
