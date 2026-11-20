@@ -1,0 +1,466 @@
+{
+ "sasaah_commit": "61da80f61a6562c8e3553168056bc107e3f93013",
+ "source": "spikes/S-12-sasaah-tool-inventory/inventory/sasaah-revit-mcp.json",
+ "tools": [
+  {
+   "name": "revit_connection_status",
+   "server_kind": "local",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "revit_ping",
+   "server_kind": "control",
+   "input_schema": {
+    "type": "object",
+    "properties": {}
+   }
+  },
+  {
+   "name": "revit_get_current_target",
+   "server_kind": "local",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "revit_list_available_targets",
+   "server_kind": "local",
+   "input_schema": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+   }
+  },
+  {
+   "name": "revit_get_model_metadata",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {}
+   }
+  },
+  {
+   "name": "revit_list_levels",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {}
+   }
+  },
+  {
+   "name": "revit_list_grids",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {}
+   }
+  },
+  {
+   "name": "revit_list_elements",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "category": {
+      "type": "string",
+      "description": "BuiltInCategory name such as OST_Walls"
+     },
+     "level_id": {
+      "type": "integer"
+     },
+     "limit": {
+      "type": "integer",
+      "default": 200,
+      "minimum": 1,
+      "maximum": 1000
+     }
+    },
+    "required": [
+     "category"
+    ]
+   }
+  },
+  {
+   "name": "revit_get_element_details",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     }
+    },
+    "required": [
+     "elementIds"
+    ]
+   }
+  },
+  {
+   "name": "revit_get_element_parameters",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "includeReadOnly": {
+      "type": "boolean",
+      "default": true
+     }
+    },
+    "required": [
+     "elementIds"
+    ]
+   }
+  },
+  {
+   "name": "revit_get_type_parameters",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "typeIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     }
+    },
+    "anyOf": [
+     {
+      "required": [
+       "elementIds"
+      ]
+     },
+     {
+      "required": [
+       "typeIds"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "name": "revit_get_available_family_types",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "category": {
+      "type": "string",
+      "default": ""
+     }
+    }
+   }
+  },
+  {
+   "name": "revit_list_family_types_in_family",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "family_id": {
+      "type": "string"
+     },
+     "family_name": {
+      "type": "string"
+     },
+     "include_parameter_values": {
+      "type": "boolean",
+      "default": true
+     },
+     "include_built_in_only": {
+      "type": "boolean",
+      "default": false
+     },
+     "start_index": {
+      "type": "integer",
+      "default": 0,
+      "minimum": 0
+     },
+     "max_types": {
+      "type": "integer",
+      "default": 100,
+      "minimum": 1,
+      "maximum": 500
+     },
+     "parameter_names": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "revit_list_worksets",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "includeElementCounts": {
+      "type": "boolean",
+      "default": false
+     }
+    }
+   }
+  },
+  {
+   "name": "revit_get_model_warnings_summary",
+   "server_kind": "read",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "include_examples": {
+      "type": "boolean",
+      "default": true
+     },
+     "max_examples_per_type": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 0,
+      "maximum": 100
+     },
+     "max_warning_types": {
+      "type": "integer",
+      "default": 200,
+      "minimum": 1,
+      "maximum": 1000
+     }
+    }
+   }
+  },
+  {
+   "name": "revit_open_model",
+   "server_kind": "write",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "Absolute path to a .rvt/.rte/.rfa on the machine Revit runs on"
+     },
+     "activate": {
+      "type": "boolean",
+      "description": "Open in the UI and make it active (default true). False opens it in the background with no view."
+     },
+     "audit": {
+      "type": "boolean",
+      "description": "Audit the file while opening - slow, use on a suspect model (default false)"
+     },
+     "worksets": {
+      "type": "string",
+      "description": "all|none|lastViewed - which worksets to open. Workshared models only; applies to the new local copy."
+     },
+     "allow_discard_unsaved_changes": {
+      "type": "boolean",
+      "description": "Allow switching away from a modified active document (default false).",
+      "default": false
+     }
+    },
+    "required": [
+     "path"
+    ]
+   }
+  },
+  {
+   "name": "revit_duplicate_family_type",
+   "server_kind": "write",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "source_type_id": {
+      "type": "string"
+     },
+     "new_type_name": {
+      "type": "string"
+     },
+     "type_parameter_overrides": {
+      "type": "object"
+     }
+    },
+    "required": [
+     "source_type_id",
+     "new_type_name"
+    ]
+   }
+  },
+  {
+   "name": "revit_set_type_parameter_values",
+   "server_kind": "destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "parameterName": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "typeIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "valueType": {
+      "type": "string",
+      "default": "auto"
+     }
+    },
+    "required": [
+     "parameterName",
+     "value"
+    ]
+   }
+  },
+  {
+   "name": "revit_set_element_parameter_values",
+   "server_kind": "destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "parameterName": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "valueType": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "string",
+       "integer",
+       "double",
+       "elementId"
+      ],
+      "default": "auto"
+     }
+    },
+    "required": [
+     "elementIds",
+     "parameterName",
+     "value"
+    ]
+   }
+  },
+  {
+   "name": "revit_set_parameter_value_by_guid",
+   "server_kind": "destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "guid": {
+      "type": "string"
+     },
+     "value": {
+      "type": "string"
+     },
+     "valueType": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "string",
+       "integer",
+       "double",
+       "elementId",
+       "display"
+      ],
+      "default": "auto"
+     },
+     "unit": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "internal",
+       "mm",
+       "m2",
+       "m3",
+       "deg"
+      ],
+      "default": "auto"
+     },
+     "target": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "instance",
+       "type"
+      ],
+      "default": "auto"
+     },
+     "allOrNothing": {
+      "type": "boolean",
+      "default": true
+     }
+    },
+    "required": [
+     "elementIds",
+     "guid",
+     "value"
+    ]
+   }
+  },
+  {
+   "name": "revit_change_element_type",
+   "server_kind": "destructive",
+   "input_schema": {
+    "type": "object",
+    "properties": {
+     "elementIds": {
+      "type": "array",
+      "items": {
+       "type": "integer"
+      }
+     },
+     "typeId": {
+      "type": "integer"
+     }
+    },
+    "required": [
+     "elementIds",
+     "typeId"
+    ]
+   }
+  }
+ ]
+}
