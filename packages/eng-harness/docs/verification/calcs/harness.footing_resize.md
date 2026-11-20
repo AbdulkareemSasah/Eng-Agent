@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_resize`
 - Version: 1
-- Content hash: `04399b2b610d7bbd447c06bfe81c2e896127c993c2b8941a039881d1bf1c18cd`
+- Content hash: `a13b74764eb45eecbaad7ba8a24847dcdccf9170683594678f75c451ae8efd4c`
 - Status: draft under ADR-0028 §4. Independent verification and owner approval are pending.
 - Method: [spec 0010 §4.4.4](../../specs/0010-design-isolated-footing.md), R1–R4 and AC9, as amended by B-567 (OQ-Q64).
 - Constants: zero from the plan-from-zero counting rule; one from the R1 next-multiple step; status strings `OK`,

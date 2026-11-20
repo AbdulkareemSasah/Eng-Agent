@@ -1,0 +1,51 @@
+{
+  "calc": {
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "id": "harness.reactions_to_joint_loads",
+    "status": "draft",
+    "version": 1
+  },
+  "draft": true,
+  "axes": "global",
+  "loads": [
+    {
+      "joint": "P1",
+      "pattern": "DEAD",
+      "FX_kN": -10.0,
+      "FY_kN": 20.0,
+      "FZ_kN": -100.0,
+      "MX_kNm": -1.0,
+      "MY_kNm": 2.0,
+      "MZ_kNm": -3.0,
+      "punch_x_mm": null,
+      "punch_y_mm": null
+    }
+  ],
+  "combinations_to_add": [
+    {
+      "name": "S1",
+      "type": "linear_add",
+      "items": [
+        {
+          "case": {
+            "case": "DEAD",
+            "case_type": "load_pattern",
+            "step": null
+          },
+          "scale_ratio": 1.0
+        }
+      ]
+    }
+  ],
+  "trace": {
+    "calc_id": "harness.reactions_to_joint_loads",
+    "calc_version": "1",
+    "constants": [],
+    "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "inputs": [],
+    "outputs": [],
+    "steps": []
+  },
+  "status": "OK",
+  "reason": null
+}

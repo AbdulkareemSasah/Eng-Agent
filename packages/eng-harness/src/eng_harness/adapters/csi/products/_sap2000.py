@@ -1,4 +1,4 @@
-"""SAP2000 product profile data and model extensions (plan 0012 T1, T4, T5; spec 0012 section 4.3, 4.4, 4.5)."""
+"""SAP2000 product profile data and model extensions (plan 0012 T1, T4, T5, T6; spec 0012 section 4.3, 4.4, 4.5)."""
 
 MODEL_EXTENSIONS = (".SDB",)
 COMPANION_GLOBS: tuple[str, ...] = ()  # empty until local test L2 (spec 0012 section 4.3)
@@ -10,7 +10,7 @@ READBACK: dict[str, tuple[str, str, str]] = {}
 DECLARED_ABSENCES: tuple[str, ...] = ("stories", "grids")
 # Spec 0012 section 4.3 / A1: the host ignores the requested frame name; reconciliation matches by geometry.
 ADD_FRAME_NAMING = "reply"
-# Gap registry (spec 0012 section 4.5); only SP-1 is wired to a step in T3 (plan 0012 T3).
+# Gap registry (spec 0012 section 4.5); SP-1 wired in T3; SP-3 (concrete non-beam) wired in T6.
 GAPS = {
     "SP-1": "creating a new model is not implemented: provide a prepared model",
     "SP-2": "defining sections, materials or load cases is not implemented",
@@ -23,4 +23,5 @@ GAPS = {
 }
 STEP_GAPS = {
     "new_model": "SP-1",
+    "concrete_non_beam": "SP-3",  # plan 0012 T6 / AC16: concrete design results for non-beams
 }
