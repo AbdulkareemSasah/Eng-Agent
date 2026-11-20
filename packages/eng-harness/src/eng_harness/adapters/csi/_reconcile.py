@@ -23,6 +23,7 @@ from eng_harness.adapters.csi import products
 from eng_harness.adapters.csi._checks import OBSERVE, Expect, Snapshot, Want, compare, expect, snapshot
 from eng_harness.adapters.csi._state import CsiStateReader
 from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+from eng_harness.adapters.csi.products._sap2000_state import Sap2000StateReader
 from eng_harness.servers import CallEffect
 
 __all__ = ["CsiReconciler"]
@@ -123,8 +124,13 @@ class CsiReconciler:
 
     async def _snapshot(self, lost: LostWrite, read: HostRead) -> Snapshot:
         """The model state and the read-back tables, read as `check_model` reads them."""
-        # Ask the profile's table map: SAFE state tables include joint_loads (spec 0008 section 4.4); else ETABS.
-        reader_type = SafeStateReader if "joint_loads" in self._profile.tables else CsiStateReader
+        # Ask the profile: declared absences → SAP2000; joint_loads tables → SAFE; else ETABS (spec 0008 AC2).
+        if self._profile.declared_absences:
+            reader_type: type = Sap2000StateReader
+        elif "joint_loads" in self._profile.tables:
+            reader_type = SafeStateReader
+        else:
+            reader_type = CsiStateReader
         reader = reader_type(product=self._product, call=read)
         state = await reader.read(lost.binding.target.pid, None)
         target: dict[str, Any] = {"target": lost.binding.target.model_dump()}
