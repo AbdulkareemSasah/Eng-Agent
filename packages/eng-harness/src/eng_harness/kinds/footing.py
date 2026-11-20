@@ -252,6 +252,58 @@ class JointLoadRow(_P):
     punch_y_mm: Annotated[float, Field(gt=0)] | None = None
 
 
+class JointLoads(_P):
+    """Calc-facing shape of `harness.joint_loads/1` (spec 0008 §4.3; registered in `_kinds`).
+
+    Allowed import for footing calcs (spec 0003 §4.3: `eng_harness.kinds.footing`).
+    """
+
+    axes: Literal["global"] = "global"
+    loads: list[JointLoadRow]
+
+
+class ModelPoint(_P):
+    """One point of `harness.model_points/1` (spec 0008 §4.4); calc-facing input for T10."""
+
+    name: _Str
+    x_mm: float
+    y_mm: float
+    z_mm: float
+
+
+class ModelPoints(_P):
+    """Calc-facing shape of `harness.model_points/1` (spec 0008 §4.4; registered in `_kinds`)."""
+
+    points: list[ModelPoint]
+
+
+class HarnessCaseRef(_P):
+    """Case reference on `harness.base_reactions/1` rows (spec 0008 §4.6)."""
+
+    case: _Str
+    case_type: Literal["load_pattern", "load_case", "load_combination"]
+    step: str | None = None
+
+
+class BaseReactionRow(_P):
+    """One row of `harness.base_reactions/1` (spec 0008 §4.6); calc-facing input for T10."""
+
+    case: HarnessCaseRef
+    FX_kN: float
+    FY_kN: float
+    FZ_kN: float
+    MX_kNm: float
+    MY_kNm: float
+    MZ_kNm: float
+
+
+class BaseReactions(_P):
+    """Calc-facing shape of `harness.base_reactions/1` (spec 0008 §4.6; registered in `_kinds`)."""
+
+    moment_reference: Literal["host_unconfirmed/1"]
+    rows: list[BaseReactionRow]
+
+
 class ReactionsToJointLoads(CalcPayload):
     """Result of `harness.reactions_to_joint_loads` (spec 0010 4.9): loads plus combinations to add.
 

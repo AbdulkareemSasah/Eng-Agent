@@ -2,7 +2,7 @@
 
 - Calc id: `harness.safe_equilibrium`
 - Version: 1
-- Content hash: `3e657d0d8edf0babd37abbaba79c113897f64eef369f7ac92b3b4cb006525c95` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `8741e6e644bb5d15a087c0c605ddbf21fe520703eef785286aafbbadd1845a9e` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.9 step 6, acceptance criterion AC25; basis field `checks.equilibrium_relative_tolerance_ratio` read as spec 0003 section 4.4 states (confirmed, unit `1`, value >= 0); magnitudes because the base-reaction sign is unconfirmed (SAFE Q6)
 - Constants: two `Cited`: zero 0 (lower bound of the relative tolerance) and calc version 1. The tolerance is the basis field, never a literal. No engineering number.
