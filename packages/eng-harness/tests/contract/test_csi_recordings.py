@@ -464,3 +464,56 @@ def test_safe_synthetic_matches_recordings(safe_recording: Path, tmp_path: Path)
     run_dir = tmp_path / "fake"
     run_dir.mkdir()
     assert fidelity_problems(RecordedHost(safe_recording), run_dir, product="SAFE") == []
+
+
+# --- SAP2000 product (plan 0012 T7; spec 0012 AC19, amendment B-573) ---
+
+
+def _sap2000_recording_params() -> list[pytest.ParameterSet]:
+    """Synthetic SAP2000 recording plus every committed recording whose fingerprint is SAP2000's (B-573)."""
+    try:
+        from fakes.recorded._checks import applicable_recordings
+
+        committed = applicable_recordings("SAP2000")
+    except ImportError:
+        committed = []
+    return [
+        pytest.param(None, id="synthetic", marks=pytest.mark.synthetic),
+        *(pytest.param(path, id=path.name, marks=pytest.mark.recorded) for path in committed),
+    ]
+
+
+@pytest.fixture(scope="module")
+def generated_sap2000(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The scripted SAP2000 session on the synthetic fake, recorded through record mode."""
+    # SAP2000_SEED lands in the feat commit; missing name fails at the base (TF004).
+    from fakes.recorded._session import SAP2000_SEED, record_synthetic
+
+    assert "frames" in SAP2000_SEED
+    base = tmp_path_factory.mktemp("recorded-sap2000")
+    (base / "run").mkdir()
+    record_synthetic(
+        base / "recording",
+        base / "run",
+        tool_names=csi_allowlist().for_product("SAP2000").tool_names,
+        product="SAP2000",
+    )
+    return base / "recording"
+
+
+@pytest.fixture(params=_sap2000_recording_params())
+def sap2000_recording(request: pytest.FixtureRequest, generated_sap2000: Path) -> Path:
+    """Each committed SAP2000 recording, and the synthetic SAP2000 fake's own (AC19, B-573)."""
+    return generated_sap2000 if request.param is None else Path(request.param)
+
+
+def test_sap2000_adapter_on_recordings(sap2000_recording: Path, tmp_path: Path) -> None:
+    """AC19: the adapter reads every SAP2000 recorded reply; the recorded tool list has the SAP2000 fingerprint."""
+    assert adapter_problems(RecordedHost(sap2000_recording), tmp_path / "workspace", product="SAP2000") == []
+
+
+def test_sap2000_synthetic_matches_recordings(sap2000_recording: Path, tmp_path: Path) -> None:
+    """AC19: the synthetic SAP2000 fake gives the recorded reply shape and error codes for every recorded operation."""
+    run_dir = tmp_path / "fake"
+    run_dir.mkdir()
+    assert fidelity_problems(RecordedHost(sap2000_recording), run_dir, product="SAP2000") == []
