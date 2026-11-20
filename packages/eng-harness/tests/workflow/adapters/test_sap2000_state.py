@@ -247,7 +247,6 @@ def test_other_unsupported_raises(tmp_path: Path, make_config: ConfigFactory, co
                 raise ContractError(
                     ErrorCode.NOT_SUPPORTED_BY_VERSION,
                     "csi_list_points is not supported by this version",
-                    host_method=tool,
                     retryable=False,
                 )
             return await real(tool, arguments, effect)
