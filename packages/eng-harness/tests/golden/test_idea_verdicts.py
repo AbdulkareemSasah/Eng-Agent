@@ -8,8 +8,14 @@ from eng_contract.verdicts import VerdictStatus
 from eng_harness.adapters.idea import _verdicts as idea_verdicts
 
 # Hand-derived from AC13: check_value (host percent), check_status, skipped → status and ratio.
+# Boundaries at ratio_limit 1.0: PASS needs ratio <= 1.0; FAIL needs ratio > 1.0 (§4.5).
 _CASES: list[tuple[dict[str, Any], VerdictStatus, float | None]] = [
     ({"name": "Plates", "check_value": 87.5, "check_status": True, "skipped": False}, VerdictStatus.PASS, 0.875),
+    (
+        {"name": "AtLimitPass", "check_value": 100.0, "check_status": True, "skipped": False},
+        VerdictStatus.PASS,
+        1.0,
+    ),
     (
         {"name": "Bolts", "check_value": 103.0, "check_status": True, "skipped": False},
         VerdictStatus.NEEDS_ENGINEER,
@@ -19,6 +25,11 @@ _CASES: list[tuple[dict[str, Any], VerdictStatus, float | None]] = [
         {"name": "Welds", "check_value": 80.0, "check_status": False, "skipped": False},
         VerdictStatus.NEEDS_ENGINEER,
         0.8,
+    ),
+    (
+        {"name": "AtLimitFail", "check_value": 100.0, "check_status": False, "skipped": False},
+        VerdictStatus.NEEDS_ENGINEER,
+        1.0,
     ),
     (
         {"name": "Buckling", "check_value": 0.0, "check_status": True, "skipped": False},
@@ -32,12 +43,27 @@ _CASES: list[tuple[dict[str, Any], VerdictStatus, float | None]] = [
         0.5,
     ),
     (
+        {"name": "SkippedZero", "check_value": 0.0, "check_status": True, "skipped": True},
+        VerdictStatus.NOT_APPLICABLE,
+        0.0,
+    ),
+    (
+        {"name": "SkippedNegative", "check_value": -1.0, "check_status": False, "skipped": True},
+        VerdictStatus.NOT_APPLICABLE,
+        None,
+    ),
+    (
         {"name": "Negative", "check_value": -5.0, "check_status": True, "skipped": False},
         VerdictStatus.NEEDS_ENGINEER,
         None,
     ),
     (
         {"name": "NonFinite", "check_value": float("nan"), "check_status": True, "skipped": False},
+        VerdictStatus.ERROR,
+        None,
+    ),
+    (
+        {"name": "NonNumeric", "check_value": "not-a-number", "check_status": True, "skipped": False},
         VerdictStatus.ERROR,
         None,
     ),
@@ -59,9 +85,16 @@ def test_mapping_cases(check: dict[str, Any], status: VerdictStatus, ratio: floa
     assert verdict.ratio_limit == 1.0
     assert verdict.code == "AISC"
     assert verdict.clause is None
+    assert verdict.demand is None
+    assert verdict.capacity is None
+    assert verdict.governing is False
+    assert verdict.trace_ref is None
     assert verdict.subject.kind.value == "joint"
     assert verdict.subject.id == "CON1"
-    assert verdict.check_id.startswith("idea:")
+    assert verdict.subject.station_mm is None
+    assert verdict.subject.case is None
+    assert verdict.check_id == f"idea:{idea_verdicts.slug(str(check.get('name') or ''))}"
     assert "host-native check of IDEA StatiCa; not merged with code-pack verdicts" in verdict.assumptions
-    if check["check_value"] == 0.0 and check["check_status"] is True and not check["skipped"]:
+    zero_value = check["check_value"] == 0.0 or check["check_value"] == 0
+    if zero_value and check["check_status"] is True and not check["skipped"]:
         assert any("utilization is exactly zero" in a for a in verdict.assumptions)

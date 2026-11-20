@@ -93,6 +93,7 @@ def test_stub_markers(reply: dict[str, Any], reason: str) -> None:
     assert caught.value.detail.host_code == "OFFLINE_STUB"
     assert caught.value.detail.host_method == "idea_calculate"
     assert caught.value.detail.retryable is False
+    assert caught.value.detail.message == "the host reply is an offline stub; no verdict is produced"
 
     clean = _rest_ok()
     assert idea_stub.is_stub_reply(clean) is False
@@ -106,3 +107,37 @@ def test_stub_markers(reply: dict[str, Any], reason: str) -> None:
     }
     assert idea_stub.is_stub_reply(native) is False
     idea_stub.refuse_stub(native, host_method="idea_native_calculate")
+
+
+def test_stub_markers_skip_non_mapping_connection() -> None:
+    """AC11: a non-mapping connection is skipped; a later Offline-stub check is still refused."""
+    reply = _rest_ok(
+        connections=[
+            "not-a-connection",
+            {
+                "connection_id": 1,
+                "name": "CON1",
+                "passed": True,
+                "calculated": True,
+                "checks": [
+                    {
+                        "name": "Plates",
+                        "check_value": 35.0,
+                        "check_status": True,
+                        "skipped": False,
+                        "message": "Offline stub.",
+                        "unity_check_message": idea_stub.OFFLINE_STUB_MESSAGE,
+                        "load_case_id": None,
+                    }
+                ],
+                "errors": [],
+                "warnings": [],
+            },
+        ]
+    )
+    assert idea_stub.is_stub_reply(reply) is True
+    with pytest.raises(ContractError) as caught:
+        idea_stub.refuse_stub(reply, host_method="idea_get_check_results")
+    assert caught.value.detail.host_code == "OFFLINE_STUB"
+    assert caught.value.detail.message == "the host reply is an offline stub; no verdict is produced"
+    assert caught.value.detail.host_method == "idea_get_check_results"

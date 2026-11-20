@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.kinds.verdicts import VerdictSet
-from eng_contract.verdicts import Verdict, VerdictSource, VerdictStatus
+from eng_contract.verdicts import Subject, SubjectKind, Verdict, VerdictSource, VerdictStatus
 
 from eng_harness.adapters.idea import _verdicts as idea_verdicts
 
@@ -209,3 +209,300 @@ def test_code_label_and_assumptions() -> None:
     assert "design code declared in the design basis, not read from the host" in rest.assumptions
     assert "loads as stored in the opened file" in rest.assumptions
     assert "ECEN" not in "".join(rest.assumptions)
+
+
+def test_slug_and_empty_name() -> None:
+    """AC13 / §4.5: check_id is idea:<slug>; empty name becomes idea:check."""
+    assert idea_verdicts.slug("Plates") == "plates"
+    assert idea_verdicts.slug("  Bolt Check!  ") == "bolt_check_"
+    assert idea_verdicts.slug("") == "check"
+    assert idea_verdicts.slug("   ") == "check"
+
+    empty = idea_verdicts.map_check(
+        {"check_value": 40.0, "check_status": True, "skipped": False},
+        connection_name="CON1",
+        design_code="AISC",
+        route="native",
+    )
+    assert empty.check_id == "idea:check"
+    assert empty.subject.case is None
+
+
+def test_map_check_every_field_and_case() -> None:
+    """AC13 / §4.5: every Verdict field; load_case_id becomes subject.case (cut to 200)."""
+    long_case = "C" * 250
+    verdict = idea_verdicts.map_check(
+        _check("Plate Check", 87.5, case=long_case),
+        connection_name="JOINT-A",
+        design_code="AISC",
+        route="native",
+    )
+    assert verdict.source is VerdictSource.HOST
+    assert verdict.check_id == "idea:plate_check"
+    assert verdict.code == "AISC"
+    assert verdict.clause is None
+    assert verdict.subject.kind.value == "joint"
+    assert verdict.subject.id == "JOINT-A"
+    assert verdict.subject.station_mm is None
+    assert verdict.subject.case == "C" * 200
+    assert verdict.demand is None
+    assert verdict.capacity is None
+    assert verdict.ratio == 0.875
+    assert verdict.ratio_limit == 1.0
+    assert verdict.status is VerdictStatus.PASS
+    assert verdict.governing is False
+    assert verdict.trace_ref is None
+    assert verdict.assumptions == [
+        idea_verdicts.HOST_ASSUMPTION,
+    ]
+
+    none_case = idea_verdicts.map_check(
+        _check("Plates", 50.0, case=None),
+        connection_name="CON1",
+        design_code="AISC",
+        route="native",
+    )
+    assert none_case.subject.case is None
+
+
+def test_map_check_missing_keys_use_host_defaults() -> None:
+    """AC13 / §4.5: missing skipped/check_status/check_value arrive as false/false/0."""
+    # Missing skipped → false (calculated); missing check_status → false; value 80 → NEEDS_ENGINEER.
+    missing_status = idea_verdicts.map_check(
+        {"name": "Welds", "check_value": 80.0},
+        connection_name="CON1",
+        design_code="AISC",
+        route="native",
+    )
+    assert missing_status.status is VerdictStatus.NEEDS_ENGINEER
+    assert missing_status.ratio == 0.8
+
+    # Missing check_value → 0 with check_status true → NEEDS_ENGINEER (zero-utilization rule).
+    missing_value = idea_verdicts.map_check(
+        {"name": "Plates", "check_status": True, "skipped": False},
+        connection_name="CON1",
+        design_code="AISC",
+        route="native",
+    )
+    assert missing_value.status is VerdictStatus.NEEDS_ENGINEER
+    assert missing_value.ratio == 0.0
+    assert any("utilization is exactly zero" in a for a in missing_value.assumptions)
+
+    # Missing skipped with a clear pass stays PASS (default skipped false).
+    missing_skipped = idea_verdicts.map_check(
+        {"name": "Plates", "check_value": 50.0, "check_status": True},
+        connection_name="CON1",
+        design_code="AISC",
+        route="native",
+    )
+    assert missing_skipped.status is VerdictStatus.PASS
+    assert missing_skipped.ratio == 0.5
+
+
+def test_passed_false_does_not_add_connection_verdict() -> None:
+    """AC14: when passed is false, no idea:connection disagreement is added (both directions)."""
+    payload = idea_verdicts.build_verdict_set(
+        [_connection(passed=False, checks=[_check("Welds", 80.0, status=False)])],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert [v for v in payload.verdicts if v.check_id == "idea:connection"] == []
+    assert payload.verdicts[0].status is VerdictStatus.NEEDS_ENGINEER
+
+
+def test_passed_disagreement_ignores_skipped_and_non_mapping() -> None:
+    """AC14: skipped checks and non-mapping rows do not count as passed disagreement."""
+    checks: list[Any] = [
+        "not-a-check",
+        _check("SkipFail", 80.0, status=False, skipped=True),
+        _check("Plates", 50.0, status=True),
+    ]
+    payload = idea_verdicts.build_verdict_set(
+        [_connection(passed=True, checks=checks)],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert [v for v in payload.verdicts if v.check_id == "idea:connection"] == []
+    assert [v.check_id for v in payload.verdicts] == ["idea:skipfail", "idea:plates"]
+
+
+def test_passed_disagreement_missing_check_keys() -> None:
+    """AC14: missing skipped/check_status on a check still drive passed disagreement (§4.5 defaults)."""
+    # No skipped key → false; check_status false → disagree.
+    no_skipped = idea_verdicts.build_verdict_set(
+        [
+            _connection(
+                passed=True,
+                checks=[{"name": "Welds", "check_value": 80.0, "check_status": False}],
+            )
+        ],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert len([v for v in no_skipped.verdicts if v.check_id == "idea:connection"]) == 1
+
+    # No check_status key → false; with ratio <= 1.0 → disagree.
+    no_status = idea_verdicts.build_verdict_set(
+        [
+            _connection(
+                passed=True,
+                checks=[{"name": "Welds", "check_value": 80.0, "skipped": False}],
+            )
+        ],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert len([v for v in no_status.verdicts if v.check_id == "idea:connection"]) == 1
+
+
+def test_connection_verdict_fields_and_governing_exclusion() -> None:
+    """AC14: idea:connection carries every host field; it is never governing; later connections still are."""
+    connections = [
+        _connection(
+            "CON1",
+            passed=True,
+            checks=[_check("Welds", 80.0, status=False)],
+        ),
+        _connection(
+            "CON2",
+            connection_id=2,
+            passed=True,
+            checks=[_check("Plates", 70.0), _check("Bolts", 90.0)],
+        ),
+    ]
+    payload = idea_verdicts.build_verdict_set(
+        connections,
+        design_code="AISC",
+        route="rest",
+        load_map_confirmed=True,
+    )
+    extras = [v for v in payload.verdicts if v.check_id == "idea:connection"]
+    assert len(extras) == 1
+    connection = extras[0]
+    assert connection.source is VerdictSource.HOST
+    assert connection.code == "AISC"
+    assert connection.clause is None
+    assert connection.subject.kind.value == "joint"
+    assert connection.subject.id == "CON1"
+    assert connection.subject.station_mm is None
+    assert connection.subject.case is None
+    assert connection.demand is None
+    assert connection.capacity is None
+    assert connection.ratio is None
+    assert connection.ratio_limit == 1.0
+    assert connection.status is VerdictStatus.NEEDS_ENGINEER
+    assert connection.governing is False
+    assert connection.trace_ref is None
+    assert "connection passed disagrees with its checks" in connection.assumptions
+    assert idea_verdicts.HOST_ASSUMPTION in connection.assumptions
+    assert "design code declared in the design basis, not read from the host" in connection.assumptions
+    assert "loads as stored in the opened file" in connection.assumptions
+
+    # build_verdict_set must pass route through to map_check (rest assumptions on check rows).
+    welds = next(v for v in payload.verdicts if v.check_id == "idea:welds")
+    assert "design code declared in the design basis, not read from the host" in welds.assumptions
+    assert "loads as stored in the opened file" in welds.assumptions
+
+    con2 = [v for v in payload.verdicts if v.subject.id == "CON2"]
+    assert len(con2) == 2
+    governing_con2 = next(v for v in con2 if v.governing)
+    assert governing_con2.check_id == "idea:bolts"
+    assert governing_con2.ratio == 0.9
+
+
+def test_governing_after_all_none_ratios() -> None:
+    """AC14: a connection with only None ratios does not stop governing on a later connection."""
+    payload = idea_verdicts.build_verdict_set(
+        [
+            _connection("CON1", checks=[_check("Neg", -5.0)]),
+            _connection(
+                "CON2",
+                connection_id=2,
+                checks=[_check("Plates", 60.0), _check("Bolts", 85.0)],
+            ),
+        ],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    con2 = [v for v in payload.verdicts if v.subject.id == "CON2"]
+    governing = [v for v in con2 if v.governing]
+    assert len(governing) == 1
+    assert governing[0].check_id == "idea:bolts"
+    assert governing[0].ratio == 0.85
+
+
+def test_default_connection_name_and_missing_passed() -> None:
+    """AC14: empty connection name becomes 'connection'; missing passed is false (no disagreement)."""
+    unnamed = idea_verdicts.build_verdict_set(
+        [
+            {
+                "connection_id": 1,
+                "passed": True,
+                "calculated": True,
+                "checks": [_check("Plates", 50.0)],
+                "errors": [],
+                "warnings": [],
+            }
+        ],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert unnamed.verdicts[0].subject.id == "connection"
+
+    no_passed = idea_verdicts.build_verdict_set(
+        [
+            {
+                "connection_id": 1,
+                "name": "CON1",
+                "calculated": True,
+                "checks": [_check("Welds", 80.0, status=False)],
+                "errors": [],
+                "warnings": [],
+            }
+        ],
+        design_code="AISC",
+        route="native",
+        load_map_confirmed=True,
+    )
+    assert [v for v in no_passed.verdicts if v.check_id == "idea:connection"] == []
+
+
+def test_host_only_exact_message() -> None:
+    """AC14: require_host_only raises the exact construction-error message."""
+    with pytest.raises(
+        ValueError,
+        match=r"^a verdicts\.set of IDEA host checks may not contain a code_pack verdict$",
+    ):
+        idea_verdicts.require_host_only(
+            [
+                Verdict(
+                    source=VerdictSource.CODE_PACK,
+                    check_id="aci318_14.flexure.beam_moment",
+                    code="ACI 318-14",
+                    clause="22.3",
+                    subject=Subject(kind=SubjectKind.JOINT, id="CON1"),
+                    status=VerdictStatus.NEEDS_ENGINEER,
+                    trace_ref="#/traces/0",
+                    assumptions=[],
+                )
+            ]
+        )
+
+
+def test_empty_precondition_exact_message() -> None:
+    """AC14: empty calculated set uses the exact PRECONDITION_FAILED message."""
+    with pytest.raises(ContractError) as caught:
+        idea_verdicts.build_verdict_set(
+            [],
+            design_code="AISC",
+            route="native",
+            load_map_confirmed=True,
+        )
+    assert caught.value.detail.message == "no calculated connection in the host reply"
+    assert caught.value.detail.precondition is Precondition.analysis_current
