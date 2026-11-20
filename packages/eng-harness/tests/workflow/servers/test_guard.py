@@ -23,7 +23,11 @@ from eng_harness.servers._procinfo import ProcessIdentity
 ConfigFactory = Callable[..., ServersConfig]
 FAKE_PID = 4242  # the pid the CSI fake gives every instance it launches
 ETABS = "ETABS.exe"
-PRODUCTS = [("ETABS", "ETABS.exe", "csi"), ("SAFE", "SAFE.exe", "csi_safe")]
+PRODUCTS = [
+    ("ETABS", "ETABS.exe", "csi"),
+    ("SAFE", "SAFE.exe", "csi_safe"),
+    ("SAP2000", "SAP2000.exe", "csi_sap2000"),  # plan 0012 T3 / spec 0012 AC5
+]
 
 
 def _product_config(

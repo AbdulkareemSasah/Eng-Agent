@@ -15,8 +15,10 @@ _positive = st.floats(min_value=0.0, max_value=1e6, exclude_min=True, allow_nan=
 
 
 def _ref(n: int, kind: str) -> dict[str, Any]:
+    result_id = f"res_{n:026d}"
     return {
-        "result_id": f"res_{n:026d}",
+        "result_id": result_id,
+        "ref": result_id,
         "kind": kind,
         "complete": True,
         "model_id": None,

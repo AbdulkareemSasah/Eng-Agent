@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
+from eng_contract.refs import parse_ref
 from pydantic import BaseModel, ConfigDict, Field
 
 from eng_harness.calc import InputMeta, RefMeta, TraceBuilder
@@ -58,7 +59,8 @@ def input_meta(refs: Mapping[str, str], incomplete: frozenset[str] = frozenset()
     return InputMeta(
         refs={
             name: RefMeta(
-                result_id=result_id,
+                result_id=parse_ref(result_id)[0],
+                ref=result_id,
                 kind=CHECK_KINDS[name],
                 complete=name not in incomplete,
                 model_id=None,

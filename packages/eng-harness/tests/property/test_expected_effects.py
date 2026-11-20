@@ -29,6 +29,7 @@ def _effects(raw: dict[str, Any], refs: dict[str, str]) -> list[dict[str, Any]]:
         refs={
             name: RefMeta(
                 result_id=result_id,
+                ref=result_id,
                 kind=KINDS[name],
                 complete=True,
                 model_id=MDL if name in STATE else None,
