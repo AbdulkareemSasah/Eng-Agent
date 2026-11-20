@@ -42,6 +42,10 @@ tasks:
     covers: [AC21]   # in part: the schema check; recordings come in T9
     depends_on: [T1]
   - id: T3
+    # Amendment (B-584, documents only): AC3 workflow tests need ServerManager._verify to call expected.status_tool
+    # (BuildExpectation.status_tool, default csi_status; IDEA idea_status) instead of the hardcoded csi_status, and to
+    # name that tool in the error message; measured by the B-302 writer on
+    # packages/eng-harness/src/eng_harness/servers/_session.py (not previously in T3's files).
     title: IDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.idea, eng_harness.servers (amendment B-356)
@@ -51,6 +55,7 @@ tasks:
       - "packages/eng-harness/src/eng_harness/adapters/idea/_tools.py"
       - "packages/eng-harness/src/eng_harness/adapters/_allowlist.py"
       - "packages/eng-harness/src/eng_harness/servers/_buildcheck.py"
+      - "packages/eng-harness/src/eng_harness/servers/_session.py"  # _verify calls expected.status_tool (BuildExpectation.status_tool) instead of hardcoded csi_status and names it in the error; AC3 (amendment B-584)
       - "packages/eng-harness/tests/unit/adapters/test_allowlist.py"
       - "packages/eng-harness/tests/unit/adapters/test_idea_args.py"
       - "packages/eng-harness/tests/unit/adapters/test_idea_units.py"
@@ -256,7 +261,9 @@ check that it is not packaged.
 **T3 Allowlist, argument models, build check** (AC2, AC3, AC15, AC16 in part). The `_allowlist.toml` exactly as the
 spec §4.4 lists the four classes (a test partitions the inventory), the pinned fingerprint over the 9 served tools,
 `idea_status` flags in the build check, the argument models (explicit `connection_ids`, `save` fixed false, `confirm`
-only under approval, design code from the basis only) and the unit header with its statuses. This is the barrier against
+only under approval, design code from the basis only) and the unit header with its statuses. Session `_verify` may call
+`BuildExpectation.status_tool` (default `csi_status`; IDEA `idea_status`) and name that tool in the build-check error
+(amendment B-584). This is the barrier against
 escape hatches, so the security lens reviews it.
 
 **T4 Errors, timeouts, licensing** (AC17 to AC19). The code table of §4.8, the read or write timeout rule, and the
