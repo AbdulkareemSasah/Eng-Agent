@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PureWindowsPath
 from typing import Any, Literal, cast
 
-from eng_contract.canonical import payload_sha256
+from eng_contract.canonical import canonical_json, payload_sha256
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.issues import ModelIssue, Severity
 from eng_contract.kinds.model import (
@@ -74,38 +74,17 @@ def fingerprint(read_set: Mapping[str, Any]) -> str:
 
 def _ordered_read_set(read_set: Mapping[str, Any]) -> dict[str, Any]:
     body = {key: value for key, value in read_set.items() if key not in {"save_time", "element_count"}}
-    result: dict[str, Any] = {}
-    for key, value in body.items():
-        if key == "elements" and isinstance(value, list):
-            result[key] = sorted((_ordered_obj(row) for row in value if isinstance(row, dict)), key=_element_sort)
-        elif key in {"levels", "grids", "types"} and isinstance(value, list):
-            result[key] = sorted((_ordered_obj(row) for row in value if isinstance(row, dict)), key=_id_sort)
-        else:
-            result[key] = _ordered_obj(value)
-    return result
-
-
-def _element_sort(row: Mapping[str, Any]) -> tuple[str, int]:
-    uid = row.get("unique_id")
-    eid = row.get("element_id")
-    return (str(uid) if isinstance(uid, str) else "", int(eid) if isinstance(eid, int) else 0)
-
-
-def _id_sort(row: Mapping[str, Any]) -> int:
-    for key in ("element_id", "type_id"):
-        value = row.get(key)
-        if isinstance(value, int):
-            return value
-    return 0
+    return {key: _ordered_obj(value) for key, value in body.items()}
 
 
 def _ordered_obj(value: object) -> object:
+    """Canonical form: dict keys sorted; lists of objects sorted by canonical JSON (spec 0011 §4.9)."""
     if isinstance(value, dict):
         return {key: _ordered_obj(item) for key, item in sorted(value.items(), key=lambda pair: pair[0])}
     if isinstance(value, list):
         items = [_ordered_obj(item) for item in value]
         if items and all(isinstance(item, dict) for item in items):
-            return sorted(items, key=lambda row: str(payload_sha256(row)))
+            return sorted(items, key=canonical_json)
         return items
     return value
 
