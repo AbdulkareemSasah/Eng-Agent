@@ -115,9 +115,7 @@ def _run(
 
     async def scenario() -> None:
         async with ServerManager(config, run_dir) as manager:
-            launched = await manager.call(
-                "csi_sap2000", "main", "csi_launch", {"product": "SAP2000"}, CallEffect.WRITE
-            )
+            launched = await manager.call("csi_sap2000", "main", "csi_launch", {"product": "SAP2000"}, CallEffect.WRITE)
             block = launched.content[0]
             assert isinstance(block, types.TextContent)
             pid = json.loads(block.text)["pid"]
@@ -150,9 +148,7 @@ def store(tmp_path: Path, ids: SeededIdSource) -> ResultStore:
     return ResultStore(workspace, HARNESS_KINDS, ids, FixedClock(1_767_225_600_000, 1))
 
 
-def test_steel_and_concrete_run(
-    make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path
-) -> None:
+def test_steel_and_concrete_run(make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path) -> None:
     """AC16: steel and concrete design runs and steel design results are raw harness kinds (never a verdict)."""
     from eng_harness.adapters.csi.products import _sap2000_results as results
 
@@ -165,16 +161,11 @@ def test_steel_and_concrete_run(
         for kind in ("steel", "concrete"):
             info = await port.describe("csi_design_run")
             assert (info.effect, info.action, info.model_param) == ("write", "design", "model")
-            run = await port.call(
-                "csi_design_run", {"model": "m", "kind": kind}, op_id=f"op-run-{kind}", model="m"
-            )
+            run = await port.call("csi_design_run", {"model": "m", "kind": kind}, op_id=f"op-run-{kind}", model="m")
             assert isinstance(run, SuccessEnvelope), run
             assert run.kind == "harness.csi_design_run/1"
-            assert run.data["kind"] == kind
-            assert run.data.get("completed") is True
-        steel = await port.call(
-            "csi_design_results", {"model": "m", "kind": "steel"}, op_id="op-steel-rows", model="m"
-        )
+            assert run.data == {"reply": {"kind": kind, "completed": True}}
+        steel = await port.call("csi_design_results", {"model": "m", "kind": "steel"}, op_id="op-steel-rows", model="m")
         assert isinstance(steel, SuccessEnvelope), steel
         assert steel.kind == "harness.csi_design_results/1"
         assert steel.data == {
@@ -220,9 +211,7 @@ def test_concrete_non_beam_results_gap(
     assert len(_calls(control)) >= before  # launch may add calls; design_results must not
 
 
-def test_other_kinds_refused(
-    make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path
-) -> None:
+def test_other_kinds_refused(make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path) -> None:
     """AC16: aluminum and coldformed are NOT_SUPPORTED_BY_VERSION before any host call."""
     from eng_harness.adapters.csi.products import _sap2000_results as results
 
@@ -232,9 +221,7 @@ def test_other_kinds_refused(
 
     async def body(port: Any, recorder: Recorder, pid: int) -> None:
         for kind in ("aluminum", "coldformed"):
-            reply = await port.call(
-                "csi_design_run", {"model": "m", "kind": kind}, op_id=f"op-{kind}", model="m"
-            )
+            reply = await port.call("csi_design_run", {"model": "m", "kind": kind}, op_id=f"op-{kind}", model="m")
             assert isinstance(reply, FailureEnvelope), reply
             assert reply.error.code is ErrorCode.NOT_SUPPORTED_BY_VERSION
         assert not any(tool == "csi_design_run" for _role, tool, _args in recorder.sent)

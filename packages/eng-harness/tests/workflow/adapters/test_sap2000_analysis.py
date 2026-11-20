@@ -124,9 +124,7 @@ def test_long_role_save_first(make_config: ConfigFactory, control: Path, store: 
 
     async def scenario() -> None:
         async with ServerManager(_timeouts(make_config()), run_dir, launcher=launcher) as manager:
-            launched = await manager.call(
-                "csi_sap2000", "main", "csi_launch", {"product": "SAP2000"}, CallEffect.WRITE
-            )
+            launched = await manager.call("csi_sap2000", "main", "csi_launch", {"product": "SAP2000"}, CallEffect.WRITE)
             block = launched.content[0]
             assert isinstance(block, types.TextContent)
             pid = json.loads(block.text)["pid"]

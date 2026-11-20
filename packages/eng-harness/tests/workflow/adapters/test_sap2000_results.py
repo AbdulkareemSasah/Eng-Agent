@@ -2,7 +2,7 @@
 
 Adapter imports sit inside the tests so a missing module fails the test. Force tools use the units token `kN_m_C`
 (spec 0012 AC15 through `eng_contract.units`). Frame-force rows keep `station` (as `station_mm`) and envelope
-`step` (host `step_type` / CaseRef.step); none are dropped or merged. Sign convention stays `host_local/1` (contract G-3).
+`step` (host `step_type` / CaseRef.step); none are dropped or merged. Sign convention is `host_local/1` (G-3).
 """
 
 from __future__ import annotations
@@ -128,9 +128,7 @@ async def _results_rig(tmp_path: Path, config: ServersConfig, control: Path) -> 
     sent: list[tuple[str, str, dict[str, Any]]] = []
 
     class _Recorder:
-        async def call(
-            self, server: str, role: str, tool: str, arguments: dict[str, Any], effect: CallEffect
-        ) -> Any:
+        async def call(self, server: str, role: str, tool: str, arguments: dict[str, Any], effect: CallEffect) -> Any:
             sent.append((role, tool, dict(arguments)))
             return await manager.call(server, role, tool, arguments, effect)
 

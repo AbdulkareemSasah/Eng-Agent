@@ -14,7 +14,7 @@ from eng_harness.servers import ServerManager, ServersConfig
 
 ConfigFactory = Callable[..., ServersConfig]
 
-# Spec 0012 AC17: remaining gaps of §4.5 other than SP-1 (AC6) and the later-wired SP-3, SP-4, SP-6.
+# Spec 0012 AC17: remaining gaps of §4.5 other than SP-1 (AC6), SP-3 (AC16 / T6), and the later-wired SP-4, SP-6.
 _REMAINING = ("SP-2", "SP-5", "SP-7", "SP-8")
 
 
@@ -64,7 +64,7 @@ def test_gaps_not_implemented(gap_id: str) -> None:
     from eng_harness.adapters.csi._gaps import SAP2000_GAPS, SAP2000_STEP_GAPS, raise_gap
 
     assert set(SAP2000_GAPS) == {f"SP-{n}" for n in range(1, 9)}
-    assert set(SAP2000_STEP_GAPS) == {"new_model"}
+    assert set(SAP2000_STEP_GAPS) == {"new_model", "concrete_non_beam"}
     assert SAP2000_GAPS[gap_id]
     with pytest.raises(NotImplementedGap) as caught:
         raise_gap(gap_id)
