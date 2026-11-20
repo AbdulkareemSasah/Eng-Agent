@@ -19,7 +19,7 @@ import pytest
 from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
-from eng_contract.kinds.model import CombinationType, PatternType
+from eng_contract.kinds.model import CombinationItem, CombinationType, PatternType
 from eng_contract.store import LocationClass, ModelStateStore, ResultStore, Workspace
 from pydantic import JsonValue
 
@@ -174,11 +174,11 @@ def store(tmp_path: Path) -> ResultStore:
     return ResultStore(workspace, HARNESS_KINDS, ids, clock)
 
 
-def _build(tool: str, model: Any, token: str | None = "kN_mm_C") -> dict[str, JsonValue]:
+def _build(tool: str, model: Any, units: str | None = None) -> dict[str, JsonValue]:
     from eng_harness.adapters.csi import csi_allowlist
     from eng_harness.adapters.csi._tools import edit_builders
 
-    binding = Binding(target=HostTarget(product="SAP2000", pid=4242), units_system=token)
+    binding = Binding(target=HostTarget(product="SAP2000", pid=4242), units_system=units)
     return edit_builders()[tool](model, csi_allowlist().for_product("SAP2000").descriptor(tool), binding)
 
 
@@ -211,7 +211,10 @@ def test_add_frame_name_from_reply(
                 zj_mm=rig.value("zj_mm", 3000.0),
             )
             payload = reply.data if isinstance(reply.data, dict) else store.payload(reply.result_id)
-            host_name = payload["value"]["name"]
+            assert isinstance(payload, dict)
+            value = payload.get("value")
+            assert isinstance(value, dict)
+            host_name = value["name"]
             assert host_name == "Frame2"
             assert host_name != "RequestedCol"
             assert edits.name_map().get("RequestedCol") == "Frame2"
@@ -219,7 +222,10 @@ def test_add_frame_name_from_reply(
             checked = await rig.host.check_model(rig.key)
             codes = [code for _, code, _, _ in _issues(checked)]
             assert "READBACK_MISMATCH" not in codes
-            await rig.host.model_state(rig.key, (await rig.host.locate(rig.key)).instance_id)  # type: ignore[union-attr]
+            held = await rig.host.locate(rig.key)
+            assert held is not None
+            assert held.instance_id is not None
+            await rig.host.model_state(rig.key, held.instance_id)
             read = rig.host.last_read(rig.key)
             assert read is not None
             frames = read.payloads["model.frame_placements/1"]
@@ -241,6 +247,7 @@ def test_add_frame_name_from_reply(
                     yj_mm=0.0,
                     zj_mm=1000.0,
                 ),
+                units="kN_mm_C",
             )
             assert args["section"] == "C300"
             assert args["start"] == [0.0, 0.0, 0.0]
@@ -249,9 +256,7 @@ def test_add_frame_name_from_reply(
     anyio.run(body)
 
 
-def test_typed_readback_edits(
-    make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path
-) -> None:
+def test_typed_readback_edits(make_config: ConfigFactory, control: Path, store: ResultStore, tmp_path: Path) -> None:
     """AC13: assign frame section, add area, pattern and combination use the 0002 argument mapping."""
 
     async def body() -> None:
@@ -298,11 +303,11 @@ def test_typed_readback_edits(
             section="SLAB1",
             points=[[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0]],
         )
-        built = _build("csi_add_area_by_coord", area)
+        built = _build("csi_add_area_by_coord", area, units="kN_mm_C")
         assert built["section"] == "SLAB1"
         assert built["points"] == [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0]]
         pattern = base.AddLoadPatternArgs(model="m", name="P", type=PatternType.LIVE, self_weight_ratio=1.0)
-        assert _build("csi_add_load_pattern", pattern, token=None) == {
+        assert _build("csi_add_load_pattern", pattern) == {
             "name": "P",
             "type": "Live",
             "self_weight": 1.0,
@@ -311,9 +316,13 @@ def test_typed_readback_edits(
             model="m",
             name="C2",
             type=CombinationType.LINEAR_ADD,
-            items=[{"case": {"case": "DEAD", "case_type": "load_pattern"}, "scale_ratio": 1.4}],
+            items=[
+                CombinationItem.model_validate(
+                    {"case": {"case": "DEAD", "case_type": "load_pattern"}, "scale_ratio": 1.4}
+                )
+            ],
         )
-        assert _build("csi_add_load_combo", combo, token=None)["combo_type"] == 0
+        assert _build("csi_add_load_combo", combo)["combo_type"] == 0
 
     anyio.run(body)
 
