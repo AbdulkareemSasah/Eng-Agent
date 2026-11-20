@@ -10,7 +10,7 @@ from eng_contract.errors import ContractError, ErrorCode
 
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.revit._edits import prepare_and_send_write
-from eng_harness.servers import CallEffect
+from eng_harness.servers import CallEffect, ServerManager
 
 from . import _revit_edit_helpers as helpers
 
@@ -21,7 +21,7 @@ def test_unique_id_verified_before_write(tmp_path: Path) -> None:
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
 
-    async def body(manager) -> None:
+    async def body(manager: ServerManager) -> None:
         ledger = WriteLedger(tmp_path / "run")
         writes: list[str] = []
 

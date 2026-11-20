@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
@@ -17,7 +17,7 @@ from eng_harness.adapters.revit._edits import (
     prepare_and_send_write,
     resolve_parameter_name,
 )
-from eng_harness.servers import CallEffect
+from eng_harness.servers import CallEffect, ServerManager
 
 from . import _revit_edit_helpers as helpers
 
@@ -32,12 +32,21 @@ from . import _revit_edit_helpers as helpers
         "set_parameter_value_by_guid",
     ],
 )
-def test_edit_mapping(kind: str, tmp_path: Path) -> None:
+def test_edit_mapping(
+    kind: Literal[
+        "duplicate_family_type",
+        "set_type_parameter_values",
+        "change_element_type",
+        "set_element_parameter_values",
+        "set_parameter_value_by_guid",
+    ],
+    tmp_path: Path,
+) -> None:
     """AC14: host arguments equal the section 4.8 mapping; ledger append before send."""
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
 
-    async def body(manager) -> None:
+    async def body(manager: ServerManager) -> None:
         ledger = WriteLedger(tmp_path / "run")
         sent: list[tuple[str, dict[str, Any]]] = []
 
@@ -286,7 +295,7 @@ def test_shared_type_refused(tmp_path: Path) -> None:
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control, seed=helpers.seed_model(elements=elements, types=types))
 
-    async def body(manager) -> None:
+    async def body(manager: ServerManager) -> None:
         ledger = WriteLedger(tmp_path / "run")
         writes: list[str] = []
 
@@ -356,7 +365,7 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
 
-    async def body(manager) -> None:
+    async def body(manager: ServerManager) -> None:
         ledger = WriteLedger(tmp_path / "run")
         writes: list[str] = []
 

@@ -10,7 +10,7 @@ from eng_contract.errors import ContractError, ErrorCode, Precondition
 
 from eng_harness.adapters._ledger import WriteLedger
 from eng_harness.adapters.revit._edits import prepare_and_send_write
-from eng_harness.servers import CallEffect
+from eng_harness.servers import CallEffect, ServerManager
 
 from . import _revit_edit_helpers as helpers
 
@@ -34,7 +34,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
         seed=helpers.seed_model(active_path=other, document_path=other),
     )
 
-    async def body_bad(manager) -> None:
+    async def body_bad(manager: ServerManager) -> None:
         ledger = WriteLedger(bad_dir / "run-ledger")
         writes: list[str] = []
 
@@ -68,7 +68,7 @@ def test_active_document_checked(tmp_path: Path) -> None:
     control_ok = ok_dir / "control.json"
     config_ok = helpers.revit_config(ok_dir, control_ok, seed=helpers.seed_model())
 
-    async def body_ok(manager) -> None:
+    async def body_ok(manager: ServerManager) -> None:
         ledger = WriteLedger(ok_dir / "run-ledger")
         writes: list[str] = []
 

@@ -183,8 +183,8 @@ def verify_unique_ids(
             by_id[eid] = row
     mismatches = 0
     for element_id, expected in references.items():
-        row = by_id.get(int(element_id))
-        got = _unique_of(row) if row is not None else None
+        found = by_id.get(int(element_id))
+        got = _unique_of(found) if found is not None else None
         if got != expected:
             mismatches += 1
     if mismatches:
@@ -221,6 +221,14 @@ def _check_shared_type(instance_ids: Sequence[int], expected_instances: Sequence
         )
 
 
+def _type_prior_row(prior: Mapping[str, Any], type_id: int) -> Mapping[str, Any] | None:
+    types_prior = prior.get("types")
+    if not isinstance(types_prior, Mapping):
+        return None
+    raw_row = types_prior.get(type_id)
+    return raw_row if isinstance(raw_row, Mapping) else None
+
+
 def build_edit_args(kind: EditKind, /, **kwargs: Any) -> dict[str, JsonValue]:
     """Build host arguments for one section 4.8 edit kind (AC14 to AC17)."""
     prior = kwargs.get("prior")
@@ -236,8 +244,8 @@ def build_edit_args(kind: EditKind, /, **kwargs: Any) -> dict[str, JsonValue]:
             )
         source_type_id = int(kwargs["source_type_id"])
         new_type_name = str(kwargs["new_type_name"])
-        type_row = prior.get("types", {}).get(source_type_id) if isinstance(prior.get("types"), Mapping) else None
-        family = str(type_row.get("family")) if isinstance(type_row, Mapping) else None
+        type_row = _type_prior_row(prior, source_type_id)
+        family = str(type_row.get("family")) if type_row is not None else None
         names = prior.get("family_type_names")
         existing: set[str] = set()
         if isinstance(names, Mapping) and family is not None:
@@ -251,8 +259,8 @@ def build_edit_args(kind: EditKind, /, **kwargs: Any) -> dict[str, JsonValue]:
     if kind == "set_type_parameter_values":
         type_id = int(kwargs["type_id"])
         expected = list(kwargs["expected_instances"])
-        type_row = prior.get("types", {}).get(type_id) if isinstance(prior.get("types"), Mapping) else None
-        if not isinstance(type_row, Mapping):
+        type_row = _type_prior_row(prior, type_id)
+        if type_row is None:
             raise ContractError(ErrorCode.INVALID_ARGUMENT, "type prior read is required", field="type_id")
         _check_shared_type(list(type_row.get("instance_ids") or ()), expected)
         params = list(type_row.get("parameters") or ())
