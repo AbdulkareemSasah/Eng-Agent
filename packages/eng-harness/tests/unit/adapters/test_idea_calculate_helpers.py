@@ -872,7 +872,7 @@ def test_calculate_native_success_tool_args_effect_and_route(monkeypatch: pytest
     monkeypatch.setattr(m, "_process_success", _fake_process)
 
     async def body() -> None:
-        out = await m.calculate_native(
+        out: Any = await m.calculate_native(
             sessions=_Sessions(),
             server="idea",
             role="main",
@@ -968,7 +968,7 @@ def test_calculate_rest_success_tool_args_effect_and_route(monkeypatch: pytest.M
     monkeypatch.setattr(m, "_process_success", _fake_process)
 
     async def body() -> None:
-        out = await m.calculate_rest(
+        out: Any = await m.calculate_rest(
             sessions=_Sessions(),
             server="idea",
             role="main",
@@ -1062,7 +1062,7 @@ def test_get_check_results_success_with_and_without_connection_id(
     async def body() -> None:
         store = _store(tmp_path)
         ids = SeededIdSource(b"get-ok", FixedClock(_START))
-        out = await m.get_check_results(
+        out: Any = await m.get_check_results(
             sessions=_Sessions(),
             server="idea",
             role="main",
@@ -1073,7 +1073,7 @@ def test_get_check_results_success_with_and_without_connection_id(
             ids=ids,
         )
         assert out is sentinel
-        out2 = await m.get_check_results(
+        out2: Any = await m.get_check_results(
             sessions=_Sessions(),
             server="idea",
             role="main",
