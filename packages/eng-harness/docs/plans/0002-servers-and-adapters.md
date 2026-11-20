@@ -764,8 +764,9 @@ result-reader tokens, argument models and readers),
 T12b, T13), `products/__init__.py` (T11, T12b; plan 0012 T3 for the gap and step-gap registry fields only, B-586; plan 0012 T4 for ProductProfile.declared_absences only, B-590), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). `_kinds.py` is shared by T21 and every
-later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0013 T2; B-503): none
-waits for T21 or T21 for it, and whichever lands second adds its registry to the line the other wrote. Parallel tasks
+later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0011 T6, plan 0013 T2; B-503, B-589): none
+waits for T21 or T21 for it, and whichever lands second adds its registry to the line the other wrote. Plan 0011 T6 may only
+register `REVIT_KINDS` there (amendment B-589; the same `_kinds.py` listing as plan 0008 T4 for SAFE). Parallel tasks
 (T3 beside T4; T18 beside T8 to T17) share only `CHANGELOG.md` and `pyproject.toml`, merged in pull-request order.
 
 Reuse (spec §2): the MCP SDK's `Client` and message types (not its `stdio_client`), the S-10 job design, the S-02 and
@@ -1158,6 +1159,11 @@ failure envelopes; `test_visible_launch` checks the fake's recorded `visible` fl
   argument models and readers from `products/_safe_results.py` into the shared registries (`TOKENS`, `ANALYSIS_MODELS`,
   `READERS`; the T6 pattern for `_safe_loads`); required for SAFE AC23 (base and joint reactions through the CSI tool
   port / `tool_allowlist()`). Recorded in this plan's `csi/_tools.py` serialization above.
+- External amendment (B-589, from plan 0011 T6 / the B-235 writer): plan 0011 T6 amends
+  `packages/eng-harness/src/eng_harness/_kinds.py` so it may only register `REVIT_KINDS` on `HARNESS_KINDS`, and adds
+  the kinds contract fixtures under `packages/eng-harness/tests/data/kinds/revit/**`; required for Revit AC33 (kinds
+  usable through the registry; the same `_kinds.py` listing as plan 0008 T4 for SAFE / B-216). Recorded in this plan's
+  `_kinds.py` serialization above.
 - External amendment (B-590, from plan 0012 T4 / the B-248 writer): plan 0012 T4 amends
   `packages/eng-harness/src/eng_harness/adapters/_hostport.py` so it selects the absences-aware state reader when
   `profile.declared_absences` is non-empty and records the fingerprint on save when absences or tables are set;
