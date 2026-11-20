@@ -66,8 +66,10 @@ def _ref(
     complete: bool = True,
     parents: tuple[str, ...] = (),
 ) -> dict[str, Any]:
+    result_id = _rid(n)
     return {
-        "result_id": _rid(n),
+        "result_id": result_id,
+        "ref": result_id,
         "kind": kind,
         "complete": complete,
         "model_id": model if revision is not None else None,

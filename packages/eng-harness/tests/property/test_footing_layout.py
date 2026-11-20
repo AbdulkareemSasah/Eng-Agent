@@ -14,6 +14,7 @@ _META = InputMeta(
     refs={
         name: RefMeta(
             result_id=f"res_0000000000000000000000000{i}",
+            ref=f"res_0000000000000000000000000{i}",
             kind=kind,
             complete=True,
             model_id=None,

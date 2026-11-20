@@ -32,6 +32,9 @@ from eng_harness.ports import CalcInfo, RunClass
 _LOG = logging.getLogger(__name__)
 _DRAFT = (CalcStatus.DRAFT, CalcStatus.VERIFIED)
 _Obj = Mapping[str, JsonValue]
+_SIZE_POINTER_FIELDS = frozenset({"size_b", "size_h", "size_d"})
+_SIZE_POINTER = ("size",)
+_SIZE_KIND = "harness.section_size/1"
 
 
 class CalcSettings(BaseModel):
@@ -162,6 +165,43 @@ class HarnessCalcPort:
             raise TypeError(f"{definition.id}: input type is no CalcInput")  # the registry checked this at load
         return input_type
 
+    def _refuse_non_size_pointers(self, input_type: type[CalcInput], args: _Obj) -> None:
+        """Refuse size_b / size_h / size_d refs whose pointer is not exactly `/size` (B-580).
+
+        Runs after the reference is parsed and the record kind is confirmed, before
+        `validate_input` dereferences the payload or checks units, so `#/size/value` and a
+        pointer to a missing member become `INVALID_ARGUMENT` on the size field rather than
+        `REF_UNIT_MISMATCH` / `REF_POINTER_INVALID`. Wrong-kind references are left for the
+        normal pipeline (`REF_KIND_MISMATCH`).
+        """
+        properties = input_type.model_json_schema().get("properties", {})
+        for name in _SIZE_POINTER_FIELDS:
+            raw = args.get(name)
+            if not isinstance(raw, dict):
+                continue
+            ref = raw.get("$ref")
+            if not isinstance(ref, str):
+                continue
+            meta = properties.get(name, {}).get("x-eng", {})
+            if not meta.get("ref_capable") or _SIZE_KIND not in meta.get("ref_kinds", []):
+                continue
+            try:
+                result_id, tokens = parse_ref(ref, field=name)
+            except ContractError:
+                continue
+            try:
+                record = self._store.get(result_id)
+            except ContractError:
+                continue
+            if record.kind != _SIZE_KIND:
+                continue
+            if tokens != _SIZE_POINTER:
+                raise ContractError(
+                    ErrorCode.INVALID_ARGUMENT,
+                    f"{name} pointer must be /size",
+                    field=name,
+                )
+
     def run(self, calc_id: str, args: _Obj) -> SuccessEnvelope | FailureEnvelope:
         """Run a calc (spec 0003 4.12 item 2); nothing is stored unless the run succeeds.
 
@@ -189,8 +229,10 @@ class HarnessCalcPort:
         if (refusal := self._refusal(calc_id, status)) is not None:
             raise CalcRefused(refusal.code, f"{calc_id} is {status.value}", evidence=[calc_id])
         started, began = self._clock.now(), self._clock.now_ms()
+        input_type = self._input_type(definition)
+        self._refuse_non_size_pointers(input_type, args)
         validated = validate_input(
-            self._input_type(definition),
+            input_type,
             args,
             source=self._store,
             current_revision=lambda _: None,
@@ -202,6 +244,7 @@ class HarnessCalcPort:
             refs={
                 name: RefMeta(
                     result_id=r.result_id,
+                    ref=refs[name],
                     kind=r.kind,
                     complete=r.complete,
                     model_id=r.producer.host.model_id if r.producer.host else None,

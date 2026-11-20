@@ -169,11 +169,16 @@ tasks:
   - id: T7
     # Amendment (B-418, documents only): T7 wires SG-2, SG-3, SG-4, SG-5 and SG-9 to their steps (AC24, AC25) and SG-6
     title: SAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps
+    # Amendment (B-588, documents only): AC23's ToolPort path needs the SAFE result-reader TOKENS, ANALYSIS_MODELS and
+    # READERS from products/_safe_results.py merged into the shared registries in adapters/csi/_tools.py (the T6 pattern
+    # for _safe_loads); measured by the B-216 writer on packages/eng-harness/src/eng_harness/adapters/csi/_tools.py
+    # (not previously in T7's files). Every other non-test file of that branch was already listed here.
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.adapters, eng_harness.adapters.csi, eng_harness.adapters.csi.products (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe_results.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/products/_safe.py"
+      - "packages/eng-harness/src/eng_harness/adapters/csi/_tools.py"  # T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries (the T6 pattern) (amendment B-588)
       - "packages/eng-harness/src/eng_harness/adapters/csi/_gaps.py"
       - "packages/eng-harness/src/eng_harness/adapters/csi/_allowlist.toml"
       - "packages/eng-harness/src/eng_harness/_kinds.py"
@@ -256,7 +261,8 @@ public module is added (everything is internal), so `[tool.eng-gate] public_modu
 source file are serialized by `depends_on`: `_allowlist.toml` (T1, T3, T6, T7, T9), `_safe.py` (T3, T5, T6, T7; plan 0012 T3 after them for the gap and step-gap registries only, B-586),
 `products/__init__.py` (T1; plan 0012 T3 after it for the gap and step-gap registry fields only, B-586),
 `_safe_state.py` (T4, T5), `_safe_results.py` (T7, T9), `_kinds.py` (T4, T5, T7, T9), `_gaps.py` (T3, T7, T9),
-`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map).
+`_hostport.py` (T3, T5; amendment B-581: T3 for AC6 and AC7 before T5's table map),
+`_tools.py` (T6, T7; amendment B-588: T7 may only merge the SAFE result-reader tokens, argument models and readers from products/_safe_results.py into the shared registries, the T6 pattern).
 
 Reuse (spec §2): everything in plan 0002; the SAFE 22 table reference of the Sasaah repository only as a source of field
 keys recorded in `_safe_tables.toml` with status `reference`, never copied code.
@@ -324,7 +330,8 @@ mapping including `SuperDead`.
 
 **T7 Analysis and results** (spec §4.6). Long-role routing for SAFE, the soil pressure reader with `group` (rows carry `step_type` and `case_type`; a non-unique key is `INTERNAL`), the
 base-reaction and joint-reaction readers, analysis status, the `Analysis Messages` read as a `NotImplementedGap` until recorded, and the explicit gaps for
-slab design. T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their registry entries (AC24, AC25; amendment
+slab design. T7 may only merge the SAFE result-reader tokens, argument models and readers from `products/_safe_results.py` into the shared registries in `csi/_tools.py` (the T6 pattern for `_safe_loads`; amendment B-588), so AC23 reaches the CSI tool port.
+T7 wires the steps of SG-2, SG-3, SG-4, SG-5 and SG-9 to their registry entries (AC24, AC25; amendment
 B-418). AC25's parametrized cases include SG-8, which T6 already raises and which is green at T7's base; this is
 acceptable because the test-first gate counts the test red while any case fails.
 

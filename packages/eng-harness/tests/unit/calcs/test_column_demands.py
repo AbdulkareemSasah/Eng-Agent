@@ -247,6 +247,7 @@ def _meta() -> InputMeta:
         refs={
             name: RefMeta(
                 result_id=f"res_01KCD{'0' * 20}{idx}",
+                ref=f"res_01KCD{'0' * 20}{idx}",
                 kind=kind,
                 complete=True,
                 model_id=None,
