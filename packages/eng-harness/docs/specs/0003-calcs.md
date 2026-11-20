@@ -320,7 +320,8 @@ design summary's input kind of §4.9, amendment B-538),
 `eng_harness.workflows.model_edit_cycle._change_set` (the change-set model of spec 0007 §4.3, input of the edit-cycle
 calcs, amendment B-493) and `eng_harness.kinds.csi` (the payload models of the CSI harness kinds, among them `CsiRows`
 of `harness.csi_design_results/1` and `harness.csi_analysis_messages/1`, inputs of the edit-cycle calcs of spec 0007
-§4.4.3 and §4.4.4, amendment B-503). `calcs/__init__.py` may import
+§4.4.3 and §4.4.4, amendment B-503) and `eng_harness._kinds` (registered host kind models only, to read calc inputs;
+no function calls, no registry mutation, amendment B-592). `calcs/__init__.py` may import
 `read_lock` and `removed_ids` through `eng_harness.calc`, which re-exports them from `eng_harness._calc._hash`.
 Everything else is refused by the rules test (AC3). Imports are top level only (AC7).
 
