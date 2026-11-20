@@ -1,7 +1,8 @@
 """Calc `harness.column_demands` v1: column code-check items and not-checked reasons (spec 0013 4.4.2, E1 to E6).
 
 Purpose: for each selected column, build check items for `max_axial_strength`, `axial_flexure_uniaxial` (only when
-symmetric by geometry and layout: `b_mm == h_mm` and `n_bars_b == n_bars_h`, else `AXES_UNDECLARED` `CW-G9`), and one
+symmetric by geometry and layout: `b_mm == h_mm` and `n_bars_b == n_bars_h`, else `AXES_UNDECLARED` `CW-G9`;
+Mu=|M3|, Mu_other=|M2| except M2-only Mu=|M2|, Mu_other=0 per amendment B-596 / OQ-Q98), and one
 `longitudinal_reinforcement_limits` item per column; report `SHAPE_NOT_CHECKED`, `LAYOUT_MISSING`, `FORCES_MISSING` and
 `AXES_UNDECLARED` in `not_checked`. Converted demands, geometry and layout values are literals equal to E3-E5 trace
 steps; confirmed basis fields (`fc_MPa`, `fy_MPa`, `k_factor`, `ratio_limit`) are `{"$ref"}` references into `basis`.
@@ -445,13 +446,26 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
                 )
             )
             if symmetric:
-                mu_knm = float(abs(Fraction(row.M3_kNm)))
-                mu_other_knm = float(abs(Fraction(row.M2_kNm)))
+                abs_m2 = abs(Fraction(row.M2_kNm))
+                abs_m3 = abs(Fraction(row.M3_kNm))
+                # Spec 0013 section 4.4.2 E3 (amendment B-596 / OQ-Q98): default Mu=|M3|, Mu_other=|M2|;
+                # when |M3|=0 and |M2|!=0 the sole nonzero magnitude goes in Mu (Mu_other=0).
+                m2_only = abs_m3 == 0 and abs_m2 != 0
+                if m2_only:
+                    mu_knm = float(abs_m2)
+                    mu_other_knm = 0.0
+                    mu_formula = "|M2_kNm| when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
+                    mu_other_formula = "0 when |M3_kNm|=0 and |M2_kNm|!=0 (amendment B-596 / OQ-Q98)"
+                else:
+                    mu_knm = float(abs_m3)
+                    mu_other_knm = float(abs_m2)
+                    mu_formula = "|M3_kNm|"
+                    mu_other_formula = "|M2_kNm|"
                 trace.step(
                     f"{r_tag}_Mu_kNm",
                     mu_knm,
                     unit="kN.m",
-                    formula="|M3_kNm|",
+                    formula=mu_formula,
                     source=f"{_RULE} E3",
                     uses=["forces"],
                 )
@@ -459,7 +473,7 @@ def column_demands(inp: DemandsInput, meta: InputMeta, trace: TraceBuilder) -> D
                     f"{r_tag}_Mu_other_kNm",
                     mu_other_knm,
                     unit="kN.m",
-                    formula="|M2_kNm|",
+                    formula=mu_other_formula,
                     source=f"{_RULE} E3",
                     uses=["forces"],
                 )
