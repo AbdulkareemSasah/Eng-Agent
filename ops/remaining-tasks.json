@@ -583,15 +583,13 @@
    "branch": "feat/b191-harness-it17-end-to-end-approval",
    "prTitle": "feat(eng-harness): end-to-end approval, replay and untrusted-text tests; Arabic environment; local testing list; agent rule (B-191)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T16",
-    "I.T16b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 485
   },
   {
    "id": "B-353",
@@ -639,14 +637,13 @@
    "branch": "feat/b430-harness-it16b-production-wiring",
    "prTitle": "feat(eng-harness): production wiring: the decision, progress and run-control ports reach the real engine (B-430)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T16"
-   ],
+   "pending_deps": [],
    "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 469
   },
   {
    "id": "B-431",
@@ -677,15 +674,13 @@
    "branch": "test/b432-harness-it17c-real-engine-re-checks-of-the",
    "prTitle": "test(eng-harness): real-engine re-checks of the screens and the run and resume commands (B-432)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T16",
-    "I.T16b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 481
   },
   {
    "id": "B-433",
@@ -1178,8 +1173,9 @@
    "writer": "opus, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
-   "open_pr": 463,
-   "branch_pushed": false
+   "open_pr": null,
+   "branch_pushed": false,
+   "merged_pr": 463
   },
   {
    "id": "B-283",
@@ -1226,14 +1222,13 @@
    "branch": "feat/b285-harness-gt6-code-pack-route-in",
    "prTitle": "feat(eng-harness): code-pack route in the CalcPort for the three ACI 318-14 column checks (B-285)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "G.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 478
   },
   {
    "id": "B-286",
@@ -1473,9 +1468,7 @@
    "branch": "feat/b327-codes-yt3-pack-assembly-registration-check",
    "prTitle": "feat(structural-codes): pack assembly, registration, check_id_for, boundary case files, pack-level tests, README usage (B-327)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "Y.T2"
-   ],
+   "pending_deps": [],
    "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -1483,7 +1476,8 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 477
   },
   {
    "id": "B-330",
@@ -1952,7 +1946,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "BLOCKED on owner question OQ-Q93 (open-only footing rounds)"
+   ]
   },
   {
    "id": "B-400",
@@ -1985,7 +1982,7 @@
    "prTitle": "feat(eng-harness): calcs harness.reactions_to_joint_loads and harness.safe_equilibrium (B-401)",
    "risk": "r1, r2, r3",
    "pending_deps": [
-    "F.T5"
+    "F.T7"
    ],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
@@ -1994,7 +1991,10 @@
     "oracle"
    ],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "amendment B-585 (#488): T10 depends on plan 0008 T7 (harness.base_reactions/1); held until B-216 merges"
+   ]
   },
   {
    "id": "B-402",
@@ -2108,7 +2108,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 467
   },
   {
    "id": "B-213",
@@ -2120,14 +2121,13 @@
    "branch": "feat/b213-harness-ft4-table-reader-framework-field",
    "prTitle": "feat(eng-harness): table reader framework, field-map data with statuses, sections, materials and soil supports (B-213)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 474
   },
   {
    "id": "B-214",
@@ -2139,14 +2139,13 @@
    "branch": "feat/b214-harness-ft5-safe-model-state-reader",
    "prTitle": "feat(eng-harness): sAFE model-state reader, points and joint-load kinds, fingerprint (B-214)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 482
   },
   {
    "id": "B-215",
@@ -2158,14 +2157,13 @@
    "branch": "feat/b215-harness-ft6-joint-load-import-pattern",
    "prTitle": "feat(eng-harness): joint-load import, pattern and combination edits for SAFE, read-back, SAFE check_model, point-load reconciliation (B-215)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T5"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 487
   },
   {
    "id": "B-216",
@@ -2233,14 +2231,13 @@
    "branch": "feat/b231-harness-rt2-synthetic-revit-fake-server",
    "prTitle": "feat(eng-harness): synthetic Revit fake server (test-only), its faults and its schema check (B-231)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T1"
-   ],
+   "pending_deps": [],
    "writer": "cursor auto",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 470
   },
   {
    "id": "B-232",
@@ -2252,15 +2249,13 @@
    "branch": "feat/b232-harness-rt3-revit-allowlist-data-argument",
    "prTitle": "feat(eng-harness): revit allowlist data, argument models and pinned role fingerprints (B-232)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T1",
-    "R.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 483
   },
   {
    "id": "B-233",
@@ -2272,14 +2267,13 @@
    "branch": "feat/b233-harness-rt4-revit-build-check-excluded",
    "prTitle": "feat(eng-harness): revit build check (excluded tools, toolset reason, catalog version), role start options and the pinned pipe (B-233)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 489
   },
   {
    "id": "B-234",
@@ -2505,14 +2499,13 @@
    "branch": "feat/b245-harness-at1-sap2000-server-section-product",
    "prTitle": "feat(eng-harness): sAP2000 server section, product by extension, profile, allowlist entries and pinned fingerprint (B-245)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 475
   },
   {
    "id": "B-246",
@@ -2524,14 +2517,13 @@
    "branch": "feat/b246-harness-at2-synthetic-sap2000-mode-of",
    "prTitle": "feat(eng-harness): synthetic SAP2000 mode of the CSI fake and its schema check (B-246)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T1"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 480
   },
   {
    "id": "B-247",
@@ -2667,7 +2659,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 466
   },
   {
    "id": "B-302",
@@ -2679,14 +2672,13 @@
    "branch": "feat/b302-harness-ht3-idea-allowlist-data-58",
    "prTitle": "feat(eng-harness): iDEA allowlist data (58 tools classified), argument models, pinned fingerprint, build-check items and unit header (B-302)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T2"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 484
   },
   {
    "id": "B-303",
@@ -3228,14 +3220,13 @@
    "branch": "feat/b526-harness-wt9a-workflow-part-2a-steps-11-to-15",
    "prTitle": "feat(eng-harness): workflow part 2a - steps 11 to 15 (analysis, design, summaries, D-3, engineer turn) (B-526)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "W.T8b"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 473
   },
   {
    "id": "B-527",
@@ -3835,11 +3826,12 @@
    "writer": "agy hydrogen medium",
    "reviewer": "codex terra",
    "verifier_lenses": [],
-   "open_pr": 464,
+   "open_pr": null,
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-569 (#430): verified B-202 finding"
-   ]
+   ],
+   "merged_pr": 464
   },
   {
    "id": "B-575",
@@ -3862,7 +3854,8 @@
    "branch_pushed": false,
    "lead_notes": [
     "registered after B-567 (#439) split plan 0010 T4 into T4 and T4b"
-   ]
+   ],
+   "merged_pr": 468
   }
  ]
 }
