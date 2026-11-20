@@ -1,7 +1,8 @@
 """Revit specification-identifier units (plan 0011 T5; spec 0011 AC7, §4.6).
 
 Length: raw feet → mm by eng_contract.units.convert (ft is the international foot, NIST SP 811).
-Unmapped specifications are left out with info issue PARAMETER_UNIT_UNMAPPED. displayValue is never parsed.
+Unmapped specifications (including angle until L7 cites a real specId) are left out with info issue
+PARAMETER_UNIT_UNMAPPED. displayValue is never parsed.
 """
 
 import pytest
@@ -51,7 +52,7 @@ def test_unmapped_spec_listed() -> None:
             "name": "Area",
             "rawValue": 10.0,
             "displayValue": "10 SF",
-            "specId": "autodesk.spec.aec:area-2.0.0",
+            "specId": "test:unmapped-spec",
         },
         subject=Subject(kind=SubjectKind.SECTION, id="C300x300"),
     )
@@ -59,7 +60,30 @@ def test_unmapped_spec_listed() -> None:
     assert issue is not None
     assert issue.severity is Severity.INFO
     assert issue.code == "PARAMETER_UNIT_UNMAPPED"
-    assert "autodesk.spec.aec:area-2.0.0" in issue.message
+    assert "test:unmapped-spec" in issue.message
+
+
+def test_angle_parameter_unmapped_until_l7() -> None:
+    # Spec 0011 §4.6 requires angle rad→deg in principle but gives no specId; S-12 has none.
+    # Until L7 supplies a cited identifier, any angle parameter is left out (PARAMETER_UNIT_UNMAPPED).
+    from eng_harness.adapters.revit._units import convert_parameter, specs_table
+
+    assert all(entry.kind != "angle" for entry in specs_table().values())
+
+    value, issue = convert_parameter(
+        {
+            "name": "Rotation",
+            "rawValue": 1.5707963267948966,  # π/2 rad if a mapping existed
+            "displayValue": "90.00°",
+            "specId": "test:angle-unmapped-until-l7",
+        },
+        subject=Subject(kind=SubjectKind.SECTION, id="C300x300"),
+    )
+    assert value is None
+    assert issue is not None
+    assert issue.severity is Severity.INFO
+    assert issue.code == "PARAMETER_UNIT_UNMAPPED"
+    assert "test:angle-unmapped-until-l7" in issue.message
 
 
 def test_display_value_never_used() -> None:

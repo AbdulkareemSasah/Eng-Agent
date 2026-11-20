@@ -1,8 +1,9 @@
 """Revit specification-identifier units (plan 0011 T5; spec 0011 AC7, §4.6).
 
-Purpose: convert a parameter's `rawValue` by `_specs.toml` (length `ft`→`mm`, angle `rad`→`deg`) through
-`eng_contract.units.convert`. `displayValue` is never parsed. An unmapped `specId` is left out with info issue
-`PARAMETER_UNIT_UNMAPPED`. Units: mm, deg. Errors: none raised.
+Purpose: convert a parameter's `rawValue` by `_specs.toml` (length `ft`→`mm` from the synthetic fake /
+§4.13) through `eng_contract.units.convert`. `displayValue` is never parsed. An unmapped `specId` (including
+any angle parameter until L7 cites a real identifier) is left out with info issue `PARAMETER_UNIT_UNMAPPED`.
+Units: mm (and deg once an angle entry is cited). Errors: none raised.
 """
 
 import tomllib
@@ -40,7 +41,7 @@ class _Loaded(NamedTuple):
 
 @lru_cache(maxsize=1)
 def load_specs() -> _Loaded:
-    """Load the packaged `_specs.toml` (length and angle only, spec 0011 §4.6)."""
+    """Load the packaged `_specs.toml` (length only until L7 cites an angle specId; spec 0011 §4.6)."""
     text = files("eng_harness.adapters.revit").joinpath("_specs.toml").read_text(encoding="utf-8")
     data = tomllib.loads(text)
     specs = data.get("specs")
