@@ -2361,7 +2361,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 517
   },
   {
    "id": "B-239",
@@ -2733,7 +2734,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 509
   },
   {
    "id": "B-307",
