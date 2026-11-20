@@ -3,9 +3,10 @@
 Test code, never shipped. Every basis and reaction value below is a synthetic test input labelled so; no case
 reproduces a project. The test workflow runs the real `design_isolated_footing` block under the real harness calcs
 and the real ACI 318-14 pack through `CodePackRoute`.
-"""
 
-from __future__ import annotations
+No ``from __future__ import annotations``: the nested workflow return type must resolve at decorate time the same
+way as ``tests/workflow/edit_cycle/conftest.py``.
+"""
 
 import asyncio
 import sys
@@ -47,6 +48,10 @@ BY = "engineer:test"
 SOURCE = "engineer:test@2026-01-01T00:00:00.000Z"
 ENTERED_AT = "2026-01-01T00:00:00.000Z"
 CHECK_IDS = {base: base for base in FOOTING_CHECK_IDS}
+
+
+class Empty(BaseModel):
+    """No engineer workflow input beyond the stored refs."""
 
 # Synthetic engineer basis for the footing block scenarios (spec 0010 4.7 paths; values from golden plan-gross
 # overburden derivation and ACI packing needs). Cited in scenario JSON under tests/data/footing/.
@@ -116,6 +121,7 @@ class Stand:
     reactions_ref: str
     service_ref: str
     factored_ref: str
+    unused_dims_ref: str
     approvals: FakeApprovalPort = field(default_factory=FakeApprovalPort)
     inputs: FakeInputPort = field(default_factory=FakeInputPort)
     labels: list[LabelStore] = field(default_factory=list)
@@ -137,9 +143,6 @@ class Stand:
             Path(isolated_footing.__file__).resolve().parent, Path(footing_rules.__file__).resolve()
         )
 
-        class Empty(BaseModel):
-            """No engineer workflow input beyond the stored refs."""
-
         required = tuple(
             sorted({*PLAN_FIELDS, *LAYOUT_FIELDS, *RESIZE_FIELDS, *BASIS_VALUES})
         )
@@ -158,6 +161,7 @@ class Stand:
                     service_cases=Ref.model_validate({"$ref": self.service_ref}),
                     factored_cases=Ref.model_validate({"$ref": self.factored_ref}),
                     check_ids={base: base for base in CHECK_BASE_IDS},
+                    unused_engineer_dims=Ref.model_validate({"$ref": self.unused_dims_ref}),
                 ),
             )
 
@@ -226,7 +230,7 @@ class Stand:
             input={},
             basis_ref=self.basis_ref,
             run_class=RunClass.TRIAL,
-            mode=PermissionMode.READ_ONLY,
+            mode=PermissionMode.WORK_ON_COPY,
             run_id=self.run_id,
         )
 
@@ -307,6 +311,22 @@ def _engineer_list(names: Sequence[str], field: str) -> dict[str, JsonValue]:
     }
 
 
+def _unused_engineer_dims(used: Mapping[str, tuple[Any, str | None]]) -> dict[str, JsonValue]:
+    """Ask-shaped Quantity fields for unused resize engineer refs (spec 0010 4.4.4; values from the stand basis)."""
+    plan = used["foundation.min_plan_dimension_mm"][0]
+    depth = used["foundation.min_depth_mm"][0]
+    spacing = used["reinforcement.max_spacing_mm"][0]
+    entered = {"unit": None, "entered_by": "test", "entered_at": ENTERED_AT}
+    return {
+        "step": "unused_resize_dims",
+        "fields": {
+            "L": {"value": {"value": plan, "unit": "mm"}, **entered},
+            "h": {"value": {"value": depth, "unit": "mm"}, **entered},
+            "s": {"value": {"value": spacing, "unit": "mm"}, **entered},
+        },
+    }
+
+
 def build_stand(
     root: Path,
     *,
@@ -331,6 +351,7 @@ def build_stand(
     reactions_id = _put(store, "forces.joint_reactions/1", dict(reactions), producer)
     service_id = _put(store, "basis.engineer_input/1", _engineer_list(service_cases, "service_cases"), producer)
     factored_id = _put(store, "basis.engineer_input/1", _engineer_list(factored_cases, "factored_cases"), producer)
+    unused_id = _put(store, "basis.engineer_input/1", _unused_engineer_dims(used), producer)
     return Stand(
         root,
         workspace,
@@ -343,6 +364,7 @@ def build_stand(
         reactions_id,
         service_id,
         factored_id,
+        unused_id,
         model=model,
     )
 

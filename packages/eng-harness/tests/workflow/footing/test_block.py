@@ -172,14 +172,17 @@ def test_eccentric_reaction_needs_engineer(tmp_stand_root: Path) -> None:
     """AC19 / Q18: q_min < 0 at the plan of §4.4.2 → bearing NEEDS_ENGINEER; no decide, no enlarge round.
 
     Derivation: at L=2000 mm, N≈736 kN, q_avg=184 kPa; MY=300 kN.m → M/S≈225 > 184 → q_min < 0 (BP G-1).
+    Factored MY=0 and denser max spacing so other families do not FAIL (status would then be failing, not
+    needs_engineer — spec 0010 4.4.5).
     """
     stand = build_stand(
         tmp_stand_root / "eccentric",
         subjects=subjects_payload(subject()),
         reactions=reactions_payload(
             reaction_row("J1", "S1", fz_kN=576.0, my_kNm=300.0),
-            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=300.0),
+            reaction_row("J1", "U1", fz_kN=800.0, my_kNm=0.0),
         ),
+        basis={"reinforcement.max_spacing_mm": (100.0, "mm")},
     )
     outcome = stand.play(_auto)
     assert outcome.status is RunStatus.COMPLETED
