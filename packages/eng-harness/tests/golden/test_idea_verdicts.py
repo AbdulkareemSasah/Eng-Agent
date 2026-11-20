@@ -10,11 +10,27 @@ from eng_harness.adapters.idea import _verdicts as idea_verdicts
 # Hand-derived from AC13: check_value (host percent), check_status, skipped → status and ratio.
 _CASES: list[tuple[dict[str, Any], VerdictStatus, float | None]] = [
     ({"name": "Plates", "check_value": 87.5, "check_status": True, "skipped": False}, VerdictStatus.PASS, 0.875),
-    ({"name": "Bolts", "check_value": 103.0, "check_status": True, "skipped": False}, VerdictStatus.NEEDS_ENGINEER, 1.03),
-    ({"name": "Welds", "check_value": 80.0, "check_status": False, "skipped": False}, VerdictStatus.NEEDS_ENGINEER, 0.8),
-    ({"name": "Buckling", "check_value": 0.0, "check_status": True, "skipped": False}, VerdictStatus.NEEDS_ENGINEER, 0.0),
+    (
+        {"name": "Bolts", "check_value": 103.0, "check_status": True, "skipped": False},
+        VerdictStatus.NEEDS_ENGINEER,
+        1.03,
+    ),
+    (
+        {"name": "Welds", "check_value": 80.0, "check_status": False, "skipped": False},
+        VerdictStatus.NEEDS_ENGINEER,
+        0.8,
+    ),
+    (
+        {"name": "Buckling", "check_value": 0.0, "check_status": True, "skipped": False},
+        VerdictStatus.NEEDS_ENGINEER,
+        0.0,
+    ),
     ({"name": "Concrete", "check_value": 112.0, "check_status": False, "skipped": False}, VerdictStatus.FAIL, 1.12),
-    ({"name": "Skipped", "check_value": 50.0, "check_status": True, "skipped": True}, VerdictStatus.NOT_APPLICABLE, 0.5),
+    (
+        {"name": "Skipped", "check_value": 50.0, "check_status": True, "skipped": True},
+        VerdictStatus.NOT_APPLICABLE,
+        0.5,
+    ),
 ]
 
 

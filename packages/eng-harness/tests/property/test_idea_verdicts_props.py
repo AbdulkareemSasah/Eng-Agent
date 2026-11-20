@@ -1,9 +1,9 @@
 """Property: IDEA host-verdict mapping never upgrades a host FAIL (plan 0014 T5; spec 0014 AC13)."""
 
+from eng_contract.verdicts import VerdictStatus
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from eng_contract.verdicts import VerdictStatus
 from eng_harness.adapters.idea import _verdicts as idea_verdicts
 
 _finite = st.floats(min_value=-1e6, max_value=1e6, allow_nan=False, allow_infinity=False)

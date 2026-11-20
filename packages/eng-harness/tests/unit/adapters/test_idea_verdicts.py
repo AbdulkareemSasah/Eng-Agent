@@ -124,7 +124,7 @@ def test_host_only() -> None:
         trace_ref="#/traces/0",
         assumptions=[],
     )
-    with pytest.raises(ValueError, match="code.pack|code_pack|host"):
+    with pytest.raises(ValueError, match=r"code_pack"):
         idea_verdicts.require_host_only([*host.verdicts, code_pack])
 
 
