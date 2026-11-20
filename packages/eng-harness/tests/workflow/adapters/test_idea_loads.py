@@ -11,7 +11,7 @@ from typing import Any
 
 import anyio
 import pytest
-from eng_contract.envelope import HostInfo, Provenance
+from eng_contract.envelope import HostInfo, Provenance, SuccessEnvelope
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
 from eng_contract.issues import Severity
@@ -137,7 +137,7 @@ def _plan(store: ResultStore, path: Path, *, p_kn: float = 25.0) -> Any:
     )
 
 
-def _session(tmp_path: Path, manager: ServerManager, files: dict[str, Path]) -> Any:
+def _session(tmp_path: Path, manager: Any, files: dict[str, Path], *, store: ResultStore | None = None) -> Any:
     from eng_harness.adapters.idea._session_ops import IdeaHostPort
 
     clock = FixedClock(_START)
@@ -146,6 +146,7 @@ def _session(tmp_path: Path, manager: ServerManager, files: dict[str, Path]) -> 
     states = ModelStateStore(workspace, clock)
     engine = ProcessIdentity(os.getpid(), "t0", "python")
     locks = HostLocks(tmp_path / "locks", run_id="b306", engine=engine, clock=clock)
+    results = store if store is not None else _store(tmp_path / "port-results")
     return IdeaHostPort(
         identity=IdentityStore(workspace=workspace, states=states, ids=ids),
         sessions=manager,
@@ -154,6 +155,7 @@ def _session(tmp_path: Path, manager: ServerManager, files: dict[str, Path]) -> 
         ids=ids,
         run_dir=tmp_path / "run",
         files=files,
+        store=results,
         server="idea",
         host_key="idea",
         route="native",
@@ -161,8 +163,42 @@ def _session(tmp_path: Path, manager: ServerManager, files: dict[str, Path]) -> 
     )
 
 
+def _issue_codes(envelope: Any) -> list[str]:
+    assert isinstance(envelope, SuccessEnvelope)
+    data: Any = envelope.data
+    assert data is not None
+    return [str(item["code"]) for item in data["issues"]]
+
+
+class _BumpNAfterWrite:
+    """After a successful idea_native_set_loads, bump the written file's first `n` so read-back mismatches."""
+
+    def __init__(self, inner: ServerManager) -> None:
+        self._inner = inner
+
+    async def call(self, server: str, role: str, tool: str, args: dict[str, Any], effect: CallEffect) -> Any:
+        result = await self._inner.call(server, role, tool, args, effect)
+        if tool != "idea_native_set_loads" or result.is_error:
+            return result
+        out = args.get("out_path")
+        if not isinstance(out, str):
+            return result
+        path = Path(out)
+        if not path.is_file():
+            return result
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for conn in data.get("connections", []):
+            for effect_row in conn.get("loads", []):
+                segments = effect_row.get("forcesOnSegments") or []
+                if segments:
+                    segments[0]["n"] = float(segments[0].get("n", 0.0)) + 1.0
+                    path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                    return result
+        return result
+
+
 def test_set_loads_writes_new_file(tmp_path: Path) -> None:
-    """AC10: idea_native_set_loads writes a new out_path file; the model rebinds; old file kept."""
+    """AC10: idea_native_set_loads writes a new out_path; model rebinds (new revision, new hash); old file kept."""
     from eng_harness.adapters.idea import _loads as loads
 
     control = tmp_path / "control.json"
@@ -173,19 +209,19 @@ def test_set_loads_writes_new_file(tmp_path: Path) -> None:
 
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
-            port = _session(tmp_path, manager, files={"m": original})
+            port = _session(tmp_path, manager, files={"m": original}, store=store)
             copy_key = await port.working_copy("m", run_dir / "copies")
             path = port.model_files(copy_key)[0]
             old_sha = hashlib.sha256(path.read_bytes()).hexdigest()
-            result = await loads.set_loads(
-                sessions=manager,
-                server="idea",
-                role="main",
+            before = await port.model_state(copy_key, port._bound[copy_key])
+            assert before.loaded
+            old_revision = before.revision
+            old_fingerprint = before.fingerprint
+            result = await port.set_loads(
+                copy_key,
                 plan=_plan(store, path),
                 load_map=loads.load_map_file(_SYNTHETIC_MAP),
                 source=store,
-                current_revision=lambda _: 1,
-                run_dir=run_dir,
                 readback_relative_tolerance_ratio=_TOLERANCE,
                 approved=True,
             )
@@ -194,6 +230,14 @@ def test_set_loads_writes_new_file(tmp_path: Path) -> None:
             assert path.exists()
             assert hashlib.sha256(path.read_bytes()).hexdigest() == old_sha
             assert result.out_path.suffix == ".ideaCon"
+            bound = port.model_files(copy_key)[0]
+            assert bound.resolve() == result.out_path.resolve()
+            after = await port.model_state(copy_key, port._bound[copy_key])
+            assert after.loaded
+            assert after.revision is not None and old_revision is not None
+            assert after.revision > old_revision
+            assert after.fingerprint != old_fingerprint
+            assert after.file_sha256 == hashlib.sha256(result.out_path.read_bytes()).hexdigest()
             reread = await manager.call(
                 "idea",
                 "main",
@@ -208,63 +252,55 @@ def test_set_loads_writes_new_file(tmp_path: Path) -> None:
     anyio.run(body)
 
 
-def test_readback_mismatch_detected() -> None:
-    """AC10: a read-back that differs beyond the basis tolerance is READBACK_MISMATCH (error)."""
-    import copy
-
-    from eng_harness.adapters.idea import _checks as checks
-
-    requested = [
-        {
-            "id": 1,
-            "name": "LE1",
-            "checkEquilibrium": True,
-            "forcesOnSegments": [
-                {
-                    "beamSegmentId": 1,
-                    "position": 0.0,
-                    "n": 25000.0,
-                    "qy": 0.0,
-                    "qz": 0.0,
-                    "mx": 0.0,
-                    "my": 0.0,
-                    "mz": 0.0,
-                }
-            ],
-            "forcesPercentageOnSegments": [],
-        }
-    ]
-    got: list[dict[str, Any]] = copy.deepcopy(requested)
-    segments = got[0]["forcesOnSegments"]
-    assert isinstance(segments, list)
-    first = segments[0]
-    assert isinstance(first, dict)
-    first["n"] = 25001.0
-    issues = checks.compare_loads_readback(
-        requested=requested,
-        got=got,
-        tolerance_ratio=_TOLERANCE,
-        connection="CON1",
-    )
-    assert any(i.code == "READBACK_MISMATCH" and i.severity is Severity.ERROR for i in issues)
-
-
-def test_zero_effect_dropped_warning(tmp_path: Path) -> None:
-    """AC10: a reply with non-empty dropped_zero becomes LOAD_EFFECT_ZERO_DROPPED naming the effects."""
-    from eng_harness.adapters.idea import _checks as checks
+def test_readback_mismatch_detected(tmp_path: Path) -> None:
+    """AC10: after a mismatching write, check_model returns READBACK_MISMATCH (error)."""
     from eng_harness.adapters.idea import _loads as loads
 
     control = tmp_path / "control.json"
     config = _idea_config(tmp_path, control)
     original = make_ideacon(tmp_path / "joint.ideaCon")
     run_dir = tmp_path / "run"
+    store = _store(tmp_path)
 
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
-            port = _session(tmp_path, manager, files={"m": original})
+            port = _session(tmp_path, _BumpNAfterWrite(manager), files={"m": original}, store=store)
             copy_key = await port.working_copy("m", run_dir / "copies")
             path = port.model_files(copy_key)[0]
-            # Read current, append an all-zero effect, write; fake drops it and reports dropped_zero.
+            await port.set_loads(
+                copy_key,
+                plan=_plan(store, path),
+                load_map=loads.load_map_file(_SYNTHETIC_MAP),
+                source=store,
+                readback_relative_tolerance_ratio=_TOLERANCE,
+                approved=True,
+            )
+            checked = await port.check_model(copy_key)
+            codes = _issue_codes(checked)
+            assert "READBACK_MISMATCH" in codes
+            data: Any = checked.data
+            assert any(
+                item["code"] == "READBACK_MISMATCH" and item["severity"] == Severity.ERROR.value for item in data["issues"]
+            )
+
+    anyio.run(body)
+
+
+def test_zero_effect_dropped_warning(tmp_path: Path) -> None:
+    """AC10: after a zero-dropped write, check_model returns LOAD_EFFECT_ZERO_DROPPED; unconfirmed map is info."""
+    from eng_harness.adapters.idea import _loads as loads
+
+    control = tmp_path / "control.json"
+    config = _idea_config(tmp_path, control)
+    original = make_ideacon(tmp_path / "joint.ideaCon")
+    run_dir = tmp_path / "run"
+    store = _store(tmp_path)
+
+    async def body() -> None:
+        async with ServerManager(config, run_dir) as manager:
+            port = _session(tmp_path, manager, files={"m": original}, store=store)
+            copy_key = await port.working_copy("m", run_dir / "copies")
+            path = port.model_files(copy_key)[0]
             got = await manager.call(
                 "idea",
                 "main",
@@ -293,7 +329,6 @@ def test_zero_effect_dropped_warning(tmp_path: Path) -> None:
                 "forcesPercentageOnSegments": [],
             }
             new_loads = [*(current["loads"]), zero_effect]
-            # Bump the first effect so the write is not all-zero.
             new_loads[0]["forcesOnSegments"][0]["n"] = 25000.0
             from eng_harness.adapters.idea._session_ops import new_out_path
             from eng_harness.adapters.idea._tools import build_native_set_loads_args
@@ -310,16 +345,79 @@ def test_zero_effect_dropped_warning(tmp_path: Path) -> None:
             body = reply_body(reply)
             assert body is not None
             assert "ZERO" in body.get("dropped_zero", [])
-            issues = checks.issues_from_set_loads_reply(body, connection="CON1")
-            assert any(
-                i.code == "LOAD_EFFECT_ZERO_DROPPED" and i.severity is Severity.WARNING and "ZERO" in i.message
-                for i in issues
+            read = await manager.call(
+                "idea",
+                "main",
+                "idea_native_get_loads",
+                {"path": str(out), "connection_id": "CON1"},
+                CallEffect.READ,
             )
-            # Shipped unconfirmed map yields LOADS_UNCONFIRMED_MAP info via check_model helpers.
-            info = checks.load_map_status_issue(loads.load_shipped_map(), connection="CON1")
-            assert info is not None
-            assert info.code == "LOADS_UNCONFIRMED_MAP"
-            assert info.severity is Severity.INFO
+            read_body = reply_body(read)
+            assert read_body is not None
+            kept = [effect for effect in new_loads if effect.get("name") != "ZERO"]
+            port.remember_set_loads(
+                copy_key,
+                requested=kept,
+                got=read_body["loads"],
+                dropped_zero=tuple(str(name) for name in body.get("dropped_zero") or []),
+                tolerance_ratio=_TOLERANCE,
+                connection="CON1",
+                load_map_status=loads.load_shipped_map().status,
+            )
+            port.rebind_to_out_path(copy_key, out)
+            checked = await port.check_model(copy_key)
+            codes = _issue_codes(checked)
+            assert "LOAD_EFFECT_ZERO_DROPPED" in codes
+            assert "LOADS_UNCONFIRMED_MAP" in codes
+            data: Any = checked.data
+            assert any(
+                item["code"] == "LOAD_EFFECT_ZERO_DROPPED"
+                and item["severity"] == Severity.WARNING.value
+                and "ZERO" in item["message"]
+                for item in data["issues"]
+            )
+            assert any(
+                item["code"] == "LOADS_UNCONFIRMED_MAP" and item["severity"] == Severity.INFO.value
+                for item in data["issues"]
+            )
+
+    anyio.run(body)
+
+
+def test_readback_unavailable_via_check_model(tmp_path: Path) -> None:
+    """AC10 / §4.10: check_model returns READBACK_UNAVAILABLE when tolerance or got is missing."""
+    control = tmp_path / "control.json"
+    config = _idea_config(tmp_path, control)
+    original = make_ideacon(tmp_path / "joint.ideaCon")
+    run_dir = tmp_path / "run"
+    store = _store(tmp_path)
+
+    async def body() -> None:
+        async with ServerManager(config, run_dir) as manager:
+            port = _session(tmp_path, manager, files={"m": original}, store=store)
+            copy_key = await port.working_copy("m", run_dir / "copies")
+            port.remember_set_loads(
+                copy_key,
+                requested=[{"name": "LE1", "forcesOnSegments": []}],
+                got=None,
+                dropped_zero=(),
+                tolerance_ratio=_TOLERANCE,
+                connection="CON1",
+                load_map_status="confirmed",
+            )
+            checked = await port.check_model(copy_key)
+            assert "READBACK_UNAVAILABLE" in _issue_codes(checked)
+            port.remember_set_loads(
+                copy_key,
+                requested=[{"name": "LE1", "forcesOnSegments": []}],
+                got=[{"name": "LE1", "forcesOnSegments": []}],
+                dropped_zero=(),
+                tolerance_ratio=None,
+                connection="CON1",
+                load_map_status="confirmed",
+            )
+            checked2 = await port.check_model(copy_key)
+            assert "READBACK_UNAVAILABLE" in _issue_codes(checked2)
 
     anyio.run(body)
 
@@ -336,20 +434,16 @@ def test_all_zero_loads_host_error(tmp_path: Path) -> None:
 
     async def body() -> None:
         async with ServerManager(config, run_dir) as manager:
-            port = _session(tmp_path, manager, files={"m": original})
+            port = _session(tmp_path, manager, files={"m": original}, store=store)
             copy_key = await port.working_copy("m", run_dir / "copies")
             path = port.model_files(copy_key)[0]
             before = list((run_dir).rglob("*.ideaCon"))
             with pytest.raises(ContractError) as caught:
-                await loads.set_loads(
-                    sessions=manager,
-                    server="idea",
-                    role="main",
+                await port.set_loads(
+                    copy_key,
                     plan=_plan(store, path, p_kn=0.0),
                     load_map=loads.load_map_file(_SYNTHETIC_MAP),
                     source=store,
-                    current_revision=lambda _: 1,
-                    run_dir=run_dir,
                     readback_relative_tolerance_ratio=_TOLERANCE,
                     approved=True,
                 )
@@ -358,7 +452,6 @@ def test_all_zero_loads_host_error(tmp_path: Path) -> None:
                 caught.value.detail.host_code == "idea_error"
             )
             after = list(run_dir.rglob("*.ideaCon"))
-            # No additional ideaCon beyond the working copy.
             assert len(after) == len(before)
 
     anyio.run(body)
