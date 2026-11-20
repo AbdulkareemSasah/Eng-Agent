@@ -215,7 +215,8 @@ the real ports of this adapter against the synthetic fake.
 ### 3.7 Mapping ETABS frames to Revit elements
 
 - AC27. Given the golden cases of §4.11 (one-to-one match, offset applied, ambiguous, unmatched on each side, link
-  hint and geometry in conflict, an upper end outside the tolerance, a distance exactly at the tolerance), then `harness.frame_element_map`
+  hint and geometry in conflict, an upper end outside the tolerance, a distance exactly at the tolerance, a matched
+  element absent from structure), then `harness.frame_element_map`
   returns the expected pairs and lists, and never pairs an element twice. Test:
   `tests/golden/test_calcs_golden.py::test_case[frame-element-map-*]`.
 - AC28. Given any permutation of the inputs, then the output is the same; given the same inputs twice, then the output
@@ -519,17 +520,18 @@ write that uses it (engine approvals).
 **Inputs.** `frames`: the ETABS columns the workflow selected (`model.frame_placements/1` with a list of ids; the calc
 does not classify frames, since `kind` is `other` from the CSI reader, 0002 H-G5, and the classification script embeds
 engineering thresholds, OQ-G14); `elements`: `model.frame_placements/1` from the Revit adapter; `structure`:
-`harness.revit_structure/1` (OQ-Q104 option (a); no other calc of this map uses a single shared parameter name for that
-kind — column update uses `revit`, readback uses `before` / `after` — so this input is named `structure`); optional
+`harness.revit_structure/1` (OQ-Q104 option (a)); optional
 `links`: a map `unique_id` to the string of the role `etabs_link`; `basis`.
 Basis fields (0003 §4.4 style): `compare.length_mm` (mm, ≥ 0; the position and elevation tolerance, already used by
 `placement_compare`), and **[added]** `mapping.offset_x_mm`, `mapping.offset_y_mm`, `mapping.offset_z_mm` (mm, signed, confirmed): the
 position of the ETABS global origin in Revit model coordinates; no default, no value in code, no rotation (Q6).
-After the geometric pairing of M1 to M6 on `frames` and `elements`, each matched pair takes `element_id` and `type_id`
-from the `ElementRow` of `structure` whose `unique_id` equals the elements `Frame.id` (the pair's `unique_id`). A matched
-element with no such row goes to `conflicts` (existing list of this section; reason code `ELEMENT_MISSING` from this
-spec A1). A matched element with more than one such row goes to `conflicts` (existing list; same style as M4; no new
-code).
+After the geometric pairing of M1 to M6 on `frames` and `elements`, the structure join applies only to pairs matched by
+M3/M5 (not to M4 conflicts): each matched pair takes `element_id` and `type_id` from the row of `structure` whose
+`unique_id` equals the `Frame.id` of `elements` (the pair's `unique_id`). A matched pair whose elements `Frame.id` has
+no row in `structure` is not in `pairs` and goes to `conflicts` with `unique_id` and `geometric_unique_id` both equal
+to that match's `unique_id`; this is the only `conflicts` row where the two ids are equal (an M4 row always has them
+different). Rows of `harness.revit_structure/1` are unique by `unique_id` (§4.5; the kind validator refuses duplicates),
+so there is at most one such row.
 
 **Method** (exact `Fraction` arithmetic as 0003 §4.11 P2). M1 translate each frame's ends by the offset and order the
 ends of every frame and element by elevation (lower, upper). M2 a frame and an element are *candidates* when the distance
@@ -537,15 +539,16 @@ between their lower ends and the distance between their upper ends are each with
 exactly one candidate each way gives `matched`; several give `ambiguous` with all candidates; none gives
 `unmatched_frames` or `unmatched_elements`. M4 if a link names the frame id and its element is not the geometric match,
 the pair goes to `conflicts` (the link is a hint from a possibly stale sync and never decides). M5 the `basis` of a pair
-is `geometry`, or `both` when a link agrees. M6 nothing is paired twice and every list is sorted. Level names are not
+is `geometry`, or `both` when a link agrees. M6 nothing is paired twice and every list is sorted (`pairs` by `frame_id`; `ambiguous` by (`side`, `id`); `unmatched_frames` by `frame_id`; `unmatched_elements` by `unique_id`; `conflicts` by (`frame_id`, `unique_id`)). Level names are not
 compared (Revit and ETABS names differ); the elevations are part of M2.
 
 **Output** `harness.frame_element_map/1`: `pairs`: `{frame_id, unique_id, element_id, type_id, basis, lower_distance_mm, upper_distance_mm}`
 (distances are display floats); `ambiguous`: `{side: "frame" | "element", id, candidates}` (M3; several geometric
 candidates each way; `candidates` length ≥ 2; placement_compare Ambiguous style); `unmatched_frames`: `{frame_id}`
 (M3); `unmatched_elements`: `{unique_id}` (M3); `conflicts`: `{frame_id, unique_id, geometric_unique_id}` (M4: `unique_id`
-is the link key and `geometric_unique_id` is the geometric match; when the row is a structure-join failure of a geometric
-match, both id fields are that match's `unique_id`); `complete`; and the `model_revision` of `frames`, `elements` and
+is the link key; for an M4 row whose frame has no unique geometric match (ambiguous or unmatched),
+`geometric_unique_id` is null; otherwise it is the geometric match; when the row is a structure-join failure of a
+geometric match, both id fields are that match's `unique_id`); `complete`; and the `model_revision` of `frames`, `elements` and
 `structure` in its provenance. Any change of either model or of `structure` makes it stale (`REF_STALE`). The map is
 kept in the harness; nothing is written to Revit (Q5).
 

@@ -231,7 +231,8 @@ tasks:
     title: Calc harness.frame_element_map and its kind, with golden cases
     # Amendment (B-467, documents only): the calc reads the basis field compare.length_mm (spec 0007 4.8 name).
     # Amendment (B-595, documents only, OQ-Q104): second input structure (harness.revit_structure/1) supplies
-    # element_id and type_id after geometric pairing; collateral PREFIXES, calc-kinds fixture and stale_ok files.
+    # element_id and type_id after geometric pairing; collateral PREFIXES, calc-kinds fixture and kind fixture
+    # (a missing stale_ok entry is treated as [] by the contract test).
     files:
       - "packages/eng-harness/pyproject.toml"  # public_modules entry for eng_harness.calcs, eng_harness.calcs.frame_element_map, eng_harness.kinds and more (amendment B-356)
       - "packages/eng-harness/CHANGELOG.md"
@@ -246,7 +247,6 @@ tasks:
       - "packages/eng-harness/tests/golden/test_calcs_golden.py"  # PREFIXES entry for frame stems (amendment B-595)
       - "packages/eng-harness/tests/contract/test_calc_kinds.py"  # CALC_KINDS equality for frame_element_map (amendment B-595)
       - "packages/eng-harness/tests/data/kinds/calcs/frame_element_map.json"  # kind fixture (amendment B-595)
-      - "packages/eng-harness/tests/data/calcs/stale_ok.json"  # harness.frame_element_map: [] (amendment B-595)
     max_changed_lines: 380
     max_sessions: 3
     tests_first:
