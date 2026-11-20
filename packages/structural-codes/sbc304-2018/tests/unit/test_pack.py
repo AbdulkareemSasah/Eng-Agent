@@ -2,7 +2,8 @@
 
 import ast
 import os
-from importlib import resources
+from dataclasses import replace
+from importlib import metadata, resources
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +14,17 @@ from structural_codes import evaluate
 from structural_codes.content_hash import lint_scope_violations
 from structural_codes.errors import CheckNotUsable
 from structural_codes.lifecycle import resolve_state
-from structural_codes.pack import Registry
+from structural_codes.meta import clause_token
+from structural_codes.overlay import Inherited, Overlay
+from structural_codes.pack import ENTRY_POINT_GROUP, Registry
 
 import sbc304_2018
 from sbc304_2018 import PACK, check_id_for
+
+# Synthetic Inherited fixtures (spec 0003 AC8 / §4.2); no engineering meaning — only to exercise check_id_for.
+_SYNTHETIC_CLAUSE = "Synthetic fixture"
+_SYNTHETIC_BASE = "aci318_14.10_6_1_1.longitudinal_reinforcement_limits"
+_SYNTHETIC_BASE_MULTI = "aci318_14.13_2_7_1.flexure_at_column_face"
 
 _CLAUSES = Path(__file__).parents[3] / "docs" / "clauses"
 _MODULES = ["src/sbc304_2018/**/*.py"]
@@ -52,10 +60,67 @@ def test_check_id_for() -> None:
     """Every base check id maps to its provisional overlay id; an unknown id is NOT_FOUND (AC9)."""
     for base_id, overlay_id in _BASE_TO_OVERLAY.items():
         assert check_id_for(base_id) == overlay_id
+    missing = "aci318_14.missing.check"
     with pytest.raises(ContractError) as caught:
-        check_id_for("aci318_14.missing.check")
+        check_id_for(missing)
     assert caught.value.detail.code == ErrorCode.NOT_FOUND
     assert caught.value.detail.field == "base_check_id"
+    assert caught.value.detail.message == f"no overlay check for base check id {missing!r}"
+
+
+def test_check_id_for_inherited_short_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inherited with an explicit short_name builds ``<pack>.<clause_token>.<short_name>`` (spec §4.2 / AC9)."""
+    short = "custom_short"
+    overlay = Overlay(
+        base="aci318_14",
+        clause_map={_SYNTHETIC_CLAUSE: "10.6.1.1"},
+        entries=(Inherited(_SYNTHETIC_BASE, _SYNTHETIC_CLAUSE, short_name=short),),
+    )
+    monkeypatch.setattr(sbc304_2018, "PACK", replace(PACK, overlay=overlay, checks=()))
+    assert check_id_for(_SYNTHETIC_BASE) == f"{PACK.name}.{clause_token(_SYNTHETIC_CLAUSE)}.{short}"
+
+
+def test_check_id_for_inherited_default_short_name(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Inherited with short_name None takes the base id's last segment via rpartition (spec §4.2 / AC9)."""
+    overlay = Overlay(
+        base="aci318_14",
+        clause_map={_SYNTHETIC_CLAUSE: "13.2.7.1"},
+        entries=(Inherited(_SYNTHETIC_BASE_MULTI, _SYNTHETIC_CLAUSE),),
+    )
+    monkeypatch.setattr(sbc304_2018, "PACK", replace(PACK, overlay=overlay, checks=()))
+    _, _, short = _SYNTHETIC_BASE_MULTI.rpartition(".")
+    assert short == "flexure_at_column_face"
+    assert check_id_for(_SYNTHETIC_BASE_MULTI) == f"{PACK.name}.{clause_token(_SYNTHETIC_CLAUSE)}.{short}"
+
+
+def test_check_id_for_inherited_unknown_still_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An Inherited entry for another base id must not satisfy an unknown lookup (AC9)."""
+    overlay = Overlay(
+        base="aci318_14",
+        clause_map={_SYNTHETIC_CLAUSE: "10.6.1.1"},
+        entries=(Inherited(_SYNTHETIC_BASE, _SYNTHETIC_CLAUSE),),
+    )
+    monkeypatch.setattr(sbc304_2018, "PACK", replace(PACK, overlay=overlay, checks=()))
+    missing = "aci318_14.missing.check"
+    with pytest.raises(ContractError) as caught:
+        check_id_for(missing)
+    assert caught.value.detail.code == ErrorCode.NOT_FOUND
+    assert caught.value.detail.field == "base_check_id"
+    assert caught.value.detail.message == f"no overlay check for base check id {missing!r}"
+
+
+def test_pack_fields_and_entry_point() -> None:
+    """PACK identity, approvals resource name, base and the structural_codes.packs entry point (AC12)."""
+    assert PACK.name == "sbc304_2018"
+    assert PACK.code == "SBC 304-2018"
+    assert PACK.edition == "2018"
+    assert PACK.version == sbc304_2018.__version__ == "0.1.0.dev0"
+    assert PACK.base == "aci318_14"
+    assert PACK.approvals == "approvals.yaml"
+    assert PACK.overlay is not None
+    assert PACK.overlay.base == "aci318_14"
+    loaded = next(ep for ep in metadata.entry_points(group=ENTRY_POINT_GROUP) if ep.name == "sbc304_2018").load()
+    assert loaded is PACK
 
 
 def test_registry_and_specs() -> None:
@@ -69,6 +134,7 @@ def test_registry_and_specs() -> None:
     assert pack is PACK
     assert pack.base == "aci318_14"
     assert (pack.code, pack.edition, pack.version) == ("SBC 304-2018", "2018", sbc304_2018.__version__)
+    assert pack.approvals == "approvals.yaml"
     assert [c.meta.check_id for c in registry.checks if c.meta.pack == "sbc304_2018"] == _IDS
     assert len({c.meta.check_id for c in registry.checks if c.meta.pack == "sbc304_2018"}) == len(_IDS)
     if not _CLAUSES.is_dir() and "MUTANT_UNDER_TEST" in os.environ:
