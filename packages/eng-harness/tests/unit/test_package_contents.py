@@ -49,6 +49,15 @@ def _built_wheel_names(tmp_path: Path) -> list[str]:
     return names
 
 
+def test_revit_fake_not_shipped(tmp_path: Path) -> None:
+    """AC30: the synthetic Revit fake under tests/ is never part of the built wheel."""
+    fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_revit"
+    assert (fake / "server.py").is_file()
+    assert (fake / "schemas.json").is_file()
+    names = _built_wheel_names(tmp_path)
+    assert not [n for n in names if {"tests", "fakes", "sasaah_revit"} & set(n.split("/"))]
+
+
 def test_idea_fake_not_shipped(tmp_path: Path) -> None:
     fake = PACKAGE_ROOT / "tests" / "fakes" / "sasaah_idea"
     assert (fake / "server.py").is_file()
