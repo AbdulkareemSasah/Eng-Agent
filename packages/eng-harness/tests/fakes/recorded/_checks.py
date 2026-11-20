@@ -41,6 +41,17 @@ def committed_recordings(root: Path = RECORDINGS) -> list[Path]:
     return sorted(manifest.parent for manifest in root.glob("*/manifest.json"))
 
 
+def applicable_recordings(product: str, root: Path = RECORDINGS) -> list[Path]:
+    """Committed recordings whose tool fingerprint is that of `product` (spec 0008 AC28, amendment B-573)."""
+    fingerprint = csi_allowlist().for_product(product).tool_fingerprint
+    found: list[Path] = []
+    for path in committed_recordings(root):
+        manifest = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+        if manifest.get("tool_fingerprint") == fingerprint:
+            found.append(path)
+    return found
+
+
 def shape(value: object) -> object:
     """The structure of a JSON value: object keys, the shape of the first item of a list, the kind of a scalar."""
     if isinstance(value, dict):
@@ -82,10 +93,10 @@ def _body(result: dict[str, Any]) -> Any:
         return None
 
 
-def fidelity_problems(host: RecordedHost, run_dir: Path) -> list[str]:
-    """Replay the recorded requests on a fresh synthetic fake and compare reply shape and error codes (AC34)."""
+def fidelity_problems(host: RecordedHost, run_dir: Path, *, product: str = "ETABS") -> list[str]:
+    """Replay the recorded requests on a fresh synthetic fake and compare reply shape and error codes (AC34 / AC28)."""
     problems: list[str] = []
-    for exchange, answer in replay_on_fake(host, run_dir):
+    for exchange, answer in replay_on_fake(host, run_dir, product=product):
         label = f"{exchange.seq} {exchange.tool}"
         if exchange.result is None:
             continue  # a JSON-RPC error has no reply to compare
@@ -110,9 +121,11 @@ def _store(workspace: Path) -> tuple[ResultStore, FixedClock, SeededIdSource]:
     return store, clock, ids
 
 
-def _call_problems(exchange: Exchange, store: ResultStore, clock: FixedClock, ids: SeededIdSource) -> list[str]:
+def _call_problems(
+    exchange: Exchange, store: ResultStore, clock: FixedClock, ids: SeededIdSource, *, product: str
+) -> list[str]:
     label = f"{exchange.seq} {exchange.tool}"
-    allowlist = csi_allowlist().for_product("ETABS")
+    allowlist = csi_allowlist().for_product(product)
     if exchange.tool not in allowlist.tool_names:
         return [f"{label}: not an allowlisted tool"]
     if exchange.result is None:
@@ -132,7 +145,7 @@ def _call_problems(exchange: Exchange, store: ResultStore, clock: FixedClock, id
         reader = READERS.get(exchange.tool)
         if reader is None:
             return []
-        binding = Binding(target=HostTarget(product="ETABS", pid=1), units_system=TOKENS.get(exchange.tool))
+        binding = Binding(target=HostTarget(product=product, pid=1), units_system=TOKENS.get(exchange.tool))
         payload, summary = reader(body, binding)
         envelope = make_envelope(
             store, tool=f"csi/{exchange.tool}", kind=str(allowlist.descriptor(exchange.tool).result_kind),
@@ -144,7 +157,7 @@ def _call_problems(exchange: Exchange, store: ResultStore, clock: FixedClock, id
     return [] if isinstance(envelope, SuccessEnvelope) else [f"{label}: no success envelope"]
 
 
-def _state_problems(host: RecordedHost) -> list[str]:
+def _state_problems(host: RecordedHost, *, product: str) -> list[str]:
     """Run the adapter's model-state read over the recording when it holds the read of `csi_model_info`."""
     first = next((e for e in host.calls if e.tool == "csi_model_info" and e.result is not None), None)
     if first is None:
@@ -152,7 +165,16 @@ def _state_problems(host: RecordedHost) -> list[str]:
     pid = first.arguments["target"]["pid"]
     path = (_body(first.result or {}) or {}).get("model_path")
     replay = RecordedHost(host.directory)
-    reader = CsiStateReader(product="ETABS", call=replay.host_call)
+    # SAFE tables: SafeStateReader (0008 T5). Others without joint_loads: CsiStateReader.
+    from eng_harness.adapters.csi.products import profile
+
+    tables = profile(product).tables
+    if "joint_loads" in tables:
+        from eng_harness.adapters.csi.products._safe_state import SafeStateReader
+
+        reader: Any = SafeStateReader(product=product, call=replay.host_call)
+    else:
+        reader = CsiStateReader(product=product, call=replay.host_call)
     try:
         anyio.run(reader.read, pid, Path(path) if isinstance(path, str) else None)
     except (AssertionError, ContractError) as error:
@@ -160,9 +182,9 @@ def _state_problems(host: RecordedHost) -> list[str]:
     return []
 
 
-def adapter_problems(host: RecordedHost, workspace: Path) -> list[str]:
-    """The adapter on a recording (AC34): the tool-list fingerprint, every recorded reply, the model-state read."""
-    allowlist = csi_allowlist().for_product("ETABS")
+def adapter_problems(host: RecordedHost, workspace: Path, *, product: str = "ETABS") -> list[str]:
+    """Adapter on a recording (AC34 / AC28): tool-list fingerprint, replies, model-state read."""
+    allowlist = csi_allowlist().for_product(product)
     listed = {n: s for n, s in host.tool_schemas.items() if n in allowlist.tool_names}
     problems: list[str] = []
     if host.manifest["tool_fingerprint"] != tool_list_fingerprint(listed):
@@ -171,5 +193,5 @@ def adapter_problems(host: RecordedHost, workspace: Path) -> list[str]:
         problems.append("the recorded tool fingerprint is not the allowlist's")
     store, clock, ids = _store(workspace)
     for exchange in host.calls:
-        problems += _call_problems(exchange, store, clock, ids)
-    return problems + _state_problems(host)
+        problems += _call_problems(exchange, store, clock, ids, product=product)
+    return problems + _state_problems(host, product=product)

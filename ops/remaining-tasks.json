@@ -655,14 +655,13 @@
    "branch": "docs/b431-harness-it17b-local-testing-list-and-the-a",
    "prTitle": "docs(eng-harness): local testing list and the agent rule in the package AGENTS.md (B-431)",
    "risk": "r3",
-   "pending_deps": [
-    "I.T17"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 497
   },
   {
    "id": "B-432",
@@ -1210,7 +1209,8 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 476
   },
   {
    "id": "B-285",
@@ -1981,9 +1981,7 @@
    "branch": "feat/b401-harness-xt10-safe-reaction-calcs",
    "prTitle": "feat(eng-harness): calcs harness.reactions_to_joint_loads and harness.safe_equilibrium (B-401)",
    "risk": "r1, r2, r3",
-   "pending_deps": [
-    "F.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, high",
    "reviewer": "opus, medium",
    "verifier_lenses": [
@@ -2175,14 +2173,13 @@
    "branch": "feat/b216-harness-ft7-safe-analysis-on-the",
    "prTitle": "feat(eng-harness): sAFE analysis on the long role, soil pressure, base reaction and joint reaction readers, design gaps (B-216)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T6"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 498
   },
   {
    "id": "B-217",
@@ -2194,14 +2191,13 @@
    "branch": "feat/b217-harness-ft8-recordings-contract-tests-for",
    "prTitle": "feat(eng-harness): recordings contract tests for SAFE, end-to-end cycle and crash matrix, local-testing list (B-217)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "F.T7"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 504
   },
   {
    "id": "B-230",
@@ -2285,14 +2281,13 @@
    "branch": "feat/b234-harness-rt5-reply-parsing-error-and",
    "prTitle": "feat(eng-harness): reply parsing, error and timeout mapping, units from specification identifiers (B-234)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 491
   },
   {
    "id": "B-235",
@@ -2304,14 +2299,13 @@
    "branch": "feat/b235-harness-rt6-revit-kinds-and-the",
    "prTitle": "feat(eng-harness): revit kinds and the parameter role map (B-235)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T5"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 501
   },
   {
    "id": "B-236",
@@ -2426,7 +2420,10 @@
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "BLOCKED on owner question OQ-Q104 (element ids source)"
+   ]
   },
   {
    "id": "B-242",
@@ -2457,14 +2454,13 @@
    "branch": "feat/b243-harness-rt14-doctor-checks-for-the",
    "prTitle": "feat(eng-harness): doctor checks for the Revit server (B-243)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "R.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 494
   },
   {
    "id": "B-244",
@@ -2535,16 +2531,13 @@
    "branch": "feat/b247-harness-at3-session-operations-for-sdb",
    "prTitle": "feat(eng-harness): session operations for .SDB, SAP2000 gap entries and product isolation (B-247)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T1",
-    "A.T2",
-    "F.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 486
   },
   {
    "id": "B-248",
@@ -2556,15 +2549,13 @@
    "branch": "feat/b248-harness-at4-table-data-all-unknown",
    "prTitle": "feat(eng-harness): table data (all unknown), model-state reader with declared absences, fingerprint (B-248)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "A.T3",
-    "F.T4"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 503
   },
   {
    "id": "B-249",
@@ -2690,14 +2681,13 @@
    "branch": "feat/b303-harness-ht4-error-mapping-timeouts-and",
    "prTitle": "feat(eng-harness): error mapping, timeouts and licensing outcomes (B-303)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 490
   },
   {
    "id": "B-304",
@@ -2709,14 +2699,13 @@
    "branch": "feat/b304-harness-ht5-replies-stub-guard-harness",
    "prTitle": "feat(eng-harness): replies, stub guard, harness kinds and the host-verdict mapping (B-304)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T3"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 492
   },
   {
    "id": "B-305",
@@ -2728,15 +2717,13 @@
    "branch": "feat/b305-harness-ht6-working-copy-route-preconditions",
    "prTitle": "feat(eng-harness): working copy, route preconditions, HostPort methods and gap entries (B-305)",
    "risk": "r1, r3",
-   "pending_deps": [
-    "H.T4",
-    "H.T5"
-   ],
+   "pending_deps": [],
    "writer": "sonnet, medium",
    "reviewer": "opus, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "merged_pr": 502
   },
   {
    "id": "B-306",
@@ -3245,7 +3232,10 @@
    "reviewer": "sonnet, medium",
    "verifier_lenses": [],
    "open_pr": null,
-   "branch_pushed": false
+   "branch_pushed": false,
+   "lead_notes": [
+    "BLOCKED on owner question OQ-Q101 (invariant-7 save order)"
+   ]
   },
   {
    "id": "B-528",
