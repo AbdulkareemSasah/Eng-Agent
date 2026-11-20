@@ -35,6 +35,8 @@ __all__ = [
     "SetElementParameterValuesArgs",
     "SetParameterValueByGuidArgs",
     "SetTypeParameterValuesArgs",
+    "build_change_element_type_args",
+    "build_duplicate_family_type_args",
     "build_set_element_parameter_values_args",
     "build_set_parameter_value_by_guid_args",
     "build_set_type_parameter_values_args",
@@ -325,3 +327,34 @@ def build_set_parameter_value_by_guid_args(
     if model.unit is not None:
         sent["unit"] = model.unit
     return sent
+
+
+def build_duplicate_family_type_args(
+    *,
+    source_type_id: str | int,
+    new_type_name: str,
+) -> dict[str, JsonValue]:
+    """Host arguments for `revit_duplicate_family_type` without overrides (AC16)."""
+    if not new_type_name:
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, "new_type_name is required", field="new_type_name")
+    model = DuplicateFamilyTypeArgs(
+        source_type_id=str(source_type_id),
+        new_type_name=new_type_name,
+        type_parameter_overrides=None,
+    )
+    return {
+        "source_type_id": model.source_type_id,
+        "new_type_name": model.new_type_name,
+    }
+
+
+def build_change_element_type_args(
+    *,
+    element_ids: Sequence[int],
+    type_id: int,
+) -> dict[str, JsonValue]:
+    """Host arguments for `revit_change_element_type` (AC14)."""
+    if not element_ids:
+        raise ContractError(ErrorCode.INVALID_ARGUMENT, "elementIds must be non-empty", field="elementIds")
+    model = ChangeElementTypeArgs(element_ids=list(element_ids), type_id=type_id)
+    return {"elementIds": list(model.element_ids), "typeId": model.type_id}
