@@ -183,9 +183,10 @@ def test_working_copy(tmp_path: Path) -> None:
         assert resolved.derived_from is not None
         opens = [c for c in _calls(control) if c.get("tool") == "revit_open_model"]
         assert len(opens) == 1
-        assert opens[0]["path"] == str(copies[0])
-        assert opens[0].get("activate", True) is True
-        assert "allow_discard_unsaved_changes" not in opens[0] or opens[0]["allow_discard_unsaved_changes"] is False
+        args = opens[0]["args"]
+        assert args["path"] == str(copies[0])
+        assert args.get("activate", True) is True
+        assert "allow_discard_unsaved_changes" not in args or args["allow_discard_unsaved_changes"] is False
         held = await port.locate(copy_key)
         assert held is not None
         assert held.pid is None
@@ -213,9 +214,7 @@ def test_workshared_refused(tmp_path: Path) -> None:
         assert caught.value.detail.code is ErrorCode.PRECONDITION_FAILED
         assert caught.value.detail.precondition is Precondition.model_open
         writes = [
-            c
-            for c in _calls(control)
-            if isinstance(c.get("tool"), str) and str(c["tool"]).startswith("revit_set")
+            c for c in _calls(control) if isinstance(c.get("tool"), str) and str(c["tool"]).startswith("revit_set")
         ]
         assert writes == []
 
