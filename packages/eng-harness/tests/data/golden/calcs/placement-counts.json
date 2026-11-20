@@ -84,6 +84,7 @@
       "refs": {
         "a_frames": {
           "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
           "kind": "model.frame_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -93,6 +94,7 @@
         },
         "b_frames": {
           "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
           "kind": "model.frame_placements/1",
           "complete": true,
           "model_id": "mdl_00000000000000000000000000",
@@ -102,6 +104,7 @@
         },
         "basis": {
           "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
           "kind": "basis.design_basis/1",
           "complete": true,
           "model_id": null,

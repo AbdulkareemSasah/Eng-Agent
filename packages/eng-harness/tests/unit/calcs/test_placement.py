@@ -31,8 +31,10 @@ def _basis(length: float = 1.0) -> dict[str, Any]:
 
 
 def _ref(n: int, kind: str, *, revision: int | None = 3, complete: bool = True) -> dict[str, Any]:
+    result_id = f"res_{n:026d}"
     return {
-        "result_id": f"res_{n:026d}",
+        "result_id": result_id,
+        "ref": result_id,
         "kind": kind,
         "complete": complete,
         "model_id": None if revision is None else MDL,
