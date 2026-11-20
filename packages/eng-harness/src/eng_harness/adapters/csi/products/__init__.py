@@ -10,7 +10,7 @@ from pathlib import PureWindowsPath
 
 from eng_contract.errors import ContractError, ErrorCode
 
-from eng_harness.adapters.csi.products import _etabs
+from eng_harness.adapters.csi.products import _etabs, _safe, _sap2000
 
 __all__ = ["ProductProfile", "product_of_model", "profile"]
 
@@ -27,9 +27,12 @@ class ProductProfile:
 
 
 _ETABS = ProductProfile("ETABS", _etabs.MODEL_EXTENSIONS, _etabs.TABLES, _etabs.READBACK)
-# `.FDB` is the extension the Sasaah footing tool opens live (spec 0008 4.1); the readers come with later tasks.
-_SAFE = ProductProfile("SAFE", (".FDB",), {}, {})
-_PROFILES = {item.name: item for item in (_ETABS, _SAFE)}
+# Companion globs stay empty until each product's local test L2 (spec 0008 4.1, spec 0012 4.3).
+_SAFE = ProductProfile("SAFE", _safe.MODEL_EXTENSIONS, _safe.TABLES, _safe.READBACK, _safe.COMPANION_GLOBS)
+_SAP2000 = ProductProfile(
+    "SAP2000", _sap2000.MODEL_EXTENSIONS, _sap2000.TABLES, _sap2000.READBACK, _sap2000.COMPANION_GLOBS
+)
+_PROFILES = {item.name: item for item in (_ETABS, _SAFE, _SAP2000)}
 
 
 def profile(name: str) -> ProductProfile:
