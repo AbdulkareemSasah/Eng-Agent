@@ -1,6 +1,6 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M2",
+  "method_ref": "§4.9 M2",
   "synthetic": true,
   "derivation": "compare.length_mm = 10 mm. Subject J1 at (0, 0); SAFE point P1 at (10, 0, 0). Plan distance squared = 10^2 + 0^2 = 100; tolerance squared = 100; 100 <= 100 so M2 matches (boundary inclusive). Reaction DEAD FZ=50 kN only. Load FZ = -50 kN on P1. Chosen S1=1.0*DEAD; SAFE already has S1 with the same items, so combinations_to_add is empty.",
   "input": {
@@ -165,6 +165,8 @@
         "punch_y_mm": null
       }
     ],
-    "combinations_to_add": []
+    "combinations_to_add": [],
+    "status": "OK",
+    "reason": null
   }
 }

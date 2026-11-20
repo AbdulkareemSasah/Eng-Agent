@@ -1,6 +1,6 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M2 M3 M1",
+  "method_ref": "§4.9 M2 M3 M1",
   "synthetic": true,
   "derivation": "Tolerance compare.length_mm = 10 mm. Subject J1 at (1000, 2000) mm; SAFE point P1 at (1000, 2000, 0) mm. Plan distance squared = 0 <= 10^2, so M2 matches J1 to P1. ETABS reaction on J1 for pattern DEAD: FX=10 kN, FY=-20 kN, FZ=100 kN, MX=1 kN.m, MY=-2 kN.m, MZ=3 kN.m. M3 (action and reaction, BP section 4.1 / spec 0010 4.9): loads are the negatives: FX=-10, FY=20, FZ=-100, MX=-1, MY=2, MZ=-3; punch_x_mm and punch_y_mm are null (SG-7). Chosen combination S1 = 1.0*DEAD (M1). SAFE load set has pattern DEAD (self_weight_ratio=0) and no combination S1, so combinations_to_add is the ETABS S1 with its items and scales (source model:).",
   "input": {
@@ -165,6 +165,8 @@
           }
         ]
       }
-    ]
+    ],
+    "status": "OK",
+    "reason": null
   }
 }

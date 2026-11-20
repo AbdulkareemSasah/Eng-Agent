@@ -253,11 +253,17 @@ class JointLoadRow(_P):
 
 
 class ReactionsToJointLoads(CalcPayload):
-    """Result of `harness.reactions_to_joint_loads` (spec 0010 4.9): loads plus combinations to add."""
+    """Result of `harness.reactions_to_joint_loads` (spec 0010 4.9): loads plus combinations to add.
+
+    `status` / `reason` carry engineering outcomes of §4.9 (M2 unmatched, M4 missing pattern, step-2 combo
+    conflict) as payload statuses per spec 0003 §4.2; `OK` has `reason` null.
+    """
 
     axes: Literal["global"] = "global"
     loads: list[JointLoadRow]
     combinations_to_add: list[Combination]
+    status: _Str
+    reason: _Str | None
 
 
 FOOTING_KINDS: dict[str, type[BaseModel]] = {

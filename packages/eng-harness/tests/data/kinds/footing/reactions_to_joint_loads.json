@@ -27,7 +27,11 @@
       "type": "linear_add",
       "items": [
         {
-          "case": {"case": "DEAD", "case_type": "load_pattern", "step": null},
+          "case": {
+            "case": "DEAD",
+            "case_type": "load_pattern",
+            "step": null
+          },
           "scale_ratio": 1.0
         }
       ]
@@ -41,5 +45,7 @@
     "inputs": [],
     "outputs": [],
     "steps": []
-  }
+  },
+  "status": "OK",
+  "reason": null
 }

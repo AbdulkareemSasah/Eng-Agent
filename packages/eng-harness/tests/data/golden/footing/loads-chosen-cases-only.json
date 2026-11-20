@@ -1,6 +1,6 @@
 {
   "source": "eng-harness spec 0010 section 4.9, synthetic fixture",
-  "method_ref": "\u00a74.9 M1",
+  "method_ref": "§4.9 M1",
   "synthetic": true,
   "derivation": "ETABS has S1=1.0*DEAD and U1=1.0*LIVE; reactions exist for both. Engineer cases = [S1] only. M1: transferred patterns are the load_pattern items of the chosen combinations = {DEAD}. Only the DEAD reaction is negated onto P1. LIVE is not transferred. SAFE has DEAD and S1 already matching; combinations_to_add empty.",
   "input": {
@@ -203,6 +203,8 @@
         "punch_y_mm": null
       }
     ],
-    "combinations_to_add": []
+    "combinations_to_add": [],
+    "status": "OK",
+    "reason": null
   }
 }
