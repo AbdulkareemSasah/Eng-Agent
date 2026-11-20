@@ -747,7 +747,7 @@ Every task is test-first: its first commit is `test:` with the tests in `tests_f
 any public module to `[tool.eng-gate] public_modules`. Workflow tests start the synthetic fakes through the harness's
 own launcher (POSIX in Linux CI); `tests/windows/` runs in the Windows CI job. Each adapter task extends the synthetic
 CSI fake (`tests/fakes/sasaah_csi/`, test code) with the behaviour of the tools it adds (spec §4.8.3); the tasks that
-share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a) are serialized by `depends_on` (B-413). Tasks that share a source file are
+share it (T6b, T10, T11, T11b, T12, T12b, T13, T14, T19a; plan 0012 T3 may only record product on csi_launch and confirm on csi_open_model, B-586) are serialized by `depends_on` (B-413). Tasks that share a source file are
 serialized by `depends_on`: `_session.py` (T5, T6b, T7, T20; plan 0014 T3 after them, B-584), `doctor.py` and `test_doctor.py` (T18, T22; B-541), `_toolport.py` (T8b, T9, T12, T14, T16, T19a; T16 and
 T19a are not ordered, so whichever lands second adapts to the other in its own task, B-503; plan 0007 T13b adds a
 no-op hook and is not ordered with T16 either, B-569), `_hostport.py` (T10, T11b,
@@ -758,9 +758,10 @@ whichever lands second adapts, B-569) and
 `test_build_ports.py` (T19a, T19b; B-475; plan 0008 T1 also edits `build_ports` after T19a: whichever of T19b and 0008 T1 lands second
 adapts to the other in its own task), `csi/_tools.py` (T12, T12b, T13, T15, T23; plan 0007 T5 and T13, B-503: T15 and
 those two are not ordered, and T15 and T23 are not ordered, B-543, so whichever lands second adapts; plan 0007 T13b
-after T13 and T23, not ordered with T15, B-569),
+after T13 and T23, not ordered with T15, B-569; plan 0008 T6 and T7 after them, B-588: T7 may only merge the SAFE
+result-reader tokens, argument models and readers),
 `_allowlist.toml` (T12, T13, T15), `_state.py` and `test_csi_state.py` (T11b, T12), `products/_etabs.py` (T11, T12,
-T12b, T13), `products/__init__.py` (T11, T12b), `_replies.py` (T11, T13, T21) and
+T12b, T13), `products/__init__.py` (T11, T12b; plan 0012 T3 for the gap and step-gap registry fields only, B-586), `_replies.py` (T11, T13, T21) and
 `test_csi_replies.py` (T11, T13), `test_toolport.py` (T8b, T12), `servers/__init__.py` (T1, T5, T22; T17 is not ordered with T22, so whichever lands second adapts, B-541), `servers/_config.py` and `test_config.py` (T1, T6, T20, T22; B-541),
 `_allowlist.py` (T6, T6b, T20) and `test_allowlist.py` (T6, T20) (B-465). `_kinds.py` is shared by T21 and every
 later task of another plan that adds kinds to `HARNESS_KINDS` (plan 0008 T4, T5, T7 and T9, plan 0013 T2; B-503): none
@@ -1145,6 +1146,18 @@ failure envelopes; `test_visible_launch` checks the fake's recorded `visible` fl
   (`BuildExpectation.status_tool`, default `csi_status`; IDEA `idea_status`) instead of the hardcoded `csi_status`, and
   names that tool in the error message; required for IDEA AC3 workflow stops (`test_idea_script_enabled_stops_run`,
   `test_idea_listed_run_script_stops_run`). Recorded in this plan's `_session.py` serialization above.
+- External amendment (B-586, from plan 0012 T3 / the B-247 writer): plan 0012 T3 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/products/__init__.py` so `ProductProfile` carries the gap and
+  step-gap registries (`profile(product).step_gaps`), and may amend `tests/fakes/sasaah_csi/server.py` only to record
+  `product` on `csi_launch` and `confirm` on `csi_open_model` (test only); required for spec 0008 AC2
+  (`test_no_product_branches_in_shared`) and optional launch/open call-log asserts. Recorded in this plan's
+  `products/__init__.py` and fake serialization above. Plan 0008 records the matching external amendment for
+  `products/_safe.py` and `products/__init__.py`.
+- External amendment (B-588, from plan 0008 T7 / the B-216 writer): plan 0008 T7 amends
+  `packages/eng-harness/src/eng_harness/adapters/csi/_tools.py` so it may only merge the SAFE result-reader tokens,
+  argument models and readers from `products/_safe_results.py` into the shared registries (`TOKENS`, `ANALYSIS_MODELS`,
+  `READERS`; the T6 pattern for `_safe_loads`); required for SAFE AC23 (base and joint reactions through the CSI tool
+  port / `tool_allowlist()`). Recorded in this plan's `csi/_tools.py` serialization above.
 - First live run (amendment B-475, lead decision D-32: the edit cycle of spec 0007 on a copy of a real ETABS model
   comes first). T16, T17 and T19b are off its path, and so are plan 0008 T1 to T3; none is deleted or weakened. Each
   returns before the first task that depends on it: T16, then T19b, with the first workflow that names a command-line

@@ -73,8 +73,10 @@ def _meta(
     refs = {}
     for n, name in enumerate(fields, start=1):
         model_id, revision = (model or {}).get(name, (MDL, 3))
+        result_id = f"res_0000000000000000000000000{n}"
         refs[name] = {
-            "result_id": f"res_0000000000000000000000000{n}",
+            "result_id": result_id,
+            "ref": result_id,
             "kind": KINDS[name],
             "complete": flags.get(name, True),
             "model_id": model_id,
