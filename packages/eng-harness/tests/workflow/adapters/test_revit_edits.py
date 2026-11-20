@@ -46,7 +46,7 @@ def test_edit_mapping(
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
 
-    async def body(manager: ServerManager) -> None:
+    async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
         sent: list[tuple[str, dict[str, Any]]] = []
 
@@ -295,7 +295,7 @@ def test_shared_type_refused(tmp_path: Path) -> None:
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control, seed=helpers.seed_model(elements=elements, types=types))
 
-    async def body(manager: ServerManager) -> None:
+    async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
         writes: list[str] = []
 
@@ -365,7 +365,7 @@ def test_duplicate_no_overrides(tmp_path: Path) -> None:
     control = tmp_path / "control.json"
     config = helpers.revit_config(tmp_path, control)
 
-    async def body(manager: ServerManager) -> None:
+    async def body(manager: ServerManager, launcher: helpers.RecordingLauncher) -> None:
         ledger = WriteLedger(tmp_path / "run")
         writes: list[str] = []
 

@@ -12,6 +12,7 @@ from typing import Any
 
 import anyio
 
+from eng_harness.adapters._args import HostTarget
 from eng_harness.adapters.revit import revit_allowlist
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig
 from eng_harness.servers._buildcheck import BuildExpectation
@@ -168,14 +169,32 @@ def revit_config(
     return ServersConfig(servers={"revit": section})
 
 
-def run_scenario(tmp_path: Path, config: ServersConfig, body: Callable[[ServerManager], Any]) -> None:
+def run_scenario(
+    tmp_path: Path,
+    config: ServersConfig,
+    body: Callable[[ServerManager, RecordingLauncher], Any],
+) -> None:
     check = {"revit/read": expectation("read"), "revit/write": expectation("write")}
+    launcher = RecordingLauncher()
 
     async def scenario() -> None:
-        async with ServerManager(config, tmp_path / "run", launcher=RecordingLauncher(), check=check) as manager:
-            await body(manager)
+        async with ServerManager(config, tmp_path / "run", launcher=launcher, check=check) as manager:
+            await body(manager, launcher)
 
     anyio.run(scenario)
+
+
+def bound_target(launcher: RecordingLauncher) -> HostTarget:
+    """HostTarget for the launched MCP process (Binding.target / HostTarget.pid; never invent a pid)."""
+    if not launcher.started:
+        raise AssertionError("no MCP process launched yet; warm a role before building the bound target")
+    return HostTarget(product="revit", pid=launcher.started[0].pid)
+
+
+async def warm_bound_target(manager: ServerManager, launcher: RecordingLauncher) -> HostTarget:
+    """Start the read role and return its HostTarget (spec 0002 §4.5.2 bound instance pid)."""
+    await call_dump(manager, "revit_get_model_metadata", {}, CallEffect.READ, role="read")
+    return bound_target(launcher)
 
 
 async def call_dump(
