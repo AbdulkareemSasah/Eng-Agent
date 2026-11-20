@@ -19,6 +19,7 @@ from typing import Any
 
 from eng_contract.envelope import LiteralInput, RefInput
 from eng_contract.errors import ContractError, ErrorCode
+from eng_contract.issues import ModelIssue
 from eng_contract.refs import RecordSource, Ref, RefRule, resolve_ref
 from eng_contract.units import convert
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -124,13 +125,14 @@ class LoadMap:
 
 @dataclass(frozen=True, slots=True)
 class SetLoadsResult:
-    """Outcome of a successful `set_loads` write (new file path and host reply fields)."""
+    """Outcome of a successful `set_loads` write (new file path, host reply fields, read-back issues)."""
 
     out_path: Path
     dropped_zero: tuple[str, ...]
     effects_written: int
     requested: list[dict[str, Any]]
     read_back: list[dict[str, Any]]
+    readback_issues: tuple[ModelIssue, ...]
 
 
 def load_map_file(path: Path) -> LoadMap:
@@ -397,7 +399,7 @@ async def set_loads(
         )
     got = read_body["loads"]
     # Read-back mismatch is an integrity issue for check_model (AC10); the new file is kept.
-    _ = checks.compare_loads_readback(
+    readback_issues = checks.compare_loads_readback(
         requested=requested,
         got=got,
         tolerance_ratio=readback_relative_tolerance_ratio,
@@ -410,6 +412,7 @@ async def set_loads(
         effects_written=int(written.get("effects_written") or 0),
         requested=requested,
         read_back=got,
+        readback_issues=tuple(readback_issues),
     )
 
 

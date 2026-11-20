@@ -234,7 +234,8 @@ def test_set_loads_writes_new_file(tmp_path: Path) -> None:
             assert bound.resolve() == result.out_path.resolve()
             after = await port.model_state(copy_key, port._bound[copy_key])
             assert after.loaded
-            assert after.revision is not None and old_revision is not None
+            assert after.revision is not None
+            assert old_revision is not None
             assert after.revision > old_revision
             assert after.fingerprint != old_fingerprint
             assert after.file_sha256 == hashlib.sha256(result.out_path.read_bytes()).hexdigest()
@@ -280,7 +281,8 @@ def test_readback_mismatch_detected(tmp_path: Path) -> None:
             assert "READBACK_MISMATCH" in codes
             data: Any = checked.data
             assert any(
-                item["code"] == "READBACK_MISMATCH" and item["severity"] == Severity.ERROR.value for item in data["issues"]
+                item["code"] == "READBACK_MISMATCH" and item["severity"] == Severity.ERROR.value
+                for item in data["issues"]
             )
 
     anyio.run(body)
