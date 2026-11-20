@@ -38,7 +38,9 @@ from . import _revit_edit_helpers as helpers
 TOLERANCE = 0.001  # test input: the value a workflow's frozen basis would hand over
 GUID = "11111111-1111-1111-1111-111111111111"
 # Short backstop so lost-reply faults (withhold forever) surface as TIMEOUT_UNKNOWN_OUTCOME quickly.
-_SHORT_S = 2
+# Keep enough headroom for write-role start under load (status + grace); fault sleep stays longer.
+_SHORT_S = 8
+_FAULT_HOLD_S = 20.0
 COPY = Path(r"C:\models\copy.rvt")
 
 HostRead = Callable[[str, dict[str, Any], CallEffect], Awaitable[dict[str, Any]]]
@@ -53,7 +55,7 @@ def _short_write_timeout(config: ServersConfig) -> ServersConfig:
         update={
             "servers": {
                 **config.servers,
-                "revit": section.model_copy(update={"roles": roles, "client_grace_s": 1}),
+                "revit": section.model_copy(update={"roles": roles, "client_grace_s": 2}),
             }
         }
     )
@@ -205,6 +207,11 @@ async def _read_body(manager: ServerManager, tool: str, arguments: dict[str, Any
     return parse_reply(dumped)
 
 
+async def _warm_write_role(manager: ServerManager) -> None:
+    """Start the write role before arming a lost-reply fault (status must not race the withhold)."""
+    await helpers.call_dump(manager, "revit_get_model_metadata", {}, CallEffect.READ, role="write")
+
+
 def _write_args(tool: str) -> dict[str, Any]:
     prior = _prior()
     if tool == "revit_set_element_parameter_values":
@@ -309,7 +316,8 @@ def test_outcomes_per_tool(tool: str, applied: bool, expected: str, tmp_path: Pa
             )
 
         pre = await _pre_image_value(read, tool, host_args)
-        _arm(control, "lost_pipe", tool, applied=applied, seconds=5.0)
+        await _warm_write_role(manager)
+        _arm(control, "lost_pipe", tool, applied=applied, seconds=_FAULT_HOLD_S)
 
         element_ids = [int(x) for x in host_args["elementIds"]] if "elementIds" in host_args else None
         references = {3001: "col-3001"} if element_ids else {}
@@ -367,7 +375,8 @@ def test_retry_duplicate_setter_applied(tmp_path: Path) -> None:
             )
 
         pre = await _pre_image_value(read, tool, host_args)
-        _arm(control, "retry_duplicate", tool, applied_twice=True, lose_reply=True, seconds=5.0)
+        await _warm_write_role(manager)
+        _arm(control, "retry_duplicate", tool, applied_twice=True, lose_reply=True, seconds=_FAULT_HOLD_S)
         with pytest.raises(ContractError) as raised:
             await send_attended_write(
                 call,
@@ -417,7 +426,8 @@ def test_retry_token_consumed_applied(tmp_path: Path) -> None:
             )
 
         pre = await _pre_image_value(read, tool, host_args)
-        _arm(control, "retry_token_consumed", tool, seconds=5.0)
+        await _warm_write_role(manager)
+        _arm(control, "retry_token_consumed", tool, seconds=_FAULT_HOLD_S)
         with pytest.raises(ContractError) as raised:
             await send_attended_write(
                 call,
