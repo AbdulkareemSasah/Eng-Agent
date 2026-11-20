@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import pytest
 from eng_contract.errors import ContractError, ErrorCode
@@ -35,6 +35,9 @@ from eng_harness.servers import CallEffect, ServerManager, ServersConfig
 
 from . import _revit_edit_helpers as helpers
 
+_ValueType = Literal["string", "integer", "double", "elementId"]
+_LengthUnit = Literal["mm", "internal"]
+_Target = Literal["instance", "type"]
 TOLERANCE = 0.001  # test input: the value a workflow's frozen basis would hand over
 GUID = "11111111-1111-1111-1111-111111111111"
 # Short backstop so lost-reply faults (withhold forever) surface as TIMEOUT_UNKNOWN_OUTCOME quickly.
@@ -44,6 +47,29 @@ _FAULT_HOLD_S = 20.0
 COPY = Path(r"C:\models\copy.rvt")
 
 HostRead = Callable[[str, dict[str, Any], CallEffect], Awaitable[dict[str, Any]]]
+
+
+def _value_type(raw: object) -> _ValueType:
+    text = str(raw)
+    if text in {"string", "integer", "double", "elementId"}:
+        return cast(_ValueType, text)
+    raise AssertionError(f"unexpected valueType {raw!r}")
+
+
+def _length_unit(raw: object | None) -> _LengthUnit | None:
+    if raw is None:
+        return None
+    text = str(raw)
+    if text in {"mm", "internal"}:
+        return cast(_LengthUnit, text)
+    raise AssertionError(f"unexpected unit {raw!r}")
+
+
+def _target(raw: object) -> _Target:
+    text = str(raw)
+    if text in {"instance", "type"}:
+        return cast(_Target, text)
+    raise AssertionError(f"unexpected target {raw!r}")
 
 
 def _short_write_timeout(config: ServersConfig) -> ServersConfig:
@@ -113,17 +139,16 @@ def _prior() -> dict[str, Any]:
 
 def _seed_two_types() -> dict[str, Any]:
     seed = helpers.seed_model()
-    seed["types"] = list(seed["types"]) + [
-        {
-            "type_id": 2002,
-            "family": helpers.FAMILY,
-            "name": "C400x400",
-            "family_id": 1001,
-            "category": "OST_StructuralColumns",
-            "parameters": [helpers.length_param("b", helpers.B_FT), helpers.length_param("h", helpers.H_FT)],
-            "instance_ids": [],
-        }
-    ]
+    extra = {
+        "type_id": 2002,
+        "family": helpers.FAMILY,
+        "name": "C400x400",
+        "family_id": 1001,
+        "category": "OST_StructuralColumns",
+        "parameters": [helpers.length_param("b", helpers.B_FT), helpers.length_param("h", helpers.H_FT)],
+        "instance_ids": [],
+    }
+    seed["types"] = [*list(seed["types"]), extra]
     return seed
 
 
@@ -137,13 +162,13 @@ def _model_for(tool: str, host_args: Mapping[str, Any]) -> ParamModel:
             element_ids=[int(x) for x in host_args["elementIds"]],
             parameter_name=str(host_args["parameterName"]),
             value=str(host_args["value"]),
-            value_type=str(host_args["valueType"]),  # type: ignore[arg-type]
+            value_type=_value_type(host_args["valueType"]),
         )
     if tool == "revit_set_type_parameter_values":
         return SetTypeParameterValuesArgs(
             parameter_name=str(host_args["parameterName"]),
             value=str(host_args["value"]),
-            value_type=str(host_args["valueType"]),  # type: ignore[arg-type]
+            value_type=_value_type(host_args["valueType"]),
             type_ids=[int(x) for x in host_args["typeIds"]],
             expected_instances=[3001],
         )
@@ -152,9 +177,9 @@ def _model_for(tool: str, host_args: Mapping[str, Any]) -> ParamModel:
             element_ids=[int(x) for x in host_args["elementIds"]],
             guid=str(host_args["guid"]),
             value=str(host_args["value"]),
-            value_type=str(host_args["valueType"]),  # type: ignore[arg-type]
-            unit=str(host_args["unit"]) if host_args.get("unit") is not None else None,  # type: ignore[arg-type]
-            target=str(host_args.get("target") or "instance"),  # type: ignore[arg-type]
+            value_type=_value_type(host_args["valueType"]),
+            unit=_length_unit(host_args.get("unit")),
+            target=_target(host_args.get("target") or "instance"),
             all_or_nothing=bool(host_args.get("allOrNothing", True)),
         )
     if tool == "revit_change_element_type":
@@ -200,7 +225,9 @@ def _arm(control: Path, fault: str, tool: str, **extra: Any) -> None:
     control.write_text(json.dumps(data), encoding="utf-8")
 
 
-async def _read_body(manager: ServerManager, tool: str, arguments: dict[str, Any], effect: CallEffect) -> dict[str, Any]:
+async def _read_body(
+    manager: ServerManager, tool: str, arguments: dict[str, Any], effect: CallEffect
+) -> dict[str, Any]:
     dumped = await helpers.call_dump(
         manager, tool, arguments, effect, role="write" if effect is CallEffect.WRITE else "read"
     )
@@ -291,7 +318,7 @@ async def _pre_image_value(
 @pytest.mark.parametrize("tool", WRITE_TOOLS)
 @pytest.mark.parametrize(
     ("applied", "expected"),
-    ((True, "applied"), (False, "not_applied")),
+    [(True, "applied"), (False, "not_applied")],
     ids=["applied", "not_applied"],
 )
 def test_outcomes_per_tool(tool: str, applied: bool, expected: str, tmp_path: Path) -> None:
@@ -450,7 +477,6 @@ def test_retry_token_consumed_applied(tmp_path: Path) -> None:
         )
         found = await reconciler.decide(_lost(tool, host_args, target, known=True, pre_image=pre), read)
         assert found.outcome == "applied"
-        assert found.outcome != "not_applied"
         assert found.missing == ()
 
     helpers.run_scenario(tmp_path, config, body)

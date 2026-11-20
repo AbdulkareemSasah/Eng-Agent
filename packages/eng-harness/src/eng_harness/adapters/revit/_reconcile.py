@@ -166,7 +166,9 @@ class RevitReconciler:
             return active == bound
         return isinstance(path, str) and path == bound
 
-    async def _call(self, read: HostRead, tool: str, arguments: dict[str, Any], effect: CallEffect) -> Mapping[str, Any]:
+    async def _call(
+        self, read: HostRead, tool: str, arguments: dict[str, Any], effect: CallEffect
+    ) -> Mapping[str, Any]:
         body = await read(tool, arguments, effect)
         return _as_mcp(body)
 
@@ -174,7 +176,7 @@ class RevitReconciler:
         item = self._expect(lost)
         try:
             return await _observe(lambda t, a, e: self._call(read, t, a, e), item)
-        except (KeyError, TypeError, ValueError, IndexError):
+        except KeyError, TypeError, ValueError, IndexError:
             return None
 
     def _expect(self, lost: LostWrite) -> Expect:
@@ -196,7 +198,9 @@ class RevitReconciler:
             return got is None
         if not isinstance(pre_image, dict):
             return False
-        pre_item = Expect(item.helper, item.subject, cast(Want | None, dict(pre_image)), tool=item.tool, host_args=item.host_args)
+        pre_item = Expect(
+            item.helper, item.subject, cast(Want | None, dict(pre_image)), tool=item.tool, host_args=item.host_args
+        )
         return compare(pre_item, got, self._tolerance) is None
 
     async def _setters(self, lost: LostWrite, read: HostRead) -> Decision:
@@ -233,7 +237,7 @@ class RevitReconciler:
             item = expect_write("revit_change_element_type", host_args, unique_id=uid)
             try:
                 got = await _observe(lambda t, a, e: self._call(read, t, a, e), item)
-            except (KeyError, TypeError, ValueError, IndexError):
+            except KeyError, TypeError, ValueError, IndexError:
                 got = None
             observed_rows.append(cast(JsonValue, got))
             if got is None:
