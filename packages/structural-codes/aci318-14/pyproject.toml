@@ -54,3 +54,5 @@ coverage_line = 95
 coverage_branch = 90
 mutation_min = 80
 r1_modules = ["src/aci318_14/**/*.py"]
+# Plan 0003 T3 (amendment B-583): declare the pack root so the SBC overlay may import PACK across the member boundary (IM002).
+public_modules = ["aci318_14"]
