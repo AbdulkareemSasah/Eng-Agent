@@ -255,6 +255,10 @@ def _add(kind: str, args: dict[str, Any], product: str) -> dict[str, Any]:
     if kind == "frames" and product == "SAP2000":
         skip = skip | {"label", "story", "name"}
     row = {**{k: v for k, v in args.items() if k not in skip}, "name": name}
+    # List replies use point1/point2 (S-12 / state reader); the write tool takes start/end.
+    if kind == "frames" and "start" in row and "end" in row:
+        row["point1"] = row.pop("start")
+        row["point2"] = row.pop("end")
     if kind == "load_combos":  # store the list-reply shape (type, items), not the tool's arguments
         row = {"name": name, "type": args.get("combo_type", 0), "items": list(args.get("components") or [])}
     items[:] = [r for r in items if r["name"] != name]  # a combination is replaced, not duplicated (S-12 section 2)
