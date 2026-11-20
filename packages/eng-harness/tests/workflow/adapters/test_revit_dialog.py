@@ -113,10 +113,16 @@ def test_declined_not_applied(tmp_path: Path) -> None:
         from eng_harness.adapters.revit._replies import parse_revit_reply
 
         parsed = parse_revit_reply(params).body
-        items = parsed["items"]
-        assert isinstance(items, list) and items
-        row = next(p for p in items[0]["parameters"] if p.get("name") == "b")  # type: ignore[index]
+        items = parsed.get("items")
+        assert isinstance(items, list)
+        assert items
+        first = items[0]
+        assert isinstance(first, dict)
+        parameters = first.get("parameters")
+        assert isinstance(parameters, list)
+        row = next(p for p in parameters if isinstance(p, dict) and p.get("name") == "b")
         raw = row.get("rawValue", row.get("value"))
+        assert isinstance(raw, int | float)
         assert float(raw) == pytest.approx(helpers.B_FT)
 
     helpers.run_scenario(tmp_path, config, body)
@@ -125,7 +131,7 @@ def test_declined_not_applied(tmp_path: Path) -> None:
 def test_unanswered_is_busy(tmp_path: Path) -> None:
     """AC18: dialog_unanswered with write timeout above the add-in deadline → HOST_BUSY / MODAL_DIALOG."""
     control = tmp_path / "control.json"
-    assert 90 > _ADDIN_DEADLINE_S
+    assert _ADDIN_DEADLINE_S < 90
     config = helpers.revit_config(
         tmp_path,
         control,
@@ -178,10 +184,16 @@ def test_unanswered_is_busy(tmp_path: Path) -> None:
         from eng_harness.adapters.revit._replies import parse_revit_reply
 
         parsed = parse_revit_reply(params).body
-        items = parsed["items"]
-        assert isinstance(items, list) and items
-        row = next(p for p in items[0]["parameters"] if p.get("name") == "b")  # type: ignore[index]
+        items = parsed.get("items")
+        assert isinstance(items, list)
+        assert items
+        first = items[0]
+        assert isinstance(first, dict)
+        parameters = first.get("parameters")
+        assert isinstance(parameters, list)
+        row = next(p for p in parameters if isinstance(p, dict) and p.get("name") == "b")
         raw = row.get("rawValue", row.get("value"))
+        assert isinstance(raw, int | float)
         assert float(raw) == pytest.approx(helpers.B_FT)
 
     helpers.run_scenario(tmp_path, config, body)

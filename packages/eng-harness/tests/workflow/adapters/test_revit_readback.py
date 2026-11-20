@@ -9,7 +9,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import pytest
 from eng_contract.envelope import HostInfo, SuccessEnvelope
 from eng_contract.store import ResultStore
 
@@ -246,9 +245,13 @@ def test_check_model_issues(tmp_path: Path, store: ResultStore) -> None:
         )
         from eng_harness.adapters.revit._replies import parse_revit_reply
 
-        types = parse_revit_reply(listed).body.get("items") or parse_revit_reply(listed).body.get("types") or []
+        listed_body = parse_revit_reply(listed).body
+        types = listed_body.get("items") or listed_body.get("types") or []
+        assert isinstance(types, list)
         new_type = next(t for t in types if isinstance(t, dict) and t.get("name") == "C450x450")
-        new_type_id = int(new_type["type_id"])
+        type_id_raw = new_type.get("type_id")
+        assert isinstance(type_id_raw, int)
+        new_type_id = type_id_raw
 
         change_args = build_edit_args(
             "change_element_type",

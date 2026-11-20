@@ -188,6 +188,16 @@ def _as_raw_row(row: Mapping[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _as_int(value: object) -> int | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float | str):
+        return int(value)
+    return None
+
+
 async def _observe(call: HostCall, item: Expect) -> Want | None:
     """Read the written item back; `None` when absent."""
     args = item.host_args
@@ -234,9 +244,7 @@ async def _observe(call: HostCall, item: Expect) -> Want | None:
 
     if item.helper == "revit_get_element_details":
         try:
-            reply = await call(
-                "revit_get_element_details", {"elementIds": list(args["elementIds"])}, CallEffect.READ
-            )
+            reply = await call("revit_get_element_details", {"elementIds": list(args["elementIds"])}, CallEffect.READ)
             body = parse_revit_reply(dict(reply)).body
         except ContractError:
             # Element replaced / not found (fault element_replaced): absent for read-back (AC19).
@@ -250,16 +258,12 @@ async def _observe(call: HostCall, item: Expect) -> Want | None:
         # Identity after change_element_type is by unique_id (AC19); missing unique_id → absent.
         if item.subject.id and first.get("unique_id") != item.subject.id:
             return None
-        type_id = first.get("type_id")
-        return None if type_id is None else {"type_id": int(type_id)}
+        type_id = _as_int(first.get("type_id"))
+        return None if type_id is None else {"type_id": type_id}
 
     if item.helper == "revit_list_family_types_in_family":
-        family = args.get("family") or _family_from_args(args)
-        reply = await call(
-            "revit_list_family_types_in_family",
-            {"family_name": family} if family else {},
-            CallEffect.READ,
-        )
+        # Host args carry source_type_id only; list without a family filter and match by name.
+        reply = await call("revit_list_family_types_in_family", {}, CallEffect.READ)
         body = parse_revit_reply(dict(reply)).body
         rows = body.get("items")
         if not isinstance(rows, list):
@@ -268,12 +272,15 @@ async def _observe(call: HostCall, item: Expect) -> Want | None:
         match = next((r for r in rows if isinstance(r, Mapping) and r.get("name") == wanted_name), None)
         if match is None:
             return None
-        got: Want = {"name": str(match["name"]), "type_id": int(match["type_id"])}
+        type_id = _as_int(match.get("type_id"))
+        if type_id is None:
+            return None
+        got: Want = {"name": str(match["name"])}
         if item.second_helper == "revit_get_type_parameters":
             # L-B232-1 / spec 0011 §4.4: second read-back of the new type's parameters.
             params_reply = await call(
                 "revit_get_type_parameters",
-                {"typeIds": [int(match["type_id"])]},
+                {"typeIds": [type_id]},
                 CallEffect.READ,
             )
             params_body = parse_revit_reply(dict(params_reply)).body
@@ -286,13 +293,9 @@ async def _observe(call: HostCall, item: Expect) -> Want | None:
     raise KeyError(f"unknown read-back helper {item.helper}")
 
 
-def _family_from_args(args: Mapping[str, Any]) -> str | None:
-    family = args.get("family_name") or args.get("family")
-    return str(family) if isinstance(family, str) else None
-
-
 def _read_param_want(row: Mapping[str, Any], item: Expect) -> Want:
-    assert item.want is not None
+    if item.want is None:
+        raise ValueError("expect with no want cannot be read as a parameter")
     field_name = next(iter(item.want))
     wanted = item.want[field_name]
     raw_row = _as_raw_row(row)
@@ -303,7 +306,10 @@ def _read_param_want(row: Mapping[str, Any], item: Expect) -> Want:
         return {field_name: float(converted)}
     if isinstance(wanted, int) and not isinstance(wanted, bool):
         value = raw_row.get("rawValue", raw_row.get("value"))
-        return {field_name: int(value)}
+        parsed = _as_int(value)
+        if parsed is None:
+            raise ValueError(f"parameter {field_name} is not an integer")
+        return {field_name: parsed}
     value = raw_row.get("rawValue", raw_row.get("value"))
     return {field_name: str(value)}
 
@@ -324,7 +330,7 @@ def compare(item: Expect, got: Want | None, tolerance: float | None) -> ModelIss
     if _differs(got, item.want, tolerance or 0.0):
         return issue(
             "READBACK_MISMATCH",
-            f"{name} reads {({k: got.get(k) for k in item.want})}, requested {item.want}",
+            f"{name} reads { ({k: got.get(k) for k in item.want}) }, requested {item.want}",
         )
     return None
 
@@ -340,12 +346,8 @@ def integrity(
 ) -> list[ModelIssue]:
     """Tolerance-free checks of spec 0011 section 4.8."""
 
-    def issue(
-        code: str, kind: SubjectKind, subject_id: str, message: str, severity: Severity = _ERROR
-    ) -> ModelIssue:
-        return ModelIssue(
-            severity=severity, code=code, subject=Subject(kind=kind, id=subject_id), message=message
-        )
+    def issue(code: str, kind: SubjectKind, subject_id: str, message: str, severity: Severity = _ERROR) -> ModelIssue:
+        return ModelIssue(severity=severity, code=code, subject=Subject(kind=kind, id=subject_id), message=message)
 
     found: list[ModelIssue] = []
     for uid in ledger_unique_ids:
@@ -410,7 +412,7 @@ async def check_model(
     for item in read_back.written.items(model_key):
         try:
             got = await _observe(call, item)
-        except (KeyError, TypeError, ValueError, IndexError):
+        except KeyError, TypeError, ValueError, IndexError:
             issues.append(
                 ModelIssue(
                     severity=_ERROR,
@@ -470,7 +472,13 @@ async def _structure_snapshot(
         rows = body.get("items") or body.get("elements") or []
         if not isinstance(rows, list):
             continue
-        ids = [int(r["element_id"]) for r in rows if isinstance(r, Mapping) and "element_id" in r]
+        ids: list[int] = []
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            eid = _as_int(row.get("element_id"))
+            if eid is not None:
+                ids.append(eid)
         if not ids:
             continue
         details = await call("revit_get_element_details", {"elementIds": ids}, CallEffect.READ)
@@ -484,14 +492,17 @@ async def _structure_snapshot(
             uid = row.get("unique_id")
             if isinstance(uid, str) and uid:
                 present.add(uid)
-                tid = row.get("type_id")
-                if isinstance(tid, int):
+                tid = _as_int(row.get("type_id"))
+                if tid is not None:
                     element_types[uid] = tid
     types_reply = await call("revit_get_available_family_types", {}, CallEffect.READ)
     types_body = parse_revit_reply(dict(types_reply)).body
     type_rows = types_body.get("items") or types_body.get("types") or []
     if isinstance(type_rows, list):
         for row in type_rows:
-            if isinstance(row, Mapping) and isinstance(row.get("type_id"), int):
-                type_ids.add(int(row["type_id"]))
+            if not isinstance(row, Mapping):
+                continue
+            tid = _as_int(row.get("type_id"))
+            if tid is not None:
+                type_ids.add(tid)
     return present, element_types, type_ids
