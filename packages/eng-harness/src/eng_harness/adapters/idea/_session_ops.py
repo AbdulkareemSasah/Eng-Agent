@@ -1,22 +1,30 @@
-"""IDEA HostPort session operations (plan 0014 T6; spec 0014 AC4, AC5, section 4.10).
+"""IDEA HostPort session operations (plan 0014 T6/T7; spec 0014 AC4, AC5, AC10, section 4.10).
 
 Purpose: working-copy hashes and lineage, path guards inside the run folder, route preconditions, and the HostPort
 methods that do not launch IDEA or the REST service (`started_instances` is empty). Acquire keys the lock as
-`idea:<hash of service_url>` (route rest) or `idea:<hash of working copy path>` (route native). Units: none for
-paths; `read_units` returns the fixed declaration of section 4.6. Errors: `ContractError` `HOST_NOT_CONNECTED`,
-`INVALID_ARGUMENT`, `CONFLICT`, `NOT_FOUND`, `PRECONDITION_FAILED`.
+`idea:<hash of service_url>` (route rest) or `idea:<hash of working copy path>` (route native). After a successful
+`set_loads` write, rebind the model key to `out_path` (new revision and hash; old file kept) and keep the last write's
+requested/got/dropped_zero/tolerance/connection/load-map status so `check_model` returns the §4.10 integrity set.
+Units: none for paths; `read_units` returns the fixed declaration of section 4.6. Errors: `ContractError`
+`HOST_NOT_CONNECTED`, `INVALID_ARGUMENT`, `CONFLICT`, `NOT_FOUND`, `PRECONDITION_FAILED`, `INTERNAL`.
 """
 
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from eng_contract.envelope import Envelope
+from eng_contract.envelope import Envelope, HostInfo, Provenance, make_success
 from eng_contract.errors import ContractError, ErrorCode, Precondition
 from eng_contract.ids import Clock, IdSource, Timestamp
+from eng_contract.issues import CheckModelSummary, ModelIssue, Severity
+from eng_contract.kinds.issues import ModelCheck
+from eng_contract.refs import RecordSource
+from eng_contract.store import ResultStore
 
 from eng_harness.adapters._identity import IdentityStore
 from eng_harness.adapters.idea._replies import parse_status
@@ -32,6 +40,19 @@ __all__ = [
     "new_out_path",
     "require_inside_run",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class _LoadsIntegrity:
+    """Last `set_loads` inputs kept for `check_model` (spec 0014 section 4.10)."""
+
+    requested: tuple[Mapping[str, Any], ...]
+    got: tuple[Mapping[str, Any], ...] | None
+    dropped_zero: tuple[str, ...]
+    tolerance_ratio: float | None
+    connection: str
+    load_map_status: str
+
 
 _PROGRAM = "idea"
 _IDEA_CON = ".ideaCon"
@@ -108,6 +129,7 @@ class IdeaHostPort:
         ids: IdSource,
         run_dir: Path,
         files: Mapping[str, Path],
+        store: ResultStore | None = None,
         server: str = "idea",
         host_key: str = "idea",
         route: str,
@@ -125,6 +147,7 @@ class IdeaHostPort:
         self._clock = clock
         self._ids = ids
         self._run_dir = run_dir.resolve()
+        self._store = store
         self._server = server
         self._host_key = host_key
         self._route = route
@@ -134,6 +157,7 @@ class IdeaHostPort:
         self._bound: dict[str, str] = {}
         self._instances: dict[str, HostInstance] = {}
         self._hashes: dict[str, str] = {}  # journaled file sha256 per model key
+        self._loads_integrity: dict[str, _LoadsIntegrity] = {}
 
     @property
     def identity_store(self) -> IdentityStore:
@@ -205,9 +229,157 @@ class IdeaHostPort:
             file_sha256=_file_sha256(path),
         )
 
+    def remember_set_loads(
+        self,
+        model_key: str,
+        *,
+        requested: Sequence[Mapping[str, Any]],
+        got: Sequence[Mapping[str, Any]] | None,
+        dropped_zero: Sequence[str],
+        tolerance_ratio: float | None,
+        connection: str,
+        load_map_status: str,
+    ) -> None:
+        """Keep the last `set_loads` requested/got/dropped_zero/tolerance/connection/map status for `check_model`."""
+        self._loads_integrity[model_key] = _LoadsIntegrity(
+            requested=tuple(dict(item) for item in requested),
+            got=None if got is None else tuple(dict(item) for item in got),
+            dropped_zero=tuple(str(name) for name in dropped_zero if name),
+            tolerance_ratio=tolerance_ratio,
+            connection=connection,
+            load_map_status=load_map_status,
+        )
+
+    def rebind_to_out_path(self, model_key: str, out_path: Path) -> None:
+        """AC10: rebind `model_key` to `out_path` (new revision, new hash); the previous file is kept on disk."""
+        resolved = require_inside_run(out_path, self._run_dir)
+        if not resolved.is_file():
+            raise ContractError(ErrorCode.NOT_FOUND, "out_path does not exist", received=str(out_path))
+        model_id = self._models.get(model_key)
+        if model_id is None or model_key not in self._bound:
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
+        digest = _file_sha256(resolved)
+        state = self._identity.record_save(model_id, resolved, fingerprint=digest)
+        instance = self._bind_file(model_key, resolved, state.model_id)
+        self._hashes[model_key] = digest
+        self._instances[instance.instance_id] = instance
+
+    async def set_loads(
+        self,
+        model_key: str,
+        *,
+        plan: Any,
+        load_map: Any,
+        source: RecordSource,
+        readback_relative_tolerance_ratio: float,
+        approved: bool,
+        role: str = "main",
+    ) -> Any:
+        """Write loads through `_loads.set_loads`, remember integrity inputs, rebind to `out_path` (AC10)."""
+        from eng_harness.adapters.idea import _loads as loads
+
+        path = self._file(model_key)
+        if model_key not in self._bound:
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
+
+        bound_id = self._models[model_key]
+
+        def current_revision(model_id: str) -> int | None:
+            if model_id != bound_id:
+                return None
+            return self._identity.resolve(path).revision
+
+        # Ensure the plan path matches the bound working copy (caller may have built it from model_files).
+        if Path(plan.path).resolve() != path.resolve():
+            plan = plan.model_copy(update={"path": str(path)})
+        result = await loads.set_loads(
+            sessions=self._sessions,
+            server=self._server,
+            role=role,
+            plan=plan,
+            load_map=load_map,
+            source=source,
+            current_revision=current_revision,
+            run_dir=self._run_dir,
+            readback_relative_tolerance_ratio=readback_relative_tolerance_ratio,
+            approved=approved,
+            ids=self._ids,
+        )
+        self.remember_set_loads(
+            model_key,
+            requested=result.requested,
+            got=result.read_back,
+            dropped_zero=result.dropped_zero,
+            tolerance_ratio=readback_relative_tolerance_ratio,
+            connection=plan.connection,
+            load_map_status=load_map.status,
+        )
+        self.rebind_to_out_path(model_key, result.out_path)
+        return result
+
     async def check_model(self, model_key: str) -> Envelope:
-        """Adapter integrity checks land in T7 (`_checks.py`); until then there is no read-back wiring."""
-        raise ContractError(ErrorCode.INTERNAL, "no read-back wiring", incident_id=self._ids.new_ulid())
+        """Return `issues.model_check/1` from the last `set_loads` integrity set (spec 0014 section 4.10)."""
+        from eng_harness.adapters.idea import _checks as checks
+        from eng_harness.adapters.idea._loads import LoadMap
+
+        if self._store is None:
+            raise ContractError(ErrorCode.INTERNAL, "no result store for check_model", incident_id=self._ids.new_ulid())
+        path = self._file(model_key)
+        if model_key not in self._bound:
+            raise ContractError(ErrorCode.PRECONDITION_FAILED, "not open", precondition=Precondition.model_open)
+        started = self._clock.now()
+        began = self._clock.now_ms()
+        issues: list[ModelIssue] = []
+        held = self._loads_integrity.get(model_key)
+        if held is not None:
+            status_map = LoadMap(
+                status=held.load_map_status,
+                sign_convention="",
+                components={},
+                source="last set_loads",
+            )
+            info = checks.load_map_status_issue(status_map, connection=held.connection)
+            if info is not None:
+                issues.append(info)
+            issues.extend(
+                checks.issues_from_set_loads_reply(
+                    {"dropped_zero": list(held.dropped_zero)},
+                    connection=held.connection,
+                )
+            )
+            issues.extend(
+                checks.compare_loads_readback(
+                    requested=held.requested,
+                    got=None if held.got is None else list(held.got),
+                    tolerance_ratio=held.tolerance_ratio,
+                    connection=held.connection,
+                )
+            )
+        tally = Counter(issue.severity for issue in issues)
+        summary = CheckModelSummary(
+            errors=tally[Severity.ERROR],
+            warnings=tally[Severity.WARNING],
+            infos=tally[Severity.INFO],
+            clean=not tally[Severity.ERROR],
+        )
+        payload = ModelCheck(summary=summary, issues=issues).model_dump(mode="json")
+        resolved = self._identity.resolve(path)
+        host = HostInfo(
+            program=_PROGRAM,
+            version="",
+            model_id=resolved.model_id,
+            model_revision=resolved.revision,
+        )
+        producer = Provenance(
+            tool="harness/check_model",
+            tool_version="1",
+            host=host,
+            inputs={},
+            started_at=started,
+            duration_ms=self._clock.now_ms() - began,
+        )
+        record = self._store.put("issues.model_check/1", payload, producer)
+        return make_success(record, summary.model_dump(mode="json"), [])
 
     async def save(self, model_key: str, role: str) -> SavedModel:
         """No host call: `SavedModel` of the bound file hash (spec 0014 section 4.10)."""
