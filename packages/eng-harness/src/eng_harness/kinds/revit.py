@@ -27,6 +27,9 @@ FRAME_ELEMENT_MAP_KIND_NAME = "harness.frame_element_map/1"
 _Str = Annotated[str, StringConstraints(min_length=1, max_length=200)]
 _Category = Literal["column", "framing"]
 _LocationKind = Literal["point", "curve"]
+# Spec 0011 §4.8 / §4.11: length and angle roles are Quantity; material and etabs_link are
+# string (or element id as StrictInt). Writes also allow integer / string / element id.
+ParameterValue = Quantity | str | StrictInt
 
 
 class _P(BaseModel):
@@ -40,7 +43,11 @@ def _ordered(items: Iterable[Any], what: str) -> None:
 
 
 class Point3(_P):
-    """A point in model global coordinates, millimetres (spec 0011 §4.5)."""
+    """A point in model global coordinates, millimetres (spec 0011 §4.5).
+
+    Local copy: `eng_contract.kinds.Point3` is not a public_modules export (same pattern as
+    `_kinds.Name` vs `eng_contract.kinds._common.Name`).
+    """
 
     x_mm: float
     y_mm: float
@@ -119,7 +126,7 @@ class ElementRow(_P):
     i: Point3 | None
     j: Point3 | None
     rotation_deg: float | None
-    parameters: dict[str, Quantity]
+    parameters: dict[str, ParameterValue]
 
 
 class TypeRow(_P):
@@ -129,7 +136,7 @@ class TypeRow(_P):
     family: _Str
     name: _Str
     instance_ids: list[StrictInt]
-    parameters: dict[str, Quantity]
+    parameters: dict[str, ParameterValue]
 
     @model_validator(mode="after")
     def _instances_sorted(self) -> Self:
