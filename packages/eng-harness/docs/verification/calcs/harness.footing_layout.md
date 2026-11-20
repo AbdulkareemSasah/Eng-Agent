@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_layout`
 - Version: 1
-- Content hash: `c8e44c71cd4a968caaed26d9a75adb1862a792f4aad7fea141020334e0535a7b` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `4ee17ec66fcba9fe2901d5481ac323b213b4be1c166b10d4154a4f1b47e86ca5` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.4.3 (rules L1 to L5, amendment B-568 / OQ-Q60, OQ-Q63), acceptance criteria AC8 and AC12; basis fields `reinforcement.bar_diameter_mm`, `reinforcement.bottom_layer`, `durability.cover_footing_mm`, `foundation.reaction_point` read as spec 0003 section 4.4 states (confirmed, exact unit, range)
 - Constants: `ZERO_MM` (0 mm, Geometry), `ZERO_COUNT` (0, Geometry), `ZERO_AREA` (0.0 mm2, Geometry), `ONE` (1, Geometry), `TWO` (2, Geometry), `THREE` (3, Geometry), `FOUR` (4, Geometry), `PI` (math.pi, Mathematical constant, area of a circle), `MAX_SAFE_INT` (9007199254740991, RFC 8785 3.2.2.3 / `eng-contract` `canonical.py` maximum exact I-JSON integer `2^53 - 1`); no engineering number.

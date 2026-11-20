@@ -7,7 +7,9 @@ needs (spec 0010 4.2). Each later footing calc is added here by its plan task.
 from eng_harness.calc import CalcDef
 from eng_harness.calcs.footing.layout import footing_layout
 from eng_harness.calcs.footing.plan_size import footing_plan_size
+from eng_harness.calcs.footing.reactions_to_loads import reactions_to_joint_loads
 from eng_harness.calcs.footing.resize import footing_resize
+from eng_harness.calcs.footing.safe_equilibrium import safe_equilibrium
 from eng_harness.calcs.footing.schedule import footing_schedule
 from eng_harness.calcs.footing.status import footing_status
 from eng_harness.calcs.footing.subjects import footing_subjects
@@ -20,6 +22,8 @@ FOOTING_CALCS: tuple[CalcDef, ...] = (
     footing_layout,
     footing_status,
     footing_schedule,
+    reactions_to_joint_loads,
+    safe_equilibrium,
 )
 """The shipped footing calcs, in registration order."""
 

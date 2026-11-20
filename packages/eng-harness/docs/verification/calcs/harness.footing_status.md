@@ -2,7 +2,7 @@
 
 - Calc id: `harness.footing_status`
 - Version: 1
-- Content hash: `8a519748016162426331a534329e7445e2653cc3ccf5703aefea704f160a78e5` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
+- Content hash: `dd24ae74ee3fdd18c5910f52ad33fe52aa20e4b454ef702c1dfffd286c0e203c` (from `calcs.lock.json`; any later change to the calc or to a module it imports changes it and the owner re-verifies)
 - Status: draft (not approved; ADR-0028 section 4: no entry in `approvals.yaml`)
 - Method source: eng-harness spec 0010 section 4.4.5 (family status order, governing ratio, closure, decision state), acceptance criterion AC10; reads no basis field
 - Constants: none but the calc version (`Cited`, 1); the family order is a tuple of statuses (a rule, not an engineering number). No engineering number.

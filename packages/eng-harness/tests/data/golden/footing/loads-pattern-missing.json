@@ -135,7 +135,7 @@
     "basis": "res_00000000000000000000000007"
   },
   "expected": {
-    "error_code": "PRECONDITION_FAILED",
+    "error_code": "INVALID_ARGUMENT",
     "field": "safe_load_set",
     "hint": "PATTERN_MISSING"
   }

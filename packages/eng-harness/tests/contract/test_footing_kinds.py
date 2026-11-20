@@ -20,6 +20,7 @@ KINDS = {
     "status": "harness.footing_status/1",
     "schedule": "harness.footing_schedule/1",
     "safe_equilibrium": "harness.safe_equilibrium/1",
+    "reactions_to_joint_loads": "harness.reactions_to_joint_loads/1",
 }
 Mutation = Callable[[dict[str, Any]], None]
 
@@ -93,6 +94,9 @@ INVALID: list[tuple[str, Mutation, str]] = [
     ("safe_equilibrium", _set(["patterns", 0, "status"], "NOT_COMPARED"), "self_weight"),
     ("safe_equilibrium", _set(["patterns", 1, "status"], "PASS"), "self_weight"),
     ("safe_equilibrium", _set(["patterns", 0, "status"], "MAYBE"), "status"),
+    ("reactions_to_joint_loads", _set(["axes"], "local"), "axes"),
+    ("reactions_to_joint_loads", _set(["loads", 0, "punch_x_mm"], 0.0), "punch_x_mm"),
+    ("reactions_to_joint_loads", _set(["loads", 0, "joint"], ""), "joint"),
 ]
 
 
@@ -113,7 +117,7 @@ def test_fixtures() -> None:
 
 
 def test_registration() -> None:
-    """The six kinds are exactly `FOOTING_KINDS` and are registered with the harness kinds."""
+    """The footing kinds are exactly `FOOTING_KINDS` and are registered with the harness kinds."""
     assert set(FOOTING_KINDS) == set(KINDS.values())
     for kind, model in FOOTING_KINDS.items():
         assert HARNESS_KINDS[kind] is model

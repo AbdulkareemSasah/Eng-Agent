@@ -36,32 +36,32 @@
       "version": 1
     },
     {
-      "content_sha256": "c8e44c71cd4a968caaed26d9a75adb1862a792f4aad7fea141020334e0535a7b",
+      "content_sha256": "4ee17ec66fcba9fe2901d5481ac323b213b4be1c166b10d4154a4f1b47e86ca5",
       "id": "harness.footing_layout",
       "version": 1
     },
     {
-      "content_sha256": "a0028c0766fe9e843c417b5114e287e52a135b4c0f731ca2caa64d05bd62527c",
+      "content_sha256": "3bca8a1310a312e054b75bae3d633bf1f135220364414007523c53ca961820ef",
       "id": "harness.footing_plan_size",
       "version": 1
     },
     {
-      "content_sha256": "546b4dd44dfe9ce998914b14d0f867d98f205407f0957a0808fbdb6539afd301",
+      "content_sha256": "c7447e187fae08d95814b557effaff87ff9a26332c59b3df7b73311e7c6454a0",
       "id": "harness.footing_resize",
       "version": 1
     },
     {
-      "content_sha256": "23fa251acf8db7eb33bb8df973c131311f352c8642ee23fdf3e8adcca3cccb92",
+      "content_sha256": "a42ac5a11703a6cc7748832d466fe69cf3c85fd34ccaceec2fdfb3cb28b83316",
       "id": "harness.footing_schedule",
       "version": 1
     },
     {
-      "content_sha256": "8a519748016162426331a534329e7445e2653cc3ccf5703aefea704f160a78e5",
+      "content_sha256": "dd24ae74ee3fdd18c5910f52ad33fe52aa20e4b454ef702c1dfffd286c0e203c",
       "id": "harness.footing_status",
       "version": 1
     },
     {
-      "content_sha256": "6023c85a3e67111231ffb12370ae81c5eefed11befba474e74f1a8dc6121d4ff",
+      "content_sha256": "c5f44c6e85055ff6c69bfd03fd21e856e6721fdef5feb843a41f1e947515f82d",
       "id": "harness.footing_subjects",
       "version": 1
     },
@@ -86,8 +86,18 @@
       "version": 1
     },
     {
+      "content_sha256": "a69b5c90ba6831a7c16404caaa4c39fc5cd3f2516171718ac4d585eea3df7909",
+      "id": "harness.reactions_to_joint_loads",
+      "version": 1
+    },
+    {
       "content_sha256": "772886bb74582a826c25e48d528aa8687abdcedfbdbc07912ca9eabfec097c2b",
       "id": "harness.readback_check",
+      "version": 1
+    },
+    {
+      "content_sha256": "102a2f7492ec97db57f62de443eabf6b568a0212607f6d3b2ec560d2a5da4065",
+      "id": "harness.safe_equilibrium",
       "version": 1
     },
     {
