@@ -8,7 +8,7 @@ Units: none in this module (loads units are declared on the kinds). Errors: `Con
 
 from collections.abc import Mapping, Sequence
 from pathlib import PurePath, PureWindowsPath
-from typing import Any
+from typing import Any, cast
 
 from eng_contract.errors import ContractError, ErrorCode
 from eng_contract.mcp import extract_raw_reply
@@ -88,10 +88,11 @@ def parse_reply_json(result: Mapping[str, Any]) -> dict[str, Any]:
             retryable=False,
             host_code=str(code)[:200],
         )
-    return reduce_paths(body)
+    reduced = reduce_paths(body)
+    return cast(dict[str, Any], reduced)
 
 
-def _validate(kind: str, payload: Mapping[str, Any], model: type[BaseModel]) -> BaseModel:
+def _validate[T: BaseModel](kind: str, payload: Mapping[str, Any], model: type[T]) -> T:
     try:
         return model.model_validate(reduce_paths(dict(payload)))
     except ValidationError as error:
@@ -107,19 +108,19 @@ def _validate(kind: str, payload: Mapping[str, Any], model: type[BaseModel]) -> 
 
 def parse_status(payload: Mapping[str, Any]) -> IdeaStatus:
     """Validate a reduced `harness.idea_status/1` payload."""
-    return _validate("harness.idea_status/1", payload, IdeaStatus)  # type: ignore[return-value]
+    return _validate("harness.idea_status/1", payload, IdeaStatus)
 
 
 def parse_project(payload: Mapping[str, Any]) -> IdeaProject:
     """Validate a reduced `harness.idea_project/1` payload."""
-    return _validate("harness.idea_project/1", payload, IdeaProject)  # type: ignore[return-value]
+    return _validate("harness.idea_project/1", payload, IdeaProject)
 
 
 def parse_loads(payload: Mapping[str, Any]) -> IdeaLoads:
     """Validate a reduced `harness.idea_loads/1` payload."""
-    return _validate("harness.idea_loads/1", payload, IdeaLoads)  # type: ignore[return-value]
+    return _validate("harness.idea_loads/1", payload, IdeaLoads)
 
 
 def parse_check_raw(payload: Mapping[str, Any]) -> IdeaCheckRaw:
     """Validate a reduced `harness.idea_check_raw/1` payload (`offline_stub` must be false)."""
-    return _validate("harness.idea_check_raw/1", payload, IdeaCheckRaw)  # type: ignore[return-value]
+    return _validate("harness.idea_check_raw/1", payload, IdeaCheckRaw)
