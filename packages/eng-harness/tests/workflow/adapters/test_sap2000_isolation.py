@@ -83,7 +83,7 @@ def test_epochs_independent(tmp_path: Path, make_config: ConfigFactory) -> None:
     from eng_harness.adapters._identity import IdentityStore
     from eng_harness.adapters.csi._gaps import SAP2000_GAPS
 
-    assert set(SAP2000_GAPS) >= {"SP-1", "SP-2", "SP-5", "SP-7", "SP-8"}
+    assert set(SAP2000_GAPS) == {f"SP-{n}" for n in range(1, 9)}
 
     etabs_control = tmp_path / "etabs_control.json"
     safe_control = tmp_path / "safe_control.json"

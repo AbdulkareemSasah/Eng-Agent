@@ -162,9 +162,11 @@ def test_working_copy_sdb(tmp_path: Path, make_config: ConfigFactory, control: P
             assert len(launches) == 1
             assert launches[0]["visible"] is False
             assert launches[0]["role"] == "main"
+            assert launches[0]["product"] == "SAP2000"
             opens = [c for c in calls if c["tool"] == "csi_open_model"]
             assert len(opens) == 1
             assert opens[0]["path"] == str(copies[0])
+            assert opens[0]["confirm"] is True
 
             recorded = json.loads((run_dir / "adapter" / "state.json").read_text())
             assert recorded["expected_units"][copy_key] == "kN_m_C"

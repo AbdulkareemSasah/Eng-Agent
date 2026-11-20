@@ -61,8 +61,10 @@ def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path
 @pytest.mark.parametrize("gap_id", list(_REMAINING))
 def test_gaps_not_implemented(gap_id: str) -> None:
     """AC17: each remaining gap of §4.5 raises NotImplementedGap with its id and nothing is sent."""
-    from eng_harness.adapters.csi._gaps import SAP2000_GAPS, raise_gap
+    from eng_harness.adapters.csi._gaps import SAP2000_GAPS, SAP2000_STEP_GAPS, raise_gap
 
+    assert set(SAP2000_GAPS) == {f"SP-{n}" for n in range(1, 9)}
+    assert set(SAP2000_STEP_GAPS) == {"new_model"}
     assert SAP2000_GAPS[gap_id]
     with pytest.raises(NotImplementedGap) as caught:
         raise_gap(gap_id)
