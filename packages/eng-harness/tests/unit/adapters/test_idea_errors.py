@@ -17,7 +17,9 @@ from eng_harness.servers import CallEffect
 R, W = CallEffect.READ, CallEffect.WRITE
 C = ErrorCode
 # (sasaah code, effect, tool, contract code, retryable, host_code, host_method, precondition, field)
-ROWS: list[tuple[str | None, CallEffect, str, ErrorCode, bool, str | None, str | None, Precondition | None, str | None]] = [
+ROWS: list[
+    tuple[str | None, CallEffect, str, ErrorCode, bool, str | None, str | None, Precondition | None, str | None]
+] = [
     ("no_project", R, "idea_list_connections", C.PRECONDITION_FAILED, False, None, None, Precondition.model_open, None),
     ("no_project", W, "idea_open_project", C.PRECONDITION_FAILED, False, None, None, Precondition.model_open, None),
     ("connection_not_found", R, "idea_get_check_results", C.NOT_FOUND, False, None, None, None, "connection"),

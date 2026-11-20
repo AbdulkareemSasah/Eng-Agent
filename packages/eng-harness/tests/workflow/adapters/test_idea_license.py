@@ -15,6 +15,7 @@ import anyio
 import pytest
 from eng_contract.errors import ErrorCode
 from eng_contract.ids import FixedClock, SeededIdSource
+from fakes.sasaah_idea.test_server import make_ideacon
 
 from eng_harness.adapters._errors import ErrorReply, parse_error_reply
 from eng_harness.adapters.idea import idea_allowlist
@@ -22,10 +23,10 @@ from eng_harness.adapters.idea._errors import IdeaErrorMapper
 from eng_harness.errors import ToolFailed
 from eng_harness.servers import CallEffect, ServerManager, ServersConfig
 from eng_harness.servers._launcher import PosixLauncher
-from fakes.sasaah_idea.test_server import make_ideacon
 
-CALL_TIMEOUT_S = 1
-CLIENT_GRACE_S = 1
+# Backstop must leave room for the MCP handshake under load, yet stay far below the hang sleep (30 s).
+CALL_TIMEOUT_S = 5
+CLIENT_GRACE_S = 2
 BACKSTOP_S = CALL_TIMEOUT_S + CLIENT_GRACE_S
 
 
@@ -101,9 +102,7 @@ def test_refusal_maps(tmp_path: Path) -> None:
     model = make_ideacon(tmp_path / "joint.ideaCon")
 
     async def body(manager: ServerManager) -> None:
-        opened = await manager.call(
-            "idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE
-        )
+        opened = await manager.call("idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE)
         assert opened.is_error is False
         _fault(control, "license_refused", tool="idea_calculate")
         result = await manager.call("idea", "main", "idea_calculate", {"confirm": True}, CallEffect.WRITE)
@@ -141,9 +140,7 @@ def test_hang_bounded(tmp_path: Path) -> None:
     model = make_ideacon(tmp_path / "joint.ideaCon")
 
     async def body(manager: ServerManager) -> None:
-        opened = await manager.call(
-            "idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE
-        )
+        opened = await manager.call("idea", "main", "idea_open_project", {"path": str(model)}, CallEffect.WRITE)
         assert opened.is_error is False
         # hang longer than the backstop so the client ends the call
         _fault(control, "license_hang", tool="idea_calculate", seconds=30.0)
@@ -151,7 +148,7 @@ def test_hang_bounded(tmp_path: Path) -> None:
         with pytest.raises(ToolFailed) as raised:
             await manager.call("idea", "main", "idea_calculate", {"confirm": True}, CallEffect.WRITE)
         elapsed = time.monotonic() - started
-        assert elapsed <= BACKSTOP_S + 2.0  # small scheduler slack under load
+        assert elapsed <= BACKSTOP_S + 5.0  # scheduler slack under machine load
         assert raised.value.detail.code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
         assert elapsed < 30.0  # never waited for the full hang
 

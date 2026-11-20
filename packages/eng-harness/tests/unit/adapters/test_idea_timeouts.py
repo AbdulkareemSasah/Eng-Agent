@@ -7,12 +7,14 @@ The host is a recording fake behind the ToolPort seam: a server `timeout` arrive
 import asyncio
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 from eng_contract.envelope import FailureEnvelope, HostInfo
 from eng_contract.errors import ErrorCode, ErrorDetail
 from eng_contract.ids import SeededIdSource
+from eng_contract.params import ParamModel
 from eng_contract.store import ResultStore
 from mcp import types
 
@@ -53,7 +55,7 @@ class FakeCaller:
         self._ledger = ledger
 
     async def call(
-        self, server: str, role: str, tool: str, arguments: dict[str, Any], effect: CallEffect
+        self, server: str, role: str, tool: str, arguments: Mapping[str, Any], effect: CallEffect
     ) -> types.CallToolResult:
         self.calls.append((server, role, tool, dict(arguments), effect))
         if self.failure is not None:
@@ -115,13 +117,13 @@ class Rig:
         full = idea_allowlist()
         tools = tuple(t for t in full.tools if t.name in _TIMEOUT_TOOLS)
         allowlist = full.model_copy(update={"tools": tools})
-        arg_models = {
+        arg_models: dict[str, type[ParamModel]] = {
             "ListConnectionsArgs": idea_tools.ListConnectionsArgs,
             "CalculateArgs": idea_tools.CalculateArgs,
             "NativeCalculateArgs": idea_tools.NativeCalculateArgs,
             "NativeSetLoadsArgs": idea_tools.NativeSetLoadsArgs,
         }
-        readers = {name: _reader for name in _TIMEOUT_TOOLS}
+        readers = dict.fromkeys(_TIMEOUT_TOOLS, _reader)
         self.port = AdapterToolPort(
             allowlist=allowlist,
             config=_config(),
@@ -159,9 +161,7 @@ def test_timeout_mapping(run_dir: Path, store: ResultStore, ids: SeededIdSource,
     assert rig.health.epoch_bumps("idea") == 1
 
     rig.health.reconciled("op-r")
-    native = _failure(
-        rig.call("idea_native_calculate", {"path": "/tmp/joint.ideaCon"}, op_id="op-n")
-    )
+    native = _failure(rig.call("idea_native_calculate", {"path": "/models/joint.ideaCon"}, op_id="op-n"))
     assert (native.code, native.retryable, native.op_id) == (ErrorCode.TIMEOUT_NO_EFFECT, True, None)
     assert rig.health.wedged("idea") == "op-n"
     assert rig.health.epoch_bumps("idea") == 2
@@ -177,9 +177,9 @@ def test_timeout_mapping(run_dir: Path, store: ResultStore, ids: SeededIdSource,
         rig.call(
             "idea_native_set_loads",
             {
-                "path": "/tmp/joint.ideaCon",
+                "path": "/models/joint.ideaCon",
                 "connection_id": "CON1",
-                "out_path": "/tmp/out.ideaCon",
+                "out_path": "/models/out.ideaCon",
                 "loads": [{"member": "M1"}],
             },
             op_id="op-w",
@@ -195,9 +195,7 @@ def test_backstop_on_calculate_gets_op_id_without_a_second_epoch_bump(
 ) -> None:
     # client backstop: the session restarted the role and increased the epoch itself (0002 §4.5.6)
     rig = Rig(run_dir, store, ids, clock)
-    lost = ErrorDetail(
-        code=ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, message="idea/main lost its session", retryable=False
-    )
+    lost = ErrorDetail(code=ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, message="idea/main lost its session", retryable=False)
     rig.caller.failure = ToolFailed(lost)
     failure = _failure(rig.call("idea_calculate", {"connection_ids": [1]}, op_id="op-b"))
     assert (failure.code, failure.op_id) == (ErrorCode.TIMEOUT_UNKNOWN_OUTCOME, "op-b")

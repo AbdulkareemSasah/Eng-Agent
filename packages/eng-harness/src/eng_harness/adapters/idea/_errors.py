@@ -55,7 +55,7 @@ IDEA_ERROR_TABLE: dict[str, Row] = {
 """Sasaah code to contract codes; `iom_error` / `idea_error` and no-code replies are decided by `IdeaErrorMapper`."""
 
 IDEA_HOST_ERROR_CODES = frozenset({"iom_error", "idea_error"})
-"""Sasaah codes that become `HOST_ERROR` with `host_code` the Sasaah code and `host_method` the tool (spec 0014 §4.8)."""
+"""Sasaah codes that become `HOST_ERROR` with `host_code` and `host_method` the tool (spec 0014 §4.8)."""
 
 # `idea_native_calculate` is analysis with allowlist effect `read` (save always false); a no-code reply is unknown.
 _ANALYSIS_NO_CODE_TOOLS = frozenset({"idea_native_calculate"})
@@ -95,10 +95,7 @@ class IdeaErrorMapper:
             extra["host_method"] = tool[:_MAX]
         elif reply.code is None:
             # unexpected error text (Program.cs:105): read → INTERNAL; write or analysis → unknown outcome
-            if write or tool in _ANALYSIS_NO_CODE_TOOLS:
-                code = ErrorCode.TIMEOUT_UNKNOWN_OUTCOME
-            else:
-                code = ErrorCode.INTERNAL
+            code = ErrorCode.TIMEOUT_UNKNOWN_OUTCOME if write or tool in _ANALYSIS_NO_CODE_TOOLS else ErrorCode.INTERNAL
         else:
             code = ErrorCode.INTERNAL
         if code is ErrorCode.TIMEOUT_UNKNOWN_OUTCOME:
