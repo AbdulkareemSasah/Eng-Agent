@@ -41,9 +41,12 @@ def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path
         async with ServerManager(
             config, tmp_path / "run", check={"csi_safe": safe_allowlist.build_expectation()}
         ) as manager:
-            for call in (new_model, lambda: refuse_step("new_model")):
-                with pytest.raises(NotImplementedGap) as caught:
-                    call()
+            # Direct calls stay typed after new_model gained product= (plan 0012 T3 / B-247).
+            with pytest.raises(NotImplementedGap) as from_new:
+                new_model()
+            with pytest.raises(NotImplementedGap) as from_step:
+                refuse_step("new_model")
+            for caught in (from_new, from_step):
                 assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
                 assert caught.value.evidence == ("SG-1",)
                 assert "SG-1" in caught.value.message or "prepared" in caught.value.message
