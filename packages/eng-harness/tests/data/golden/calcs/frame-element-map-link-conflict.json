@@ -1,0 +1,215 @@
+{
+  "source": "eng-harness spec 0011 \u00a74.11 (M4, M5); synthetic link disagreeing with geometry, no project value",
+  "method_ref": "\u00a74.11 M4",
+  "synthetic": true,
+  "derivation": "t = 5 mm; offsets zero. Frame F1 matches element U1 uniquely (all end d\u00b2 = 0). links maps unique_id U2 \u2192 etabs string F1, so the link names frame F1 on element U2, which is not the geometric match U1. M4: conflicts row {frame_id:F1, unique_id:U2, geometric_unique_id:U1}; no pairs (the link never decides). U1 is not unmatched (it was the geometric match removed by the conflict). U2 remains unmatched_elements (far from F1). Structure rows present for U1 and U2 but unused for pairs.",
+  "inputs": {
+    "input": {
+      "frames": {
+        "frames": [
+          {
+            "id": "F1",
+            "kind": "column",
+            "section": "C400",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "elements": {
+        "frames": [
+          {
+            "id": "U1",
+            "kind": "column",
+            "section": "Concrete Rectangular Column: 400 x 400",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          },
+          {
+            "id": "U2",
+            "kind": "column",
+            "section": "Concrete Rectangular Column: 400 x 400",
+            "i": {
+              "x_mm": 100.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 100.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0
+          }
+        ]
+      },
+      "structure": {
+        "elements": [
+          {
+            "unique_id": "U1",
+            "element_id": 10,
+            "category": "column",
+            "family": "Concrete Rectangular Column",
+            "type_id": 20,
+            "type_name": "400 x 400",
+            "level_id": 1,
+            "level_name": "L1",
+            "location_kind": "curve",
+            "i": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 0.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0,
+            "parameters": {}
+          },
+          {
+            "unique_id": "U2",
+            "element_id": 12,
+            "category": "column",
+            "family": "Concrete Rectangular Column",
+            "type_id": 22,
+            "type_name": "400 x 400",
+            "level_id": 1,
+            "level_name": "L1",
+            "location_kind": "curve",
+            "i": {
+              "x_mm": 100.0,
+              "y_mm": 0.0,
+              "z_mm": 0.0
+            },
+            "j": {
+              "x_mm": 100.0,
+              "y_mm": 0.0,
+              "z_mm": 3000.0
+            },
+            "rotation_deg": 0.0,
+            "parameters": {}
+          }
+        ],
+        "types": []
+      },
+      "links": {
+        "U2": "F1"
+      },
+      "basis": {
+        "template": null,
+        "fields": {
+          "compare.length_mm": {
+            "value": 5.0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_x_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_y_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          },
+          "mapping.offset_z_mm": {
+            "value": 0,
+            "unit": "mm",
+            "source": "engineer:synthetic@2026-01-01T00:00:00.000Z",
+            "confirmed": true,
+            "citation": null
+          }
+        }
+      }
+    },
+    "meta": {
+      "refs": {
+        "frames": {
+          "result_id": "res_00000000000000000000000001",
+          "ref": "res_00000000000000000000000001",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 3,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "elements": {
+          "result_id": "res_00000000000000000000000002",
+          "ref": "res_00000000000000000000000002",
+          "kind": "model.frame_placements/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 4,
+          "parents": [],
+          "producer_tool": "csi"
+        },
+        "structure": {
+          "result_id": "res_00000000000000000000000003",
+          "ref": "res_00000000000000000000000003",
+          "kind": "harness.revit_structure/1",
+          "complete": true,
+          "model_id": "mdl_00000000000000000000000000",
+          "model_revision": 5,
+          "parents": [],
+          "producer_tool": "revit"
+        },
+        "basis": {
+          "result_id": "res_00000000000000000000000009",
+          "ref": "res_00000000000000000000000009",
+          "kind": "basis.design_basis/1",
+          "complete": true,
+          "model_id": null,
+          "model_revision": null,
+          "parents": [],
+          "producer_tool": "harness"
+        }
+      }
+    }
+  },
+  "expected": {
+    "pairs": [],
+    "ambiguous": [],
+    "unmatched_frames": [],
+    "unmatched_elements": [
+      {
+        "unique_id": "U2"
+      }
+    ],
+    "conflicts": [
+      {
+        "frame_id": "F1",
+        "unique_id": "U2",
+        "geometric_unique_id": "U1"
+      }
+    ],
+    "complete": true
+  }
+}
