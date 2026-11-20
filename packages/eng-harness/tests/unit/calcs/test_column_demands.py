@@ -393,6 +393,38 @@ def test_axes_undeclared() -> None:
     assert out_bars["not_checked"] == [{"frame_id": "C1", "code": "AXES_UNDECLARED", "gap": "CW-G9"}]
 
 
+def test_m2_only_symmetric_puts_sole_moment_in_mu() -> None:
+    """AC6 / E3 (B-596, OQ-Q98): on a symmetric section, M2-only puts |M2| in Mu and Mu_other = 0."""
+    # Hand derivation (spec 0013 §4.4.2 E3 as amended by B-596):
+    # square C1, b=h=400, n_bars_b=n_bars_h=3 (symmetric); one row P=-800, M2=-15, M3=0.
+    # |M3|=0 and |M2|=15 != 0 => Mu = |M2| = 15.0, Mu_other = 0 (not the fixed Mu=|M3|, Mu_other=|M2| map).
+    m2_only = _base_inputs()
+    m2_only["selection"]["columns"] = [m2_only["selection"]["columns"][0]]
+    m2_only["forces"]["rows"] = [
+        {
+            "member": "C1",
+            "case": {"case": "ULS1", "case_type": "load_combination", "step": None},
+            "end": "j",
+            "station_mm": 3000.0,
+            "P_kN": -800.0,
+            "V2_kN": 0.0,
+            "V3_kN": 0.0,
+            "T_kNm": 0.0,
+            "M2_kNm": -15.0,
+            "M3_kNm": 0.0,
+        }
+    ]
+    m2_only["sections"]["frame_sections"] = [m2_only["sections"]["frame_sections"][0]]
+    m2_only["layouts"]["sections"] = [m2_only["layouts"]["sections"][0]]
+    out = _run_direct(m2_only)
+    items = out["items"][AXIAL_FLEXURE_ID]
+    assert len(items) == 1
+    assert items[0]["inputs"]["Mu_kNm"] == 15.0
+    assert items[0]["inputs"]["Mu_other_kNm"] == 0.0
+    assert items[0]["inputs"]["Pu_kN"] == 800.0
+    assert out["not_checked"] == []
+
+
 def test_items_validate_against_checks(tmp_path: Path) -> None:
     """Plan 0013 T3: every emitted item validates against its aci318_14 CheckInputs model under require_refs=True."""
     port, store, args, basis_id = _setup_port(tmp_path, _base_inputs())
