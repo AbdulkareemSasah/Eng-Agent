@@ -1,12 +1,13 @@
-"""What `run` and `resume` build for the engine (spec 0006 section 4.2.2, 4.4.8; plan 0006 T14).
+"""What `run` and `resume` build for the engine (spec 0006 section 4.2.2, 4.4.8; plan 0006 T14, T16b).
 
 Purpose: the full port set of the engine factory, the default factory over the merged `Engine`, the run-id cell behind
-the page's stop check and report, and the page ports of one command, whose server starts at the first request shown.
-Nothing here builds an answer: the page ports belong to `eng_harness.pages`. Units: none. Errors: `ContractError` for
-a workspace that cannot be used (`resolve_workspace`); the cell raises `RuntimeError` for a run id that changes.
+the page's stop check and report, the isolating progress fan-out (T16b), and the page ports of one command, whose
+server starts at the first request shown. Nothing here builds an answer: the page ports belong to `eng_harness.pages`.
+Units: none. Errors: `ContractError` for a workspace that cannot be used (`resolve_workspace`); the cell raises
+`RuntimeError` for a run id that changes.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,8 @@ from eng_harness.cli._config import HarnessConfig
 from eng_harness.cli._control import FileRunControl
 from eng_harness.cli._opener import write_to_terminal
 from eng_harness.engine import Engine, EnginePorts, EngineSettings, RunOutcome, RunRequest
-from eng_harness.journal import JournalReader
+from eng_harness.journal import Event, JournalReader
+from eng_harness.journal import _events as ev
 from eng_harness.pages import PageApprovalPort, PageBasisSetupPort, PageInputPort, PageServer, accept_answers_file
 from eng_harness.pages._ports import _NO_REPORT
 from eng_harness.pages._screens_approval import approval_screens, sign_off_screens
@@ -81,10 +83,10 @@ def default_engine_factory(
     workspace: Workspace, registry: Registry, ports: RunPortSet, store: ResultStore, settings: EngineSettings,
     clock: Clock, ids: IdSource,
 ) -> Engine:  # fmt: skip
-    """The merged `Engine`, given the ports its `EnginePorts` holds (progress and run-control reach it with T16b)."""
+    """The merged `Engine`, with every field of `RunPortSet` mapped onto `EnginePorts` (plan 0006 T16b)."""
     held = EnginePorts(
         tool=ports.tool, host=ports.host, calc=ports.calc, basis=ports.basis, approvals=ports.approvals,
-        inputs=ports.inputs, decision=ports.decision,
+        inputs=ports.inputs, decision=ports.decision, progress=ports.progress, run_control=ports.run_control,
     )  # fmt: skip
     return Engine(workspace, registry, held, store, settings, clock, ids)
 
@@ -115,6 +117,11 @@ class RunIdCell:
         self._runs_dir, self._run_id = runs_dir, known
 
     @property
+    def runs_dir(self) -> Path:
+        """The workspace runs folder that holds every run directory."""
+        return self._runs_dir
+
+    @property
     def run_id(self) -> str | None:
         """The run id, or `None` while it is not known."""
         return self._run_id
@@ -130,6 +137,50 @@ class RunIdCell:
         if self._run_id is None:
             raise RuntimeError("the run id is not known yet")
         return self._runs_dir / self._run_id
+
+
+class IsolatingFanOut:
+    """A `ProgressSink` that fans each event to its members and detaches a failing one alone (spec 0006 AC19, AC37).
+
+    A member whose `emit` raises is dropped for the rest of the run; delivery continues to the others. The fan-out
+    itself raises only when every member has failed, so the engine can detach it under engine AC58. When a `RunIdCell`
+    is given, a `run_started` event fills it from `RunHeader.run_id` (spec 4.4.8) before the members are called.
+    """
+
+    def __init__(self, members: Sequence[ProgressSink], cell: RunIdCell | None = None) -> None:
+        self._members = list(members)
+        self._active = list(range(len(self._members)))
+        self._cell = cell
+
+    def emit(self, event: Event) -> None:
+        """Deliver `event` to every still-active member; fill the run-id cell from `run_started` first."""
+        if self._cell is not None and isinstance(event.payload, ev.RunHeader):
+            self._cell.fill(event.payload.run_id)
+        failed: list[int] = []
+        last: BaseException | None = None
+        for index in self._active:
+            try:
+                self._members[index].emit(event)
+            except Exception as exc:
+                failed.append(index)
+                last = exc
+        if failed:
+            self._active = [i for i in self._active if i not in failed]
+        if not self._active and last is not None:
+            raise last
+
+
+def heartbeat_run_dir(cell: RunIdCell) -> Callable[[], Path | None]:
+    """The heartbeat's path callable: the run folder once the cell is filled and the folder exists (spec 4.3, 4.4.8)."""
+
+    def folder() -> Path | None:
+        run_id = cell.run_id
+        if run_id is None:
+            return None
+        path = cell.runs_dir / run_id
+        return path if path.is_dir() else None
+
+    return folder
 
 
 class PageSession:
