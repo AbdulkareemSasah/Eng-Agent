@@ -26,7 +26,7 @@ def _calls(control: Path) -> list[dict[str, Any]]:
 
 
 def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path) -> None:
-    """AC6: a new SAP2000 model step raises NotImplementedGap (SP-1), sends no call, and new-model tools are unserved."""
+    """AC6: new SAP2000 model raises NotImplementedGap (SP-1); nothing is sent; new-model tools are unserved."""
     from eng_harness.adapters.csi._gaps import new_model, refuse_step
 
     control.write_text(json.dumps({"faults": [], "seed": {}, "product": "SAP2000"}))
@@ -44,10 +44,11 @@ def test_new_model_gap(tmp_path: Path, make_config: ConfigFactory, control: Path
         async with ServerManager(
             config, tmp_path / "run", check={"csi_sap2000": allowlist.build_expectation()}
         ) as manager:
-            refusals = (lambda: new_model(product="SAP2000"), lambda: refuse_step("new_model", product="SAP2000"))
-            for refuse in refusals:
-                with pytest.raises(NotImplementedGap) as caught:
-                    refuse()
+            with pytest.raises(NotImplementedGap) as from_new:
+                new_model(product="SAP2000")
+            with pytest.raises(NotImplementedGap) as from_step:
+                refuse_step("new_model", product="SAP2000")
+            for caught in (from_new, from_step):
                 assert caught.value.code is HarnessCode.NOT_IMPLEMENTED
                 assert caught.value.evidence == ("SP-1",)
                 assert "SP-1" in caught.value.message or "prepared" in caught.value.message
