@@ -1,7 +1,8 @@
-"""SAFE adapter gap registry (plan 0008 T3; spec 0008 section 4.8, AC8, amendment B-418).
+"""CSI adapter gap registries (plan 0008 T3 / plan 0012 T3; spec 0008 §4.8, spec 0012 §4.5).
 
-Purpose: hold the SG-1 to SG-9 gap identifiers and messages (`NotImplementedGap`); T3 wires only SG-1 (new model)
-to a step, while SG-2 to SG-5 and SG-9 are wired in T7 and SG-7/SG-8 in T6. No units are involved.
+Purpose: hold the SAFE (`SG-1` to `SG-9`) and SAP2000 (`SP-1` to `SP-8`) gap identifiers and messages
+(`NotImplementedGap`). SAFE T3 wires only SG-1 (new model); SAP2000 T3 wires only SP-1 (new model). Later tasks wire
+the remaining ids to their steps. No units are involved.
 """
 
 from collections.abc import Mapping
@@ -9,7 +10,15 @@ from typing import NoReturn
 
 from eng_harness.errors import NotImplementedGap
 
-__all__ = ["SAFE_GAPS", "STEP_GAPS", "new_model", "raise_gap", "refuse_step"]
+__all__ = [
+    "SAFE_GAPS",
+    "SAP2000_GAPS",
+    "STEP_GAPS",
+    "SAP2000_STEP_GAPS",
+    "new_model",
+    "raise_gap",
+    "refuse_step",
+]
 
 SAFE_GAPS: Mapping[str, str] = {
     "SG-1": "creating a new model is not implemented: provide a prepared model",
@@ -23,21 +32,41 @@ SAFE_GAPS: Mapping[str, str] = {
     "SG-9": "FE slab forces, strip results and displacements are not implemented",
 }
 
+# Spec 0012 section 4.5 gap table (messages paraphrase the Missing column; way-out is not a message).
+SAP2000_GAPS: Mapping[str, str] = {
+    "SP-1": "creating a new model is not implemented: provide a prepared model",
+    "SP-2": "defining sections, materials or load cases is not implemented",
+    "SP-3": "concrete design results for frames that are not beams are not implemented",
+    "SP-4": "table-based reads and the edits that need them are not implemented",
+    "SP-5": "design orientation, frame labels and local axes are not implemented",
+    "SP-6": "choosing which load cases an analysis runs is not implemented",
+    "SP-7": "levels and grids are not implemented",
+    "SP-8": "cable, link and general-shell workflows are not implemented",
+}
+
+_GAPS: Mapping[str, str] = {**SAFE_GAPS, **SAP2000_GAPS}
+
 STEP_GAPS: Mapping[str, str] = {
     "new_model": "SG-1",
+}
+
+SAP2000_STEP_GAPS: Mapping[str, str] = {
+    "new_model": "SP-1",
 }
 
 
 def raise_gap(gap_id: str) -> NoReturn:
     """Raise `NotImplementedGap` for `gap_id`; `KeyError` for an unknown gap identifier."""
-    raise NotImplementedGap(SAFE_GAPS[gap_id], evidence=(gap_id,))
+    raise NotImplementedGap(_GAPS[gap_id], evidence=(gap_id,))
 
 
-def refuse_step(step: str) -> NoReturn:
-    """Raise the `NotImplementedGap` wired to `step`; `KeyError` when no gap is wired to `step`."""
+def refuse_step(step: str, *, product: str = "SAFE") -> NoReturn:
+    """Raise the `NotImplementedGap` wired to `step` for `product`; `KeyError` when none is wired."""
+    if product == "SAP2000":
+        raise_gap(SAP2000_STEP_GAPS[step])
     raise_gap(STEP_GAPS[step])
 
 
-def new_model() -> NoReturn:
-    """Refuse creating a new model (gap SG-1, spec 0008 AC8); nothing is sent to the host."""
-    refuse_step("new_model")
+def new_model(*, product: str = "SAFE") -> NoReturn:
+    """Refuse creating a new model (SG-1 or SP-1); nothing is sent to the host."""
+    refuse_step("new_model", product=product)

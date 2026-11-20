@@ -25,7 +25,11 @@ from eng_harness.servers._procinfo import ProcessIdentity
 
 ConfigFactory = Callable[..., ServersConfig]
 ETABS_EXE = "ETABS.exe"  # spec 0002 section 4.2, the image name that identifies an ETABS instance
-PRODUCTS = [("ETABS", "ETABS.exe", ".EDB", "csi"), ("SAFE", "SAFE.exe", ".FDB", "csi_safe")]
+PRODUCTS = [
+    ("ETABS", "ETABS.exe", ".EDB", "csi"),
+    ("SAFE", "SAFE.exe", ".FDB", "csi_safe"),
+    ("SAP2000", "SAP2000.exe", ".SDB", "csi_sap2000"),  # plan 0012 T3 / spec 0012 AC5
+]
 FIRST_PID = 4242  # the pid the CSI fake gives the first instance it launches
 _START = 1_700_000_000_000
 
